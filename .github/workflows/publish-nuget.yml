@@ -154,6 +154,9 @@ jobs:
       - name: Publish NuGet packages
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
           if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
             throw "Add the NUGET_API_KEY repository secret before publishing."
           }
