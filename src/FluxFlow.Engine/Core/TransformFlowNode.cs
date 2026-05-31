@@ -50,8 +50,14 @@ public abstract class TransformFlowNode<TInput, TOutput> : FlowNodeBase
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_transform).Fault(exception);
-        FaultNode(exception);
+        try
+        {
+            FaultNode(exception);
+        }
+        finally
+        {
+            ((IDataflowBlock)_transform).Fault(exception);
+        }
     }
 
     private async Task<IEnumerable<TOutput>> TransformInputAsync(TInput input)

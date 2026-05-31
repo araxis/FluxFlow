@@ -84,6 +84,9 @@ Date: 2026-05-31
   category-owned contracts, use typed request/options/result records, keep
   `Input` as the default inbound port, and treat the first consumer as boundary
   validation rather than the source of reusable schemas.
+- Fixed a Dataflow helper node fault-order race so explicit `Fault(...)` calls
+  run node fault hooks before owned blocks can complete through asynchronous
+  completion continuations.
 
 ## Remaining
 

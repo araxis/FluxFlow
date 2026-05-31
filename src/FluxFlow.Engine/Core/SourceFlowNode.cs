@@ -40,7 +40,13 @@ public abstract class SourceFlowNode<TOutput> : FlowNodeBase
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_output).Fault(exception);
-        FaultNode(exception);
+        try
+        {
+            FaultNode(exception);
+        }
+        finally
+        {
+            ((IDataflowBlock)_output).Fault(exception);
+        }
     }
 }

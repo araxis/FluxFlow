@@ -36,8 +36,14 @@ public abstract class SinkFlowNode<TInput> : FlowNodeBase
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        ((IDataflowBlock)_input).Fault(exception);
-        FaultNode(exception);
+        try
+        {
+            FaultNode(exception);
+        }
+        finally
+        {
+            ((IDataflowBlock)_input).Fault(exception);
+        }
     }
 
     private async Task HandleInputAsync(TInput input)
