@@ -4,7 +4,7 @@ namespace FluxFlow.Components.Mqtt.Contracts;
 
 public interface IMqttClientFactory
 {
-    ValueTask<IMqttClientAdapter> CreateAsync(
-        MqttConnectionProfile connection,
+    ValueTask<MqttClientLease> CreateAsync(
+        MqttClientFactoryContext context,
         CancellationToken cancellationToken = default);
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt 0.2.0-alpha.1
+
+MQTT package hardening for host integration.
+
+- Added client factory context with node address, connection name, and profile.
+- Added explicit client ownership through `MqttClientLease`.
+- Added subscription leases so subscribe startup failures fail during startup.
+- Added retained subscription options.
+- Added richer publish and subscribe diagnostics/events with topic, payload
+  size, quality setting, retain, and correlation metadata.
+- Added split error codes for not-started, invalid topic, invalid payload,
+  startup failure, and processing failure cases.
+
 ## FluxFlow.Components.Mqtt 0.1.0-alpha.1
 
 Initial MQTT component package.

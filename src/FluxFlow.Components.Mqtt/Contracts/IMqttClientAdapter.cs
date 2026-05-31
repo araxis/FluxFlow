@@ -8,7 +8,7 @@ public interface IMqttClientAdapter : IAsyncDisposable
         MqttPublishRequest request,
         CancellationToken cancellationToken = default);
 
-    IAsyncEnumerable<MqttReceivedMessage> SubscribeAsync(
+    ValueTask<IMqttSubscription> SubscribeAsync(
         MqttSubscriptionOptions options,
         CancellationToken cancellationToken = default);
 }

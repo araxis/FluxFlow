@@ -1,5 +1,4 @@
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using Xunit;
@@ -29,6 +28,17 @@ public sealed class MqttComponentModuleTests
     }
 
     [Fact]
+    public void RegisterMqttComponents_AcceptsContextFactoryDirectly()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents((context, _) =>
+                ValueTask.FromResult(MqttClientLease.Shared(new RecordingMqttClientAdapter())));
+
+        registry.TryGetFactory(MqttComponentTypes.Publish, out _).ShouldBeTrue();
+        registry.TryGetFactory(MqttComponentTypes.Subscribe, out _).ShouldBeTrue();
+    }
+
+    [Fact]
     public void RegisterMqttComponents_RequiresClientFactory()
     {
         var registry = new RuntimeNodeFactoryRegistry();
@@ -41,8 +51,8 @@ public sealed class MqttComponentModuleTests
 
     private sealed class TestMqttClientFactory : IMqttClientFactory
     {
-        public ValueTask<IMqttClientAdapter> CreateAsync(
-            MqttConnectionProfile connection,
+        public ValueTask<MqttClientLease> CreateAsync(
+            MqttClientFactoryContext context,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
     }

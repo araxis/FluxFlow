@@ -1,17 +1,20 @@
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Options;
 
 namespace FluxFlow.Components.Mqtt.Tests;
 
-internal sealed class RecordingMqttClientFactory(RecordingMqttClientAdapter adapter) : IMqttClientFactory
+internal sealed class RecordingMqttClientFactory(
+    RecordingMqttClientAdapter adapter,
+    bool disposeAdapter = true) : IMqttClientFactory
 {
-    public List<MqttConnectionProfile> Connections { get; } = [];
+    public List<MqttClientFactoryContext> Contexts { get; } = [];
 
-    public ValueTask<IMqttClientAdapter> CreateAsync(
-        MqttConnectionProfile connection,
+    public ValueTask<MqttClientLease> CreateAsync(
+        MqttClientFactoryContext context,
         CancellationToken cancellationToken = default)
     {
-        Connections.Add(connection);
-        return ValueTask.FromResult<IMqttClientAdapter>(adapter);
+        Contexts.Add(context);
+        return ValueTask.FromResult(disposeAdapter
+            ? MqttClientLease.Owned(adapter)
+            : MqttClientLease.Shared(adapter));
     }
 }

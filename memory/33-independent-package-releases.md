@@ -27,12 +27,13 @@ project.
 ## Current Package Versions
 
 - `FluxFlow.Engine`: `0.5.0-alpha.1`
-- `FluxFlow.Components.Mqtt`: `0.1.0-alpha.1`
+- `FluxFlow.Components.Mqtt`: `0.2.0-alpha.1`
 
 ## Tag Convention
 
 - `engine-v0.5.0-alpha.1`
 - `components-mqtt-v0.1.0-alpha.1`
+- `components-mqtt-v0.2.0-alpha.1`
 
 ## Result
 

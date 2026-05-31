@@ -16,6 +16,17 @@ public sealed class MqttComponentOptions
         Func<MqttConnectionProfile, CancellationToken, ValueTask<IMqttClientAdapter>> clientFactory)
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
+        _clientFactory = new DelegateMqttClientFactory(
+            async (context, cancellationToken) =>
+                MqttClientLease.Owned(await clientFactory(context.Profile, cancellationToken)
+                    .ConfigureAwait(false)));
+        return this;
+    }
+
+    public MqttComponentOptions UseClientFactory(
+        Func<MqttClientFactoryContext, CancellationToken, ValueTask<MqttClientLease>> clientFactory)
+    {
+        ArgumentNullException.ThrowIfNull(clientFactory);
         _clientFactory = new DelegateMqttClientFactory(clientFactory);
         return this;
     }
@@ -25,12 +36,12 @@ public sealed class MqttComponentOptions
             "MQTT components require a client factory. Configure one before registering the module.");
 
     private sealed class DelegateMqttClientFactory(
-        Func<MqttConnectionProfile, CancellationToken, ValueTask<IMqttClientAdapter>> create)
+        Func<MqttClientFactoryContext, CancellationToken, ValueTask<MqttClientLease>> create)
         : IMqttClientFactory
     {
-        public ValueTask<IMqttClientAdapter> CreateAsync(
-            MqttConnectionProfile connection,
+        public ValueTask<MqttClientLease> CreateAsync(
+            MqttClientFactoryContext context,
             CancellationToken cancellationToken = default)
-            => create(connection, cancellationToken);
+            => create(context, cancellationToken);
     }
 }

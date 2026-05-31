@@ -12,6 +12,7 @@ internal static class MqttOptionsReader
     {
         var options = Read<MqttPublishOptions>(definition);
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
+        EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
         return options;
     }
 
@@ -19,6 +20,7 @@ internal static class MqttOptionsReader
     {
         var options = Read<MqttSubscriptionOptions>(definition);
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
+        EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
 
         if (string.IsNullOrWhiteSpace(options.TopicFilter))
         {
@@ -47,6 +49,15 @@ internal static class MqttOptionsReader
         if (value <= 0)
         {
             throw new InvalidOperationException($"MQTT option '{name}' must be greater than zero.");
+        }
+    }
+
+    private static void EnsureDefined<TEnum>(TEnum value, string name)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new InvalidOperationException($"MQTT option '{name}' is not supported.");
         }
     }
 

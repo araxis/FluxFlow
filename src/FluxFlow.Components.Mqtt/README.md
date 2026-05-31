@@ -17,9 +17,21 @@ adapter through `RegisterMqttComponents`.
 
 ```csharp
 var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterMqttComponents((connection, cancellationToken) =>
-        ValueTask.FromResult<IMqttClientAdapter>(
-            new AppMqttClientAdapter(connection)));
+    .RegisterMqttComponents((context, cancellationToken) =>
+        ValueTask.FromResult(MqttClientLease.Owned(
+            new AppMqttClientAdapter(context.Profile))));
 ```
 
 Options are static node settings. Requests and messages are per-item data.
+
+`MqttClientFactoryContext` includes the runtime node address, connection name,
+and connection profile. Hosts can use `ConnectionName` to resolve app-owned
+resources instead of placing all broker settings inline.
+
+Return `MqttClientLease.Owned(adapter)` when the node should dispose the
+adapter. Return `MqttClientLease.Shared(adapter)` when the host owns a shared
+client lifetime.
+
+Subscriptions return `IMqttSubscription`; once `SubscribeAsync` returns,
+startup is considered successful. Each subscription should expose an independent
+message stream so shared clients can safely serve multiple nodes.

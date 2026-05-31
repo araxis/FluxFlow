@@ -97,9 +97,12 @@ Date: 2026-05-31
   manifest, keeping solution changes separate from package publication.
 - Set the engine project back to its latest engine package version and set the
   MQTT package to its first package-specific prerelease version.
+- Started `FluxFlow.Components.Mqtt` `0.2.0-alpha.1` with client factory
+  context, explicit adapter ownership, subscription leases, retained
+  subscription options, richer diagnostics/events, and split error codes.
 
 ## Remaining
 
-- Publish `FluxFlow.Components.Mqtt` `0.1.0-alpha.1`.
+- Publish `FluxFlow.Components.Mqtt` `0.2.0-alpha.1`.
 - Use the MQTT package in the first consumer migration spike and record any
   missing adapter or options surface before adding concrete client adapters.

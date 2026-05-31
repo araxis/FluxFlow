@@ -23,6 +23,11 @@ public static class MqttComponentRegistrationExtensions
 
     public static RuntimeNodeFactoryRegistry RegisterMqttComponents(
         this RuntimeNodeFactoryRegistry registry,
+        Func<MqttClientFactoryContext, CancellationToken, ValueTask<MqttClientLease>> clientFactory)
+        => registry.RegisterMqttComponents(options => options.UseClientFactory(clientFactory));
+
+    public static RuntimeNodeFactoryRegistry RegisterMqttComponents(
+        this RuntimeNodeFactoryRegistry registry,
         Action<MqttComponentOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(registry);

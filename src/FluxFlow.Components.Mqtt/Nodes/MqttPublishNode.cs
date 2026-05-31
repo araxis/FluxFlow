@@ -10,17 +10,20 @@ namespace FluxFlow.Components.Mqtt.Nodes;
 public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 {
     private readonly IMqttClientFactory _clientFactory;
+    private readonly MqttClientFactoryContext _factoryContext;
     private readonly ActionBlock<MqttPublishRequest> _input;
     private readonly BufferBlock<MqttPublishResult> _result;
     private readonly MqttPublishOptions _options;
-    private IMqttClientAdapter? _adapter;
+    private MqttClientLease? _clientLease;
     private bool _disposed;
 
     private MqttPublishNode(
         MqttPublishOptions options,
+        MqttClientFactoryContext factoryContext,
         IMqttClientFactory clientFactory)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _factoryContext = factoryContext ?? throw new ArgumentNullException(nameof(factoryContext));
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
 
         _input = new ActionBlock<MqttPublishRequest>(
@@ -39,8 +42,10 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         RuntimeNodeFactoryContext context,
         IMqttClientFactory clientFactory)
     {
+        var options = MqttOptionsReader.ReadPublishOptions(context.Definition);
         var node = new MqttPublishNode(
-            MqttOptionsReader.ReadPublishOptions(context.Definition),
+            options,
+            MqttClientFactoryContexts.Create(context, options),
             clientFactory);
 
         return context.CreateNode(node)
@@ -50,8 +55,12 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
-        => _adapter = await _clientFactory.CreateAsync(_options.Connection, cancellationToken)
+    {
+        var clientLease = await _clientFactory.CreateAsync(_factoryContext, cancellationToken)
             .ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(clientLease);
+        _clientLease = clientLease;
+    }
 
     public override void Complete()
         => _input.Complete();
@@ -79,9 +88,9 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 
         _disposed = true;
 
-        if (_adapter is not null)
+        if (_clientLease is not null)
         {
-            await _adapter.DisposeAsync().ConfigureAwait(false);
+            await _clientLease.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -101,41 +110,54 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var adapter = _adapter;
-        if (adapter is null)
+        if (_clientLease is null)
         {
-            TryReportError(
-                MqttErrorCodes.PublishFailed,
-                "MQTT publish node has not started.");
+            ReportPublishError(
+                MqttErrorCodes.PublishNotStarted,
+                "MQTT publish node has not started.",
+                input);
             return;
         }
 
         var request = ResolveRequest(input);
         if (string.IsNullOrWhiteSpace(request.Topic))
         {
-            TryReportError(
-                MqttErrorCodes.PublishFailed,
-                "MQTT publish request requires a topic or a default topic option.");
+            ReportPublishError(
+                MqttErrorCodes.PublishInvalidTopic,
+                "MQTT publish request requires a topic or a default topic option.",
+                request);
             return;
         }
 
         if (request.Payload is null)
         {
-            TryReportError(
-                MqttErrorCodes.PublishFailed,
-                "MQTT publish request requires a payload.");
+            ReportPublishError(
+                MqttErrorCodes.PublishInvalidPayload,
+                "MQTT publish request requires a payload.",
+                request);
+            return;
+        }
+
+        if (request.QualityOfService.HasValue &&
+            !Enum.IsDefined(request.QualityOfService.Value))
+        {
+            ReportPublishError(
+                MqttErrorCodes.PublishInvalidQualityOfService,
+                "MQTT publish request uses an unsupported quality setting.",
+                request);
             return;
         }
 
         try
         {
-            await adapter.PublishAsync(request).ConfigureAwait(false);
+            await _clientLease.Adapter.PublishAsync(request).ConfigureAwait(false);
 
             var result = new MqttPublishResult
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 Topic = request.Topic,
                 PayloadBytes = request.Payload.Length,
+                PayloadPreview = request.PayloadPreview,
                 QualityOfService = request.QualityOfService ?? _options.QualityOfService,
                 Retain = request.Retain ?? _options.Retain,
                 CorrelationId = request.CorrelationId
@@ -146,27 +168,35 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 MqttEventNames.PublishSucceeded,
                 subject: request.Topic,
                 channel: MqttEventNames.PublishSucceeded,
-                payloadBytes: result.PayloadBytes);
+                payloadBytes: result.PayloadBytes,
+                payloadPreview: result.PayloadPreview,
+                attributes: CreateEventAttributes(request, result));
             TryEmitDiagnostic(
                 MqttDiagnosticNames.PublishSucceeded,
                 message: $"Published MQTT message to '{request.Topic}'.",
-                attributes: new Dictionary<string, object?>
-                {
-                    ["topic"] = request.Topic,
-                    ["payloadBytes"] = result.PayloadBytes
-                });
+                attributes: CreateDiagnosticAttributes(request, result.PayloadBytes));
         }
         catch (Exception exception)
         {
-            TryReportError(
+            ReportPublishError(
                 MqttErrorCodes.PublishFailed,
                 $"MQTT publish failed: {exception.Message}",
+                request,
                 exception);
+            EmitEvent(
+                MqttEventNames.PublishFailed,
+                subject: request.Topic,
+                status: "failed",
+                channel: MqttEventNames.PublishFailed,
+                payloadBytes: request.Payload.Length,
+                payloadPreview: request.PayloadPreview,
+                attributes: CreateEventAttributes(request, request.Payload.Length));
             TryEmitDiagnostic(
                 MqttDiagnosticNames.PublishFailed,
                 FlowDiagnosticLevel.Error,
                 $"MQTT publish failed for '{request.Topic}'.",
-                exception);
+                exception,
+                CreateDiagnosticAttributes(request, request.Payload.Length));
         }
     }
 
@@ -179,4 +209,92 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
             QualityOfService = input.QualityOfService ?? _options.QualityOfService,
             Retain = input.Retain ?? _options.Retain
         };
+
+    private void ReportPublishError(
+        int code,
+        string message,
+        MqttPublishRequest request,
+        Exception? exception = null)
+        => TryReportError(
+            code,
+            message,
+            exception,
+            CreateErrorContext(request));
+
+    private static string CreateErrorContext(MqttPublishRequest request)
+    {
+        var values = new List<string>();
+        if (!string.IsNullOrWhiteSpace(request.Topic))
+        {
+            values.Add($"topic={request.Topic}");
+        }
+
+        if (request.Payload is not null)
+        {
+            values.Add($"payloadBytes={request.Payload.Length}");
+        }
+
+        var qualityOfService = request.QualityOfService;
+        if (qualityOfService.HasValue)
+        {
+            values.Add($"qualityOfService={qualityOfService.Value}");
+        }
+
+        var retain = request.Retain;
+        if (retain.HasValue)
+        {
+            values.Add($"retain={retain.Value}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            values.Add($"correlationId={request.CorrelationId}");
+        }
+
+        return string.Join("; ", values);
+    }
+
+    private static Dictionary<string, object?> CreateDiagnosticAttributes(
+        MqttPublishRequest request,
+        int payloadBytes)
+    {
+        var attributes = new Dictionary<string, object?>
+        {
+            ["topic"] = request.Topic,
+            ["payloadBytes"] = payloadBytes,
+            ["qualityOfService"] = request.QualityOfService,
+            ["retain"] = request.Retain
+        };
+
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            attributes["correlationId"] = request.CorrelationId;
+        }
+
+        return attributes;
+    }
+
+    private static Dictionary<string, string> CreateEventAttributes(
+        MqttPublishRequest request,
+        MqttPublishResult result)
+        => CreateEventAttributes(request, result.PayloadBytes);
+
+    private static Dictionary<string, string> CreateEventAttributes(
+        MqttPublishRequest request,
+        int payloadBytes)
+    {
+        var attributes = new Dictionary<string, string>
+        {
+            ["payloadBytes"] = payloadBytes.ToString(),
+            ["qualityOfService"] = request.QualityOfService?.ToString() ?? string.Empty,
+            ["retain"] = request.Retain?.ToString() ?? string.Empty
+        };
+
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+        {
+            attributes["correlationId"] = request.CorrelationId;
+        }
+
+        return attributes;
+    }
 }

@@ -4,6 +4,7 @@ public sealed record MqttPublishRequest
 {
     public string? Topic { get; init; }
     public required byte[] Payload { get; init; }
+    public string? PayloadPreview { get; init; }
     public string? ContentType { get; init; }
     public MqttQualityOfService? QualityOfService { get; init; }
     public bool? Retain { get; init; }

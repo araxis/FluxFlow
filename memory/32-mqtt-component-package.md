@@ -12,7 +12,7 @@ separate package artifact.
 - Package project: `src/FluxFlow.Components.Mqtt`.
 - Test project: `tests/FluxFlow.Components.Mqtt.Tests`.
 - Package identity: `FluxFlow.Components.Mqtt`.
-- Package version: `0.1.0-alpha.1`.
+- Package version: `0.2.0-alpha.1`.
 - The package references `FluxFlow.Engine`; the engine does not reference this
   package.
 - The package does not include a concrete network client.
@@ -43,11 +43,14 @@ Implemented:
 - common port name constants
 - request/result/message records
 - connection, publish, and subscription options
+- retained subscription options
 - client adapter and factory contracts
+- client factory context and explicit client ownership leases
+- subscription leases for clear startup failure behavior
 - module and registration extension
 - adapter-backed publish and subscribe nodes
 - background subscribe lifecycle handling for long-lived subscriptions
-- diagnostics and event name constants
+- diagnostics and event name constants with richer publish/subscribe metadata
 - deterministic in-memory adapter tests
 - package-scoped release support for publishing this project independently
 
@@ -57,7 +60,7 @@ Deferred:
 - topic filter helper
 - payload encoder/decoder nodes
 - connection probe node
-- component README expansion after first consumer migration
+- mapper helper decisions after first consumer migration
 
 ## Review Notes
 
@@ -66,4 +69,5 @@ registration stays explicit, and app-specific workspace or scenario concepts do
 not enter package contracts.
 
 Next suggested step: run one migration spike in the first consumer using
-`FluxFlow.Components.Mqtt` and record any missing adapter or options surface.
+`FluxFlow.Components.Mqtt` `0.2.0-alpha.1` and record any missing adapter or
+options surface.
