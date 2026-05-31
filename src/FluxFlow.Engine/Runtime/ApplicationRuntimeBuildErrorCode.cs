@@ -8,5 +8,6 @@ public enum ApplicationRuntimeBuildErrorCode
     MissingInputPort = 4,
     MissingOutputPort = 5,
     PortTypeMismatch = 6,
-    LinkFailed = 7
+    LinkFailed = 7,
+    CleanupFailed = 8
 }

@@ -34,7 +34,6 @@ public sealed class FlowApplicationConfigurationLoader
             {
                 Resources = definition.Resources ?? [],
                 Workflows = definition.Workflows ?? [],
-                Dashboards = definition.Dashboards ?? [],
                 Tests = definition.Tests ?? []
             };
         }

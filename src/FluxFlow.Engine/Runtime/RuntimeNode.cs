@@ -8,7 +8,8 @@ public sealed record RuntimeNode(
     IFlowNode Node,
     IReadOnlyList<InputPort> Inputs,
     IReadOnlyList<OutputPort> Outputs,
-    int Phase = 0)
+    int Phase = 0,
+    NodeType? Type = null)
 {
     public InputPort? FindInput(PortName port)
         => Inputs.FirstOrDefault(p => p.Address.Port == port);
@@ -21,11 +22,13 @@ public sealed record RuntimeNode(
         IFlowNode node,
         IEnumerable<InputPort>? inputs = null,
         IEnumerable<OutputPort>? outputs = null,
-        int phase = 0)
+        int phase = 0,
+        NodeType? type = null)
         => new(
             address,
             node,
             (inputs ?? []).ToArray(),
             (outputs ?? []).ToArray(),
-            phase);
+            phase,
+            type);
 }

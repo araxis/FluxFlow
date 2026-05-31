@@ -26,8 +26,24 @@ Date: 2026-05-31
 - Added a clean docs entrypoint and a documentation consolidation note.
 - Added node authoring helpers: base node classes, a runtime node builder, and a registration contract.
 - Added focused tests for helper-based source, map, sink, error reporting, and registration.
+- Reworked output delivery to reliable runtime fanout without requiring component changes.
+- Hardened startup failure cleanup, runtime disposal, build-failure disposal, and node fault diagnostics.
+- Added regression tests for fanout delivery, startup failure cleanup, sync/async node disposal, public helper ports, and diagnostic error delivery.
+- Closed follow-up review issues: pending fanout sends now cancel on link disposal, raw output source access was removed, startup cleanup preserves the original failure, and fault hooks can publish final diagnostics.
+- Closed second runtime review issues: failed-start disposal is best-effort, runtime and workflow disposal now aggregate cleanup errors after trying every owned resource, output ports can be disposed, output pumps cancel cleanly, and build-failure cleanup now releases output ports too.
+- Closed final runtime review loop: output pumps now start only after a link or discard drain exists, buffered values are preserved until graph wiring is complete, completion-link cleanup no longer faults inputs during disposal or after cleanup starts, and start cancellation leaves runtime and host state stopped without running fault hooks.
+- Closed follow-up review items: helper node fault hooks now run synchronously during fault calls, and runtime/workflow completion continuations preserve faulted state atomically.
+- Added a separate diagnostics channel with node helper APIs, runtime/workflow collectors, enriched runtime diagnostic records, focused tests, and public README notes.
+- Closed diagnostics review items: diagnostics now use reliable fanout, host diagnostics can be linked before startup, and regression tests cover slow subscribers plus direct receives.
+- Recorded the next roadmap: defer FluxMq migration until its current feature work settles, keep a future fluent C# DSL on the roadmap, and plan component families as separate packages.
+- Added a release-readiness audit with gates for license metadata, version strategy, dashboard boundary, docs, and release notes.
+- Selected MIT licensing, added root `LICENSE`, and added package license metadata.
+- Set the default package version to `0.1.0-alpha.1`.
+- Removed dashboard/designer metadata from the base engine definition model, validator, and JSON converters.
+- Added `CHANGELOG.md` for the first prerelease.
+- Upgraded release automation so tag/manual releases build, test, pack, publish NuGet packages, upload artifacts, and create or update GitHub Releases.
 
 ## Remaining
 
 - Rewrite detailed public docs from the legacy reference set.
-- Decide whether dashboard definitions stay in the first package or move out before release.
+- Run the final release command set before tagging.

@@ -1,7 +1,9 @@
+using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using FluxFlow.Engine.Scenarios;
 using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Engine;
 
@@ -28,13 +30,17 @@ public sealed class FlowApplicationHost(
     private readonly FlowApplicationConfigurationLoader _configurationLoader = configurationLoader ?? new FlowApplicationConfigurationLoader();
     private readonly ScenarioRunner _scenarioRunner = scenarioRunner ?? CreateDefaultScenarioRunner();
     private readonly ApplicationDefinition? _applicationDefinition = applicationDefinition;
+    private readonly FlowFanoutSource<RuntimeFlowDiagnostic> _diagnostics = new();
     private ApplicationDefinition? _definition;
     private ApplicationRuntime? _runtime;
+    private IDisposable? _runtimeDiagnosticsLink;
+    private ITargetBlock<RuntimeFlowDiagnostic>? _runtimeDiagnosticsTarget;
     private bool _disposed;
 
     public FlowApplicationHostState State { get; private set; } = FlowApplicationHostState.Empty;
     public ApplicationDefinition? Definition => _definition;
     public ApplicationRuntime? Runtime => _runtime;
+    public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnostics;
     public FlowApplicationHostBuildResult? LastBuildResult { get; private set; }
     public Exception? LastException { get; private set; }
 
@@ -105,6 +111,7 @@ public sealed class FlowApplicationHost(
             if (runtimeBuild.IsSuccess)
             {
                 _runtime = runtimeBuild.Runtime;
+                AttachRuntimeDiagnostics(_runtime!);
                 State = FlowApplicationHostState.Built;
             }
             else
@@ -165,6 +172,9 @@ public sealed class FlowApplicationHost(
         }
         catch (OperationCanceledException)
         {
+            State = FlowApplicationHostState.Stopped;
+            LastException = null;
+            await DisposeRuntimeAfterFailedStartAsync().ConfigureAwait(false);
             throw;
         }
         catch (ApplicationRuntimeNodeStartException exception)
@@ -179,6 +189,7 @@ public sealed class FlowApplicationHost(
                     exception.NodeAddress.Scope == WellKnownScopes.Resources ? null : exception.NodeAddress.Scope,
                     exception.NodeAddress.Node.Value));
 
+            await DisposeRuntimeAfterFailedStartAsync().ConfigureAwait(false);
             return LastBuildResult;
         }
         catch (Exception exception)
@@ -191,6 +202,7 @@ public sealed class FlowApplicationHost(
                     $"Flow application start failed: {exception.Message}",
                     exception));
 
+            await DisposeRuntimeAfterFailedStartAsync().ConfigureAwait(false);
             return LastBuildResult;
         }
 
@@ -264,31 +276,101 @@ public sealed class FlowApplicationHost(
     {
         if (_disposed) return;
         _disposed = true;
-        DisposeRuntime();
+        try
+        {
+            DisposeRuntime();
+        }
+        finally
+        {
+            _diagnostics.Complete();
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;
-        await DisposeRuntimeAsync().ConfigureAwait(false);
+        try
+        {
+            await DisposeRuntimeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _diagnostics.Complete();
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void DisposeRuntime()
     {
-        _runtime?.Dispose();
+        var runtime = _runtime;
         _runtime = null;
+        try
+        {
+            runtime?.Dispose();
+        }
+        finally
+        {
+            DetachRuntimeDiagnostics();
+        }
     }
 
     private async ValueTask DisposeRuntimeAsync()
     {
-        if (_runtime is not null)
+        var runtime = _runtime;
+        _runtime = null;
+        try
         {
-            await _runtime.DisposeAsync().ConfigureAwait(false);
-            _runtime = null;
+            if (runtime is not null)
+            {
+                await runtime.DisposeAsync().ConfigureAwait(false);
+            }
         }
+        finally
+        {
+            DetachRuntimeDiagnostics();
+        }
+    }
+
+    private void AttachRuntimeDiagnostics(ApplicationRuntime runtime)
+    {
+        DetachRuntimeDiagnostics();
+        _runtimeDiagnosticsTarget = new ActionBlock<RuntimeFlowDiagnostic>(
+            diagnostic => _diagnostics.Post(diagnostic));
+        _runtimeDiagnosticsLink = runtime.Diagnostics.LinkTo(
+            _runtimeDiagnosticsTarget,
+            new DataflowLinkOptions { PropagateCompletion = true });
+    }
+
+    private void DetachRuntimeDiagnostics()
+    {
+        _runtimeDiagnosticsLink?.Dispose();
+        _runtimeDiagnosticsTarget?.Complete();
+        _runtimeDiagnosticsLink = null;
+        _runtimeDiagnosticsTarget = null;
+    }
+
+    private async ValueTask DisposeRuntimeAfterFailedStartAsync()
+    {
+        try
+        {
+            await DisposeRuntimeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            AppendLastBuildError(new FlowApplicationHostBuildError(
+                FlowApplicationHostBuildErrorCode.StartFailed,
+                $"Flow application start cleanup failed: {exception.Message}",
+                exception));
+        }
+    }
+
+    private void AppendLastBuildError(FlowApplicationHostBuildError error)
+    {
+        LastBuildResult = LastBuildResult is null
+            ? FlowApplicationHostBuildResult.FromHostError(error)
+            : LastBuildResult with { Errors = LastBuildResult.Errors.Concat([error]).ToArray() };
     }
 
     private ApplicationDefinition LoadDefinitionFromConfiguration()

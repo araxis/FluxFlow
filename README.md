@@ -32,11 +32,12 @@ protocol-specific dependencies.
 | Feature | Description |
 |---------|-------------|
 | **Typed ports** | `InputPort<T>` / `OutputPort<T>`; type mismatches are caught at build time |
-| **BroadcastBlock fan-out** | Every `OutputPort<T>` wraps its source in a `BroadcastBlock<T>` automatically |
+| **Reliable fan-out** | Runtime-owned output delivery sends each item to every linked input |
 | **Phase-ordered startup** | Nodes declare a `phase` integer; the runtime starts lower phases first |
 | **Completion propagation** | Entry nodes drive completion through the whole graph |
 | **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
 | **Event journal** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
+| **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
 | **Expression mapping** | Built-in DynamicExpresso (C#) and JSONata engines behind `IFlowExpressionEngine` |
 | **Scenario testing** | Deterministic, step-by-step test runner driven by `FlowEvent` observations |
 | **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
@@ -76,6 +77,29 @@ public sealed class NumberSource : SourceFlowNode<int>
 Use `SinkFlowNode<T>`, `TransformFlowNode<TInput,TOutput>`, `MapFlowNode<TInput,TOutput>`,
 and `EventFlowNodeBase` when those shapes fit. Direct `IFlowNode` implementations
 still work when a node needs full control.
+
+Nodes derived from `FlowNodeBase` can also emit operational diagnostics:
+
+```csharp
+TryEmitDiagnostic(
+    "demo.node.ready",
+    FlowDiagnosticLevel.Information,
+    "Node is ready.");
+```
+
+The runtime labels each diagnostic with the node address, id, phase, and type.
+Use diagnostics for health, status, counters, and live monitoring data. Use
+`FlowEvent` for workflow/domain activity.
+
+Subscribe to `FlowApplicationHost.Diagnostics` before `StartAsync` when startup
+diagnostics matter:
+
+```csharp
+var diagnostics = new BufferBlock<RuntimeFlowDiagnostic>();
+host.Diagnostics.LinkTo(diagnostics, new DataflowLinkOptions { PropagateCompletion = true });
+
+var result = await host.StartAsync();
+```
 
 ### 2. Define the graph in JSON
 
@@ -127,6 +151,12 @@ for status.
 dotnet build FluxFlow.sln
 dotnet test  FluxFlow.sln
 ```
+
+---
+
+## License
+
+FluxFlow.Engine is licensed under the MIT License.
 
 ---
 

@@ -59,5 +59,6 @@ public sealed class RuntimeNodeBuilder
             _node,
             _inputs,
             _outputs,
-            _phase);
+            _phase,
+            _context.Definition.Type);
 }

@@ -22,7 +22,9 @@ public abstract class SinkFlowNode<TInput> : FlowNodeBase
         CompleteWhen(_input.Completion);
     }
 
-    protected ITargetBlock<TInput> InputBlock => _input;
+    public ITargetBlock<TInput> Input => _input;
+
+    protected ITargetBlock<TInput> InputBlock => Input;
 
     protected abstract ValueTask HandleAsync(
         TInput input,
@@ -35,6 +37,7 @@ public abstract class SinkFlowNode<TInput> : FlowNodeBase
     {
         ArgumentNullException.ThrowIfNull(exception);
         ((IDataflowBlock)_input).Fault(exception);
+        FaultNode(exception);
     }
 
     private async Task HandleInputAsync(TInput input)

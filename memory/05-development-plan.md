@@ -7,7 +7,7 @@ Date: 2026-05-31
 1. Remove transport-specific scenario code from the engine.
 2. Remove component event constants from the engine.
 3. Rename the default configuration section to `FluxFlow:Application`.
-4. Decide whether dashboard metadata moves out before first public package.
+4. Move dashboard metadata out before first public package.
 5. Update README and docs to use neutral sample nodes only.
 6. Add tests that prove unknown external scenario step types stay outside the base package.
 

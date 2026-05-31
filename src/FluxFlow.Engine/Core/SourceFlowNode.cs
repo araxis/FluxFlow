@@ -19,7 +19,9 @@ public abstract class SourceFlowNode<TOutput> : FlowNodeBase
         CompleteWhen(_output.Completion);
     }
 
-    protected ISourceBlock<TOutput> OutputBlock => _output;
+    public ISourceBlock<TOutput> Output => _output;
+
+    protected ISourceBlock<TOutput> OutputBlock => Output;
 
     protected bool PostOutput(TOutput output)
         => _output.Post(output);
@@ -39,5 +41,6 @@ public abstract class SourceFlowNode<TOutput> : FlowNodeBase
     {
         ArgumentNullException.ThrowIfNull(exception);
         ((IDataflowBlock)_output).Fault(exception);
+        FaultNode(exception);
     }
 }

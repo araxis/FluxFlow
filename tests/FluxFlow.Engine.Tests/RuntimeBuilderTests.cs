@@ -3,6 +3,7 @@ using FluxFlow.Engine.Core;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
+using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
@@ -99,6 +100,34 @@ public sealed class RuntimeBuilderTests
         await runtime.StartAsync();           // should not throw
         runtime.Complete();
         await runtime.Completion;             // drains cleanly
+    }
+
+    [Fact]
+    public void DefinitionJson_IgnoresDashboardMetadata()
+    {
+        var json = """
+        {
+          "workflows": {
+            "smoke": {
+              "n1": { "type": "test.noop" }
+            }
+          },
+          "dashboards": {
+            "main": {
+              "widgets": {
+                "unused": { "type": "demo.widget" }
+              }
+            }
+          }
+        }
+        """;
+
+        var definition = JsonSerializer.Deserialize<ApplicationDefinition>(
+            json,
+            ApplicationDefinitionJson.CreateSerializerOptions());
+
+        definition.ShouldNotBeNull();
+        definition.Workflows.Keys.ShouldBe(["smoke"]);
     }
 
     // ── Minimal protocol-neutral IFlowNode ────────────────────────────────────

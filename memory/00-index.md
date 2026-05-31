@@ -13,4 +13,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `07-progress-log.md`: running history of completed work.
 - `08-documentation-consolidation.md`: docs cleanup decisions.
 - `09-node-authoring-helpers.md`: optional base classes and registration helpers.
+- `10-runtime-review-fixes.md`: runtime review fixes for fanout, lifecycle, diagnostics, and disposal.
+- `11-fluxmq-adoption-report.md`: current FluxMq adoption feasibility, migration shape, and estimated impact.
+- `12-diagnostics-channel.md`: diagnostic channel decisions and runtime API.
+- `13-roadmap.md`: near-term release path plus deferred DSL and component package ideas.
+- `14-release-readiness-audit.md`: prerelease readiness status, gates, and next steps.
+- `15-release-automation.md`: release workflow, versioning, GitHub Release, and NuGet automation.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

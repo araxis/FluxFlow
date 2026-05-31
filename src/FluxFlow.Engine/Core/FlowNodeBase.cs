@@ -3,9 +3,10 @@ using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Engine.Components;
 
-public abstract class FlowNodeBase : IFlowNode
+public abstract class FlowNodeBase : IFlowNode, IFlowDiagnosticSource
 {
     private readonly BufferBlock<FlowError> _errors = new();
+    private readonly FlowFanoutSource<FlowDiagnostic> _diagnostics = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -24,6 +25,8 @@ public abstract class FlowNodeBase : IFlowNode
     public Task Completion => _completion.Task;
 
     public ISourceBlock<FlowError> Errors => _errors;
+
+    public ISourceBlock<FlowDiagnostic> Diagnostics => _diagnostics;
 
     public virtual Task StartAsync(CancellationToken cancellationToken = default)
         => Task.CompletedTask;
@@ -44,8 +47,16 @@ public abstract class FlowNodeBase : IFlowNode
             return false;
         }
 
-        _errors.Complete();
-        OnNodeCompleted();
+        try
+        {
+            OnNodeCompleted();
+        }
+        finally
+        {
+            _errors.Complete();
+            _diagnostics.Complete();
+        }
+
         return true;
     }
 
@@ -58,8 +69,16 @@ public abstract class FlowNodeBase : IFlowNode
             return false;
         }
 
-        ((IDataflowBlock)_errors).Fault(exception);
-        OnNodeFaulted(exception);
+        try
+        {
+            OnNodeFaulted(exception);
+        }
+        finally
+        {
+            _errors.Complete();
+            _diagnostics.Complete();
+        }
+
         return true;
     }
 
@@ -84,6 +103,25 @@ public abstract class FlowNodeBase : IFlowNode
         CancellationToken cancellationToken = default)
         => _errors.SendAsync(CreateError(code, message, exception, context), cancellationToken);
 
+    protected bool TryEmitDiagnostic(
+        string name,
+        FlowDiagnosticLevel level = FlowDiagnosticLevel.Information,
+        string? message = null,
+        Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? attributes = null)
+        => _diagnostics.Post(CreateDiagnostic(name, level, message, exception, attributes));
+
+    protected Task<bool> EmitDiagnosticAsync(
+        string name,
+        FlowDiagnosticLevel level = FlowDiagnosticLevel.Information,
+        string? message = null,
+        Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? attributes = null,
+        CancellationToken cancellationToken = default)
+        => _diagnostics.SendAsync(
+            CreateDiagnostic(name, level, message, exception, attributes),
+            cancellationToken);
+
     protected virtual FlowError CreateError(
         int code,
         string message,
@@ -97,6 +135,26 @@ public abstract class FlowNodeBase : IFlowNode
             Exception = exception,
             Context = context
         };
+
+    protected virtual FlowDiagnostic CreateDiagnostic(
+        string name,
+        FlowDiagnosticLevel level = FlowDiagnosticLevel.Information,
+        string? message = null,
+        Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? attributes = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        return new FlowDiagnostic
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Name = name,
+            Level = level,
+            Message = message,
+            Exception = exception,
+            Attributes = attributes ?? new Dictionary<string, object?>(StringComparer.Ordinal)
+        };
+    }
 
     protected virtual void OnNodeCompleted()
     {

@@ -32,9 +32,13 @@ public abstract class TransformFlowNode<TInput, TOutput> : FlowNodeBase
         CompleteWhen(_output.Completion);
     }
 
-    protected ITargetBlock<TInput> InputBlock => _transform;
+    public ITargetBlock<TInput> Input => _transform;
 
-    protected ISourceBlock<TOutput> OutputBlock => _output;
+    public ISourceBlock<TOutput> Output => _output;
+
+    protected ITargetBlock<TInput> InputBlock => Input;
+
+    protected ISourceBlock<TOutput> OutputBlock => Output;
 
     protected abstract ValueTask<IReadOnlyCollection<TOutput>> TransformAsync(
         TInput input,
@@ -47,6 +51,7 @@ public abstract class TransformFlowNode<TInput, TOutput> : FlowNodeBase
     {
         ArgumentNullException.ThrowIfNull(exception);
         ((IDataflowBlock)_transform).Fault(exception);
+        FaultNode(exception);
     }
 
     private async Task<IEnumerable<TOutput>> TransformInputAsync(TInput input)

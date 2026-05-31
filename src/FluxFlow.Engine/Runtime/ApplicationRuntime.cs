@@ -1,4 +1,5 @@
 using FluxFlow.Engine.Components;
+using FluxFlow.Engine.Definitions;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Engine.Runtime;
@@ -14,6 +15,7 @@ public sealed class ApplicationRuntime(
     private readonly IReadOnlyList<IDisposable> _resourceLinks = resourceLinks ?? [];
     private readonly BroadcastBlock<ApplicationStateChanged> _stateChanges = new(s => s);
     private readonly FlowEventCollector _eventCollector = new(resources.Concat(workflows.SelectMany(workflow => workflow.Nodes)));
+    private readonly FlowDiagnosticCollector _diagnosticCollector = new(resources.Concat(workflows.SelectMany(workflow => workflow.Nodes)));
     private readonly object _stateLock = new();
     private bool _disposed;
     private ApplicationState _state = ApplicationState.Idle;
@@ -28,6 +30,8 @@ public sealed class ApplicationRuntime(
     public ISourceBlock<ApplicationStateChanged> StateChanges => _stateChanges;
 
     public ISourceBlock<FlowEvent> Events => _eventCollector.Events;
+
+    public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnosticCollector.Diagnostics;
 
     public Task Completion => Task.WhenAll(Nodes.Select(node => node.Node.Completion));
 
@@ -57,9 +61,19 @@ public sealed class ApplicationRuntime(
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            foreach (var workflow in Workflows)
+            {
+                workflow.CancelStartup();
+            }
+
+            SetState(ApplicationState.Stopped);
+            throw;
+        }
         catch (Exception ex)
         {
-            SetState(ApplicationState.Faulted, ex);
+            TryFault(ex);
             throw;
         }
 
@@ -68,11 +82,12 @@ public sealed class ApplicationRuntime(
 
         var completion = Completion;
         _eventCollector.CompleteWhen(completion);
+        _diagnosticCollector.CompleteWhen(completion);
         _ = completion.ContinueWith(t =>
         {
-            if (_state == ApplicationState.Faulted) return;
             SetState(t.IsFaulted ? ApplicationState.Faulted : ApplicationState.Stopped,
-                     t.Exception?.InnerException);
+                     t.Exception?.InnerException,
+                     preserveFaulted: true);
         }, TaskScheduler.Default);
     }
 
@@ -92,17 +107,42 @@ public sealed class ApplicationRuntime(
 
     public void Fault(Exception exception)
     {
+        var faultErrors = TryFault(exception);
+        if (faultErrors.Count > 0)
+        {
+            throw new AggregateException("One or more runtime nodes failed while faulting.", faultErrors);
+        }
+    }
+
+    private IReadOnlyList<Exception> TryFault(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
         SetState(ApplicationState.Faulted, exception);
+        var errors = new List<Exception>();
         foreach (var resource in Resources)
         {
-            resource.Node.Fault(exception);
+            try
+            {
+                resource.Node.Fault(exception);
+            }
+            catch (Exception faultException)
+            {
+                errors.Add(CreateFaultCleanupException(resource.Address, faultException));
+            }
         }
 
         foreach (var workflow in Workflows)
         {
-            workflow.Fault(exception);
+            errors.AddRange(workflow.TryFault(exception));
         }
+
+        return errors;
     }
+
+    private static InvalidOperationException CreateFaultCleanupException(
+        NodeAddress address,
+        Exception exception)
+        => new($"Node '{address}' failed while faulting runtime.", exception);
 
     public void Dispose()
     {
@@ -112,23 +152,54 @@ public sealed class ApplicationRuntime(
         }
 
         _disposed = true;
+        var errors = new List<Exception>();
 
         foreach (var workflow in Workflows)
         {
-            workflow.Dispose();
+            try
+            {
+                workflow.Dispose();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(new InvalidOperationException(
+                    $"Runtime failed while disposing workflow '{workflow.Name}'.",
+                    exception));
+            }
         }
 
         foreach (var link in _resourceLinks)
         {
-            link.Dispose();
+            RuntimeCleanup.TryDisposeLink(link, errors, "Runtime");
         }
 
-        _eventCollector.Dispose();
-
-        foreach (var disposable in Resources.Select(node => node.Node).OfType<IDisposable>())
+        foreach (var output in Resources.SelectMany(node => node.Outputs))
         {
-            disposable.Dispose();
+            RuntimeCleanup.TryDisposeOutput(output, errors, "Runtime");
         }
+
+        try
+        {
+            _eventCollector.Dispose();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(new InvalidOperationException(
+                "Runtime failed while disposing event collector.",
+                exception));
+        }
+
+        foreach (var resource in Resources)
+        {
+            RuntimeCleanup.TryDisposeNode(resource, errors, "Runtime");
+        }
+
+        RuntimeCleanup.TryDisposeDiagnostics(_diagnosticCollector, errors, "Runtime");
+
+        _stateChanges.Complete();
+        RuntimeCleanup.ThrowIfErrors(
+            "One or more resources failed while disposing application runtime.",
+            errors);
     }
 
     public async ValueTask DisposeAsync()
@@ -139,30 +210,69 @@ public sealed class ApplicationRuntime(
         }
 
         _disposed = true;
+        var errors = new List<Exception>();
 
         foreach (var workflow in Workflows)
         {
-            await workflow.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await workflow.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(new InvalidOperationException(
+                    $"Runtime failed while disposing workflow '{workflow.Name}'.",
+                    exception));
+            }
         }
 
         foreach (var link in _resourceLinks)
         {
-            link.Dispose();
+            RuntimeCleanup.TryDisposeLink(link, errors, "Runtime");
         }
 
-        _eventCollector.Dispose();
-
-        foreach (var disposable in Resources.Select(node => node.Node).OfType<IAsyncDisposable>())
+        foreach (var output in Resources.SelectMany(node => node.Outputs))
         {
-            await disposable.DisposeAsync().ConfigureAwait(false);
+            await RuntimeCleanup.TryDisposeOutputAsync(output, errors, "Runtime").ConfigureAwait(false);
         }
+
+        try
+        {
+            _eventCollector.Dispose();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(new InvalidOperationException(
+                "Runtime failed while disposing event collector.",
+                exception));
+        }
+
+        foreach (var resource in Resources)
+        {
+            await RuntimeCleanup.TryDisposeNodeAsync(resource, errors, "Runtime").ConfigureAwait(false);
+        }
+
+        await RuntimeCleanup.TryDisposeDiagnosticsAsync(_diagnosticCollector, errors, "Runtime").ConfigureAwait(false);
+
+        _stateChanges.Complete();
+        RuntimeCleanup.ThrowIfErrors(
+            "One or more resources failed while disposing application runtime.",
+            errors);
     }
 
-    private void SetState(ApplicationState next, Exception? exception = null)
+    private void SetState(
+        ApplicationState next,
+        Exception? exception = null,
+        bool preserveFaulted = false)
     {
         ApplicationStateChanged? change;
         lock (_stateLock)
         {
+            if (preserveFaulted && _state == ApplicationState.Faulted)
+            {
+                return;
+            }
+
             if (_state == next) return;
             var previous = _state;
             _state = next;

@@ -62,7 +62,8 @@ public sealed class ApplicationRuntimeBuilder
             DisposeCreatedNodes(
                 resourceNodes,
                 workflowNodes,
-                resourceLinks.Concat(workflowLinks.Values.SelectMany(l => l)).ToList());
+                resourceLinks.Concat(workflowLinks.Values.SelectMany(l => l)).ToList(),
+                errors);
             return ApplicationRuntimeBuildResult.Failed(validation, errors);
         }
 
@@ -112,7 +113,11 @@ public sealed class ApplicationRuntimeBuilder
                     definition.Value,
                     workflowName,
                     resourceView));
-                nodes.Add(nodeName, runtimeNode with { Phase = definition.Value.Phase });
+                nodes.Add(nodeName, runtimeNode with
+                {
+                    Phase = definition.Value.Phase,
+                    Type = definition.Value.Type
+                });
             }
             catch (Exception exception)
             {
@@ -272,16 +277,31 @@ public sealed class ApplicationRuntimeBuilder
     private static void DisposeCreatedNodes(
         IReadOnlyDictionary<NodeName, RuntimeNode> resources,
         IReadOnlyDictionary<string, IReadOnlyDictionary<NodeName, RuntimeNode>> workflows,
-        List<IDisposable> links)
+        List<IDisposable> links,
+        List<ApplicationRuntimeBuildError> buildErrors)
     {
+        var cleanupErrors = new List<Exception>();
         foreach (var link in links)
-            link.Dispose();
+            RuntimeCleanup.TryDisposeLink(link, cleanupErrors, "Runtime build");
 
-        foreach (var disposable in workflows.Values.SelectMany(wf => wf.Values).Select(n => n.Node).OfType<IDisposable>())
-            disposable.Dispose();
+        foreach (var output in workflows.Values.SelectMany(wf => wf.Values).SelectMany(node => node.Outputs))
+            RuntimeCleanup.TryDisposeOutput(output, cleanupErrors, "Runtime build");
 
-        foreach (var disposable in resources.Values.Select(n => n.Node).OfType<IDisposable>())
-            disposable.Dispose();
+        foreach (var node in workflows.Values.SelectMany(wf => wf.Values))
+            RuntimeCleanup.TryDisposeNode(node, cleanupErrors, "Runtime build");
+
+        foreach (var output in resources.Values.SelectMany(node => node.Outputs))
+            RuntimeCleanup.TryDisposeOutput(output, cleanupErrors, "Runtime build");
+
+        foreach (var resource in resources.Values)
+            RuntimeCleanup.TryDisposeNode(resource, cleanupErrors, "Runtime build");
+
+        if (cleanupErrors.Count > 0)
+        {
+            buildErrors.Add(new(
+                ApplicationRuntimeBuildErrorCode.CleanupFailed,
+                $"One or more resources failed while cleaning up a failed runtime build: {new AggregateException(cleanupErrors).Message}"));
+        }
     }
 
     private static NodeName? ToNodeName(string? value)
@@ -293,27 +313,44 @@ public sealed class ApplicationRuntimeBuilder
     private sealed class InputCompletionLink : IDisposable
     {
         private readonly CancellationTokenSource _disposed = new();
+        private readonly Task[] _watchers;
         private int _remaining;
         private int _finished;
+        private int _disposeStarted;
 
         public InputCompletionLink(InputPort input, IReadOnlyCollection<OutputPort> outputs)
         {
             _remaining = outputs.Count;
-
-            foreach (var output in outputs)
-            {
-                _ = WatchSourceCompletionAsync(input, output.Completion, _disposed.Token);
-            }
+            _watchers = outputs
+                .Select(output => WatchSourceCompletionAsync(input, output.Completion, _disposed.Token))
+                .ToArray();
         }
 
         public void Dispose()
         {
-            if (!_disposed.IsCancellationRequested)
+            if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
             {
-                _disposed.Cancel();
+                return;
             }
 
-            _disposed.Dispose();
+            _disposed.Cancel();
+            _ = DisposeTokenWhenWatchersStopAsync();
+        }
+
+        private async Task DisposeTokenWhenWatchersStopAsync()
+        {
+            try
+            {
+                await Task.WhenAll(_watchers).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Watchers only observe completion so the token source can be released.
+            }
+            finally
+            {
+                _disposed.Dispose();
+            }
         }
 
         private async Task WatchSourceCompletionAsync(
@@ -331,6 +368,11 @@ public sealed class ApplicationRuntimeBuilder
             }
             catch (Exception exception)
             {
+                if (Volatile.Read(ref _disposeStarted) != 0)
+                {
+                    return;
+                }
+
                 if (Interlocked.Exchange(ref _finished, 1) == 0)
                 {
                     input.Fault(exception);

@@ -1,4 +1,4 @@
-name: publish-nuget
+name: release
 
 on:
   push:
@@ -7,20 +7,22 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Package version, for example 1.0.0"
+        description: "Package version, for example 0.1.0-alpha.1"
         required: true
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -29,7 +31,7 @@ jobs:
             8.0.x
             10.0.x
 
-      - name: Resolve package version
+      - name: Resolve release version
         shell: pwsh
         run: |
           $version = "${{ inputs.version }}"
@@ -44,7 +46,12 @@ jobs:
             throw "Invalid package version '$version'."
           }
 
+          $tag = "v$version"
+          $isPrerelease = $version.Contains("-")
+
           "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "IS_PRERELEASE=$isPrerelease" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Restore
         run: dotnet restore FluxFlow.sln
@@ -58,7 +65,21 @@ jobs:
       - name: Pack
         run: dotnet pack src/FluxFlow.Engine/FluxFlow.Engine.csproj --configuration Release --no-build -p:PackageVersion=${{ env.PACKAGE_VERSION }} --output artifacts/packages
 
-      - name: Publish package
+      - name: Prepare release notes
+        shell: pwsh
+        run: ./eng/get-release-notes.ps1 -Version "${{ env.PACKAGE_VERSION }}" -OutputPath artifacts/release-notes.md
+
+      - name: Upload workflow package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluxflow-engine-${{ env.PACKAGE_VERSION }}
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+            artifacts/release-notes.md
+          if-no-files-found: error
+
+      - name: Publish NuGet packages
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
@@ -67,3 +88,65 @@ jobs:
 
           dotnet nuget push "artifacts/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
           dotnet nuget push "artifacts/packages/*.snupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ env.RELEASE_TAG }}"
+          $notesPath = "artifacts/release-notes.md"
+          $files = Get-ChildItem -LiteralPath "artifacts/packages" -File |
+            Where-Object { $_.Extension -in ".nupkg", ".snupkg" } |
+            Sort-Object Name
+
+          if ($files.Count -eq 0) {
+            throw "No package files were found for GitHub Release upload."
+          }
+
+          $uploadArgs = @($tag) + @($files.FullName) + @("--clobber")
+          $releaseExists = $true
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $releaseExists = $false
+          }
+
+          if ($releaseExists) {
+            gh release upload @uploadArgs
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to upload assets to GitHub Release '$tag'."
+            }
+
+            $editArgs = @("release", "edit", $tag, "--title", $tag, "--notes-file", $notesPath)
+            if ("${{ env.IS_PRERELEASE }}" -eq "True") {
+              $editArgs += "--prerelease"
+            }
+
+            gh @editArgs
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to update GitHub Release '$tag'."
+            }
+            return
+          }
+
+          $createArgs = @(
+            "release",
+            "create",
+            $tag
+          ) + @($files.FullName) + @(
+            "--title",
+            $tag,
+            "--notes-file",
+            $notesPath,
+            "--target",
+            "${{ github.sha }}"
+          )
+
+          if ("${{ env.IS_PRERELEASE }}" -eq "True") {
+            $createArgs += "--prerelease"
+          }
+
+          gh @createArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create GitHub Release '$tag'."
+          }

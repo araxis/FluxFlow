@@ -15,7 +15,11 @@ The helper script is `eng\github-bootstrap.ps1`.
 ## GitHub workflows
 
 - `.github\workflows\ci.yml` runs restore, build, and tests on pull requests and pushes to `main`.
-- `.github\workflows\publish-nuget.yml` publishes packages when a `v*.*.*` tag is pushed or when manually run with a version.
+- `.github\workflows\publish-nuget.yml` is the release workflow.
+  It runs on `v*.*.*` tags or manual dispatch with a version.
+  It restores, builds, tests, packs, publishes NuGet packages, uploads workflow
+  artifacts, and creates or updates the matching GitHub Release with `.nupkg`
+  and `.snupkg` assets.
 
 ## NuGet secret
 
@@ -30,10 +34,12 @@ $env:NUGET_API_KEY = "<key>"
 
 ## Release flow
 
-1. Update release notes.
-2. Run `dotnet test FluxFlow.sln`.
-3. Run `dotnet pack src\FluxFlow.Engine\FluxFlow.Engine.csproj --configuration Release --output artifacts\packages`.
-4. Commit all changes.
-5. Tag the release, for example `v0.1.0-alpha.1`.
-6. Push `main` and the tag.
-7. Confirm the publish workflow completes.
+1. Update `CHANGELOG.md`.
+2. Run `dotnet build FluxFlow.sln --configuration Release --no-restore`.
+3. Run `dotnet test FluxFlow.sln --configuration Release --no-build`.
+4. Run `dotnet pack src\FluxFlow.Engine\FluxFlow.Engine.csproj --configuration Release --no-build --output artifacts\packages`.
+5. Commit all changes.
+6. Tag the release, for example `v0.1.0-alpha.1`.
+7. Push `main` and the tag.
+8. Confirm the release workflow completes.
+9. Confirm the GitHub Release has package assets and the NuGet package is available.
