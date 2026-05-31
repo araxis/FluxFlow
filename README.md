@@ -1,5 +1,8 @@
 # FluxFlow.Engine
 
+[![Package Version](https://img.shields.io/nuget/vpre/FluxFlow.Engine?label=package)](https://www.nuget.org/packages/FluxFlow.Engine)
+[![Package Downloads](https://img.shields.io/nuget/dt/FluxFlow.Engine?label=downloads)](https://www.nuget.org/packages/FluxFlow.Engine)
+
 **A protocol-neutral, dataflow-based workflow engine for .NET.**
 
 Define graphs of typed processing nodes in JSON, build them into live

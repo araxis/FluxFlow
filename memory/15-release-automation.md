@@ -55,3 +55,7 @@ Current status: the first prerelease workflow reached restore, build, test,
 pack, artifact upload, GitHub Release asset upload, and NuGet deployment
 successfully after the package feed key scope was updated. The public package
 feed lists `FluxFlow.Engine` version `0.1.0-alpha.1`.
+
+The project README shows package version and download badges from the public
+package feed so the repository front page reflects the latest published
+package state automatically.
