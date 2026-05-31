@@ -20,6 +20,7 @@ Date: 2026-05-31
 - Initialized git on `main`.
 - Created private repository `araxis/FluxFlow`.
 - Pushed the initial commit to `origin/main`.
+- Updated workflow actions and runner labels after the first CI run reported deprecation notices.
 
 ## Remaining
 
