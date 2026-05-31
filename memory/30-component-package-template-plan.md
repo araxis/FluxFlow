@@ -10,10 +10,15 @@ for future component families.
 The broader component catalog and reusable per-component definition template are
 recorded in `31-component-catalog-and-template.md`.
 
+This package is a category-owned design, not an application extraction. The
+first consumer can prove integration pressure, but package contracts must stay
+neutral and reusable.
+
 The package should prove:
 
 - package-owned node type names
 - package-owned options and validation
+- package-owned request, result, and output records
 - explicit registration through `IFlowNodeModule`
 - no assembly scanning
 - no hidden global state
@@ -27,8 +32,8 @@ Start with `FluxFlow.Components.Mqtt`.
 
 Reason:
 
-- FluxMq already has real MQTT components and real integration pressure.
-- The engine boundary was already validated by the FluxMq migration.
+- The first consumer already has real MQTT integration pressure.
+- The engine boundary was already validated by a real migration.
 - A messaging component package will exercise sources, sinks, options,
   diagnostics, and event patterns.
 - Other component families can copy the same module/registration shape.
@@ -50,7 +55,9 @@ src/
     Contracts/
       IMqttClientAdapter.cs
       IMqttClientFactory.cs
-      MqttMessage.cs
+      MqttPublishRequest.cs
+      MqttPublishResult.cs
+      MqttReceivedMessage.cs
     Nodes/
       MqttSubscribeNode.cs
       MqttPublishNode.cs
@@ -98,6 +105,27 @@ mqtt.publish
 Keep persisted type names lowercase and dotted. Do not rename them after a
 package is published unless a migration path exists.
 
+## Port And Contract Shape
+
+Use the shared component convention from the catalog:
+
+- source nodes have no input and emit `Output`
+- transform nodes receive `Input` and emit `Output`
+- sink/command nodes receive `Input` with an action request record
+- sink/command nodes emit `Result` only when consumers need acknowledgements or
+  operation metadata
+
+For the MQTT package:
+
+- subscribe node emits `MqttReceivedMessage` on `Output`
+- publish node receives `MqttPublishRequest` on `Input`
+- publish node may emit `MqttPublishResult` on `Result`
+
+The request model carries per-message data such as topic override, payload,
+content type, retain override, and correlation metadata. The options model
+carries static node defaults such as connection profile, default topic, payload
+format, retain default, and quality setting.
+
 ## Options Boundary
 
 Each node should read only its own configuration from `NodeDefinition`:
@@ -106,6 +134,10 @@ Each node should read only its own configuration from `NodeDefinition`:
   event channel
 - publish node: connection profile, target topic, payload mapping mode, retain
   flag, quality setting
+
+Options are static node settings. Requests are runtime messages. A setting that
+can vary per item belongs in the request type, even if an option supplies its
+default value.
 
 Validation should produce clear package-level errors before runtime startup
 where possible.
@@ -121,8 +153,9 @@ Subscribe node:
 
 Publish node:
 
-- receives messages through an input port
+- receives `MqttPublishRequest` through `Input`
 - publishes through the adapter
+- emits `MqttPublishResult` through `Result` only if configured or useful
 - emits diagnostics for send success/failure
 - emits events only for workflow-relevant publish activity
 
@@ -141,14 +174,16 @@ Initial component release can use the same prerelease version as the engine.
 
 1. Scaffold the component package and test project.
 2. Add adapter contracts and in-memory test adapter.
-3. Add options models and parsing helpers.
-4. Add module and registry extension.
-5. Implement publish node first because it is easier to test deterministically.
-6. Implement subscribe node with in-memory adapter tests.
-7. Add package README content and docs link.
-8. Update release workflow to pack all selected packages.
-9. Publish a prerelease.
-10. Migrate FluxMq components to the package in a separate FluxMq branch.
+3. Add request, result, output, and options records.
+4. Add options parsing and validation helpers.
+5. Add module and registry extension.
+6. Implement publish node first because it is easier to test deterministically.
+7. Implement subscribe node with in-memory adapter tests.
+8. Add package README content and docs link.
+9. Update release workflow to pack all selected packages.
+10. Publish a prerelease.
+11. Migrate the first consumer from local components to the package in a
+    separate branch.
 
 ## Open Decisions
 
@@ -163,4 +198,4 @@ Initial component release can use the same prerelease version as the engine.
 
 Start with contracts, options, module registration, publish node, subscribe
 node, and deterministic tests. Defer a default live client adapter until the
-package shape is proven by FluxMq.
+package shape is proven by at least one consumer.

@@ -80,8 +80,13 @@ Date: 2026-05-31
 - Added a planning-only component catalog with class-library-per-category
   package shape, planned components by category, a reusable component definition
   template, and development-order options.
+- Refined component package planning so reusable packages are designed from
+  category-owned contracts, use typed request/options/result records, keep
+  `Input` as the default inbound port, and treat the first consumer as boundary
+  validation rather than the source of reusable schemas.
 
 ## Remaining
 
-- Decide which package to scaffold first: MQTT for FluxMq alignment, Timers for
-  the fastest template proof, or Files as a source/sink middle ground.
+- Decide which package to scaffold first: MQTT for real source/sink integration
+  pressure, Timers for the fastest template proof, or Files as a source/sink
+  middle ground.

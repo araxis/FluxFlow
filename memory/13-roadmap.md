@@ -23,7 +23,9 @@ package-authoring improvements.
    mapping, and package versioning references done.
 5. Keep release automation healthy for the next prerelease.
 6. Plan the first component package template. Started with the MQTT package
-   template plan and added a component category catalog.
+   template plan and added a component category catalog. The component catalog
+   now uses package-owned request/options/result contracts and treats the first
+   consumer as validation, not as the source of reusable schemas.
 
 ## First Consumer Pilot
 
@@ -89,20 +91,26 @@ Possible packages:
 Package rules:
 
 - Each package owns its node registrations.
-- Each package owns options, validation, diagnostics names, events, and tests.
+- Each package owns options, request/result records, validation, diagnostics
+  names, events, and tests.
+- `Input` is the default inbound port; typed request records carry semantic
+  meaning for sink and command nodes.
+- Options describe static node settings; requests describe per-message work.
+- Consumer application schemas must not leak into reusable package contracts.
 - The engine stays protocol-neutral.
 - Start with one package, likely MQTT, as the template before creating several.
 
 First template plan:
 
 - `FluxFlow.Components.Mqtt`
-- adapter contracts first, no live client dependency in the initial template
+- adapter contracts and request/options records first, no live client dependency
+  in the initial template
 - deterministic tests with an in-memory adapter
 - explicit `IFlowNodeModule` registration
 - release workflow update to pack and publish multiple package projects
 
 Package category decision options:
 
-- MQTT first for FluxMq alignment.
+- MQTT first for real source/sink integration pressure.
 - Timers first for fastest template proof.
 - Files first for a balanced source/sink package without broker dependencies.

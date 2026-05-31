@@ -9,6 +9,17 @@ Plan the reusable component packages before scaffolding code.
 This step is planning-only. No class libraries or component implementations are
 created in this step.
 
+## General-Purpose Boundary
+
+Design component packages from their category contracts, not from any one
+consumer application. A consumer can prove whether the package is useful, but it
+must not decide package-owned schemas, port names, request models, option
+models, or node type names.
+
+Reusable packages must not copy application workspace schemas, dashboards,
+scenario definitions, storage models, or connection naming. Applications remain
+free to project their own configuration shape into engine definitions.
+
 ## Package Shape
 
 Use one class library per component category:
@@ -38,6 +49,7 @@ FluxFlow.Components.<Category>/
   Options/
     <Category>ComponentOptions.cs
   Contracts/
+    request, result, and output records
     package-specific abstractions
   Nodes/
     component node classes
@@ -66,6 +78,7 @@ Each package should expose:
 - one `IFlowNodeModule` implementation
 - one registry extension method
 - option models and parsing helpers
+- request, result, and output records for typed ports
 - deterministic tests
 - component diagnostics names
 - component event names when workflow activity should be visible
@@ -77,6 +90,39 @@ Avoid:
 - app-specific workspace models
 - dashboard/UI models
 - live external services in normal unit tests
+
+## Request, Options, And Result Pattern
+
+Components should behave like small typed functions over engine ports:
+
+- options records describe static node configuration
+- request records describe each operation message
+- output/result records describe emitted values or completed work
+- diagnostics and events describe observation, not control flow
+
+Default port conventions:
+
+| Shape | Input ports | Output ports |
+|-------|-------------|--------------|
+| Source/trigger | none | `Output` with a package-owned output record |
+| Transform | `Input` with a package-owned input record or primitive value | `Output` with a package-owned output record or primitive value |
+| Sink/command | `Input` with an `<Action>Request` record | optional `Result` with an `<Action>Result` record |
+| Utility | choose the smallest explicit shape | choose the smallest explicit shape |
+
+Use `Input` as the default inbound port name. Put semantic meaning in the type,
+not in custom port names. For example, an MQTT publish node should receive
+`MqttPublishRequest` on `Input`, read static settings from
+`MqttPublishOptions`, and optionally emit `MqttPublishResult` on `Result`.
+
+Keep options and requests separate:
+
+- options: static values parsed from node configuration during build/startup
+- request: per-message values supplied by the workflow at runtime
+- result/output: values emitted after processing or observation
+
+Validation should happen at the right boundary. Options should fail early during
+build/startup where possible. Requests should fail per message with clear
+diagnostics and normal runtime failure behavior.
 
 ## Component Definition Template
 
@@ -91,15 +137,19 @@ Component:
   Role: source | sink | transform | utility
   Inputs:
   Outputs:
-  Configuration:
+  Options type:
+  Request/input type:
+  Result/output type:
+  Configuration fields:
+  Option validation:
+  Request validation:
   Diagnostics:
   Events:
   Failure behavior:
   Test cases:
 ```
 
-This keeps component design consistent and makes future migration from FluxMq
-less guessy.
+This keeps component design consistent and makes future migrations less guessy.
 
 ## Category Catalog
 
@@ -113,29 +163,29 @@ FluxFlow.Components.Mqtt
 
 Planned components:
 
-| Component | Role | Node type | Notes |
-|-----------|------|-----------|-------|
-| MQTT Trigger | source | `mqtt.trigger` | Subscribes to a topic/filter and emits messages. |
-| MQTT Publisher | sink | `mqtt.publisher` | Publishes incoming messages to a configured topic. |
-| MQTT Topic Filter | transform | `mqtt.topic-filter` | Routes or filters messages by topic pattern without broker access. |
-| MQTT Payload Decoder | transform | `mqtt.payload-decode` | Converts payload bytes/text into app-friendly values. |
-| MQTT Payload Encoder | transform | `mqtt.payload-encode` | Converts app values into publishable payloads. |
-| MQTT Connection Probe | source/utility | `mqtt.connection-probe` | Emits connection status diagnostics on a schedule. |
+| Component | Role | Node type | Contract shape | Notes |
+|-----------|------|-----------|----------------|-------|
+| MQTT Trigger | source | `mqtt.subscribe` | emits `MqttReceivedMessage` on `Output` | Subscribes to a topic/filter and emits messages. |
+| MQTT Publisher | sink | `mqtt.publish` | receives `MqttPublishRequest` on `Input`; optional `MqttPublishResult` on `Result` | Publishes requests using static defaults from `MqttPublishOptions`. |
+| MQTT Topic Filter | transform | `mqtt.topic-filter` | `Input` to `Output` with `MqttReceivedMessage` | Routes or filters messages by topic pattern without broker access. |
+| MQTT Payload Decoder | transform | `mqtt.payload-decode` | `Input` to `Output` with package-owned payload records | Converts payload bytes/text into app-friendly values. |
+| MQTT Payload Encoder | transform | `mqtt.payload-encode` | `Input` to `Output` with package-owned payload records | Converts app values into publishable payloads. |
+| MQTT Connection Probe | source/utility | `mqtt.connection-probe` | emits connection status on `Output` and diagnostics | Emits connection status diagnostics on a schedule. |
 
 Shared package pieces:
 
 - connection profile options
 - client adapter contract
 - client factory contract
-- message DTO
+- request, result, and message DTOs
 - topic matching helper
 - reconnect policy options
 - diagnostics and event names
 
 Recommendation:
 
-Use this as the first real package once FluxMq-side feature work settles,
-because it validates real source/sink behavior and adapter boundaries.
+Use this as the first real package once the first consumer's feature work
+settles, because it validates real source/sink behavior and adapter boundaries.
 
 ### HTTP
 
@@ -301,7 +351,7 @@ until the base diagnostics package proves useful.
 
 Option A: MQTT first.
 
-- Best match for FluxMq migration.
+- Best match for the first consumer migration.
 - Proves real source/sink behavior.
 - Needs adapter contracts before nodes.
 
@@ -309,7 +359,7 @@ Option B: Timers first.
 
 - Fastest way to prove package template.
 - No external service boundary.
-- Less directly useful for FluxMq migration.
+- Less directly useful for the first consumer migration.
 
 Option C: Files first.
 
