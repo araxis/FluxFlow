@@ -153,13 +153,15 @@ jobs:
 
       - name: Publish NuGet packages
         shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
 
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
             throw "Add the NUGET_API_KEY repository secret before publishing."
           }
 
-          dotnet nuget push "artifacts/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-          dotnet nuget push "artifacts/packages/*.snupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          dotnet nuget push "artifacts/packages/*.nupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          dotnet nuget push "artifacts/packages/*.snupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate
