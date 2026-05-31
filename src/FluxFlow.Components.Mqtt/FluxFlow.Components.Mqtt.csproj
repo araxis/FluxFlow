@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.2.1-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens MQTT adapter context, ownership, retained subscription options, lifecycle, and diagnostics.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds MQTT topic validation helpers and applies them to publish and subscribe nodes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

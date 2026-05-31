@@ -35,3 +35,13 @@ client lifetime.
 Subscriptions return `IMqttSubscription`; once `SubscribeAsync` returns,
 startup is considered successful. Each subscription should expose an independent
 message stream so shared clients can safely serve multiple nodes.
+
+## Topic validation
+
+Use `MqttTopicValidator.ValidatePublishTopic` and
+`MqttTopicValidator.ValidateSubscriptionFilter` when projecting host settings or
+building requests.
+
+Publish topics must be present and cannot contain MQTT wildcards. Subscription
+filters may use `+` as a complete level and `#` only as the final complete
+level. Both helpers also reject null characters and oversized encoded topics.

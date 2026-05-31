@@ -250,6 +250,20 @@ public sealed class MqttSubscribeNodeTests
     }
 
     [Fact]
+    public void SubscribeNode_RejectsInvalidTopicFilter()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(CreateContext(MqttComponentTypes.Subscribe, new { topicFilter = "devices/#/state" })));
+
+        exception.Message.ShouldContain("topicFilter");
+    }
+
+    [Fact]
     public async Task SubscribeNode_EmitsDiagnostics()
     {
         var adapter = new RecordingMqttClientAdapter(new MqttReceivedMessage

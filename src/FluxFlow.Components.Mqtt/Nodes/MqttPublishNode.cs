@@ -1,6 +1,7 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -120,11 +121,12 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         }
 
         var request = ResolveRequest(input);
-        if (string.IsNullOrWhiteSpace(request.Topic))
+        var topicValidation = MqttTopicValidator.ValidatePublishTopic(request.Topic);
+        if (!topicValidation.IsValid)
         {
             ReportPublishError(
                 MqttErrorCodes.PublishInvalidTopic,
-                "MQTT publish request requires a topic or a default topic option.",
+                topicValidation.Message ?? "MQTT publish request uses an invalid topic.",
                 request);
             return;
         }
@@ -155,7 +157,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
             var result = new MqttPublishResult
             {
                 Timestamp = DateTimeOffset.UtcNow,
-                Topic = request.Topic,
+                Topic = request.Topic!,
                 PayloadBytes = request.Payload.Length,
                 PayloadPreview = request.PayloadPreview,
                 QualityOfService = request.QualityOfService ?? _options.QualityOfService,

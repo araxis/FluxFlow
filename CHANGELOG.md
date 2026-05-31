@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt 0.2.1-alpha.1
+
+MQTT package topic validation polish.
+
+- Added public publish topic and subscription filter validation helpers.
+- Validated publish topics before adapter calls.
+- Validated default publish topics and subscription topic filters during node
+  creation.
+- Kept invalid topic handling on publish as `FlowError` so later messages can
+  continue processing.
+
 ## FluxFlow.Components.Mqtt 0.2.0-alpha.1
 
 MQTT package hardening for host integration.

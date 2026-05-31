@@ -148,7 +148,7 @@ public sealed class NodeAuthoringTests
         await runtime.StartAsync();
         await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        errors.TryReceive(out var error).ShouldBeTrue();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(FlowErrorCodes.ProcessingFailed);
         error.Message.ShouldContain("failed to process input");
     }

@@ -103,6 +103,49 @@ public sealed class MqttPublishNodeTests
     }
 
     [Fact]
+    public async Task PublishNode_ReportsErrorWhenTopicContainsWildcard()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var runtimeNode = factory(CreateContext(MqttComponentTypes.Publish, new { }));
+        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
+            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
+        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+
+        await runtimeNode.Node.StartAsync();
+        await input.Target.SendAsync(new MqttPublishRequest
+        {
+            Topic = "devices/+",
+            Payload = [1]
+        });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        adapter.Published.ShouldBeEmpty();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MqttErrorCodes.PublishInvalidTopic);
+        error.Message.ShouldContain("wildcard");
+    }
+
+    [Fact]
+    public void PublishNode_RejectsInvalidDefaultTopic()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(CreateContext(MqttComponentTypes.Publish, new { defaultTopic = "devices/#" })));
+
+        exception.Message.ShouldContain("defaultTopic");
+    }
+
+    [Fact]
     public async Task PublishNode_ReportsErrorWhenPayloadIsMissing()
     {
         var adapter = new RecordingMqttClientAdapter();

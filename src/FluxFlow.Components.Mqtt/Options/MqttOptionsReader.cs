@@ -1,3 +1,4 @@
+using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Definitions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -13,6 +14,7 @@ internal static class MqttOptionsReader
         var options = Read<MqttPublishOptions>(definition);
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
+        EnsureValidPublishTopic(options.DefaultTopic, nameof(options.DefaultTopic), required: false);
         return options;
     }
 
@@ -22,10 +24,7 @@ internal static class MqttOptionsReader
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
 
-        if (string.IsNullOrWhiteSpace(options.TopicFilter))
-        {
-            throw new InvalidOperationException("MQTT subscribe node requires a topic filter.");
-        }
+        EnsureValidSubscriptionFilter(options.TopicFilter, nameof(options.TopicFilter));
 
         return options;
     }
@@ -58,6 +57,29 @@ internal static class MqttOptionsReader
         if (!Enum.IsDefined(value))
         {
             throw new InvalidOperationException($"MQTT option '{name}' is not supported.");
+        }
+    }
+
+    private static void EnsureValidPublishTopic(string? value, string name, bool required)
+    {
+        if (!required && value is null)
+        {
+            return;
+        }
+
+        var result = MqttTopicValidator.ValidatePublishTopic(value);
+        if (!result.IsValid)
+        {
+            throw new InvalidOperationException($"MQTT option '{name}' is invalid: {result.Message}");
+        }
+    }
+
+    private static void EnsureValidSubscriptionFilter(string? value, string name)
+    {
+        var result = MqttTopicValidator.ValidateSubscriptionFilter(value);
+        if (!result.IsValid)
+        {
+            throw new InvalidOperationException($"MQTT option '{name}' is invalid: {result.Message}");
         }
     }
 
