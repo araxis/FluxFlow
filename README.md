@@ -153,9 +153,9 @@ await host.DisposeAsync();
 
 ## Documentation
 
-The package README is the current public entrypoint. The full docs set is being
-rebuilt around the standalone package boundary; see [docs/README.md](docs/README.md)
-for status.
+The package README is the short entrypoint. The focused docs set starts at
+[docs/README.md](docs/README.md) and covers getting started, definitions, node
+authoring, package authoring, hosting, observability, and workspace projection.
 
 ---
 

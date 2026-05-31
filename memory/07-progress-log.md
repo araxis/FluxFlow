@@ -62,7 +62,10 @@ Date: 2026-05-31
   neutral consumer sample.
 - Published `0.5.0-alpha.1` and verified a fresh public package restore from
   the NuGet feed.
+- Rewrote public docs around getting started, definitions, node authoring,
+  package authoring, hosting, observability, and workspace projection.
 
 ## Remaining
 
-- Rewrite detailed public docs from the legacy reference set.
+- Add deeper reference docs for validation, runtime states, JSON conversion, and
+  expression mapping.

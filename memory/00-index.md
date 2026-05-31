@@ -27,5 +27,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `21-component-package-roadmap.md`: future package split for reusable component families.
 - `22-package-authoring-helpers.md`: package module registration helper decision.
 - `23-release-0.5.md`: version 0.5 package release record.
+- `24-public-docs-rewrite.md`: focused public docs rewrite record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.
