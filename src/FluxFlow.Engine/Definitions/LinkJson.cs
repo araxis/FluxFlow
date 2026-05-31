@@ -42,18 +42,36 @@ public static class LinkJson
         if (from is null)
             throw new JsonException("Flow link object must contain a From property.");
 
-        var fromStr = from.Value.GetString()
-            ?? throw new JsonException("Flow link 'from' must be a string.");
+        var fromStr = ReadString(from.Value, "Flow link 'from' must be a string.");
 
         var when = ReadProperty(value, "when") ?? ReadProperty(value, "When");
 
         return new LinkDefinition
         {
             From = PortAddress.ExpandAndParse(fromStr, workflowName),
-            When = when?.GetString() ?? defaultWhen
+            When = when is null
+                ? defaultWhen
+                : ReadOptionalString(when.Value, "Flow link 'when' must be a string.") ?? defaultWhen
         };
     }
 
     private static JsonElement? ReadProperty(JsonElement value, string propertyName)
         => value.TryGetProperty(propertyName, out var property) ? property : null;
+
+    private static string ReadString(JsonElement value, string errorMessage)
+    {
+        if (value.ValueKind != JsonValueKind.String)
+            throw new JsonException(errorMessage);
+
+        return value.GetString()
+            ?? throw new JsonException(errorMessage);
+    }
+
+    private static string? ReadOptionalString(JsonElement value, string errorMessage)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+            return null;
+
+        return ReadString(value, errorMessage);
+    }
 }

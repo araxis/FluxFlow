@@ -90,11 +90,10 @@ public static class ApplicationDefinitionJson
                 : root.TryGetProperty("From", out var fUpper) ? fUpper
                 : throw new JsonException("Flow link object must contain a From property.");
 
-            var fromStr = from.GetString()
-                ?? throw new JsonException("Flow link 'from' must be a string.");
+            var fromStr = ReadString(from, "Flow link 'from' must be a string.");
 
-            var when = root.TryGetProperty("when", out var w) ? w.GetString()
-                : root.TryGetProperty("When", out var wUpper) ? wUpper.GetString()
+            var when = root.TryGetProperty("when", out var w) ? ReadOptionalString(w, "Flow link 'when' must be a string.")
+                : root.TryGetProperty("When", out var wUpper) ? ReadOptionalString(wUpper, "Flow link 'when' must be a string.")
                 : null;
 
             return new LinkDefinition
@@ -111,6 +110,23 @@ public static class ApplicationDefinitionJson
             if (!string.IsNullOrWhiteSpace(value.When))
                 writer.WriteString("when", value.When);
             writer.WriteEndObject();
+        }
+
+        private static string ReadString(JsonElement value, string errorMessage)
+        {
+            if (value.ValueKind != JsonValueKind.String)
+                throw new JsonException(errorMessage);
+
+            return value.GetString()
+                ?? throw new JsonException(errorMessage);
+        }
+
+        private static string? ReadOptionalString(JsonElement value, string errorMessage)
+        {
+            if (value.ValueKind == JsonValueKind.Null)
+                return null;
+
+            return ReadString(value, errorMessage);
         }
     }
 

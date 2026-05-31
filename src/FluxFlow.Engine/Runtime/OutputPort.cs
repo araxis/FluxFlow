@@ -1,5 +1,6 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Engine.Runtime;
@@ -21,6 +22,24 @@ public abstract class OutputPort : IDisposable, IAsyncDisposable
         InputPort input,
         bool propagateCompletion,
         out ApplicationRuntimeBuildError? error);
+
+    public virtual IDisposable? TryLinkTo(
+        InputPort input,
+        bool propagateCompletion,
+        IFlowPredicate<object?>? condition,
+        out ApplicationRuntimeBuildError? error)
+    {
+        if (condition is null)
+        {
+            return TryLinkTo(input, propagateCompletion, out error);
+        }
+
+        error = new(
+            ApplicationRuntimeBuildErrorCode.LinkFailed,
+            $"Output port '{Address}' does not support conditional links.",
+            PortName: input.Address.Port);
+        return null;
+    }
 
     public abstract IDisposable LinkToDiscard();
 
@@ -68,6 +87,13 @@ public sealed class OutputPort<T> : OutputPort
         InputPort input,
         bool propagateCompletion,
         out ApplicationRuntimeBuildError? error)
+        => TryLinkTo(input, propagateCompletion, condition: null, out error);
+
+    public override IDisposable? TryLinkTo(
+        InputPort input,
+        bool propagateCompletion,
+        IFlowPredicate<object?>? condition,
+        out ApplicationRuntimeBuildError? error)
     {
         if (input is not InputPort<T> typedInput)
         {
@@ -87,6 +113,7 @@ public sealed class OutputPort<T> : OutputPort
                 link = new FanoutLink(
                     typedInput.Target,
                     propagateCompletion,
+                    condition,
                     RemoveLink);
                 _links.Add(link);
                 StartPumpIfNeeded();
@@ -114,6 +141,7 @@ public sealed class OutputPort<T> : OutputPort
             link = new FanoutLink(
                 DataflowBlock.NullTarget<T>(),
                 propagateCompletion: false,
+                condition: null,
                 RemoveLink);
             _links.Add(link);
             StartPumpIfNeeded();
@@ -246,6 +274,11 @@ public sealed class OutputPort<T> : OutputPort
 
         try
         {
+            if (!link.IsMatch(item))
+            {
+                return;
+            }
+
             var accepted = await link.Target.SendAsync(item, link.CancellationToken).ConfigureAwait(false);
             if (!accepted && !link.IsDisposed)
             {
@@ -310,18 +343,24 @@ public sealed class OutputPort<T> : OutputPort
         public FanoutLink(
             ITargetBlock<T> target,
             bool propagateCompletion,
+            IFlowPredicate<object?>? condition,
             Action<FanoutLink> remove)
         {
             Target = target;
             PropagateCompletion = propagateCompletion;
+            Condition = condition;
             _remove = remove;
             _cancellationToken = _disposedToken.Token;
         }
 
         public ITargetBlock<T> Target { get; }
         public bool PropagateCompletion { get; }
+        public IFlowPredicate<object?>? Condition { get; }
         public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
         public CancellationToken CancellationToken => _cancellationToken;
+
+        public bool IsMatch(T item)
+            => Condition is null || Condition.IsMatch(item);
 
         public void Dispose()
         {

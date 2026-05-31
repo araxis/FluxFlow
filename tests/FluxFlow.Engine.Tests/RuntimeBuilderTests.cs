@@ -69,6 +69,57 @@ public sealed class RuntimeBuilderTests
     }
 
     [Fact]
+    public void Build_LinkWithNonStringCondition_ReturnsValidationError()
+    {
+        var builder = new ApplicationRuntimeBuilder(new RuntimeNodeFactoryRegistry());
+
+        var definition = new ApplicationDefinition
+        {
+            Workflows = new Dictionary<string, WorkflowDefinition>
+            {
+                ["smoke"] = new()
+                {
+                    Nodes = new Dictionary<string, NodeDefinition>
+                    {
+                        ["source"] = new() { Type = new NodeType("test.source") },
+                        ["sink"] = new()
+                        {
+                            Type = new NodeType("test.sink"),
+                            Ports =
+                            {
+                                ["Input"] = JsonValue(new { from = "source.Output", when = 1 })
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var result = builder.Build(definition);
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Errors.ShouldContain(error => error.Message.Contains("when"));
+    }
+
+    [Fact]
+    public void NodeDefinition_NullLinkConditionUsesNodeDefaultCondition()
+    {
+        var node = new NodeDefinition
+        {
+            Type = new NodeType("test.sink"),
+            When = "input > 0",
+            Ports =
+            {
+                ["Input"] = JsonValue(new { from = "source.Output", when = (string?)null })
+            }
+        };
+
+        var links = node.GetPortLinks("Input", "smoke");
+
+        links.Single().When.ShouldBe("input > 0");
+    }
+
+    [Fact]
     public async Task Build_RegisteredNodeType_Succeeds_AndNodeStarts()
     {
         var registry = new RuntimeNodeFactoryRegistry();
@@ -136,6 +187,9 @@ public sealed class RuntimeBuilderTests
         definition.ShouldNotBeNull();
         definition.Workflows.Keys.ShouldBe(["smoke"]);
     }
+
+    private static JsonElement JsonValue<T>(T value)
+        => JsonSerializer.SerializeToElement(value);
 
     // ── Minimal protocol-neutral IFlowNode ────────────────────────────────────
     private sealed class NoopNode : IFlowNode

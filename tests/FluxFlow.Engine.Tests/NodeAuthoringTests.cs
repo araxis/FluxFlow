@@ -56,6 +56,62 @@ public sealed class NodeAuthoringTests
     }
 
     [Fact]
+    public async Task RuntimeBuilder_AppliesConditionalLinkExpressions()
+    {
+        var evenValues = new List<int>();
+        var oddValues = new List<int>();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(new NodeType("test.sequence"), SequenceNode.Create)
+            .Register(new NodeType("test.collect-even"), context => CollectNode.Create(context, evenValues))
+            .Register(new NodeType("test.collect-odd"), context => CollectNode.Create(context, oddValues));
+
+        var runtime = BuildRuntime(registry, new ApplicationDefinition
+        {
+            Workflows = new Dictionary<string, WorkflowDefinition>
+            {
+                ["main"] = new()
+                {
+                    Nodes = new Dictionary<string, NodeDefinition>
+                    {
+                        ["source"] = new() { Type = new NodeType("test.sequence") },
+                        ["even"] = new()
+                        {
+                            Type = new NodeType("test.collect-even"),
+                            Ports =
+                            {
+                                ["Input"] = JsonValue(new
+                                {
+                                    from = "source.Output",
+                                    when = "input % 2 == 0"
+                                })
+                            }
+                        },
+                        ["odd"] = new()
+                        {
+                            Type = new NodeType("test.collect-odd"),
+                            Ports =
+                            {
+                                ["Input"] = JsonValue(new
+                                {
+                                    from = "source.Output",
+                                    when = "input % 2 != 0"
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        await using var _ = runtime;
+        await runtime.StartAsync();
+        await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        evenValues.ShouldBe([2]);
+        oddValues.ShouldBe([1, 3]);
+    }
+
+    [Fact]
     public async Task SinkBase_ReportsProcessingErrorsAndCompletes()
     {
         var registry = new RuntimeNodeFactoryRegistry()
@@ -265,7 +321,7 @@ public sealed class NodeAuthoringTests
         return result.Runtime!;
     }
 
-    private static System.Text.Json.JsonElement JsonValue(string value)
+    private static System.Text.Json.JsonElement JsonValue<T>(T value)
         => System.Text.Json.JsonSerializer.SerializeToElement(value);
 
     private sealed class SequenceNode : SourceFlowNode<int>

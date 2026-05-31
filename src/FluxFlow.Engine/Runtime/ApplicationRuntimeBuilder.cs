@@ -1,4 +1,5 @@
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 
 namespace FluxFlow.Engine.Runtime;
 
@@ -6,13 +7,16 @@ public sealed class ApplicationRuntimeBuilder
 {
     private readonly RuntimeNodeFactoryRegistry _factories;
     private readonly ApplicationDefinitionValidator _validator;
+    private readonly IFlowExpressionEngine _linkConditionExpressionEngine;
 
     public ApplicationRuntimeBuilder(
         RuntimeNodeFactoryRegistry factories,
-        ApplicationDefinitionValidator? validator = null)
+        ApplicationDefinitionValidator? validator = null,
+        IFlowExpressionEngine? linkConditionExpressionEngine = null)
     {
         _factories = factories;
         _validator = validator ?? new ApplicationDefinitionValidator();
+        _linkConditionExpressionEngine = linkConditionExpressionEngine ?? new DynamicExpressoFlowExpressionEngine();
     }
 
     public ApplicationRuntimeBuildResult Build(ApplicationDefinition definition)
@@ -132,7 +136,7 @@ public sealed class ApplicationRuntimeBuilder
         return nodes;
     }
 
-    private static void LinkWorkflows(
+    private void LinkWorkflows(
         ApplicationDefinition definition,
         IReadOnlyDictionary<NodeName, RuntimeNode> resources,
         IReadOnlyDictionary<string, IReadOnlyDictionary<NodeName, RuntimeNode>> workflows,
@@ -167,7 +171,7 @@ public sealed class ApplicationRuntimeBuilder
                         continue;
                     }
 
-                    var resolvedLinks = new List<OutputPort>();
+                    var resolvedLinks = new List<ResolvedOutputLink>();
                     foreach (var link in portLinks.Value)
                     {
                         if (!TryFindSource(link.From, workflows, resources, out var sourceNode))
@@ -187,14 +191,18 @@ public sealed class ApplicationRuntimeBuilder
                             continue;
                         }
 
-                        resolvedLinks.Add(output);
+                        resolvedLinks.Add(new ResolvedOutputLink(output, CreateLinkCondition(link)));
                     }
 
                     var shouldCoordinateCompletion = resolvedLinks.Count > 1;
                     var linkedOutputs = new List<OutputPort>();
-                    foreach (var output in resolvedLinks)
+                    foreach (var resolvedLink in resolvedLinks)
                     {
-                        var disposable = output.TryLinkTo(input, propagateCompletion: !shouldCoordinateCompletion, out var error);
+                        var disposable = resolvedLink.Output.TryLinkTo(
+                            input,
+                            propagateCompletion: !shouldCoordinateCompletion,
+                            resolvedLink.Condition,
+                            out var error);
                         if (error is not null)
                         {
                             errors.Add(error with
@@ -210,8 +218,8 @@ public sealed class ApplicationRuntimeBuilder
                         {
                             links.Add(disposable);
                             linkedTargets.Add(targetNode);
-                            linkedOutputs.Add(output);
-                            allLinkedOutputs.Add(output);
+                            linkedOutputs.Add(resolvedLink.Output);
+                            allLinkedOutputs.Add(resolvedLink.Output);
                         }
                     }
 
@@ -223,6 +231,11 @@ public sealed class ApplicationRuntimeBuilder
             }
         }
     }
+
+    private IFlowPredicate<object?>? CreateLinkCondition(LinkDefinition link)
+        => string.IsNullOrWhiteSpace(link.When)
+            ? null
+            : new ExpressionFlowPredicate<object?>(link.When, _linkConditionExpressionEngine);
 
     private static void DrainUnlinkedOutputs(
         IEnumerable<RuntimeNode> resources,
@@ -309,6 +322,10 @@ public sealed class ApplicationRuntimeBuilder
 
     private static PortName? ToPortName(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : new PortName(value);
+
+    private sealed record ResolvedOutputLink(
+        OutputPort Output,
+        IFlowPredicate<object?>? Condition);
 
     private sealed class InputCompletionLink : IDisposable
     {

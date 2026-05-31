@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0-alpha.1
+
+Conditional link runtime behavior.
+
+- Added runtime evaluation for link `when` expressions.
+- Added `ExpressionFlowPredicate<TInput>` for expression-backed predicates.
+- Allowed expression predicates to use custom `IFlowMapContextFactory<TInput>`
+  implementations.
+- Added an `OutputPort.TryLinkTo` overload that accepts an optional predicate.
+- Kept existing unconditional link APIs working unchanged.
+
 ## 0.3.0-alpha.1
 
 Neutral event metadata naming.

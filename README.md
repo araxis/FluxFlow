@@ -36,6 +36,7 @@ protocol-specific dependencies.
 |---------|-------------|
 | **Typed ports** | `InputPort<T>` / `OutputPort<T>`; type mismatches are caught at build time |
 | **Reliable fan-out** | Runtime-owned output delivery sends each item to every linked input |
+| **Conditional links** | Link-level `when` expressions route each output item to matching inputs |
 | **Phase-ordered startup** | Nodes declare a `phase` integer; the runtime starts lower phases first |
 | **Completion propagation** | Entry nodes drive completion through the whole graph |
 | **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
@@ -110,11 +111,21 @@ var result = await host.StartAsync();
   "workflows": {
     "main": {
       "source": { "type": "demo.numbers" },
-      "sink":   { "type": "demo.printer", "Input": "source.Output" }
+      "even": {
+        "type": "demo.printer",
+        "Input": { "from": "source.Output", "when": "input % 2 == 0" }
+      },
+      "odd": {
+        "type": "demo.printer",
+        "Input": { "from": "source.Output", "when": "input % 2 != 0" }
+      }
     }
   }
 }
 ```
+
+The default link condition engine exposes the current output item as `input`
+and `value`. If no `when` expression is set, the link receives every item.
 
 ### 3. Register, build, run
 

@@ -22,5 +22,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `16-fluxmq-migration-spike-review.md`: review of the FluxMq migration spike report and recommended sequencing.
 - `17-engine-boundary-version.md`: version 0.2 engine-only boundary decision.
 - `18-event-channel-rename.md`: version 0.3 neutral event channel naming decision.
+- `19-conditional-links.md`: version 0.4 conditional link runtime decision.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

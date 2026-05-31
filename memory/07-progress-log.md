@@ -46,6 +46,7 @@ Date: 2026-05-31
 - Started `0.2.0-alpha.1` as the engine-only boundary version by removing scenario/test ownership from the core package.
 - Started `0.3.0-alpha.1` to rename flow event route metadata to `Channel`.
 - Published `0.3.0-alpha.1` and verified a fresh package install from the public feed after clearing stale local HTTP cache.
+- Started `0.4.0-alpha.1` to add runtime behavior for link `when` expressions.
 
 ## Remaining
 

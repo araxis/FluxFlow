@@ -1,6 +1,7 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Core;
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -44,6 +45,44 @@ public sealed class RuntimeLifecycleTests
 
         (await fastRead.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe([1, 2, 3, 4, 5]);
         (await slowRead.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe([1, 2, 3, 4, 5]);
+    }
+
+    [Fact]
+    public async Task OutputPort_DeliversOnlyMatchingValuesToConditionalLinks()
+    {
+        var source = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 1 });
+        var output = new OutputPort<int>(
+            new PortAddress("main", new NodeName("source"), new PortName("Output")),
+            source);
+        var evenTarget = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 10 });
+        var oddTarget = new BufferBlock<int>(new DataflowBlockOptions { BoundedCapacity = 10 });
+
+        output.TryLinkTo(
+            Input("even", evenTarget),
+            propagateCompletion: true,
+            new DelegateFlowPredicate<object?>(value => (int)value! % 2 == 0),
+            out var evenError).ShouldNotBeNull();
+        evenError.ShouldBeNull();
+        output.TryLinkTo(
+            Input("odd", oddTarget),
+            propagateCompletion: true,
+            new DelegateFlowPredicate<object?>(value => (int)value! % 2 != 0),
+            out var oddError).ShouldNotBeNull();
+        oddError.ShouldBeNull();
+
+        var evenRead = ReceiveAllAsync(evenTarget);
+        var oddRead = ReceiveAllAsync(oddTarget);
+
+        for (var value = 1; value <= 5; value++)
+        {
+            await source.SendAsync(value);
+        }
+
+        source.Complete();
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await evenRead.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe([2, 4]);
+        (await oddRead.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe([1, 3, 5]);
     }
 
     [Fact]
