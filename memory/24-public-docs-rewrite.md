@@ -16,6 +16,7 @@ Added docs:
 - `docs/05-hosting-and-observability.md`
 - `docs/06-workspace-projection.md`
 - `docs/07-validation-and-errors.md`
+- `docs/08-runtime-states.md`
 
 ## Decisions
 
@@ -29,7 +30,6 @@ Added docs:
 
 Add deeper reference docs only where users need exact behavior:
 
-- runtime states
 - JSON conversion details
 - expression mapping details
 - package versioning guidance

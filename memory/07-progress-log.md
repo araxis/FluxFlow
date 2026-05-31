@@ -67,8 +67,10 @@ Date: 2026-05-31
 - Added a validation and errors reference page covering definition validation,
   runtime build failures, host lifecycle failures, runtime streams, and
   troubleshooting.
+- Added a runtime states reference page covering host state, application runtime
+  state, workflow state, startup order, stop/completion behavior, state streams,
+  and dashboard usage.
 
 ## Remaining
 
-- Add deeper reference docs for runtime states, JSON conversion, and expression
-  mapping.
+- Add deeper reference docs for JSON conversion and expression mapping.

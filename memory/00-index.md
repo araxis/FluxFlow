@@ -29,5 +29,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `23-release-0.5.md`: version 0.5 package release record.
 - `24-public-docs-rewrite.md`: focused public docs rewrite record.
 - `25-validation-errors-docs.md`: structured validation and error docs record.
+- `26-runtime-states-docs.md`: runtime, workflow, and host state docs record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

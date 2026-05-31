@@ -16,6 +16,7 @@ the engine, and only executable resources and workflows are projected into
 5. [Hosting And Observability](05-hosting-and-observability.md)
 6. [Workspace Projection](06-workspace-projection.md)
 7. [Validation And Errors](07-validation-and-errors.md)
+8. [Runtime States](08-runtime-states.md)
 
 ## Current Boundary
 

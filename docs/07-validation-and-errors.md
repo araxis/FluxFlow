@@ -187,3 +187,5 @@ structured error surface.
 | `LinkFailed` | Check conditional-link support and any custom output port implementation. |
 | `StartFailed` | Inspect `LastException`, node diagnostics, and startup hooks. |
 | `CleanupFailed` | Treat it as a secondary failure after the primary build error. |
+
+Next: [Runtime States](08-runtime-states.md)
