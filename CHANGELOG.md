@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0-alpha.1
+
+Neutral event metadata naming.
+
+- Renamed `FlowEvent.Topic` to `FlowEvent.Channel`.
+- Renamed the `EventFlowNodeBase.EmitEvent(... topic ...)` helper parameter
+  to `channel`.
+- Kept channel as first-class event metadata instead of moving it into
+  attributes.
+
 ## 0.2.0-alpha.1
 
 Engine-only prerelease boundary.

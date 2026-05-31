@@ -29,7 +29,7 @@ public abstract class EventFlowNodeBase : FlowNodeBase, IFlowEventSource
         string? source = null,
         string? subject = null,
         string? status = null,
-        string? topic = null,
+        string? channel = null,
         int? payloadBytes = null,
         string? payloadPreview = null,
         IReadOnlyDictionary<string, string>? attributes = null)
@@ -41,7 +41,7 @@ public abstract class EventFlowNodeBase : FlowNodeBase, IFlowEventSource
             SourceNodeId = Id,
             Subject = subject,
             Status = status,
-            Topic = topic,
+            Channel = channel,
             PayloadBytes = payloadBytes,
             PayloadPreview = payloadPreview,
             Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)

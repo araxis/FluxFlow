@@ -1,0 +1,29 @@
+# Event Channel Rename
+
+Date: 2026-05-31
+
+## Decision
+
+Use `Channel` as the first-class route/group label on `FlowEvent`.
+
+## Reasoning
+
+`Topic` was readable for publish/subscribe style event streams, but it also
+suggested a specific transport vocabulary. The engine should stay neutral, so
+the generic event metadata is now named `Channel`.
+
+Keeping this as a property is still useful:
+
+- Dashboard and logging adapters can group events without parsing attributes.
+- Component packages can map their own domain-specific route names into this
+  neutral field.
+- Applications still have `Attributes` for details that are not common enough
+  to belong on the core event contract.
+
+## API Change
+
+- `FlowEvent.Topic` becomes `FlowEvent.Channel`.
+- `EventFlowNodeBase.EmitEvent(... topic ...)` becomes
+  `EventFlowNodeBase.EmitEvent(... channel ...)`.
+
+This is a prerelease breaking change and is planned for `0.3.0-alpha.1`.

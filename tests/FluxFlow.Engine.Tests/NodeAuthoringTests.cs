@@ -229,6 +229,24 @@ public sealed class NodeAuthoringTests
     }
 
     [Fact]
+    public async Task EventFlowNodeBase_EmitsChannelMetadata()
+    {
+        var node = new EventReportingNode();
+        var events = new BufferBlock<FlowEvent>();
+        node.Events.LinkTo(
+            events,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        node.Report();
+        node.Complete();
+
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        flowEvent.Type.ShouldBe("node.event");
+        flowEvent.Channel.ShouldBe("demo.channel");
+        await events.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void RegistrationContract_CanUsePublicNodePorts()
     {
         var registry = new RuntimeNodeFactoryRegistry()
@@ -383,6 +401,12 @@ public sealed class NodeAuthoringTests
                 {
                     ["count"] = count
                 });
+    }
+
+    private sealed class EventReportingNode : EventFlowNodeBase
+    {
+        public void Report()
+            => EmitEvent("node.event", channel: "demo.channel");
     }
 
     private sealed class PublicSequenceNode : SourceFlowNode<int>

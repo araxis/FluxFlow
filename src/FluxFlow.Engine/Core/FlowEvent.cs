@@ -10,7 +10,7 @@ public sealed record FlowEvent
     public FlowNodeId? SourceNodeId { get; init; }
     public string? Subject { get; init; }
     public string? Status { get; init; }
-    public string? Topic { get; init; }
+    public string? Channel { get; init; }
     public int? PayloadBytes { get; init; }
     public string? PayloadPreview { get; init; }
     public IReadOnlyDictionary<string, string> Attributes { get; init; } = EmptyAttributes;

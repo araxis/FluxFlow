@@ -44,6 +44,7 @@ Date: 2026-05-31
 - Upgraded release automation so tag/manual releases build, test, pack, publish NuGet packages, upload artifacts, and create or update GitHub Releases.
 - Published `0.1.0-alpha.1` to NuGet and verified package install from the public feed.
 - Started `0.2.0-alpha.1` as the engine-only boundary version by removing scenario/test ownership from the core package.
+- Started `0.3.0-alpha.1` to rename flow event route metadata to `Channel`.
 
 ## Remaining
 
