@@ -15,6 +15,7 @@ Added docs:
 - `docs/04-package-authoring.md`
 - `docs/05-hosting-and-observability.md`
 - `docs/06-workspace-projection.md`
+- `docs/07-validation-and-errors.md`
 
 ## Decisions
 
@@ -28,7 +29,6 @@ Added docs:
 
 Add deeper reference docs only where users need exact behavior:
 
-- validation errors
 - runtime states
 - JSON conversion details
 - expression mapping details

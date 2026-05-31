@@ -64,8 +64,11 @@ Date: 2026-05-31
   the NuGet feed.
 - Rewrote public docs around getting started, definitions, node authoring,
   package authoring, hosting, observability, and workspace projection.
+- Added a validation and errors reference page covering definition validation,
+  runtime build failures, host lifecycle failures, runtime streams, and
+  troubleshooting.
 
 ## Remaining
 
-- Add deeper reference docs for validation, runtime states, JSON conversion, and
-  expression mapping.
+- Add deeper reference docs for runtime states, JSON conversion, and expression
+  mapping.

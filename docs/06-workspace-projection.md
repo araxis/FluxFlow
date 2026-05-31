@@ -67,3 +67,5 @@ var host = FlowApplicationHost.Create(definition, registry);
 This boundary lets each app choose its own file format and UI concepts without
 forcing those concepts into the engine package. The same engine runtime can then
 be reused by apps with very different workspace models.
+
+Next: [Validation And Errors](07-validation-and-errors.md)

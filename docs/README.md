@@ -15,6 +15,7 @@ the engine, and only executable resources and workflows are projected into
 4. [Package Authoring](04-package-authoring.md)
 5. [Hosting And Observability](05-hosting-and-observability.md)
 6. [Workspace Projection](06-workspace-projection.md)
+7. [Validation And Errors](07-validation-and-errors.md)
 
 ## Current Boundary
 
@@ -26,6 +27,7 @@ the engine, and only executable resources and workflows are projected into
 - lifecycle coordination
 - fanout and conditional links
 - event and diagnostic aggregation
+- structured validation and build errors
 - node and package authoring helpers
 
 Applications and component packages own:

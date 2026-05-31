@@ -19,7 +19,7 @@ package-authoring improvements.
 3. Decide whether `0.5.0-alpha.1` should include only samples/docs or a small
    registration helper. Done and published.
 4. Rewrite detailed public docs from the legacy reference set. Initial focused
-   set done.
+   set plus validation/errors reference done.
 5. Keep release automation healthy for the next prerelease.
 
 ## First Consumer Pilot

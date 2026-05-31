@@ -155,7 +155,8 @@ await host.DisposeAsync();
 
 The package README is the short entrypoint. The focused docs set starts at
 [docs/README.md](docs/README.md) and covers getting started, definitions, node
-authoring, package authoring, hosting, observability, and workspace projection.
+authoring, package authoring, hosting, observability, workspace projection, and
+validation and error handling.
 
 ---
 
