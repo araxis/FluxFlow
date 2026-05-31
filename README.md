@@ -192,7 +192,8 @@ Applications add those behaviors by:
 3. Composing flows as JSON that FluxFlow.Engine builds and runs
 
 Component packages should own their own options, validation, event names, tests,
-and documentation.
+and documentation. They can expose an `IFlowNodeModule` or a registry extension
+that registers one module.
 
 Applications are free to keep richer workspace files with dashboards, tests,
 connections, or UI state. Project only the executable resources and workflows

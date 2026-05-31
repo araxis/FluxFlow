@@ -15,9 +15,9 @@ package-authoring improvements.
 ## Near-Term Work
 
 1. Add a neutral consumer sample that mirrors the FluxMq integration shape. Done.
-2. Review package-authoring ergonomics exposed by the FluxMq factory registry.
+2. Review package-authoring ergonomics exposed by the FluxMq factory registry. Done.
 3. Decide whether `0.5.0-alpha.1` should include only samples/docs or a small
-   registration helper.
+   registration helper. Decided: include the small module registration helper.
 4. Rewrite detailed public docs from the legacy reference set.
 5. Keep release automation healthy for the next prerelease.
 

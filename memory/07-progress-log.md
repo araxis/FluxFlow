@@ -56,6 +56,8 @@ Date: 2026-05-31
 - Added a neutral consumer-style sample app that projects app-owned workspace
   metadata into `ApplicationDefinition`, registers typed components explicitly,
   and models bounded Dataflow blocks for sample package authors.
+- Added package-authoring registration helpers: `FlowNodeRegistration`,
+  `IFlowNodeModule`, and `FlowNodeModule`.
 
 ## Remaining
 

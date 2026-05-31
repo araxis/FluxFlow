@@ -33,6 +33,8 @@ rewriting the package docs around the current boundary.
 - `MapFlowNode<TInput,TOutput>`: one-output transform node.
 - `RuntimeNodeBuilder`: fluent input/output registration for node factories.
 - `IFlowNodeRegistration`: package-friendly factory registration contract.
+- `FlowNodeRegistration`: delegate-backed registration helper.
+- `IFlowNodeModule` / `FlowNodeModule`: package-friendly registration group.
 - `ExpressionFlowPredicate<TInput>`: expression-backed predicate for link
   conditions and custom routing helpers. It can use the default `input` and
   `value` variables or a custom `IFlowMapContextFactory<TInput>`.

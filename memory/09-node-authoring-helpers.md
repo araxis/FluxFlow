@@ -19,7 +19,9 @@ valid.
 - `RuntimeNodeBuilder`: fluent factory helper for registering ports.
 - `RuntimeNodeFactoryContextExtensions`: small helpers for port addresses and builder creation.
 - `IFlowNodeRegistration`: component-package registration contract.
-- `RuntimeNodeFactoryRegistryExtensions`: registration helpers for one or more registration objects.
+- `FlowNodeRegistration`: delegate-backed registration helper.
+- `IFlowNodeModule` and `FlowNodeModule`: component-family registration grouping.
+- `RuntimeNodeFactoryRegistryExtensions`: registration helpers for registrations and modules.
 
 ## Design Rules
 

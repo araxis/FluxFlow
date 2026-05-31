@@ -164,6 +164,84 @@ public sealed class NodeAuthoringTests
     }
 
     [Fact]
+    public void DelegateRegistration_AddsFactoryToRegistry()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(new FlowNodeRegistration(new NodeType("test.sequence"), SequenceNode.Create));
+
+        registry.TryGetFactory(new NodeType("test.sequence"), out var factory).ShouldBeTrue();
+        factory.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void NodeModule_AddsAllFactoriesToRegistry()
+    {
+        var module = new FlowNodeModule(
+            new FlowNodeRegistration(new NodeType("test.sequence"), SequenceNode.Create),
+            new FlowNodeRegistration(new NodeType("test.public-sequence"), PublicSequenceNode.Create));
+
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(module);
+
+        registry.TryGetFactory(new NodeType("test.sequence"), out _).ShouldBeTrue();
+        registry.TryGetFactory(new NodeType("test.public-sequence"), out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void NodeModules_AddAllFactoriesToRegistry()
+    {
+        var modules = new IFlowNodeModule[]
+        {
+            new FlowNodeModule(new FlowNodeRegistration(new NodeType("test.sequence"), SequenceNode.Create)),
+            new FlowNodeModule(new FlowNodeRegistration(new NodeType("test.fail"), FailingSinkNode.Create))
+        };
+
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterModules(modules);
+
+        registry.TryGetFactory(new NodeType("test.sequence"), out _).ShouldBeTrue();
+        registry.TryGetFactory(new NodeType("test.fail"), out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void RegistrationRange_DoesNotPartiallyRegisterDuplicateSet()
+    {
+        var registry = new RuntimeNodeFactoryRegistry();
+        var duplicate = new NodeType("test.sequence");
+        var next = new NodeType("test.public-sequence");
+
+        var exception = Should.Throw<InvalidOperationException>(() => registry.RegisterRange(
+        [
+            new FlowNodeRegistration(duplicate, SequenceNode.Create),
+            new FlowNodeRegistration(duplicate, SequenceNode.Create),
+            new FlowNodeRegistration(next, PublicSequenceNode.Create)
+        ]));
+
+        exception.Message.ShouldContain(duplicate.Value);
+        registry.TryGetFactory(duplicate, out _).ShouldBeFalse();
+        registry.TryGetFactory(next, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void RegistrationRange_DoesNotPartiallyRegisterWhenTypeAlreadyExists()
+    {
+        var existing = new NodeType("test.sequence");
+        var next = new NodeType("test.public-sequence");
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(existing, SequenceNode.Create);
+
+        var exception = Should.Throw<InvalidOperationException>(() => registry.RegisterRange(
+        [
+            new FlowNodeRegistration(existing, SequenceNode.Create),
+            new FlowNodeRegistration(next, PublicSequenceNode.Create)
+        ]));
+
+        exception.Message.ShouldContain(existing.Value);
+        registry.TryGetFactory(existing, out _).ShouldBeTrue();
+        registry.TryGetFactory(next, out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task FlowNodeBase_FaultCompletesErrorsAfterQueuedDiagnostics()
     {
         var node = new ErrorReportingNode();

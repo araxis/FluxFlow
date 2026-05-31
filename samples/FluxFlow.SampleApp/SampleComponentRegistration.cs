@@ -19,9 +19,25 @@ internal static class SampleComponentRegistration
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(store);
 
-        return registry
-            .Register(SampleNodeTypes.OrderSource, OrderSourceNode.Create)
-            .Register(SampleNodeTypes.OrderReview, OrderReviewNode.Create)
-            .Register(SampleNodeTypes.OrderSink, context => OrderSinkNode.Create(context, store));
+        return registry.Register(new SampleOrderModule(store));
     }
+}
+
+internal sealed class SampleOrderModule : IFlowNodeModule
+{
+    public SampleOrderModule(InMemoryOrderStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        Registrations =
+        [
+            new FlowNodeRegistration(SampleNodeTypes.OrderSource, OrderSourceNode.Create),
+            new FlowNodeRegistration(SampleNodeTypes.OrderReview, OrderReviewNode.Create),
+            new FlowNodeRegistration(
+                SampleNodeTypes.OrderSink,
+                context => OrderSinkNode.Create(context, store))
+        ];
+    }
+
+    public IReadOnlyCollection<IFlowNodeRegistration> Registrations { get; }
 }

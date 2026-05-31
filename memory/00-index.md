@@ -25,5 +25,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `19-conditional-links.md`: version 0.4 conditional link runtime decision.
 - `20-fluxmq-migration-result.md`: first consumer migration result and remaining cleanup.
 - `21-component-package-roadmap.md`: future package split for reusable component families.
+- `22-package-authoring-helpers.md`: package module registration helper decision.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

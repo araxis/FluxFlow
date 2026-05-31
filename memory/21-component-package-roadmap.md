@@ -80,8 +80,9 @@ package after the core component package has settled.
 ## Sequence
 
 1. Record the FluxMq migration result. Done.
-2. Add a small neutral consumer sample in FluxFlow.
-3. Introduce a package registration helper pattern in the engine if needed.
+2. Add a small neutral consumer sample in FluxFlow. Done.
+3. Introduce a package registration helper pattern in the engine if needed. Done
+   with `IFlowNodeModule`, `FlowNodeModule`, and `FlowNodeRegistration`.
 4. Extract one package family, preferably MQTT, only after FluxMq feature work
    settles.
 5. Publish the package as a prerelease and migrate FluxMq from local components

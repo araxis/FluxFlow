@@ -10,7 +10,7 @@ The sample workspace owns extra sections:
 
 Only `Resources` and `Workflows` are projected into `ApplicationDefinition`.
 The sample also shows package-style component registration through
-`RegisterSampleOrderComponents`.
+`RegisterSampleOrderComponents`, backed by an `IFlowNodeModule`.
 
 Run it with:
 

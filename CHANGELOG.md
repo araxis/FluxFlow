@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+Package authoring helpers.
+
+- Added `FlowNodeRegistration` as a delegate-backed registration helper.
+- Added `IFlowNodeModule` and `FlowNodeModule` for grouping component family
+  registrations.
+- Made range and module registration validate duplicate node types before
+  mutating the registry.
+- Added a neutral consumer sample that demonstrates workspace projection,
+  explicit component registration, conditional links, events, and diagnostics.
+
 ## 0.4.0-alpha.1
 
 Conditional link runtime behavior.
