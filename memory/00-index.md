@@ -39,5 +39,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `33-independent-package-releases.md`: package-scoped release and versioning decision.
 - `34-mqtt-0.2-hardening.md`: MQTT package host-integration hardening record.
 - `35-mqtt-topic-validation.md`: MQTT topic validation helper and package behavior record.
+- `36-mapping-component-package.md`: first generic mapping component package record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

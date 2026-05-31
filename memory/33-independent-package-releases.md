@@ -28,12 +28,14 @@ project.
 
 - `FluxFlow.Engine`: `0.5.0-alpha.1`
 - `FluxFlow.Components.Mqtt`: `0.2.1-alpha.1` source version, release pending
+- `FluxFlow.Components.Mapping`: `0.1.0-alpha.1` source version, release pending
 
 ## Tag Convention
 
 - `engine-v0.5.0-alpha.1`
 - `components-mqtt-v0.1.0-alpha.1`
 - `components-mqtt-v0.2.0-alpha.1`
+- `components-mapping-v0.1.0-alpha.1`
 
 ## Result
 

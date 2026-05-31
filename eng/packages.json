@@ -12,5 +12,12 @@
     "packageId": "FluxFlow.Components.Mqtt",
     "project": "src/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj",
     "notesName": "FluxFlow.Components.Mqtt"
+  },
+  {
+    "alias": "components-mapping",
+    "tagPrefix": "components-mapping",
+    "packageId": "FluxFlow.Components.Mapping",
+    "project": "src/FluxFlow.Components.Mapping/FluxFlow.Components.Mapping.csproj",
+    "notesName": "FluxFlow.Components.Mapping"
   }
 ]

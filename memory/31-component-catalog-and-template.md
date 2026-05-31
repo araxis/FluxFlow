@@ -207,6 +207,34 @@ Use this as the first real package. The initial package now includes
 adapter-backed publish and subscribe nodes; the first consumer migration should
 validate whether the options and adapter surface need adjustment.
 
+### Mapping
+
+Package:
+
+```text
+FluxFlow.Components.Mapping
+```
+
+Implemented components:
+
+| Component | Role | Node type | Contract shape | Notes |
+|-----------|------|-----------|----------------|-------|
+| Mapper | transform | `flow.mapper` | `Input` to `Output`, defaulting to `object` ports and supporting host-registered typed aliases | Maps each message with a host-provided expression engine and context factory. |
+
+Shared package pieces:
+
+- expression engine resolver registration
+- type alias registration
+- per-type mapping context factories
+- mapper options reader
+- diagnostics and error codes
+
+Recommendation:
+
+Keep this package focused on `flow.mapper` until a real consumer proves the
+next primitive. Likely follow-ons are `flow.filter`, `flow.router`, and
+`flow.assert`, but those should not be added until their contracts are clearer.
+
 ### HTTP
 
 Package:

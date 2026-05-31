@@ -28,6 +28,9 @@ package-authoring improvements.
    consumer as validation, not as the source of reusable schemas.
 7. Scaffold the first MQTT component package. Done with adapter-backed publish
    and subscribe nodes plus deterministic tests.
+8. Scaffold the first generic mapping component package. Done with `flow.mapper`,
+   typed ports, host-provided expression engines, context factories, diagnostics,
+   and per-message failure handling.
 
 ## First Consumer Pilot
 
@@ -85,6 +88,7 @@ Possible packages:
 
 - `FluxFlow.Components.Data`
 - `FluxFlow.Components.Http`
+- `FluxFlow.Components.Mapping`
 - `FluxFlow.Components.Mqtt`
 - `FluxFlow.Components.Files`
 - `FluxFlow.Components.Replay`
@@ -117,6 +121,14 @@ First template plan:
 
 Status: initial package implemented with adapter-backed publish and subscribe
 nodes.
+
+Second package:
+
+- `FluxFlow.Components.Mapping`
+- starts with `flow.mapper` only
+- keeps expression engines and context building host-provided
+- supports object defaults and host-registered typed ports
+- reports per-message failures without stopping later messages
 
 Package category decision options:
 

@@ -170,6 +170,17 @@ registers typed components explicitly, and runs conditional links.
 
 ---
 
+## Component Packages
+
+Reusable components live outside `FluxFlow.Engine` and are released separately.
+
+| Package | Nodes | Purpose |
+|---------|-------|---------|
+| `FluxFlow.Components.Mqtt` | `mqtt.publish`, `mqtt.subscribe` | Adapter-backed MQTT publish and subscribe nodes. |
+| `FluxFlow.Components.Mapping` | `flow.mapper` | Pluggable expression mapping with generic or typed ports. |
+
+---
+
 ## Building
 
 ```sh

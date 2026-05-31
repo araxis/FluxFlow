@@ -1,5 +1,18 @@
 # Changelog
 
+## FluxFlow.Components.Mapping 0.1.0-alpha.1
+
+Initial reusable mapping component package.
+
+- Added `FluxFlow.Components.Mapping` as a separate source project, test
+  project, and package artifact.
+- Added `flow.mapper` with `Input` and `Output` ports.
+- Added typed port support through package type aliases.
+- Added host-provided expression engine resolution and context factories.
+- Added per-message mapping failures as `FlowError` so later messages continue.
+- Added mapping diagnostics with input type, output type, engine, expression id,
+  and expression name metadata.
+
 ## FluxFlow.Components.Mqtt 0.2.1-alpha.1
 
 MQTT package topic validation polish.
