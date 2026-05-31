@@ -24,7 +24,11 @@ The engine owns only graph execution definitions. Design-time metadata should re
 
 ## Scenario ownership
 
-The base package may keep `expect.event` because it validates runtime event streams without introducing component knowledge. Any step that drives an external system belongs in a companion package.
+Scenario and test definitions are not part of the engine package boundary.
+Applications or companion testing packages own test documents, step types,
+validation, runners, and reports. The engine exposes runtime events and
+diagnostics so those layers can observe workflow behavior without making the
+engine own test semantics.
 
 ## Versioning
 

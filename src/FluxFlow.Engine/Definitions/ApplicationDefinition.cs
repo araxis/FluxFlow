@@ -4,7 +4,6 @@ public sealed record ApplicationDefinition
 {
     private Dictionary<string, NodeDefinition>? _resources = [];
     private Dictionary<string, WorkflowDefinition>? _workflows = [];
-    private Dictionary<string, ScenarioDefinition>? _tests = [];
 
     public Dictionary<string, NodeDefinition> Resources
     {
@@ -16,11 +15,5 @@ public sealed record ApplicationDefinition
     {
         get => _workflows ??= [];
         init => _workflows = value ?? [];
-    }
-
-    public Dictionary<string, ScenarioDefinition> Tests
-    {
-        get => _tests ??= [];
-        init => _tests = value ?? [];
     }
 }

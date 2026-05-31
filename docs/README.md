@@ -11,8 +11,9 @@ rewriting the package docs around the current boundary.
 1. Getting started with neutral sample nodes.
 2. Definitions and runtime model.
 3. Node authoring and package extension model.
-4. Scenario runner.
-5. Generated API reference from the current source.
+4. Host lifecycle and diagnostics.
+5. Workspace projection patterns for consuming applications.
+6. Generated API reference from the current source.
 
 ## Current Rules
 

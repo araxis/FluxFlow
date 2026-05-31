@@ -42,6 +42,8 @@ Date: 2026-05-31
 - Removed dashboard/designer metadata from the base engine definition model, validator, and JSON converters.
 - Added `CHANGELOG.md` for the first prerelease.
 - Upgraded release automation so tag/manual releases build, test, pack, publish NuGet packages, upload artifacts, and create or update GitHub Releases.
+- Published `0.1.0-alpha.1` to NuGet and verified package install from the public feed.
+- Started `0.2.0-alpha.1` as the engine-only boundary version by removing scenario/test ownership from the core package.
 
 ## Remaining
 

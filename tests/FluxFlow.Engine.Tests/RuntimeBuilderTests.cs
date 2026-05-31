@@ -103,7 +103,7 @@ public sealed class RuntimeBuilderTests
     }
 
     [Fact]
-    public void DefinitionJson_IgnoresDashboardMetadata()
+    public void DefinitionJson_IgnoresWorkspaceMetadata()
     {
         var json = """
         {
@@ -116,6 +116,13 @@ public sealed class RuntimeBuilderTests
             "main": {
               "widgets": {
                 "unused": { "type": "demo.widget" }
+              }
+            }
+          },
+          "tests": {
+            "smoke": {
+              "steps": {
+                "unused": { "type": "expect.event" }
               }
             }
           }

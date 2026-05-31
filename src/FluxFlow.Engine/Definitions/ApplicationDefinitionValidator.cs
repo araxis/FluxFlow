@@ -1,5 +1,3 @@
-using FluxFlow.Engine.Scenarios;
-
 namespace FluxFlow.Engine.Definitions;
 
 public sealed class ApplicationDefinitionValidator
@@ -53,58 +51,7 @@ public sealed class ApplicationDefinitionValidator
             ValidateLinks(workflow.Key, workflow.Value.Nodes, definition, errors);
         }
 
-        foreach (var test in definition.Tests)
-        {
-            ValidateScenario(test.Key, test.Value, definition, errors);
-        }
-
         return new ApplicationDefinitionValidationResult(errors);
-    }
-
-    private static void ValidateScenario(
-        string scenarioName,
-        ScenarioDefinition scenario,
-        ApplicationDefinition definition,
-        List<ApplicationDefinitionValidationError> errors)
-    {
-        if (string.IsNullOrWhiteSpace(scenarioName))
-        {
-            errors.Add(new(
-                ApplicationDefinitionValidationErrorCode.EmptyScenarioName,
-                "Test scenario name cannot be empty."));
-        }
-
-        foreach (var step in scenario.Steps)
-        {
-            if (string.IsNullOrWhiteSpace(step.Key))
-            {
-                errors.Add(new(
-                    ApplicationDefinitionValidationErrorCode.EmptyScenarioStepName,
-                    $"Test scenario '{scenarioName}' has an empty step name."));
-            }
-
-            if (string.IsNullOrWhiteSpace(step.Value.Type))
-            {
-                errors.Add(new(
-                    ApplicationDefinitionValidationErrorCode.EmptyScenarioStepType,
-                    $"Test scenario '{scenarioName}' step '{step.Key}' has an empty type."));
-            }
-            else if (!ScenarioStepTypes.All.Contains(step.Value.Type))
-            {
-                errors.Add(new(
-                    ApplicationDefinitionValidationErrorCode.UnknownScenarioStepType,
-                    $"Test scenario '{scenarioName}' step '{step.Key}' has unknown type '{step.Value.Type}'."));
-            }
-            else
-            {
-                ScenarioStepDefinitionValidator.Validate(
-                    scenarioName,
-                    step.Key,
-                    step.Value,
-                    definition,
-                    errors);
-            }
-        }
     }
 
     private static void ValidateNode(

@@ -15,7 +15,7 @@ The extracted package now owns:
 - generic event collection;
 - generic mapping contracts and expression engines;
 - base node authoring helpers;
-- generic `expect.event` scenario support.
+- runtime diagnostics for app-owned observability and test layers.
 
 `FluxMq` should keep:
 
@@ -50,7 +50,7 @@ Most of this is now owned by `FluxFlow.Engine`.
 4. Update FluxMq component implementations so they implement `FluxFlow.Engine.Components.IFlowNode` and use `FluxFlow.Engine.Core.FlowNodeId`, `FlowError`, and `FlowEvent`.
 5. Rewrite `FluxMq.App.RuntimeNodeFactoryRegistryExtensions` to use FluxFlow node factory APIs. The current registration shape can stay mostly the same, but the new builder helpers can reduce repeated `InputPort` and `OutputPort` construction.
 6. Replace or wrap `FluxMq.App.FlowApplicationHost` with `FluxFlow.Engine.FlowApplicationHost`. Keep a thin FluxMq host facade only for default FluxMq factory/scenario registration.
-7. Move MQTT-specific scenario runners from FluxMq app code into a FluxMq-owned scenario registration helper.
+7. Keep scenario documents, result reporting, and MQTT-specific scenario runners in FluxMq or a FluxMq-owned testing package.
 8. Delete `src/FluxMq.Pipeline` and `tests/FluxMq.Pipeline.Tests` after all references are removed and equivalent coverage lives in FluxFlow or FluxMq-specific tests.
 
 ## Estimated impact

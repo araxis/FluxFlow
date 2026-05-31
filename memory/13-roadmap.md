@@ -14,7 +14,8 @@ When that work is ready, use FluxMq as the first real consumer pilot.
 1. Finish the release-readiness pass.
 2. Decide the release version and license metadata.
 3. Rewrite enough public docs for a useful prerelease package.
-4. Publish the first prerelease package.
+4. Publish the first prerelease package. Done with `0.1.0-alpha.1`.
+5. Publish the engine-only boundary prerelease after scenario/test ownership is removed.
 
 ## Deferred Consumer Pilot
 

@@ -12,10 +12,5 @@ public enum ApplicationDefinitionValidationErrorCode
     MissingSourceNode = 8,
     EmptySourcePort = 9,
     EmptyTargetPort = 10,
-    DuplicateLink = 11,
-    EmptyScenarioName = 19,
-    EmptyScenarioStepName = 20,
-    EmptyScenarioStepType = 21,
-    UnknownScenarioStepType = 22,
-    InvalidScenarioStepConfiguration = 23
+    DuplicateLink = 11
 }

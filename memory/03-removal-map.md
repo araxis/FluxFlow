@@ -10,7 +10,7 @@ Date: 2026-05-31
 - `IFlowNode`, `IFlowEventSource`, `FlowEvent`, and `FlowError`.
 - Runtime host lifecycle.
 - Generic expression mapping contracts and engines, unless the package is later split into `FluxFlow.Mapping`.
-- Generic scenario runner with `expect.event`, if tests remain part of the base package.
+- Runtime event and diagnostic streams used by application-owned test layers.
 
 ## Remove from `FluxFlow.Engine`
 
@@ -24,7 +24,8 @@ Date: 2026-05-31
 ## Move to companion packages later
 
 - Dashboard and designer metadata: `FluxFlow.Designer` or `FluxFlow.UI`.
-- Scenario steps for transports or protocols: `FluxFlow.Scenarios.*`.
+- Scenario/test documents, runners, step registries, and step validation.
+- Scenario steps for transports or protocols: app-owned or companion testing packages.
 - Transport components: separate packages per connector family.
 - Storage helpers: separate storage packages.
 - Mapping engines, if package size or dependency control becomes a concern.

@@ -1,7 +1,6 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
-using FluxFlow.Engine.Scenarios;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks.Dataflow;
 
@@ -21,14 +20,12 @@ public sealed class FlowApplicationHost(
     ApplicationRuntimeBuilder runtimeBuilder,
     FlowApplicationConfigurationLoader? configurationLoader = null,
     string sectionName = FlowApplicationConfigurationLoader.DefaultSectionName,
-    ScenarioRunner? scenarioRunner = null,
     ApplicationDefinition? applicationDefinition = null)
     : IAsyncDisposable, IDisposable
 {
     private readonly IConfiguration? _configuration = configuration;
     private readonly ApplicationRuntimeBuilder _runtimeBuilder = runtimeBuilder ?? throw new ArgumentNullException(nameof(runtimeBuilder));
     private readonly FlowApplicationConfigurationLoader _configurationLoader = configurationLoader ?? new FlowApplicationConfigurationLoader();
-    private readonly ScenarioRunner _scenarioRunner = scenarioRunner ?? CreateDefaultScenarioRunner();
     private readonly ApplicationDefinition? _applicationDefinition = applicationDefinition;
     private readonly FlowFanoutSource<RuntimeFlowDiagnostic> _diagnostics = new();
     private ApplicationDefinition? _definition;
@@ -80,19 +77,6 @@ public sealed class FlowApplicationHost(
             new ApplicationRuntimeBuilder(registry),
             applicationDefinition: definition);
     }
-
-    /// <summary>Returns a <see cref="ScenarioRunner"/> with the built-in generic step runners.</summary>
-    public static ScenarioRunner CreateDefaultScenarioRunner()
-        => new(CreateDefaultScenarioStepRunnerRegistry());
-
-    /// <summary>
-    /// Returns a registry containing the generic built-in step runners.
-    /// Applications extend this by calling <see cref="ScenarioStepRunnerRegistry.Register"/> with
-    /// their own protocol-specific step runners.
-    /// </summary>
-    public static ScenarioStepRunnerRegistry CreateDefaultScenarioStepRunnerRegistry()
-        => new ScenarioStepRunnerRegistry()
-            .Register(new ExpectEventScenarioStepRunner());
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -207,39 +191,6 @@ public sealed class FlowApplicationHost(
         }
 
         return result;
-    }
-
-    // ── Scenarios ─────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Runs a named scenario against the currently running runtime.
-    /// Scenario step services are populated via <paramref name="servicesFactory"/>
-    /// (defaults to <see cref="ScenarioStepServices.Empty"/> when not supplied).
-    /// </summary>
-    public async Task<ScenarioRunResult> RunScenarioAsync(
-        string scenarioName,
-        Func<ApplicationRuntime, ScenarioStepServices>? servicesFactory = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-
-        if (string.IsNullOrWhiteSpace(scenarioName))
-            throw new ArgumentException("Scenario name cannot be empty.", nameof(scenarioName));
-
-        var definition = _definition ?? _applicationDefinition ?? LoadDefinitionFromConfiguration();
-        if (!definition.Tests.TryGetValue(scenarioName, out _))
-            throw new InvalidOperationException($"Scenario '{scenarioName}' does not exist.");
-
-        if (_runtime is null || State != FlowApplicationHostState.Running)
-            throw new InvalidOperationException(
-                $"Scenario '{scenarioName}' cannot run because the app runtime is not running. " +
-                $"Call StartAsync before running scenarios.");
-
-        var services = servicesFactory?.Invoke(_runtime) ?? ScenarioStepServices.Empty;
-        var scenario = definition.Tests[scenarioName];
-        return await _scenarioRunner
-            .RunAsync(scenarioName, scenario, _runtime.Events, services, cancellationToken)
-            .ConfigureAwait(false);
     }
 
     // ── Stop / dispose ────────────────────────────────────────────────────────

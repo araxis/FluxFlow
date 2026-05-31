@@ -39,10 +39,9 @@ protocol-specific dependencies.
 | **Phase-ordered startup** | Nodes declare a `phase` integer; the runtime starts lower phases first |
 | **Completion propagation** | Entry nodes drive completion through the whole graph |
 | **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
-| **Event journal** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
+| **Event stream** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
 | **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
 | **Expression mapping** | Built-in DynamicExpresso (C#) and JSONata engines behind `IFlowExpressionEngine` |
-| **Scenario testing** | Deterministic, step-by-step test runner driven by `FlowEvent` observations |
 | **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
 | **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
 | **Host lifecycle** | `FlowApplicationHost` owns build → start → stop → dispose |
@@ -174,3 +173,7 @@ Applications add those behaviors by:
 
 Component packages should own their own options, validation, event names, tests,
 and documentation.
+
+Applications are free to keep richer workspace files with dashboards, tests,
+connections, or UI state. Project only the executable resources and workflows
+into `ApplicationDefinition` before building the engine runtime.
