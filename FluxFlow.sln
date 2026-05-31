@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FluxFlow.Engine", "src\Flux
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FluxFlow.Engine.Tests", "tests\FluxFlow.Engine.Tests\FluxFlow.Engine.Tests.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F01234567891}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FluxFlow.SampleApp", "samples\FluxFlow.SampleApp\FluxFlow.SampleApp.csproj", "{6B0C7186-C19B-4999-905A-D0FA6AC4D40F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,5 +23,9 @@ Global
 		{B2C3D4E5-F6A7-8901-BCDE-F01234567891}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F01234567891}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F01234567891}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B0C7186-C19B-4999-905A-D0FA6AC4D40F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B0C7186-C19B-4999-905A-D0FA6AC4D40F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B0C7186-C19B-4999-905A-D0FA6AC4D40F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B0C7186-C19B-4999-905A-D0FA6AC4D40F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

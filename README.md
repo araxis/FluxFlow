@@ -158,6 +158,15 @@ for status.
 
 ---
 
+## Samples
+
+See [samples/FluxFlow.SampleApp](samples/FluxFlow.SampleApp) for a small
+consumer-style console app. It keeps app-specific workspace metadata outside the
+engine, projects executable resources and workflows into `ApplicationDefinition`,
+registers typed components explicitly, and runs conditional links.
+
+---
+
 ## Building
 
 ```sh

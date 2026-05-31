@@ -53,6 +53,9 @@ Date: 2026-05-31
   still needs FluxMq-side docs cleanup for stale old-pipeline references.
 - Recorded the component package roadmap, starting with a future MQTT package
   family after the package-authoring pattern is proven.
+- Added a neutral consumer-style sample app that projects app-owned workspace
+  metadata into `ApplicationDefinition`, registers typed components explicitly,
+  and models bounded Dataflow blocks for sample package authors.
 
 ## Remaining
 

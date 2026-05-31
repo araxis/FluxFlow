@@ -1,6 +1,7 @@
 # FluxFlow.Engine Docs
 
 The package README is the current public documentation for the standalone engine.
+The neutral consumer sample lives at `samples/FluxFlow.SampleApp`.
 
 The previous detailed docs were moved to `memory/legacy-docs` because they still
 describe source-app concerns and older public APIs. Keep them as reference while
