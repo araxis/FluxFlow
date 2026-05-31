@@ -60,8 +60,9 @@ Date: 2026-05-31
   `IFlowNodeModule`, and `FlowNodeModule`.
 - Started `0.5.0-alpha.1` release prep for package-authoring helpers and the
   neutral consumer sample.
+- Published `0.5.0-alpha.1` and verified a fresh public package restore from
+  the NuGet feed.
 
 ## Remaining
 
 - Rewrite detailed public docs from the legacy reference set.
-- Run the final release command set before tagging.
