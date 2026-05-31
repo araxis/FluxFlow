@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Engine</PackageId>
+    <AssemblyName>FluxFlow.Engine</AssemblyName>
+    <RootNamespace>FluxFlow.Engine</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, expression mapping, and scenario testing.</Description>
+    <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
+    <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DynamicExpresso.Core" Version="2.19.3" />
+    <PackageReference Include="Jsonata.Net.Native" Version="3.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
+    <!-- On net10 Dataflow ships inbox; keeping the explicit ref for net8/9 compat -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,69 @@
+name: publish-nuget
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version, for example 1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Resolve package version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = "${{ github.ref_name }}"
+            if ($version.StartsWith("v")) {
+              $version = $version.Substring(1)
+            }
+          }
+
+          if ($version -notmatch "^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$") {
+            throw "Invalid package version '$version'."
+          }
+
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Restore
+        run: dotnet restore FluxFlow.sln
+
+      - name: Build
+        run: dotnet build FluxFlow.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test FluxFlow.sln --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/FluxFlow.Engine/FluxFlow.Engine.csproj --configuration Release --no-build -p:PackageVersion=${{ env.PACKAGE_VERSION }} --output artifacts/packages
+
+      - name: Publish package
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
+            throw "Add the NUGET_API_KEY repository secret before publishing."
+          }
+
+          dotnet nuget push "artifacts/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          dotnet nuget push "artifacts/packages/*.snupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
