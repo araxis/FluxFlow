@@ -35,6 +35,25 @@ Each package may contain several nodes from the same category. For example,
 `FluxFlow.Components.Mqtt` can contain an MQTT trigger/source, publisher/sink,
 connection helpers, registration helpers, options, diagnostics, and tests.
 
+## Project And Package Boundary
+
+Each component family must be its own source project in the solution and its own
+packable unit. A component package can include several related nodes from the
+same category, but unrelated categories should not be bundled together.
+
+Rules:
+
+- one source project per component family
+- one test project per component family
+- one package artifact per source project
+- each package owns its package identity, metadata, README, and release notes
+- consumers reference only the component packages they need
+- release automation can process several package projects in one run, but each
+  project must remain a separate artifact
+
+Create shared component helper projects only after at least two real component
+families need the same helper contracts.
+
 ## Standard Package Template
 
 Every component package should follow the same internal shape unless there is a
@@ -378,7 +397,7 @@ For the next development step, do only the skeleton:
 2. Add one test project.
 3. Add module and registration extension shape.
 4. Add one placeholder component definition document.
-5. Add release workflow support for multiple package projects.
+5. Add release workflow support for multiple independent package projects.
 6. Do not implement live external behavior until the skeleton and tests are
    reviewed.
 

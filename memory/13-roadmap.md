@@ -74,8 +74,10 @@ Likely package name:
 
 Keep components outside `FluxFlow.Engine`.
 
-Each component family can become a separate NuGet package after the base engine
-is stable and a consumer pilot proves the extension surface.
+Each component family can become a separate package after the base engine is
+stable and a consumer pilot proves the extension surface.
+Each component family should also be a separate source project in the solution
+and produce its own package artifact.
 
 Possible packages:
 
@@ -90,6 +92,8 @@ Possible packages:
 
 Package rules:
 
+- Each component family is a separate source project.
+- Each component family produces a separate package artifact.
 - Each package owns its node registrations.
 - Each package owns options, request/result records, validation, diagnostics
   names, events, and tests.
@@ -107,7 +111,7 @@ First template plan:
   in the initial template
 - deterministic tests with an in-memory adapter
 - explicit `IFlowNodeModule` registration
-- release workflow update to pack and publish multiple package projects
+- release workflow update to process multiple independent package projects
 
 Package category decision options:
 

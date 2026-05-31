@@ -38,6 +38,16 @@ Reason:
   diagnostics, and event patterns.
 - Other component families can copy the same module/registration shape.
 
+## Solution And Package Boundary
+
+`FluxFlow.Components.Mqtt` should be added as a separate source project in the
+solution, with its own test project and its own package artifact. It can ship in
+the same release run as the engine, but it must keep a separate package identity
+and metadata.
+
+Do not place MQTT nodes inside the engine project, and do not bundle unrelated
+component categories into this project.
+
 ## Proposed Project Shape
 
 ```text
@@ -163,10 +173,11 @@ Publish node:
 
 The first component package requires release workflow changes:
 
-- pack more than one project
+- pack more than one source project
 - upload all package artifacts
 - publish all package artifacts
 - keep changelog sections clear for multi-package releases
+- preserve one artifact per packable project
 
 Initial component release can use the same prerelease version as the engine.
 

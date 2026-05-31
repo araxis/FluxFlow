@@ -15,6 +15,8 @@ belong in opt-in packages or in the consuming application.
 
 Each component package should own:
 
+- Its own source project in the solution.
+- Its own package identity and package metadata.
 - Node type constants or descriptors.
 - Component implementation classes.
 - Option models and option parsing helpers.
@@ -34,6 +36,10 @@ Package contracts should be designed from the component category outward. A
 consumer application can prove the boundary, but it must not leak its workspace
 schema, naming, storage, dashboards, or scenario concepts into reusable package
 contracts.
+
+One component family maps to one source project and one package artifact. A
+single release run can build and publish several component package projects, but
+it must not merge unrelated component families into one artifact.
 
 ## Candidate Packages
 

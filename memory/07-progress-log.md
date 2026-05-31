@@ -87,6 +87,8 @@ Date: 2026-05-31
 - Fixed a Dataflow helper node fault-order race so explicit `Fault(...)` calls
   run node fault hooks before owned blocks can complete through asynchronous
   completion continuations.
+- Recorded the component packaging rule: every component family is a separate
+  source project in the solution and produces a separate package artifact.
 
 ## Remaining
 
