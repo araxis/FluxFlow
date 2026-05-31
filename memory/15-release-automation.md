@@ -44,6 +44,9 @@ GitHub Release creation runs before NuGet deployment so package assets are
 still attached to the release if an external package feed credential is invalid
 or expired.
 
+Reruns update release notes, replace package assets, and retarget the release
+metadata to the commit that triggered the workflow.
+
 ## Secrets
 
 NuGet publish uses the repository secret `NUGET_API_KEY`.

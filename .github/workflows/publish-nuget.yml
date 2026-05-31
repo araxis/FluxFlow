@@ -107,7 +107,17 @@ jobs:
               throw "Failed to upload assets to GitHub Release '$tag'."
             }
 
-            $editArgs = @("release", "edit", $tag, "--title", $tag, "--notes-file", $notesPath)
+            $editArgs = @(
+              "release",
+              "edit",
+              $tag,
+              "--title",
+              $tag,
+              "--notes-file",
+              $notesPath,
+              "--target",
+              "${{ github.sha }}"
+            )
             if ("${{ env.IS_PRERELEASE }}" -eq "True") {
               $editArgs += "--prerelease"
             }
