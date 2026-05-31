@@ -12,6 +12,7 @@ separate package artifact.
 - Package project: `src/FluxFlow.Components.Mqtt`.
 - Test project: `tests/FluxFlow.Components.Mqtt.Tests`.
 - Package identity: `FluxFlow.Components.Mqtt`.
+- Package version: `0.1.0-alpha.1`.
 - The package references `FluxFlow.Engine`; the engine does not reference this
   package.
 - The package does not include a concrete network client.
@@ -48,7 +49,7 @@ Implemented:
 - background subscribe lifecycle handling for long-lived subscriptions
 - diagnostics and event name constants
 - deterministic in-memory adapter tests
-- release packing loop for multiple source package projects
+- package-scoped release support for publishing this project independently
 
 Deferred:
 

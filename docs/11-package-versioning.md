@@ -8,27 +8,27 @@ Current prereleases use this shape:
 0.5.0-alpha.1
 ```
 
-Release tags use `v` plus the package version:
+Release tags use the package tag prefix, `-v`, and the package version:
 
 ```text
-v0.5.0-alpha.1
+engine-v0.5.0-alpha.1
+components-mqtt-v0.1.0-alpha.1
 ```
 
 ## Source Of Truth
 
-The project file keeps a default `<Version>` so local pack commands produce a
-valid prerelease package.
+Each packable project owns its own `<Version>`.
 
-The release workflow sets the published package version with
-`PackageVersion`. That means a release can be produced from the same committed
-source after selecting the exact version.
+The release workflow reads the selected project version and refuses to publish
+when the requested version does not match the project file. This keeps package
+versions reviewable in source.
 
 ## Changelog
 
-Every published version needs a matching `CHANGELOG.md` section:
+Every published package version needs a matching `CHANGELOG.md` section:
 
 ```md
-## 0.6.0-alpha.1
+## FluxFlow.Components.Mqtt 0.1.0-alpha.1
 
 Short release summary.
 
@@ -59,8 +59,8 @@ After 1.0:
 Before publishing:
 
 1. Update `CHANGELOG.md`.
-2. Confirm the project file default version matches the next local prerelease
-   target or is intentionally behind the release override.
+2. Confirm the selected project file version matches the intended package
+   version.
 3. Run build and tests locally.
 4. Run the sample app when docs, JSON, links, lifecycle, or package authoring
    behavior changed.
@@ -69,19 +69,18 @@ Before publishing:
 
 ## Component Packages
 
-Component packages should start on the same prerelease train as the engine while
-the extension surface is still settling. Keep their dependency range narrow at
-first, then loosen it only after real consumers prove compatibility.
+Component packages move independently from the engine package. Keep their
+dependency range narrow at first, then loosen it only after real consumers prove
+compatibility.
 
 Recommended early pattern:
 
 ```text
-FluxFlow.Engine              0.6.0-alpha.1
-FluxFlow.Components.Example  0.6.0-alpha.1
+FluxFlow.Engine              0.5.0-alpha.1
+FluxFlow.Components.Example  0.1.0-alpha.1
 ```
 
-Once the engine reaches a stable 1.0 line, component packages can move at their
-own pace as long as their supported engine range is tested.
+Do not bump the engine version when only a component package changes.
 
 ## Keep Releases Small
 

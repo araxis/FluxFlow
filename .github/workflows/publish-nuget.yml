@@ -3,12 +3,16 @@ name: release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "*-v*.*.*"
   workflow_dispatch:
     inputs:
-      version:
-        description: "Package version, for example 0.1.0-alpha.1"
+      package:
+        description: "Package alias or id, for example engine or components-mqtt"
         required: true
+        type: string
+      version:
+        description: "Optional package version. Defaults to the project version."
+        required: false
         type: string
 
 permissions:
@@ -31,27 +35,14 @@ jobs:
             8.0.x
             10.0.x
 
-      - name: Resolve release version
+      - name: Resolve release package
         shell: pwsh
         run: |
-          $version = "${{ inputs.version }}"
-          if ([string]::IsNullOrWhiteSpace($version)) {
-            $version = "${{ github.ref_name }}"
-            if ($version.StartsWith("v")) {
-              $version = $version.Substring(1)
-            }
-          }
-
-          if ($version -notmatch "^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$") {
-            throw "Invalid package version '$version'."
-          }
-
-          $tag = "v$version"
-          $isPrerelease = $version.Contains("-")
-
-          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "IS_PRERELEASE=$isPrerelease" | Out-File -FilePath $env:GITHUB_ENV -Append
+          ./eng/resolve-package-release.ps1 `
+            -Package "${{ inputs.package }}" `
+            -Version "${{ inputs.version }}" `
+            -RefName "${{ github.ref_name }}" `
+            -EnvironmentPath $env:GITHUB_ENV
 
       - name: Restore
         run: dotnet restore FluxFlow.sln
@@ -64,41 +55,36 @@ jobs:
 
       - name: Pack
         shell: pwsh
-        run: |
-          $projects = Get-ChildItem -LiteralPath "src" -Filter "*.csproj" -Recurse |
-            Sort-Object FullName
-
-          foreach ($project in $projects) {
-            dotnet pack $project.FullName --configuration Release --no-build -p:PackageVersion=${{ env.PACKAGE_VERSION }} --output artifacts/packages
-          }
+        run: dotnet pack "${{ env.PACKAGE_PROJECT }}" --configuration Release --no-build --output artifacts/packages
 
       - name: Prepare release notes
         shell: pwsh
-        run: ./eng/get-release-notes.ps1 -Version "${{ env.PACKAGE_VERSION }}" -OutputPath artifacts/release-notes.md
+        run: ./eng/get-release-notes.ps1 -PackageName "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -OutputPath artifacts/release-notes.md
 
       - name: Upload workflow package artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: fluxflow-packages-${{ env.PACKAGE_VERSION }}
+          name: ${{ env.PACKAGE_ALIAS }}-${{ env.PACKAGE_VERSION }}
           path: |
             artifacts/packages/*.nupkg
             artifacts/packages/*.snupkg
             artifacts/release-notes.md
           if-no-files-found: error
 
-      - name: Create GitHub Release
+      - name: Create release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ env.RELEASE_TAG }}"
+          $releaseTitle = "${{ env.PACKAGE_ID }} ${{ env.PACKAGE_VERSION }}"
           $notesPath = "artifacts/release-notes.md"
           $files = Get-ChildItem -LiteralPath "artifacts/packages" -File |
             Where-Object { $_.Extension -in ".nupkg", ".snupkg" } |
             Sort-Object Name
 
           if ($files.Count -eq 0) {
-            throw "No package files were found for GitHub Release upload."
+            throw "No package files were found for release upload."
           }
 
           $uploadArgs = @($tag) + @($files.FullName) + @("--clobber")
@@ -111,7 +97,7 @@ jobs:
           if ($releaseExists) {
             gh release upload @uploadArgs
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to upload assets to GitHub Release '$tag'."
+              throw "Failed to upload assets to release '$tag'."
             }
 
             $editArgs = @(
@@ -119,7 +105,7 @@ jobs:
               "edit",
               $tag,
               "--title",
-              $tag,
+              $releaseTitle,
               "--notes-file",
               $notesPath,
               "--target",
@@ -131,7 +117,7 @@ jobs:
 
             gh @editArgs
             if ($LASTEXITCODE -ne 0) {
-              throw "Failed to update GitHub Release '$tag'."
+              throw "Failed to update release '$tag'."
             }
             return
           }
@@ -142,7 +128,7 @@ jobs:
             $tag
           ) + @($files.FullName) + @(
             "--title",
-            $tag,
+            $releaseTitle,
             "--notes-file",
             $notesPath,
             "--target",
@@ -155,10 +141,10 @@ jobs:
 
           gh @createArgs
           if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create GitHub Release '$tag'."
+            throw "Failed to create release '$tag'."
           }
 
-      - name: Publish NuGet packages
+      - name: Publish package
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
@@ -167,7 +153,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
 
           if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
-            throw "Add the NUGET_API_KEY repository secret before publishing."
+            throw "Add the package feed repository secret before publishing."
           }
 
           dotnet nuget push "artifacts/packages/*.nupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate

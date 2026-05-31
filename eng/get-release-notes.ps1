@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $Version,
 
+    [string] $PackageName = "",
+
     [string] $ChangelogPath = "CHANGELOG.md",
 
     [string] $OutputPath = "artifacts/release-notes.md"
@@ -14,19 +16,36 @@ if (-not (Test-Path -LiteralPath $ChangelogPath)) {
 }
 
 $lines = Get-Content -LiteralPath $ChangelogPath
-$headingPattern = "^\s*##\s+\[?$([regex]::Escape($Version))\]?\s*$"
+$headingPatterns = New-Object System.Collections.Generic.List[string]
+if (-not [string]::IsNullOrWhiteSpace($PackageName)) {
+    $headingPatterns.Add("^\s*##\s+\[?$([regex]::Escape($PackageName))\s+$([regex]::Escape($Version))\]?\s*$")
+}
+
+if ([string]::IsNullOrWhiteSpace($PackageName) -or $PackageName -eq "FluxFlow.Engine") {
+    $headingPatterns.Add("^\s*##\s+\[?$([regex]::Escape($Version))\]?\s*$")
+}
 $nextHeadingPattern = "^\s*##\s+"
 $start = -1
 
 for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match $headingPattern) {
-        $start = $i + 1
+    foreach ($headingPattern in $headingPatterns) {
+        if ($lines[$i] -match $headingPattern) {
+            $start = $i + 1
+            break
+        }
+    }
+
+    if ($start -ge 0) {
         break
     }
 }
 
 if ($start -lt 0) {
-    throw "Changelog does not contain a section for version '$Version'."
+    if ([string]::IsNullOrWhiteSpace($PackageName)) {
+        throw "Changelog does not contain a section for version '$Version'."
+    }
+
+    throw "Changelog does not contain a section for '$PackageName' version '$Version'."
 }
 
 $notes = New-Object System.Collections.Generic.List[string]

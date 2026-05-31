@@ -1,0 +1,16 @@
+[
+  {
+    "alias": "engine",
+    "tagPrefix": "engine",
+    "packageId": "FluxFlow.Engine",
+    "project": "src/FluxFlow.Engine/FluxFlow.Engine.csproj",
+    "notesName": "FluxFlow.Engine"
+  },
+  {
+    "alias": "components-mqtt",
+    "tagPrefix": "components-mqtt",
+    "packageId": "FluxFlow.Components.Mqtt",
+    "project": "src/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj",
+    "notesName": "FluxFlow.Components.Mqtt"
+  }
+]

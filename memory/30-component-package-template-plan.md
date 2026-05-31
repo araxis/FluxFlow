@@ -42,8 +42,8 @@ Reason:
 
 `FluxFlow.Components.Mqtt` should be added as a separate source project in the
 solution, with its own test project and its own package artifact. It can ship in
-the same release run as the engine, but it must keep a separate package identity
-and metadata.
+the same repository as the engine, but it must keep a separate package
+identity, version, release notes, and metadata.
 
 Do not place MQTT nodes inside the engine project, and do not bundle unrelated
 component categories into this project.
@@ -173,13 +173,13 @@ Publish node:
 
 The first component package requires release workflow changes:
 
-- pack more than one source project
-- upload all package artifacts
-- publish all package artifacts
-- keep changelog sections clear for multi-package releases
-- preserve one artifact per packable project
+- resolve a selected package from a manifest
+- pack one selected source project per release run
+- upload only the selected package artifacts
+- publish only the selected package artifact
+- keep changelog sections clear for package-scoped releases
 
-Initial component release can use the same prerelease version as the engine.
+Initial component release should use its own package version.
 
 ## Implementation Steps
 
@@ -192,7 +192,7 @@ Initial component release can use the same prerelease version as the engine.
    Done.
 7. Implement subscribe node with in-memory adapter tests. Done.
 8. Add package README content and docs link. Initial package README done.
-9. Update release workflow to pack all selected packages. Done.
+9. Update release workflow to publish one selected package. Done.
 10. Publish a prerelease.
 11. Migrate the first consumer from local components to the package in a
     separate branch.
@@ -203,8 +203,8 @@ Initial component release can use the same prerelease version as the engine.
   default client adapter.
 - Whether payload mapping belongs in this package or a later data/mapping
   package.
-- Whether multi-package releases share one changelog section or separate
-  package subsections.
+- Whether future grouped release notes are useful after package-scoped releases
+  are proven.
 
 ## Recommendation
 

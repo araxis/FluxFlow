@@ -37,9 +37,9 @@ consumer application can prove the boundary, but it must not leak its workspace
 schema, naming, storage, dashboards, or scenario concepts into reusable package
 contracts.
 
-One component family maps to one source project and one package artifact. A
-single release run can build and publish several component package projects, but
-it must not merge unrelated component families into one artifact.
+One component family maps to one source project and one package artifact. The
+repository can build all projects together, while each release run publishes one
+selected package.
 
 ## Candidate Packages
 

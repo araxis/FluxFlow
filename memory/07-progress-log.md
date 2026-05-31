@@ -93,8 +93,13 @@ Date: 2026-05-31
   adapter-backed publish/subscribe nodes, typed request/options/result/message
   contracts, explicit module registration, and release packing for multiple
   source package projects.
+- Changed release automation to resolve one package per run from a package
+  manifest, keeping solution changes separate from package publication.
+- Set the engine project back to its latest engine package version and set the
+  MQTT package to its first package-specific prerelease version.
 
 ## Remaining
 
+- Publish `FluxFlow.Components.Mqtt` `0.1.0-alpha.1`.
 - Use the MQTT package in the first consumer migration spike and record any
   missing adapter or options surface before adding concrete client adapters.
