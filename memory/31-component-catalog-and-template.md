@@ -6,8 +6,8 @@ Date: 2026-05-31
 
 Plan the reusable component packages before scaffolding code.
 
-This step is planning-only. No class libraries or component implementations are
-created in this step.
+This started as a planning-only step. The first package family has now been
+implemented in `src/FluxFlow.Components.Mqtt`.
 
 ## General-Purpose Boundary
 
@@ -203,8 +203,9 @@ Shared package pieces:
 
 Recommendation:
 
-Use this as the first real package once the first consumer's feature work
-settles, because it validates real source/sink behavior and adapter boundaries.
+Use this as the first real package. The initial package now includes
+adapter-backed publish and subscribe nodes; the first consumer migration should
+validate whether the options and adapter surface need adjustment.
 
 ### HTTP
 

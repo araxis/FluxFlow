@@ -101,7 +101,6 @@ after the core component package has settled.
 3. Introduce a package registration helper pattern in the engine if needed. Done
    with `IFlowNodeModule`, `FlowNodeModule`, and `FlowNodeRegistration`.
 4. Extract one package family, preferably MQTT, only after the first consumer's
-   feature work settles. The first template plan is recorded in
-   `30-component-package-template-plan.md`.
+   feature work settles. Done with adapter-backed publish and subscribe nodes.
 5. Publish the package as a prerelease and migrate the first consumer from
    local components to that package in a small follow-up branch.

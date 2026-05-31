@@ -183,15 +183,16 @@ Initial component release can use the same prerelease version as the engine.
 
 ## Implementation Steps
 
-1. Scaffold the component package and test project.
-2. Add adapter contracts and in-memory test adapter.
-3. Add request, result, output, and options records.
-4. Add options parsing and validation helpers.
-5. Add module and registry extension.
+1. Scaffold the component package and test project. Done.
+2. Add adapter contracts and in-memory test adapter. Done.
+3. Add request, result, output, and options records. Done.
+4. Add options parsing and validation helpers. Done.
+5. Add module and registry extension. Done.
 6. Implement publish node first because it is easier to test deterministically.
-7. Implement subscribe node with in-memory adapter tests.
-8. Add package README content and docs link.
-9. Update release workflow to pack all selected packages.
+   Done.
+7. Implement subscribe node with in-memory adapter tests. Done.
+8. Add package README content and docs link. Initial package README done.
+9. Update release workflow to pack all selected packages. Done.
 10. Publish a prerelease.
 11. Migrate the first consumer from local components to the package in a
     separate branch.

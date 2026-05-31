@@ -26,6 +26,8 @@ package-authoring improvements.
    template plan and added a component category catalog. The component catalog
    now uses package-owned request/options/result contracts and treats the first
    consumer as validation, not as the source of reusable schemas.
+7. Scaffold the first MQTT component package. Done with adapter-backed publish
+   and subscribe nodes plus deterministic tests.
 
 ## First Consumer Pilot
 
@@ -112,6 +114,9 @@ First template plan:
 - deterministic tests with an in-memory adapter
 - explicit `IFlowNodeModule` registration
 - release workflow update to process multiple independent package projects
+
+Status: initial package implemented with adapter-backed publish and subscribe
+nodes.
 
 Package category decision options:
 

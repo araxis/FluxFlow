@@ -35,5 +35,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `29-package-versioning-docs.md`: package versioning guidance docs record.
 - `30-component-package-template-plan.md`: first component package template plan.
 - `31-component-catalog-and-template.md`: category package catalog and reusable component template.
+- `32-mqtt-component-package.md`: first MQTT component package implementation record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

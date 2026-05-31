@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0-alpha.1
+
+First component package boundary.
+
+- Added `FluxFlow.Components.Mqtt` as a separate source project, test project,
+  and package artifact.
+- Added adapter-backed `mqtt.publish` and `mqtt.subscribe` nodes.
+- Added typed MQTT request, result, received-message, options, and adapter
+  contracts.
+- Added MQTT module registration through `RegisterMqttComponents`.
+- Added background subscribe lifecycle handling so long-lived subscriptions do
+  not block runtime startup.
+- Updated release packing to process each source package project separately.
+
 ## 0.5.0-alpha.1
 
 Package authoring helpers.

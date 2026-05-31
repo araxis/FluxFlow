@@ -89,9 +89,12 @@ Date: 2026-05-31
   completion continuations.
 - Recorded the component packaging rule: every component family is a separate
   source project in the solution and produces a separate package artifact.
+- Added the first MQTT component package project and test project, including
+  adapter-backed publish/subscribe nodes, typed request/options/result/message
+  contracts, explicit module registration, and release packing for multiple
+  source package projects.
 
 ## Remaining
 
-- Decide which package to scaffold first: MQTT for real source/sink integration
-  pressure, Timers for the fastest template proof, or Files as a source/sink
-  middle ground.
+- Use the MQTT package in the first consumer migration spike and record any
+  missing adapter or options surface before adding concrete client adapters.
