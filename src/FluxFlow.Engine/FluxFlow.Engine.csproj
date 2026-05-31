@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Engine</PackageId>
     <AssemblyName>FluxFlow.Engine</AssemblyName>
     <RootNamespace>FluxFlow.Engine</RootNamespace>
-    <Version>0.4.0-alpha.1</Version>
+    <Version>0.5.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, expression mapping, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds runtime conditional links through per-link when expressions.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-authoring registration helpers and a neutral consumer sample.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

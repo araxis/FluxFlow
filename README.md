@@ -44,6 +44,7 @@ protocol-specific dependencies.
 | **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
 | **Expression mapping** | Built-in DynamicExpresso (C#) and JSONata engines behind `IFlowExpressionEngine` |
 | **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
+| **Package authoring helpers** | `IFlowNodeModule` and `FlowNodeRegistration` group component families explicitly |
 | **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
 | **Host lifecycle** | `FlowApplicationHost` owns build → start → stop → dispose |
 

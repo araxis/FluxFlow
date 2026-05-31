@@ -58,6 +58,8 @@ Date: 2026-05-31
   and models bounded Dataflow blocks for sample package authors.
 - Added package-authoring registration helpers: `FlowNodeRegistration`,
   `IFlowNodeModule`, and `FlowNodeModule`.
+- Started `0.5.0-alpha.1` release prep for package-authoring helpers and the
+  neutral consumer sample.
 
 ## Remaining
 
