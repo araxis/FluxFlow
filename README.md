@@ -42,7 +42,7 @@ protocol-specific dependencies.
 | **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
 | **Event stream** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
 | **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
-| **Expression mapping** | Built-in DynamicExpresso (C#) and JSONata engines behind `IFlowExpressionEngine` |
+| **Expression mapping** | Built-in expression engines behind `IFlowExpressionEngine` |
 | **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
 | **Package authoring helpers** | `IFlowNodeModule` and `FlowNodeRegistration` group component families explicitly |
 | **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
@@ -156,7 +156,8 @@ await host.DisposeAsync();
 The package README is the short entrypoint. The focused docs set starts at
 [docs/README.md](docs/README.md) and covers getting started, definitions, node
 authoring, package authoring, hosting, observability, workspace projection, and
-validation, error handling, and runtime states.
+validation, error handling, runtime states, JSON conversion, and expression
+mapping.
 
 ---
 

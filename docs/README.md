@@ -17,6 +17,8 @@ the engine, and only executable resources and workflows are projected into
 6. [Workspace Projection](06-workspace-projection.md)
 7. [Validation And Errors](07-validation-and-errors.md)
 8. [Runtime States](08-runtime-states.md)
+9. [JSON Conversion](09-json-conversion.md)
+10. [Expression Mapping](10-expression-mapping.md)
 
 ## Current Boundary
 

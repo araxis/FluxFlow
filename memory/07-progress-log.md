@@ -70,7 +70,11 @@ Date: 2026-05-31
 - Added a runtime states reference page covering host state, application runtime
   state, workflow state, startup order, stop/completion behavior, state streams,
   and dashboard usage.
+- Added JSON conversion and expression mapping reference pages covering
+  serializer options, link JSON forms, workspace projection, condition
+  evaluation, custom expression engines, and mapper contracts.
 
 ## Remaining
 
-- Add deeper reference docs for JSON conversion and expression mapping.
+- Add package versioning guidance if the public docs need a release-management
+  reference page.

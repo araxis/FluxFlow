@@ -17,6 +17,8 @@ Added docs:
 - `docs/06-workspace-projection.md`
 - `docs/07-validation-and-errors.md`
 - `docs/08-runtime-states.md`
+- `docs/09-json-conversion.md`
+- `docs/10-expression-mapping.md`
 
 ## Decisions
 
@@ -30,6 +32,4 @@ Added docs:
 
 Add deeper reference docs only where users need exact behavior:
 
-- JSON conversion details
-- expression mapping details
 - package versioning guidance

@@ -213,3 +213,5 @@ For application dashboards:
 
 This keeps dashboard status aligned with the engine lifecycle without forcing
 application-specific UI rules into the engine.
+
+Next: [JSON Conversion](09-json-conversion.md)
