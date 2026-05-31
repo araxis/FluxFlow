@@ -7,6 +7,9 @@ Date: 2026-05-31
 Create the first separate component package in a way that becomes the template
 for future component families.
 
+The broader component catalog and reusable per-component definition template are
+recorded in `31-component-catalog-and-template.md`.
+
 The package should prove:
 
 - package-owned node type names

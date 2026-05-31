@@ -23,7 +23,7 @@ package-authoring improvements.
    mapping, and package versioning references done.
 5. Keep release automation healthy for the next prerelease.
 6. Plan the first component package template. Started with the MQTT package
-   template plan.
+   template plan and added a component category catalog.
 
 ## First Consumer Pilot
 
@@ -100,3 +100,9 @@ First template plan:
 - deterministic tests with an in-memory adapter
 - explicit `IFlowNodeModule` registration
 - release workflow update to pack and publish multiple package projects
+
+Package category decision options:
+
+- MQTT first for FluxMq alignment.
+- Timers first for fastest template proof.
+- Files first for a balanced source/sink package without broker dependencies.

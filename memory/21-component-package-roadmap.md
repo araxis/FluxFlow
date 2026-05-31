@@ -46,6 +46,9 @@ FluxMq can keep components in its own repository until the package boundary is
 stable. The first extracted package should prove the pattern before other
 families follow.
 
+The expanded category catalog and reusable component template are recorded in
+`31-component-catalog-and-template.md`.
+
 ## Registration Convention
 
 The desired authoring shape is:

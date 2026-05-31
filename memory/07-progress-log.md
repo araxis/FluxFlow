@@ -77,8 +77,11 @@ Date: 2026-05-31
 - Started the first separate component package template plan around an MQTT
   component package with adapter contracts, module registration, options,
   diagnostics, events, tests, and release workflow impact.
+- Added a planning-only component catalog with class-library-per-category
+  package shape, planned components by category, a reusable component definition
+  template, and development-order options.
 
 ## Remaining
 
-- Decide whether to scaffold the first component package now or wait for FluxMq
-  feature work to settle.
+- Decide which package to scaffold first: MQTT for FluxMq alignment, Timers for
+  the fastest template proof, or Files as a source/sink middle ground.
