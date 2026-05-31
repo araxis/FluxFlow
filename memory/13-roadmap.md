@@ -4,27 +4,34 @@ Date: 2026-05-31
 
 ## Current Direction
 
-Proceed with release-readiness work for the base engine first.
+Proceed with migration polish after the first real consumer proved the package
+boundary.
 
-The FluxMq migration is deferred until the current FluxMq feature work settles.
-When that work is ready, use FluxMq as the first real consumer pilot.
+FluxMq has migrated its runtime dependency to `FluxFlow.Engine`
+`0.4.0-alpha.1`. Keep the FluxMq branch read-only from this repository while
+its current feature work settles, then use it as the source for cleanup and
+package-authoring improvements.
 
 ## Near-Term Work
 
-1. Finish the release-readiness pass.
-2. Decide the release version and license metadata.
-3. Rewrite enough public docs for a useful prerelease package.
-4. Publish the first prerelease package. Done with `0.1.0-alpha.1`.
-5. Publish the engine-only boundary prerelease after scenario/test ownership is removed.
+1. Add a neutral consumer sample that mirrors the FluxMq integration shape.
+2. Review package-authoring ergonomics exposed by the FluxMq factory registry.
+3. Decide whether `0.5.0-alpha.1` should include only samples/docs or a small
+   registration helper.
+4. Rewrite detailed public docs from the legacy reference set.
+5. Keep release automation healthy for the next prerelease.
 
-## Deferred Consumer Pilot
+## First Consumer Pilot
 
-After the current FluxMq feature work is complete:
+FluxMq now validates the intended engine boundary:
 
-1. Add `FluxFlow.Engine` to FluxMq by project reference.
-2. Migrate one small vertical slice first.
-3. Use that pilot to discover missing extension points.
-4. Move to a package reference after the base package works in that slice.
+1. The app keeps its own workspace schema and projects executable resources and
+   workflows into `ApplicationDefinition`.
+2. The app host wraps `ApplicationRuntimeBuilder` for FluxMq-specific loading,
+   build-result mapping, scenarios, and MQTT client resolution.
+3. Components remain outside the engine and register through the runtime factory
+   registry.
+4. Stale FluxMq docs and build-output folders remain as FluxMq-side cleanup.
 
 ## Future Fluent DSL
 
@@ -68,8 +75,11 @@ Possible packages:
 
 - `FluxFlow.Components.Data`
 - `FluxFlow.Components.Http`
+- `FluxFlow.Components.Mqtt`
 - `FluxFlow.Components.Files`
+- `FluxFlow.Components.Replay`
 - `FluxFlow.Components.Timers`
+- `FluxFlow.Components.Validation`
 - `FluxFlow.Components.Diagnostics`
 
 Package rules:
@@ -77,4 +87,4 @@ Package rules:
 - Each package owns its node registrations.
 - Each package owns options, validation, diagnostics names, events, and tests.
 - The engine stays protocol-neutral.
-- Start with one small package as the template before creating several.
+- Start with one package, likely MQTT, as the template before creating several.

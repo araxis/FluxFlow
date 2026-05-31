@@ -48,6 +48,11 @@ Date: 2026-05-31
 - Published `0.3.0-alpha.1` and verified a fresh package install from the public feed after clearing stale local HTTP cache.
 - Started `0.4.0-alpha.1` to add runtime behavior for link `when` expressions.
 - Published `0.4.0-alpha.1` and verified a fresh package install from the public feed.
+- Recorded the FluxMq migration result: FluxMq now depends on `FluxFlow.Engine`
+  `0.4.0-alpha.1`, keeps its app schema and scenarios outside the engine, and
+  still needs FluxMq-side docs cleanup for stale old-pipeline references.
+- Recorded the component package roadmap, starting with a future MQTT package
+  family after the package-authoring pattern is proven.
 
 ## Remaining
 
