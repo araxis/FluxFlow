@@ -4,11 +4,11 @@ Date: 2026-05-31
 
 ## Private repository
 
-1. Initialize git in `D:\Projects\FluxFlow`.
-2. Create `araxis/FluxFlow` as a private GitHub repository.
-3. Add `origin` to the local repository.
-4. Commit the package boundary and workflow files.
-5. Push `main`.
+1. Initialize git in `D:\Projects\FluxFlow`. Done.
+2. Create `araxis/FluxFlow` as a private GitHub repository. Done.
+3. Add `origin` to the local repository. Done.
+4. Commit the package boundary and workflow files. Done.
+5. Push `main`. Done.
 
 The helper script is `eng\github-bootstrap.ps1`.
 

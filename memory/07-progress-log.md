@@ -17,10 +17,12 @@ Date: 2026-05-31
 - Confirmed source, tests, and package README no longer contain source-application transport terms.
 - Ran release tests successfully.
 - Created local prerelease package files in `artifacts\packages`.
+- Initialized git on `main`.
+- Created private repository `araxis/FluxFlow`.
+- Pushed the initial commit to `origin/main`.
 
 ## Remaining
 
-- Initialize git and create the private GitHub repository.
 - Add the NuGet API key as a repository secret.
 - Clean docs to remove source-application examples.
 - Decide whether dashboard definitions stay in the first package or move out before release.
