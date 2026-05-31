@@ -4,7 +4,8 @@ Date: 2026-05-31
 
 ## Decision
 
-Version `0.2.0-alpha.1` is the engine-only boundary release.
+Version `0.2.0-alpha.1` is the engine-only boundary release and has been
+published.
 
 `FluxFlow.Engine` now owns executable workflow structure and runtime behavior:
 

@@ -164,4 +164,3 @@ jobs:
           }
 
           dotnet nuget push "artifacts/packages/*.nupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-          dotnet nuget push "artifacts/packages/*.snupkg" --api-key $env:NUGET_API_KEY --source "https://api.nuget.org/v3/index.json" --skip-duplicate

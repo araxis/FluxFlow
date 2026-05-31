@@ -25,8 +25,8 @@ The helper script is `eng\github-bootstrap.ps1`.
 
 The repository has `NUGET_API_KEY` stored for the publish workflow.
 
-Current status: `FluxFlow.Engine` version `0.1.0-alpha.1` was published
-successfully after the package feed key scope was updated.
+Current status: `FluxFlow.Engine` versions `0.1.0-alpha.1` and
+`0.2.0-alpha.1` were published successfully.
 
 To rotate it later, create a new NuGet key and store it as a repository secret:
 
