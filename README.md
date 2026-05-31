@@ -130,18 +130,9 @@ await host.DisposeAsync();
 
 ## Documentation
 
-| Document | Contents |
-|----------|----------|
-| [Architecture](docs/01-architecture.md) | Engine design, execution model, completion propagation |
-| [Getting started](docs/02-getting-started.md) | Full walkthrough with runnable examples |
-| [Core concepts](docs/03-core-concepts.md) | `IFlowNode`, `FlowError`, `FlowEvent`, `FlowNodeId` |
-| [Definitions](docs/04-definitions.md) | JSON format, validation rules, serialization |
-| [Runtime](docs/05-runtime.md) | Builder, ports, links, state streams |
-| [Mapping](docs/06-mapping.md) | Expression engines, `IFlowMapper`, `IFlowPredicate` |
-| [Scenarios](docs/07-scenarios.md) | Deterministic scenario testing |
-| [Hosting](docs/08-hosting.md) | `FlowApplicationHost`, configuration loader |
-| [Extending](docs/09-extending.md) | Writing and registering custom node types |
-| [API reference](docs/10-api-reference.md) | Complete public surface, all namespaces |
+The package README is the current public entrypoint. The full docs set is being
+rebuilt around the standalone package boundary; see [docs/README.md](docs/README.md)
+for status.
 
 ---
 

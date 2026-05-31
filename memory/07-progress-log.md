@@ -21,9 +21,11 @@ Date: 2026-05-31
 - Created private repository `araxis/FluxFlow`.
 - Pushed the initial commit to `origin/main`.
 - Updated workflow actions and switched to an Ubuntu runner after the first CI runs reported runner/action notices.
+- Stored the NuGet publish credential as repository setting `NUGET_API_KEY`.
+- Moved the stale docs set to `memory\legacy-docs`.
+- Added a clean docs entrypoint and a documentation consolidation note.
 
 ## Remaining
 
-- Add the NuGet API key as a repository secret.
-- Clean docs to remove source-application examples.
+- Rewrite detailed public docs from the legacy reference set.
 - Decide whether dashboard definitions stay in the first package or move out before release.

@@ -19,7 +19,9 @@ The helper script is `eng\github-bootstrap.ps1`.
 
 ## NuGet secret
 
-Create a NuGet API key and store it as a repository secret:
+The repository has `NUGET_API_KEY` stored for the publish workflow.
+
+To rotate it later, create a new NuGet key and store it as a repository secret:
 
 ```powershell
 $env:NUGET_API_KEY = "<key>"
