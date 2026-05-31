@@ -24,6 +24,8 @@ Date: 2026-05-31
 - Stored the NuGet publish credential as repository setting `NUGET_API_KEY`.
 - Moved the stale docs set to `memory\legacy-docs`.
 - Added a clean docs entrypoint and a documentation consolidation note.
+- Added node authoring helpers: base node classes, a runtime node builder, and a registration contract.
+- Added focused tests for helper-based source, map, sink, error reporting, and registration.
 
 ## Remaining
 

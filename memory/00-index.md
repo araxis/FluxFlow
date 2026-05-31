@@ -12,4 +12,5 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `06-deploy-plan.md`: GitHub and NuGet release plan.
 - `07-progress-log.md`: running history of completed work.
 - `08-documentation-consolidation.md`: docs cleanup decisions.
+- `09-node-authoring-helpers.md`: optional base classes and registration helpers.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

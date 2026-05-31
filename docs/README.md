@@ -20,3 +20,14 @@ rewriting the package docs around the current boundary.
 - Put planning notes and extraction history under `memory`.
 - Keep component package ideas out of the base package docs until those packages exist.
 - Regenerate API reference after every public API change.
+
+## Current Node Authoring Helpers
+
+- `FlowNodeBase`: owns `Id`, `Completion`, and `Errors`.
+- `EventFlowNodeBase`: adds an event stream and `EmitEvent` helpers.
+- `SourceFlowNode<TOutput>`: source node with an output buffer.
+- `SinkFlowNode<TInput>`: sink node with input handling and error reporting.
+- `TransformFlowNode<TInput,TOutput>`: multi-output transform node.
+- `MapFlowNode<TInput,TOutput>`: one-output transform node.
+- `RuntimeNodeBuilder`: fluent input/output registration for node factories.
+- `IFlowNodeRegistration`: package-friendly factory registration contract.

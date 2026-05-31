@@ -39,6 +39,7 @@ protocol-specific dependencies.
 | **Event journal** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
 | **Expression mapping** | Built-in DynamicExpresso (C#) and JSONata engines behind `IFlowExpressionEngine` |
 | **Scenario testing** | Deterministic, step-by-step test runner driven by `FlowEvent` observations |
+| **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
 | **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
 | **Host lifecycle** | `FlowApplicationHost` owns build → start → stop → dispose |
 
@@ -46,51 +47,35 @@ protocol-specific dependencies.
 
 ## Quick start
 
-### 1. Implement `IFlowNode`
+### 1. Implement a node
 
 ```csharp
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Core;
 using FluxFlow.Engine.Runtime;
-using System.Threading.Tasks.Dataflow;
 
-public sealed class NumberSource : IFlowNode, IFlowEventSource
+public sealed class NumberSource : SourceFlowNode<int>
 {
-    private readonly BufferBlock<int> _output = new();
-    private readonly TaskCompletionSource _done =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly BroadcastBlock<FlowEvent> _events = new(e => e);
-
-    public FlowNodeId Id { get; } = FlowNodeId.New();
-    public Task Completion => _done.Task;
-    public ISourceBlock<FlowError> Errors { get; } = new BufferBlock<FlowError>();
-    public ISourceBlock<FlowEvent> Events => _events;
-
     public static RuntimeNode Create(RuntimeNodeFactoryContext ctx)
     {
         var node = new NumberSource();
-        return RuntimeNode.Create(
-            ctx.Address,
-            node,
-            outputs: [
-                new OutputPort<int>(
-                    ctx.Address.Port(new PortName("Output")),
-                    node._output)
-            ]);
+        return ctx.CreateNode(node)
+            .Output("Output", node.OutputBlock)
+            .Build();
     }
 
-    public async Task StartAsync(CancellationToken ct = default)
+    public override async Task StartAsync(CancellationToken ct = default)
     {
         for (var i = 0; i < 10; i++)
-            await _output.SendAsync(i, ct);
-        _output.Complete();
-        _done.SetResult();
-    }
+            await SendOutputAsync(i, ct);
 
-    public void Complete() => _output.Complete();
-    public void Fault(Exception ex) => _done.TrySetException(ex);
+        CompleteOutput();
+    }
 }
 ```
+
+Use `SinkFlowNode<T>`, `TransformFlowNode<TInput,TOutput>`, `MapFlowNode<TInput,TOutput>`,
+and `EventFlowNodeBase` when those shapes fit. Direct `IFlowNode` implementations
+still work when a node needs full control.
 
 ### 2. Define the graph in JSON
 
