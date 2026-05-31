@@ -19,6 +19,7 @@ the engine, and only executable resources and workflows are projected into
 8. [Runtime States](08-runtime-states.md)
 9. [JSON Conversion](09-json-conversion.md)
 10. [Expression Mapping](10-expression-mapping.md)
+11. [Package Versioning](11-package-versioning.md)
 
 ## Current Boundary
 

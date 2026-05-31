@@ -73,8 +73,12 @@ Date: 2026-05-31
 - Added JSON conversion and expression mapping reference pages covering
   serializer options, link JSON forms, workspace projection, condition
   evaluation, custom expression engines, and mapper contracts.
+- Added a short package versioning reference page.
+- Started the first separate component package template plan around an MQTT
+  component package with adapter contracts, module registration, options,
+  diagnostics, events, tests, and release workflow impact.
 
 ## Remaining
 
-- Add package versioning guidance if the public docs need a release-management
-  reference page.
+- Decide whether to scaffold the first component package now or wait for FluxMq
+  feature work to settle.

@@ -19,9 +19,11 @@ package-authoring improvements.
 3. Decide whether `0.5.0-alpha.1` should include only samples/docs or a small
    registration helper. Done and published.
 4. Rewrite detailed public docs from the legacy reference set. Initial focused
-   set plus validation/errors, runtime-state, JSON conversion, and expression
-   mapping references done.
+   set plus validation/errors, runtime-state, JSON conversion, expression
+   mapping, and package versioning references done.
 5. Keep release automation healthy for the next prerelease.
+6. Plan the first component package template. Started with the MQTT package
+   template plan.
 
 ## First Consumer Pilot
 
@@ -90,3 +92,11 @@ Package rules:
 - Each package owns options, validation, diagnostics names, events, and tests.
 - The engine stays protocol-neutral.
 - Start with one package, likely MQTT, as the template before creating several.
+
+First template plan:
+
+- `FluxFlow.Components.Mqtt`
+- adapter contracts first, no live client dependency in the initial template
+- deterministic tests with an in-memory adapter
+- explicit `IFlowNodeModule` registration
+- release workflow update to pack and publish multiple package projects

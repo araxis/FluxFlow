@@ -19,6 +19,7 @@ Added docs:
 - `docs/08-runtime-states.md`
 - `docs/09-json-conversion.md`
 - `docs/10-expression-mapping.md`
+- `docs/11-package-versioning.md`
 
 ## Decisions
 
@@ -30,6 +31,4 @@ Added docs:
 
 ## Next Step
 
-Add deeper reference docs only where users need exact behavior:
-
-- package versioning guidance
+The focused public reference set is now complete enough for the next prerelease.

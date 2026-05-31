@@ -157,7 +157,7 @@ The package README is the short entrypoint. The focused docs set starts at
 [docs/README.md](docs/README.md) and covers getting started, definitions, node
 authoring, package authoring, hosting, observability, workspace projection, and
 validation, error handling, runtime states, JSON conversion, and expression
-mapping.
+mapping, and package versioning.
 
 ---
 

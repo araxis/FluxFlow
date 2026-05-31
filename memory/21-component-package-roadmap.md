@@ -84,6 +84,7 @@ package after the core component package has settled.
 3. Introduce a package registration helper pattern in the engine if needed. Done
    with `IFlowNodeModule`, `FlowNodeModule`, and `FlowNodeRegistration`.
 4. Extract one package family, preferably MQTT, only after FluxMq feature work
-   settles.
+   settles. The first template plan is recorded in
+   `30-component-package-template-plan.md`.
 5. Publish the package as a prerelease and migrate FluxMq from local components
    to that package in a small follow-up branch.

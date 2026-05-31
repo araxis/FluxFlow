@@ -218,3 +218,5 @@ For application-authored workflows:
 | expression cannot see data | Use `input` or `value`, or provide a custom context factory. |
 | mapper is not used | Register/use the mapper inside the node; graph links do not apply mappers automatically. |
 | expression is hard to maintain | Move business rules into C# node code and keep the expression as a small routing condition. |
+
+Next: [Package Versioning](11-package-versioning.md)
