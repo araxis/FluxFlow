@@ -25,6 +25,10 @@ The helper script is `eng\github-bootstrap.ps1`.
 
 The repository has `NUGET_API_KEY` stored for the publish workflow.
 
+Current status: the release workflow can read the secret, but the package feed
+rejects it with `403`. Rotate the key with permission to publish
+`FluxFlow.Engine`, then rerun the failed release workflow.
+
 To rotate it later, create a new NuGet key and store it as a repository secret:
 
 ```powershell

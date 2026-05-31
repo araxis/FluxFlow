@@ -50,3 +50,8 @@ metadata to the commit that triggered the workflow.
 ## Secrets
 
 NuGet publish uses the repository secret `NUGET_API_KEY`.
+
+Current status: the first prerelease workflow reached restore, build, test,
+pack, artifact upload, and GitHub Release asset upload successfully. NuGet
+deployment is blocked because the stored key is rejected with `403`; rotate the
+secret with publish permission for `FluxFlow.Engine`, then rerun the release.
