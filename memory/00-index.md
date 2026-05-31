@@ -19,4 +19,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `13-roadmap.md`: near-term release path plus deferred DSL and component package ideas.
 - `14-release-readiness-audit.md`: prerelease readiness status, gates, and next steps.
 - `15-release-automation.md`: release workflow, versioning, GitHub Release, and NuGet automation.
+- `16-fluxmq-migration-spike-review.md`: review of the FluxMq migration spike report and recommended sequencing.
+- `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.
