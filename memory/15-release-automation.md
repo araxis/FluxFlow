@@ -53,7 +53,8 @@ NuGet publish uses the repository secret `NUGET_API_KEY`.
 
 Current status: the release workflow reached restore, build, test, pack,
 artifact upload, GitHub Release asset upload, and NuGet deployment
-successfully for `0.1.0-alpha.1` and `0.2.0-alpha.1`.
+successfully for `0.1.0-alpha.1`, `0.2.0-alpha.1`, and
+`0.3.0-alpha.1`.
 
 The project README shows package version and download badges from the public
 package feed so the repository front page reflects the latest published
@@ -61,3 +62,6 @@ package state automatically.
 
 The package publish step pushes `.nupkg` files only; the matching `.snupkg`
 symbols package is pushed automatically by the package tooling.
+
+Release `0.3.0-alpha.1` completed in run `26713377988`; branch CI for the
+same commit completed in run `26713375042`.

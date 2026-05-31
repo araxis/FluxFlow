@@ -26,4 +26,13 @@ Keeping this as a property is still useful:
 - `EventFlowNodeBase.EmitEvent(... topic ...)` becomes
   `EventFlowNodeBase.EmitEvent(... channel ...)`.
 
-This is a prerelease breaking change and is planned for `0.3.0-alpha.1`.
+This is a prerelease breaking change released in `0.3.0-alpha.1`.
+
+## Verification
+
+- Release build, tests, package creation, and post-feature review passed.
+- Compiled API check found `Channel` and no old route metadata property.
+- Release automation completed in run `26713377988`.
+- Public package feed listed `0.3.0-alpha.1`.
+- Fresh package install from the public feed succeeded after clearing stale
+  local HTTP cache.
