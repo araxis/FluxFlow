@@ -79,16 +79,6 @@ jobs:
             artifacts/release-notes.md
           if-no-files-found: error
 
-      - name: Publish NuGet packages
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
-            throw "Add the NUGET_API_KEY repository secret before publishing."
-          }
-
-          dotnet nuget push "artifacts/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-          dotnet nuget push "artifacts/packages/*.snupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-
       - name: Create GitHub Release
         shell: pwsh
         env:
@@ -150,3 +140,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Failed to create GitHub Release '$tag'."
           }
+
+      - name: Publish NuGet packages
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.NUGET_API_KEY }}")) {
+            throw "Add the NUGET_API_KEY repository secret before publishing."
+          }
+
+          dotnet nuget push "artifacts/packages/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          dotnet nuget push "artifacts/packages/*.snupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate

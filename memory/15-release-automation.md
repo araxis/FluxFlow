@@ -36,11 +36,14 @@ The GitHub Release uses those extracted notes.
 4. Pack.
 5. Extract release notes.
 6. Upload workflow artifacts.
-7. Publish `.nupkg` and `.snupkg` to NuGet.
-8. Create or update the GitHub Release.
-9. Attach package files to the GitHub Release.
+7. Create or update the GitHub Release.
+8. Attach package files to the GitHub Release.
+9. Publish `.nupkg` and `.snupkg` to NuGet.
+
+GitHub Release creation runs before NuGet deployment so package assets are
+still attached to the release if an external package feed credential is invalid
+or expired.
 
 ## Secrets
 
 NuGet publish uses the repository secret `NUGET_API_KEY`.
-

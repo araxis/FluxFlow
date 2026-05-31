@@ -17,9 +17,9 @@ The helper script is `eng\github-bootstrap.ps1`.
 - `.github\workflows\ci.yml` runs restore, build, and tests on pull requests and pushes to `main`.
 - `.github\workflows\publish-nuget.yml` is the release workflow.
   It runs on `v*.*.*` tags or manual dispatch with a version.
-  It restores, builds, tests, packs, publishes NuGet packages, uploads workflow
-  artifacts, and creates or updates the matching GitHub Release with `.nupkg`
-  and `.snupkg` assets.
+  It restores, builds, tests, packs, uploads workflow artifacts, creates or
+  updates the matching GitHub Release with `.nupkg` and `.snupkg` assets, then
+  publishes NuGet packages.
 
 ## NuGet secret
 
@@ -41,5 +41,5 @@ $env:NUGET_API_KEY = "<key>"
 5. Commit all changes.
 6. Tag the release, for example `v0.1.0-alpha.1`.
 7. Push `main` and the tag.
-8. Confirm the release workflow completes.
-9. Confirm the GitHub Release has package assets and the NuGet package is available.
+8. Confirm the GitHub Release has package assets.
+9. Confirm the release workflow completes and the NuGet package is available.
