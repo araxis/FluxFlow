@@ -54,5 +54,12 @@
     "packageId": "FluxFlow.Components.Timers",
     "project": "src/FluxFlow.Components.Timers/FluxFlow.Components.Timers.csproj",
     "notesName": "FluxFlow.Components.Timers"
+  },
+  {
+    "alias": "components-payloads",
+    "tagPrefix": "components-payloads",
+    "packageId": "FluxFlow.Components.Payloads",
+    "project": "src/FluxFlow.Components.Payloads/FluxFlow.Components.Payloads.csproj",
+    "notesName": "FluxFlow.Components.Payloads"
   }
 ]

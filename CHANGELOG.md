@@ -1,5 +1,26 @@
 # Changelog
 
+## FluxFlow.Components.Payloads 0.1.0-alpha.1
+
+Initial reusable payload inspection component package.
+
+- Added `FluxFlow.Components.Payloads` as a separate source project, test
+  project, and package artifact.
+- Added `payload.inspect` with `Input`, `Output`, and `Errors` ports.
+- Added `PayloadInspectionRequest`, `PayloadInspectionResult`, and
+  `PayloadKind` contracts.
+- Added classification for empty, JSON object, JSON array, JSON scalar, XML,
+  base64, text, and binary payloads.
+- Added preview metadata for byte count, detected encoding, text preview,
+  formatted preview, parse errors, truncation flags, and base64 decoded size.
+- Added byte payload decoding from explicit encoding hints or content type
+  charset values.
+- Added configurable preview limits, formatting controls, base64 detection,
+  and bounded capacity.
+- Added focused coverage for classification, preview truncation, error
+  emission, continuation after per-message failures, diagnostics, and
+  completion behavior.
+
 ## FluxFlow.Components.Timers 0.4.1-alpha.1
 
 Finalizes the first timer component set.
