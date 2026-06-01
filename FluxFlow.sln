@@ -83,6 +83,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Storage
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Storage.Tests", "tests\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj", "{2D0583B6-E9DC-4E37-A4AA-D758CD909B41}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.StorageCompositionSample", "samples\FluxFlow.StorageCompositionSample\FluxFlow.StorageCompositionSample.csproj", "{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -537,6 +539,18 @@ Global
 		{2D0583B6-E9DC-4E37-A4AA-D758CD909B41}.Release|x64.Build.0 = Release|Any CPU
 		{2D0583B6-E9DC-4E37-A4AA-D758CD909B41}.Release|x86.ActiveCfg = Release|Any CPU
 		{2D0583B6-E9DC-4E37-A4AA-D758CD909B41}.Release|x86.Build.0 = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|x64.Build.0 = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Debug|x86.Build.0 = Debug|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|x64.ActiveCfg = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|x64.Build.0 = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|x86.ActiveCfg = Release|Any CPU
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -576,5 +590,6 @@ Global
 		{49273A23-2AC1-4518-9D67-44E1C0A9E204} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{F154572F-A92B-4C9C-A814-9A957A6F7A4F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{2D0583B6-E9DC-4E37-A4AA-D758CD909B41} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{5FACCDD0-E0A1-416C-A81E-99CB446A52FB} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal

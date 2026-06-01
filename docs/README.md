@@ -39,6 +39,9 @@ mapped into `state.reducer` and observed by `flow.counter`.
 Add `FluxFlow.Components.Storage` when a workflow needs host-backed logical
 record storage through put, get, and delete nodes.
 
+Run `samples/FluxFlow.StorageCompositionSample` to see the storage package with
+a host-owned store adapter.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

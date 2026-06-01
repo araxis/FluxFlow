@@ -186,6 +186,10 @@ See [samples/FluxFlow.StateCompositionSample](samples/FluxFlow.StateCompositionS
 for a timer, mapper, state reducer, and counter composition sample. It keeps
 host-specific expressions and sinks outside the reusable packages.
 
+See [samples/FluxFlow.StorageCompositionSample](samples/FluxFlow.StorageCompositionSample)
+for a logical storage composition sample. It keeps the concrete store in the
+host while composing `storage.put`, `storage.get`, and `storage.delete`.
+
 See [samples/FluxFlow.ComponentPackageTemplate](samples/FluxFlow.ComponentPackageTemplate)
 for a copyable component package shape with contracts, options, diagnostics,
 module registration, and tests.

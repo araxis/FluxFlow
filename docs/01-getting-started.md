@@ -69,6 +69,14 @@ dotnet build samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSa
 dotnet run --project samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSample.csproj --no-build
 ```
 
+The storage composition sample uses a host-owned in-memory store with
+`storage.put`, `storage.get`, and `storage.delete`:
+
+```sh
+dotnet build samples/FluxFlow.StorageCompositionSample/FluxFlow.StorageCompositionSample.csproj /nr:false
+dotnet run --project samples/FluxFlow.StorageCompositionSample/FluxFlow.StorageCompositionSample.csproj --no-build
+```
+
 ## Basic Flow
 
 Every app follows the same core steps:
