@@ -280,16 +280,22 @@ public sealed class MqttSubscribeNodeTests
         var diagnostics = new BufferBlock<FluxFlow.Engine.Components.FlowDiagnostic>();
         var events = new BufferBlock<FluxFlow.Engine.Components.FlowEvent>();
         runtimeNode.Node.ShouldBeOfType<Nodes.MqttSubscribeNode>()
-            .Diagnostics.LinkTo(diagnostics);
+            .Diagnostics.LinkTo(
+                diagnostics,
+                new DataflowLinkOptions { PropagateCompletion = true });
         runtimeNode.Node.ShouldBeAssignableTo<FluxFlow.Engine.Components.IFlowEventSource>()!
-            .Events.LinkTo(events);
+            .Events.LinkTo(
+                events,
+                new DataflowLinkOptions { PropagateCompletion = true });
 
         await runtimeNode.Node.StartAsync();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var names = new List<string>();
-        while (diagnostics.TryReceive(out var diagnostic))
+        while (names.Count < 3)
         {
+            var diagnostic = await diagnostics.ReceiveAsync()
+                .WaitAsync(TimeSpan.FromSeconds(5));
             names.Add(diagnostic.Name);
         }
 
