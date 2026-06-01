@@ -1,5 +1,26 @@
 # Changelog
 
+## FluxFlow.Components.Http 0.1.0-alpha.1
+
+Initial reusable HTTP request component package.
+
+- Added `FluxFlow.Components.Http` as a separate source project, test project,
+  and package artifact.
+- Added `http.request` with `Input`, `Output`, and `Errors` ports.
+- Added `HttpRequestInput`, `HttpResponseOutput`, `HttpErrorOutput`, and
+  `HttpErrorKind` contracts.
+- Added host-replaceable `IHttpRequestSenderFactory` and `IHttpRequestSender`
+  contracts.
+- Added default per-node HTTP sender without static/shared client state.
+- Added base URL, default headers, timeout, redirect, response body limit,
+  non-success routing, and bounded capacity options.
+- Added structured errors for invalid request, invalid URL, timeout,
+  cancellation, network failure, response body size, send failure, and
+  non-success status.
+- Added focused coverage for sender replacement, request resolution, response
+  routing, error routing, timeouts, response body limits, diagnostics, and
+  registration.
+
 ## FluxFlow.Components.Payloads 0.1.0-alpha.1
 
 Initial reusable payload inspection component package.

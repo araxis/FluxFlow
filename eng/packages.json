@@ -61,5 +61,12 @@
     "packageId": "FluxFlow.Components.Payloads",
     "project": "src/FluxFlow.Components.Payloads/FluxFlow.Components.Payloads.csproj",
     "notesName": "FluxFlow.Components.Payloads"
+  },
+  {
+    "alias": "components-http",
+    "tagPrefix": "components-http",
+    "packageId": "FluxFlow.Components.Http",
+    "project": "src/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj",
+    "notesName": "FluxFlow.Components.Http"
   }
 ]
