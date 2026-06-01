@@ -113,5 +113,5 @@ after the core component package has settled.
    observability package release.
 7. Add a generic timer package for interval-driven workflow activity. Done with
    `timer.interval`.
-8. Plan a generic storage package for host-adapter-backed put/get/delete
-   workflow storage. Planned in `62-storage-component-package-plan.md`.
+8. Add a generic storage package for host-adapter-backed put/get/delete
+   workflow storage. Done in `63-storage-component-package.md`.

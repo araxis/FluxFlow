@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Storage</PackageId>
+    <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Reusable logical storage components for FluxFlow.</Description>
+    <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Adds the initial host-adapter-backed storage component package.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

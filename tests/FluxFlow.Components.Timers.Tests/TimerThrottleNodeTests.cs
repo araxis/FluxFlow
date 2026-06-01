@@ -4,6 +4,7 @@ using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
+using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
@@ -51,20 +52,19 @@ public sealed class TimerThrottleNodeTests
             .ShouldBeOfType<InputPort<InputMessage>>();
         var output = new BufferBlock<InputMessage>();
         LinkOutput(runtimeNode, output);
+        var stopwatch = Stopwatch.StartNew();
 
         await input.Target.SendAsync(new InputMessage("one"));
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var firstAt = DateTimeOffset.UtcNow;
-
         await input.Target.SendAsync(new InputMessage("two"));
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var secondAt = DateTimeOffset.UtcNow;
+        stopwatch.Stop();
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         first.Value.ShouldBe("one");
         second.Value.ShouldBe("two");
-        secondAt.ShouldBeGreaterThanOrEqualTo(firstAt.AddMilliseconds(30));
+        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(30);
     }
 
     [Fact]

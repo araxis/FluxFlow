@@ -207,6 +207,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Timers` | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` | Interval, cron schedule, delay, rate-limit, and quiet-period timing nodes. |
 | `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay` | Host-store-backed session recording and replay. |
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
+| `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.delete` | Host-store-backed logical record storage. |
 
 ---
 

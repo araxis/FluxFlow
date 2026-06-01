@@ -20,7 +20,8 @@ host code:
 6. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
 7. Add edge packages for validation, serialization, payload inspection, HTTP,
-   file system operations, recording, replay, or external transport adapters.
+   file system operations, recording, replay, storage, or external transport
+   adapters.
 
 This keeps early application work direct while leaving a clean path to extract
 generic behavior later.

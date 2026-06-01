@@ -1,5 +1,24 @@
 # Changelog
 
+## FluxFlow.Components.Storage 0.1.0-alpha.1
+
+Initial reusable logical storage component package.
+
+- Added `FluxFlow.Components.Storage` as a separate source project, test
+  project, and package artifact.
+- Added `storage.put`, `storage.get`, and `storage.delete` nodes.
+- Added storage request/result/record contracts and write modes.
+- Added host-injected store factories and explicit store ownership leases.
+- Added startup failure handling when stores cannot be opened.
+- Added per-message store failures as `FlowError` with later-message
+  continuation.
+- Added found and not-found routing for `storage.get`.
+- Added missing delete result control for `storage.delete`.
+- Added diagnostics for store open, put, get, delete, and failure paths.
+- Added focused coverage for put modes, get routing, expiration, delete
+  behavior, startup failure, invalid requests, diagnostics, registration, and
+  lease disposal.
+
 ## Documentation
 
 - Added component composition guidance for host boundaries, package boundaries,

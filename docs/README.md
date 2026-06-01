@@ -36,6 +36,9 @@ through reducer expressions.
 Run `samples/FluxFlow.StateCompositionSample` to see a finite timer stream
 mapped into `state.reducer` and observed by `flow.counter`.
 
+Add `FluxFlow.Components.Storage` when a workflow needs host-backed logical
+record storage through put, get, and delete nodes.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

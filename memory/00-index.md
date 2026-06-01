@@ -66,5 +66,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `60-component-composition-docs.md`: package composition guidance and host/package boundary notes.
 - `61-package-readme-composition-links.md`: component package README links to composition guidance.
 - `62-storage-component-package-plan.md`: planned generic storage component package boundary and v0.1 scope.
+- `63-storage-component-package.md`: first generic logical storage component package.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

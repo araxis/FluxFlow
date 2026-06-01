@@ -96,5 +96,12 @@
     "packageId": "FluxFlow.Components.State",
     "project": "src/FluxFlow.Components.State/FluxFlow.Components.State.csproj",
     "notesName": "FluxFlow.Components.State"
+  },
+  {
+    "alias": "components-storage",
+    "tagPrefix": "components-storage",
+    "packageId": "FluxFlow.Components.Storage",
+    "project": "src/FluxFlow.Components.Storage/FluxFlow.Components.Storage.csproj",
+    "notesName": "FluxFlow.Components.Storage"
   }
 ]
