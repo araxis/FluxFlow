@@ -1,5 +1,17 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.4.1-alpha.1
+
+Finalizes the first timer component set.
+
+- Added a shared internal typed node factory path for `timer.delay`,
+  `timer.throttle`, and `timer.debounce`.
+- Fixed throttle emission timestamp ordering so immediate downstream feedback
+  cannot bypass the configured interval.
+- Kept existing timer node contracts, ports, options, and behavior unchanged.
+- Preserved focused coverage for interval, schedule, delay, throttle, and
+  debounce nodes.
+
 ## FluxFlow.Components.Timers 0.4.0-alpha.1
 
 Adds typed debounce for quiet-period workflow paths.

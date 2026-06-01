@@ -54,5 +54,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `48-timers-delay-schedule.md`: timer delay and cron schedule component addition.
 - `49-timers-throttle.md`: timer throttle component addition.
 - `50-timers-debounce.md`: timer debounce component addition.
+- `51-timers-finalization.md`: first timer component set finalization.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

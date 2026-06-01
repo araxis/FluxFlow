@@ -75,9 +75,9 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         try
         {
             await WaitForSlotAsync().ConfigureAwait(false);
+            _lastEmittedAt = DateTimeOffset.UtcNow;
             await _output.SendAsync(input, _processingCancellation.Token).ConfigureAwait(false);
 
-            _lastEmittedAt = DateTimeOffset.UtcNow;
             var sequence = Interlocked.Increment(ref _emitted);
             TryEmitDiagnostic(
                 TimerDiagnosticNames.ThrottleEmitted,
