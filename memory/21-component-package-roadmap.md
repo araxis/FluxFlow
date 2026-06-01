@@ -54,6 +54,7 @@ Start with one package as the template before splitting everything:
   helpers that are not tied to one application.
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
+- `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
 
 The first consumer can keep components in its own repository until the package
 boundary is stable. The first extracted package should prove the pattern before
@@ -108,3 +109,5 @@ after the core component package has settled.
 6. Add generic mapping, control, validation, file system, and observability
    packages as independent package artifacts. Done through the first
    observability package release.
+7. Add a generic timer package for interval-driven workflow activity. Done with
+   `timer.interval`.

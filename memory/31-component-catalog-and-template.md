@@ -329,20 +329,25 @@ Package:
 FluxFlow.Components.Timers
 ```
 
+Implemented components:
+
+| Component | Role | Node type | Notes |
+|-----------|------|-----------|-------|
+| Interval Trigger | source | `timer.interval` | Emits `TimerTick` values at a fixed interval with optional initial delay, immediate first tick, and max tick count. |
+
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| Interval Trigger | source | `timers.interval` | Emits ticks at a fixed interval. |
-| Schedule Trigger | source | `timers.schedule` | Emits ticks based on a schedule expression. |
-| Delay | transform | `timers.delay` | Delays each input item. |
-| Throttle | transform | `timers.throttle` | Limits output rate. |
-| Debounce | transform | `timers.debounce` | Emits only after quiet periods. |
+| Schedule Trigger | source | `timer.schedule` | Emits ticks based on a schedule expression. |
+| Delay | transform | `timer.delay` | Delays each input item. |
+| Throttle | transform | `timer.throttle` | Limits output rate. |
+| Debounce | transform | `timer.debounce` | Emits only after quiet periods. |
 
 Recommendation:
 
-This is the easiest category for deterministic package-template tests because
-it can use a fake clock.
+This category is useful for workflow orchestration and can later add a
+host-provided clock if interval tests need stronger determinism.
 
 ### Data
 

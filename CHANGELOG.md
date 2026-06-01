@@ -1,5 +1,22 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.1.0-alpha.1
+
+Initial reusable timer component package.
+
+- Added `FluxFlow.Components.Timers` as a separate source project, test
+  project, and package artifact.
+- Added `timer.interval` with an `Output` port.
+- Added `TimerTick` with timestamp, due time, sequence, elapsed time,
+  interval, and drift metadata.
+- Added interval, initial delay, immediate first tick, max tick, and bounded
+  capacity options.
+- Added package diagnostics for interval start, tick emission, stop, and
+  failure.
+- Added workflow events for emitted interval ticks.
+- Added configuration validation for missing or invalid duration, capacity, and
+  max tick options.
+
 ## FluxFlow.Components.Observability 0.1.0-alpha.1
 
 Initial reusable observability component package.

@@ -47,5 +47,12 @@
     "packageId": "FluxFlow.Components.Observability",
     "project": "src/FluxFlow.Components.Observability/FluxFlow.Components.Observability.csproj",
     "notesName": "FluxFlow.Components.Observability"
+  },
+  {
+    "alias": "components-timers",
+    "tagPrefix": "components-timers",
+    "packageId": "FluxFlow.Components.Timers",
+    "project": "src/FluxFlow.Components.Timers/FluxFlow.Components.Timers.csproj",
+    "notesName": "FluxFlow.Components.Timers"
   }
 ]
