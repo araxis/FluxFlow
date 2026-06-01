@@ -97,6 +97,11 @@ public sealed class FileWriteNode : FlowNodeBase
             ReportWriteError(exception.Code, exception.Message, request, exception.InnerException);
             return;
         }
+        catch (FileSystemPathResolutionException exception)
+        {
+            ReportWriteError(exception.Code, exception.Message, request, exception.InnerException);
+            return;
+        }
 
         try
         {
@@ -203,13 +208,6 @@ public sealed class FileWriteNode : FlowNodeBase
 
     private ResolvedWrite ResolveWrite(FileWriteRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Path))
-        {
-            throw new FileWriteNodeException(
-                FileSystemErrorCodes.FileWriteInvalidPath,
-                "file.write request path cannot be empty.");
-        }
-
         if (!Enum.IsDefined(request.Mode))
         {
             throw new FileWriteNodeException(
@@ -224,50 +222,14 @@ public sealed class FileWriteNode : FlowNodeBase
     }
 
     private string ResolvePath(string requestPath)
-    {
-        var isAbsolute = Path.IsPathRooted(requestPath);
-        if (isAbsolute && !_options.AllowAbsolutePaths)
-        {
-            throw new FileWriteNodeException(
-                FileSystemErrorCodes.FileWriteAbsolutePathDenied,
-                "file.write absolute paths are disabled.");
-        }
-
-        try
-        {
-            if (string.IsNullOrWhiteSpace(_options.BaseDirectory))
-            {
-                return Path.GetFullPath(requestPath);
-            }
-
-            var baseDirectory = Path.GetFullPath(_options.BaseDirectory);
-            if (!isAbsolute)
-            {
-                var resolvedPath = Path.GetFullPath(Path.Combine(baseDirectory, requestPath));
-                if (!IsUnderBaseDirectory(baseDirectory, resolvedPath))
-                {
-                    throw new FileWriteNodeException(
-                        FileSystemErrorCodes.FileWriteInvalidPath,
-                        "file.write path escapes the configured baseDirectory.");
-                }
-
-                return resolvedPath;
-            }
-
-            return Path.GetFullPath(requestPath);
-        }
-        catch (FileWriteNodeException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            throw new FileWriteNodeException(
+        => FileSystemPathResolver.Resolve(
+            requestPath,
+            new FileSystemPathPolicy(
+                "file.write",
+                _options.BaseDirectory,
+                _options.AllowAbsolutePaths,
                 FileSystemErrorCodes.FileWriteInvalidPath,
-                $"file.write request path is invalid: {exception.Message}",
-                exception);
-        }
-    }
+                FileSystemErrorCodes.FileWriteAbsolutePathDenied));
 
     private byte[] ResolveBytes(FileWriteRequest request)
     {
@@ -364,18 +326,6 @@ public sealed class FileWriteNode : FlowNodeBase
         }
 
         return string.Join("; ", values);
-    }
-
-    private static bool IsUnderBaseDirectory(string baseDirectory, string path)
-    {
-        var normalizedBase = Path.TrimEndingDirectorySeparator(baseDirectory);
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
-        return path.Equals(normalizedBase, comparison) ||
-               path.StartsWith(normalizedBase + Path.DirectorySeparatorChar, comparison) ||
-               path.StartsWith(normalizedBase + Path.AltDirectorySeparatorChar, comparison);
     }
 
     private sealed record ResolvedWrite(string Path, byte[] Bytes);

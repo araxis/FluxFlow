@@ -9,4 +9,13 @@ public static class FileSystemErrorCodes
     public const int FileWriteUnsupportedMode = 7004;
     public const int FileWriteAccessDenied = 7005;
     public const int FileWriteIoFailed = 7006;
+
+    public const int FileReadInvalidPath = 7100;
+    public const int FileReadAbsolutePathDenied = 7101;
+    public const int FileReadUnsupportedEncoding = 7102;
+    public const int FileReadUnsupportedMode = 7103;
+    public const int FileReadAccessDenied = 7104;
+    public const int FileReadIoFailed = 7105;
+    public const int FileReadNotFound = 7106;
+    public const int FileReadTooLarge = 7107;
 }

@@ -7,11 +7,17 @@ namespace FluxFlow.Components.FileSystem.Tests;
 internal static class FileSystemTestHost
 {
     public static RuntimeNodeFactoryContext CreateContext(object configuration)
+        => CreateContext(FileSystemComponentTypes.FileWrite, configuration, "writer");
+
+    public static RuntimeNodeFactoryContext CreateContext(
+        NodeType nodeType,
+        object configuration,
+        string nodeName)
         => new(
-            new NodeName("writer"),
+            new NodeName(nodeName),
             new NodeDefinition
             {
-                Type = FileSystemComponentTypes.FileWrite,
+                Type = nodeType,
                 Configuration = ToConfiguration(configuration)
             },
             "main",

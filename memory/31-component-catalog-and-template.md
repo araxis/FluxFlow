@@ -303,13 +303,13 @@ Implemented components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
+| File Reader | utility | `file.read` | Reads file content as text or bytes and emits `FileReadResult`. |
 | File Writer | sink | `file.write` | Writes request content or bytes to a file and emits `FileWriteResult`. |
 
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| File Reader | source | `file.read` | Reads one file or a configured file set. |
 | File Watcher | source | `file.watch` | Emits file-change events. |
 | Directory Enumerator | source | `directory.enumerate` | Emits file paths and metadata. |
 

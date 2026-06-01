@@ -15,27 +15,22 @@ internal static class FileSystemOptionsReader
     {
         var options = Read<FileWriteOptions>(definition);
 
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new InvalidOperationException(
-                "file.write option 'boundedCapacity' must be greater than zero.");
-        }
+        ValidateBoundedCapacity("file.write", options.BoundedCapacity);
+        ValidateDefaultEncoding("file.write", options.DefaultEncoding);
 
-        if (string.IsNullOrWhiteSpace(options.DefaultEncoding))
-        {
-            throw new InvalidOperationException(
-                "file.write option 'defaultEncoding' cannot be empty.");
-        }
+        return options;
+    }
 
-        try
-        {
-            Encoding.GetEncoding(options.DefaultEncoding);
-        }
-        catch (ArgumentException exception)
+    public static FileReadOptions ReadFileReadOptions(NodeDefinition definition)
+    {
+        var options = Read<FileReadOptions>(definition);
+
+        ValidateBoundedCapacity("file.read", options.BoundedCapacity);
+        ValidateDefaultEncoding("file.read", options.DefaultEncoding);
+        if (options.MaxBytes is <= 0)
         {
             throw new InvalidOperationException(
-                "file.write option 'defaultEncoding' is not supported.",
-                exception);
+                "file.read option 'maxBytes' must be greater than zero when set.");
         }
 
         return options;
@@ -48,5 +43,34 @@ internal static class FileSystemOptionsReader
         var json = JsonSerializer.Serialize(definition.Configuration, SerializerOptions);
         return JsonSerializer.Deserialize<T>(json, SerializerOptions)
             ?? throw new InvalidOperationException($"Could not read {typeof(T).Name}.");
+    }
+
+    private static void ValidateBoundedCapacity(string nodeType, int boundedCapacity)
+    {
+        if (boundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'boundedCapacity' must be greater than zero.");
+        }
+    }
+
+    private static void ValidateDefaultEncoding(string nodeType, string defaultEncoding)
+    {
+        if (string.IsNullOrWhiteSpace(defaultEncoding))
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'defaultEncoding' cannot be empty.");
+        }
+
+        try
+        {
+            Encoding.GetEncoding(defaultEncoding);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'defaultEncoding' is not supported.",
+                exception);
+        }
     }
 }

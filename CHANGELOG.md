@@ -1,5 +1,21 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.2.0-alpha.1
+
+Adds package-owned file reads.
+
+- Added `file.read` with `Input` and `Result` ports.
+- Added `FileReadRequest`, `FileReadResult`, and `FileReadMode` contracts.
+- Added text and byte read modes with per-request encoding for text reads.
+- Added `maxBytes` protection for read nodes.
+- Shared base directory, absolute path, and path escape handling between
+  `file.write` and `file.read`.
+- Added stable file read error codes for invalid paths, denied absolute paths,
+  unsupported encodings, unsupported modes, access denial, IO failures, missing
+  files, and oversized files.
+- Added read diagnostics with path, resolved path, read mode, encoding, byte
+  count, base directory, and max byte metadata where available.
+
 ## FluxFlow.Components.FileSystem 0.1.0-alpha.1
 
 Initial reusable file system component package.

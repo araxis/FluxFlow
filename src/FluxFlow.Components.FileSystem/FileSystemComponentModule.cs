@@ -13,6 +13,9 @@ public sealed class FileSystemComponentModule : IFlowNodeModule
         Registrations =
         [
             new FlowNodeRegistration(
+                FileSystemComponentTypes.FileRead,
+                FileReadNode.Create),
+            new FlowNodeRegistration(
                 FileSystemComponentTypes.FileWrite,
                 FileWriteNode.Create)
         ];

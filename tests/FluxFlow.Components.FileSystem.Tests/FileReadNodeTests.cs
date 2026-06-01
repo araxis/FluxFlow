@@ -10,254 +10,238 @@ using Xunit;
 
 namespace FluxFlow.Components.FileSystem.Tests;
 
-public sealed class FileWriteNodeTests
+public sealed class FileReadNodeTests
 {
     [Fact]
-    public async Task FileWrite_WritesStringContentInsideBaseDirectory()
+    public async Task FileRead_ReadsTextInsideBaseDirectory()
     {
         using var directory = TempDirectory.Create();
+        Directory.CreateDirectory(Path.Combine(directory.Path, "logs"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "logs", "input.txt"), "hello");
         var runtimeNode = CreateNode(new
         {
             baseDirectory = directory.Path,
             boundedCapacity = 4
         });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
-        var results = new BufferBlock<FileWriteResult>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
         LinkResult(runtimeNode, results);
 
-        await input.Target.SendAsync(new FileWriteRequest
+        await input.Target.SendAsync(new FileReadRequest
         {
-            Path = "logs/output.txt",
-            Content = "hello"
+            Path = "logs/input.txt"
         });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var expectedPath = Path.Combine(directory.Path, "logs", "output.txt");
-        var text = await File.ReadAllTextAsync(expectedPath);
-        text.ShouldBe("hello");
+        var expectedPath = Path.Combine(directory.Path, "logs", "input.txt");
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         result.Path.ShouldBe(Path.GetFullPath(expectedPath));
-        result.BytesWritten.ShouldBe(5);
-        result.Mode.ShouldBe(FileWriteMode.Overwrite);
+        result.Content.ShouldBe("hello");
+        result.Bytes.ShouldBeNull();
+        result.BytesRead.ShouldBe(5);
+        result.ReadAs.ShouldBe(FileReadMode.Text);
+        result.Encoding.ShouldBe("utf-8");
     }
 
     [Fact]
-    public async Task FileWrite_WritesBytesAndAppendsInOrder()
+    public async Task FileRead_ReadsBytes()
     {
         using var directory = TempDirectory.Create();
+        await File.WriteAllBytesAsync(Path.Combine(directory.Path, "data.bin"), [1, 2, 3]);
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
-        runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
+        LinkResult(runtimeNode, results);
 
-        await input.Target.SendAsync(new FileWriteRequest
+        await input.Target.SendAsync(new FileReadRequest
         {
             Path = "data.bin",
-            Bytes = [1, 2],
-            Mode = FileWriteMode.Overwrite
-        });
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = "data.bin",
-            Bytes = [3, 4],
-            Mode = FileWriteMode.Append
+            ReadAs = FileReadMode.Bytes
         });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        File.ReadAllBytes(Path.Combine(directory.Path, "data.bin")).ShouldBe([1, 2, 3, 4]);
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.Bytes.ShouldBe([1, 2, 3]);
+        result.Content.ShouldBeNull();
+        result.Encoding.ShouldBeNull();
+        result.BytesRead.ShouldBe(3);
+        result.ReadAs.ShouldBe(FileReadMode.Bytes);
     }
 
     [Fact]
-    public async Task FileWrite_CreateNewReportsIoFailureAndContinues()
+    public async Task FileRead_MissingFileReportsErrorAndContinues()
     {
         using var directory = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(directory.Path, "target.txt"), "existing");
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "next.txt"), "second");
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<FileWriteResult>();
+        var results = new BufferBlock<FileReadResult>();
         runtimeNode.Node.Errors.LinkTo(errors);
         LinkResult(runtimeNode, results);
 
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = "target.txt",
-            Content = "first",
-            Mode = FileWriteMode.CreateNew
-        });
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = "next.txt",
-            Content = "second",
-            Mode = FileWriteMode.CreateNew
-        });
+        await input.Target.SendAsync(new FileReadRequest { Path = "missing.txt" });
+        await input.Target.SendAsync(new FileReadRequest { Path = "next.txt" });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWriteIoFailed);
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadNotFound);
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Path.ShouldEndWith("next.txt");
-        var text = await File.ReadAllTextAsync(Path.Combine(directory.Path, "next.txt"));
-        text.ShouldBe("second");
+        result.Content.ShouldBe("second");
     }
 
     [Fact]
-    public async Task FileWrite_RejectsAbsolutePathWhenDisabled()
+    public async Task FileRead_RejectsAbsolutePathWhenDisabled()
     {
         using var directory = TempDirectory.Create();
+        var filePath = Path.Combine(directory.Path, "blocked.txt");
+        await File.WriteAllTextAsync(filePath, "blocked");
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var errors = new BufferBlock<FlowError>();
         runtimeNode.Node.Errors.LinkTo(errors);
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
 
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = Path.Combine(directory.Path, "blocked.txt"),
-            Content = "blocked"
-        });
+        await input.Target.SendAsync(new FileReadRequest { Path = filePath });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWriteAbsolutePathDenied);
-        File.Exists(Path.Combine(directory.Path, "blocked.txt")).ShouldBeFalse();
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadAbsolutePathDenied);
     }
 
     [Fact]
-    public async Task FileWrite_RejectsRelativePathThatEscapesBaseDirectory()
+    public async Task FileRead_RejectsRelativePathThatEscapesBaseDirectory()
     {
         using var directory = TempDirectory.Create();
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var errors = new BufferBlock<FlowError>();
         runtimeNode.Node.Errors.LinkTo(errors);
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
 
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = "../outside.txt",
-            Content = "blocked"
-        });
+        await input.Target.SendAsync(new FileReadRequest { Path = "../outside.txt" });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWriteInvalidPath);
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadInvalidPath);
         error.Message.ShouldContain("baseDirectory");
     }
 
     [Fact]
-    public async Task FileWrite_UsesRequestEncoding()
+    public async Task FileRead_UsesRequestEncoding()
     {
         using var directory = TempDirectory.Create();
+        await File.WriteAllBytesAsync(
+            Path.Combine(directory.Path, "encoded.txt"),
+            Encoding.Unicode.GetBytes("A"));
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path, defaultEncoding = "utf-8" });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
-        var results = new BufferBlock<FileWriteResult>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
         LinkResult(runtimeNode, results);
 
-        await input.Target.SendAsync(new FileWriteRequest
+        await input.Target.SendAsync(new FileReadRequest
         {
             Path = "encoded.txt",
-            Content = "A",
             Encoding = "utf-16"
         });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.BytesWritten.ShouldBe(2);
-        File.ReadAllBytes(Path.Combine(directory.Path, "encoded.txt"))
-            .ShouldBe(Encoding.Unicode.GetBytes("A"));
+        result.Content.ShouldBe("A");
+        result.BytesRead.ShouldBe(2);
+        result.Encoding.ShouldBe("utf-16");
     }
 
     [Fact]
-    public async Task FileWrite_ReportsUnsupportedEncoding()
+    public async Task FileRead_ReportsUnsupportedEncoding()
     {
         using var directory = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "encoded.txt"), "A");
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var errors = new BufferBlock<FlowError>();
         runtimeNode.Node.Errors.LinkTo(errors);
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
 
-        await input.Target.SendAsync(new FileWriteRequest
+        await input.Target.SendAsync(new FileReadRequest
         {
             Path = "encoded.txt",
-            Content = "A",
             Encoding = "not-a-real-encoding"
         });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWriteUnsupportedEncoding);
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadUnsupportedEncoding);
     }
 
     [Fact]
-    public async Task FileWrite_ReportsMissingContent()
+    public async Task FileRead_RejectsFilesOverMaxBytes()
     {
         using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
+        await File.WriteAllBytesAsync(Path.Combine(directory.Path, "large.bin"), [1, 2, 3, 4]);
+        var runtimeNode = CreateNode(new { baseDirectory = directory.Path, maxBytes = 3 });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var errors = new BufferBlock<FlowError>();
         runtimeNode.Node.Errors.LinkTo(errors);
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
 
-        await input.Target.SendAsync(new FileWriteRequest
+        await input.Target.SendAsync(new FileReadRequest
         {
-            Path = "empty.txt"
+            Path = "large.bin",
+            ReadAs = FileReadMode.Bytes
         });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWriteContentMissing);
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadTooLarge);
     }
 
     [Fact]
-    public async Task FileWrite_EmitsDiagnostics()
+    public async Task FileRead_EmitsDiagnostics()
     {
         using var directory = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "diag.txt"), "value");
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
         var diagnostics = new BufferBlock<FlowDiagnostic>();
         runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
             .Diagnostics.LinkTo(diagnostics);
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
 
-        await input.Target.SendAsync(new FileWriteRequest
-        {
-            Path = "diag.txt",
-            Content = "value"
-        });
+        await input.Target.SendAsync(new FileReadRequest { Path = "diag.txt" });
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(FileSystemDiagnosticNames.FileWriteSucceeded);
-        diagnostic.Attributes["bytesWritten"].ShouldBe(5);
+        diagnostic.Name.ShouldBe(FileSystemDiagnosticNames.FileReadSucceeded);
+        diagnostic.Attributes["bytesRead"].ShouldBe(5L);
     }
 
     [Fact]
-    public async Task FileWrite_CompletesResultOutput()
+    public async Task FileRead_CompletesResultOutput()
     {
         using var directory = TempDirectory.Create();
         var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
-            .ShouldBeOfType<InputPort<FileWriteRequest>>();
-        var results = new BufferBlock<FileWriteResult>();
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
         LinkResult(runtimeNode, results);
 
         input.Target.Complete();
@@ -268,7 +252,7 @@ public sealed class FileWriteNodeTests
     }
 
     [Fact]
-    public void FileWrite_RejectsInvalidBoundedCapacity()
+    public void FileRead_RejectsInvalidBoundedCapacity()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(new { boundedCapacity = 0 }));
@@ -277,7 +261,7 @@ public sealed class FileWriteNodeTests
     }
 
     [Fact]
-    public void FileWrite_RejectsUnsupportedDefaultEncoding()
+    public void FileRead_RejectsUnsupportedDefaultEncoding()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(new { defaultEncoding = "not-a-real-encoding" }));
@@ -285,19 +269,31 @@ public sealed class FileWriteNodeTests
         exception.Message.ShouldContain("defaultEncoding");
     }
 
+    [Fact]
+    public void FileRead_RejectsInvalidMaxBytes()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(new { maxBytes = 0 }));
+
+        exception.Message.ShouldContain("maxBytes");
+    }
+
     private static RuntimeNode CreateNode(object configuration)
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterFileSystemComponents();
-        registry.TryGetFactory(FileSystemComponentTypes.FileWrite, out var factory).ShouldBeTrue();
-        return factory(FileSystemTestHost.CreateContext(configuration));
+        registry.TryGetFactory(FileSystemComponentTypes.FileRead, out var factory).ShouldBeTrue();
+        return factory(FileSystemTestHost.CreateContext(
+            FileSystemComponentTypes.FileRead,
+            configuration,
+            "reader"));
     }
 
-    private static void LinkResult(RuntimeNode runtimeNode, BufferBlock<FileWriteResult> target)
+    private static void LinkResult(RuntimeNode runtimeNode, BufferBlock<FileReadResult> target)
     {
         runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!
             .TryLinkTo(
-                new InputPort<FileWriteResult>(
+                new InputPort<FileReadResult>(
                     new PortAddress("test", new NodeName("results"), new PortName("Input")),
                     target),
                 propagateCompletion: true,
@@ -318,7 +314,7 @@ public sealed class FileWriteNodeTests
         {
             var path = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
-                $"fluxflow-filesystem-{Guid.NewGuid():N}");
+                $"fluxflow-filesystem-read-{Guid.NewGuid():N}");
             Directory.CreateDirectory(path);
             return new TempDirectory(path);
         }

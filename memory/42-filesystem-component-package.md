@@ -7,8 +7,8 @@ Date: 2026-06-01
 Add `FluxFlow.Components.FileSystem` as an independent component family.
 
 The package is a category package, not a file-writer-only package. The first
-node is `file.write`; future nodes can include `file.read`, `file.watch`, and
-`directory.enumerate` without changing the package identity.
+node was `file.write`; the second node is `file.read`. Future nodes can include
+`file.watch` and `directory.enumerate` without changing the package identity.
 
 ## Package Boundary
 
@@ -34,7 +34,42 @@ The package does not own:
 Hosts can adapt their own request models and product events around the package
 node while keeping file write mechanics package-owned.
 
-## Implemented Node
+## Implemented Nodes
+
+Read node:
+
+```text
+Node type: file.read
+Input:     Input
+Output:    Result
+Errors:    node error stream
+Options:   boundedCapacity, baseDirectory, allowAbsolutePaths,
+           defaultEncoding, maxBytes
+```
+
+Request contract:
+
+```text
+FileReadRequest
+  Path
+  Encoding
+  ReadAs
+```
+
+Result contract:
+
+```text
+FileReadResult
+  Path
+  Content
+  Bytes
+  Encoding
+  BytesRead
+  ReadAs
+  ReadAt
+```
+
+Write node:
 
 ```text
 Node type: file.write
@@ -76,6 +111,9 @@ FileWriteResult
 - Absolute paths require `allowAbsolutePaths`.
 - Supported modes are overwrite, append, and create-new.
 - Per-message failures emit `FlowError` and later messages continue.
+- Reads can return text or bytes.
+- Text reads use request encoding first, then `defaultEncoding`.
+- Reads can be limited with `maxBytes`.
 
 ## Verification
 
@@ -96,8 +134,6 @@ The first package test set covers:
 
 ## Next Steps
 
-1. Tag and publish `components-filesystem-v0.1.0-alpha.1` after this commit.
-2. Migrate the first consuming application by keeping its current `file.writer`
-   UX and delegating runtime writes to `file.write`.
-3. Consider `file.read` next only after a real consumer proves the request and
-   result shape.
+1. Tag and publish `components-filesystem-v0.2.0-alpha.1` after this commit.
+2. Keep `file.watch` deferred until lifecycle and event contracts are clearer.
+3. Consider a consuming application adapter after the package surface settles.
