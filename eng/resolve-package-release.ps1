@@ -19,7 +19,8 @@ if (-not (Test-Path -LiteralPath $ManifestPath)) {
     throw "Package manifest '$ManifestPath' was not found."
 }
 
-$packages = @(Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json)
+$packages = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+$packages = @($packages)
 if ($packages.Count -eq 0) {
     throw "Package manifest '$ManifestPath' is empty."
 }

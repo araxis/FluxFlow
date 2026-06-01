@@ -40,5 +40,12 @@
     "packageId": "FluxFlow.Components.FileSystem",
     "project": "src/FluxFlow.Components.FileSystem/FluxFlow.Components.FileSystem.csproj",
     "notesName": "FluxFlow.Components.FileSystem"
+  },
+  {
+    "alias": "components-observability",
+    "tagPrefix": "components-observability",
+    "packageId": "FluxFlow.Components.Observability",
+    "project": "src/FluxFlow.Components.Observability/FluxFlow.Components.Observability.csproj",
+    "notesName": "FluxFlow.Components.Observability"
   }
 ]

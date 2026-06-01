@@ -195,6 +195,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Control` | `flow.filter`, `flow.when`, `flow.assert` | Pluggable expression-driven filtering, routing, and assertions. |
 | `FluxFlow.Components.Validation` | `json.schema-validator` | JSON schema validation with result, valid, and invalid routing. |
 | `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
+| `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |
 
 ---
 

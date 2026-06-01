@@ -17,6 +17,9 @@ Add `FluxFlow.Components.FileSystem` when a workflow needs package-owned file
 system operations such as `file.write`, `file.read`, `file.watch`, and
 `directory.enumerate`.
 
+Add `FluxFlow.Components.Observability` when a workflow needs neutral
+structured log entries, metrics snapshots, or counter snapshots.
+
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.
 

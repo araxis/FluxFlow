@@ -1,5 +1,21 @@
 # Changelog
 
+## FluxFlow.Components.Observability 0.1.0-alpha.1
+
+Initial reusable observability component package.
+
+- Added `FluxFlow.Components.Observability` as a separate source project, test
+  project, and package artifact.
+- Added `flow.logger` with `Input` and `Entries` ports.
+- Added `flow.metrics` and `flow.counter` with `Input` and `Snapshots` ports.
+- Added `FlowLogEntry`, `FlowMetricSnapshot`, and `FlowCounterSnapshot`
+  contracts.
+- Added host-registered input type aliases and value selectors.
+- Added optional expression-backed counter predicates.
+- Added stable observability error codes for selector and predicate failures.
+- Added diagnostics with node name, input type, count, rate, log category,
+  selected attributes, and failure metadata where available.
+
 ## FluxFlow.Components.FileSystem 0.4.0-alpha.1
 
 Adds package-owned directory enumeration.

@@ -417,27 +417,35 @@ Boundary:
 Keep storage format simple and package-owned. FluxMq scenario definitions stay
 outside this package for now.
 
-### Diagnostics
+### Observability
 
 Package:
 
 ```text
-FluxFlow.Components.Diagnostics
+FluxFlow.Components.Observability
 ```
+
+Implemented components:
+
+| Component | Role | Node type | Notes |
+|-----------|------|-----------|-------|
+| Logger | observer | `flow.logger` | Emits structured `FlowLogEntry` values from host-selected attributes. |
+| Metrics | observer | `flow.metrics` | Emits `FlowMetricSnapshot` values with count, rate, timestamp, and optional size data. |
+| Counter | observer | `flow.counter` | Emits `FlowCounterSnapshot` values with optional expression-backed filtering. |
 
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| Diagnostic Sink | sink | `diagnostics.sink` | Receives diagnostic-shaped messages and forwards them. |
-| Event Sink | sink | `diagnostics.event-sink` | Records workflow events for inspection. |
-| Counter | transform/sink | `diagnostics.counter` | Counts items and emits metrics diagnostics. |
-| Heartbeat | source | `diagnostics.heartbeat` | Emits periodic status diagnostics. |
+| Diagnostic Sink | sink | `flow.diagnostics-sink` | Receives diagnostic-shaped messages and forwards them. |
+| Event Sink | sink | `flow.event-sink` | Records workflow events for inspection. |
+| Heartbeat | source | `flow.heartbeat` | Emits periodic status snapshots. |
 
 Boundary:
 
-Adapters for specific observability systems should be separate or deferred
-until the base diagnostics package proves useful.
+Adapters for specific observability systems should be separate packages or
+application-owned bridges. The base package should stay neutral and emit
+package-owned records.
 
 ## Development Order Options
 

@@ -52,7 +52,8 @@ Start with one package as the template before splitting everything:
   mapping helpers.
 - `FluxFlow.Components.Validation`: JSON schema validation and assertion
   helpers that are not tied to one application.
-- `FluxFlow.Components.Diagnostics`: optional diagnostic sinks and adapters.
+- `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
+  observer nodes.
 
 The first consumer can keep components in its own repository until the package
 boundary is stable. The first extracted package should prove the pattern before
@@ -104,3 +105,6 @@ after the core component package has settled.
    feature work settles. Done with adapter-backed publish and subscribe nodes.
 5. Publish the package as a prerelease and migrate the first consumer from
    local components to that package in a small follow-up branch.
+6. Add generic mapping, control, validation, file system, and observability
+   packages as independent package artifacts. Done through the first
+   observability package release.
