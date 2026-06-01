@@ -371,11 +371,16 @@ Package:
 FluxFlow.Components.Validation
 ```
 
+Implemented components:
+
+| Component | Role | Node type | Notes |
+|-----------|------|-----------|-------|
+| JSON Schema Validator | transform/router | `json.schema-validator` | Validates a host-selected value, emits a validation result, and routes the original input to `Valid` or `Invalid`. |
+
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| JSON Schema Validator | transform | `validation.json-schema` | Validates JSON input and emits valid/invalid results. |
 | Required Field Check | transform | `validation.required-fields` | Checks configured fields. |
 | Predicate Check | transform | `validation.predicate` | Runs a configured predicate and routes result. |
 | Assertion Sink | sink | `validation.assert` | Useful for tests and local checks. |

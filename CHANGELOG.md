@@ -1,5 +1,21 @@
 # Changelog
 
+## FluxFlow.Components.Validation 0.1.0-alpha.1
+
+Initial reusable validation component package.
+
+- Added `FluxFlow.Components.Validation` as a separate source project, test
+  project, and package artifact.
+- Added `json.schema-validator` with `Input`, `Result`, `Valid`, and `Invalid`
+  ports.
+- Added inline schema and schema file loading options.
+- Added host-registered input type aliases and value selectors.
+- Routed invalid data to `Invalid` without reporting it as a processing error.
+- Added stable validation error codes for schema loading, selector, conversion,
+  and evaluation failures.
+- Added diagnostics with input type, selector, schema id, schema path, validity,
+  and issue count metadata where available.
+
 ## FluxFlow.Components.Control 0.1.0-alpha.1
 
 Initial reusable control component package.

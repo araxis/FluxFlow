@@ -10,6 +10,9 @@ the engine, and only executable resources and workflows are projected into
 Then run `samples/FluxFlow.MappingControlSample` to see package composition with
 host-owned source/sink nodes and reusable mapping/control nodes.
 
+Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
+schema validation with host-owned value selection.
+
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.
 

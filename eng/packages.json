@@ -26,5 +26,12 @@
     "packageId": "FluxFlow.Components.Control",
     "project": "src/FluxFlow.Components.Control/FluxFlow.Components.Control.csproj",
     "notesName": "FluxFlow.Components.Control"
+  },
+  {
+    "alias": "components-validation",
+    "tagPrefix": "components-validation",
+    "packageId": "FluxFlow.Components.Validation",
+    "project": "src/FluxFlow.Components.Validation/FluxFlow.Components.Validation.csproj",
+    "notesName": "FluxFlow.Components.Validation"
   }
 ]
