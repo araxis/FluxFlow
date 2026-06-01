@@ -12,4 +12,6 @@ public static class TimerDiagnosticNames
     public const string ScheduleTick = "timer.schedule.tick";
     public const string ScheduleStopped = "timer.schedule.stopped";
     public const string ScheduleFailed = "timer.schedule.failed";
+    public const string ThrottleEmitted = "timer.throttle.emitted";
+    public const string ThrottleFailed = "timer.throttle.failed";
 }

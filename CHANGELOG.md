@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.3.0-alpha.1
+
+Adds typed throttling for rate-limited workflow paths.
+
+- Added `timer.throttle` with typed `Input` and `Output` ports.
+- Added host-registered input type aliases for typed throttle pass-through.
+- Added interval options, immediate-first-item control, and bounded capacity.
+- Added throttle diagnostics with input type, interval, sequence, and node name.
+- Added validation for interval, input type, duplicate interval options, and
+  bounded capacity.
+
 ## FluxFlow.Components.Timers 0.2.0-alpha.1
 
 Adds delay and cron schedule timing nodes.

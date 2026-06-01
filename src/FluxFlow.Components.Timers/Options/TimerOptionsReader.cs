@@ -115,6 +115,40 @@ internal static class TimerOptionsReader
         };
     }
 
+    public static TimerThrottleSettings ReadThrottleSettings(NodeDefinition definition)
+    {
+        var options = Read<TimerThrottleOptions>(definition);
+
+        ValidateBoundedCapacity("timer.throttle", options.BoundedCapacity);
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException(
+                "timer.throttle option 'inputType' cannot be empty.");
+        }
+
+        var interval = ResolveDuration(
+            "timer.throttle",
+            "interval",
+            options.Interval,
+            "intervalMilliseconds",
+            options.IntervalMilliseconds,
+            required: true);
+        if (interval <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException(
+                "timer.throttle option 'interval' must be greater than zero.");
+        }
+
+        return new TimerThrottleSettings
+        {
+            Name = string.IsNullOrWhiteSpace(options.Name) ? "throttle" : options.Name.Trim(),
+            InputType = options.InputType.Trim(),
+            Interval = interval,
+            EmitFirstImmediately = options.EmitFirstImmediately,
+            BoundedCapacity = options.BoundedCapacity
+        };
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);

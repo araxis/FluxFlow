@@ -9,6 +9,7 @@ Reusable timer components for FluxFlow.
 | `timer.interval` | `Output` | Emits `TimerTick` values on a fixed interval. |
 | `timer.schedule` | `Output` | Emits `ScheduleTick` values from a cron expression. |
 | `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
+| `timer.throttle` | `Input` -> `Output` | Rate-limits typed inputs without changing them. |
 
 The package emits neutral tick contracts only. Hosts decide whether ticks drive
 polling, periodic health checks, metrics, file work, message publishing, or
@@ -60,6 +61,22 @@ fields or six fields when seconds are needed.
 
 `timer.delay` preserves input order and emits the original item after the
 configured delay. Register custom input aliases on the package options.
+
+## Throttle
+
+```json
+{
+  "type": "timer.throttle",
+  "inputType": "message",
+  "intervalMilliseconds": 100,
+  "emitFirstImmediately": true,
+  "boundedCapacity": 128
+}
+```
+
+`timer.throttle` preserves input order and emits the original item no more
+than once per configured interval. It queues items through normal bounded
+capacity instead of dropping them.
 
 ## Registration
 

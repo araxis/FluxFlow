@@ -17,6 +17,7 @@ Implemented nodes:
 | `timer.interval` | `Output` | Emits `TimerTick` values on a fixed interval. |
 | `timer.schedule` | `Output` | Emits `ScheduleTick` values from cron expressions. |
 | `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
+| `timer.throttle` | `Input` -> `Output` | Rate-limits typed inputs without changing them. |
 
 Package contracts:
 
@@ -42,6 +43,12 @@ Additional `timer.delay` options:
 - `inputType`
 - `delay` or `delayMilliseconds`
 
+Additional `timer.throttle` options:
+
+- `inputType`
+- `interval` or `intervalMilliseconds`
+- `emitFirstImmediately`
+
 ## Behavior
 
 - The interval must be greater than zero.
@@ -58,6 +65,8 @@ Additional `timer.delay` options:
   ranges, steps, question-mark day wildcards, and month/day names.
 - `timer.delay` uses host-registered input type aliases and preserves input
   ordering.
+- `timer.throttle` queues input items, preserves ordering, and emits no more
+  than once per configured interval.
 
 ## Boundaries
 
@@ -69,7 +78,7 @@ The package does not include:
 - scenario/test runner behavior
 - external protocol calls
 
-Throttling and debounce behavior are future nodes in the same package family.
+Debounce behavior is a future node in the same package family.
 
 ## Verification
 
@@ -85,8 +94,10 @@ Focused tests cover:
 - typed delay pass-through
 - cron schedule tick emission
 - invalid cron expression, time zone, input type, and duplicate option handling
+- typed throttle pass-through
+- throttle ordering, spacing, diagnostics, disposal, and validation
 
-Release tag:
+Initial release tag:
 
 ```text
 components-timers-v0.1.0-alpha.1

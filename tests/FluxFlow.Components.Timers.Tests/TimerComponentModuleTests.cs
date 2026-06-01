@@ -15,5 +15,6 @@ public sealed class TimerComponentModuleTests
         registry.TryGetFactory(TimerComponentTypes.Delay, out _).ShouldBeTrue();
         registry.TryGetFactory(TimerComponentTypes.Interval, out _).ShouldBeTrue();
         registry.TryGetFactory(TimerComponentTypes.Schedule, out _).ShouldBeTrue();
+        registry.TryGetFactory(TimerComponentTypes.Throttle, out _).ShouldBeTrue();
     }
 }
