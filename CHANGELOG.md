@@ -1,5 +1,22 @@
 # Changelog
 
+## FluxFlow.Components.Control 0.1.0-alpha.1
+
+Initial reusable control component package.
+
+- Added `FluxFlow.Components.Control` as a separate source project, test
+  project, and package artifact.
+- Added `flow.filter` with `Input` and `Output` ports.
+- Added `flow.when` with `Input`, `WhenTrue`, and `WhenFalse` ports.
+- Added `flow.assert` with `Input`, `Result`, `Passed`, and `Failed` ports.
+- Added host-provided expression engine resolution, type aliases, and context
+  factories.
+- Added stable control error codes for expression evaluation failures.
+- Added per-message expression failures as `FlowError` so later messages
+  continue.
+- Added diagnostics with input type, engine, expression id, expression name,
+  route, and pass metadata where available.
+
 ## FluxFlow.Components.Mapping 0.1.0-alpha.1
 
 Initial reusable mapping component package.

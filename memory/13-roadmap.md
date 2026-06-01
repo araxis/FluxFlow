@@ -31,6 +31,8 @@ package-authoring improvements.
 8. Scaffold the first generic mapping component package. Done with `flow.mapper`,
    typed ports, host-provided expression engines, context factories, diagnostics,
    and per-message failure handling.
+9. Scaffold the first generic control component package. Done with `flow.filter`,
+   `flow.when`, and `flow.assert` as expression-driven, typed control nodes.
 
 ## First Consumer Pilot
 
@@ -87,6 +89,7 @@ and produce its own package artifact.
 Possible packages:
 
 - `FluxFlow.Components.Data`
+- `FluxFlow.Components.Control`
 - `FluxFlow.Components.Http`
 - `FluxFlow.Components.Mapping`
 - `FluxFlow.Components.Mqtt`
@@ -129,6 +132,15 @@ Second package:
 - keeps expression engines and context building host-provided
 - supports object defaults and host-registered typed ports
 - reports per-message failures without stopping later messages
+
+Third package:
+
+- `FluxFlow.Components.Control`
+- starts with `flow.filter`, `flow.when`, and `flow.assert`
+- keeps expression engines and context building host-provided
+- supports object defaults and host-registered typed ports
+- avoids scenario/test-runner behavior
+- reports per-message expression failures without stopping later messages
 
 Package category decision options:
 

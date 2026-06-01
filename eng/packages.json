@@ -19,5 +19,12 @@
     "packageId": "FluxFlow.Components.Mapping",
     "project": "src/FluxFlow.Components.Mapping/FluxFlow.Components.Mapping.csproj",
     "notesName": "FluxFlow.Components.Mapping"
+  },
+  {
+    "alias": "components-control",
+    "tagPrefix": "components-control",
+    "packageId": "FluxFlow.Components.Control",
+    "project": "src/FluxFlow.Components.Control/FluxFlow.Components.Control.csproj",
+    "notesName": "FluxFlow.Components.Control"
   }
 ]

@@ -235,6 +235,36 @@ Keep this package focused on `flow.mapper` until a real consumer proves the
 next primitive. Likely follow-ons are `flow.filter`, `flow.router`, and
 `flow.assert`, but those should not be added until their contracts are clearer.
 
+### Control
+
+Package:
+
+```text
+FluxFlow.Components.Control
+```
+
+Implemented components:
+
+| Component | Role | Node type | Contract shape | Notes |
+|-----------|------|-----------|----------------|-------|
+| Filter | transform | `flow.filter` | `Input` to `Output`, preserving input type | Emits only values whose expression evaluates to true. |
+| When | router | `flow.when` | `Input` to `WhenTrue` and `WhenFalse`, preserving input type | Routes each value by expression result. |
+| Assert | utility | `flow.assert` | `Input` to `Result`, `Passed`, and `Failed` | Emits `ControlAssertionResult` plus routed input values. |
+
+Shared package pieces:
+
+- expression engine resolver registration
+- type alias registration
+- per-type control context factories
+- expression options reader
+- diagnostics and error codes
+
+Recommendation:
+
+Keep scenario timing, journals, expected-event helpers, and isolated runtime
+rules out of this package. Those remain host/product behavior. Use these nodes
+as building blocks for cleaner host-side scenarios later.
+
 ### HTTP
 
 Package:

@@ -178,6 +178,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 |---------|-------|---------|
 | `FluxFlow.Components.Mqtt` | `mqtt.publish`, `mqtt.subscribe` | Adapter-backed MQTT publish and subscribe nodes. |
 | `FluxFlow.Components.Mapping` | `flow.mapper` | Pluggable expression mapping with generic or typed ports. |
+| `FluxFlow.Components.Control` | `flow.filter`, `flow.when`, `flow.assert` | Pluggable expression-driven filtering, routing, and assertions. |
 
 ---
 
