@@ -74,3 +74,9 @@ The first slice includes:
 Records carry neutral fields: session id, sequence, timestamp, type, name,
 payload, content type, and string attributes. Hosts can map their own envelope
 or event types into these contracts.
+
+## Composition Guidance
+
+Use this package as one part of a host-composed graph. See
+[Component Composition](../../docs/12-component-composition.md) for recommended
+host boundaries, package boundaries, and extraction timing.

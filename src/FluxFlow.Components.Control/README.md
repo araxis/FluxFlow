@@ -41,3 +41,9 @@ engine configured by the host.
 Expression evaluation failures emit `FlowError` and the node continues
 processing later messages. Nodes emit diagnostics with input type, engine,
 expression id, expression name, and pass/route metadata where available.
+
+## Composition Guidance
+
+Use this package as one part of a host-composed graph. See
+[Component Composition](../../docs/12-component-composition.md) for recommended
+host boundaries, package boundaries, and extraction timing.

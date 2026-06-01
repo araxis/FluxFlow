@@ -44,3 +44,9 @@ Invalid data emits a result and routes the original input to `Invalid`; it is
 not reported as a processing error. Schema loading, value selection, value
 conversion, and evaluation failures emit `FlowError` and the node continues
 processing later messages where possible.
+
+## Composition Guidance
+
+Use this package as one part of a host-composed graph. See
+[Component Composition](../../docs/12-component-composition.md) for recommended
+host boundaries, package boundaries, and extraction timing.

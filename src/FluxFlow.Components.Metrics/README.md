@@ -59,3 +59,9 @@ new MetricSampleInput
 ```csharp
 registry.RegisterMetricsComponents();
 ```
+
+## Composition Guidance
+
+Use this package as one part of a host-composed graph. See
+[Component Composition](../../docs/12-component-composition.md) for recommended
+host boundaries, package boundaries, and extraction timing.

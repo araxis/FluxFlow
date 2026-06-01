@@ -4,6 +4,7 @@
 
 - Added component composition guidance for host boundaries, package boundaries,
   common node shapes, extraction timing, and independent package movement.
+- Linked component package READMEs back to the shared composition guidance.
 
 ## FluxFlow.Components.State 0.1.0-alpha.1
 

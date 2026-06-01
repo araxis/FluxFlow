@@ -45,3 +45,9 @@ building requests.
 Publish topics must be present and cannot contain MQTT wildcards. Subscription
 filters may use `+` as a complete level and `#` only as the final complete
 level. Both helpers also reject null characters and oversized encoded topics.
+
+## Composition Guidance
+
+Use this package as one part of a host-composed graph. See
+[Component Composition](../../docs/12-component-composition.md) for recommended
+host boundaries, package boundaries, and extraction timing.

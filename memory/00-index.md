@@ -64,5 +64,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `58-state-reducer-component-package.md`: first generic state reducer component package.
 - `59-state-composition-sample.md`: runnable timer/mapper/state/counter composition sample.
 - `60-component-composition-docs.md`: package composition guidance and host/package boundary notes.
+- `61-package-readme-composition-links.md`: component package README links to composition guidance.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.
