@@ -35,6 +35,13 @@
     "notesName": "FluxFlow.Components.Assertions"
   },
   {
+    "alias": "components-sources",
+    "tagPrefix": "components-sources",
+    "packageId": "FluxFlow.Components.Sources",
+    "project": "src/FluxFlow.Components.Sources/FluxFlow.Components.Sources.csproj",
+    "notesName": "FluxFlow.Components.Sources"
+  },
+  {
     "alias": "components-validation",
     "tagPrefix": "components-validation",
     "packageId": "FluxFlow.Components.Validation",

@@ -10,16 +10,18 @@ Start with a small graph and add component families only when they remove real
 host code:
 
 1. Keep source and sink nodes in the host until the behavior is clearly reusable.
-2. Add `flow.mapper` to translate from host input shapes into package request
+2. Add `source.generated` or `source.sequence` for deterministic generated
+   streams that do not depend on a transport or app store.
+3. Add `flow.mapper` to translate from host input shapes into package request
    contracts.
-3. Add `flow.filter` and `flow.when` for expression-driven decisions.
-4. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
-5. Add `state.reducer` when later decisions depend on previous messages.
-6. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+4. Add `flow.filter` and `flow.when` for expression-driven decisions.
+5. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
+6. Add `state.reducer` when later decisions depend on previous messages.
+7. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
    runtime observation.
-7. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
+8. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
-8. Add edge packages for validation, serialization, payload inspection, HTTP,
+9. Add edge packages for validation, serialization, payload inspection, HTTP,
    file system operations, recording, replay, storage, or external transport
    adapters.
 
@@ -99,6 +101,12 @@ Stateful timer flow:
 timer.interval -> flow.mapper -> state.reducer -> flow.counter
                                   |
                                   +-> host sink
+```
+
+Deterministic source flow:
+
+```text
+source.generated -> flow.mapper -> flow.assert -> host sink
 ```
 
 Validation and routing:

@@ -13,6 +13,9 @@ host-owned source/sink nodes and reusable mapping, control, and assertion nodes.
 Add `FluxFlow.Components.Assertions` when a workflow needs expression-driven
 assertion results and pass/fail routing.
 
+Add `FluxFlow.Components.Sources` when a workflow needs deterministic generated
+or sequence-driven source messages without a transport adapter.
+
 Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
 schema validation with host-owned value selection.
 

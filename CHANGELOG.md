@@ -1,5 +1,23 @@
 # Changelog
 
+## FluxFlow.Components.Sources 0.1.0-alpha.1
+
+Initial reusable deterministic source component package.
+
+- Added `FluxFlow.Components.Sources` as a separate source project, test
+  project, and package artifact.
+- Added `source.generated` with typed `Output` and `Errors` ports.
+- Added `source.sequence` with `Output` and `Errors` ports.
+- Added host-registered output type aliases for generated source items.
+- Added configured JSON item conversion for generated source output.
+- Added generated list loop/max item controls.
+- Added initial delay, interval, and bounded output options.
+- Added `SourceSequenceItem` for deterministic sequence output.
+- Added diagnostics for source start, item emission, completion, and failure.
+- Added focused coverage for typed output, loop behavior, empty completion,
+  diagnostics, cancellation, registration, invalid options, unsupported types,
+  and conversion failures.
+
 ## FluxFlow.Components.Assertions 0.1.0-alpha.1
 
 Initial reusable assertion component package.

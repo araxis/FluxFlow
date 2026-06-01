@@ -71,5 +71,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `65-storage-adapter-and-migration-plan.md`: persisted storage adapter and host migration plan.
 - `66-storage-local-adapter-package.md`: first file-backed local storage adapter package.
 - `67-assertions-component-package.md`: assertion package split from control and release notes.
+- `68-sources-component-package.md`: deterministic source package and deferred replay boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

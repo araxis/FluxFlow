@@ -54,6 +54,8 @@ Start with one package as the template before splitting everything:
   helpers that are not tied to one application.
 - `FluxFlow.Components.Assertions`: expression-driven assertion checks with
   result and pass/fail routing.
+- `FluxFlow.Components.Sources`: deterministic generated and sequence source
+  nodes without transport or app storage dependencies.
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
@@ -123,3 +125,5 @@ after the core component package has settled.
     `66-storage-local-adapter-package.md`.
 11. Split expression-driven assertions out of the control package. Done in
     `67-assertions-component-package.md`.
+12. Add deterministic generated and sequence sources. Done in
+    `68-sources-component-package.md`.
