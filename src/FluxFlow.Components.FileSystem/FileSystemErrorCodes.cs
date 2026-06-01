@@ -18,4 +18,12 @@ public static class FileSystemErrorCodes
     public const int FileReadIoFailed = 7105;
     public const int FileReadNotFound = 7106;
     public const int FileReadTooLarge = 7107;
+
+    public const int FileWatchInvalidDirectory = 7200;
+    public const int FileWatchAbsolutePathDenied = 7201;
+    public const int FileWatchDirectoryMissing = 7202;
+    public const int FileWatchUnsupportedNotifyFilter = 7203;
+    public const int FileWatchStartupFailed = 7204;
+    public const int FileWatchFailed = 7205;
+    public const int FileWatchOutputFull = 7206;
 }

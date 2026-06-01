@@ -14,6 +14,8 @@ public sealed class FileSystemComponentModuleTests
 
         registry.TryGetFactory(FileSystemComponentTypes.FileRead, out var readFactory).ShouldBeTrue();
         readFactory.ShouldNotBeNull();
+        registry.TryGetFactory(FileSystemComponentTypes.FileWatch, out var watchFactory).ShouldBeTrue();
+        watchFactory.ShouldNotBeNull();
         registry.TryGetFactory(FileSystemComponentTypes.FileWrite, out var writeFactory).ShouldBeTrue();
         writeFactory.ShouldNotBeNull();
     }

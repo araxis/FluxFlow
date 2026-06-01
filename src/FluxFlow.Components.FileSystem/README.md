@@ -7,6 +7,7 @@ Reusable file system components for FluxFlow.
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
 | `file.read` | `Input` -> `Result` | Reads file content as text or bytes and emits a read result. |
+| `file.watch` | `Output` | Emits file system change events from a watched directory. |
 | `file.write` | `Input` -> `Result` | Writes request content to a file and emits a write result. |
 
 Failures emit `FlowError` through the node error stream and do not stop later
@@ -38,6 +39,24 @@ new FileReadRequest
 
 Use `ReadAs = FileReadMode.Bytes` when the workflow needs raw bytes. Text reads
 use the request `Encoding` value when provided, otherwise `defaultEncoding`.
+
+## Watch Output
+
+```json
+{
+  "type": "file.watch",
+  "directory": "inbox",
+  "filter": "*.json",
+  "includeSubdirectories": false,
+  "notifyFilters": [ "FileName", "LastWrite", "Size" ],
+  "baseDirectory": "data",
+  "allowAbsolutePaths": false,
+  "boundedCapacity": 128
+}
+```
+
+`file.watch` emits `FileWatchEvent` values with the changed path, directory,
+name, change type, and old path/name for rename events.
 
 ## Configuration
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.3.0-alpha.1
+
+Adds package-owned file system watching.
+
+- Added `file.watch` with an `Output` port.
+- Added `FileWatchEvent` and `FileWatchChangeType` contracts.
+- Added directory, filter, subdirectory, notify filter, bounded capacity, base
+  directory, and absolute path options.
+- Added startup failures for missing directories, invalid directories, denied
+  absolute paths, and unsupported notify filters.
+- Added watcher runtime errors as `FlowError` without stopping later file
+  events where the platform watcher can continue.
+- Added diagnostics and workflow events for observed file changes.
+
 ## FluxFlow.Components.FileSystem 0.2.0-alpha.1
 
 Adds package-owned file reads.

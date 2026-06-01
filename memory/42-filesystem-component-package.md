@@ -7,8 +7,9 @@ Date: 2026-06-01
 Add `FluxFlow.Components.FileSystem` as an independent component family.
 
 The package is a category package, not a file-writer-only package. The first
-node was `file.write`; the second node is `file.read`. Future nodes can include
-`file.watch` and `directory.enumerate` without changing the package identity.
+node was `file.write`; the second node is `file.read`; the third node is
+`file.watch`. Future nodes can include `directory.enumerate` without changing
+the package identity.
 
 ## Package Boundary
 
@@ -35,6 +36,30 @@ Hosts can adapt their own request models and product events around the package
 node while keeping file write mechanics package-owned.
 
 ## Implemented Nodes
+
+Watch node:
+
+```text
+Node type: file.watch
+Input:     none
+Output:    Output
+Errors:    node error stream
+Options:   directory, filter, includeSubdirectories, notifyFilters,
+           boundedCapacity, baseDirectory, allowAbsolutePaths
+```
+
+Output contract:
+
+```text
+FileWatchEvent
+  Timestamp
+  Path
+  Directory
+  Name
+  ChangeType
+  OldPath
+  OldName
+```
 
 Read node:
 
@@ -114,6 +139,8 @@ FileWriteResult
 - Reads can return text or bytes.
 - Text reads use request encoding first, then `defaultEncoding`.
 - Reads can be limited with `maxBytes`.
+- Watchers emit file change events until completed.
+- Watcher startup fails clearly when the directory is invalid or missing.
 
 ## Verification
 
@@ -134,6 +161,6 @@ The first package test set covers:
 
 ## Next Steps
 
-1. Tag and publish `components-filesystem-v0.2.0-alpha.1` after this commit.
-2. Keep `file.watch` deferred until lifecycle and event contracts are clearer.
+1. Tag and publish `components-filesystem-v0.3.0-alpha.1` after this commit.
+2. Consider `directory.enumerate` next.
 3. Consider a consuming application adapter after the package surface settles.

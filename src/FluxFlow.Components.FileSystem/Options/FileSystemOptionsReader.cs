@@ -36,6 +36,56 @@ internal static class FileSystemOptionsReader
         return options;
     }
 
+    public static FileWatchOptions ReadFileWatchOptions(NodeDefinition definition)
+    {
+        var options = Read<FileWatchOptions>(definition);
+
+        ValidateBoundedCapacity("file.watch", options.BoundedCapacity);
+        if (string.IsNullOrWhiteSpace(options.Directory))
+        {
+            throw new InvalidOperationException(
+                "file.watch option 'directory' cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Filter))
+        {
+            throw new InvalidOperationException(
+                "file.watch option 'filter' cannot be empty.");
+        }
+
+        ResolveNotifyFilters(options);
+
+        return options;
+    }
+
+    public static NotifyFilters ResolveNotifyFilters(FileWatchOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.NotifyFilters.Length == 0)
+        {
+            return NotifyFilters.FileName |
+                   NotifyFilters.DirectoryName |
+                   NotifyFilters.LastWrite |
+                   NotifyFilters.Size;
+        }
+
+        var filters = (NotifyFilters)0;
+        foreach (var value in options.NotifyFilters)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                !Enum.TryParse<NotifyFilters>(value, ignoreCase: true, out var filter))
+            {
+                throw new InvalidOperationException(
+                    $"file.watch option 'notifyFilters' contains unsupported value '{value}'.");
+            }
+
+            filters |= filter;
+        }
+
+        return filters;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
