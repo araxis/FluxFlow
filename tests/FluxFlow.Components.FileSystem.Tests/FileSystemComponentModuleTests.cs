@@ -12,6 +12,8 @@ public sealed class FileSystemComponentModuleTests
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterFileSystemComponents();
 
+        registry.TryGetFactory(FileSystemComponentTypes.DirectoryEnumerate, out var enumerateFactory).ShouldBeTrue();
+        enumerateFactory.ShouldNotBeNull();
         registry.TryGetFactory(FileSystemComponentTypes.FileRead, out var readFactory).ShouldBeTrue();
         readFactory.ShouldNotBeNull();
         registry.TryGetFactory(FileSystemComponentTypes.FileWatch, out var watchFactory).ShouldBeTrue();

@@ -8,8 +8,7 @@ Add `FluxFlow.Components.FileSystem` as an independent component family.
 
 The package is a category package, not a file-writer-only package. The first
 node was `file.write`; the second node is `file.read`; the third node is
-`file.watch`. Future nodes can include `directory.enumerate` without changing
-the package identity.
+`file.watch`; the fourth node is `directory.enumerate`.
 
 ## Package Boundary
 
@@ -36,6 +35,33 @@ Hosts can adapt their own request models and product events around the package
 node while keeping file write mechanics package-owned.
 
 ## Implemented Nodes
+
+Directory enumerate node:
+
+```text
+Node type: directory.enumerate
+Input:     none
+Output:    Output
+Errors:    node error stream
+Options:   directory, filter, includeSubdirectories, includeFiles,
+           includeDirectories, maxEntries, boundedCapacity, baseDirectory,
+           allowAbsolutePaths
+```
+
+Output contract:
+
+```text
+DirectoryEnumerateEntry
+  EnumeratedAt
+  Path
+  Directory
+  Name
+  EntryType
+  Length
+  CreatedAt
+  LastModifiedAt
+  Attributes
+```
 
 Watch node:
 
@@ -141,6 +167,10 @@ FileWriteResult
 - Reads can be limited with `maxBytes`.
 - Watchers emit file change events until completed.
 - Watcher startup fails clearly when the directory is invalid or missing.
+- Directory enumeration is a finite source that completes its output after the
+  configured entries are emitted.
+- Directory enumeration can emit files, directories, or both, and can limit the
+  number of emitted entries with `maxEntries`.
 
 ## Verification
 
@@ -158,9 +188,13 @@ The first package test set covers:
 - missing content
 - diagnostics
 - output completion
+- directory enumeration with filters and recursive traversal
+- directory-only enumeration
+- directory enumeration `maxEntries`
+- directory enumeration startup failures and option validation
 
 ## Next Steps
 
-1. Tag and publish `components-filesystem-v0.3.0-alpha.1` after this commit.
-2. Consider `directory.enumerate` next.
+1. Tag and publish `components-filesystem-v0.4.0-alpha.1` after this commit.
+2. Consider whether `file.copy` belongs before adding a new component family.
 3. Consider a consuming application adapter after the package surface settles.

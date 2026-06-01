@@ -303,6 +303,7 @@ Implemented components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
+| Directory Enumerator | source | `directory.enumerate` | Emits file and directory paths with metadata. |
 | File Reader | utility | `file.read` | Reads file content as text or bytes and emits `FileReadResult`. |
 | File Watcher | source | `file.watch` | Emits file-change events for a configured directory. |
 | File Writer | sink | `file.write` | Writes request content or bytes to a file and emits `FileWriteResult`. |
@@ -311,7 +312,7 @@ Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| Directory Enumerator | source | `directory.enumerate` | Emits file paths and metadata. |
+| File Copier | utility | `file.copy` | Copies files under the same path policy. |
 
 Shared package pieces:
 

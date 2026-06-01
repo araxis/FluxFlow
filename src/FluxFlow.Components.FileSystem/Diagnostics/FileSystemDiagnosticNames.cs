@@ -2,6 +2,10 @@ namespace FluxFlow.Components.FileSystem.Diagnostics;
 
 public static class FileSystemDiagnosticNames
 {
+    public const string DirectoryEnumerateStarted = "directory.enumerate.started";
+    public const string DirectoryEnumerateCompleted = "directory.enumerate.completed";
+    public const string DirectoryEnumerateEntry = "directory.enumerate.entry";
+    public const string DirectoryEnumerateFailed = "directory.enumerate.failed";
     public const string FileWriteSucceeded = "file.write.succeeded";
     public const string FileWriteFailed = "file.write.failed";
     public const string FileReadSucceeded = "file.read.succeeded";

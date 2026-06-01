@@ -1,5 +1,21 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.4.0-alpha.1
+
+Adds package-owned directory enumeration.
+
+- Added `directory.enumerate` with an `Output` port.
+- Added `DirectoryEnumerateEntry` and `DirectoryEntryType` contracts.
+- Added directory, filter, recursive, file/directory inclusion, max entry,
+  bounded capacity, base directory, and absolute path options.
+- Added startup failures for missing directories, invalid directories, and
+  denied absolute paths.
+- Added configuration validation for disabled entry types and invalid limits.
+- Added enumeration runtime errors as `FlowError` and node faults for access,
+  IO, and unexpected directory traversal failures.
+- Added diagnostics for enumeration start, entry emission, completion, and
+  failure.
+
 ## FluxFlow.Components.FileSystem 0.3.0-alpha.1
 
 Adds package-owned file system watching.

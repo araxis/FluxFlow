@@ -21,6 +21,38 @@ internal static class FileSystemOptionsReader
         return options;
     }
 
+    public static DirectoryEnumerateOptions ReadDirectoryEnumerateOptions(NodeDefinition definition)
+    {
+        var options = Read<DirectoryEnumerateOptions>(definition);
+
+        ValidateBoundedCapacity("directory.enumerate", options.BoundedCapacity);
+        if (string.IsNullOrWhiteSpace(options.Directory))
+        {
+            throw new InvalidOperationException(
+                "directory.enumerate option 'directory' cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Filter))
+        {
+            throw new InvalidOperationException(
+                "directory.enumerate option 'filter' cannot be empty.");
+        }
+
+        if (!options.IncludeFiles && !options.IncludeDirectories)
+        {
+            throw new InvalidOperationException(
+                "directory.enumerate requires includeFiles or includeDirectories.");
+        }
+
+        if (options.MaxEntries is <= 0)
+        {
+            throw new InvalidOperationException(
+                "directory.enumerate option 'maxEntries' must be greater than zero when set.");
+        }
+
+        return options;
+    }
+
     public static FileReadOptions ReadFileReadOptions(NodeDefinition definition)
     {
         var options = Read<FileReadOptions>(definition);

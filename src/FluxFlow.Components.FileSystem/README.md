@@ -6,6 +6,7 @@ Reusable file system components for FluxFlow.
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
+| `directory.enumerate` | `Output` | Emits files and directories from a configured directory. |
 | `file.read` | `Input` -> `Result` | Reads file content as text or bytes and emits a read result. |
 | `file.watch` | `Output` | Emits file system change events from a watched directory. |
 | `file.write` | `Input` -> `Result` | Writes request content to a file and emits a write result. |
@@ -57,6 +58,27 @@ use the request `Encoding` value when provided, otherwise `defaultEncoding`.
 
 `file.watch` emits `FileWatchEvent` values with the changed path, directory,
 name, change type, and old path/name for rename events.
+
+## Directory Enumerate Output
+
+```json
+{
+  "type": "directory.enumerate",
+  "directory": "inbox",
+  "filter": "*.json",
+  "includeSubdirectories": true,
+  "includeFiles": true,
+  "includeDirectories": false,
+  "maxEntries": 1000,
+  "baseDirectory": "data",
+  "allowAbsolutePaths": false,
+  "boundedCapacity": 128
+}
+```
+
+`directory.enumerate` emits `DirectoryEnumerateEntry` values with the resolved
+path, source directory, name, entry type, optional byte length, timestamps, and
+file attributes.
 
 ## Configuration
 

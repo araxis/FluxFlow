@@ -48,5 +48,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `42-filesystem-component-package.md`: first generic file system component package record.
 - `43-filesystem-read-component.md`: file read component addition and package path-policy extraction.
 - `44-filesystem-watch-component.md`: file watch source component addition and lifecycle notes.
+- `45-directory-enumerate-component.md`: directory enumerate source component addition and release notes.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

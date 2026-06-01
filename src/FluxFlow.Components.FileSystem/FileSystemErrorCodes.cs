@@ -2,6 +2,14 @@ namespace FluxFlow.Components.FileSystem;
 
 public static class FileSystemErrorCodes
 {
+    public const int DirectoryEnumerateInvalidDirectory = 7300;
+    public const int DirectoryEnumerateAbsolutePathDenied = 7301;
+    public const int DirectoryEnumerateDirectoryMissing = 7302;
+    public const int DirectoryEnumerateNoEntryTypes = 7303;
+    public const int DirectoryEnumerateAccessDenied = 7304;
+    public const int DirectoryEnumerateIoFailed = 7305;
+    public const int DirectoryEnumerateFailed = 7306;
+
     public const int FileWriteInvalidPath = 7000;
     public const int FileWriteAbsolutePathDenied = 7001;
     public const int FileWriteContentMissing = 7002;

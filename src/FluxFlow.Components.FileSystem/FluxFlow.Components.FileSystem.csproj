@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>0.3.0-alpha.1</Version>
+    <Version>0.4.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable file system components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds file.watch as a package-owned file system source.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds directory.enumerate as a package-owned file system source.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
