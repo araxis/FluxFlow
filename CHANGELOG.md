@@ -1,5 +1,23 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.1.0-alpha.1
+
+Initial reusable file system component package.
+
+- Added `FluxFlow.Components.FileSystem` as a separate source project, test
+  project, and package artifact.
+- Added `file.write` with `Input` and `Result` ports.
+- Added `FileWriteRequest`, `FileWriteResult`, and `FileWriteMode` contracts.
+- Added base directory, absolute path, default encoding, and bounded capacity
+  options.
+- Added ordered asynchronous writes for overwrite, append, and create-new
+  modes.
+- Added stable file write error codes for invalid paths, denied absolute paths,
+  missing content, unsupported encodings, unsupported modes, access denial, and
+  IO failures.
+- Added diagnostics with path, resolved path, mode, directory creation, base
+  directory, and byte count metadata where available.
+
 ## FluxFlow.Components.Validation 0.1.0-alpha.1
 
 Initial reusable validation component package.

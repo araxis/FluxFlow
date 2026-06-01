@@ -33,5 +33,12 @@
     "packageId": "FluxFlow.Components.Validation",
     "project": "src/FluxFlow.Components.Validation/FluxFlow.Components.Validation.csproj",
     "notesName": "FluxFlow.Components.Validation"
+  },
+  {
+    "alias": "components-filesystem",
+    "tagPrefix": "components-filesystem",
+    "packageId": "FluxFlow.Components.FileSystem",
+    "project": "src/FluxFlow.Components.FileSystem/FluxFlow.Components.FileSystem.csproj",
+    "notesName": "FluxFlow.Components.FileSystem"
   }
 ]

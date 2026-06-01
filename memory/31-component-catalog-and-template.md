@@ -291,23 +291,27 @@ Deferred:
 - inbound web/server trigger nodes should stay out until the hosting boundary is
   clearer.
 
-### Files
+### FileSystem
 
 Package:
 
 ```text
-FluxFlow.Components.Files
+FluxFlow.Components.FileSystem
 ```
+
+Implemented components:
+
+| Component | Role | Node type | Notes |
+|-----------|------|-----------|-------|
+| File Writer | sink | `file.write` | Writes request content or bytes to a file and emits `FileWriteResult`. |
 
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| File Reader | source | `files.read` | Reads one file or a configured file set. |
-| File Writer | sink | `files.write` | Writes payloads to files. |
-| File Appender | sink | `files.append` | Appends records to an existing file. |
-| File Watcher | source | `files.watch` | Emits file-change events. |
-| Directory Enumerator | source | `files.enumerate` | Emits file paths and metadata. |
+| File Reader | source | `file.read` | Reads one file or a configured file set. |
+| File Watcher | source | `file.watch` | Emits file-change events. |
+| Directory Enumerator | source | `directory.enumerate` | Emits file paths and metadata. |
 
 Shared package pieces:
 

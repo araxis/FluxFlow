@@ -13,6 +13,9 @@ host-owned source/sink nodes and reusable mapping/control nodes.
 Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
 schema validation with host-owned value selection.
 
+Add `FluxFlow.Components.FileSystem` when a workflow needs package-owned file
+system operations such as `file.write`.
+
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.
 
