@@ -29,6 +29,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{5D20
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.MappingControlSample", "samples\FluxFlow.MappingControlSample\FluxFlow.MappingControlSample.csproj", "{4506352C-7826-47EB-86CB-892E8AA34C3F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.MqttCompositionSample", "samples\FluxFlow.MqttCompositionSample\FluxFlow.MqttCompositionSample.csproj", "{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -159,6 +161,18 @@ Global
 		{4506352C-7826-47EB-86CB-892E8AA34C3F}.Release|x64.Build.0 = Release|Any CPU
 		{4506352C-7826-47EB-86CB-892E8AA34C3F}.Release|x86.ActiveCfg = Release|Any CPU
 		{4506352C-7826-47EB-86CB-892E8AA34C3F}.Release|x86.Build.0 = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|x64.Build.0 = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Debug|x86.Build.0 = Debug|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|x64.ActiveCfg = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|x64.Build.0 = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|x86.ActiveCfg = Release|Any CPU
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -171,5 +185,6 @@ Global
 		{636E3CD9-0C81-4C10-ACE8-4ABDC74DD236} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{A187A832-B31C-446E-B2C3-416106C6578D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{4506352C-7826-47EB-86CB-892E8AA34C3F} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{BA4CD270-9012-4ED7-AA5E-613B656C2DAC} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal

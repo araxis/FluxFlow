@@ -42,5 +42,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `36-mapping-component-package.md`: first generic mapping component package record.
 - `37-control-component-package.md`: first generic control component package record.
 - `38-mapping-control-sample.md`: runnable mapping/control package composition sample.
+- `39-mqtt-composition-sample.md`: runnable MQTT composition sample with an in-memory adapter.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

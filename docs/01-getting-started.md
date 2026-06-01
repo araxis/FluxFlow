@@ -45,6 +45,14 @@ dotnet build samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample
 dotnet run --project samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample.csproj --no-build
 ```
 
+The MQTT composition sample uses an in-memory host adapter, so it does not need
+a live broker:
+
+```sh
+dotnet build samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj /nr:false
+dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj --no-build
+```
+
 ## Basic Flow
 
 Every app follows the same core steps:

@@ -173,6 +173,11 @@ for a broker-free component composition sample. It keeps source and sink nodes i
 the host, then composes `flow.mapper`, `flow.filter`, `flow.when`, and
 `flow.assert` from reusable component packages.
 
+See [samples/FluxFlow.MqttCompositionSample](samples/FluxFlow.MqttCompositionSample)
+for an MQTT composition sample backed by an in-memory host adapter. It composes
+`mqtt.subscribe`, mapping/control nodes, and `mqtt.publish` without requiring a
+live broker.
+
 ---
 
 ## Component Packages
