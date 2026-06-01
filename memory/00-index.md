@@ -59,5 +59,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `53-http-component-package.md`: first generic HTTP request component package.
 - `54-serialization-component-package.md`: first generic serialization component package.
 - `55-metrics-component-package.md`: first generic metrics aggregation component package.
+- `56-sessions-component-package.md`: first generic session recording and replay component package.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

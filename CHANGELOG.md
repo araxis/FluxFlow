@@ -1,5 +1,26 @@
 # Changelog
 
+## FluxFlow.Components.Sessions 0.1.0-alpha.1
+
+Initial reusable session recording and replay component package.
+
+- Added `FluxFlow.Components.Sessions` as a separate source project, test
+  project, and package artifact.
+- Added `session.recorder` with `Input`, `Output`, and `Errors` ports.
+- Added `session.replay` with `Output` and `Errors` ports.
+- Added `SessionRecordInput`, `SessionRecord`, `SessionMetadata`, store
+  request contracts, `ISessionStore`, and `ISessionStoreFactory`.
+- Added host-injected storage through `SessionsComponentOptions`.
+- Added ordered recording with per-message append failures reported as
+  structured errors.
+- Added replay modes for instant, fixed interval, timestamp delta, and
+  multiplier timing.
+- Added replay range options through `startSequence` and `maxMessages`.
+- Added diagnostics for recorder and replay lifecycle/messages.
+- Added focused coverage for recording order, append failure continuation,
+  replay order, replay timing, cancellation, missing sessions, diagnostics,
+  store injection, registration, and option validation.
+
 ## FluxFlow.Components.Metrics 0.1.0-alpha.1
 
 Initial reusable metrics aggregation component package.

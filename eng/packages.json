@@ -82,5 +82,12 @@
     "packageId": "FluxFlow.Components.Metrics",
     "project": "src/FluxFlow.Components.Metrics/FluxFlow.Components.Metrics.csproj",
     "notesName": "FluxFlow.Components.Metrics"
+  },
+  {
+    "alias": "components-sessions",
+    "tagPrefix": "components-sessions",
+    "packageId": "FluxFlow.Components.Sessions",
+    "project": "src/FluxFlow.Components.Sessions/FluxFlow.Components.Sessions.csproj",
+    "notesName": "FluxFlow.Components.Sessions"
   }
 ]
