@@ -55,6 +55,8 @@ Start with one package as the template before splitting everything:
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
+- `FluxFlow.Components.Storage`: host-adapter-backed logical record storage
+  nodes for put, get, and delete flows.
 
 The first consumer can keep components in its own repository until the package
 boundary is stable. The first extracted package should prove the pattern before
@@ -111,3 +113,5 @@ after the core component package has settled.
    observability package release.
 7. Add a generic timer package for interval-driven workflow activity. Done with
    `timer.interval`.
+8. Plan a generic storage package for host-adapter-backed put/get/delete
+   workflow storage. Planned in `62-storage-component-package-plan.md`.
