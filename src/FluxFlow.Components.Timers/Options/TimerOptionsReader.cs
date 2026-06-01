@@ -58,6 +58,39 @@ internal static class TimerOptionsReader
         };
     }
 
+    public static TimerDebounceSettings ReadDebounceSettings(NodeDefinition definition)
+    {
+        var options = Read<TimerDebounceOptions>(definition);
+
+        ValidateBoundedCapacity("timer.debounce", options.BoundedCapacity);
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException(
+                "timer.debounce option 'inputType' cannot be empty.");
+        }
+
+        var quietPeriod = ResolveDuration(
+            "timer.debounce",
+            "quietPeriod",
+            options.QuietPeriod,
+            "quietPeriodMilliseconds",
+            options.QuietPeriodMilliseconds,
+            required: true);
+        if (quietPeriod <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException(
+                "timer.debounce option 'quietPeriod' must be greater than zero.");
+        }
+
+        return new TimerDebounceSettings
+        {
+            Name = string.IsNullOrWhiteSpace(options.Name) ? "debounce" : options.Name.Trim(),
+            InputType = options.InputType.Trim(),
+            QuietPeriod = quietPeriod,
+            BoundedCapacity = options.BoundedCapacity
+        };
+    }
+
     public static TimerDelaySettings ReadDelaySettings(NodeDefinition definition)
     {
         var options = Read<TimerDelayOptions>(definition);

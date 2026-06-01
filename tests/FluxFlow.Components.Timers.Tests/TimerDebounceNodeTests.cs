@@ -9,17 +9,46 @@ using Xunit;
 
 namespace FluxFlow.Components.Timers.Tests;
 
-public sealed class TimerThrottleNodeTests
+public sealed class TimerDebounceNodeTests
 {
     [Fact]
-    public async Task Throttle_EmitsFirstInputBeforeIntervalByDefault()
+    public async Task Debounce_EmitsLatestInputAfterQuietPeriod()
+    {
+        var runtimeNode = CreateNode(
+            options => options.RegisterType<InputMessage>("message"),
+            new
+            {
+                inputType = "message",
+                name = "quiet",
+                quietPeriodMilliseconds = 40,
+                boundedCapacity = 4
+            });
+        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var output = new BufferBlock<InputMessage>();
+        LinkOutput(runtimeNode, output);
+        var startedAt = DateTimeOffset.UtcNow;
+
+        await input.Target.SendAsync(new InputMessage("one"));
+        await input.Target.SendAsync(new InputMessage("two"));
+
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        value.Value.ShouldBe("two");
+        DateTimeOffset.UtcNow.ShouldBeGreaterThanOrEqualTo(startedAt.AddMilliseconds(25));
+    }
+
+    [Fact]
+    public async Task Debounce_FlushesPendingInputOnCompletion()
     {
         var runtimeNode = CreateNode(
             _ => { },
             new
             {
                 inputType = "string",
-                intervalMilliseconds = 1000
+                quietPeriodMilliseconds = 1000
             });
         var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
             .ShouldBeOfType<InputPort<string>>();
@@ -36,72 +65,14 @@ public sealed class TimerThrottleNodeTests
     }
 
     [Fact]
-    public async Task Throttle_SpacesLaterInputs()
-    {
-        var runtimeNode = CreateNode(
-            options => options.RegisterType<InputMessage>("message"),
-            new
-            {
-                inputType = "message",
-                name = "rate",
-                intervalMilliseconds = 45,
-                boundedCapacity = 4
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var output = new BufferBlock<InputMessage>();
-        LinkOutput(runtimeNode, output);
-
-        await input.Target.SendAsync(new InputMessage("one"));
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var firstAt = DateTimeOffset.UtcNow;
-
-        await input.Target.SendAsync(new InputMessage("two"));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var secondAt = DateTimeOffset.UtcNow;
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        first.Value.ShouldBe("one");
-        second.Value.ShouldBe("two");
-        secondAt.ShouldBeGreaterThanOrEqualTo(firstAt.AddMilliseconds(30));
-    }
-
-    [Fact]
-    public async Task Throttle_CanDelayFirstInput()
-    {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                intervalMilliseconds = 35,
-                emitFirstImmediately = false
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
-        var startedAt = DateTimeOffset.UtcNow;
-
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        value.ShouldBe("hello");
-        DateTimeOffset.UtcNow.ShouldBeGreaterThanOrEqualTo(startedAt.AddMilliseconds(25));
-    }
-
-    [Fact]
-    public async Task Throttle_PreservesOrder()
+    public async Task Debounce_EmitsLatestPerQuietWindow()
     {
         var runtimeNode = CreateNode(
             _ => { },
             new
             {
                 inputType = "int",
-                intervalMilliseconds = 1,
+                quietPeriodMilliseconds = 25,
                 boundedCapacity = 8
             });
         var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
@@ -111,22 +82,25 @@ public sealed class TimerThrottleNodeTests
 
         await input.Target.SendAsync(1);
         await input.Target.SendAsync(2);
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await input.Target.SendAsync(3);
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
+        first.ShouldBe(2);
+        second.ShouldBe(3);
     }
 
     [Fact]
-    public async Task Throttle_EmitsDiagnostics()
+    public async Task Debounce_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(
             _ => { },
             new
             {
                 inputType = "string",
-                intervalMilliseconds = 1
+                quietPeriodMilliseconds = 1
             });
         var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
             .ShouldBeOfType<InputPort<string>>();
@@ -144,20 +118,20 @@ public sealed class TimerThrottleNodeTests
 
         (await DrainUntilCompletedAsync(output)).ShouldBe(["hello"]);
         var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(TimerDiagnosticNames.ThrottleEmitted);
+        diagnostic.Name.ShouldBe(TimerDiagnosticNames.DebounceEmitted);
         diagnostic.Attributes["inputType"].ShouldBe("string");
         diagnostic.Attributes["sequence"].ShouldBe(1L);
     }
 
     [Fact]
-    public async Task Throttle_DisposeDrainsAndCompletesOutput()
+    public async Task Debounce_DisposeFlushesAndCompletesOutput()
     {
         var runtimeNode = CreateNode(
             _ => { },
             new
             {
                 inputType = "string",
-                intervalMilliseconds = 1
+                quietPeriodMilliseconds = 1000
             });
         var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
             .ShouldBeOfType<InputPort<string>>();
@@ -173,16 +147,16 @@ public sealed class TimerThrottleNodeTests
     }
 
     [Fact]
-    public void Throttle_RejectsMissingInterval()
+    public void Debounce_RejectsMissingQuietPeriod()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(_ => { }, new { inputType = "string" }));
 
-        exception.Message.ShouldContain("interval");
+        exception.Message.ShouldContain("quietPeriod");
     }
 
     [Fact]
-    public void Throttle_RejectsNonPositiveInterval()
+    public void Debounce_RejectsNonPositiveQuietPeriod()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(
@@ -190,14 +164,14 @@ public sealed class TimerThrottleNodeTests
                 new
                 {
                     inputType = "string",
-                    intervalMilliseconds = 0
+                    quietPeriodMilliseconds = 0
                 }));
 
-        exception.Message.ShouldContain("interval");
+        exception.Message.ShouldContain("quietPeriod");
     }
 
     [Fact]
-    public void Throttle_RejectsInvalidBoundedCapacity()
+    public void Debounce_RejectsInvalidBoundedCapacity()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(
@@ -205,7 +179,7 @@ public sealed class TimerThrottleNodeTests
                 new
                 {
                     inputType = "string",
-                    intervalMilliseconds = 1,
+                    quietPeriodMilliseconds = 1,
                     boundedCapacity = 0
                 }));
 
@@ -213,7 +187,7 @@ public sealed class TimerThrottleNodeTests
     }
 
     [Fact]
-    public void Throttle_RejectsUnknownInputType()
+    public void Debounce_RejectsUnknownInputType()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(
@@ -221,14 +195,14 @@ public sealed class TimerThrottleNodeTests
                 new
                 {
                     inputType = "message",
-                    intervalMilliseconds = 1
+                    quietPeriodMilliseconds = 1
                 }));
 
         exception.Message.ShouldContain("message");
     }
 
     [Fact]
-    public void Throttle_RejectsDuplicateIntervalOptions()
+    public void Debounce_RejectsDuplicateQuietPeriodOptions()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(
@@ -236,11 +210,11 @@ public sealed class TimerThrottleNodeTests
                 new
                 {
                     inputType = "string",
-                    interval = TimeSpan.FromMilliseconds(1),
-                    intervalMilliseconds = 1
+                    quietPeriod = TimeSpan.FromMilliseconds(1),
+                    quietPeriodMilliseconds = 1
                 }));
 
-        exception.Message.ShouldContain("interval");
+        exception.Message.ShouldContain("quietPeriod");
     }
 
     private static RuntimeNode CreateNode(
@@ -249,11 +223,11 @@ public sealed class TimerThrottleNodeTests
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterTimerComponents(configure);
-        registry.TryGetFactory(TimerComponentTypes.Throttle, out var factory).ShouldBeTrue();
+        registry.TryGetFactory(TimerComponentTypes.Debounce, out var factory).ShouldBeTrue();
         return factory(TimerTestHost.CreateContext(
-            TimerComponentTypes.Throttle,
+            TimerComponentTypes.Debounce,
             configuration,
-            "throttle"));
+            "debounce"));
     }
 
     private static void LinkOutput<T>(

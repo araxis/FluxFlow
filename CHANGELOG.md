@@ -1,5 +1,18 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.4.0-alpha.1
+
+Adds typed debounce for quiet-period workflow paths.
+
+- Added `timer.debounce` with typed `Input` and `Output` ports.
+- Added host-registered input type aliases for typed debounce pass-through.
+- Added quiet-period options and bounded capacity.
+- Added completion flushing for the latest pending input.
+- Added debounce diagnostics with input type, quiet period, sequence, and node
+  name.
+- Added validation for quiet period, input type, duplicate quiet-period
+  options, and bounded capacity.
+
 ## FluxFlow.Components.Timers 0.3.0-alpha.1
 
 Adds typed throttling for rate-limited workflow paths.

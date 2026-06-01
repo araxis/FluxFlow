@@ -10,6 +10,7 @@ Reusable timer components for FluxFlow.
 | `timer.schedule` | `Output` | Emits `ScheduleTick` values from a cron expression. |
 | `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
 | `timer.throttle` | `Input` -> `Output` | Rate-limits typed inputs without changing them. |
+| `timer.debounce` | `Input` -> `Output` | Emits the latest typed input after a quiet period. |
 
 The package emits neutral tick contracts only. Hosts decide whether ticks drive
 polling, periodic health checks, metrics, file work, message publishing, or
@@ -77,6 +78,21 @@ configured delay. Register custom input aliases on the package options.
 `timer.throttle` preserves input order and emits the original item no more
 than once per configured interval. It queues items through normal bounded
 capacity instead of dropping them.
+
+## Debounce
+
+```json
+{
+  "type": "timer.debounce",
+  "inputType": "message",
+  "quietPeriodMilliseconds": 250,
+  "boundedCapacity": 128
+}
+```
+
+`timer.debounce` keeps the latest input and emits it after no new input arrives
+for the configured quiet period. When the input completes, the latest pending
+item is flushed before the output completes.
 
 ## Registration
 

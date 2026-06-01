@@ -2,6 +2,8 @@ namespace FluxFlow.Components.Timers.Diagnostics;
 
 public static class TimerDiagnosticNames
 {
+    public const string DebounceEmitted = "timer.debounce.emitted";
+    public const string DebounceFailed = "timer.debounce.failed";
     public const string DelayEmitted = "timer.delay.emitted";
     public const string DelayFailed = "timer.delay.failed";
     public const string IntervalStarted = "timer.interval.started";

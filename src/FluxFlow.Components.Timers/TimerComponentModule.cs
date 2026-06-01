@@ -13,6 +13,9 @@ public sealed class TimerComponentModule : IFlowNodeModule
         Registrations =
         [
             new FlowNodeRegistration(
+                TimerComponentTypes.Debounce,
+                context => TimerDebounceNodeFactory.Create(context, options)),
+            new FlowNodeRegistration(
                 TimerComponentTypes.Delay,
                 context => TimerDelayNodeFactory.Create(context, options)),
             new FlowNodeRegistration(

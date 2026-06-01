@@ -18,6 +18,7 @@ Implemented nodes:
 | `timer.schedule` | `Output` | Emits `ScheduleTick` values from cron expressions. |
 | `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
 | `timer.throttle` | `Input` -> `Output` | Rate-limits typed inputs without changing them. |
+| `timer.debounce` | `Input` -> `Output` | Emits the latest typed input after a quiet period. |
 
 Package contracts:
 
@@ -49,6 +50,11 @@ Additional `timer.throttle` options:
 - `interval` or `intervalMilliseconds`
 - `emitFirstImmediately`
 
+Additional `timer.debounce` options:
+
+- `inputType`
+- `quietPeriod` or `quietPeriodMilliseconds`
+
 ## Behavior
 
 - The interval must be greater than zero.
@@ -67,6 +73,8 @@ Additional `timer.throttle` options:
   ordering.
 - `timer.throttle` queues input items, preserves ordering, and emits no more
   than once per configured interval.
+- `timer.debounce` coalesces input bursts to the latest item, emits after the
+  configured quiet period, and flushes the latest pending item on completion.
 
 ## Boundaries
 
@@ -78,7 +86,7 @@ The package does not include:
 - scenario/test runner behavior
 - external protocol calls
 
-Debounce behavior is a future node in the same package family.
+The first general-purpose timer set is now complete.
 
 ## Verification
 
@@ -96,6 +104,9 @@ Focused tests cover:
 - invalid cron expression, time zone, input type, and duplicate option handling
 - typed throttle pass-through
 - throttle ordering, spacing, diagnostics, disposal, and validation
+- typed debounce pass-through
+- debounce quiet-period coalescing, completion flushing, diagnostics,
+  disposal, and validation
 
 Initial release tag:
 

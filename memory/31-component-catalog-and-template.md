@@ -337,12 +337,11 @@ Implemented components:
 | Schedule Trigger | source | `timer.schedule` | Emits `ScheduleTick` values from a five-field or six-field cron expression. |
 | Delay | transform | `timer.delay` | Delays each typed input item and emits the same item unchanged. |
 | Throttle | transform | `timer.throttle` | Queues typed input items and emits them no more than once per configured interval. |
+| Debounce | transform | `timer.debounce` | Keeps the latest typed input and emits it after a configured quiet period. |
 
 Planned components:
 
-| Component | Role | Node type | Notes |
-|-----------|------|-----------|-------|
-| Debounce | transform | `timer.debounce` | Emits only after quiet periods. |
+No additional timer components are planned for the first general-purpose set.
 
 Recommendation:
 
