@@ -178,6 +178,10 @@ for an MQTT composition sample backed by an in-memory host adapter. It composes
 `mqtt.subscribe`, mapping/control nodes, and `mqtt.publish` without requiring a
 live broker.
 
+See [samples/FluxFlow.SessionsCompositionSample](samples/FluxFlow.SessionsCompositionSample)
+for a session recording and replay sample. It keeps storage in the host, records
+messages through `session.recorder`, then replays them through `session.replay`.
+
 See [samples/FluxFlow.ComponentPackageTemplate](samples/FluxFlow.ComponentPackageTemplate)
 for a copyable component package shape with contracts, options, diagnostics,
 module registration, and tests.
@@ -197,6 +201,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
 | `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |
 | `FluxFlow.Components.Timers` | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` | Interval, cron schedule, delay, rate-limit, and quiet-period timing nodes. |
+| `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay` | Host-store-backed session recording and replay. |
 
 ---
 

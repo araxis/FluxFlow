@@ -27,6 +27,9 @@ quiet-period coalescing.
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.
 
+Run `samples/FluxFlow.SessionsCompositionSample` to see session recording and
+replay with host-owned storage.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

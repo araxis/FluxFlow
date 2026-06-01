@@ -1,5 +1,11 @@
 # Changelog
 
+## Samples
+
+- Added `samples/FluxFlow.SessionsCompositionSample`, a runnable composition
+  sample that records neutral session messages into a host-owned store and then
+  replays them through `session.replay`.
+
 ## FluxFlow.Components.Sessions 0.1.0-alpha.1
 
 Initial reusable session recording and replay component package.

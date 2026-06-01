@@ -53,6 +53,14 @@ dotnet build samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSamp
 dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj --no-build
 ```
 
+The sessions composition sample uses a host-owned in-memory store to record and
+then replay a session:
+
+```sh
+dotnet build samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsCompositionSample.csproj /nr:false
+dotnet run --project samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsCompositionSample.csproj --no-build
+```
+
 ## Basic Flow
 
 Every app follows the same core steps:
