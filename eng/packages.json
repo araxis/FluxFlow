@@ -89,5 +89,12 @@
     "packageId": "FluxFlow.Components.Sessions",
     "project": "src/FluxFlow.Components.Sessions/FluxFlow.Components.Sessions.csproj",
     "notesName": "FluxFlow.Components.Sessions"
+  },
+  {
+    "alias": "components-state",
+    "tagPrefix": "components-state",
+    "packageId": "FluxFlow.Components.State",
+    "project": "src/FluxFlow.Components.State/FluxFlow.Components.State.csproj",
+    "notesName": "FluxFlow.Components.State"
   }
 ]

@@ -30,6 +30,9 @@ through a host-owned in-memory adapter.
 Run `samples/FluxFlow.SessionsCompositionSample` to see session recording and
 replay with host-owned storage.
 
+Add `FluxFlow.Components.State` when a workflow needs per-key state updates
+through reducer expressions.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

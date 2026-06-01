@@ -1,5 +1,24 @@
 # Changelog
 
+## FluxFlow.Components.State 0.1.0-alpha.1
+
+Initial reusable state reducer component package.
+
+- Added `FluxFlow.Components.State` as a separate source project, test
+  project, and package artifact.
+- Added `state.reducer` with `Input`, `Output`, and `Errors` ports.
+- Added `StateReducerInput`, `StateReducerResult`, and
+  `StateReducerOperation` contracts.
+- Added per-key in-memory state with reducer expression updates.
+- Added optional key expression support.
+- Added bounded key cardinality through `maxKeys`.
+- Added reset and clear operations on the reducer input stream.
+- Added reducer/key failure errors with later-message continuation.
+- Added diagnostics for update, reset, clear, failures, and key limits.
+- Added focused coverage for state updates, initial state, key expressions,
+  reset/clear, reducer failures, key limits, diagnostics, registration, and
+  option validation.
+
 ## Samples
 
 - Added `samples/FluxFlow.SessionsCompositionSample`, a runnable composition
