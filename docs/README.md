@@ -21,7 +21,7 @@ Add `FluxFlow.Components.Observability` when a workflow needs neutral
 structured log entries, metrics snapshots, or counter snapshots.
 
 Add `FluxFlow.Components.Timers` when a workflow needs package-owned interval
-ticks to drive scheduled activity.
+ticks, cron schedule ticks, or typed pass-through delays.
 
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.

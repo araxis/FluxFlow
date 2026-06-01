@@ -13,8 +13,14 @@ public sealed class TimerComponentModule : IFlowNodeModule
         Registrations =
         [
             new FlowNodeRegistration(
+                TimerComponentTypes.Delay,
+                context => TimerDelayNodeFactory.Create(context, options)),
+            new FlowNodeRegistration(
                 TimerComponentTypes.Interval,
-                TimerIntervalNode.Create)
+                TimerIntervalNode.Create),
+            new FlowNodeRegistration(
+                TimerComponentTypes.Schedule,
+                TimerScheduleNode.Create)
         ];
     }
 

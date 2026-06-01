@@ -1,5 +1,21 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.2.0-alpha.1
+
+Adds delay and cron schedule timing nodes.
+
+- Added `timer.delay` with typed `Input` and `Output` ports.
+- Added host-registered input type aliases for typed delay pass-through.
+- Added `timer.schedule` with an `Output` port.
+- Added `ScheduleTick` with timestamp, due time, sequence, cron, time zone, and
+  drift metadata.
+- Added five-field and six-field cron parsing with lists, ranges, steps,
+  question-mark day wildcards, and month/day names.
+- Added schedule options for time zone, max ticks, and bounded capacity.
+- Added delay and schedule diagnostics, plus workflow events for schedule ticks.
+- Added validation for delay duration, cron expression, time zone, max tick,
+  input type, and bounded capacity options.
+
 ## FluxFlow.Components.Timers 0.1.0-alpha.1
 
 Initial reusable timer component package.

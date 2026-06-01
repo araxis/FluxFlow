@@ -12,6 +12,8 @@ public sealed class TimerComponentModuleTests
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterTimerComponents();
 
+        registry.TryGetFactory(TimerComponentTypes.Delay, out _).ShouldBeTrue();
         registry.TryGetFactory(TimerComponentTypes.Interval, out _).ShouldBeTrue();
+        registry.TryGetFactory(TimerComponentTypes.Schedule, out _).ShouldBeTrue();
     }
 }

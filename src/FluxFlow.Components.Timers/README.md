@@ -7,6 +7,8 @@ Reusable timer components for FluxFlow.
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
 | `timer.interval` | `Output` | Emits `TimerTick` values on a fixed interval. |
+| `timer.schedule` | `Output` | Emits `ScheduleTick` values from a cron expression. |
+| `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
 
 The package emits neutral tick contracts only. Hosts decide whether ticks drive
 polling, periodic health checks, metrics, file work, message publishing, or
@@ -29,8 +31,39 @@ other workflow activity.
 due time, elapsed time, interval, and drift. Use `emitImmediately: true` when
 the first tick should be emitted as soon as the node starts.
 
+## Schedule
+
+```json
+{
+  "type": "timer.schedule",
+  "name": "weekday-noon",
+  "cron": "0 12 ? * MON-FRI",
+  "timeZoneId": "UTC",
+  "maxTicks": 10,
+  "boundedCapacity": 128
+}
+```
+
+`timer.schedule` emits `ScheduleTick` values. Cron expressions can use five
+fields or six fields when seconds are needed.
+
+## Delay
+
+```json
+{
+  "type": "timer.delay",
+  "inputType": "message",
+  "delayMilliseconds": 250,
+  "boundedCapacity": 128
+}
+```
+
+`timer.delay` preserves input order and emits the original item after the
+configured delay. Register custom input aliases on the package options.
+
 ## Registration
 
 ```csharp
-registry.RegisterTimerComponents();
+registry.RegisterTimerComponents(options => options
+    .RegisterType<MyMessage>("message"));
 ```

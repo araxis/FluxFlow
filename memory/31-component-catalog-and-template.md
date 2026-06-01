@@ -334,13 +334,13 @@ Implemented components:
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
 | Interval Trigger | source | `timer.interval` | Emits `TimerTick` values at a fixed interval with optional initial delay, immediate first tick, and max tick count. |
+| Schedule Trigger | source | `timer.schedule` | Emits `ScheduleTick` values from a five-field or six-field cron expression. |
+| Delay | transform | `timer.delay` | Delays each typed input item and emits the same item unchanged. |
 
 Planned components:
 
 | Component | Role | Node type | Notes |
 |-----------|------|-----------|-------|
-| Schedule Trigger | source | `timer.schedule` | Emits ticks based on a schedule expression. |
-| Delay | transform | `timer.delay` | Delays each input item. |
 | Throttle | transform | `timer.throttle` | Limits output rate. |
 | Debounce | transform | `timer.debounce` | Emits only after quiet periods. |
 
