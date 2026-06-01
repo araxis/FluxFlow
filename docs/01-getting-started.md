@@ -37,6 +37,14 @@ Events observed: 3
 Diagnostics observed: 6
 ```
 
+The component composition sample uses host-owned source and sink nodes with
+reusable mapping/control nodes:
+
+```sh
+dotnet build samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample.csproj /nr:false
+dotnet run --project samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample.csproj --no-build
+```
+
 ## Basic Flow
 
 Every app follows the same core steps:

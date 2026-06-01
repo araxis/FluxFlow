@@ -168,6 +168,11 @@ consumer-style console app. It keeps app-specific workspace metadata outside the
 engine, projects executable resources and workflows into `ApplicationDefinition`,
 registers typed components explicitly, and runs conditional links.
 
+See [samples/FluxFlow.MappingControlSample](samples/FluxFlow.MappingControlSample)
+for a broker-free component composition sample. It keeps source and sink nodes in
+the host, then composes `flow.mapper`, `flow.filter`, `flow.when`, and
+`flow.assert` from reusable component packages.
+
 ---
 
 ## Component Packages

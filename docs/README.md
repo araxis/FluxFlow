@@ -7,6 +7,9 @@ the intended application boundary: app-owned workspace metadata stays outside
 the engine, and only executable resources and workflows are projected into
 `ApplicationDefinition`.
 
+Then run `samples/FluxFlow.MappingControlSample` to see package composition with
+host-owned source/sink nodes and reusable mapping/control nodes.
+
 ## Contents
 
 1. [Getting Started](01-getting-started.md)
