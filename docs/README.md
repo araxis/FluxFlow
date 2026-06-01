@@ -52,6 +52,7 @@ for a new component package.
 9. [JSON Conversion](09-json-conversion.md)
 10. [Expression Mapping](10-expression-mapping.md)
 11. [Package Versioning](11-package-versioning.md)
+12. [Component Composition](12-component-composition.md)
 
 ## Current Boundary
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Documentation
+
+- Added component composition guidance for host boundaries, package boundaries,
+  common node shapes, extraction timing, and independent package movement.
+
 ## FluxFlow.Components.State 0.1.0-alpha.1
 
 Initial reusable state reducer component package.
