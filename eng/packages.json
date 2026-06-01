@@ -68,5 +68,12 @@
     "packageId": "FluxFlow.Components.Http",
     "project": "src/FluxFlow.Components.Http/FluxFlow.Components.Http.csproj",
     "notesName": "FluxFlow.Components.Http"
+  },
+  {
+    "alias": "components-serialization",
+    "tagPrefix": "components-serialization",
+    "packageId": "FluxFlow.Components.Serialization",
+    "project": "src/FluxFlow.Components.Serialization/FluxFlow.Components.Serialization.csproj",
+    "notesName": "FluxFlow.Components.Serialization"
   }
 ]

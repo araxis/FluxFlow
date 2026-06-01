@@ -1,5 +1,23 @@
 # Changelog
 
+## FluxFlow.Components.Serialization 0.1.0-alpha.1
+
+Initial reusable serialization component package.
+
+- Added `FluxFlow.Components.Serialization` as a separate source project, test
+  project, and package artifact.
+- Added `json.parse` and `json.stringify` nodes.
+- Added `text.encode` and `text.decode` nodes.
+- Added `base64.encode` and `base64.decode` nodes.
+- Added request and result contracts for JSON, text, and base64 conversions.
+- Added bounded capacity, default encoding, input byte limit, output byte
+  limit, JSON indentation, trailing comma, and comment handling options.
+- Added structured errors for parse, stringify, encode, decode, missing input,
+  unsupported encoding, oversized input, and oversized output failures.
+- Added diagnostics for successful and failed conversions.
+- Added focused coverage for each node, per-message error continuation,
+  diagnostics, registration, and option validation.
+
 ## FluxFlow.Components.Http 0.1.0-alpha.1
 
 Initial reusable HTTP request component package.

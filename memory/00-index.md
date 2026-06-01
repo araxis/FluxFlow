@@ -57,5 +57,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `51-timers-finalization.md`: first timer component set finalization.
 - `52-payloads-component-package.md`: first generic payload inspection component package.
 - `53-http-component-package.md`: first generic HTTP request component package.
+- `54-serialization-component-package.md`: first generic serialization component package.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.
