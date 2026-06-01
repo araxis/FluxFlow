@@ -212,6 +212,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay` | Host-store-backed session recording and replay. |
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
 | `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.delete` | Host-store-backed logical record storage. |
+| `FluxFlow.Components.Storage.Local` | adapter only | File-backed local adapter for storage nodes. |
 
 ---
 

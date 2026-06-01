@@ -38,9 +38,9 @@ shape. Good signals:
 The adapter package should not add new workflow nodes. It should only provide a
 store implementation and registration helpers for the existing storage nodes.
 
-## First Adapter Candidate
+## First Adapter Package
 
-Proposed package:
+Package:
 
 ```text
 FluxFlow.Components.Storage.Local
@@ -70,8 +70,9 @@ Expected options:
 - `defaultCollection`
 - `flushOnWrite`
 
-The package should use `StorageStoreLease.Owned(...)` when it creates the store
-and `StorageStoreLease.Shared(...)` when the host passes an existing store.
+The package uses `StorageStoreLease.Owned(...)` when it creates the store. Hosts
+can still pass a shared `LocalStorageStore` through the base storage package
+when they want to own the lifetime.
 
 ## Record Model
 

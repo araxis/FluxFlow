@@ -117,3 +117,5 @@ after the core component package has settled.
    workflow storage. Done in `63-storage-component-package.md`.
 9. Plan a neutral persisted storage adapter package and host migration path.
    Done in `65-storage-adapter-and-migration-plan.md`.
+10. Add the first file-backed local storage adapter package. Done in
+    `66-storage-local-adapter-package.md`.

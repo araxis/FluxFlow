@@ -1,5 +1,23 @@
 # Changelog
 
+## FluxFlow.Components.Storage.Local 0.1.0-alpha.1
+
+Initial file-backed local storage adapter package.
+
+- Added `FluxFlow.Components.Storage.Local` as a separate source project, test
+  project, and package artifact.
+- Added `LocalStorageStore`, `LocalStorageStoreFactory`, local storage options,
+  and `UseLocalStorage(...)` registration helpers.
+- Persisted one JSON file per storage record under hashed store, collection,
+  and key paths.
+- Added support for create, replace, upsert, expected version checks,
+  expiration-aware reads, and found/missing delete results.
+- Added value size validation and best-effort temporary-file replacement on
+  writes.
+- Added focused coverage for persistence, write modes, version checks,
+  expiration, deletes, path safety, size limits, factory defaults, and option
+  validation.
+
 ## FluxFlow.Components.Storage 0.1.0-alpha.1
 
 Initial reusable logical storage component package.

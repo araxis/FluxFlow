@@ -42,6 +42,9 @@ record storage through put, get, and delete nodes.
 Run `samples/FluxFlow.StorageCompositionSample` to see the storage package with
 a host-owned store adapter.
 
+Add `FluxFlow.Components.Storage.Local` when a workflow needs a simple
+file-backed local store for the storage package.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

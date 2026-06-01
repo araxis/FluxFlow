@@ -103,5 +103,12 @@
     "packageId": "FluxFlow.Components.Storage",
     "project": "src/FluxFlow.Components.Storage/FluxFlow.Components.Storage.csproj",
     "notesName": "FluxFlow.Components.Storage"
+  },
+  {
+    "alias": "components-storage-local",
+    "tagPrefix": "components-storage-local",
+    "packageId": "FluxFlow.Components.Storage.Local",
+    "project": "src/FluxFlow.Components.Storage.Local/FluxFlow.Components.Storage.Local.csproj",
+    "notesName": "FluxFlow.Components.Storage.Local"
   }
 ]
