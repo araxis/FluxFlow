@@ -59,6 +59,7 @@ for a new component package.
 10. [Expression Mapping](10-expression-mapping.md)
 11. [Package Versioning](11-package-versioning.md)
 12. [Component Composition](12-component-composition.md)
+13. [Storage Host Adapters](13-storage-host-adapters.md)
 
 ## Current Boundary
 

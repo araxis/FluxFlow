@@ -115,3 +115,5 @@ after the core component package has settled.
    `timer.interval`.
 8. Add a generic storage package for host-adapter-backed put/get/delete
    workflow storage. Done in `63-storage-component-package.md`.
+9. Plan a neutral persisted storage adapter package and host migration path.
+   Done in `65-storage-adapter-and-migration-plan.md`.
