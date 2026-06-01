@@ -136,7 +136,8 @@ Second package:
 Third package:
 
 - `FluxFlow.Components.Control`
-- starts with `flow.filter`, `flow.when`, and `flow.assert`
+- started with `flow.filter`, `flow.when`, and `flow.assert`; `flow.assert`
+  later moved to `FluxFlow.Components.Assertions`
 - keeps expression engines and context building host-provided
 - supports object defaults and host-registered typed ports
 - avoids scenario/test-runner behavior

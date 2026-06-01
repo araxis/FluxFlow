@@ -1,8 +1,8 @@
 # FluxFlow Mapping And Control Sample
 
-This console sample shows how a host can compose reusable mapping and control
-components while keeping source, sink, and domain-specific context code inside
-the application.
+This console sample shows how a host can compose reusable mapping, control, and
+assertion components while keeping source, sink, and domain-specific context
+code inside the application.
 
 The flow is:
 

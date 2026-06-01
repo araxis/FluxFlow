@@ -7,6 +7,9 @@ Date: 2026-06-01
 Add a small runnable sample that demonstrates package composition without an
 external transport dependency.
 
+Update: `flow.assert` now comes from `FluxFlow.Components.Assertions`, while
+filtering and branching stay in `FluxFlow.Components.Control`.
+
 ## Decisions
 
 - Sample project: `samples/FluxFlow.MappingControlSample`.

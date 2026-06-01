@@ -11,7 +11,6 @@ internal static class ControlNodeFactory
 {
     private static readonly MethodInfo CreateFilterMethod = GetMethod(nameof(CreateFilterTyped));
     private static readonly MethodInfo CreateWhenMethod = GetMethod(nameof(CreateWhenTyped));
-    private static readonly MethodInfo CreateAssertMethod = GetMethod(nameof(CreateAssertTyped));
 
     public static RuntimeNode CreateFilter(
         RuntimeNodeFactoryContext context,
@@ -22,11 +21,6 @@ internal static class ControlNodeFactory
         RuntimeNodeFactoryContext context,
         ControlComponentOptions componentOptions)
         => Create(context, componentOptions, ControlComponentTypes.When.Value, CreateWhenMethod);
-
-    public static RuntimeNode CreateAssert(
-        RuntimeNodeFactoryContext context,
-        ControlComponentOptions componentOptions)
-        => Create(context, componentOptions, ControlComponentTypes.Assert.Value, CreateAssertMethod);
 
     private static RuntimeNode Create(
         RuntimeNodeFactoryContext context,
@@ -98,27 +92,6 @@ internal static class ControlNodeFactory
             .Input(ControlComponentPorts.Input, node.Input)
             .Output(ControlComponentPorts.WhenTrue, node.WhenTrue)
             .Output(ControlComponentPorts.WhenFalse, node.WhenFalse)
-            .Build();
-    }
-
-    private static RuntimeNode CreateAssertTyped<TInput>(
-        RuntimeNodeFactoryContext context,
-        ControlExpressionOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IControlContextFactory contextFactory,
-        ControlNodeContext nodeContext)
-    {
-        var node = new AssertNode<TInput>(
-            options,
-            expressionEngine,
-            contextFactory,
-            nodeContext);
-
-        return context.CreateNode(node)
-            .Input(ControlComponentPorts.Input, node.Input)
-            .Output(ControlComponentPorts.Result, node.Result)
-            .Output(ControlComponentPorts.Passed, node.Passed)
-            .Output(ControlComponentPorts.Failed, node.Failed)
             .Build();
     }
 

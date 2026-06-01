@@ -1,3 +1,4 @@
+using FluxFlow.Components.Assertions;
 using FluxFlow.Components.Control;
 using FluxFlow.Components.Mapping;
 using FluxFlow.Engine.Definitions;
@@ -65,20 +66,20 @@ internal static class SampleApplicationDefinition
                         },
                         ["assertTotal"] = new NodeDefinition
                         {
-                            Type = ControlComponentTypes.Assert,
+                            Type = AssertionsComponentTypes.Assert,
                             Configuration =
                             {
                                 ["engine"] = JsonValue("sample"),
                                 ["expression"] = JsonValue("order-total-valid"),
                                 ["expressionName"] = JsonValue("valid-total"),
-                                ["name"] = JsonValue("total is valid"),
+                                ["description"] = JsonValue("total is valid"),
                                 ["failureMessage"] = JsonValue("Order total must be zero or greater."),
                                 ["inputType"] = JsonValue("sample.order.reviewed"),
                                 ["boundedCapacity"] = JsonValue(8)
                             },
                             Ports =
                             {
-                                [ControlComponentPorts.Input] = JsonValue("active.Output")
+                                [AssertionsComponentPorts.Input] = JsonValue("active.Output")
                             }
                         },
                         ["route"] = new NodeDefinition

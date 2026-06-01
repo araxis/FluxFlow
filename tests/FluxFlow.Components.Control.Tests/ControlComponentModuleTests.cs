@@ -14,7 +14,6 @@ public sealed class ControlComponentModuleTests
 
         registry.TryGetFactory(ControlComponentTypes.Filter, out _).ShouldBeTrue();
         registry.TryGetFactory(ControlComponentTypes.When, out _).ShouldBeTrue();
-        registry.TryGetFactory(ControlComponentTypes.Assert, out _).ShouldBeTrue();
     }
 
     [Fact]

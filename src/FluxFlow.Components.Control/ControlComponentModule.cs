@@ -17,10 +17,7 @@ public sealed class ControlComponentModule : IFlowNodeModule
                 context => ControlNodeFactory.CreateFilter(context, options)),
             new FlowNodeRegistration(
                 ControlComponentTypes.When,
-                context => ControlNodeFactory.CreateWhen(context, options)),
-            new FlowNodeRegistration(
-                ControlComponentTypes.Assert,
-                context => ControlNodeFactory.CreateAssert(context, options))
+                context => ControlNodeFactory.CreateWhen(context, options))
         ];
     }
 

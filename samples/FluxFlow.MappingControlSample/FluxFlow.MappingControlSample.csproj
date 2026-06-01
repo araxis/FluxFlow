@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Assertions\FluxFlow.Components.Assertions.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Control\FluxFlow.Components.Control.csproj" />
   </ItemGroup>

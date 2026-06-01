@@ -1,5 +1,32 @@
 # Changelog
 
+## FluxFlow.Components.Assertions 0.1.0-alpha.1
+
+Initial reusable assertion component package.
+
+- Added `FluxFlow.Components.Assertions` as a separate source project, test
+  project, and package artifact.
+- Added `flow.assert` with `Input`, `Result`, `Passed`, `Failed`, and `Errors`
+  ports.
+- Added `FlowAssertionResult`, `FlowAssertionStatus`, and `AssertionFailure`
+  contracts.
+- Added host-provided expression engine resolution, type aliases, and context
+  factories.
+- Added optional pass/fail input routing controls.
+- Added per-message expression failures as `FlowError` so later messages
+  continue.
+- Added diagnostics with input type, engine, expression id, expression name, and
+  pass metadata where available.
+
+## FluxFlow.Components.Control 0.2.0-alpha.1
+
+Control package boundary cleanup.
+
+- Kept `flow.filter` and `flow.when` in the control package.
+- Moved `flow.assert` ownership to the assertions package.
+- Removed assertion-only result contracts, ports, diagnostics, and error codes
+  from the control package.
+
 ## FluxFlow.Components.Storage.Local 0.1.0-alpha.1
 
 Initial file-backed local storage adapter package.
@@ -346,7 +373,6 @@ Initial reusable control component package.
   project, and package artifact.
 - Added `flow.filter` with `Input` and `Output` ports.
 - Added `flow.when` with `Input`, `WhenTrue`, and `WhenFalse` ports.
-- Added `flow.assert` with `Input`, `Result`, `Passed`, and `Failed` ports.
 - Added host-provided expression engine resolution, type aliases, and context
   factories.
 - Added stable control error codes for expression evaluation failures.

@@ -8,12 +8,16 @@ Add a reusable expression-driven control package after mapping. The package
 should cover generic filtering, branching, and assertions without importing
 host product behavior.
 
+Update: assertion ownership was split into `FluxFlow.Components.Assertions` in
+`67-assertions-component-package.md`. The current Control package owns only
+`flow.filter` and `flow.when`.
+
 ## Decisions
 
 - Package project: `src/FluxFlow.Components.Control`.
 - Test project: `tests/FluxFlow.Components.Control.Tests`.
 - Package identity: `FluxFlow.Components.Control`.
-- Package version: `0.1.0-alpha.1`.
+- Initial package version: `0.1.0-alpha.1`.
 - Initial node types:
   - `flow.filter`
   - `flow.when`
@@ -48,7 +52,7 @@ host product behavior.
 - result output port: `Result`
 - passed output port: `Passed`
 - failed output port: `Failed`
-- emits `ControlAssertionResult` on `Result`
+- initially emitted an assertion result on `Result`
 - preserves input type on `Passed` and `Failed`
 
 Common config fields:
@@ -78,12 +82,18 @@ Implemented:
 - default and typed context factory support
 - generic `FilterNode<TInput>`
 - generic `WhenNode<TInput>`
-- generic `AssertNode<TInput>`
+- initial generic assertion node before the later package split
 - isolated runtime generic node factory
 - diagnostics for route/pass/failure behavior
 - stable error codes for expression failures
 - deterministic tests for filtering, branching, assertions, diagnostics, typed
   ports, missing expression, and per-message expression failure behavior
+
+## Later Split
+
+`flow.assert` moved to `FluxFlow.Components.Assertions` with
+`FlowAssertionResult` and `AssertionFailure` contracts. Control was then moved
+to `0.2.0-alpha.1` with assertion-specific ports and contracts removed.
 
 ## Deferred
 

@@ -1,4 +1,4 @@
-using FluxFlow.Components.Control.Contracts;
+using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -119,7 +119,7 @@ internal sealed class OrderSinkNode : SinkFlowNode<ReviewedOrder>
     }
 }
 
-internal sealed class AssertionSinkNode(SampleStore store) : SinkFlowNode<ControlAssertionResult>(
+internal sealed class AssertionSinkNode(SampleStore store) : SinkFlowNode<FlowAssertionResult>(
     new ExecutionDataflowBlockOptions { BoundedCapacity = 8 })
 {
     public static RuntimeNode Create(RuntimeNodeFactoryContext context, SampleStore store)
@@ -131,10 +131,10 @@ internal sealed class AssertionSinkNode(SampleStore store) : SinkFlowNode<Contro
     }
 
     protected override ValueTask HandleAsync(
-        ControlAssertionResult input,
+        FlowAssertionResult input,
         CancellationToken cancellationToken)
     {
-        store.AddAssertion(new SampleAssertion(input.Name, input.Passed, input.Message));
+        store.AddAssertion(new SampleAssertion(input.Description, input.Passed, input.Message));
         return ValueTask.CompletedTask;
     }
 }

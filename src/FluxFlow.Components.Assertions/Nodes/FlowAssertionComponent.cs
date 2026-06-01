@@ -1,29 +1,29 @@
-using FluxFlow.Components.Control.Contracts;
-using FluxFlow.Components.Control.Diagnostics;
-using FluxFlow.Components.Control.Options;
+using FluxFlow.Components.Assertions.Contracts;
+using FluxFlow.Components.Assertions.Diagnostics;
+using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
 
-namespace FluxFlow.Components.Control.Nodes;
+namespace FluxFlow.Components.Assertions.Nodes;
 
-public sealed class AssertNode<TInput> : FlowNodeBase
+public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
 {
     private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IControlContextFactory _contextFactory;
-    private readonly ControlNodeContext _nodeContext;
-    private readonly ControlExpressionOptions _options;
+    private readonly IAssertionContextFactory _contextFactory;
+    private readonly AssertionNodeContext _nodeContext;
+    private readonly AssertionOptions _options;
     private readonly ActionBlock<TInput> _input;
-    private readonly BufferBlock<ControlAssertionResult> _result;
+    private readonly BufferBlock<FlowAssertionResult> _result;
     private readonly BufferBlock<TInput> _passed;
     private readonly BufferBlock<TInput> _failed;
     private readonly CancellationToken _processingCancellationToken;
 
-    public AssertNode(
-        ControlExpressionOptions options,
+    public FlowAssertionComponent(
+        AssertionOptions options,
         IFlowExpressionEngine expressionEngine,
-        IControlContextFactory contextFactory,
-        ControlNodeContext nodeContext)
+        IAssertionContextFactory contextFactory,
+        AssertionNodeContext nodeContext)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
@@ -34,7 +34,7 @@ public sealed class AssertNode<TInput> : FlowNodeBase
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "Assert bounded capacity must be greater than zero.");
+                "Assertion bounded capacity must be greater than zero.");
         }
 
         var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
@@ -45,7 +45,7 @@ public sealed class AssertNode<TInput> : FlowNodeBase
         };
         _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(EvaluateAsync, inputOptions);
-        _result = new BufferBlock<ControlAssertionResult>(blockOptions);
+        _result = new BufferBlock<FlowAssertionResult>(blockOptions);
         _passed = new BufferBlock<TInput>(blockOptions);
         _failed = new BufferBlock<TInput>(blockOptions);
         _input.Completion.ContinueWith(
@@ -58,7 +58,7 @@ public sealed class AssertNode<TInput> : FlowNodeBase
 
     public ITargetBlock<TInput> Input => _input;
 
-    public ISourceBlock<ControlAssertionResult> Result => _result;
+    public ISourceBlock<FlowAssertionResult> Result => _result;
 
     public ISourceBlock<TInput> Passed => _passed;
 
@@ -89,7 +89,7 @@ public sealed class AssertNode<TInput> : FlowNodeBase
         try
         {
             _processingCancellationToken.ThrowIfCancellationRequested();
-            passed = ControlNodeSupport.Evaluate(
+            passed = AssertionNodeSupport.Evaluate(
                 _expressionEngine,
                 _options,
                 _contextFactory,
@@ -103,39 +103,63 @@ public sealed class AssertNode<TInput> : FlowNodeBase
         catch (Exception exception)
         {
             TryReportError(
-                ControlErrorCodes.AssertExpressionFailed,
+                AssertionErrorCodes.ExpressionFailed,
                 $"flow.assert failed to evaluate input: {exception.Message}",
                 exception,
-                ControlNodeSupport.CreateErrorContext(_options, _expressionEngine));
+                AssertionNodeSupport.CreateErrorContext(_options, _expressionEngine));
             TryEmitDiagnostic(
-                ControlDiagnosticNames.AssertFailed,
+                AssertionDiagnosticNames.ExpressionFailed,
                 FlowDiagnosticLevel.Error,
                 "flow.assert failed to evaluate input.",
                 exception,
-                ControlNodeSupport.CreateAttributes(_options, _expressionEngine));
+                AssertionNodeSupport.CreateAttributes(_options, _expressionEngine));
             return;
         }
 
-        var result = new ControlAssertionResult
+        var result = CreateResult(input, passed);
+        await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        if (passed && _options.EmitPassedInput)
         {
-            Name = _options.EffectiveName,
+            await _passed.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+        }
+
+        if (!passed && _options.EmitFailedInput)
+        {
+            await _failed.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+        }
+
+        TryEmitDiagnostic(
+            AssertionDiagnosticNames.Evaluated,
+            message: passed ? "flow.assert passed input." : "flow.assert failed input.",
+            attributes: AssertionNodeSupport.CreateAttributes(_options, _expressionEngine, passed));
+    }
+
+    private FlowAssertionResult CreateResult(TInput input, bool passed)
+    {
+        var status = passed
+            ? FlowAssertionStatus.Passed
+            : FlowAssertionStatus.Failed;
+        return new FlowAssertionResult
+        {
+            Description = _options.EffectiveDescription,
             Expression = _options.Expression!,
             ExpressionId = _options.ExpressionId,
             ExpressionName = _options.ExpressionName,
             InputType = _options.InputType,
-            Passed = passed,
+            Status = status,
+            Message = passed ? "Assertion passed." : _options.EffectiveFailureMessage,
             Value = input,
-            Message = passed ? "Assertion passed." : _options.EffectiveFailureMessage
+            Failure = passed
+                ? null
+                : new AssertionFailure
+                {
+                    Description = _options.EffectiveDescription,
+                    Message = _options.EffectiveFailureMessage,
+                    Expression = _options.Expression!,
+                    InputType = _options.InputType,
+                    Value = input
+                }
         };
-
-        await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
-        await (passed ? _passed : _failed).SendAsync(input, _processingCancellationToken)
-            .ConfigureAwait(false);
-
-        TryEmitDiagnostic(
-            ControlDiagnosticNames.AssertEvaluated,
-            message: passed ? "flow.assert passed input." : "flow.assert failed input.",
-            attributes: ControlNodeSupport.CreateAttributes(_options, _expressionEngine, passed));
     }
 
     private void CompleteOutputs(Task completion)

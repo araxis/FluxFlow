@@ -1,5 +1,5 @@
-using FluxFlow.Components.Control.Contracts;
-using FluxFlow.Components.Control.Diagnostics;
+using FluxFlow.Components.Assertions.Contracts;
+using FluxFlow.Components.Assertions.Diagnostics;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -8,12 +8,12 @@ using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
-namespace FluxFlow.Components.Control.Tests;
+namespace FluxFlow.Components.Assertions.Tests;
 
-public sealed class AssertNodeTests
+public sealed class FlowAssertionComponentTests
 {
     [Fact]
-    public async Task AssertNode_EmitsResultsAndRoutesInputs()
+    public async Task FlowAssertionComponent_EmitsResultsAndRoutesInputs()
     {
         var runtimeNode = CreateNode(
             options => options
@@ -25,29 +25,29 @@ public sealed class AssertNodeTests
             {
                 expression = "score >= 10",
                 inputType = "app.input",
-                name = "score-check",
+                description = "score-check",
                 failureMessage = "Score too low."
             });
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
             .ShouldBeOfType<InputPort<InputMessage>>();
-        var results = new BufferBlock<ControlAssertionResult>();
+        var results = new BufferBlock<FlowAssertionResult>();
         var passed = new BufferBlock<InputMessage>();
         var failed = new BufferBlock<InputMessage>();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Result))!
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!
             .TryLinkTo(
-                new InputPort<ControlAssertionResult>(
+                new InputPort<FlowAssertionResult>(
                     new PortAddress("test", new NodeName("results"), new PortName("Input")),
                     results),
                 propagateCompletion: true,
                 out _);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Passed))!
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!
             .TryLinkTo(
                 new InputPort<InputMessage>(
                     new PortAddress("test", new NodeName("passed"), new PortName("Input")),
                     passed),
                 propagateCompletion: true,
                 out _);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Failed))!
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!
             .TryLinkTo(
                 new InputPort<InputMessage>(
                     new PortAddress("test", new NodeName("failed"), new PortName("Input")),
@@ -63,15 +63,18 @@ public sealed class AssertNodeTests
         var first = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var second = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         first.Passed.ShouldBeTrue();
-        first.Name.ShouldBe("score-check");
+        first.Description.ShouldBe("score-check");
+        first.Message.ShouldBe("Assertion passed.");
+        first.Failure.ShouldBeNull();
         second.Passed.ShouldBeFalse();
         second.Message.ShouldBe("Score too low.");
+        second.Failure.ShouldNotBeNull();
         (await passed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Score.ShouldBe(12);
         (await failed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Score.ShouldBe(3);
     }
 
     [Fact]
-    public async Task AssertNode_ReportsExpressionFailureAndContinues()
+    public async Task FlowAssertionComponent_ReportsExpressionFailureAndContinues()
     {
         var calls = 0;
         var runtimeNode = CreateNode(
@@ -91,20 +94,26 @@ public sealed class AssertNodeTests
                 expression = "assert",
                 expressionName = "assert-test"
             });
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
             .ShouldBeOfType<InputPort<object>>();
         var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<ControlAssertionResult>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Result))!
+        var results = new BufferBlock<FlowAssertionResult>();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Errors))!
             .TryLinkTo(
-                new InputPort<ControlAssertionResult>(
+                new InputPort<FlowError>(
+                    new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                    errors),
+                propagateCompletion: true,
+                out _);
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<FlowAssertionResult>(
                     new PortAddress("test", new NodeName("results"), new PortName("Input")),
                     results),
                 propagateCompletion: true,
                 out _);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Passed))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Failed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!.LinkToDiscard();
 
         await input.Target.SendAsync("first");
         await input.Target.SendAsync("second");
@@ -112,13 +121,61 @@ public sealed class AssertNodeTests
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(ControlErrorCodes.AssertExpressionFailed);
+        error.Code.ShouldBe(AssertionErrorCodes.ExpressionFailed);
         error.Context!.ShouldContain("expressionName=assert-test");
         (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Passed.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task AssertNode_EmitsDiagnostics()
+    public async Task FlowAssertionComponent_CanSuppressRoutedInputs()
+    {
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+                evaluate: (_, _, _) => true)),
+            new
+            {
+                expression = "assert",
+                emitPassedInput = false,
+                emitFailedInput = false
+            });
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var results = new BufferBlock<FlowAssertionResult>();
+        var passed = new BufferBlock<object>();
+        var failed = new BufferBlock<object>();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<FlowAssertionResult>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out _);
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!
+            .TryLinkTo(
+                new InputPort<object>(
+                    new PortAddress("test", new NodeName("passed"), new PortName("Input")),
+                    passed),
+                propagateCompletion: true,
+                out _);
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!
+            .TryLinkTo(
+                new InputPort<object>(
+                    new PortAddress("test", new NodeName("failed"), new PortName("Input")),
+                    failed),
+                propagateCompletion: true,
+                out _);
+
+        await input.Target.SendAsync("value");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Passed.ShouldBeTrue();
+        passed.TryReceive(out _).ShouldBeFalse();
+        failed.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task FlowAssertionComponent_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(
             options => options.UseExpressionEngine(new RecordingExpressionEngine(
@@ -127,28 +184,28 @@ public sealed class AssertNodeTests
             {
                 expression = "assert",
                 expressionId = "assert-v1"
-        });
+            });
         var diagnostics = new BufferBlock<FlowDiagnostic>();
         runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
             .Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
             .ShouldBeOfType<InputPort<object>>();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Result))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Passed))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Failed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!.LinkToDiscard();
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(ControlDiagnosticNames.AssertEvaluated);
+        diagnostic.Name.ShouldBe(AssertionDiagnosticNames.Evaluated);
         diagnostic.Attributes["passed"].ShouldBe(true);
         diagnostic.Attributes["expressionId"].ShouldBe("assert-v1");
     }
 
     [Fact]
-    public void AssertNode_RejectsMissingExpression()
+    public void FlowAssertionComponent_RejectsMissingExpression()
     {
         var exception = Should.Throw<InvalidOperationException>(
             () => CreateNode(
@@ -159,13 +216,13 @@ public sealed class AssertNodeTests
     }
 
     private static RuntimeNode CreateNode(
-        Action<Options.ControlComponentOptions> configure,
+        Action<Options.AssertionsComponentOptions> configure,
         object configuration)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterControlComponents(configure);
-        registry.TryGetFactory(ControlComponentTypes.Assert, out var factory).ShouldBeTrue();
-        return factory(ControlTestHost.CreateContext(ControlComponentTypes.Assert, configuration));
+            .RegisterAssertionsComponents(configure);
+        registry.TryGetFactory(AssertionsComponentTypes.Assert, out var factory).ShouldBeTrue();
+        return factory(AssertionsTestHost.CreateContext(AssertionsComponentTypes.Assert, configuration));
     }
 
     private sealed record InputMessage(int Score);

@@ -1,3 +1,4 @@
+using FluxFlow.Components.Assertions;
 using FluxFlow.Components.Control;
 using FluxFlow.Components.Mapping;
 using FluxFlow.Engine;
@@ -16,6 +17,10 @@ var registry = new RuntimeNodeFactoryRegistry()
         .RegisterType<ReviewedOrder>("sample.order.reviewed")
         .UseContextFactory(new IncomingOrderContextFactory()))
     .RegisterControlComponents(options => options
+        .UseExpressionEngine(expressionEngine)
+        .RegisterType<ReviewedOrder>("sample.order.reviewed")
+        .UseContextFactory(new ReviewedOrderContextFactory()))
+    .RegisterAssertionsComponents(options => options
         .UseExpressionEngine(expressionEngine)
         .RegisterType<ReviewedOrder>("sample.order.reviewed")
         .UseContextFactory(new ReviewedOrderContextFactory()))

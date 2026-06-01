@@ -1,20 +1,19 @@
-# FluxFlow.Components.Control
+# FluxFlow.Components.Assertions
 
-Reusable expression-driven control components for FluxFlow.
+Reusable expression-driven assertion components for FluxFlow.
 
 ## Nodes
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
-| `flow.filter` | `Input` -> `Output` | Emits only input values that match an expression. |
-| `flow.when` | `Input` -> `WhenTrue` / `WhenFalse` | Routes each input value by expression result. |
+| `flow.assert` | `Input` -> `Result`, `Passed`, `Failed`, `Errors` | Evaluates an expression and emits assertion results plus routed input values. |
 
 The package does not choose an expression language. Applications provide one or
 more `IFlowExpressionEngine` implementations during registration.
 
 ```csharp
 var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterControlComponents(options => options
+    .RegisterAssertionsComponents(options => options
         .UseExpressionEngine(appExpressionEngine)
         .RegisterType<AppMessage>("app.message")
         .UseContextFactory(new AppMessageContextFactory()));
@@ -24,22 +23,25 @@ Basic configuration:
 
 ```json
 {
-  "type": "flow.when",
+  "type": "flow.assert",
   "inputType": "object",
   "engine": "my-engine",
-  "expressionId": "route-v1",
-  "expressionName": "route-important",
+  "expressionId": "assert-v1",
+  "expressionName": "valid-message",
+  "description": "message is valid",
+  "failureMessage": "Message failed validation.",
   "expression": "..."
 }
 ```
 
-`inputType` defaults to `object`. Register type aliases when a control node
+`inputType` defaults to `object`. Register type aliases when an assertion node
 needs to connect to typed ports. Omit `engine` to use the default expression
 engine configured by the host.
 
-Expression evaluation failures emit `FlowError` and the node continues
-processing later messages. Nodes emit diagnostics with input type, engine,
-expression id, expression name, and route metadata where available.
+False assertions emit a `FlowAssertionResult` and route the original input to
+`Failed`. True assertions emit a result and route the original input to
+`Passed`. Expression evaluation failures emit `FlowError` and the node
+continues processing later messages.
 
 ## Composition Guidance
 

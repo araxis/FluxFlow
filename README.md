@@ -171,7 +171,7 @@ registers typed components explicitly, and runs conditional links.
 See [samples/FluxFlow.MappingControlSample](samples/FluxFlow.MappingControlSample)
 for a broker-free component composition sample. It keeps source and sink nodes in
 the host, then composes `flow.mapper`, `flow.filter`, `flow.when`, and
-`flow.assert` from reusable component packages.
+`flow.assert` from reusable packages.
 
 See [samples/FluxFlow.MqttCompositionSample](samples/FluxFlow.MqttCompositionSample)
 for an MQTT composition sample backed by an in-memory host adapter. It composes
@@ -204,7 +204,8 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 |---------|-------|---------|
 | `FluxFlow.Components.Mqtt` | `mqtt.publish`, `mqtt.subscribe` | Adapter-backed MQTT publish and subscribe nodes. |
 | `FluxFlow.Components.Mapping` | `flow.mapper` | Pluggable expression mapping with generic or typed ports. |
-| `FluxFlow.Components.Control` | `flow.filter`, `flow.when`, `flow.assert` | Pluggable expression-driven filtering, routing, and assertions. |
+| `FluxFlow.Components.Control` | `flow.filter`, `flow.when` | Pluggable expression-driven filtering and routing. |
+| `FluxFlow.Components.Assertions` | `flow.assert` | Pluggable expression-driven assertions with result and routed input ports. |
 | `FluxFlow.Components.Validation` | `json.schema-validator` | JSON schema validation with result, valid, and invalid routing. |
 | `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
 | `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |

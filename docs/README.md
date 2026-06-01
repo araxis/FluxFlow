@@ -8,7 +8,10 @@ the engine, and only executable resources and workflows are projected into
 `ApplicationDefinition`.
 
 Then run `samples/FluxFlow.MappingControlSample` to see package composition with
-host-owned source/sink nodes and reusable mapping/control nodes.
+host-owned source/sink nodes and reusable mapping, control, and assertion nodes.
+
+Add `FluxFlow.Components.Assertions` when a workflow needs expression-driven
+assertion results and pass/fail routing.
 
 Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
 schema validation with host-owned value selection.

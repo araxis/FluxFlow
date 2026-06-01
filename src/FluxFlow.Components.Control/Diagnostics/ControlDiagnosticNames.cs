@@ -7,6 +7,4 @@ public static class ControlDiagnosticNames
     public const string FilterFailed = "flow.filter.failed";
     public const string WhenRouted = "flow.when.routed";
     public const string WhenFailed = "flow.when.failed";
-    public const string AssertEvaluated = "flow.assert.evaluated";
-    public const string AssertFailed = "flow.assert.failed";
 }

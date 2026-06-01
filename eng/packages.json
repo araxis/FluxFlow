@@ -28,6 +28,13 @@
     "notesName": "FluxFlow.Components.Control"
   },
   {
+    "alias": "components-assertions",
+    "tagPrefix": "components-assertions",
+    "packageId": "FluxFlow.Components.Assertions",
+    "project": "src/FluxFlow.Components.Assertions/FluxFlow.Components.Assertions.csproj",
+    "notesName": "FluxFlow.Components.Assertions"
+  },
+  {
     "alias": "components-validation",
     "tagPrefix": "components-validation",
     "packageId": "FluxFlow.Components.Validation",

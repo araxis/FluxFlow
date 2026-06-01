@@ -4,15 +4,15 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>FluxFlow.Components.Control</PackageId>
-    <AssemblyName>FluxFlow.Components.Control</AssemblyName>
-    <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <PackageId>FluxFlow.Components.Assertions</PackageId>
+    <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable expression-driven control components for FluxFlow.</Description>
-    <PackageTags>workflow;dataflow;components;control</PackageTags>
+    <Description>Reusable expression-driven assertion components for FluxFlow.</Description>
+    <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Keeps expression-driven filter and when components; assertions are provided by the assertions package.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the initial expression-driven assertion component package.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

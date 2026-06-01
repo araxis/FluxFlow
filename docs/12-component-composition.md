@@ -12,14 +12,14 @@ host code:
 1. Keep source and sink nodes in the host until the behavior is clearly reusable.
 2. Add `flow.mapper` to translate from host input shapes into package request
    contracts.
-3. Add `flow.filter`, `flow.when`, and `flow.assert` for expression-driven
-   decisions.
-4. Add `state.reducer` when later decisions depend on previous messages.
-5. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+3. Add `flow.filter` and `flow.when` for expression-driven decisions.
+4. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
+5. Add `state.reducer` when later decisions depend on previous messages.
+6. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
    runtime observation.
-6. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
+7. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
-7. Add edge packages for validation, serialization, payload inspection, HTTP,
+8. Add edge packages for validation, serialization, payload inspection, HTTP,
    file system operations, recording, replay, storage, or external transport
    adapters.
 

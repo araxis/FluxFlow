@@ -253,7 +253,7 @@ Implemented components:
 |-----------|------|-----------|----------------|-------|
 | Filter | transform | `flow.filter` | `Input` to `Output`, preserving input type | Emits only values whose expression evaluates to true. |
 | When | router | `flow.when` | `Input` to `WhenTrue` and `WhenFalse`, preserving input type | Routes each value by expression result. |
-| Assert | utility | `flow.assert` | `Input` to `Result`, `Passed`, and `Failed` | Emits `ControlAssertionResult` plus routed input values. |
+| Assert | utility | `flow.assert` | `Input` to `Result`, `Passed`, and `Failed` | Moved to `FluxFlow.Components.Assertions`; emits `FlowAssertionResult` plus routed input values. |
 
 Shared package pieces:
 

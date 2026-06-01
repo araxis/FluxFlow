@@ -52,6 +52,8 @@ Start with one package as the template before splitting everything:
   mapping helpers.
 - `FluxFlow.Components.Validation`: JSON schema validation and assertion
   helpers that are not tied to one application.
+- `FluxFlow.Components.Assertions`: expression-driven assertion checks with
+  result and pass/fail routing.
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
@@ -119,3 +121,5 @@ after the core component package has settled.
    Done in `65-storage-adapter-and-migration-plan.md`.
 10. Add the first file-backed local storage adapter package. Done in
     `66-storage-local-adapter-package.md`.
+11. Split expression-driven assertions out of the control package. Done in
+    `67-assertions-component-package.md`.
