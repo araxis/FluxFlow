@@ -75,5 +75,12 @@
     "packageId": "FluxFlow.Components.Serialization",
     "project": "src/FluxFlow.Components.Serialization/FluxFlow.Components.Serialization.csproj",
     "notesName": "FluxFlow.Components.Serialization"
+  },
+  {
+    "alias": "components-metrics",
+    "tagPrefix": "components-metrics",
+    "packageId": "FluxFlow.Components.Metrics",
+    "project": "src/FluxFlow.Components.Metrics/FluxFlow.Components.Metrics.csproj",
+    "notesName": "FluxFlow.Components.Metrics"
   }
 ]

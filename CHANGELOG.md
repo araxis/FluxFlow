@@ -1,5 +1,26 @@
 # Changelog
 
+## FluxFlow.Components.Metrics 0.1.0-alpha.1
+
+Initial reusable metrics aggregation component package.
+
+- Added `FluxFlow.Components.Metrics` as a separate source project, test
+  project, and package artifact.
+- Added `metrics.aggregate` with `Input`, `Output`, and `Errors` ports.
+- Added `MetricSampleInput`, `MetricSnapshotOutput`, and
+  `MetricGroupSnapshot` contracts.
+- Added sample count, numeric total, average, min, max, current rate, average
+  rate, total size, latest sample, and grouped snapshot aggregation.
+- Added deterministic rate calculations from sample timestamps.
+- Added bounded group cardinality through `maxGroups`.
+- Added non-blocking snapshot output with structured dropped-snapshot errors.
+- Added options for rate window, bounded capacity, group limit, per-sample
+  emission, latest tracking, min/max tracking, size tracking, tag grouping, and
+  missing-value handling.
+- Added focused coverage for counts, sizes, rates, grouping, latest/final
+  snapshots, missing values, group limits, invalid samples, unlinked output,
+  diagnostics, registration, and option validation.
+
 ## FluxFlow.Components.Serialization 0.1.0-alpha.1
 
 Initial reusable serialization component package.
