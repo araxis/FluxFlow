@@ -21,6 +21,9 @@ Initial reusable state reducer component package.
 
 ## Samples
 
+- Added `samples/FluxFlow.StateCompositionSample`, a runnable composition sample
+  that maps timer ticks into `state.reducer` and observes reducer outputs with
+  `flow.counter`.
 - Added `samples/FluxFlow.SessionsCompositionSample`, a runnable composition
   sample that records neutral session messages into a host-owned store and then
   replays them through `session.replay`.

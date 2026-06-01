@@ -182,6 +182,10 @@ See [samples/FluxFlow.SessionsCompositionSample](samples/FluxFlow.SessionsCompos
 for a session recording and replay sample. It keeps storage in the host, records
 messages through `session.recorder`, then replays them through `session.replay`.
 
+See [samples/FluxFlow.StateCompositionSample](samples/FluxFlow.StateCompositionSample)
+for a timer, mapper, state reducer, and counter composition sample. It keeps
+host-specific expressions and sinks outside the reusable packages.
+
 See [samples/FluxFlow.ComponentPackageTemplate](samples/FluxFlow.ComponentPackageTemplate)
 for a copyable component package shape with contracts, options, diagnostics,
 module registration, and tests.

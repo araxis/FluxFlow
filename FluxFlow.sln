@@ -77,6 +77,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.State",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.State.Tests", "tests\FluxFlow.Components.State.Tests\FluxFlow.Components.State.Tests.csproj", "{2E69C800-64CF-4279-9E3E-32B3934B3493}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.StateCompositionSample", "samples\FluxFlow.StateCompositionSample\FluxFlow.StateCompositionSample.csproj", "{49273A23-2AC1-4518-9D67-44E1C0A9E204}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -495,6 +497,18 @@ Global
 		{2E69C800-64CF-4279-9E3E-32B3934B3493}.Release|x64.Build.0 = Release|Any CPU
 		{2E69C800-64CF-4279-9E3E-32B3934B3493}.Release|x86.ActiveCfg = Release|Any CPU
 		{2E69C800-64CF-4279-9E3E-32B3934B3493}.Release|x86.Build.0 = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|x64.Build.0 = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Debug|x86.Build.0 = Debug|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|x64.ActiveCfg = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|x64.Build.0 = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|x86.ActiveCfg = Release|Any CPU
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -531,5 +545,6 @@ Global
 		{1667D4DE-1930-4B1E-B5FF-27C41C27D972} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{464A3592-557A-45A6-BE61-AC49919CC6ED} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{2E69C800-64CF-4279-9E3E-32B3934B3493} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{49273A23-2AC1-4518-9D67-44E1C0A9E204} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal

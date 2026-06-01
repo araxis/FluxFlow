@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.State\FluxFlow.Components.State.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Timers\FluxFlow.Components.Timers.csproj" />
+  </ItemGroup>
+
+</Project>

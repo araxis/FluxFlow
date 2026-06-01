@@ -33,6 +33,9 @@ replay with host-owned storage.
 Add `FluxFlow.Components.State` when a workflow needs per-key state updates
 through reducer expressions.
 
+Run `samples/FluxFlow.StateCompositionSample` to see a finite timer stream
+mapped into `state.reducer` and observed by `flow.counter`.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 

@@ -62,5 +62,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `56-sessions-component-package.md`: first generic session recording and replay component package.
 - `57-sessions-composition-sample.md`: runnable sessions recording/replay composition sample.
 - `58-state-reducer-component-package.md`: first generic state reducer component package.
+- `59-state-composition-sample.md`: runnable timer/mapper/state/counter composition sample.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

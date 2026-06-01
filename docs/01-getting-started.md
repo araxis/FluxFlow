@@ -61,6 +61,14 @@ dotnet build samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsComposi
 dotnet run --project samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsCompositionSample.csproj --no-build
 ```
 
+The state composition sample maps timer ticks into a state reducer and observes
+the reducer stream with a counter:
+
+```sh
+dotnet build samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSample.csproj /nr:false
+dotnet run --project samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSample.csproj --no-build
+```
+
 ## Basic Flow
 
 Every app follows the same core steps:
