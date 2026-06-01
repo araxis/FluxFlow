@@ -178,6 +178,10 @@ for an MQTT composition sample backed by an in-memory host adapter. It composes
 `mqtt.subscribe`, mapping/control nodes, and `mqtt.publish` without requiring a
 live broker.
 
+See [samples/FluxFlow.ComponentPackageTemplate](samples/FluxFlow.ComponentPackageTemplate)
+for a copyable component package shape with contracts, options, diagnostics,
+module registration, and tests.
+
 ---
 
 ## Component Packages

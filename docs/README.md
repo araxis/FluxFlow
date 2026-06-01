@@ -13,6 +13,9 @@ host-owned source/sink nodes and reusable mapping/control nodes.
 Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
 through a host-owned in-memory adapter.
 
+Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
+for a new component package.
+
 ## Contents
 
 1. [Getting Started](01-getting-started.md)

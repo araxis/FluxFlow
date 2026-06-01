@@ -77,6 +77,23 @@ Avoid:
 Dependencies should be passed through constructors, delegates, or package-owned
 options.
 
+## Copyable Template
+
+The repository includes a small buildable template under
+`samples/FluxFlow.ComponentPackageTemplate`. It contains one transform node and
+the expected package pieces:
+
+- contracts
+- options and option parsing
+- diagnostics and error codes
+- node type and port constants
+- node implementation
+- module and registry extension
+- focused tests
+
+Use it as the starting shape for new component families, then replace the
+sample contracts and node with the real package contract.
+
 ## Versioning Guidance
 
 Treat node type names and port names as part of the package contract. Changing a

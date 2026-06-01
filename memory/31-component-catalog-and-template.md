@@ -79,6 +79,10 @@ FluxFlow.Components.<Category>/
     package-specific option validation
 ```
 
+A buildable copyable version now exists at
+`samples/FluxFlow.ComponentPackageTemplate`, with focused tests under
+`tests/FluxFlow.ComponentPackageTemplate.Tests`.
+
 Each test project should include:
 
 ```text
