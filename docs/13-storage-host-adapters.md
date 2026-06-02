@@ -58,7 +58,8 @@ It owns contracts, store abstractions, leases, node options, diagnostics, and
 the `storage.put`, `storage.get`, `storage.query`, and `storage.delete` nodes.
 It must not grow concrete persistence implementations.
 
-Adapter packages own one persistence style each. They can provide:
+Adapter packages own exactly one concrete persistence backend each. They can
+provide:
 
 - one `IStorageStore` implementation
 - one `IStorageStoreFactory` implementation when useful
@@ -70,18 +71,22 @@ Adapter packages should avoid adding workflow node types. If a persistence
 adapter appears to require new nodes, first check whether the base storage
 contracts need a neutral extension instead.
 
-Use neutral adapter package suffixes that describe the persistence style rather
-than one host application. Examples:
+Use adapter package suffixes that identify the backend clearly enough for a
+consumer to choose dependencies intentionally. Do not use broad family names
+that could hide several unrelated implementations in one package.
+
+Examples:
 
 ```text
 FluxFlow.Components.Storage.Local
-FluxFlow.Components.Storage.EmbeddedDocument
-FluxFlow.Components.Storage.EmbeddedSql
-FluxFlow.Components.Storage.ServerSql
+FluxFlow.Components.Storage.LiteDb
+FluxFlow.Components.Storage.Sqlite
+FluxFlow.Components.Storage.Postgres
 ```
 
-This keeps consumers free to reference only the persistence style they need and
-lets each adapter move on its own release cadence.
+If two backends fit the same broad category, they still get two packages. This
+keeps consumers free to reference only the backend they need and lets each
+adapter move on its own release cadence.
 
 ## First Adapter Package
 

@@ -148,3 +148,6 @@ after the core component package has settled.
     each reusable persistence implementation lives in its own
     `FluxFlow.Components.Storage.*` package. Done in
     `76-storage-adapter-package-rule.md`.
+21. Refine storage adapter naming so each adapter package maps to exactly one
+    concrete backend, not a broad persistence family. Done in
+    `77-storage-adapter-backend-naming.md`.

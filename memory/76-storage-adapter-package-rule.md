@@ -26,7 +26,7 @@ The base storage package owns:
 
 The base storage package must not own concrete persistence implementations.
 
-Each adapter package owns one persistence style:
+Each adapter package owns exactly one concrete persistence backend:
 
 - store implementation
 - optional store factory
@@ -40,14 +40,18 @@ extension.
 
 ## Naming
 
-Use neutral package suffixes:
+Use package suffixes that identify the backend clearly enough for consumers to
+choose dependencies intentionally:
 
 ```text
 FluxFlow.Components.Storage.Local
-FluxFlow.Components.Storage.EmbeddedDocument
-FluxFlow.Components.Storage.EmbeddedSql
-FluxFlow.Components.Storage.ServerSql
+FluxFlow.Components.Storage.LiteDb
+FluxFlow.Components.Storage.Sqlite
+FluxFlow.Components.Storage.Postgres
 ```
+
+Avoid broad family names such as `EmbeddedDocument` or `EmbeddedSql` when that
+name could hide multiple unrelated implementations in one package.
 
 Avoid naming adapter packages after one consuming application or one product
 workflow.
