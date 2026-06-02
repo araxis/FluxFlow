@@ -83,5 +83,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `77-storage-adapter-backend-naming.md`: concrete-backend adapter package naming refinement.
 - `78-storage-filesystem-adapter-rename.md`: storage adapter rename from location-based to backend-based naming.
 - `79-storage-local-package-unlist.md`: old location-based storage adapter package unlist record.
+- `80-v1-readiness-plan.md`: stabilization freeze, engine v1 scope, readiness gates, and release path.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

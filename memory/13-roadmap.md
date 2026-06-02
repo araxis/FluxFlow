@@ -4,13 +4,15 @@ Date: 2026-05-31
 
 ## Current Direction
 
-Proceed with migration polish after the first real consumer proved the package
-boundary.
+Proceed with version 1 readiness after the first real consumer proved the
+package boundary and the reusable component package model.
 
-FluxMq has migrated its runtime dependency to `FluxFlow.Engine`
-`0.4.0-alpha.1`. Keep the FluxMq branch read-only from this repository while
-its current feature work settles, then use it as the source for cleanup and
-package-authoring improvements.
+FluxMq has migrated its runtime dependency to `FluxFlow.Engine` successfully.
+The repository is now in a temporary stabilization freeze: no new component
+package families or speculative node features until the engine v1 readiness
+audit is complete.
+
+The active readiness plan is recorded in `80-v1-readiness-plan.md`.
 
 ## Near-Term Work
 
