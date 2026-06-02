@@ -255,6 +255,56 @@ public sealed class MqttPublishNodeTests
         flowEvent.GetAttribute("correlationId").ShouldBe("abc");
     }
 
+    [Fact]
+    public async Task PublishNode_ForwardsAdapterHealthEvents()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        adapter.HealthEvents.Add(new MqttClientHealthEvent
+        {
+            State = MqttClientHealthState.Connected,
+            Reason = "ready",
+            ClientId = "publisher-1",
+            Attributes = new Dictionary<string, string>
+            {
+                ["attempt"] = "1"
+            }
+        });
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var runtimeNode = factory(CreateContext(
+            MqttComponentTypes.Publish,
+            new
+            {
+                connectionName = "main-broker",
+                defaultTopic = "devices/state"
+            }));
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttPublishNode>();
+        var diagnostics = new BufferBlock<FluxFlow.Engine.Components.FlowDiagnostic>();
+        var events = new BufferBlock<FluxFlow.Engine.Components.FlowEvent>();
+        node.Diagnostics.LinkTo(diagnostics);
+        node.Events.LinkTo(events);
+
+        await node.StartAsync();
+
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        diagnostic.Name.ShouldBe(MqttDiagnosticNames.ConnectionHealthChanged);
+        diagnostic.Attributes["state"].ShouldBe("Connected");
+        diagnostic.Attributes["connectionName"].ShouldBe("main-broker");
+        diagnostic.Attributes["clientId"].ShouldBe("publisher-1");
+        diagnostic.Attributes["attempt"].ShouldBe("1");
+
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        flowEvent.Channel.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        flowEvent.Status.ShouldBe("Connected");
+        flowEvent.Subject.ShouldBe("main-broker");
+        flowEvent.GetAttribute("attempt").ShouldBe("1");
+
+        await node.DisposeAsync();
+    }
+
     private static RuntimeNodeFactoryContext CreateContext(NodeType type, object configuration)
         => new(
             new NodeName("node"),

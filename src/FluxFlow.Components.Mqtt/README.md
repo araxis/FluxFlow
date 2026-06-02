@@ -36,6 +36,15 @@ Subscriptions return `IMqttSubscription`; once `SubscribeAsync` returns,
 startup is considered successful. Each subscription should expose an independent
 message stream so shared clients can safely serve multiple nodes.
 
+## Adapter Health
+
+Adapters that also implement `IMqttClientHealthSource` can expose connection
+health transitions. `mqtt.publish` and `mqtt.subscribe` forward those values as
+diagnostics and events named `mqtt.connection.healthChanged`.
+
+The package does not own reconnect policy. Adapters decide how to connect,
+reconnect, and report state.
+
 ## Topic validation
 
 Use `MqttTopicValidator.ValidatePublishTopic` and

@@ -8,4 +8,5 @@ public static class MqttDiagnosticNames
     public const string SubscribeReceived = "mqtt.subscribe.received";
     public const string SubscribeStopped = "mqtt.subscribe.stopped";
     public const string SubscribeFailed = "mqtt.subscribe.failed";
+    public const string ConnectionHealthChanged = "mqtt.connection.healthChanged";
 }

@@ -159,8 +159,12 @@ Date: 2026-05-31
 - Confirmed shared expression registry storage now lives only in
   `FluxFlow.Components.Expressions`; component packages resolve through the
   shared helper instead of owning local expression registries.
+- Started `FluxFlow.Components.Mqtt` `0.3.0-alpha.1` with optional adapter
+  health forwarding through diagnostics and events while keeping reconnect
+  policy host/adapter-owned.
 
 ## Remaining
 
 - Return to the broader component maturity backlog. Current best next slice is
-  MQTT reconnect and health behavior, if a consumer needs it now.
+  hardening generic source/replay behavior or adding concrete storage adapter
+  packages when a consumer needs them.

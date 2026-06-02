@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt 0.3.0-alpha.1
+
+MQTT adapter health forwarding.
+
+- Adds optional `IMqttClientHealthSource`, `MqttClientHealthEvent`, and
+  `MqttClientHealthState` contracts.
+- Forwards adapter health from `mqtt.publish` and `mqtt.subscribe` as
+  diagnostics and events named `mqtt.connection.healthChanged`.
+- Keeps reconnect policy host/adapter-owned.
+
 ## FluxFlow.Components.Routing 0.8.0-alpha.1
 
 Expression support hardening.

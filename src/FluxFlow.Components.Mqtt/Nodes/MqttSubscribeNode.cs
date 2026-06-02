@@ -16,6 +16,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private CancellationTokenSource? _subscriptionCancellation;
     private Task? _subscriptionTask;
+    private MqttHealthMonitor? _healthMonitor;
     private MqttClientLease? _clientLease;
     private IMqttSubscription? _subscription;
     private bool _started;
@@ -86,6 +87,8 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                 _subscriptionCancellation = subscriptionCancellation;
                 _subscriptionTask = RunSubscriptionAsync(subscription, subscriptionCancellation.Token);
             }
+
+            StartHealthMonitor(clientLease.Adapter);
         }
         catch (OperationCanceledException)
         {
@@ -147,6 +150,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
         _disposed = true;
         _subscriptionCancellation?.Cancel();
+        await StopHealthMonitorAsync().ConfigureAwait(false);
 
         if (_subscription is not null)
         {
@@ -226,15 +230,71 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
     protected override void OnNodeCompleted()
     {
+        CancelHealthMonitor();
         _events.Complete();
         base.OnNodeCompleted();
     }
 
     protected override void OnNodeFaulted(Exception exception)
     {
+        CancelHealthMonitor();
         ((IDataflowBlock)_events).Fault(exception);
         base.OnNodeFaulted(exception);
     }
+
+    private void StartHealthMonitor(IMqttClientAdapter adapter)
+        => _healthMonitor = MqttHealthMonitor.Start(adapter, EmitHealth, EmitHealthFailure);
+
+    private void CancelHealthMonitor()
+        => _healthMonitor?.Cancel();
+
+    private async ValueTask StopHealthMonitorAsync()
+    {
+        if (_healthMonitor is not null)
+        {
+            await _healthMonitor.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private void EmitHealthFailure(MqttClientHealthEvent health, Exception exception)
+    {
+        TryEmitDiagnostic(
+            MqttDiagnosticNames.ConnectionHealthChanged,
+            FlowDiagnosticLevel.Error,
+            "MQTT connection health stream failed.",
+            exception,
+            MqttHealthSignal.CreateDiagnosticAttributes(
+                health,
+                _factoryContext.ConnectionName));
+        EmitHealthEvent(health);
+    }
+
+    private void EmitHealth(MqttClientHealthEvent health)
+    {
+        TryEmitDiagnostic(
+            MqttDiagnosticNames.ConnectionHealthChanged,
+            MqttHealthSignal.GetLevel(health),
+            MqttHealthSignal.CreateMessage(health),
+            attributes: MqttHealthSignal.CreateDiagnosticAttributes(
+                health,
+                _factoryContext.ConnectionName));
+        EmitHealthEvent(health);
+    }
+
+    private bool EmitHealthEvent(MqttClientHealthEvent health)
+        => _events.Post(new FlowEvent
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Type = MqttEventNames.ConnectionHealthChanged,
+            Source = Id.ToString(),
+            SourceNodeId = Id,
+            Subject = MqttHealthSignal.CreateSubject(health, _factoryContext.ConnectionName),
+            Status = health.State.ToString(),
+            Channel = MqttEventNames.ConnectionHealthChanged,
+            Attributes = MqttHealthSignal.CreateEventAttributes(
+                health,
+                _factoryContext.ConnectionName)
+        });
 
     private void ReportSubscribeError(
         int code,

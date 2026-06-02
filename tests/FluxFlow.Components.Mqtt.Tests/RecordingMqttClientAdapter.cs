@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace FluxFlow.Components.Mqtt.Tests;
 
-internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter
+internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClientHealthSource
 {
     private readonly IReadOnlyList<MqttReceivedMessage> _messages;
     private readonly bool _waitForCancellation;
@@ -41,6 +41,8 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter
     public Queue<Exception?> PublishOutcomes { get; } = [];
 
     public List<MqttPublishRequest> Published { get; } = [];
+
+    public List<MqttClientHealthEvent> HealthEvents { get; } = [];
 
     public MqttSubscriptionOptions? SubscriptionOptions { get; private set; }
 
@@ -84,6 +86,24 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter
     {
         Disposed = true;
         return ValueTask.CompletedTask;
+    }
+
+    public IAsyncEnumerable<MqttClientHealthEvent> Health => ReadHealthAsync();
+
+    private async IAsyncEnumerable<MqttClientHealthEvent> ReadHealthAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        foreach (var health in HealthEvents)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return health;
+            await Task.Yield();
+        }
+
+        if (_waitForCancellation)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 }
 

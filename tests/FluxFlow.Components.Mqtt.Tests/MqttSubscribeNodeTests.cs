@@ -307,6 +307,60 @@ public sealed class MqttSubscribeNodeTests
         flowEvent.GetAttribute("retain").ShouldBe("False");
     }
 
+    [Fact]
+    public async Task SubscribeNode_ForwardsAdapterHealthEvents()
+    {
+        var adapter = new RecordingMqttClientAdapter(waitForCancellation: true);
+        adapter.HealthEvents.Add(new MqttClientHealthEvent
+        {
+            State = MqttClientHealthState.Reconnecting,
+            Reason = "retry",
+            Attributes = new Dictionary<string, string>
+            {
+                ["attempt"] = "2"
+            }
+        });
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
+
+        var runtimeNode = factory(CreateContext(
+            MqttComponentTypes.Subscribe,
+            new
+            {
+                connectionName = "main-broker",
+                topicFilter = "devices/+"
+            }));
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttSubscribeNode>();
+        var diagnostics = new BufferBlock<FluxFlow.Engine.Components.FlowDiagnostic>();
+        var events = new BufferBlock<FluxFlow.Engine.Components.FlowEvent>();
+        node.Diagnostics.LinkTo(diagnostics);
+        node.Events.LinkTo(events);
+
+        await node.StartAsync();
+
+        FluxFlow.Engine.Components.FlowDiagnostic diagnostic;
+        do
+        {
+            diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        while (diagnostic.Name != MqttDiagnosticNames.ConnectionHealthChanged);
+
+        diagnostic.Level.ShouldBe(FluxFlow.Engine.Components.FlowDiagnosticLevel.Warning);
+        diagnostic.Attributes["state"].ShouldBe("Reconnecting");
+        diagnostic.Attributes["connectionName"].ShouldBe("main-broker");
+        diagnostic.Attributes["attempt"].ShouldBe("2");
+
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        flowEvent.Status.ShouldBe("Reconnecting");
+        flowEvent.Subject.ShouldBe("main-broker");
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.DisposeAsync();
+    }
+
     private static RuntimeNodeFactoryContext CreateContext(NodeType type, object configuration)
         => new(
             new NodeName("node"),
