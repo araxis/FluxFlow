@@ -209,6 +209,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.FileSystem` `0.5.0-alpha.1` with a
   host-provided file system clock for deterministic write, read, watch, and
   enumerate timestamps.
+- Published `FluxFlow.Components.FileSystem` `0.5.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
 
 ## Remaining
 
