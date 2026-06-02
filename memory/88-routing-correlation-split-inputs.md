@@ -43,9 +43,10 @@ keeping the node alive.
 
 - `dotnet test tests\FluxFlow.Components.Routing.Tests\FluxFlow.Components.Routing.Tests.csproj -c Release --no-restore`
 - `dotnet build FluxFlow.sln -c Release --no-restore`
+- Released `FluxFlow.Components.Routing` `0.7.0-alpha.1`.
+- Verified fresh public-feed restore/build with
+  `FluxFlow.Components.Routing` `0.7.0-alpha.1`.
 
 ## Next
 
-Run a package-level review for Routing, then decide whether to release
-`FluxFlow.Components.Routing` `0.7.0-alpha.1` or continue with another component
-maturity slice first.
+Continue component maturity work while keeping the engine boundary stable.

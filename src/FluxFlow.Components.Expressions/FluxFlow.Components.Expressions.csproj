@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Expressions</PackageId>
+    <AssemblyName>FluxFlow.Components.Expressions</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Expressions</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Shared expression registration helpers for FluxFlow component packages.</Description>
+    <PackageTags>workflow;dataflow;components;expressions</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Adds neutral expression engine and context factory registries for component packages.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

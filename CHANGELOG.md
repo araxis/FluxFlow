@@ -1,5 +1,24 @@
 # Changelog
 
+## FluxFlow.Components.Mapping 0.2.0-alpha.1
+
+Expression support hardening.
+
+- Uses `FluxFlow.Components.Expressions` internally for expression engine and
+  context factory registration.
+- Preserves the existing public Mapping registration API.
+- No mapper port or runtime behavior changes.
+
+## FluxFlow.Components.Expressions 0.1.0-alpha.1
+
+First supporting package for component expression registration.
+
+- Adds `FlowExpressionEngineRegistry` for named/default expression engines and
+  host-provided expression engine resolvers.
+- Adds `FlowContextFactoryRegistry<TFactory>` for exact, assignable, and
+  default context factory resolution by input type.
+- Does not include a concrete expression language.
+
 ## FluxFlow.Components.Routing 0.7.0-alpha.1
 
 Routing correlation hardening.

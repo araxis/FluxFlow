@@ -7,6 +7,13 @@
     "notesName": "FluxFlow.Engine"
   },
   {
+    "alias": "components-expressions",
+    "tagPrefix": "components-expressions",
+    "packageId": "FluxFlow.Components.Expressions",
+    "project": "src/FluxFlow.Components.Expressions/FluxFlow.Components.Expressions.csproj",
+    "notesName": "FluxFlow.Components.Expressions"
+  },
+  {
     "alias": "components-mqtt",
     "tagPrefix": "components-mqtt",
     "packageId": "FluxFlow.Components.Mqtt",

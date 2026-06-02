@@ -124,9 +124,17 @@ Date: 2026-05-31
 - Started component maturity work with `FluxFlow.Components.Routing`
   `0.7.0-alpha.1`, adding split `Request` and `Response` inputs for
   `flow.correlation` while preserving the existing single-stream `Input` mode.
+- Published `FluxFlow.Components.Routing` `0.7.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
+- Started shared expression support work with `FluxFlow.Components.Expressions`
+  `0.1.0-alpha.1`, adding reusable expression engine and context factory
+  registries with focused tests.
+- Prepared `FluxFlow.Components.Mapping` `0.2.0-alpha.1` to use the shared
+  expression support while preserving the existing Mapping registration API.
 
 ## Remaining
 
-- Review the Routing `0.7.0-alpha.1` slice, then either release that package or
-  continue the next component hardening slice while keeping the engine boundary
-  stable.
+- Release `FluxFlow.Components.Expressions` `0.1.0-alpha.1`, then release
+  `FluxFlow.Components.Mapping` `0.2.0-alpha.1`.
+- Continue expression-support migration into the next expression-based component
+  package while keeping the engine boundary stable.

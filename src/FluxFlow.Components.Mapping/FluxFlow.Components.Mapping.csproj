@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>0.1.1-alpha.1</Version>
+    <Version>0.2.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable mapping components for FluxFlow with pluggable expression engines and typed ports.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilds the package against FluxFlow.Engine 1.0.0 and its stable node identity boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses shared component expression registration helpers while preserving the public Mapping registration API.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -20,6 +20,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
     <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 
