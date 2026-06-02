@@ -39,8 +39,16 @@ and any higher-level retention or migration policy.
 
 ## Verification
 
-Planned verification:
+Completed verification:
 
-- Focused SQL file adapter tests.
-- Full solution build and test pass.
-- Package pack and public package smoke after release.
+- `dotnet test tests\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj -c Release --no-restore`
+  passed with 11 tests.
+- `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
+- `dotnet test FluxFlow.sln -c Release --no-restore` passed.
+- `dotnet pack src\FluxFlow.Components.Storage.SqlFile\FluxFlow.Components.Storage.SqlFile.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+  created the package and symbol package.
+- Commit: `57bd553` (`Add SQL file storage adapter`).
+- Tag: `components-storage-sqlfile-v0.1.0-alpha.1`.
+- Release workflow: `26830934341`, success.
+- Branch CI workflow: `26830925299`, success.
+- Public package restore/build smoke passed on attempt 10.
