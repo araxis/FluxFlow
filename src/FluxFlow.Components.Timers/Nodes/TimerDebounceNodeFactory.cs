@@ -1,4 +1,5 @@
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
 
@@ -20,9 +21,10 @@ internal static class TimerDebounceNodeFactory
 
     private static RuntimeNode CreateDebounceTyped<TInput>(
         RuntimeNodeFactoryContext context,
-        TimerDebounceSettings settings)
+        TimerDebounceSettings settings,
+        ITimerClock clock)
     {
-        var node = new TimerDebounceNode<TInput>(settings);
+        var node = new TimerDebounceNode<TInput>(settings, clock);
 
         return context.CreateNode(node)
             .Input(TimerComponentPorts.Input, node.Input)

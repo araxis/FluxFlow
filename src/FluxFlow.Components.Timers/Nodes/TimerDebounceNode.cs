@@ -1,5 +1,6 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -8,6 +9,7 @@ namespace FluxFlow.Components.Timers.Nodes;
 public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly TimerDebounceSettings _settings;
+    private readonly ITimerClock _clock;
     private readonly BufferBlock<TInput> _input;
     private readonly BufferBlock<TInput> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
@@ -15,9 +17,12 @@ public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
     private int _faulted;
     private long _emitted;
 
-    internal TimerDebounceNode(TimerDebounceSettings settings)
+    internal TimerDebounceNode(
+        TimerDebounceSettings settings,
+        ITimerClock clock)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (settings.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -89,7 +94,7 @@ public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
 
                 using var raceCancellation =
                     CancellationTokenSource.CreateLinkedTokenSource(_processingCancellation.Token);
-                var quietPeriod = Task.Delay(_settings.QuietPeriod, raceCancellation.Token);
+                var quietPeriod = _clock.DelayAsync(_settings.QuietPeriod, raceCancellation.Token).AsTask();
                 var inputAvailable = _input.OutputAvailableAsync(raceCancellation.Token);
                 var completed = await Task.WhenAny(quietPeriod, inputAvailable).ConfigureAwait(false);
                 raceCancellation.Cancel();

@@ -106,6 +106,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   recording and replay timing.
 - `100-filesystem-enumerate-start-diagnostic.md`: directory enumerate startup
   diagnostic race fix.
+- `101-timers-clock-hardening.md`: timer clock hardening for deterministic
+  timestamps and delays.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

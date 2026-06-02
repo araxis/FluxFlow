@@ -165,3 +165,6 @@ after the core component package has settled.
 25. Harden deterministic Sessions behavior with a host-provided session clock
     for recorder timestamps and replay delays. Done in
     `99-sessions-clock-hardening.md`.
+26. Harden deterministic Timers behavior with a host-provided timer clock for
+    timer timestamps, schedule due-time delays, delay, throttle, and debounce.
+    Started in `101-timers-clock-hardening.md`.

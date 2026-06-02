@@ -1,5 +1,6 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -8,13 +9,17 @@ namespace FluxFlow.Components.Timers.Nodes;
 public sealed class TimerDelayNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly TimerDelaySettings _settings;
+    private readonly ITimerClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
 
-    internal TimerDelayNode(TimerDelaySettings settings)
+    internal TimerDelayNode(
+        TimerDelaySettings settings,
+        ITimerClock clock)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (settings.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -74,7 +79,7 @@ public sealed class TimerDelayNode<TInput> : FlowNodeBase, IAsyncDisposable
         {
             if (_settings.Delay > TimeSpan.Zero)
             {
-                await Task.Delay(_settings.Delay, _processingCancellation.Token).ConfigureAwait(false);
+                await _clock.DelayAsync(_settings.Delay, _processingCancellation.Token).ConfigureAwait(false);
             }
 
             await _output.SendAsync(input, _processingCancellation.Token).ConfigureAwait(false);

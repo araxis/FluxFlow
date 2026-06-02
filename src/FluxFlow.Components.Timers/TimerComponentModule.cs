@@ -20,10 +20,10 @@ public sealed class TimerComponentModule : IFlowNodeModule
                 context => TimerDelayNodeFactory.Create(context, options)),
             new FlowNodeRegistration(
                 TimerComponentTypes.Interval,
-                TimerIntervalNode.Create),
+                context => TimerIntervalNode.Create(context, options)),
             new FlowNodeRegistration(
                 TimerComponentTypes.Schedule,
-                TimerScheduleNode.Create),
+                context => TimerScheduleNode.Create(context, options)),
             new FlowNodeRegistration(
                 TimerComponentTypes.Throttle,
                 context => TimerThrottleNodeFactory.Create(context, options))

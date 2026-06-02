@@ -1,5 +1,6 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -8,15 +9,19 @@ namespace FluxFlow.Components.Timers.Nodes;
 public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly TimerThrottleSettings _settings;
+    private readonly ITimerClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
     private DateTimeOffset? _lastEmittedAt;
     private long _emitted;
 
-    internal TimerThrottleNode(TimerThrottleSettings settings)
+    internal TimerThrottleNode(
+        TimerThrottleSettings settings,
+        ITimerClock clock)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (settings.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -75,7 +80,7 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         try
         {
             await WaitForSlotAsync().ConfigureAwait(false);
-            _lastEmittedAt = DateTimeOffset.UtcNow;
+            _lastEmittedAt = _clock.UtcNow;
             await _output.SendAsync(input, _processingCancellation.Token).ConfigureAwait(false);
 
             var sequence = Interlocked.Increment(ref _emitted);
@@ -114,12 +119,12 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         else
         {
             var nextAllowedAt = _lastEmittedAt.Value + _settings.Interval;
-            delay = nextAllowedAt - DateTimeOffset.UtcNow;
+            delay = nextAllowedAt - _clock.UtcNow;
         }
 
         if (delay > TimeSpan.Zero)
         {
-            await Task.Delay(delay, _processingCancellation.Token).ConfigureAwait(false);
+            await _clock.DelayAsync(delay, _processingCancellation.Token).ConfigureAwait(false);
         }
     }
 

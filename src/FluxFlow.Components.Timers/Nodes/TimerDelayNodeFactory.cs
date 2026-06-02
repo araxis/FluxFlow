@@ -1,4 +1,5 @@
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
 
@@ -20,9 +21,10 @@ internal static class TimerDelayNodeFactory
 
     private static RuntimeNode CreateDelayTyped<TInput>(
         RuntimeNodeFactoryContext context,
-        TimerDelaySettings settings)
+        TimerDelaySettings settings,
+        ITimerClock clock)
     {
-        var node = new TimerDelayNode<TInput>(settings);
+        var node = new TimerDelayNode<TInput>(settings, clock);
 
         return context.CreateNode(node)
             .Input(TimerComponentPorts.Input, node.Input)

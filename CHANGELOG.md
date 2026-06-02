@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Timers 0.5.0-alpha.1
+
+Deterministic timer timing.
+
+- Adds `ITimerClock` and `SystemTimerClock`.
+- Adds `UseClock(...)` to `TimerComponentOptions`.
+- `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, and
+  `timer.debounce` now use the configured clock for timestamps and delays.
+- `timer.interval` and `timer.schedule` now emit their started diagnostics
+  before background work begins.
+
 ## FluxFlow.Components.FileSystem 0.4.2-alpha.1
 
 Directory enumerate diagnostic reliability.

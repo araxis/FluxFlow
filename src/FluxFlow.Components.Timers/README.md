@@ -98,8 +98,13 @@ item is flushed before the output completes.
 
 ```csharp
 registry.RegisterTimerComponents(options => options
+    .UseClock(timerClock)
     .RegisterType<MyMessage>("message"));
 ```
+
+`UseClock(...)` is optional. The default uses normal system time. Hosts and
+tests can provide an `ITimerClock` to control tick timestamps, schedule due-time
+delays, delay nodes, throttle windows, and debounce quiet periods.
 
 ## Composition Guidance
 

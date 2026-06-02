@@ -1,4 +1,5 @@
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
@@ -25,7 +26,7 @@ internal static class TimerTypedNodeFactory
         try
         {
             var method = createTypedMethod.MakeGenericMethod(inputType);
-            return (RuntimeNode)method.Invoke(null, [context, settings])!;
+            return (RuntimeNode)method.Invoke(null, [context, settings, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
