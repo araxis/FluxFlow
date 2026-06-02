@@ -37,9 +37,11 @@ Added package version `0.2.0-alpha.2` with:
 
 ## Deferred
 
-The next routing candidates are richer multi-route switch outputs, correlation
-with separate input ports, joins, and count/time windows. Those should wait
-until this single-stream correlation shape is exercised by a consumer.
+Direct switch route outputs were added in
+`71-routing-switch-output-ports.md`. The next routing candidates are
+correlation with separate input ports, joins, and count/time windows. Those
+should wait until this single-stream correlation shape is exercised by a
+consumer.
 
 ## Release Note
 

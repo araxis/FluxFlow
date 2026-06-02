@@ -118,6 +118,14 @@ Validation and routing:
 host source -> flow.mapper -> json.schema-validator -> flow.switch -> host sinks
 ```
 
+Switch with direct route outputs:
+
+```text
+host source -> flow.switch
+                  |-> Priority -> host sink
+                  |-> Standard -> host sink
+```
+
 Request/response pairing:
 
 ```text

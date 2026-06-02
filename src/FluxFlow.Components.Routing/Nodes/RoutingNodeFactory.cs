@@ -89,13 +89,19 @@ internal static class RoutingNodeFactory
             contextFactory,
             nodeContext);
 
-        return context.CreateNode(node)
+        var builder = context.CreateNode(node)
             .Input(RoutingComponentPorts.Input, node.Input)
             .Output(RoutingComponentPorts.Result, node.Result)
             .Output(RoutingComponentPorts.Matched, node.Matched)
             .Output(RoutingComponentPorts.Default, node.Default)
-            .Output(RoutingComponentPorts.Errors, node.Errors)
-            .Build();
+            .Output(RoutingComponentPorts.Errors, node.Errors);
+
+        foreach (var (portName, output) in node.RouteOutputs)
+        {
+            builder.Output(portName, output);
+        }
+
+        return builder.Build();
     }
 
     private static RuntimeNode CreateCorrelationTyped<TInput>(

@@ -17,7 +17,8 @@ Add `FluxFlow.Components.Sources` when a workflow needs deterministic generated
 or sequence-driven source messages without a transport adapter.
 
 Add `FluxFlow.Components.Routing` when a workflow needs expression-driven route
-keys, neutral matched/default streams, or key-based request/response pairing.
+keys, direct route outputs, neutral matched/default streams, or key-based
+request/response pairing.
 
 Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
 schema validation with host-owned value selection.

@@ -10,8 +10,8 @@ The first release contains only:
 
 - `flow.switch`
 
-Correlation, join, merge, and window nodes stay deferred until the switch route
-contract is proven in real flows.
+Correlation, join, merge, and window nodes stayed deferred for the first
+package release until the switch route contract was proven in real flows.
 
 ## Package Shape
 
@@ -55,11 +55,12 @@ workflow models.
 - `flow.fork`
 - `flow.merge`
 - `flow.join`
-- `flow.correlation`
 - `flow.window`
 
-These need separate contracts for buffering, timeouts, late events, missing
-events, and typed pair/result shapes.
+`flow.correlation` was added later in `70-routing-correlation-component.md`.
+Direct switch route outputs were added in `71-routing-switch-output-ports.md`.
+The remaining nodes need separate contracts for buffering, timeouts, late
+events, missing events, and typed result shapes.
 
 ## Verification Plan
 

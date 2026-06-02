@@ -138,6 +138,78 @@ public sealed class FlowSwitchNodeTests
     }
 
     [Fact]
+    public async Task Switch_EmitsConfiguredRouteOutputPorts()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, context, _) => context.Variables["category"]))
+                .RegisterType<InputMessage>("app.input")
+                .UseContextFactory(new InputMessageContextFactory()),
+            new
+            {
+                expression = "category",
+                inputType = "app.input",
+                routes = new[] { "priority", "standard" },
+                routeOutputs = new Dictionary<string, string>
+                {
+                    ["priority"] = "Priority",
+                    ["standard"] = "Standard"
+                }
+            });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var priority = new BufferBlock<InputMessage>();
+        var standard = new BufferBlock<InputMessage>();
+        LinkOutput(runtimeNode, "Priority", priority);
+        LinkOutput(runtimeNode, "Standard", standard);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Result))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Default))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new InputMessage("A-100", "priority"));
+        await input.Target.SendAsync(new InputMessage("A-101", "standard"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await priority.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-100");
+        (await standard.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-101");
+    }
+
+    [Fact]
+    public async Task Switch_CanMapSeveralRoutesToTheSameOutputPort()
+    {
+        var calls = 0;
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+                evaluate: (_, _, _) => ++calls == 1 ? "priority" : "urgent")),
+            new
+            {
+                expression = "category",
+                routes = new[] { "priority", "urgent" },
+                routeOutputs = new Dictionary<string, string>
+                {
+                    ["priority"] = "Important",
+                    ["urgent"] = "Important"
+                }
+            });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var important = new BufferBlock<object>();
+        LinkOutput(runtimeNode, "Important", important);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Result))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Default))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new { category = "priority" });
+        await input.Target.SendAsync(new { category = "urgent" });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await DrainUntilCompletedAsync(important)).Count.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Switch_ReportsExpressionFailureAndContinues()
     {
         var calls = 0;
@@ -251,6 +323,61 @@ public sealed class FlowSwitchNodeTests
         exception.Message.ShouldContain("routes");
     }
 
+    [Fact]
+    public void Switch_RejectsRouteOutputForMissingRoute()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(
+                options => options.UseExpressionEngine(new RecordingExpressionEngine()),
+                new
+                {
+                    expression = "route",
+                    routes = new[] { "priority" },
+                    routeOutputs = new Dictionary<string, string>
+                    {
+                        ["standard"] = "Standard"
+                    }
+                }));
+
+        exception.Message.ShouldContain("route output");
+    }
+
+    [Fact]
+    public void Switch_RejectsRouteOutputWithInvalidPortName()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(
+                options => options.UseExpressionEngine(new RecordingExpressionEngine()),
+                new
+                {
+                    expression = "route",
+                    routeOutputs = new Dictionary<string, string>
+                    {
+                        ["priority"] = "Bad.Port"
+                    }
+                }));
+
+        exception.Message.ShouldContain("invalid port");
+    }
+
+    [Fact]
+    public void Switch_RejectsRouteOutputUsingBuiltInPortName()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(
+                options => options.UseExpressionEngine(new RecordingExpressionEngine()),
+                new
+                {
+                    expression = "route",
+                    routeOutputs = new Dictionary<string, string>
+                    {
+                        ["priority"] = RoutingComponentPorts.Result
+                    }
+                }));
+
+        exception.Message.ShouldContain("built-in port");
+    }
+
     private static RuntimeNode CreateNode(
         Action<Options.RoutingComponentOptions> configure,
         object configuration)
@@ -291,5 +418,21 @@ public sealed class FlowSwitchNodeTests
                     ["category"] = input.Category
                 }
             };
+    }
+
+    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
+        BufferBlock<T> output)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var values = new List<T>();
+        while (await output.OutputAvailableAsync(cancellation.Token))
+        {
+            while (output.TryReceive(out var value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values;
     }
 }

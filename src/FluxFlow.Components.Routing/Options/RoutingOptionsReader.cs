@@ -33,6 +33,7 @@ internal static class RoutingOptionsReader
             throw new InvalidOperationException("flow.switch option 'routes' cannot contain empty values.");
         }
 
+        ValidateRouteOutputs(options);
         return options;
     }
 
@@ -100,5 +101,77 @@ internal static class RoutingOptionsReader
         var json = JsonSerializer.Serialize(definition.Configuration, SerializerOptions);
         return JsonSerializer.Deserialize<T>(json, SerializerOptions)
             ?? throw new InvalidOperationException($"Could not read {typeof(T).Name}.");
+    }
+
+    private static void ValidateRouteOutputs(SwitchRoutingOptions options)
+    {
+        if (options.RouteOutputs.Count == 0)
+        {
+            return;
+        }
+
+        var comparer = options.CaseSensitive
+            ? StringComparer.Ordinal
+            : StringComparer.OrdinalIgnoreCase;
+        var routeKeys = options.Routes
+            .Select(route => route.Trim())
+            .ToHashSet(comparer);
+        var seenRouteOutputs = new HashSet<string>(comparer);
+        var builtInPorts = new HashSet<string>(
+            [
+                RoutingComponentPorts.Input,
+                RoutingComponentPorts.Result,
+                RoutingComponentPorts.Matched,
+                RoutingComponentPorts.Timeouts,
+                RoutingComponentPorts.Default,
+                RoutingComponentPorts.Errors
+            ],
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (routeKey, portName) in options.RouteOutputs)
+        {
+            if (string.IsNullOrWhiteSpace(routeKey))
+            {
+                throw new InvalidOperationException(
+                    "flow.switch option 'routeOutputs' cannot contain empty route keys.");
+            }
+
+            var normalizedRoute = routeKey.Trim();
+            if (!seenRouteOutputs.Add(normalizedRoute))
+            {
+                throw new InvalidOperationException(
+                    $"flow.switch option 'routeOutputs' contains duplicate route key '{normalizedRoute}'.");
+            }
+
+            if (routeKeys.Count > 0 && !routeKeys.Contains(normalizedRoute))
+            {
+                throw new InvalidOperationException(
+                    $"flow.switch route output '{normalizedRoute}' must also be present in 'routes'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(portName))
+            {
+                throw new InvalidOperationException(
+                    $"flow.switch route output '{normalizedRoute}' cannot use an empty port name.");
+            }
+
+            var normalizedPort = portName.Trim();
+            if (builtInPorts.Contains(normalizedPort))
+            {
+                throw new InvalidOperationException(
+                    $"flow.switch route output '{normalizedRoute}' cannot use built-in port '{normalizedPort}'.");
+            }
+
+            try
+            {
+                _ = new PortName(normalizedPort);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new InvalidOperationException(
+                    $"flow.switch route output '{normalizedRoute}' has invalid port '{normalizedPort}'.",
+                    exception);
+            }
+        }
     }
 }

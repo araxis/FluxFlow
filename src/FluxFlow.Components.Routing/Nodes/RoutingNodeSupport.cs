@@ -30,6 +30,20 @@ internal static class RoutingNodeSupport
             .ToHashSet(comparer);
     }
 
+    public static Dictionary<string, string> CreateRouteOutputPortMap(SwitchRoutingOptions options)
+    {
+        var comparer = options.CaseSensitive
+            ? StringComparer.Ordinal
+            : StringComparer.OrdinalIgnoreCase;
+        return options.RouteOutputs
+            .Select(routeOutput => new
+            {
+                Route = routeOutput.Key.Trim(),
+                Port = routeOutput.Value.Trim()
+            })
+            .ToDictionary(routeOutput => routeOutput.Route, routeOutput => routeOutput.Port, comparer);
+    }
+
     public static Dictionary<string, object?> CreateAttributes(
         SwitchRoutingOptions options,
         IFlowExpressionEngine expressionEngine,
@@ -41,6 +55,7 @@ internal static class RoutingNodeSupport
             ["inputType"] = options.InputType,
             ["engine"] = expressionEngine.Name,
             ["routes"] = options.Routes.Length,
+            ["routeOutputs"] = options.RouteOutputs.Count,
             ["caseSensitive"] = options.CaseSensitive
         };
 
@@ -80,7 +95,8 @@ internal static class RoutingNodeSupport
         {
             $"inputType={options.InputType}",
             $"engine={expressionEngine.Name}",
-            $"routes={options.Routes.Length}"
+            $"routes={options.Routes.Length}",
+            $"routeOutputs={options.RouteOutputs.Count}"
         };
 
         if (!string.IsNullOrWhiteSpace(options.ExpressionId))

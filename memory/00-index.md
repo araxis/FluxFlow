@@ -74,5 +74,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `68-sources-component-package.md`: deterministic source package and deferred replay boundary.
 - `69-routing-component-package.md`: first routing package with switch and deferred correlation/window scope.
 - `70-routing-correlation-component.md`: routing correlation node addition and release notes.
+- `71-routing-switch-output-ports.md`: switch route-specific output port hardening.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

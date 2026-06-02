@@ -133,3 +133,5 @@ after the core component package has settled.
     `69-routing-component-package.md`.
 14. Add key-based request/response correlation to routing. Done in
     `70-routing-correlation-component.md`.
+15. Add direct route-specific output ports to `flow.switch`. Done in
+    `71-routing-switch-output-ports.md`.

@@ -10,6 +10,7 @@ public sealed record SwitchRoutingOptions
     public string? ExpressionName { get; init; }
     public string InputType { get; init; } = ObjectTypeName;
     public string[] Routes { get; init; } = [];
+    public Dictionary<string, string> RouteOutputs { get; init; } = [];
     public string? DefaultRoute { get; init; }
     public bool CaseSensitive { get; init; } = true;
     public bool EmitMatchedInput { get; init; } = true;

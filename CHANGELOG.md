@@ -1,5 +1,18 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.3.0-alpha.1
+
+Switch route-output hardening.
+
+- Added optional `routeOutputs` configuration for `flow.switch`.
+- Added dynamic route-specific output ports that emit the original input for
+  matched route keys.
+- Added support for mapping multiple route keys to one output port.
+- Added validation for empty route output keys, missing route declarations,
+  invalid port names, and built-in port collisions.
+- Added focused coverage for route-specific outputs, shared output ports, and
+  invalid route-output configuration.
+
 ## FluxFlow.Components.Routing 0.2.0-alpha.2
 
 Routing correlation published build.

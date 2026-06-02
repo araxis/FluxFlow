@@ -14,6 +14,9 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     private readonly RoutingNodeContext _nodeContext;
     private readonly SwitchRoutingOptions _options;
     private readonly HashSet<string> _routes;
+    private readonly Dictionary<string, string> _routeOutputPorts;
+    private readonly Dictionary<string, BufferBlock<TInput>> _routeOutputBlocks;
+    private readonly IReadOnlyDictionary<string, ISourceBlock<TInput>> _routeOutputs;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowSwitchResult<TInput>> _result;
     private readonly BufferBlock<TInput> _matched;
@@ -39,7 +42,18 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         }
 
         _routes = RoutingNodeSupport.CreateRouteSet(options);
+        _routeOutputPorts = RoutingNodeSupport.CreateRouteOutputPortMap(options);
         var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
+        _routeOutputBlocks = _routeOutputPorts.Values
+            .Distinct(StringComparer.Ordinal)
+            .ToDictionary(
+                portName => portName,
+                _ => new BufferBlock<TInput>(blockOptions),
+                StringComparer.Ordinal);
+        _routeOutputs = _routeOutputBlocks.ToDictionary(
+            routeOutput => routeOutput.Key,
+            routeOutput => (ISourceBlock<TInput>)routeOutput.Value,
+            StringComparer.Ordinal);
         var inputOptions = new ExecutionDataflowBlockOptions
         {
             BoundedCapacity = options.BoundedCapacity,
@@ -55,7 +69,12 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_result.Completion, _matched.Completion, _default.Completion));
+        CompleteWhen(Task.WhenAll(
+            _routeOutputBlocks.Values
+                .Select(output => output.Completion)
+                .Append(_result.Completion)
+                .Append(_matched.Completion)
+                .Append(_default.Completion)));
     }
 
     public ITargetBlock<TInput> Input => _input;
@@ -65,6 +84,8 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     public ISourceBlock<TInput> Matched => _matched;
 
     public ISourceBlock<TInput> Default => _default;
+
+    public IReadOnlyDictionary<string, ISourceBlock<TInput>> RouteOutputs => _routeOutputs;
 
     public override void Complete()
         => _input.Complete();
@@ -137,6 +158,14 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             await _matched.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
         }
 
+        if (matched
+            && routeKey is not null
+            && _routeOutputPorts.TryGetValue(routeKey, out var outputPort)
+            && _routeOutputBlocks.TryGetValue(outputPort, out var routeOutput))
+        {
+            await routeOutput.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+        }
+
         if (!matched && _options.EmitDefaultInput)
         {
             await _default.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
@@ -171,11 +200,20 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             ((IDataflowBlock)_result).Fault(exception);
             ((IDataflowBlock)_matched).Fault(exception);
             ((IDataflowBlock)_default).Fault(exception);
+            foreach (var routeOutput in _routeOutputBlocks.Values)
+            {
+                ((IDataflowBlock)routeOutput).Fault(exception);
+            }
+
             return;
         }
 
         _result.Complete();
         _matched.Complete();
         _default.Complete();
+        foreach (var routeOutput in _routeOutputBlocks.Values)
+        {
+            routeOutput.Complete();
+        }
     }
 }
