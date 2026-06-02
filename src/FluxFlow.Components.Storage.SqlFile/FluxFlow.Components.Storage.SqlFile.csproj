@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
+    <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
+    <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Adds the first single-file SQL storage adapter package.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.27" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

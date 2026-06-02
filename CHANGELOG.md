@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Storage.SqlFile 0.1.0-alpha.1
+
+First single-file SQL storage adapter package.
+
+- Adds `SqlFileStorageStore`, `SqlFileStorageStoreFactory`, and
+  `SqlFileStorageStoreOptions`.
+- Adds `UseSqlFileStorage(...)` registration helpers for existing storage
+  nodes.
+- Supports put, get, query, delete, write modes, expected versions,
+  expiration, attributes, and store/collection defaults.
+
 ## FluxFlow.Components.Mqtt 0.3.0-alpha.1
 
 MQTT adapter health forwarding.

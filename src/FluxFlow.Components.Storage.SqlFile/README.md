@@ -1,0 +1,54 @@
+# FluxFlow.Components.Storage.SqlFile
+
+Single-file SQL storage adapter for `FluxFlow.Components.Storage`.
+
+This package does not add workflow nodes. It provides an `IStorageStore`
+implementation and registration helpers for the existing storage nodes:
+
+- `storage.put`
+- `storage.get`
+- `storage.query`
+- `storage.delete`
+
+## Register
+
+```csharp
+var registry = new RuntimeNodeFactoryRegistry()
+    .RegisterStorageComponents(options => options
+        .UseSqlFileStorage(new SqlFileStorageStoreOptions
+        {
+            DatabasePath = "data/storage.db",
+            DefaultCollection = "items"
+        }));
+```
+
+## Behavior
+
+- one record table per database file
+- store, collection, and key primary key
+- create, replace, and upsert write modes
+- optimistic version checks through `ExpectedVersion`
+- expiration honored by `storage.get` and `storage.query`
+- query by collection, key prefix, attributes, stored time bounds, expiration,
+  and limit
+- owned store lifetime when created through `UseSqlFileStorage`
+
+The adapter is intended for single-machine workflows, service hosts, and desktop
+apps that need a durable local store with stronger coordination than per-record
+JSON files.
+
+## Options
+
+| Option | Purpose |
+|--------|---------|
+| `DatabasePath` | Required database file path. |
+| `StoreName` | Optional fallback store name when the node does not set `store`. |
+| `CreateDatabase` | Allows creating the database file when it does not exist. |
+| `CreateDirectory` | Creates the parent directory when it does not exist. |
+| `AllowAbsoluteDatabasePath` | Allows absolute database path values. |
+| `MaxValueBytes` | Rejects values whose serialized JSON exceeds the limit. |
+| `DefaultCollection` | Optional fallback collection. |
+| `BusyTimeoutMilliseconds` | Wait time for a locked database before failing. |
+
+The package persists only neutral `StorageRecord` data. Hosts that need exact
+payload shaping should compose serialization or payload nodes before storage.

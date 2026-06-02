@@ -138,5 +138,12 @@
     "packageId": "FluxFlow.Components.Storage.FileSystem",
     "project": "src/FluxFlow.Components.Storage.FileSystem/FluxFlow.Components.Storage.FileSystem.csproj",
     "notesName": "FluxFlow.Components.Storage.FileSystem"
+  },
+  {
+    "alias": "components-storage-sqlfile",
+    "tagPrefix": "components-storage-sqlfile",
+    "packageId": "FluxFlow.Components.Storage.SqlFile",
+    "project": "src/FluxFlow.Components.Storage.SqlFile/FluxFlow.Components.Storage.SqlFile.csproj",
+    "notesName": "FluxFlow.Components.Storage.SqlFile"
   }
 ]
