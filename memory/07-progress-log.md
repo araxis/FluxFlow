@@ -143,8 +143,12 @@ Date: 2026-05-31
   expression support while preserving the existing Assertions registration API.
 - Published `FluxFlow.Components.Assertions` `0.2.0-alpha.1` and verified a
   fresh public-feed restore/build smoke test.
+- Started `FluxFlow.Components.State` `0.2.0-alpha.1` to use shared expression
+  support while preserving the existing State registration API.
 
 ## Remaining
 
+- Release and public-feed smoke-test `FluxFlow.Components.State`
+  `0.2.0-alpha.1`.
 - Continue expression-support migration into the next expression-based component
   package while keeping the engine boundary stable.

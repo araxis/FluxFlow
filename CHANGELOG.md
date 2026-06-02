@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.State 0.2.0-alpha.1
+
+Expression support hardening.
+
+- Uses `FluxFlow.Components.Expressions` internally for expression engine
+  registration.
+- Preserves the existing public State registration API.
+- No state reducer port or runtime behavior changes.
+
 ## FluxFlow.Components.Assertions 0.2.0-alpha.1
 
 Expression support hardening.

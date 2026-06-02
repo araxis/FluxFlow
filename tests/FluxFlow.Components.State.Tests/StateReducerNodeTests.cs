@@ -255,6 +255,32 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
+    public async Task Reducer_UsesExpressionEngineResolver()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterStateComponents(options => options.UseExpressionEngineResolver(name =>
+            {
+                name.ShouldBe("custom");
+                return new SampleExpressionEngine();
+            }));
+        registry.TryGetFactory(StateComponentTypes.Reducer, out var factory).ShouldBeTrue();
+        var runtimeNode = factory(CreateContext(new
+        {
+            reducer = "count",
+            engine = "custom"
+        }));
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<StateReducerResult>(runtimeNode);
+
+        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
+        input.Target.Complete();
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.NewState.ShouldBe(1);
+    }
+
+    [Fact]
     public void RegisterStateComponents_RegistersReducer()
     {
         var registry = new RuntimeNodeFactoryRegistry()
