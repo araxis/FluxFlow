@@ -35,7 +35,20 @@ milliseconds in hosts and tests.
 
 ## Verification
 
-Initial local verification:
+Completed local verification:
 
 - `dotnet test tests\FluxFlow.Components.Http.Tests\FluxFlow.Components.Http.Tests.csproj -c Release --no-restore`
   passed with 14 tests.
+- `dotnet build FluxFlow.sln -c Release --no-restore` passed with 0 warnings.
+- `dotnet test FluxFlow.sln -c Release --no-restore` passed.
+- `dotnet pack src\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+  created the package and symbol package.
+- Commit: `32a0265` (`Add deterministic http clock`).
+- Release-notes fix commit: `da57226` (`Add http release notes`).
+- Tag: `components-http-v0.2.0-alpha.1`.
+- Initial release workflow `26840774581` stopped before publish because the
+  root changelog was missing the package section.
+- Release workflow `26840973783`, success.
+- Main CI workflow `26840963094`, success.
+- Public package restore/build smoke passed on attempt 8 after public-feed
+  indexing caught up.
