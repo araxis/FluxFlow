@@ -1,4 +1,5 @@
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Engine.Runtime;
 
 namespace FluxFlow.Components.Mqtt.Options;
@@ -7,21 +8,25 @@ internal static class MqttClientFactoryContexts
 {
     public static MqttClientFactoryContext Create(
         RuntimeNodeFactoryContext context,
-        MqttPublishOptions options)
-        => Create(context, options.ConnectionName, options.Connection);
+        MqttPublishOptions options,
+        IMqttClock clock)
+        => Create(context, options.ConnectionName, options.Connection, clock);
 
     public static MqttClientFactoryContext Create(
         RuntimeNodeFactoryContext context,
-        MqttSubscriptionOptions options)
-        => Create(context, options.ConnectionName, options.Connection);
+        MqttSubscriptionOptions options,
+        IMqttClock clock)
+        => Create(context, options.ConnectionName, options.Connection, clock);
 
     private static MqttClientFactoryContext Create(
         RuntimeNodeFactoryContext context,
         string? connectionName,
-        MqttConnectionProfile profile)
+        MqttConnectionProfile profile,
+        IMqttClock clock)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(clock);
 
         return new MqttClientFactoryContext
         {
@@ -29,7 +34,8 @@ internal static class MqttClientFactoryContexts
             ConnectionName = string.IsNullOrWhiteSpace(connectionName)
                 ? profile.Name
                 : connectionName,
-            Profile = profile
+            Profile = profile,
+            Clock = clock
         };
     }
 }

@@ -1,6 +1,7 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
@@ -12,6 +13,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 {
     private readonly IMqttClientFactory _clientFactory;
     private readonly MqttClientFactoryContext _factoryContext;
+    private readonly IMqttClock _clock;
     private readonly ActionBlock<MqttPublishRequest> _input;
     private readonly BufferBlock<MqttPublishResult> _result;
     private readonly MqttPublishOptions _options;
@@ -22,11 +24,13 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     private MqttPublishNode(
         MqttPublishOptions options,
         MqttClientFactoryContext factoryContext,
-        IMqttClientFactory clientFactory)
+        IMqttClientFactory clientFactory,
+        IMqttClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _factoryContext = factoryContext ?? throw new ArgumentNullException(nameof(factoryContext));
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
         _input = new ActionBlock<MqttPublishRequest>(
             HandleAsync,
@@ -42,13 +46,15 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 
     public static RuntimeNode Create(
         RuntimeNodeFactoryContext context,
-        IMqttClientFactory clientFactory)
+        IMqttClientFactory clientFactory,
+        IMqttClock clock)
     {
         var options = MqttOptionsReader.ReadPublishOptions(context.Definition);
         var node = new MqttPublishNode(
             options,
-            MqttClientFactoryContexts.Create(context, options),
-            clientFactory);
+            MqttClientFactoryContexts.Create(context, options, clock),
+            clientFactory,
+            clock);
 
         return context.CreateNode(node)
             .Input(MqttComponentPorts.Input, node.Input)
@@ -113,7 +119,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     }
 
     private void StartHealthMonitor(IMqttClientAdapter adapter)
-        => _healthMonitor = MqttHealthMonitor.Start(adapter, EmitHealth, EmitHealthFailure);
+        => _healthMonitor = MqttHealthMonitor.Start(adapter, _clock, EmitHealth, EmitHealthFailure);
 
     private void CancelHealthMonitor()
         => _healthMonitor?.Cancel();
@@ -152,8 +158,8 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     }
 
     private bool EmitHealthEvent(MqttClientHealthEvent health)
-        => EmitEvent(
-            MqttEventNames.ConnectionHealthChanged,
+        => EmitMqttEvent(
+            type: MqttEventNames.ConnectionHealthChanged,
             subject: MqttHealthSignal.CreateSubject(health, _factoryContext.ConnectionName),
             status: health.State.ToString(),
             channel: MqttEventNames.ConnectionHealthChanged,
@@ -210,7 +216,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 
             var result = new MqttPublishResult
             {
-                Timestamp = DateTimeOffset.UtcNow,
+                Timestamp = _clock.UtcNow,
                 Topic = request.Topic!,
                 PayloadBytes = request.Payload.Length,
                 PayloadPreview = request.PayloadPreview,
@@ -220,8 +226,8 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
             };
 
             await _result.SendAsync(result).ConfigureAwait(false);
-            EmitEvent(
-                MqttEventNames.PublishSucceeded,
+            EmitMqttEvent(
+                type: MqttEventNames.PublishSucceeded,
                 subject: request.Topic,
                 channel: MqttEventNames.PublishSucceeded,
                 payloadBytes: result.PayloadBytes,
@@ -239,8 +245,8 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 $"MQTT publish failed: {exception.Message}",
                 request,
                 exception);
-            EmitEvent(
-                MqttEventNames.PublishFailed,
+            EmitMqttEvent(
+                type: MqttEventNames.PublishFailed,
                 subject: request.Topic,
                 status: "failed",
                 channel: MqttEventNames.PublishFailed,
@@ -255,6 +261,28 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 CreateDiagnosticAttributes(request, request.Payload.Length));
         }
     }
+
+    private bool EmitMqttEvent(
+        string type,
+        string? subject = null,
+        string? status = null,
+        string? channel = null,
+        int? payloadBytes = null,
+        string? payloadPreview = null,
+        IReadOnlyDictionary<string, string>? attributes = null)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.UtcNow,
+            Type = type,
+            Source = Id.ToString(),
+            SourceNodeId = Id,
+            Subject = subject,
+            Status = status,
+            Channel = channel,
+            PayloadBytes = payloadBytes,
+            PayloadPreview = payloadPreview,
+            Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)
+        });
 
     private MqttPublishRequest ResolveRequest(MqttPublishRequest input)
         => input with

@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>0.3.0-alpha.1</Version>
+    <Version>0.4.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds optional adapter connection health forwarding through MQTT diagnostics and events.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a host-provided MQTT clock for deterministic publish result and event timestamps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -1,5 +1,17 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt 0.4.0-alpha.1
+
+Deterministic MQTT package timestamps.
+
+- Adds `IMqttClock` and `SystemMqttClock`.
+- Adds `UseClock(...)` to `MqttComponentOptions`.
+- `mqtt.publish` now uses the configured clock for publish result timestamps.
+- MQTT publish, subscribe, and connection health events now use the configured
+  clock for package-owned event timestamps.
+- `MqttClientFactoryContext` now carries the configured clock to host adapter
+  factories.
+
 ## FluxFlow.Components.Storage 0.3.0-alpha.1
 
 Deterministic logical storage timestamps.

@@ -1,6 +1,7 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -13,6 +14,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private readonly IMqttClientFactory _clientFactory;
     private readonly MqttClientFactoryContext _factoryContext;
     private readonly MqttSubscriptionOptions _options;
+    private readonly IMqttClock _clock;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private CancellationTokenSource? _subscriptionCancellation;
     private Task? _subscriptionTask;
@@ -25,25 +27,29 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private MqttSubscribeNode(
         MqttSubscriptionOptions options,
         MqttClientFactoryContext factoryContext,
-        IMqttClientFactory clientFactory)
+        IMqttClientFactory clientFactory,
+        IMqttClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _factoryContext = factoryContext ?? throw new ArgumentNullException(nameof(factoryContext));
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     }
 
     public ISourceBlock<FlowEvent> Events => _events;
 
     public static RuntimeNode Create(
         RuntimeNodeFactoryContext context,
-        IMqttClientFactory clientFactory)
+        IMqttClientFactory clientFactory,
+        IMqttClock clock)
     {
         var options = MqttOptionsReader.ReadSubscriptionOptions(context.Definition);
         var node = new MqttSubscribeNode(
             options,
-            MqttClientFactoryContexts.Create(context, options),
-            clientFactory);
+            MqttClientFactoryContexts.Create(context, options, clock),
+            clientFactory,
+            clock);
 
         return context.CreateNode(node)
             .Output(MqttComponentPorts.Output, node.Output)
@@ -243,7 +249,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     }
 
     private void StartHealthMonitor(IMqttClientAdapter adapter)
-        => _healthMonitor = MqttHealthMonitor.Start(adapter, EmitHealth, EmitHealthFailure);
+        => _healthMonitor = MqttHealthMonitor.Start(adapter, _clock, EmitHealth, EmitHealthFailure);
 
     private void CancelHealthMonitor()
         => _healthMonitor?.Cancel();
@@ -284,7 +290,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private bool EmitHealthEvent(MqttClientHealthEvent health)
         => _events.Post(new FlowEvent
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _clock.UtcNow,
             Type = MqttEventNames.ConnectionHealthChanged,
             Source = Id.ToString(),
             SourceNodeId = Id,
@@ -362,7 +368,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
         return _events.Post(new FlowEvent
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _clock.UtcNow,
             Type = MqttEventNames.SubscribeReceived,
             Source = Id.ToString(),
             SourceNodeId = Id,

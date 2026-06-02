@@ -36,6 +36,27 @@ Subscriptions return `IMqttSubscription`; once `SubscribeAsync` returns,
 startup is considered successful. Each subscription should expose an independent
 message stream so shared clients can safely serve multiple nodes.
 
+## Runtime Timing
+
+Use `MqttComponentOptions.UseClock(...)` when tests or hosts need deterministic
+package-owned timestamps.
+
+```csharp
+var registry = new RuntimeNodeFactoryRegistry()
+    .RegisterMqttComponents(options => options
+        .UseClientFactory(factory)
+        .UseClock(testClock));
+```
+
+`mqtt.publish` uses the configured clock for `MqttPublishResult.Timestamp`.
+MQTT publish, subscribe, and connection health events also use that clock for
+their `FlowEvent.Timestamp` values.
+
+Incoming `MqttReceivedMessage.Timestamp` values stay adapter-owned because they
+represent when the adapter observed the broker message. Adapter-provided
+`MqttClientHealthEvent.Timestamp` values also stay adapter-owned, while the
+emitted workflow event timestamp uses the configured package clock.
+
 ## Adapter Health
 
 Adapters that also implement `IMqttClientHealthSource` can expose connection

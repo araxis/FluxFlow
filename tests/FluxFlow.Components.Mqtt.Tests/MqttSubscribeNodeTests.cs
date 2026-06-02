@@ -17,14 +17,18 @@ public sealed class MqttSubscribeNodeTests
     {
         var message = new MqttReceivedMessage
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = new DateTimeOffset(2026, 2, 3, 1, 1, 2, TimeSpan.Zero),
             Topic = "devices/temperature",
             Payload = [42],
             QualityOfService = MqttQualityOfService.AtLeastOnce
         };
         var adapter = new RecordingMqttClientAdapter(message);
+        var clientFactory = new RecordingMqttClientFactory(adapter);
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 10, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(clientFactory)
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(
@@ -62,6 +66,8 @@ public sealed class MqttSubscribeNodeTests
         adapter.SubscriptionOptions.TopicFilter.ShouldBe("devices/+");
         adapter.SubscriptionOptions.ReceiveRetainedMessages.ShouldBeFalse();
         adapter.SubscriptionOptions.RetainAsPublished.ShouldBeTrue();
+        clientFactory.Contexts.Count.ShouldBe(1);
+        clientFactory.Contexts[0].Clock.ShouldBe(clock);
 
         if (runtimeNode.Node is IAsyncDisposable disposable)
         {
@@ -127,7 +133,7 @@ public sealed class MqttSubscribeNodeTests
     {
         var message = new MqttReceivedMessage
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = new DateTimeOffset(2026, 2, 3, 2, 1, 2, TimeSpan.Zero),
             Topic = "devices/temperature",
             Payload = [7]
         };
@@ -268,12 +274,15 @@ public sealed class MqttSubscribeNodeTests
     {
         var adapter = new RecordingMqttClientAdapter(new MqttReceivedMessage
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = new DateTimeOffset(2026, 2, 3, 3, 1, 2, TimeSpan.Zero),
             Topic = "devices/temperature",
             Payload = [1]
         });
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 11, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(new RecordingMqttClientFactory(adapter))
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(MqttComponentTypes.Subscribe, new { topicFilter = "devices/+" }));
@@ -304,6 +313,7 @@ public sealed class MqttSubscribeNodeTests
         names.ShouldContain(MqttDiagnosticNames.SubscribeStopped);
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.SubscribeReceived);
+        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
         flowEvent.GetAttribute("retain").ShouldBe("False");
     }
 
@@ -311,6 +321,7 @@ public sealed class MqttSubscribeNodeTests
     public async Task SubscribeNode_ForwardsAdapterHealthEvents()
     {
         var adapter = new RecordingMqttClientAdapter(waitForCancellation: true);
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 12, 1, 2, TimeSpan.Zero));
         adapter.HealthEvents.Add(new MqttClientHealthEvent
         {
             State = MqttClientHealthState.Reconnecting,
@@ -321,7 +332,9 @@ public sealed class MqttSubscribeNodeTests
             }
         });
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(new RecordingMqttClientFactory(adapter))
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(
@@ -353,6 +366,7 @@ public sealed class MqttSubscribeNodeTests
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
         flowEvent.Status.ShouldBe("Reconnecting");
         flowEvent.Subject.ShouldBe("main-broker");
 

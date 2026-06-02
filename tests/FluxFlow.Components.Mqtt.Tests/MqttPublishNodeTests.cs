@@ -16,8 +16,11 @@ public sealed class MqttPublishNodeTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var clientFactory = new RecordingMqttClientFactory(adapter);
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(clientFactory));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(clientFactory)
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(
@@ -63,8 +66,10 @@ public sealed class MqttPublishNodeTests
         clientFactory.Contexts.Count.ShouldBe(1);
         clientFactory.Contexts[0].Address.ToString().ShouldBe("main.node");
         clientFactory.Contexts[0].ConnectionName.ShouldBe("main-broker");
+        clientFactory.Contexts[0].Clock.ShouldBe(clock);
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.Timestamp.ShouldBe(clock.UtcNow);
         result.Topic.ShouldBe("devices/temperature");
         result.PayloadBytes.ShouldBe(3);
         result.CorrelationId.ShouldBe("abc");
@@ -222,8 +227,11 @@ public sealed class MqttPublishNodeTests
     public async Task PublishNode_EmitsDiagnosticsAndEvents()
     {
         var adapter = new RecordingMqttClientAdapter();
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 8, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(new RecordingMqttClientFactory(adapter))
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(MqttComponentTypes.Publish, new { defaultTopic = "devices/state" }));
@@ -250,6 +258,7 @@ public sealed class MqttPublishNodeTests
         diagnostic.Attributes["correlationId"].ShouldBe("abc");
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.PublishSucceeded);
+        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
         flowEvent.Channel.ShouldBe(MqttEventNames.PublishSucceeded);
         flowEvent.PayloadPreview.ShouldBe("09");
         flowEvent.GetAttribute("correlationId").ShouldBe("abc");
@@ -259,6 +268,7 @@ public sealed class MqttPublishNodeTests
     public async Task PublishNode_ForwardsAdapterHealthEvents()
     {
         var adapter = new RecordingMqttClientAdapter();
+        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 9, 1, 2, TimeSpan.Zero));
         adapter.HealthEvents.Add(new MqttClientHealthEvent
         {
             State = MqttClientHealthState.Connected,
@@ -270,7 +280,9 @@ public sealed class MqttPublishNodeTests
             }
         });
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+            .RegisterMqttComponents(options => options
+                .UseClientFactory(new RecordingMqttClientFactory(adapter))
+                .UseClock(clock));
         registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
 
         var runtimeNode = factory(CreateContext(
@@ -297,6 +309,7 @@ public sealed class MqttPublishNodeTests
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
         flowEvent.Channel.ShouldBe(MqttEventNames.ConnectionHealthChanged);
         flowEvent.Status.ShouldBe("Connected");
         flowEvent.Subject.ShouldBe("main-broker");

@@ -215,6 +215,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
 | `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.query`, `storage.delete` | Host-store-backed logical record storage. |
 | `FluxFlow.Components.Storage.FileSystem` | adapter only | File-system-backed adapter for storage nodes. |
+| `FluxFlow.Components.Storage.SqlFile` | adapter only | Single-file SQL adapter for storage nodes. |
 
 ---
 

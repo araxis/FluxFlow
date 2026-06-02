@@ -1,10 +1,14 @@
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Components.Mqtt.Timing;
 
 namespace FluxFlow.Components.Mqtt.Options;
 
 public sealed class MqttComponentOptions
 {
     private IMqttClientFactory? _clientFactory;
+    private IMqttClock _clock = SystemMqttClock.Instance;
+
+    public IMqttClock Clock => _clock;
 
     public MqttComponentOptions UseClientFactory(IMqttClientFactory clientFactory)
     {
@@ -28,6 +32,12 @@ public sealed class MqttComponentOptions
     {
         ArgumentNullException.ThrowIfNull(clientFactory);
         _clientFactory = new DelegateMqttClientFactory(clientFactory);
+        return this;
+    }
+
+    public MqttComponentOptions UseClock(IMqttClock clock)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;
     }
 
