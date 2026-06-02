@@ -31,6 +31,22 @@ Use `StorageStoreLease.Shared(store)` when the host owns the store lifetime.
 The factory receives the node address, node type, store name, and default
 collection through `StorageStoreContext`.
 
+## Runtime Timing
+
+Storage nodes use `SystemStorageClock` by default. Hosts can provide an
+`IStorageClock` when tests, replay, or deterministic dashboards need stable
+timestamps:
+
+```csharp
+var registry = new RuntimeNodeFactoryRegistry()
+    .RegisterStorageComponents(options => options
+        .UseClock(storageClock)
+        .UseSharedStore(context => new AppStorageStore(context.StoreName)));
+```
+
+The configured clock is also available on `StorageStoreContext`, so backend
+stores can use the same time source for stored records and expiration checks.
+
 ## Put
 
 ```json
@@ -117,6 +133,8 @@ Core contracts:
 - `StorageWriteMode`
 - `IStorageStore`
 - `IStorageStoreFactory`
+- `IStorageClock`
+- `SystemStorageClock`
 - `StorageStoreContext`
 - `StorageStoreLease`
 

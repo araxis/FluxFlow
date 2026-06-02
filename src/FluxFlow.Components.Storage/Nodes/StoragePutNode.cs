@@ -65,7 +65,8 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
                 context.Address,
                 StorageComponentTypes.Put,
                 options.Store,
-                options.Collection));
+                options.Collection,
+                componentOptions.Clock));
 
         return context.CreateNode(node)
             .Input(StorageComponentPorts.Input, node.Input)
@@ -202,7 +203,8 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
                 "put",
                 record,
                 _options.EmitStoredRecord,
-                request.CorrelationId);
+                request.CorrelationId,
+                _componentOptions.Clock);
 
             await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
             TryEmitDiagnostic(

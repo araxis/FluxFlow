@@ -66,7 +66,8 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
                 context.Address,
                 StorageComponentTypes.Delete,
                 options.Store,
-                options.Collection));
+                options.Collection,
+                componentOptions.Clock));
 
         return context.CreateNode(node)
             .Input(StorageComponentPorts.Input, node.Input)

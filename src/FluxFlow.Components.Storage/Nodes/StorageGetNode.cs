@@ -74,7 +74,8 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
                 context.Address,
                 StorageComponentTypes.Get,
                 options.Store,
-                options.Collection));
+                options.Collection,
+                componentOptions.Clock));
 
         return context.CreateNode(node)
             .Input(StorageComponentPorts.Input, node.Input)
@@ -216,7 +217,8 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
                     "get",
                     record,
                     includeRecord: true,
-                    request.CorrelationId);
+                    request.CorrelationId,
+                    _componentOptions.Clock);
 
             await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
             await (record is null ? _notFound : _found)
@@ -263,10 +265,10 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
         };
 
-    private static StorageResult CreateMissingResult(StorageGetRequest request)
+    private StorageResult CreateMissingResult(StorageGetRequest request)
         => new()
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _componentOptions.Clock.UtcNow,
             Operation = "get",
             Collection = request.Collection!,
             Key = request.Key,

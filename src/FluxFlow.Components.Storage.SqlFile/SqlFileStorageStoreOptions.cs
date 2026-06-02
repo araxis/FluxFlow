@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Components.Storage.Timing;
 
 namespace FluxFlow.Components.Storage.SqlFile;
 
@@ -12,6 +13,7 @@ public sealed record SqlFileStorageStoreOptions
     public long MaxValueBytes { get; init; } = 1_048_576;
     public string? DefaultCollection { get; init; }
     public int BusyTimeoutMilliseconds { get; init; } = 30_000;
+    public IStorageClock? Clock { get; init; }
 
     internal SqlFileStorageStoreSettings Resolve(StorageStoreContext? context = null)
     {
@@ -66,7 +68,8 @@ public sealed record SqlFileStorageStoreOptions
             Normalize(context?.Collection) ?? Normalize(DefaultCollection),
             MaxValueBytes,
             BusyTimeoutMilliseconds,
-            CreateDatabase);
+            CreateDatabase,
+            Clock ?? context?.Clock ?? SystemStorageClock.Instance);
     }
 
     internal static string? Normalize(string? value)

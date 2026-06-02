@@ -73,7 +73,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
             var storedValue = CreateStoredValue(request.Value);
             var attributes = CopyAttributes(request.Attributes);
-            var storedAt = DateTimeOffset.UtcNow;
+            var storedAt = _settings.Clock.UtcNow;
             var record = new StorageRecord
             {
                 Collection = collection,
@@ -238,7 +238,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new StorageResult
             {
-                Timestamp = DateTimeOffset.UtcNow,
+                Timestamp = _settings.Clock.UtcNow,
                 Operation = "delete",
                 Collection = collection,
                 Key = key,
@@ -439,7 +439,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         if (request.IncludeExpired != true)
         {
             text.AppendLine("  AND (expires_at_ms IS NULL OR expires_at_ms > $nowMs)");
-            Add(command, "$nowMs", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            Add(command, "$nowMs", _settings.Clock.UtcNow.ToUnixTimeMilliseconds());
         }
 
         text.AppendLine("ORDER BY stored_at_ms, record_key;");
@@ -542,7 +542,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         return key;
     }
 
-    private static bool Matches(
+    private bool Matches(
         StorageRecord record,
         string? keyPrefix,
         Dictionary<string, string> attributes,
@@ -571,9 +571,9 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         return true;
     }
 
-    private static bool IsExpired(StorageRecord record, bool? includeExpired)
+    private bool IsExpired(StorageRecord record, bool? includeExpired)
         => record.ExpiresAt.HasValue &&
-            record.ExpiresAt.Value <= DateTimeOffset.UtcNow &&
+            record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
             includeExpired != true;
 
     private SqliteConnection CreateConnection()

@@ -122,6 +122,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   deterministic write, read, watch, and enumerate timestamps.
 - `108-validation-clock-hardening.md`: validation clock hardening for
   deterministic JSON schema validation result timestamps.
+- `109-storage-clock-hardening.md`: storage clock hardening for deterministic
+  logical storage and adapter timestamps.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -22,6 +22,11 @@ var registry = new RuntimeNodeFactoryRegistry()
         }));
 ```
 
+Set `StorageComponentOptions.UseClock(...)` when node results and adapter
+records should share a deterministic time source. `SqlFileStorageStore` also
+accepts `SqlFileStorageStoreOptions.Clock` for direct store use or an
+adapter-specific override.
+
 ## Behavior
 
 - one record table per database file
@@ -49,6 +54,7 @@ JSON files.
 | `MaxValueBytes` | Rejects values whose serialized JSON exceeds the limit. |
 | `DefaultCollection` | Optional fallback collection. |
 | `BusyTimeoutMilliseconds` | Wait time for a locked database before failing. |
+| `Clock` | Optional direct-store time source override. |
 
 The package persists only neutral `StorageRecord` data. Hosts that need exact
 payload shaping should compose serialization or payload nodes before storage.

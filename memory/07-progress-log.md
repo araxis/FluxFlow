@@ -216,6 +216,10 @@ Date: 2026-05-31
   result timestamps.
 - Published `FluxFlow.Components.Validation` `0.2.0-alpha.1` and verified a
   fresh public-feed restore/build smoke test.
+- Started coordinated storage clock hardening for
+  `FluxFlow.Components.Storage` `0.3.0-alpha.1`,
+  `FluxFlow.Components.Storage.FileSystem` `0.2.0-alpha.1`, and
+  `FluxFlow.Components.Storage.SqlFile` `0.2.0-alpha.1`.
 
 ## Remaining
 

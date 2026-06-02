@@ -46,6 +46,30 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task PutAndDelete_UseConfiguredClock()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 1, 2, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path, clock);
+
+        var saved = await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first"
+        });
+        var deleted = await store.DeleteAsync(new StorageDeleteRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        });
+
+        saved.StoredAt.ShouldBe(now);
+        deleted.Timestamp.ShouldBe(now);
+    }
+
+    [Fact]
     public async Task Put_HonorsWriteModesAndExpectedVersion()
     {
         using var temp = TempDirectory.Create();
@@ -96,14 +120,16 @@ public sealed class FileSystemStorageStoreTests
     [Fact]
     public async Task Get_HonorsExpiration()
     {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 2, 3, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
         using var temp = TempDirectory.Create();
-        var store = CreateStore(temp.Path);
+        var store = CreateStore(temp.Path, clock);
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
             Key = "expired",
             Value = "old",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            ExpiresAt = now.AddMinutes(-1)
         });
 
         var current = await store.GetAsync(new StorageGetRequest
@@ -171,14 +197,16 @@ public sealed class FileSystemStorageStoreTests
     [Fact]
     public async Task Query_HonorsExpiration()
     {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 3, 4, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
         using var temp = TempDirectory.Create();
-        var store = CreateStore(temp.Path);
+        var store = CreateStore(temp.Path, clock);
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
             Key = "expired",
             Value = "old",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            ExpiresAt = now.AddMinutes(-1)
         });
 
         var current = await store.QueryAsync(new StorageQueryRequest
@@ -356,6 +384,44 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Registration_PropagatesConfiguredClockToStoreContext()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 4, 5, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        using var temp = TempDirectory.Create();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterStorageComponents(options =>
+            {
+                options.UseClock(clock);
+                options.UseFileSystemStorage(temp.Path);
+            });
+        registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
+        var runtimeNode = factory(CreateContext(StorageComponentTypes.Put, new
+        {
+            collection = "items",
+            boundedCapacity = 4
+        }));
+        var input = runtimeNode.FindInput(new PortName(StorageComponentPorts.Input))
+            .ShouldBeOfType<InputPort<StoragePutRequest>>();
+        var output = LinkOutput<StorageResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Timestamp.ShouldBe(now);
+        result.Record.ShouldNotBeNull();
+        result.Record!.StoredAt.ShouldBe(now);
+    }
+
+    [Fact]
     public async Task Registration_QueriesThroughStorageNode()
     {
         using var temp = TempDirectory.Create();
@@ -389,10 +455,13 @@ public sealed class FileSystemStorageStoreTests
         result.Records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
     }
 
-    private static FileSystemStorageStore CreateStore(string rootDirectory)
+    private static FileSystemStorageStore CreateStore(
+        string rootDirectory,
+        RecordingStorageClock? clock = null)
         => new(new FileSystemStorageStoreOptions
         {
-            RootDirectory = rootDirectory
+            RootDirectory = rootDirectory,
+            Clock = clock
         });
 
     private static RuntimeNodeFactoryContext CreateContext(

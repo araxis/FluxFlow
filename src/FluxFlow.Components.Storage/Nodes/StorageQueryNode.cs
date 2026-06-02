@@ -70,7 +70,8 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
                 context.Address,
                 StorageComponentTypes.Query,
                 options.Store,
-                options.Collection));
+                options.Collection,
+                componentOptions.Clock));
 
         return context.CreateNode(node)
             .Input(StorageComponentPorts.Input, node.Input)
@@ -283,7 +284,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
         IReadOnlyList<StorageRecord> records)
         => new()
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _componentOptions.Clock.UtcNow,
             Operation = "query",
             Collection = request.Collection!,
             Succeeded = true,

@@ -1,5 +1,35 @@
 # Changelog
 
+## FluxFlow.Components.Storage 0.3.0-alpha.1
+
+Deterministic logical storage timestamps.
+
+- Adds `IStorageClock` and `SystemStorageClock`.
+- Adds `UseClock(...)` to `StorageComponentOptions`.
+- `storage.put`, `storage.get`, and `storage.query` now use the configured
+  clock for emitted result timestamps.
+- `StorageStoreContext` now carries the configured clock to backend store
+  factories.
+
+## FluxFlow.Components.Storage.FileSystem 0.2.0-alpha.1
+
+Deterministic file-system storage adapter timestamps.
+
+- `FileSystemStorageStore` now uses the configured storage clock for
+  `StorageRecord.StoredAt`, delete result timestamps, and expiration checks.
+- `FileSystemStorageStoreOptions.Clock` can override the context clock for
+  direct store construction.
+
+## FluxFlow.Components.Storage.SqlFile 0.2.0-alpha.1
+
+Deterministic SQL-file storage adapter timestamps.
+
+- `SqlFileStorageStore` now uses the configured storage clock for
+  `StorageRecord.StoredAt`, delete result timestamps, query expiration
+  filtering, and in-memory expiration checks.
+- `SqlFileStorageStoreOptions.Clock` can override the context clock for direct
+  store construction.
+
 ## FluxFlow.Components.Validation 0.2.0-alpha.1
 
 Deterministic validation result timestamps.

@@ -49,6 +49,33 @@ public sealed class StorageComponentTests
     }
 
     [Fact]
+    public async Task Put_UsesConfiguredClockForResultTimestamp()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 4, 5, 6, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        var store = new TestStorageStore();
+        var runtimeNode = CreatePut(new
+        {
+            collection = "items"
+        }, store, clock);
+        var input = GetInput<StoragePutRequest>(runtimeNode);
+        var output = LinkOutput<StorageResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StoragePutRequest
+        {
+            Key = "a",
+            Value = "one"
+        });
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Timestamp.ShouldBe(now);
+    }
+
+    [Fact]
     public async Task Put_ReportsFailureAndContinues()
     {
         var store = new TestStorageStore { FailNextPut = true };
@@ -140,6 +167,30 @@ public sealed class StorageComponentTests
         found.Record.ShouldNotBeNull();
         notFound.Found.ShouldBeFalse();
         notFound.Key.ShouldBe("missing");
+    }
+
+    [Fact]
+    public async Task Get_UsesConfiguredClockForMissingResultTimestamp()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 4, 6, 7, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        var store = new TestStorageStore();
+        var runtimeNode = CreateGet(new
+        {
+            collection = "items"
+        }, store, clock);
+        var input = GetInput<StorageGetRequest>(runtimeNode);
+        var output = LinkOutput<StorageResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageGetRequest { Key = "missing" });
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Found.ShouldBeFalse();
+        result.Timestamp.ShouldBe(now);
     }
 
     [Fact]
@@ -240,6 +291,38 @@ public sealed class StorageComponentTests
         result.CorrelationId.ShouldBe("query-a");
         result.Records.Select(record => record.Key).ShouldBe(["a-1", "a-2"]);
         records.Select(record => record.Key).ShouldBe(["a-1", "a-2"]);
+    }
+
+    [Fact]
+    public async Task Query_UsesConfiguredClockForResultTimestamp()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 4, 7, 8, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        var store = new TestStorageStore();
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a",
+            Value = "one",
+            Version = 1,
+            StoredAt = now.AddMinutes(-1)
+        });
+        var runtimeNode = CreateQuery(new
+        {
+            collection = "items"
+        }, store, clock);
+        var input = GetInput<StorageQueryRequest>(runtimeNode);
+        var output = LinkOutput<StorageQueryResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest());
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Count.ShouldBe(1);
+        result.Timestamp.ShouldBe(now);
     }
 
     [Fact]
@@ -497,43 +580,56 @@ public sealed class StorageComponentTests
 
     private static RuntimeNode CreatePut(
         object configuration,
-        TestStorageStore store)
+        TestStorageStore store,
+        RecordingStorageClock? clock = null)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSharedStore(store));
+        var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
         return factory(CreateContext(StorageComponentTypes.Put, configuration));
     }
 
     private static RuntimeNode CreateGet(
         object configuration,
-        TestStorageStore store)
+        TestStorageStore store,
+        RecordingStorageClock? clock = null)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSharedStore(store));
+        var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Get, out var factory).ShouldBeTrue();
         return factory(CreateContext(StorageComponentTypes.Get, configuration));
     }
 
     private static RuntimeNode CreateDelete(
         object configuration,
-        TestStorageStore store)
+        TestStorageStore store,
+        RecordingStorageClock? clock = null)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSharedStore(store));
+        var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Delete, out var factory).ShouldBeTrue();
         return factory(CreateContext(StorageComponentTypes.Delete, configuration));
     }
 
     private static RuntimeNode CreateQuery(
         object configuration,
-        TestStorageStore store)
+        TestStorageStore store,
+        RecordingStorageClock? clock = null)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSharedStore(store));
+        var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
         return factory(CreateContext(StorageComponentTypes.Query, configuration));
     }
+
+    private static RuntimeNodeFactoryRegistry CreateRegistry(
+        TestStorageStore store,
+        RecordingStorageClock? clock)
+        => new RuntimeNodeFactoryRegistry()
+            .RegisterStorageComponents(options =>
+            {
+                options.UseSharedStore(store);
+                if (clock is not null)
+                {
+                    options.UseClock(clock);
+                }
+            });
 
     private static RuntimeNodeFactoryContext CreateContext(
         NodeType nodeType,

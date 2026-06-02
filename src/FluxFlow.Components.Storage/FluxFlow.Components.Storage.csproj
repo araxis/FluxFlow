@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>0.2.1-alpha.1</Version>
+    <Version>0.3.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable logical storage components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilds the package against FluxFlow.Engine 1.0.0 and its stable node identity boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds host-provided storage clocks for deterministic result timestamps and store contexts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

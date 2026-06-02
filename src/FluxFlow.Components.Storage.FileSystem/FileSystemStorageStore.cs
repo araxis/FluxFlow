@@ -68,7 +68,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 ContentType = Normalize(request.ContentType),
                 Attributes = CopyAttributes(request.Attributes),
                 Version = (existing?.Version ?? 0) + 1,
-                StoredAt = DateTimeOffset.UtcNow,
+                StoredAt = _settings.Clock.UtcNow,
                 ExpiresAt = request.ExpiresAt,
                 CorrelationId = Normalize(request.CorrelationId)
             };
@@ -97,7 +97,7 @@ public sealed class FileSystemStorageStore : IStorageStore
             }
 
             if (record.ExpiresAt.HasValue &&
-                record.ExpiresAt.Value <= DateTimeOffset.UtcNow &&
+                record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
                 request.IncludeExpired != true)
             {
                 return Task.FromResult<StorageRecord?>(null);
@@ -184,7 +184,7 @@ public sealed class FileSystemStorageStore : IStorageStore
 
             return Task.FromResult(new StorageResult
             {
-                Timestamp = DateTimeOffset.UtcNow,
+                Timestamp = _settings.Clock.UtcNow,
                 Operation = "delete",
                 Collection = collection,
                 Key = key,
@@ -330,7 +330,7 @@ public sealed class FileSystemStorageStore : IStorageStore
             "stores",
             Hash(_settings.StoreName));
 
-    private static bool Matches(
+    private bool Matches(
         StorageRecord record,
         string collection,
         string? keyPrefix,
@@ -359,7 +359,7 @@ public sealed class FileSystemStorageStore : IStorageStore
         }
 
         if (record.ExpiresAt.HasValue &&
-            record.ExpiresAt.Value <= DateTimeOffset.UtcNow &&
+            record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
             request.IncludeExpired != true)
         {
             return false;

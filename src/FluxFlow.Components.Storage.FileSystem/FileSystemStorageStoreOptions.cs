@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Components.Storage.Timing;
 using System.IO;
 
 namespace FluxFlow.Components.Storage.FileSystem;
@@ -12,6 +13,7 @@ public sealed record FileSystemStorageStoreOptions
     public long MaxValueBytes { get; init; } = 1_048_576;
     public string? DefaultCollection { get; init; }
     public bool FlushOnWrite { get; init; } = true;
+    public IStorageClock? Clock { get; init; }
 
     internal FileSystemStorageStoreSettings Resolve(StorageStoreContext? context = null)
     {
@@ -58,7 +60,8 @@ public sealed record FileSystemStorageStoreOptions
             Normalize(context?.StoreName) ?? Normalize(StoreName) ?? "default",
             Normalize(context?.Collection) ?? Normalize(DefaultCollection),
             MaxValueBytes,
-            FlushOnWrite);
+            FlushOnWrite,
+            Clock ?? context?.Clock ?? SystemStorageClock.Instance);
 
     internal static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

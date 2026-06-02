@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Components.Storage.Timing;
 using FluxFlow.Engine.Definitions;
 
 namespace FluxFlow.Components.Storage.Nodes;
@@ -17,13 +18,15 @@ internal static class StorageNodeSupport
         NodeAddress address,
         NodeType nodeType,
         string? store,
-        string? collection)
+        string? collection,
+        IStorageClock clock)
         => new()
         {
             Address = address,
             NodeType = nodeType,
             StoreName = Normalize(store),
-            Collection = Normalize(collection)
+            Collection = Normalize(collection),
+            Clock = clock ?? throw new ArgumentNullException(nameof(clock))
         };
 
     public static async ValueTask<StorageStoreLease> OpenStoreAsync(
@@ -73,10 +76,11 @@ internal static class StorageNodeSupport
         string operation,
         StorageRecord record,
         bool includeRecord,
-        string? correlationId)
+        string? correlationId,
+        IStorageClock clock)
         => new()
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = clock.UtcNow,
             Operation = operation,
             Collection = record.Collection,
             Key = record.Key,
