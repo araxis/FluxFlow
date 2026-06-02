@@ -132,6 +132,12 @@ Request/response pairing:
 host source -> flow.correlation -> flow.assert -> host sink
 ```
 
+Windowed processing:
+
+```text
+host source -> flow.window -> flow.mapper -> host sink
+```
+
 Recording and replay:
 
 ```text

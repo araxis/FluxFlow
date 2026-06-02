@@ -25,6 +25,15 @@ public sealed class RoutingComponentModuleTests
     }
 
     [Fact]
+    public void RegisterRoutingComponents_AddsWindowFactory()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(new RecordingExpressionEngine());
+
+        registry.TryGetFactory(RoutingComponentTypes.Window, out _).ShouldBeTrue();
+    }
+
+    [Fact]
     public void RegisterRoutingComponents_RequiresExpressionEngine()
     {
         var registry = new RuntimeNodeFactoryRegistry()

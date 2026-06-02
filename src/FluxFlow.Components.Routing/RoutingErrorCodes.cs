@@ -10,4 +10,6 @@ public static class RoutingErrorCodes
     public const int CorrelationInvalidSide = 18120;
     public const int CorrelationDuplicateSide = 18130;
     public const int CorrelationCapacityExceeded = 18140;
+
+    public const int WindowFailed = 18200;
 }

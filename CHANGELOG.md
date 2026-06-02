@@ -1,5 +1,19 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.4.0-alpha.1
+
+Window routing primitive.
+
+- Added `flow.window` with `Input`, `Output`, and `Errors` ports.
+- Added `FlowWindow<TInput>` and `FlowWindowEmitReason` contracts.
+- Added count-based window emission through `maxItems`.
+- Added time-based window emission through `timeMilliseconds`.
+- Added partial window flush on completion with an option to suppress partials.
+- Added diagnostics for emitted windows.
+- Added focused coverage for count windows, time windows without a next input,
+  count-before-time behavior, completion partials, empty completion, diagnostics,
+  invalid config, and module registration.
+
 ## FluxFlow.Components.Routing 0.3.0-alpha.1
 
 Switch route-output hardening.

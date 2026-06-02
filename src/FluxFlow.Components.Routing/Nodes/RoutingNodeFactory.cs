@@ -11,6 +11,7 @@ internal static class RoutingNodeFactory
 {
     private static readonly MethodInfo CreateSwitchMethod = GetMethod(nameof(CreateSwitchTyped));
     private static readonly MethodInfo CreateCorrelationMethod = GetMethod(nameof(CreateCorrelationTyped));
+    private static readonly MethodInfo CreateWindowMethod = GetMethod(nameof(CreateWindowTyped));
 
     public static RuntimeNode CreateSwitch(
         RuntimeNodeFactoryContext context,
@@ -76,6 +77,28 @@ internal static class RoutingNodeFactory
         }
     }
 
+    public static RuntimeNode CreateWindow(
+        RuntimeNodeFactoryContext context,
+        RoutingComponentOptions componentOptions)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
+
+        var options = RoutingOptionsReader.ReadWindowOptions(context.Definition);
+        var inputType = componentOptions.ResolveType(options.InputType);
+
+        try
+        {
+            var method = CreateWindowMethod.MakeGenericMethod(inputType);
+            return (RuntimeNode)method.Invoke(null, [context, options])!;
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            throw;
+        }
+    }
+
     private static RuntimeNode CreateSwitchTyped<TInput>(
         RuntimeNodeFactoryContext context,
         SwitchRoutingOptions options,
@@ -121,6 +144,19 @@ internal static class RoutingNodeFactory
             .Input(RoutingComponentPorts.Input, node.Input)
             .Output(RoutingComponentPorts.Matched, node.Matched)
             .Output(RoutingComponentPorts.Timeouts, node.Timeouts)
+            .Output(RoutingComponentPorts.Errors, node.Errors)
+            .Build();
+    }
+
+    private static RuntimeNode CreateWindowTyped<TInput>(
+        RuntimeNodeFactoryContext context,
+        WindowRoutingOptions options)
+    {
+        var node = new FlowWindowNode<TInput>(options);
+
+        return context.CreateNode(node)
+            .Input(RoutingComponentPorts.Input, node.Input)
+            .Output(RoutingComponentPorts.Output, node.Output)
             .Output(RoutingComponentPorts.Errors, node.Errors)
             .Build();
     }

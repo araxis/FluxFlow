@@ -94,6 +94,40 @@ internal static class RoutingOptionsReader
         return options;
     }
 
+    public static WindowRoutingOptions ReadWindowOptions(NodeDefinition definition)
+    {
+        var options = Read<WindowRoutingOptions>(definition);
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException("flow.window option 'inputType' cannot be empty.");
+        }
+
+        if (options.MaxItems < 0)
+        {
+            throw new InvalidOperationException("flow.window option 'maxItems' cannot be negative.");
+        }
+
+        if (options.TimeMilliseconds < 0)
+        {
+            throw new InvalidOperationException(
+                "flow.window option 'timeMilliseconds' cannot be negative.");
+        }
+
+        if (options.MaxItems == 0 && options.TimeMilliseconds == 0)
+        {
+            throw new InvalidOperationException(
+                "flow.window requires option 'maxItems' or 'timeMilliseconds'.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                "flow.window option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -122,7 +156,6 @@ internal static class RoutingOptionsReader
                 RoutingComponentPorts.Input,
                 RoutingComponentPorts.Result,
                 RoutingComponentPorts.Matched,
-                RoutingComponentPorts.Timeouts,
                 RoutingComponentPorts.Default,
                 RoutingComponentPorts.Errors
             ],

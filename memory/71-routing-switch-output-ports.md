@@ -39,5 +39,4 @@ The next Routing hardening choices are:
 - `flow.window` for count/time grouping
 - `flow.join` for multi-stream joins with timeout handling
 
-The recommended next step is `flow.window`, because it adds a common stream
-primitive without changing the current correlation contract.
+`flow.window` was added in `72-routing-window-component.md`.

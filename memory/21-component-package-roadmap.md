@@ -135,3 +135,5 @@ after the core component package has settled.
     `70-routing-correlation-component.md`.
 15. Add direct route-specific output ports to `flow.switch`. Done in
     `71-routing-switch-output-ports.md`.
+16. Add count/time stream windows to routing. Done in
+    `72-routing-window-component.md`.

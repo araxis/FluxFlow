@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>0.3.0-alpha.1</Version>
+    <Version>0.4.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds optional route-specific output ports for flow.switch.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds flow.window for count and time based stream windows.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

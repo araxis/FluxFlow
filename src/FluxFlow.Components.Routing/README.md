@@ -8,6 +8,7 @@ Reusable expression-driven routing components for FluxFlow.
 |-----------|-------|---------|
 | `flow.switch` | `Input` -> `Result`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
 | `flow.correlation` | `Input` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key and side expressions. |
+| `flow.window` | `Input` -> `Output`, `Errors` | Groups input items into count or time based windows. |
 
 The package does not choose an expression language. Applications provide one or
 more `IFlowExpressionEngine` implementations during registration.
@@ -82,6 +83,31 @@ the node completes.
 Invalid keys, unsupported sides, duplicate same-side messages, expression
 failures, and pending-capacity failures emit `FlowError` and the node continues
 processing later messages.
+
+## Window
+
+Use `flow.window` when a workflow needs batches of items before a downstream
+node runs.
+
+```json
+{
+  "type": "flow.window",
+  "inputType": "app.message",
+  "maxItems": 100,
+  "timeMilliseconds": 5000,
+  "emitPartialOnCompletion": true
+}
+```
+
+`Output` emits `FlowWindow<TInput>` with a sequence number, item list, start and
+emit timestamps, duration, count, and emit reason. `maxItems` emits when the
+window reaches the configured count. `timeMilliseconds` emits when the current
+window has been open for that duration, even if no later input arrives. When
+both are configured, whichever condition happens first emits the window.
+
+At least one boundary must be configured. On completion, a partial window is
+emitted by default. Set `emitPartialOnCompletion` to `false` to discard partial
+windows.
 
 ## Composition Guidance
 
