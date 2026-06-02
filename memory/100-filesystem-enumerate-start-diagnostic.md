@@ -27,8 +27,15 @@ sequence deterministic for fast enumerations.
 - Package: `FluxFlow.Components.FileSystem`
 - Version: `0.4.2-alpha.1`
 
-## Planned Verification
+## Verification
 
-- Focused file-system tests.
-- Full solution build and tests.
-- Package pack and fresh public-feed restore/build smoke after release.
+- Focused file-system tests passed: 45 tests.
+- Full solution build passed in Release with 0 warnings.
+- Full solution tests passed in Release.
+- Package pack passed and produced
+  `FluxFlow.Components.FileSystem.0.4.2-alpha.1.nupkg`.
+- Release commit: `090987f`.
+- Release tag: `components-filesystem-v0.4.2-alpha.1`.
+- Release workflow run: `26834092306`, success.
+- Main verification run: `26834080777`, success.
+- Fresh public-feed restore/build smoke passed on attempt 8.
