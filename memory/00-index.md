@@ -82,5 +82,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `76-storage-adapter-package-rule.md`: official per-persistence-style storage adapter package rule.
 - `77-storage-adapter-backend-naming.md`: concrete-backend adapter package naming refinement.
 - `78-storage-filesystem-adapter-rename.md`: storage adapter rename from location-based to backend-based naming.
+- `79-storage-local-package-unlist.md`: old location-based storage adapter package unlist record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.
