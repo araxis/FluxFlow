@@ -54,13 +54,13 @@ workflow models.
 
 - `flow.fork`
 - `flow.merge`
-- `flow.join`
 
 `flow.correlation` was added later in `70-routing-correlation-component.md`.
 Direct switch route outputs were added in `71-routing-switch-output-ports.md`.
 `flow.window` was added in `72-routing-window-component.md`.
-The remaining nodes need separate contracts for buffering, timeouts, late
-events, missing events, and typed result shapes.
+`flow.join` was added in `73-routing-join-component.md`.
+The remaining nodes need separate contracts for buffering, late events, missing
+events, and typed result shapes.
 
 ## Verification Plan
 

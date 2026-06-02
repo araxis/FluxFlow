@@ -19,12 +19,13 @@ host code:
 5. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
 6. Add `flow.correlation` when a single stream needs request/response pairing
    by key.
-7. Add `state.reducer` when later decisions depend on previous messages.
-8. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+7. Add `flow.join` when two streams need to be paired by related keys.
+8. Add `state.reducer` when later decisions depend on previous messages.
+9. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
    runtime observation.
-9. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
+10. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
-10. Add edge packages for validation, serialization, payload inspection, HTTP,
+11. Add edge packages for validation, serialization, payload inspection, HTTP,
    file system operations, recording, replay, storage, or external transport
    adapters.
 
@@ -136,6 +137,13 @@ Windowed processing:
 
 ```text
 host source -> flow.window -> flow.mapper -> host sink
+```
+
+Two-stream join:
+
+```text
+left source  -> flow.join -> flow.assert -> host sink
+right source ->/
 ```
 
 Recording and replay:

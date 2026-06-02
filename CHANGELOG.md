@@ -1,5 +1,25 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.5.0-alpha.1
+
+Two-stream join primitive.
+
+- Added `flow.join` with `Left`, `Right`, `Output`, `Timeouts`, and `Errors`
+  ports.
+- Added `FlowJoinResult<TLeft, TRight>`,
+  `FlowJoinTimeout<TLeft, TRight>`, and `FlowJoinSide` contracts.
+- Added per-side key expressions through the host-provided expression engine
+  and context factories.
+- Added FIFO pairing for repeated keys across left and right streams.
+- Added timer-driven timeout output plus completion flush for unmatched values.
+- Added bounded pending-item tracking through `maxPending`.
+- Added recoverable errors for key failures, invalid keys, and pending
+  capacity failures.
+- Added diagnostics for joined values, timeouts, and recoverable failures.
+- Added focused coverage for in-order and out-of-order joins, duplicate-key
+  order, timer timeouts, completion timeouts, expression failures, capacity,
+  diagnostics, invalid config, unknown input types, and module registration.
+
 ## FluxFlow.Components.Routing 0.4.0-alpha.1
 
 Window routing primitive.

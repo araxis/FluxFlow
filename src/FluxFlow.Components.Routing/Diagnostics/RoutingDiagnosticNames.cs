@@ -11,4 +11,8 @@ public static class RoutingDiagnosticNames
 
     public const string WindowEmitted = "flow.window.emitted";
     public const string WindowFailed = "flow.window.failed";
+
+    public const string JoinMatched = "flow.join.matched";
+    public const string JoinTimedOut = "flow.join.timedOut";
+    public const string JoinFailed = "flow.join.failed";
 }

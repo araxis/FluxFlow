@@ -137,3 +137,5 @@ after the core component package has settled.
     `71-routing-switch-output-ports.md`.
 16. Add count/time stream windows to routing. Done in
     `72-routing-window-component.md`.
+17. Add two-stream key joins to routing. Done in
+    `73-routing-join-component.md`.

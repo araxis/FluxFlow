@@ -128,6 +128,49 @@ internal static class RoutingOptionsReader
         return options;
     }
 
+    public static JoinRoutingOptions ReadJoinOptions(NodeDefinition definition)
+    {
+        var options = Read<JoinRoutingOptions>(definition);
+        if (string.IsNullOrWhiteSpace(options.LeftKeyExpression))
+        {
+            throw new InvalidOperationException("flow.join requires configuration value 'leftKeyExpression'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.RightKeyExpression))
+        {
+            throw new InvalidOperationException("flow.join requires configuration value 'rightKeyExpression'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.LeftInputType))
+        {
+            throw new InvalidOperationException("flow.join option 'leftInputType' cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.RightInputType))
+        {
+            throw new InvalidOperationException("flow.join option 'rightInputType' cannot be empty.");
+        }
+
+        if (options.TimeoutMilliseconds <= 0)
+        {
+            throw new InvalidOperationException(
+                "flow.join option 'timeoutMilliseconds' must be greater than zero.");
+        }
+
+        if (options.MaxPending <= 0)
+        {
+            throw new InvalidOperationException("flow.join option 'maxPending' must be greater than zero.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                "flow.join option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);

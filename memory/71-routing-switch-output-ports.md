@@ -36,7 +36,8 @@ If `routes` is not empty, every `routeOutputs` key must also be listed in
 The next Routing hardening choices are:
 
 - separate request and response input ports for correlation
-- `flow.window` for count/time grouping
-- `flow.join` for multi-stream joins with timeout handling
+- route envelope helpers if consumers need one object output instead of
+  dynamic switch ports
 
 `flow.window` was added in `72-routing-window-component.md`.
+`flow.join` was added in `73-routing-join-component.md`.

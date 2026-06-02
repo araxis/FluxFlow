@@ -9,6 +9,7 @@ Reusable expression-driven routing components for FluxFlow.
 | `flow.switch` | `Input` -> `Result`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
 | `flow.correlation` | `Input` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key and side expressions. |
 | `flow.window` | `Input` -> `Output`, `Errors` | Groups input items into count or time based windows. |
+| `flow.join` | `Left`, `Right` -> `Output`, `Timeouts`, `Errors` | Joins two typed streams by per-side key expressions. |
 
 The package does not choose an expression language. Applications provide one or
 more `IFlowExpressionEngine` implementations during registration.
@@ -108,6 +109,32 @@ both are configured, whichever condition happens first emits the window.
 At least one boundary must be configured. On completion, a partial window is
 emitted by default. Set `emitPartialOnCompletion` to `false` to discard partial
 windows.
+
+## Join
+
+Use `flow.join` when a workflow needs to pair values from two streams by key.
+
+```json
+{
+  "type": "flow.join",
+  "leftInputType": "app.request",
+  "rightInputType": "app.response",
+  "engine": "my-engine",
+  "leftKeyExpression": "correlationId",
+  "rightKeyExpression": "correlationId",
+  "timeoutMilliseconds": 30000,
+  "maxPending": 1024
+}
+```
+
+`Output` emits `FlowJoinResult<TLeft, TRight>` with the joined left and right
+values, key, timestamps, and elapsed time. `Timeouts` emits
+`FlowJoinTimeout<TLeft, TRight>` for unmatched pending values when the timeout
+expires or when the node completes.
+
+Repeated keys are paired in FIFO order. Key evaluation failures, empty keys,
+and pending-capacity failures emit `FlowError` and the node continues
+processing later values.
 
 ## Composition Guidance
 

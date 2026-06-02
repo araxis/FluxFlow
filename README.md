@@ -207,7 +207,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Control` | `flow.filter`, `flow.when` | Pluggable expression-driven filtering and routing. |
 | `FluxFlow.Components.Assertions` | `flow.assert` | Pluggable expression-driven assertions with result and routed input ports. |
 | `FluxFlow.Components.Sources` | `source.generated`, `source.sequence` | Deterministic generated and sequence source nodes. |
-| `FluxFlow.Components.Routing` | `flow.switch`, `flow.correlation`, `flow.window` | Expression-driven route-key evaluation, direct route outputs, key-based pairing, and count/time windows. |
+| `FluxFlow.Components.Routing` | `flow.switch`, `flow.correlation`, `flow.window`, `flow.join` | Expression-driven route-key evaluation, direct route outputs, key-based pairing, windows, and two-stream joins. |
 | `FluxFlow.Components.Validation` | `json.schema-validator` | JSON schema validation with result, valid, and invalid routing. |
 | `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
 | `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |

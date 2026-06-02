@@ -76,5 +76,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `70-routing-correlation-component.md`: routing correlation node addition and release notes.
 - `71-routing-switch-output-ports.md`: switch route-specific output port hardening.
 - `72-routing-window-component.md`: count/time stream window component.
+- `73-routing-join-component.md`: two-stream key join component.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

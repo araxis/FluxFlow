@@ -12,4 +12,10 @@ public static class RoutingErrorCodes
     public const int CorrelationCapacityExceeded = 18140;
 
     public const int WindowFailed = 18200;
+
+    public const int JoinLeftKeyFailed = 18300;
+    public const int JoinRightKeyFailed = 18310;
+    public const int JoinInvalidKey = 18320;
+    public const int JoinCapacityExceeded = 18330;
+    public const int JoinFailed = 18340;
 }

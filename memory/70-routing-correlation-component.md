@@ -39,9 +39,9 @@ Added package version `0.2.0-alpha.2` with:
 
 Direct switch route outputs were added in
 `71-routing-switch-output-ports.md`. Count/time windows were added in
-`72-routing-window-component.md`. The next routing candidates are correlation
-with separate input ports and joins. Those should wait until this single-stream
-correlation shape is exercised by a consumer.
+`72-routing-window-component.md`. Two-stream joins were added in
+`73-routing-join-component.md`. A future correlation refinement can still add
+separate request/response input ports if consumers need that graph shape.
 
 ## Release Note
 

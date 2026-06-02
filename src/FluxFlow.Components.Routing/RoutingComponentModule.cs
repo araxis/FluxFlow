@@ -20,7 +20,10 @@ public sealed class RoutingComponentModule : IFlowNodeModule
                 context => RoutingNodeFactory.CreateCorrelation(context, options)),
             new FlowNodeRegistration(
                 RoutingComponentTypes.Window,
-                context => RoutingNodeFactory.CreateWindow(context, options))
+                context => RoutingNodeFactory.CreateWindow(context, options)),
+            new FlowNodeRegistration(
+                RoutingComponentTypes.Join,
+                context => RoutingNodeFactory.CreateJoin(context, options))
         ];
     }
 
