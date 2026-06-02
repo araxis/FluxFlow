@@ -105,9 +105,12 @@ Date: 2026-05-31
 - Added Storage `0.2.0-alpha.1` and Storage.FileSystem `0.1.0-alpha.1` work with
   `storage.query`, query contracts, file-system adapter query support, and updated
   storage sample composition.
+- Prepared `FluxFlow.Engine` `0.6.0-beta.1` with the public API namespace
+  cleanup, host-provided expression boundary, release notes, package metadata,
+  sample app update, package pack, and local install smoke test.
 
 ## Remaining
 
-- Publish `FluxFlow.Components.Mqtt` `0.2.0-alpha.1`.
-- Use the MQTT package in the first consumer migration spike and record any
-  missing adapter or options surface before adding concrete client adapters.
+- Publish `FluxFlow.Engine` `0.6.0-beta.1` after branch CI passes.
+- Move the first consumer to the engine beta package and record compatibility
+  feedback before `1.0.0`.

@@ -5,13 +5,13 @@ Use semantic versions for published packages.
 Current prereleases use this shape:
 
 ```text
-0.5.0-alpha.1
+0.6.0-beta.1
 ```
 
 Release tags use the package tag prefix, `-v`, and the package version:
 
 ```text
-engine-v0.5.0-alpha.1
+engine-v0.6.0-beta.1
 components-mqtt-v0.1.0-alpha.1
 ```
 
@@ -76,7 +76,7 @@ compatibility.
 Recommended early pattern:
 
 ```text
-FluxFlow.Engine              0.5.0-alpha.1
+FluxFlow.Engine              0.6.0-beta.1
 FluxFlow.Components.Example  0.1.0-alpha.1
 ```
 

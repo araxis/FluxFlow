@@ -234,10 +234,9 @@ Add tests/docs only if a consumer finds the defaulting behavior surprising.
 
 ## Next Work
 
-1. Update release notes for the `FlowNodeId` namespace change and expression
-   adapter split.
-2. Re-run docs snippets or add a compile-smoke sample for the README quick start
-   before beta.
+1. Publish `FluxFlow.Engine` `0.6.0-beta.1` after branch CI passes.
+2. Move the first consumer to the beta package and record any compatibility
+   feedback before `1.0.0`.
 
 ## Verification
 

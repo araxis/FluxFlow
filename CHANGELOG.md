@@ -1,5 +1,27 @@
 # Changelog
 
+## FluxFlow.Engine 0.6.0-beta.1
+
+Engine beta readiness release.
+
+- Moved `FlowNodeId` into `FluxFlow.Engine.Components` so the node-authoring
+  surface has one stable namespace.
+- Removed concrete expression-language adapters from the engine package.
+- Removed expression parser package dependencies from `FluxFlow.Engine`.
+- Kept expression abstractions, mapper/predicate helpers, and conditional-link
+  runtime support in the engine.
+- Changed link `when` conditions to require a host-provided
+  `IFlowExpressionEngine` through `ApplicationRuntimeBuilder` or
+  `FlowApplicationHost.Create(...)`.
+- Added `ApplicationRuntimeBuildErrorCode.MissingExpressionEngine` for
+  definitions that use `when` without a supplied expression engine.
+- Added host factory overloads that accept the link-condition expression
+  engine directly.
+- Updated public docs and the sample app for the host-provided expression
+  boundary.
+- Stabilized the routing join capacity test so release verification no longer
+  relies on cross-input scheduling order.
+
 ## FluxFlow.Components.Storage.FileSystem 0.1.0-alpha.1
 
 Initial file-system-backed storage adapter package.

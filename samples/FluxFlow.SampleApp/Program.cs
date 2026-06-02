@@ -9,7 +9,10 @@ var store = new InMemoryOrderStore();
 var registry = new RuntimeNodeFactoryRegistry()
     .RegisterSampleOrderComponents(store);
 
-await using var host = FlowApplicationHost.Create(workspace.ToEngineDefinition(), registry);
+await using var host = FlowApplicationHost.Create(
+    workspace.ToEngineDefinition(),
+    registry,
+    new SampleExpressionEngine());
 
 var build = host.Build();
 if (!build.IsSuccess || host.Runtime is null)

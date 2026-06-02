@@ -11,6 +11,8 @@ The sample workspace owns extra sections:
 Only `Resources` and `Workflows` are projected into `ApplicationDefinition`.
 The sample also shows package-style component registration through
 `RegisterSampleOrderComponents`, backed by an `IFlowNodeModule`.
+Because the sample uses conditional links, it also passes a small host-owned
+expression engine to `FlowApplicationHost.Create(...)`.
 
 Run it with:
 
