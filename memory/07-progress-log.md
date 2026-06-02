@@ -156,8 +156,11 @@ Date: 2026-05-31
   expression support while preserving the existing Routing registration API.
 - Published `FluxFlow.Components.Routing` `0.8.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Confirmed shared expression registry storage now lives only in
+  `FluxFlow.Components.Expressions`; component packages resolve through the
+  shared helper instead of owning local expression registries.
 
 ## Remaining
 
-- Check for any remaining duplicated expression-support registries, then return
-  to the broader component maturity backlog.
+- Return to the broader component maturity backlog. Current best next slice is
+  MQTT reconnect and health behavior, if a consumer needs it now.

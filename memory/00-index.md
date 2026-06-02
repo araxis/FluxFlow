@@ -98,6 +98,7 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `92-state-expression-support.md`: State migration to shared expression support.
 - `93-observability-expression-support.md`: Observability migration to shared expression support.
 - `94-routing-expression-support.md`: Routing migration to shared expression support.
+- `95-expression-support-migration-complete.md`: expression-support migration closure.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

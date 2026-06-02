@@ -154,3 +154,8 @@ after the core component package has settled.
 22. Rename the first persisted storage adapter to a backend-based
     file-system package and API. Done in
     `78-storage-filesystem-adapter-rename.md`.
+23. Add shared component expression registration helpers and migrate Mapping,
+    Control, Assertions, State, Observability, and Routing to use them while
+    preserving each package's public registration API. Done in
+    `89-shared-expression-support.md` through
+    `95-expression-support-migration-complete.md`.
