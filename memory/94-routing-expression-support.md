@@ -34,8 +34,11 @@ the most specific registered factory for the runtime input type.
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
 - `dotnet pack src\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- GitHub release workflow `26827755583`
+- Public-feed smoke restore/build for `FluxFlow.Components.Routing`
+  `0.8.0-alpha.1`; package appeared on attempt 9.
 
 ## Next
 
-Run package review and verification, then release
-`FluxFlow.Components.Routing` `0.8.0-alpha.1`.
+Check for any remaining duplicated expression-support registries, then return
+to the broader component maturity backlog.
