@@ -13,7 +13,7 @@ matched pairs or unmatched timeout records.
 
 ## Scope
 
-Added package version `0.2.0-alpha.1` with:
+Added package version `0.2.0-alpha.2` with:
 
 - `flow.correlation`
 - `FlowCorrelationMatch<TInput>`
@@ -40,3 +40,10 @@ Added package version `0.2.0-alpha.1` with:
 The next routing candidates are richer multi-route switch outputs, correlation
 with separate input ports, joins, and count/time windows. Those should wait
 until this single-stream correlation shape is exercised by a consumer.
+
+## Release Note
+
+The first `0.2.0-alpha.1` tag did not publish a package because release
+verification exposed a timer interval test that could wait on a buffered target
+without draining remaining ticks. The test was hardened and the routing package
+release moved forward as `0.2.0-alpha.2`.

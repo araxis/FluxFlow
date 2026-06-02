@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.2.0-alpha.2
+
+Routing correlation published build.
+
+- Keeps the `flow.correlation` component and contracts added for the 0.2
+  routing line.
+- Hardens the timer interval completion test so release verification drains
+  buffered ticks before waiting for completion.
+- Supersedes `0.2.0-alpha.1`, which did not publish a package.
+
 ## FluxFlow.Components.Routing 0.2.0-alpha.1
 
 Routing correlation addition.

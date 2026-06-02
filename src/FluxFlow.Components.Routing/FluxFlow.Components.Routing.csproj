@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.2.0-alpha.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>

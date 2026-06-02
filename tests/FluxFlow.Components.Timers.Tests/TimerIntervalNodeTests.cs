@@ -72,7 +72,7 @@ public sealed class TimerIntervalNodeTests
         runtimeNode.Node.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await DrainUntilCompletedAsync(output);
     }
 
     [Fact]
