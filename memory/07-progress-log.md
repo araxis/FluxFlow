@@ -150,10 +150,10 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Observability` `0.2.0-alpha.1` to use shared
   expression support while preserving the existing Observability registration
   API.
+- Published `FluxFlow.Components.Observability` `0.2.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
 
 ## Remaining
 
-- Review, verify, release, and public-feed smoke-test
-  `FluxFlow.Components.Observability` `0.2.0-alpha.1`.
 - Continue expression-support migration into the next expression-based component
   package while keeping the engine boundary stable.
