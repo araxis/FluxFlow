@@ -35,8 +35,11 @@ most-specific assignable context factory for a derived input type.
 - `dotnet build FluxFlow.sln -c Release --no-restore`
 - `dotnet test FluxFlow.sln -c Release --no-restore`
 - `dotnet pack src\FluxFlow.Components.Assertions\FluxFlow.Components.Assertions.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- Released `FluxFlow.Components.Assertions` `0.2.0-alpha.1`.
+- Verified fresh public-feed restore/build with
+  `FluxFlow.Components.Assertions` `0.2.0-alpha.1`.
 
 ## Next
 
-Release `FluxFlow.Components.Assertions` `0.2.0-alpha.1` and verify a fresh
-public-feed restore/build.
+Continue shared expression support migration into the next expression-driven
+component package, starting with State or Observability.
