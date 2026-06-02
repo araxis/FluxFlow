@@ -16,4 +16,7 @@ public sealed record CorrelationRoutingOptions
     public int TimeoutMilliseconds { get; init; } = 30_000;
     public int MaxPending { get; init; } = 1_024;
     public int BoundedCapacity { get; init; } = 128;
+
+    public bool UsesSideExpression
+        => !string.IsNullOrWhiteSpace(SideExpression);
 }

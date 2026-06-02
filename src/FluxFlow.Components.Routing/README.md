@@ -7,7 +7,7 @@ Reusable expression-driven routing components for FluxFlow.
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
 | `flow.switch` | `Input` -> `Result`, optional `Routed`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
-| `flow.correlation` | `Input` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key and side expressions. |
+| `flow.correlation` | `Input` or `Request`/`Response` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key. |
 | `flow.window` | `Input` -> `Output`, `Errors` | Groups input items into count or time based windows. |
 | `flow.join` | `Left`, `Right` -> `Output`, `Timeouts`, `Errors` | Joins two typed streams by per-side key expressions. |
 | `flow.fork` | `Input` -> configured named outputs, `Errors` | Copies every input to every configured output. |
@@ -67,8 +67,10 @@ processing later messages.
 
 ## Correlation
 
-Use `flow.correlation` when a workflow receives related messages on one stream
-and needs to pair them by key.
+Use `flow.correlation` when a workflow receives related messages and needs to
+pair them by key.
+
+Single-stream mode uses `Input` and a `sideExpression`:
 
 ```json
 {
@@ -79,6 +81,20 @@ and needs to pair them by key.
   "sideExpression": "kind",
   "requestSide": "request",
   "responseSide": "response",
+  "timeoutMilliseconds": 30000,
+  "maxPending": 1024
+}
+```
+
+Split-stream mode omits `sideExpression` and exposes separate `Request` and
+`Response` inputs:
+
+```json
+{
+  "type": "flow.correlation",
+  "inputType": "app.message",
+  "engine": "my-engine",
+  "keyExpression": "correlationId",
   "timeoutMilliseconds": 30000,
   "maxPending": 1024
 }

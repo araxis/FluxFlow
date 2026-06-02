@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>0.6.1-alpha.1</Version>
+    <Version>0.7.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilds the package against FluxFlow.Engine 1.0.0 and its stable node identity boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds split Request and Response input ports for flow.correlation while preserving the existing side-expression Input mode.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

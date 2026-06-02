@@ -45,11 +45,6 @@ internal static class RoutingOptionsReader
             throw new InvalidOperationException("flow.correlation requires configuration value 'keyExpression'.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.SideExpression))
-        {
-            throw new InvalidOperationException("flow.correlation requires configuration value 'sideExpression'.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.InputType))
         {
             throw new InvalidOperationException("flow.correlation option 'inputType' cannot be empty.");

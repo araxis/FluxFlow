@@ -18,7 +18,11 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     private readonly string _requestSide;
     private readonly string _responseSide;
     private readonly TimeSpan _timeout;
-    private readonly ActionBlock<TInput> _input;
+    private readonly List<IDataflowBlock> _inputBlocks = [];
+    private readonly ActionBlock<CorrelationInput> _processor;
+    private readonly TransformBlock<TInput, CorrelationInput>? _input;
+    private readonly TransformBlock<TInput, CorrelationInput>? _request;
+    private readonly TransformBlock<TInput, CorrelationInput>? _response;
     private readonly BufferBlock<FlowCorrelationMatch<TInput>> _matched;
     private readonly BufferBlock<FlowCorrelationTimeout<TInput>> _timeouts;
     private readonly CancellationToken _processingCancellationToken;
@@ -34,7 +38,6 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.KeyExpression);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.SideExpression);
         if (options.TimeoutMilliseconds <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -79,10 +82,25 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
             MaxDegreeOfParallelism = 1
         };
         _processingCancellationToken = inputOptions.CancellationToken;
-        _input = new ActionBlock<TInput>(CorrelateAsync, inputOptions);
+        _processor = new ActionBlock<CorrelationInput>(CorrelateAsync, inputOptions);
+        if (options.UsesSideExpression)
+        {
+            _input = CreateInputBlock(value => new CorrelationInput(value, Side: null));
+        }
+        else
+        {
+            _request = CreateInputBlock(value => new CorrelationInput(value, _requestSide));
+            _response = CreateInputBlock(value => new CorrelationInput(value, _responseSide));
+        }
+
         _matched = new BufferBlock<FlowCorrelationMatch<TInput>>(blockOptions);
         _timeouts = new BufferBlock<FlowCorrelationTimeout<TInput>>(blockOptions);
-        _input.Completion.ContinueWith(
+        Task.WhenAll(_inputBlocks.Select(block => block.Completion)).ContinueWith(
+            completion => CompleteProcessor(completion),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        _processor.Completion.ContinueWith(
             completion => _ = CompleteOutputsAsync(completion),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -90,14 +108,23 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         CompleteWhen(Task.WhenAll(_matched.Completion, _timeouts.Completion));
     }
 
-    public ITargetBlock<TInput> Input => _input;
+    public ITargetBlock<TInput>? Input => _input;
+
+    public ITargetBlock<TInput>? Request => _request;
+
+    public ITargetBlock<TInput>? Response => _response;
 
     public ISourceBlock<FlowCorrelationMatch<TInput>> Matched => _matched;
 
     public ISourceBlock<FlowCorrelationTimeout<TInput>> Timeouts => _timeouts;
 
     public override void Complete()
-        => _input.Complete();
+    {
+        foreach (var inputBlock in _inputBlocks)
+        {
+            inputBlock.Complete();
+        }
+    }
 
     public override void Fault(Exception exception)
     {
@@ -108,13 +135,51 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         }
         finally
         {
-            ((IDataflowBlock)_input).Fault(exception);
+            foreach (var inputBlock in _inputBlocks)
+            {
+                inputBlock.Fault(exception);
+            }
+
+            ((IDataflowBlock)_processor).Fault(exception);
             ((IDataflowBlock)_matched).Fault(exception);
             ((IDataflowBlock)_timeouts).Fault(exception);
         }
     }
 
-    private async Task CorrelateAsync(TInput input)
+    private TransformBlock<TInput, CorrelationInput> CreateInputBlock(
+        Func<TInput, CorrelationInput> transform)
+    {
+        var input = new TransformBlock<TInput, CorrelationInput>(
+            transform,
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = _options.BoundedCapacity,
+                EnsureOrdered = true,
+                MaxDegreeOfParallelism = 1
+            });
+        input.LinkTo(_processor, new DataflowLinkOptions { PropagateCompletion = false });
+        _inputBlocks.Add(input);
+        return input;
+    }
+
+    private void CompleteProcessor(Task completion)
+    {
+        if (completion.IsFaulted && completion.Exception is { } exception)
+        {
+            ((IDataflowBlock)_processor).Fault(exception);
+            return;
+        }
+
+        if (completion.IsCanceled)
+        {
+            ((IDataflowBlock)_processor).Fault(new OperationCanceledException());
+            return;
+        }
+
+        _processor.Complete();
+    }
+
+    private async Task CorrelateAsync(CorrelationInput input)
     {
         try
         {
@@ -144,7 +209,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
                 return;
             }
 
-            var entry = new PendingEntry(input, side, now);
+            var entry = new PendingEntry(input.Value, side, now);
             if (pending.HasSide(side, _comparer))
             {
                 ReportCorrelationError(
@@ -186,7 +251,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         }
     }
 
-    private CorrelationItem Evaluate(TInput input)
+    private CorrelationItem Evaluate(CorrelationInput input)
     {
         string? key;
         try
@@ -196,7 +261,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
                 _options,
                 _contextFactory,
                 _nodeContext,
-                input);
+                input.Value);
         }
         catch (Exception exception)
         {
@@ -213,23 +278,26 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
                 "flow.correlation key cannot be empty.");
         }
 
-        string? side;
-        try
+        var side = input.Side;
+        if (string.IsNullOrWhiteSpace(side))
         {
-            side = CorrelationNodeSupport.EvaluateSide(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input);
-        }
-        catch (Exception exception)
-        {
-            throw new CorrelationException(
-                RoutingErrorCodes.CorrelationSideFailed,
-                $"flow.correlation failed to evaluate side: {exception.Message}",
-                exception,
-                key);
+            try
+            {
+                side = CorrelationNodeSupport.EvaluateSide(
+                    _expressionEngine,
+                    _options,
+                    _contextFactory,
+                    _nodeContext,
+                    input.Value);
+            }
+            catch (Exception exception)
+            {
+                throw new CorrelationException(
+                    RoutingErrorCodes.CorrelationSideFailed,
+                    $"flow.correlation failed to evaluate side: {exception.Message}",
+                    exception,
+                    key);
+            }
         }
 
         if (string.IsNullOrWhiteSpace(side))
@@ -417,6 +485,10 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     private sealed record CorrelationItem(
         string Key,
         string Side);
+
+    private sealed record CorrelationInput(
+        TInput Value,
+        string? Side);
 
     private sealed record PendingEntry(
         TInput Value,

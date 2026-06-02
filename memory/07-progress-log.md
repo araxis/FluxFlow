@@ -119,9 +119,14 @@ Date: 2026-05-31
   `FlowNodeId` location.
 - Verified a fresh public-feed restore/build smoke with `FluxFlow.Engine`
   `1.0.0` plus all rebuilt component packages.
+- Confirmed the first consumer migrated successfully to `FluxFlow.Engine`
+  `1.0.0` and the rebuilt component packages.
+- Started component maturity work with `FluxFlow.Components.Routing`
+  `0.7.0-alpha.1`, adding split `Request` and `Response` inputs for
+  `flow.correlation` while preserving the existing single-stream `Input` mode.
 
 ## Remaining
 
-- Run the first consumer against `FluxFlow.Engine` `1.0.0` and the rebuilt
-  component packages, then continue component hardening while keeping the engine
-  boundary stable.
+- Review the Routing `0.7.0-alpha.1` slice, then either release that package or
+  continue the next component hardening slice while keeping the engine boundary
+  stable.

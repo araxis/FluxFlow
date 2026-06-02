@@ -236,12 +236,27 @@ internal static class RoutingNodeFactory
             contextFactory,
             nodeContext);
 
-        return context.CreateNode(node)
-            .Input(RoutingComponentPorts.Input, node.Input)
+        var builder = context.CreateNode(node)
             .Output(RoutingComponentPorts.Matched, node.Matched)
             .Output(RoutingComponentPorts.Timeouts, node.Timeouts)
-            .Output(RoutingComponentPorts.Errors, node.Errors)
-            .Build();
+            .Output(RoutingComponentPorts.Errors, node.Errors);
+
+        if (node.Input is not null)
+        {
+            builder.Input(RoutingComponentPorts.Input, node.Input);
+        }
+
+        if (node.Request is not null)
+        {
+            builder.Input(RoutingComponentPorts.Request, node.Request);
+        }
+
+        if (node.Response is not null)
+        {
+            builder.Input(RoutingComponentPorts.Response, node.Response);
+        }
+
+        return builder.Build();
     }
 
     private static RuntimeNode CreateWindowTyped<TInput>(

@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.7.0-alpha.1
+
+Routing correlation hardening.
+
+- Adds split `Request` and `Response` input ports for `flow.correlation` when
+  `sideExpression` is omitted.
+- Keeps the existing single-stream `Input` mode when `sideExpression` is
+  configured.
+- Keeps `Matched`, `Timeouts`, and `Errors` output contracts unchanged.
+
 ## FluxFlow.Engine 1.0.0
 
 Stable engine release.

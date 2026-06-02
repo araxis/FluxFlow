@@ -18,6 +18,8 @@ public sealed class FlowCorrelationNodeTests
         var runtimeNode = CreateNode(new { });
         var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
             .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        runtimeNode.FindInput(new PortName(RoutingComponentPorts.Request)).ShouldBeNull();
+        runtimeNode.FindInput(new PortName(RoutingComponentPorts.Response)).ShouldBeNull();
         var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
         LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
         runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
@@ -32,6 +34,54 @@ public sealed class FlowCorrelationNodeTests
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
         match.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task Correlation_MatchesSplitRequestAndResponseInputs()
+    {
+        var runtimeNode = CreateSplitNode(new { });
+        runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input)).ShouldBeNull();
+        var request = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Request))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var response = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Response))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await response.Target.SendAsync(new CorrelationMessage("A-100", "ignored", "done"));
+        await request.Target.SendAsync(new CorrelationMessage("A-100", "ignored", "start"));
+        request.Target.Complete();
+        response.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        match.Key.ShouldBe("A-100");
+        match.Request.Payload.ShouldBe("start");
+        match.Response.Payload.ShouldBe("done");
+    }
+
+    [Fact]
+    public async Task Correlation_EmitsSplitInputTimeoutsOnCompletion()
+    {
+        var runtimeNode = CreateSplitNode(new { timeoutMilliseconds = 10 });
+        var request = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Request))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var response = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Response))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+
+        await request.Target.SendAsync(new CorrelationMessage("A-100", "ignored", "start"));
+        request.Target.Complete();
+        response.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        timeout.Key.ShouldBe("A-100");
+        timeout.Side.ShouldBe("request");
+        timeout.Value.Payload.ShouldBe("start");
     }
 
     [Fact]
@@ -249,6 +299,27 @@ public sealed class FlowCorrelationNodeTests
             {
                 keyExpression = "key",
                 sideExpression = "side",
+                inputType = "app.correlation"
+            },
+            overrides);
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: evaluate ?? EvaluateCorrelationExpression))
+                .RegisterType<CorrelationMessage>("app.correlation")
+                .UseContextFactory(new CorrelationMessageContextFactory()));
+        registry.TryGetFactory(RoutingComponentTypes.Correlation, out var factory).ShouldBeTrue();
+        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Correlation, configuration));
+    }
+
+    private static RuntimeNode CreateSplitNode(
+        object overrides,
+        Func<string, FlowMapContext, Type, object?>? evaluate = null)
+    {
+        var configuration = RoutingTestHost.MergeConfiguration(
+            new
+            {
+                keyExpression = "key",
                 inputType = "app.correlation"
             },
             overrides);

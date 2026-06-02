@@ -90,6 +90,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `84-first-consumer-beta-adoption.md`: first consumer beta migration success and v1 release decision.
 - `85-engine-1.0-release-prep.md`: engine `1.0.0` release-prep record.
 - `86-component-engine-boundary-rebuild.md`: component package rebuild decision after the engine node identity move.
+- `87-fluxmq-stable-migration-baseline.md`: first consumer stable migration result and component maturity baseline.
+- `88-routing-correlation-split-inputs.md`: routing correlation split input hardening and release-prep note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
