@@ -131,10 +131,12 @@ Date: 2026-05-31
   registries with focused tests.
 - Prepared `FluxFlow.Components.Mapping` `0.2.0-alpha.1` to use the shared
   expression support while preserving the existing Mapping registration API.
+- Published `FluxFlow.Components.Expressions` `0.1.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
+- Published `FluxFlow.Components.Mapping` `0.2.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
-- Release `FluxFlow.Components.Expressions` `0.1.0-alpha.1`, then release
-  `FluxFlow.Components.Mapping` `0.2.0-alpha.1`.
 - Continue expression-support migration into the next expression-based component
   package while keeping the engine boundary stable.

@@ -47,6 +47,12 @@ This keeps current hosts compatible while reducing duplicated package code.
 - `dotnet test FluxFlow.sln -c Release --no-restore`
 - `dotnet pack src\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
 - `dotnet pack src\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- Released `FluxFlow.Components.Expressions` `0.1.0-alpha.1`.
+- Verified fresh public-feed restore/build with
+  `FluxFlow.Components.Expressions` `0.1.0-alpha.1`.
+- Released `FluxFlow.Components.Mapping` `0.2.0-alpha.1`.
+- Verified fresh public-feed restore/build with
+  `FluxFlow.Components.Mapping` `0.2.0-alpha.1`.
 
 ## Release Order
 
@@ -55,5 +61,5 @@ Release `FluxFlow.Components.Expressions` first, then
 
 ## Next
 
-After the release and public-feed verification, migrate the same helper pattern
-into the next expression-based package, starting with Control or Assertions.
+Migrate the same helper pattern into the next expression-based package,
+starting with Control or Assertions.
