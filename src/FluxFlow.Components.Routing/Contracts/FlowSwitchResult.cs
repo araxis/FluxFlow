@@ -10,5 +10,5 @@ public sealed record FlowSwitchResult<TInput>
     public required string Expression { get; init; }
     public required string InputType { get; init; }
     public TInput? Value { get; init; }
-    public DateTimeOffset EvaluatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset EvaluatedAt { get; init; }
 }

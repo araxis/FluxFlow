@@ -5,5 +5,5 @@ public sealed record FlowMergeItem<TInput>
     public required long Sequence { get; init; }
     public required string Source { get; init; }
     public required TInput Value { get; init; }
-    public DateTimeOffset ReceivedAt { get; init; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset ReceivedAt { get; init; }
 }

@@ -7,6 +7,6 @@ public sealed record FlowJoinResult<TLeft, TRight>
     public required TRight Right { get; init; }
     public required DateTimeOffset LeftReceivedAt { get; init; }
     public required DateTimeOffset RightReceivedAt { get; init; }
-    public DateTimeOffset JoinedAt { get; init; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset JoinedAt { get; init; }
     public TimeSpan Elapsed { get; init; }
 }

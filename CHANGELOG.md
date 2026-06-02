@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.10.0-alpha.1
+
+Explicit routing result timestamps.
+
+- Makes `FlowSwitchResult.EvaluatedAt`, `FlowRoute.RoutedAt`,
+  `FlowCorrelationMatch.MatchedAt`, `FlowJoinResult.JoinedAt`, and
+  `FlowMergeItem.ReceivedAt` required values instead of current-time defaults.
+- Routing nodes already set these values from the configured routing clock, so
+  package-owned timestamps stay deterministic.
+
 ## FluxFlow.Components.Mqtt 0.4.0-alpha.1
 
 Deterministic MQTT package timestamps.

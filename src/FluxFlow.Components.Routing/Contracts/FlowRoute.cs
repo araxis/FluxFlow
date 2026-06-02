@@ -11,5 +11,5 @@ public sealed record FlowRoute<TInput>
     public string? ExpressionName { get; init; }
     public required string InputType { get; init; }
     public required TInput Value { get; init; }
-    public DateTimeOffset RoutedAt { get; init; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset RoutedAt { get; init; }
 }
