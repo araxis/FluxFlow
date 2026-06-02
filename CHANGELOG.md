@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.5.0-alpha.1
+
+Deterministic file system timestamps.
+
+- Adds `IFileSystemClock` and `SystemFileSystemClock`.
+- Adds `UseClock(...)` to `FileSystemComponentOptions`.
+- `file.write`, `file.read`, `file.watch`, and `directory.enumerate` now use
+  the configured clock for emitted timestamps.
+- Keeps the existing static node `Create(context)` methods as default-clock
+  wrappers.
+
 ## FluxFlow.Components.Http 0.2.0-alpha.1
 
 Deterministic HTTP request timing.

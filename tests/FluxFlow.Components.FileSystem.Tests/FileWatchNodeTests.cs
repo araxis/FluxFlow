@@ -1,5 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -78,12 +79,15 @@ public sealed class FileWatchNodeTests
     public async Task FileWatch_EmitsDiagnosticsAndFlowEvents()
     {
         using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
-        {
-            directory = ".",
-            baseDirectory = directory.Path,
-            boundedCapacity = 16
-        });
+        var timestamp = DateTimeOffset.Parse("2026-06-02T12:30:00Z");
+        var runtimeNode = CreateNode(
+            new
+            {
+                directory = ".",
+                baseDirectory = directory.Path,
+                boundedCapacity = 16
+            },
+            options => options.UseClock(new RecordingFileSystemClock(timestamp)));
         var output = new BufferBlock<FileWatchEvent>();
         var diagnostics = new BufferBlock<FlowDiagnostic>();
         var events = new BufferBlock<FlowEvent>();
@@ -95,7 +99,8 @@ public sealed class FileWatchNodeTests
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "diag.txt"), "hello");
-        await ReceiveMatchingAsync(output, value => value.Name == "diag.txt");
+        var watchEvent = await ReceiveMatchingAsync(output, value => value.Name == "diag.txt");
+        watchEvent.Timestamp.ShouldBe(timestamp);
 
         await ReceiveDiagnosticAsync(
             diagnostics,
@@ -106,6 +111,7 @@ public sealed class FileWatchNodeTests
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(FileSystemEventNames.FileWatchChanged);
         flowEvent.Subject.ShouldEndWith("diag.txt");
+        flowEvent.Timestamp.ShouldBe(timestamp);
 
         runtimeNode.Node.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -212,10 +218,12 @@ public sealed class FileWatchNodeTests
         exception.Message.ShouldContain("notifyFilters");
     }
 
-    private static RuntimeNode CreateNode(object configuration)
+    private static RuntimeNode CreateNode(
+        object configuration,
+        Action<FileSystemComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterFileSystemComponents();
+            .RegisterFileSystemComponents(configure ?? (_ => { }));
         registry.TryGetFactory(FileSystemComponentTypes.FileWatch, out var factory).ShouldBeTrue();
         return factory(FileSystemTestHost.CreateContext(
             FileSystemComponentTypes.FileWatch,

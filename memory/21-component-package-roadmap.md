@@ -182,3 +182,6 @@ after the core component package has settled.
 31. Harden deterministic HTTP behavior with a host-provided HTTP clock for
     response and error timestamps plus elapsed milliseconds. Done in
     `106-http-clock-hardening.md`.
+32. Harden deterministic FileSystem behavior with a host-provided file system
+    clock for write, read, watch, and enumerate timestamps. In progress in
+    `107-filesystem-clock-hardening.md`.

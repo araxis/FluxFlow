@@ -1,5 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -41,6 +42,31 @@ public sealed class FileWriteNodeTests
         result.Path.ShouldBe(Path.GetFullPath(expectedPath));
         result.BytesWritten.ShouldBe(5);
         result.Mode.ShouldBe(FileWriteMode.Overwrite);
+    }
+
+    [Fact]
+    public async Task FileWrite_UsesConfiguredClockForResultTimestamp()
+    {
+        using var directory = TempDirectory.Create();
+        var writtenAt = DateTimeOffset.Parse("2026-06-02T12:00:00Z");
+        var runtimeNode = CreateNode(
+            new { baseDirectory = directory.Path },
+            options => options.UseClock(new RecordingFileSystemClock(writtenAt)));
+        var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+            .ShouldBeOfType<InputPort<FileWriteRequest>>();
+        var results = new BufferBlock<FileWriteResult>();
+        LinkResult(runtimeNode, results);
+
+        await input.Target.SendAsync(new FileWriteRequest
+        {
+            Path = "clock.txt",
+            Content = "hello"
+        });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.WrittenAt.ShouldBe(writtenAt);
     }
 
     [Fact]
@@ -285,10 +311,12 @@ public sealed class FileWriteNodeTests
         exception.Message.ShouldContain("defaultEncoding");
     }
 
-    private static RuntimeNode CreateNode(object configuration)
+    private static RuntimeNode CreateNode(
+        object configuration,
+        Action<FileSystemComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterFileSystemComponents();
+            .RegisterFileSystemComponents(configure ?? (_ => { }));
         registry.TryGetFactory(FileSystemComponentTypes.FileWrite, out var factory).ShouldBeTrue();
         return factory(FileSystemTestHost.CreateContext(configuration));
     }

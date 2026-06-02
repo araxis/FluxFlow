@@ -14,6 +14,18 @@ Reusable file system components for FluxFlow.
 Failures emit `FlowError` through the node error stream and do not stop later
 messages from being processed.
 
+## Runtime Timing
+
+File write results, file read results, file watch events, and directory
+enumeration entries use the package clock for timestamps. Existing callers use
+the default system clock. Hosts and tests can provide a deterministic clock
+through registration:
+
+```csharp
+registry.RegisterFileSystemComponents(options => options
+    .UseClock(fileSystemClock));
+```
+
 ## Write Request
 
 ```csharp

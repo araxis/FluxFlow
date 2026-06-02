@@ -206,6 +206,9 @@ Date: 2026-05-31
   clock for deterministic response and error timestamps.
 - Published `FluxFlow.Components.Http` `0.2.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.FileSystem` `0.5.0-alpha.1` with a
+  host-provided file system clock for deterministic write, read, watch, and
+  enumerate timestamps.
 
 ## Remaining
 

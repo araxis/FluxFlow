@@ -1,5 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -43,6 +44,28 @@ public sealed class FileReadNodeTests
         result.BytesRead.ShouldBe(5);
         result.ReadAs.ShouldBe(FileReadMode.Text);
         result.Encoding.ShouldBe("utf-8");
+    }
+
+    [Fact]
+    public async Task FileRead_UsesConfiguredClockForResultTimestamp()
+    {
+        using var directory = TempDirectory.Create();
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "input.txt"), "hello");
+        var readAt = DateTimeOffset.Parse("2026-06-02T12:10:00Z");
+        var runtimeNode = CreateNode(
+            new { baseDirectory = directory.Path },
+            options => options.UseClock(new RecordingFileSystemClock(readAt)));
+        var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
+        LinkResult(runtimeNode, results);
+
+        await input.Target.SendAsync(new FileReadRequest { Path = "input.txt" });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.ReadAt.ShouldBe(readAt);
     }
 
     [Fact]
@@ -278,10 +301,12 @@ public sealed class FileReadNodeTests
         exception.Message.ShouldContain("maxBytes");
     }
 
-    private static RuntimeNode CreateNode(object configuration)
+    private static RuntimeNode CreateNode(
+        object configuration,
+        Action<FileSystemComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterFileSystemComponents();
+            .RegisterFileSystemComponents(configure ?? (_ => { }));
         registry.TryGetFactory(FileSystemComponentTypes.FileRead, out var factory).ShouldBeTrue();
         return factory(FileSystemTestHost.CreateContext(
             FileSystemComponentTypes.FileRead,

@@ -1,6 +1,7 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Text;
@@ -11,12 +12,16 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 public sealed class FileReadNode : FlowNodeBase
 {
     private readonly FileReadOptions _options;
+    private readonly IFileSystemClock _clock;
     private readonly ActionBlock<FileReadRequest> _input;
     private readonly BufferBlock<FileReadResult> _result;
 
-    private FileReadNode(FileReadOptions options)
+    private FileReadNode(
+        FileReadOptions options,
+        IFileSystemClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -42,11 +47,17 @@ public sealed class FileReadNode : FlowNodeBase
     public ISourceBlock<FileReadResult> Result => _result;
 
     public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+        => Create(context, new FileSystemComponentOptions());
+
+    public static RuntimeNode Create(
+        RuntimeNodeFactoryContext context,
+        FileSystemComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = FileSystemOptionsReader.ReadFileReadOptions(context.Definition);
-        var node = new FileReadNode(options);
+        var node = new FileReadNode(options, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(FileSystemComponentPorts.Input, node.Input)
@@ -251,6 +262,7 @@ public sealed class FileReadNode : FlowNodeBase
 
     private FileReadResult CreateResult(FileReadRequest request, ResolvedRead resolved, byte[] bytes)
     {
+        var readAt = _clock.UtcNow;
         if (request.ReadAs == FileReadMode.Bytes)
         {
             return new FileReadResult
@@ -259,7 +271,7 @@ public sealed class FileReadNode : FlowNodeBase
                 Bytes = bytes,
                 BytesRead = bytes.LongLength,
                 ReadAs = request.ReadAs,
-                ReadAt = DateTimeOffset.UtcNow
+                ReadAt = readAt
             };
         }
 
@@ -270,7 +282,7 @@ public sealed class FileReadNode : FlowNodeBase
             Encoding = resolved.EncodingName,
             BytesRead = bytes.LongLength,
             ReadAs = request.ReadAs,
-            ReadAt = DateTimeOffset.UtcNow
+            ReadAt = readAt
         };
     }
 

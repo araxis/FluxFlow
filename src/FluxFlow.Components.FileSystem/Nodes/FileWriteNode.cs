@@ -1,6 +1,7 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Text;
@@ -11,12 +12,16 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 public sealed class FileWriteNode : FlowNodeBase
 {
     private readonly FileWriteOptions _options;
+    private readonly IFileSystemClock _clock;
     private readonly ActionBlock<FileWriteRequest> _input;
     private readonly BufferBlock<FileWriteResult> _result;
 
-    private FileWriteNode(FileWriteOptions options)
+    private FileWriteNode(
+        FileWriteOptions options,
+        IFileSystemClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -42,11 +47,17 @@ public sealed class FileWriteNode : FlowNodeBase
     public ISourceBlock<FileWriteResult> Result => _result;
 
     public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+        => Create(context, new FileSystemComponentOptions());
+
+    public static RuntimeNode Create(
+        RuntimeNodeFactoryContext context,
+        FileSystemComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = FileSystemOptionsReader.ReadFileWriteOptions(context.Definition);
-        var node = new FileWriteNode(options);
+        var node = new FileWriteNode(options, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(FileSystemComponentPorts.Input, node.Input)
@@ -155,7 +166,7 @@ public sealed class FileWriteNode : FlowNodeBase
                 Path = resolved.Path,
                 BytesWritten = resolved.Bytes.Length,
                 Mode = request.Mode,
-                WrittenAt = DateTimeOffset.UtcNow
+                WrittenAt = _clock.UtcNow
             };
 
             await _result.SendAsync(result).ConfigureAwait(false);

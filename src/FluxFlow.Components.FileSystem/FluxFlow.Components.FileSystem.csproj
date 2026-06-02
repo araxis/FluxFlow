@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>0.4.2-alpha.1</Version>
+    <Version>0.5.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable file system components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Ensures directory.enumerate emits its started diagnostic before enumeration work begins.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds host-provided file system clock support for deterministic write, read, watch, and enumerate timestamps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -1,6 +1,7 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -11,6 +12,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
 {
     private readonly object _stateLock = new();
     private readonly FileWatchOptions _options;
+    private readonly IFileSystemClock _clock;
     private readonly NotifyFilters _notifyFilters;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private FileSystemWatcher? _watcher;
@@ -18,10 +20,13 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     private bool _started;
     private bool _disposed;
 
-    private FileWatchNode(FileWatchOptions options)
+    private FileWatchNode(
+        FileWatchOptions options,
+        IFileSystemClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -35,11 +40,17 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     public ISourceBlock<FlowEvent> Events => _events;
 
     public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+        => Create(context, new FileSystemComponentOptions());
+
+    public static RuntimeNode Create(
+        RuntimeNodeFactoryContext context,
+        FileSystemComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = FileSystemOptionsReader.ReadFileWatchOptions(context.Definition);
-        var node = new FileWatchNode(options);
+        var node = new FileWatchNode(options, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Output(FileSystemComponentPorts.Output, node.Output)
@@ -203,7 +214,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
 
         PublishChange(new FileWatchEvent
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _clock.UtcNow,
             Path = args.FullPath,
             Directory = _resolvedDirectory ?? System.IO.Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
             Name = args.Name,
@@ -214,7 +225,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     private void OnRenamed(object sender, RenamedEventArgs args)
         => PublishChange(new FileWatchEvent
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = _clock.UtcNow,
             Path = args.FullPath,
             Directory = _resolvedDirectory ?? System.IO.Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
             Name = args.Name,

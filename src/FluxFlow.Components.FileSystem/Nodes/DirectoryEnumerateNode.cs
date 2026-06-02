@@ -1,6 +1,7 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -11,16 +12,20 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 {
     private readonly object _stateLock = new();
     private readonly DirectoryEnumerateOptions _options;
+    private readonly IFileSystemClock _clock;
     private CancellationTokenSource? _enumerationCancellation;
     private Task? _enumerationTask;
     private string? _resolvedDirectory;
     private bool _started;
     private bool _disposed;
 
-    private DirectoryEnumerateNode(DirectoryEnumerateOptions options)
+    private DirectoryEnumerateNode(
+        DirectoryEnumerateOptions options,
+        IFileSystemClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -30,11 +35,17 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
     }
 
     public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+        => Create(context, new FileSystemComponentOptions());
+
+    public static RuntimeNode Create(
+        RuntimeNodeFactoryContext context,
+        FileSystemComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = FileSystemOptionsReader.ReadDirectoryEnumerateOptions(context.Definition);
-        var node = new DirectoryEnumerateNode(options);
+        var node = new DirectoryEnumerateNode(options, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Output(FileSystemComponentPorts.Output, node.Output)
@@ -262,12 +273,12 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         }
     }
 
-    private static DirectoryEnumerateEntry CreateDirectoryEntry(
+    private DirectoryEnumerateEntry CreateDirectoryEntry(
         DirectoryInfo directory,
         string resolvedDirectory)
         => new()
         {
-            EnumeratedAt = DateTimeOffset.UtcNow,
+            EnumeratedAt = _clock.UtcNow,
             Path = directory.FullName,
             Directory = resolvedDirectory,
             Name = directory.Name,
@@ -281,12 +292,12 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
             Attributes = directory.Attributes
         };
 
-    private static DirectoryEnumerateEntry CreateFileEntry(
+    private DirectoryEnumerateEntry CreateFileEntry(
         FileInfo file,
         string resolvedDirectory)
         => new()
         {
-            EnumeratedAt = DateTimeOffset.UtcNow,
+            EnumeratedAt = _clock.UtcNow,
             Path = file.FullName,
             Directory = resolvedDirectory,
             Name = file.Name,
