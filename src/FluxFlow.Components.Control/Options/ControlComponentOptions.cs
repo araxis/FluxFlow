@@ -1,4 +1,5 @@
 using FluxFlow.Components.Control.Contracts;
+using FluxFlow.Components.Expressions;
 using FluxFlow.Engine.Mapping;
 using System.Text.Json;
 
@@ -29,12 +30,9 @@ public sealed class ControlComponentOptions
         [typeof(JsonElement).FullName!] = typeof(JsonElement)
     };
 
-    private readonly Dictionary<string, IFlowExpressionEngine> _expressionEngines =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<Type, IControlContextFactory> _contextFactories = [];
-    private IFlowExpressionEngine? _defaultExpressionEngine;
-    private Func<string?, IFlowExpressionEngine>? _expressionEngineResolver;
-    private IControlContextFactory _defaultContextFactory = new DefaultControlContextFactory();
+    private readonly FlowExpressionEngineRegistry _expressionEngines = new("Control");
+    private readonly FlowContextFactoryRegistry<IControlContextFactory> _contextFactories =
+        new(new DefaultControlContextFactory());
 
     public ControlComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -43,19 +41,14 @@ public sealed class ControlComponentOptions
         ArgumentNullException.ThrowIfNull(expressionEngine);
         ArgumentException.ThrowIfNullOrWhiteSpace(expressionEngine.Name);
 
-        _expressionEngines[expressionEngine.Name] = expressionEngine;
-        if (useAsDefault || _defaultExpressionEngine is null)
-        {
-            _defaultExpressionEngine = expressionEngine;
-        }
-
+        _expressionEngines.Use(expressionEngine, useAsDefault);
         return this;
     }
 
     public ControlComponentOptions UseExpressionEngineResolver(
         Func<string?, IFlowExpressionEngine> resolver)
     {
-        _expressionEngineResolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+        _expressionEngines.UseResolver(resolver);
         return this;
     }
 
@@ -74,40 +67,19 @@ public sealed class ControlComponentOptions
 
     public ControlComponentOptions UseDefaultContextFactory(IControlContextFactory contextFactory)
     {
-        _defaultContextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        _contextFactories.UseDefault(contextFactory);
         return this;
     }
 
     public ControlComponentOptions UseContextFactory<TInput>(IFlowMapContextFactory<TInput> contextFactory)
     {
         ArgumentNullException.ThrowIfNull(contextFactory);
-        _contextFactories[typeof(TInput)] = new TypedContextFactory<TInput>(contextFactory);
+        _contextFactories.Register(typeof(TInput), new TypedContextFactory<TInput>(contextFactory));
         return this;
     }
 
     internal IFlowExpressionEngine ResolveExpressionEngine(string? name)
-    {
-        if (_expressionEngineResolver is not null)
-        {
-            var resolved = _expressionEngineResolver(name);
-            return resolved ?? throw new InvalidOperationException(
-                "Control expression engine resolver returned null.");
-        }
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return _defaultExpressionEngine ?? throw new InvalidOperationException(
-                "Control components require an expression engine.");
-        }
-
-        if (_expressionEngines.TryGetValue(name.Trim(), out var expressionEngine))
-        {
-            return expressionEngine;
-        }
-
-        throw new InvalidOperationException(
-            $"Control expression engine '{name}' is not registered.");
-    }
+        => _expressionEngines.Resolve(name);
 
     internal Type ResolveType(string name)
     {
@@ -134,20 +106,7 @@ public sealed class ControlComponentOptions
     {
         ArgumentNullException.ThrowIfNull(inputType);
 
-        if (_contextFactories.TryGetValue(inputType, out var exact))
-        {
-            return exact;
-        }
-
-        foreach (var (candidateType, factory) in _contextFactories)
-        {
-            if (candidateType.IsAssignableFrom(inputType))
-            {
-                return factory;
-            }
-        }
-
-        return _defaultContextFactory;
+        return _contextFactories.Resolve(inputType);
     }
 
     private sealed class TypedContextFactory<TInput>(IFlowMapContextFactory<TInput> inner)

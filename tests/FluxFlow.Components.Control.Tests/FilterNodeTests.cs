@@ -123,6 +123,42 @@ public sealed class FilterNodeTests
         diagnostic.Attributes["expressionId"].ShouldBe("filter-v1");
     }
 
+    [Fact]
+    public async Task FilterNode_UsesMostSpecificAssignableContextFactory()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, context, _) => context.Variables["matches"]))
+                .RegisterType<MoreDerivedMessage>("message")
+                .UseContextFactory<BaseMessage>(new TestContextFactory<BaseMessage>(matches: false))
+                .UseContextFactory<DerivedMessage>(new TestContextFactory<DerivedMessage>(matches: true)),
+            new
+            {
+                expression = "matches",
+                inputType = "message"
+            });
+        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
+            .ShouldBeOfType<InputPort<MoreDerivedMessage>>();
+        var output = runtimeNode.FindOutput(new PortName(ControlComponentPorts.Output));
+        output.ShouldNotBeNull();
+        var results = new BufferBlock<MoreDerivedMessage>();
+        output.TryLinkTo(
+            new InputPort<MoreDerivedMessage>(
+                new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                results),
+            propagateCompletion: true,
+            out var error);
+        error.ShouldBeNull();
+
+        var message = new MoreDerivedMessage("value");
+        await input.Target.SendAsync(message);
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(message);
+    }
+
     private static RuntimeNode CreateNode(
         Action<Options.ControlComponentOptions> configure,
         object configuration)
@@ -131,5 +167,25 @@ public sealed class FilterNodeTests
             .RegisterControlComponents(configure);
         registry.TryGetFactory(ControlComponentTypes.Filter, out var factory).ShouldBeTrue();
         return factory(ControlTestHost.CreateContext(ControlComponentTypes.Filter, configuration));
+    }
+
+    private record BaseMessage(string Value);
+
+    private record DerivedMessage(string Value) : BaseMessage(Value);
+
+    private sealed record MoreDerivedMessage(string Value) : DerivedMessage(Value);
+
+    private sealed class TestContextFactory<TInput>(bool matches) : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["matches"] = matches
+                }
+            };
     }
 }

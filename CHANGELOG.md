@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Control 0.3.0-alpha.1
+
+Expression support hardening.
+
+- Uses `FluxFlow.Components.Expressions` internally for expression engine and
+  context factory registration.
+- Preserves the existing public Control registration API.
+- No control port or runtime behavior changes.
+
 ## FluxFlow.Components.Mapping 0.2.0-alpha.1
 
 Expression support hardening.
