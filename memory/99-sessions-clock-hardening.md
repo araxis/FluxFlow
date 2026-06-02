@@ -32,8 +32,15 @@ timing can provide their own clock.
   - `SystemSessionClock`
   - `SessionsComponentOptions.UseClock(...)`
 
-## Planned Verification
+## Verification
 
-- Focused Sessions tests.
-- Full solution build and test pass.
-- Package pack and public package smoke after release.
+- Focused Sessions tests passed: 13 tests.
+- Full solution build passed in Release with 0 warnings.
+- Full solution tests passed in Release.
+- Package pack passed and produced
+  `FluxFlow.Components.Sessions.0.2.0-alpha.1.nupkg`.
+- Release commit: `5c19701`.
+- Release tag: `components-sessions-v0.2.0-alpha.1`.
+- Release workflow run: `26833142464`, success.
+- Main verification run: `26833129238`, success.
+- Fresh public-feed restore/build smoke passed on attempt 4.

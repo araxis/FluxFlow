@@ -174,6 +174,8 @@ Date: 2026-05-31
   public-feed restore/build smoke test.
 - Started `FluxFlow.Components.Sessions` `0.2.0-alpha.1` with host-provided
   session clocks for deterministic recorder timestamps and replay timing.
+- Published `FluxFlow.Components.Sessions` `0.2.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
 
 ## Remaining
 

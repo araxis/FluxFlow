@@ -163,5 +163,5 @@ after the core component package has settled.
     delay scheduling and sequence timestamps. Done in
     `98-sources-clock-hardening.md`.
 25. Harden deterministic Sessions behavior with a host-provided session clock
-    for recorder timestamps and replay delays. Started in
+    for recorder timestamps and replay delays. Done in
     `99-sessions-clock-hardening.md`.
