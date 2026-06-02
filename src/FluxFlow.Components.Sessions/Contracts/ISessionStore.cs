@@ -18,6 +18,10 @@ public interface ISessionStore
         SessionCompleteRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<SessionMetadata>> QuerySessionsAsync(
+        SessionQueryRequest request,
+        CancellationToken cancellationToken = default);
+
     IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
         SessionReadRequest request,
         CancellationToken cancellationToken = default);

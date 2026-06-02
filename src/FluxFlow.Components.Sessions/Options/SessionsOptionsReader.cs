@@ -74,6 +74,34 @@ internal static class SessionsOptionsReader
         };
     }
 
+    public static SessionQueryOptions ReadQueryOptions(NodeDefinition definition)
+    {
+        var options = Read<SessionQueryOptions>(definition);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                "session.query option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (options.Limit <= 0)
+        {
+            throw new InvalidOperationException(
+                "session.query option 'limit' must be greater than zero.");
+        }
+
+        if (!options.IncludeActive && !options.IncludeCompleted)
+        {
+            throw new InvalidOperationException(
+                "session.query must include active sessions, completed sessions, or both.");
+        }
+
+        ValidateOptionalText(options.Store, "store", "session.query");
+        ValidateOptionalText(options.Name, "name", "session.query");
+        ValidateOptionalText(options.NamePrefix, "namePrefix", "session.query");
+        ValidateTags(options.Tags, "session.query");
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);

@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Sessions 0.3.0-alpha.1
+
+Session metadata query node.
+
+- Adds `session.query` for neutral session metadata queries.
+- Adds `SessionQueryRequest` and `SessionQueryResult` contracts.
+- Adds aggregate query results plus optional per-session outputs.
+- Keeps concrete persistence and retention policy outside the package.
+
 ## FluxFlow.Components.Routing 0.10.0-alpha.1
 
 Explicit routing result timestamps.

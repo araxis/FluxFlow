@@ -10,4 +10,7 @@ public static class SessionsDiagnosticNames
     public const string ReplayEmitted = "session.replay.emitted";
     public const string ReplayCompleted = "session.replay.completed";
     public const string ReplayFailed = "session.replay.failed";
+    public const string QueryStarted = "session.query.started";
+    public const string QueryCompleted = "session.query.completed";
+    public const string QueryFailed = "session.query.failed";
 }

@@ -103,6 +103,74 @@ internal sealed class InMemorySessionStore : ISessionStore
         }
     }
 
+    public Task<IReadOnlyList<SessionMetadata>> QuerySessionsAsync(
+        SessionQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        lock (_gate)
+        {
+            IEnumerable<SessionMetadata> query = _sessions.Values
+                .Select(state => state.Metadata);
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                query = query.Where(session =>
+                    StringComparer.Ordinal.Equals(session.Name, request.Name));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.NamePrefix))
+            {
+                query = query.Where(session =>
+                    session.Name?.StartsWith(request.NamePrefix, StringComparison.Ordinal) == true);
+            }
+
+            if (request.StartedFrom.HasValue)
+            {
+                query = query.Where(session => session.StartedAt >= request.StartedFrom.Value);
+            }
+
+            if (request.StartedTo.HasValue)
+            {
+                query = query.Where(session => session.StartedAt <= request.StartedTo.Value);
+            }
+
+            if (request.EndedFrom.HasValue)
+            {
+                query = query.Where(session => session.EndedAt >= request.EndedFrom.Value);
+            }
+
+            if (request.EndedTo.HasValue)
+            {
+                query = query.Where(session => session.EndedAt <= request.EndedTo.Value);
+            }
+
+            if (request.IncludeActive == false)
+            {
+                query = query.Where(session => session.EndedAt is not null);
+            }
+
+            if (request.IncludeCompleted == false)
+            {
+                query = query.Where(session => session.EndedAt is null);
+            }
+
+            foreach (var (key, value) in request.Tags)
+            {
+                query = query.Where(session =>
+                    session.Tags.TryGetValue(key, out var actual) &&
+                    StringComparer.Ordinal.Equals(actual, value));
+            }
+
+            var sessions = query
+                .OrderBy(session => session.StartedAt)
+                .Take(request.Limit ?? int.MaxValue)
+                .Select(CopySession)
+                .ToArray();
+            return Task.FromResult<IReadOnlyList<SessionMetadata>>(sessions);
+        }
+    }
+
     public async IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
         SessionReadRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -148,6 +216,12 @@ internal sealed class InMemorySessionStore : ISessionStore
         => record with
         {
             Attributes = CopyDictionary(record.Attributes)
+        };
+
+    private static SessionMetadata CopySession(SessionMetadata session)
+        => session with
+        {
+            Tags = CopyDictionary(session.Tags)
         };
 
     private static Dictionary<string, string> CopyDictionary(Dictionary<string, string>? source)

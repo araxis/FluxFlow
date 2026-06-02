@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Sessions</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.3.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable session recording and replay components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds host-provided session clocks for deterministic recorder timestamps and replay timing.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds session.query for neutral session metadata queries with aggregate and per-session outputs.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

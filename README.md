@@ -211,7 +211,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
 | `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |
 | `FluxFlow.Components.Timers` | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` | Interval, cron schedule, delay, rate-limit, and quiet-period timing nodes. |
-| `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay` | Host-store-backed session recording and replay. |
+| `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay`, `session.query` | Host-store-backed session recording, replay, and metadata query. |
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
 | `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.query`, `storage.delete` | Host-store-backed logical record storage. |
 | `FluxFlow.Components.Storage.FileSystem` | adapter only | File-system-backed adapter for storage nodes. |

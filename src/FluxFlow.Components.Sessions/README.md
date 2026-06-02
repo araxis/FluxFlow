@@ -8,6 +8,7 @@ Reusable session recording and replay components for FluxFlow.
 |-----------|-------|---------|
 | `session.recorder` | `Input` -> `Output`, `Errors` | Records incoming messages into a host-provided session store. |
 | `session.replay` | `Output`, `Errors` | Replays stored session messages as a source stream. |
+| `session.query` | `Input` -> `Output`, `Sessions`, `Errors` | Queries session metadata from a host-provided session store. |
 
 ## Storage
 
@@ -75,6 +76,27 @@ Replay modes:
 `UseClock(...)` controls replay delays for fixed interval, real-time, and
 multiplier modes. Without it, sessions use the system clock.
 
+## Query
+
+```json
+{
+  "type": "session.query",
+  "name": "query",
+  "store": "default",
+  "namePrefix": "sample",
+  "limit": 100,
+  "boundedCapacity": 128
+}
+```
+
+`session.query` consumes `SessionQueryRequest` and emits `SessionQueryResult`
+on `Output`. When `emitSessionOutputs` is enabled, each matching
+`SessionMetadata` is also emitted on `Sessions`.
+
+The request can filter by name, name prefix, tags, started/ended ranges, active
+or completed status, and limit. Query failures are emitted through `Errors` and
+later requests continue.
+
 ## Contracts
 
 The package includes:
@@ -82,6 +104,8 @@ The package includes:
 - `SessionRecordInput`
 - `SessionRecord`
 - `SessionMetadata`
+- `SessionQueryRequest`
+- `SessionQueryResult`
 - `ISessionStore`
 - `ISessionStoreFactory`
 - `ISessionClock`

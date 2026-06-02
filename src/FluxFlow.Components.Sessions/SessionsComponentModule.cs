@@ -17,7 +17,10 @@ public sealed class SessionsComponentModule : IFlowNodeModule
                 context => SessionRecorderNode.Create(context, options)),
             new FlowNodeRegistration(
                 SessionsComponentTypes.Replay,
-                context => SessionReplayNode.Create(context, options))
+                context => SessionReplayNode.Create(context, options)),
+            new FlowNodeRegistration(
+                SessionsComponentTypes.Query,
+                context => SessionQueryNode.Create(context, options))
         ];
     }
 
