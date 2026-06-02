@@ -32,18 +32,32 @@ Non-success status codes do not fault the node. Responses are emitted with
 `Success = false`. When `treatNonSuccessStatusAsError` is enabled, the response
 is still emitted and a matching error item is also emitted.
 
-## Sender Ownership
+## Runtime Timing
 
-The package includes a default per-node sender. Hosts that need named clients,
-shared clients, custom authentication, tracing, proxy settings, or test doubles
-can provide `IHttpRequestSenderFactory` through registration:
+Responses and request errors use the package clock for timestamps and elapsed
+milliseconds. Existing callers use the default system clock. Hosts and tests can
+provide a deterministic clock through registration:
 
 ```csharp
 registry.RegisterHttpComponents(options => options
+    .UseClock(httpClock));
+```
+
+## Sender Ownership
+
+The package includes a default per-node sender. Hosts that need named clients,
+shared clients, custom authentication, tracing, proxy settings, deterministic
+time, or test doubles can provide `IHttpRequestSenderFactory` through
+registration:
+
+```csharp
+registry.RegisterHttpComponents(options => options
+    .UseClock(httpClock)
     .UseRequestSenderFactory(myFactory));
 ```
 
-The package disposes senders it creates through the configured factory.
+The sender factory receives the resolved node options and configured clock. The
+package disposes senders it creates through the configured factory.
 
 ## Composition Guidance
 

@@ -2,7 +2,7 @@ namespace FluxFlow.Components.Http.Contracts;
 
 public sealed record HttpResponseOutput
 {
-    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; init; }
     public string Method { get; init; } = "";
     public string Url { get; init; } = "";
     public int StatusCode { get; init; }

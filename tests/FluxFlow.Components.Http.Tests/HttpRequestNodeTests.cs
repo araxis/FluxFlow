@@ -1,6 +1,7 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Diagnostics;
 using FluxFlow.Components.Http.Options;
+using FluxFlow.Components.Http.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -65,6 +66,42 @@ public sealed class HttpRequestNodeTests
         captured.Headers["X-Request"].ShouldBe("one");
         captured.ContentType.ShouldBe("application/json");
         Encoding.UTF8.GetString(captured.BodyBytes!).ShouldBe("""{"name":"flux"}""");
+    }
+
+    [Fact]
+    public async Task Request_UsesConfiguredClockForResponseTiming()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-06-02T10:00:00Z");
+        var completedAt = DateTimeOffset.Parse("2026-06-02T10:00:02.500Z");
+        var clock = new RecordingHttpClock(startedAt, completedAt);
+        IHttpClock? capturedClock = null;
+        var runtimeNode = CreateNode(
+            options => options
+                .UseClock(clock)
+                .UseRequestSender((context) =>
+                {
+                    capturedClock = context.Clock;
+                    return new DelegateSender((sendContext, _) =>
+                        Task.FromResult(CreateResponse(sendContext, 200, "ok") with
+                        {
+                            Timestamp = DateTimeOffset.UnixEpoch,
+                            ElapsedMilliseconds = 42
+                        }));
+                }),
+            new { });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(
+            runtimeNode,
+            HttpComponentPorts.Output);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/ok" });
+        input.Target.Complete();
+        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        capturedClock.ShouldBeSameAs(clock);
+        response.Timestamp.ShouldBe(completedAt);
+        response.ElapsedMilliseconds.ShouldBe(2500);
     }
 
     [Fact]
@@ -180,6 +217,33 @@ public sealed class HttpRequestNodeTests
         error.Kind.ShouldBe(HttpErrorKind.InvalidUrl);
         response.Success.ShouldBeTrue();
         response.Body.ShouldBe("ok");
+    }
+
+    [Fact]
+    public async Task Request_UsesConfiguredClockForRequestErrors()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-06-02T11:00:00Z");
+        var failedAt = DateTimeOffset.Parse("2026-06-02T11:00:01.250Z");
+        var clock = new RecordingHttpClock(startedAt, failedAt);
+        var runtimeNode = CreateNode(
+            options => options
+                .UseClock(clock)
+                .UseRequestSender((_) => new DelegateSender((context, _) =>
+                    Task.FromResult(CreateResponse(context, 200, "ok")))),
+            new { });
+        var input = GetInput(runtimeNode);
+        var errors = LinkOutput<HttpErrorOutput>(
+            runtimeNode,
+            HttpComponentPorts.Errors);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = "relative" });
+        input.Target.Complete();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Kind.ShouldBe(HttpErrorKind.InvalidUrl);
+        error.Timestamp.ShouldBe(failedAt);
+        error.ElapsedMilliseconds.ShouldBe(1250);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using FluxFlow.Components.Http.Contracts;
+using FluxFlow.Components.Http.Timing;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -9,6 +10,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
     public IHttpRequestSender Create(HttpRequestSenderContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(context.Clock);
 
         var handler = new HttpClientHandler
         {
@@ -19,10 +21,12 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
             Timeout = Timeout.InfiniteTimeSpan
         };
 
-        return new HttpClientRequestSender(client);
+        return new HttpClientRequestSender(client, context.Clock);
     }
 
-    private sealed class HttpClientRequestSender(HttpClient client) : IHttpRequestSender
+    private sealed class HttpClientRequestSender(
+        HttpClient client,
+        IHttpClock clock) : IHttpRequestSender
     {
         public async Task<HttpResponseOutput> SendAsync(
             HttpRequestSendContext context,
@@ -31,7 +35,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
             ArgumentNullException.ThrowIfNull(context);
 
             using var request = CreateRequest(context);
-            var startedAt = DateTimeOffset.UtcNow;
+            var startedAt = clock.UtcNow;
             using var response = await client.SendAsync(
                     request,
                     HttpCompletionOption.ResponseHeadersRead,
@@ -45,9 +49,10 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
                 .ConfigureAwait(false);
             var contentType = response.Content.Headers.ContentType?.ToString();
 
+            var completedAt = clock.UtcNow;
             return new HttpResponseOutput
             {
-                Timestamp = DateTimeOffset.UtcNow,
+                Timestamp = completedAt,
                 Method = context.Method,
                 Url = context.Url.ToString(),
                 StatusCode = (int)response.StatusCode,
@@ -56,9 +61,9 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
                 BodyBytes = bodyBytes,
                 Body = DecodeBody(bodyBytes, response.Content.Headers.ContentType),
                 ContentType = contentType,
-                ElapsedMilliseconds = Math.Max(
-                    0,
-                    (long)(DateTimeOffset.UtcNow - startedAt).TotalMilliseconds),
+                ElapsedMilliseconds = HttpClockSupport.GetElapsedMilliseconds(
+                    startedAt,
+                    completedAt),
                 Success = ((int)response.StatusCode) is >= 200 and <= 299,
                 BodyTruncated = false
             };

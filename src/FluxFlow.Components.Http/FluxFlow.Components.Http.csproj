@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>0.1.1-alpha.1</Version>
+    <Version>0.2.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable HTTP request components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilds the package against FluxFlow.Engine 1.0.0 and its stable node identity boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds host-provided HTTP clock support for deterministic response and error timestamps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

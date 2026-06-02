@@ -116,6 +116,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   deterministic logger, counter, and metrics timestamps.
 - `105-state-clock-hardening.md`: state clock hardening for deterministic
   reducer result timestamps.
+- `106-http-clock-hardening.md`: HTTP clock hardening for deterministic
+  response and error timing.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

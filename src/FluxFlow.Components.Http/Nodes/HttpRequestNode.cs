@@ -1,9 +1,9 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Diagnostics;
 using FluxFlow.Components.Http.Options;
+using FluxFlow.Components.Http.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
-using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 
@@ -13,6 +13,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 {
     private readonly HttpRequestNodeOptions _options;
     private readonly IHttpRequestSender _sender;
+    private readonly IHttpClock _clock;
     private readonly ActionBlock<HttpRequestInput> _input;
     private readonly BufferBlock<HttpResponseOutput> _output;
     private readonly BufferBlock<HttpErrorOutput> _errors;
@@ -20,10 +21,12 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 
     private HttpRequestNode(
         HttpRequestNodeOptions options,
-        IHttpRequestSender sender)
+        IHttpRequestSender sender,
+        IHttpClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -70,10 +73,11 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         var sender = componentOptions.RequestSenderFactory.Create(new HttpRequestSenderContext
         {
             Address = context.Address,
-            Options = options
+            Options = options,
+            Clock = componentOptions.Clock
         }) ?? throw new InvalidOperationException(
             "http.request sender factory returned null.");
-        var node = new HttpRequestNode(options, sender);
+        var node = new HttpRequestNode(options, sender, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(HttpComponentPorts.Input, node.Input)
@@ -117,7 +121,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var stopwatch = Stopwatch.StartNew();
+        var startedAt = _clock.UtcNow;
         HttpRequestSendContext sendContext;
         try
         {
@@ -130,7 +134,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     exception.Kind,
                     exception.Message,
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception.InnerException)
                 .ConfigureAwait(false);
             return;
@@ -141,11 +145,13 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         {
             var response = await _sender.SendAsync(sendContext, timeout.Token)
                 .ConfigureAwait(false);
+            var timing = CaptureTiming(startedAt);
             response = response with
             {
+                Timestamp = timing.Timestamp,
                 Method = sendContext.Method,
                 Url = sendContext.Url.ToString(),
-                ElapsedMilliseconds = stopwatch.ElapsedMilliseconds
+                ElapsedMilliseconds = timing.ElapsedMilliseconds
             };
 
             await _output.SendAsync(response).ConfigureAwait(false);
@@ -166,7 +172,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                         HttpErrorKind.NonSuccessStatus,
                         $"http.request received status code {response.StatusCode}.",
                         input,
-                        stopwatch.ElapsedMilliseconds,
+                        timing,
                         statusCode: response.StatusCode,
                         reasonPhrase: response.ReasonPhrase,
                         resolvedUrl: response.Url,
@@ -181,7 +187,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     HttpErrorKind.Timeout,
                     "http.request timed out.",
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception,
                     resolvedUrl: sendContext.Url.ToString(),
                     method: sendContext.Method)
@@ -194,7 +200,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     HttpErrorKind.Network,
                     $"http.request failed: {exception.Message}",
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception,
                     exception.StatusCode.HasValue ? (int)exception.StatusCode.Value : null,
                     resolvedUrl: sendContext.Url.ToString(),
@@ -208,7 +214,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     HttpErrorKind.ResponseTooLarge,
                     exception.Message,
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception,
                     resolvedUrl: sendContext.Url.ToString(),
                     method: sendContext.Method)
@@ -221,7 +227,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     HttpErrorKind.Canceled,
                     "http.request was canceled.",
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception,
                     resolvedUrl: sendContext.Url.ToString(),
                     method: sendContext.Method)
@@ -234,7 +240,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                     HttpErrorKind.SendFailed,
                     $"http.request failed: {exception.Message}",
                     input,
-                    stopwatch.ElapsedMilliseconds,
+                    CaptureTiming(startedAt),
                     exception,
                     resolvedUrl: sendContext.Url.ToString(),
                     method: sendContext.Method)
@@ -357,7 +363,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         HttpErrorKind kind,
         string message,
         HttpRequestInput input,
-        long elapsedMilliseconds,
+        HttpRequestTiming timing,
         Exception? exception = null,
         int? statusCode = null,
         string? reasonPhrase = null,
@@ -366,13 +372,14 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     {
         var error = new HttpErrorOutput
         {
+            Timestamp = timing.Timestamp,
             Kind = kind,
             Message = message,
             StatusCode = statusCode,
             ReasonPhrase = reasonPhrase,
             Method = method ?? input.Method,
             Url = resolvedUrl ?? input.Url,
-            ElapsedMilliseconds = elapsedMilliseconds
+            ElapsedMilliseconds = timing.ElapsedMilliseconds
         };
 
         await _errors.SendAsync(error).ConfigureAwait(false);
@@ -480,4 +487,16 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         public int Code { get; } = code;
         public HttpErrorKind Kind { get; } = kind;
     }
+
+    private HttpRequestTiming CaptureTiming(DateTimeOffset startedAt)
+    {
+        var completedAt = _clock.UtcNow;
+        return new HttpRequestTiming(
+            completedAt,
+            HttpClockSupport.GetElapsedMilliseconds(startedAt, completedAt));
+    }
+
+    private readonly record struct HttpRequestTiming(
+        DateTimeOffset Timestamp,
+        long ElapsedMilliseconds);
 }

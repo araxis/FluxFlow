@@ -179,3 +179,6 @@ after the core component package has settled.
     `104-observability-clock-hardening.md`.
 30. Harden deterministic State behavior with a host-provided state clock for
     reducer result timestamps. Done in `105-state-clock-hardening.md`.
+31. Harden deterministic HTTP behavior with a host-provided HTTP clock for
+    response and error timestamps plus elapsed milliseconds. In progress in
+    `106-http-clock-hardening.md`.
