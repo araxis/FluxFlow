@@ -32,7 +32,7 @@ is ready to be promoted to a stable engine release.
 - Release-note extraction: passed.
 - Local package pack: passed.
 - Local package install smoke test: passed.
-- Branch CI after commit.
+- Branch CI after release-prep commit: passed (`26814635047`).
 - Release workflow after tag.
 - Public package restore smoke test.
 
@@ -45,5 +45,6 @@ output and compiled a minimal consumer against:
 
 ## Next Step
 
-Run the release gates, commit the release-prep changes, push `main`, then
-publish by pushing `engine-v1.0.0` if branch CI is green.
+Publish `FluxFlow.Engine` `1.0.0` only after the component compatibility
+rebuild commit is also green. Then publish the rebuilt component packages so
+consumers do not mix the stable engine boundary with old component binaries.

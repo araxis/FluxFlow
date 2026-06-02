@@ -79,6 +79,11 @@ Component packages move independently from the engine package. Keep their
 dependency range narrow at first, then loosen it only after real consumers prove
 compatibility.
 
+When an engine prerelease moves public node-authoring types, republish every
+published component package that references the engine, even if the component
+behavior did not change. Use a patch prerelease bump and describe it as an
+engine compatibility rebuild.
+
 Recommended early pattern:
 
 ```text

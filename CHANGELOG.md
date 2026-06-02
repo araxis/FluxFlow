@@ -17,6 +17,168 @@ Stable engine release.
 - No public API changes were added after `0.6.0-beta.1`; `1.0.0` is the stable
   promotion of the beta engine boundary.
 
+## FluxFlow.Components.Assertions 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Control 0.2.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.FileSystem 0.4.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Http 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Mapping 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Metrics 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Mqtt 0.2.2-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Observability 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Payloads 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Routing 0.6.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Serialization 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Sessions 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Sources 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.State 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Storage 0.2.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Storage.FileSystem 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Timers 0.4.2-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
+## FluxFlow.Components.Validation 0.1.1-alpha.1
+
+Engine compatibility rebuild.
+
+- Rebuilt the package against `FluxFlow.Engine` `1.0.0`.
+- Aligns package binaries with the stable `FlowNodeId` namespace in
+  `FluxFlow.Engine.Components`.
+- No component behavior changes.
+
 ## FluxFlow.Engine 0.6.0-beta.1
 
 Engine beta readiness release.
