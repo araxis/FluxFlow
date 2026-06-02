@@ -1,5 +1,33 @@
 # Changelog
 
+## FluxFlow.Components.Storage.Local 0.2.0-alpha.1
+
+Local storage query support.
+
+- Added `QueryAsync` to `LocalStorageStore`.
+- Added local filtering by collection, key prefix, exact-match attributes,
+  stored time bounds, expiration policy, and limit.
+- Kept the existing one-file-per-record persisted format unchanged.
+- Added focused coverage for filtered queries, expired-record query behavior,
+  and registration through the storage query node.
+
+## FluxFlow.Components.Storage 0.2.0-alpha.1
+
+Logical storage query primitive.
+
+- Added `storage.query` with `Input`, `Result`, `Records`, and `Errors` ports.
+- Added `StorageQueryRequest` and `StorageQueryResult` contracts.
+- Added `IStorageStore.QueryAsync(...)` for host-provided stores.
+- Added filters for collection, key prefix, exact-match attributes, stored time
+  bounds, expiration policy, and limit.
+- Added options for default collection, default limit, result record payloads,
+  per-record output emission, and bounded capacity.
+- Added per-message query failures as `FlowError` so later messages continue.
+- Added diagnostics for query completion and query failures.
+- Updated the storage composition sample to include `storage.query`.
+- Added focused coverage for query results, record streaming, suppression
+  options, failures, registration, and sample store behavior.
+
 ## FluxFlow.Components.Routing 0.6.0-alpha.1
 
 Merge, fork, and route-envelope primitives.

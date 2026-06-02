@@ -19,6 +19,9 @@ public sealed class StorageComponentModule : IFlowNodeModule
                 StorageComponentTypes.Get,
                 context => StorageGetNode.Create(context, options)),
             new FlowNodeRegistration(
+                StorageComponentTypes.Query,
+                context => StorageQueryNode.Create(context, options)),
+            new FlowNodeRegistration(
                 StorageComponentTypes.Delete,
                 context => StorageDeleteNode.Create(context, options))
         ];

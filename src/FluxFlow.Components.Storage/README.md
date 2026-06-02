@@ -11,6 +11,7 @@ provide the concrete store through an adapter.
 |-----------|-------|---------|
 | `storage.put` | `Input` -> `Result`, `Errors` | Stores or updates a logical record. |
 | `storage.get` | `Input` -> `Result`, `Found`, `NotFound`, `Errors` | Reads a logical record and routes found/missing results. |
+| `storage.query` | `Input` -> `Result`, `Records`, `Errors` | Queries records by collection, key prefix, attributes, time bounds, and limit. |
 | `storage.delete` | `Input` -> `Result`, `Errors` | Deletes a logical record and reports whether it existed. |
 
 ## Store Ownership
@@ -64,6 +65,29 @@ the node mode per item.
 routed to `NotFound`. Missing records are normal results, not processing
 errors.
 
+## Query
+
+```json
+{
+  "type": "storage.query",
+  "store": "default",
+  "collection": "items",
+  "limit": 100,
+  "includeExpired": false,
+  "emitRecordsInResult": true,
+  "emitRecordOutputs": true,
+  "boundedCapacity": 128
+}
+```
+
+`storage.query` consumes `StorageQueryRequest` and emits one
+`StorageQueryResult` on `Result`. The `Records` port emits each returned
+`StorageRecord` when `emitRecordOutputs` is true.
+
+Requests can filter by collection, key prefix, exact-match attributes, stored
+time bounds, expired-record policy, and limit. Store failures emit `FlowError`
+and the node continues processing later messages.
+
 ## Delete
 
 ```json
@@ -85,7 +109,9 @@ Core contracts:
 
 - `StoragePutRequest`
 - `StorageGetRequest`
+- `StorageQueryRequest`
 - `StorageDeleteRequest`
+- `StorageQueryResult`
 - `StorageResult`
 - `StorageRecord`
 - `StorageWriteMode`

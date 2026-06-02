@@ -118,6 +118,50 @@ internal static class SampleApplicationDefinition
             }
         };
 
+    public static ApplicationDefinition CreateQuery()
+        => new()
+        {
+            Workflows =
+            {
+                ["query"] = new WorkflowDefinition
+                {
+                    Nodes =
+                    {
+                        ["source"] = new NodeDefinition
+                        {
+                            Type = SampleNodeTypes.QuerySource,
+                            Phase = 1
+                        },
+                        ["store"] = new NodeDefinition
+                        {
+                            Type = StorageComponentTypes.Query,
+                            Configuration =
+                            {
+                                ["collection"] = JsonValue("items"),
+                                ["boundedCapacity"] = JsonValue(8)
+                            },
+                            Ports =
+                            {
+                                [StorageComponentPorts.Input] = JsonValue("source.Output")
+                            }
+                        },
+                        ["sink"] = new NodeDefinition
+                        {
+                            Type = SampleNodeTypes.QueryResultSink,
+                            Configuration =
+                            {
+                                ["stage"] = JsonValue("query")
+                            },
+                            Ports =
+                            {
+                                ["Input"] = JsonValue("store.Result")
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
     public static ApplicationDefinition CreateDelete()
         => new()
         {

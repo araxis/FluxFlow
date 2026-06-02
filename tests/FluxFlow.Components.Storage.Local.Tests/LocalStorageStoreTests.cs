@@ -124,6 +124,78 @@ public sealed class LocalStorageStoreTests
     }
 
     [Fact]
+    public async Task Query_FiltersRecordsAndHonorsLimit()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a-1",
+            Value = "one",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" }
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a-2",
+            Value = "two",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" }
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "b-1",
+            Value = "three",
+            Attributes = new Dictionary<string, string> { ["kind"] = "beta" }
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "other",
+            Key = "a-3",
+            Value = "other",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" }
+        });
+
+        var records = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            KeyPrefix = "a-",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" },
+            Limit = 1
+        });
+
+        records.ShouldHaveSingleItem().Key.ShouldBe("a-1");
+    }
+
+    [Fact]
+    public async Task Query_HonorsExpiration()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "expired",
+            Value = "old",
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+
+        var current = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items"
+        });
+        var expired = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            IncludeExpired = true
+        });
+
+        current.ShouldBeEmpty();
+        expired.ShouldHaveSingleItem().Key.ShouldBe("expired");
+    }
+
+    [Fact]
     public async Task Delete_ReturnsFoundAndMissingResults()
     {
         using var temp = TempDirectory.Create();
@@ -281,6 +353,40 @@ public sealed class LocalStorageStoreTests
         result.Version.ShouldBe(1);
         Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Registration_QueriesThroughStorageNode()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first"
+        });
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterStorageComponents(options => options.UseLocalStorage(temp.Path));
+        registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
+        var runtimeNode = factory(CreateContext(StorageComponentTypes.Query, new
+        {
+            collection = "items",
+            boundedCapacity = 4
+        }));
+        var input = runtimeNode.FindInput(new PortName(StorageComponentPorts.Input))
+            .ShouldBeOfType<InputPort<StorageQueryRequest>>();
+        var output = LinkOutput<StorageQueryResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest());
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Count.ShouldBe(1);
+        result.Records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
     }
 
     private static LocalStorageStore CreateStore(string rootDirectory)

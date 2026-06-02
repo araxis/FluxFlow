@@ -181,6 +181,136 @@ public sealed class StorageComponentTests
     }
 
     [Fact]
+    public async Task Query_EmitsSummaryAndRecordOutputs()
+    {
+        var store = new TestStorageStore();
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a-1",
+            Value = "one",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" },
+            Version = 1,
+            StoredAt = DateTimeOffset.UtcNow.AddMinutes(-3)
+        });
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a-2",
+            Value = "two",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" },
+            Version = 1,
+            StoredAt = DateTimeOffset.UtcNow.AddMinutes(-2)
+        });
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "b-1",
+            Value = "three",
+            Attributes = new Dictionary<string, string> { ["kind"] = "beta" },
+            Version = 1,
+            StoredAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+        var runtimeNode = CreateQuery(new
+        {
+            collection = "items",
+            limit = 10
+        }, store);
+        var input = GetInput<StorageQueryRequest>(runtimeNode);
+        var resultOutput = LinkOutput<StorageQueryResult>(runtimeNode);
+        var recordsOutput = LinkOutput<StorageRecord>(runtimeNode, StorageComponentPorts.Records);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest
+        {
+            KeyPrefix = "a-",
+            Attributes = new Dictionary<string, string> { ["kind"] = "alpha" },
+            CorrelationId = "query-a"
+        });
+        input.Target.Complete();
+
+        var result = await resultOutput.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var records = await DrainUntilCompletedAsync(recordsOutput);
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Operation.ShouldBe("query");
+        result.Collection.ShouldBe("items");
+        result.Succeeded.ShouldBeTrue();
+        result.Count.ShouldBe(2);
+        result.CorrelationId.ShouldBe("query-a");
+        result.Records.Select(record => record.Key).ShouldBe(["a-1", "a-2"]);
+        records.Select(record => record.Key).ShouldBe(["a-1", "a-2"]);
+    }
+
+    [Fact]
+    public async Task Query_CanSuppressRecordPayloadsAndOutputs()
+    {
+        var store = new TestStorageStore();
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a",
+            Value = "one",
+            Version = 1,
+            StoredAt = DateTimeOffset.UtcNow
+        });
+        var runtimeNode = CreateQuery(new
+        {
+            collection = "items",
+            emitRecordsInResult = false,
+            emitRecordOutputs = false
+        }, store);
+        var input = GetInput<StorageQueryRequest>(runtimeNode);
+        var resultOutput = LinkOutput<StorageQueryResult>(runtimeNode);
+        var recordsOutput = LinkOutput<StorageRecord>(runtimeNode, StorageComponentPorts.Records);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest());
+        input.Target.Complete();
+
+        var result = await resultOutput.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var records = await DrainUntilCompletedAsync(recordsOutput);
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Count.ShouldBe(1);
+        result.Records.ShouldBeEmpty();
+        records.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Query_ReportsFailureAndContinues()
+    {
+        var store = new TestStorageStore { FailNextQuery = true };
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a",
+            Value = "one",
+            Version = 1,
+            StoredAt = DateTimeOffset.UtcNow
+        });
+        var runtimeNode = CreateQuery(new
+        {
+            collection = "items"
+        }, store);
+        var input = GetInput<StorageQueryRequest>(runtimeNode);
+        var output = LinkOutput<StorageQueryResult>(runtimeNode);
+        var errors = LinkOutput<FlowError>(runtimeNode, StorageComponentPorts.Errors);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest());
+        await input.Target.SendAsync(new StorageQueryRequest());
+        input.Target.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        result.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Delete_EmitsDeletedAndMissingResults()
     {
         var store = new TestStorageStore();
@@ -361,6 +491,7 @@ public sealed class StorageComponentTests
 
         registry.TryGetFactory(StorageComponentTypes.Put, out _).ShouldBeTrue();
         registry.TryGetFactory(StorageComponentTypes.Get, out _).ShouldBeTrue();
+        registry.TryGetFactory(StorageComponentTypes.Query, out _).ShouldBeTrue();
         registry.TryGetFactory(StorageComponentTypes.Delete, out _).ShouldBeTrue();
     }
 
@@ -392,6 +523,16 @@ public sealed class StorageComponentTests
             .RegisterStorageComponents(options => options.UseSharedStore(store));
         registry.TryGetFactory(StorageComponentTypes.Delete, out var factory).ShouldBeTrue();
         return factory(CreateContext(StorageComponentTypes.Delete, configuration));
+    }
+
+    private static RuntimeNode CreateQuery(
+        object configuration,
+        TestStorageStore store)
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterStorageComponents(options => options.UseSharedStore(store));
+        registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
+        return factory(CreateContext(StorageComponentTypes.Query, configuration));
     }
 
     private static RuntimeNodeFactoryContext CreateContext(
@@ -471,6 +612,7 @@ public sealed class StorageComponentTests
 
         public bool FailNextPut { get; set; }
         public bool FailNextGet { get; set; }
+        public bool FailNextQuery { get; set; }
         public bool FailNextDelete { get; set; }
 
         public void Seed(StorageRecord record)
@@ -546,6 +688,35 @@ public sealed class StorageComponentTests
             return Task.FromResult<StorageRecord?>(CopyRecord(record));
         }
 
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (FailNextQuery)
+            {
+                FailNextQuery = false;
+                throw new InvalidOperationException("query failed");
+            }
+
+            var records = _records.Values
+                .Where(record => StringComparer.Ordinal.Equals(record.Collection, request.Collection))
+                .Where(record => string.IsNullOrWhiteSpace(request.KeyPrefix) ||
+                    record.Key.StartsWith(request.KeyPrefix, StringComparison.Ordinal))
+                .Where(record => !request.StoredFrom.HasValue || record.StoredAt >= request.StoredFrom.Value)
+                .Where(record => !request.StoredTo.HasValue || record.StoredAt <= request.StoredTo.Value)
+                .Where(record => !record.ExpiresAt.HasValue ||
+                    record.ExpiresAt.Value > DateTimeOffset.UtcNow ||
+                    request.IncludeExpired == true)
+                .Where(record => MatchesAttributes(record, request.Attributes))
+                .OrderBy(record => record.StoredAt)
+                .ThenBy(record => record.Key, StringComparer.Ordinal)
+                .Take(request.Limit ?? int.MaxValue)
+                .Select(CopyRecord)
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyList<StorageRecord>>(records);
+        }
+
         public Task<StorageResult> DeleteAsync(
             StorageDeleteRequest request,
             CancellationToken cancellationToken = default)
@@ -585,6 +756,22 @@ public sealed class StorageComponentTests
             => attributes is null
                 ? []
                 : new Dictionary<string, string>(attributes, StringComparer.Ordinal);
+
+        private static bool MatchesAttributes(
+            StorageRecord record,
+            Dictionary<string, string> attributes)
+        {
+            foreach (var (name, value) in attributes)
+            {
+                if (!record.Attributes.TryGetValue(name, out var current) ||
+                    !StringComparer.Ordinal.Equals(current, value))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     private sealed class DisposableStorageStore : TestStorageStore, IAsyncDisposable

@@ -127,6 +127,43 @@ internal static class StorageNodeSupport
         return attributes;
     }
 
+    public static Dictionary<string, object?> CreateCollectionAttributes(
+        string operation,
+        string? store,
+        string collection,
+        string? correlationId,
+        int? count = null,
+        int? limit = null)
+    {
+        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["operation"] = operation,
+            ["collection"] = collection
+        };
+
+        if (!string.IsNullOrWhiteSpace(store))
+        {
+            attributes["store"] = store;
+        }
+
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            attributes["correlationId"] = correlationId;
+        }
+
+        if (count.HasValue)
+        {
+            attributes["count"] = count.Value;
+        }
+
+        if (limit.HasValue)
+        {
+            attributes["limit"] = limit.Value;
+        }
+
+        return attributes;
+    }
+
     public static string CreateOperationContext(
         string operation,
         string? store,
@@ -139,6 +176,31 @@ internal static class StorageNodeSupport
             $"operation={operation}",
             $"collection={collection}",
             $"key={key}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(store))
+        {
+            values.Add($"store={store}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            values.Add($"correlationId={correlationId}");
+        }
+
+        return string.Join("; ", values);
+    }
+
+    public static string CreateCollectionContext(
+        string operation,
+        string? store,
+        string collection,
+        string? correlationId)
+    {
+        var values = new List<string>
+        {
+            $"operation={operation}",
+            $"collection={collection}"
         };
 
         if (!string.IsNullOrWhiteSpace(store))

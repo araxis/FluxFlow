@@ -11,8 +11,10 @@ internal static class SampleNodeTypes
 {
     public static readonly NodeType PutSource = new("sample.storage-put-source");
     public static readonly NodeType GetSource = new("sample.storage-get-source");
+    public static readonly NodeType QuerySource = new("sample.storage-query-source");
     public static readonly NodeType DeleteSource = new("sample.storage-delete-source");
     public static readonly NodeType ResultSink = new("sample.storage-result-sink");
+    public static readonly NodeType QueryResultSink = new("sample.storage-query-result-sink");
 }
 
 internal static class SampleComponentRegistration
@@ -38,10 +40,14 @@ internal sealed class SampleComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(SampleNodeTypes.PutSource, PutSourceNode.Create),
             new FlowNodeRegistration(SampleNodeTypes.GetSource, GetSourceNode.Create),
+            new FlowNodeRegistration(SampleNodeTypes.QuerySource, QuerySourceNode.Create),
             new FlowNodeRegistration(SampleNodeTypes.DeleteSource, DeleteSourceNode.Create),
             new FlowNodeRegistration(
                 SampleNodeTypes.ResultSink,
-                context => ResultSinkNode.Create(context, capture))
+                context => ResultSinkNode.Create(context, capture)),
+            new FlowNodeRegistration(
+                SampleNodeTypes.QueryResultSink,
+                context => QueryResultSinkNode.Create(context, capture))
         ];
     }
 
@@ -105,6 +111,35 @@ internal sealed class GetSourceNode(IReadOnlyList<string> keys)
                 CorrelationId = $"get-{key}"
             }, cancellationToken).ConfigureAwait(false);
         }
+
+        CompleteOutput();
+    }
+}
+
+internal sealed class QuerySourceNode(string? keyPrefix)
+    : SourceFlowNode<StorageQueryRequest>(new DataflowBlockOptions { BoundedCapacity = 8 })
+{
+    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var node = new QuerySourceNode(SampleNodeOptions.ReadOptionalNullable(
+            context.Definition,
+            "keyPrefix",
+            fallback: null));
+        return context.CreateNode(node)
+            .Output("Output", node.Output)
+            .Build();
+    }
+
+    public override async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await SendOutputAsync(new StorageQueryRequest
+        {
+            KeyPrefix = keyPrefix,
+            Limit = 10,
+            CorrelationId = "query-items"
+        }, cancellationToken).ConfigureAwait(false);
 
         CompleteOutput();
     }
@@ -174,6 +209,40 @@ internal sealed class ResultSinkNode : SinkFlowNode<StorageResult>
     }
 }
 
+internal sealed class QueryResultSinkNode : SinkFlowNode<StorageQueryResult>
+{
+    private readonly string _stage;
+    private readonly SampleCapture _capture;
+
+    private QueryResultSinkNode(string stage, SampleCapture capture)
+        : base(new ExecutionDataflowBlockOptions { BoundedCapacity = 8 })
+    {
+        _stage = stage;
+        _capture = capture;
+    }
+
+    public static RuntimeNode Create(RuntimeNodeFactoryContext context, SampleCapture capture)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(capture);
+
+        var node = new QueryResultSinkNode(
+            SampleNodeOptions.ReadOptional(context.Definition, "stage", "default"),
+            capture);
+        return context.CreateNode(node)
+            .Input("Input", node.Input)
+            .Build();
+    }
+
+    protected override ValueTask HandleAsync(
+        StorageQueryResult input,
+        CancellationToken cancellationToken)
+    {
+        _capture.Add(_stage, input);
+        return ValueTask.CompletedTask;
+    }
+}
+
 internal static class SampleNodeOptions
 {
     public static T ReadRequired<T>(NodeDefinition definition, string name)
@@ -187,6 +256,16 @@ internal static class SampleNodeOptions
     }
 
     public static string ReadOptional(NodeDefinition definition, string name, string fallback)
+    {
+        if (!definition.Configuration.TryGetValue(name, out var value))
+        {
+            return fallback;
+        }
+
+        return value.GetString() ?? fallback;
+    }
+
+    public static string? ReadOptionalNullable(NodeDefinition definition, string name, string? fallback)
     {
         if (!definition.Configuration.TryGetValue(name, out var value))
         {

@@ -102,6 +102,9 @@ Date: 2026-05-31
   subscription options, richer diagnostics/events, and split error codes.
 - Added Routing `0.6.0-alpha.1` work with `flow.fork`, `flow.merge`, and
   optional switch route envelopes.
+- Added Storage `0.2.0-alpha.1` and Storage.Local `0.2.0-alpha.1` work with
+  `storage.query`, query contracts, local adapter query support, and updated
+  storage sample composition.
 
 ## Remaining
 

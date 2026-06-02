@@ -63,7 +63,7 @@ Start with one package as the template before splitting everything:
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
 - `FluxFlow.Components.Storage`: host-adapter-backed logical record storage
-  nodes for put, get, and delete flows.
+  nodes for put, get, query, and delete flows.
 
 The first consumer can keep components in its own repository until the package
 boundary is stable. The first extracted package should prove the pattern before
@@ -142,3 +142,5 @@ after the core component package has settled.
     `73-routing-join-component.md`.
 18. Add same-stream fork, source-tagged merge, and optional switch route
     envelopes. Done in `74-routing-merge-fork-route-envelope.md`.
+19. Add logical storage query and local adapter query support. Done in
+    `75-storage-query-component.md`.

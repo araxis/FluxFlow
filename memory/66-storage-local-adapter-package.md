@@ -41,3 +41,6 @@ Added focused tests for:
 - factory context defaults and owned leases
 - option validation
 - storage node registration through `UseLocalStorage(...)`
+
+Query support for the local adapter was added later in
+`75-storage-query-component.md`.

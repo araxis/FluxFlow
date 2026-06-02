@@ -70,7 +70,7 @@ dotnet run --project samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompo
 ```
 
 The storage composition sample uses a host-owned in-memory store with
-`storage.put`, `storage.get`, and `storage.delete`:
+`storage.put`, `storage.get`, `storage.query`, and `storage.delete`:
 
 ```sh
 dotnet build samples/FluxFlow.StorageCompositionSample/FluxFlow.StorageCompositionSample.csproj /nr:false

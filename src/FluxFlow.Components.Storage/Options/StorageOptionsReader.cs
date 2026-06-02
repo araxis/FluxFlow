@@ -39,6 +39,16 @@ internal static class StorageOptionsReader
         return options;
     }
 
+    public static StorageQueryOptions ReadQueryOptions(NodeDefinition definition)
+    {
+        var options = Read<StorageQueryOptions>(definition);
+        ValidateBoundedCapacity("storage.query", options.BoundedCapacity);
+        ValidateOptionalText("storage.query", "store", options.Store);
+        ValidateOptionalText("storage.query", "collection", options.Collection);
+        ValidateLimit("storage.query", options.Limit);
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -66,6 +76,15 @@ internal static class StorageOptionsReader
         {
             throw new InvalidOperationException(
                 $"{nodeType} option '{optionName}' cannot be empty when set.");
+        }
+    }
+
+    private static void ValidateLimit(string nodeType, int limit)
+    {
+        if (limit <= 0)
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'limit' must be greater than zero.");
         }
     }
 }

@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Storage.Local</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Local</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Local</RootNamespace>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>0.2.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-backed local storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;local;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the initial file-backed local storage adapter package.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds query support for the file-backed local storage adapter.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

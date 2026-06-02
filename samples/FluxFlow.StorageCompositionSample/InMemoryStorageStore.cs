@@ -89,6 +89,35 @@ internal sealed class InMemoryStorageStore : IStorageStore
         }
     }
 
+    public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+        StorageQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var collection = Required(request.Collection, "collection");
+        lock (_gate)
+        {
+            var records = _records.Values
+                .Where(record => StringComparer.Ordinal.Equals(record.Collection, collection))
+                .Where(record => string.IsNullOrWhiteSpace(request.KeyPrefix) ||
+                    record.Key.StartsWith(request.KeyPrefix, StringComparison.Ordinal))
+                .Where(record => !request.StoredFrom.HasValue || record.StoredAt >= request.StoredFrom.Value)
+                .Where(record => !request.StoredTo.HasValue || record.StoredAt <= request.StoredTo.Value)
+                .Where(record => !record.ExpiresAt.HasValue ||
+                    record.ExpiresAt.Value > DateTimeOffset.UtcNow ||
+                    request.IncludeExpired == true)
+                .Where(record => MatchesAttributes(record, request.Attributes))
+                .OrderBy(record => record.StoredAt)
+                .ThenBy(record => record.Key, StringComparer.Ordinal)
+                .Take(request.Limit ?? int.MaxValue)
+                .Select(CopyRecord)
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyList<StorageRecord>>(records);
+        }
+    }
+
     public Task<StorageResult> DeleteAsync(
         StorageDeleteRequest request,
         CancellationToken cancellationToken = default)
@@ -138,4 +167,20 @@ internal sealed class InMemoryStorageStore : IStorageStore
         => source is null
             ? []
             : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+    private static bool MatchesAttributes(
+        StorageRecord record,
+        Dictionary<string, string> attributes)
+    {
+        foreach (var (name, value) in attributes)
+        {
+            if (!record.Attributes.TryGetValue(name, out var current) ||
+                !StringComparer.Ordinal.Equals(current, value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

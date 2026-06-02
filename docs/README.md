@@ -48,7 +48,7 @@ Run `samples/FluxFlow.StateCompositionSample` to see a finite timer stream
 mapped into `state.reducer` and observed by `flow.counter`.
 
 Add `FluxFlow.Components.Storage` when a workflow needs host-backed logical
-record storage through put, get, and delete nodes.
+record storage through put, get, query, and delete nodes.
 
 Run `samples/FluxFlow.StorageCompositionSample` to see the storage package with
 a host-owned store adapter.

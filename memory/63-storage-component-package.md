@@ -51,3 +51,5 @@ Added focused tests for:
 - diagnostics
 - registration
 - store lease disposal, including faulted node disposal
+
+`storage.query` was added later in `75-storage-query-component.md`.

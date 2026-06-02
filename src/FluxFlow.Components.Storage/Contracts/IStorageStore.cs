@@ -10,6 +10,10 @@ public interface IStorageStore
         StorageGetRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<StorageRecord>> QueryAsync(
+        StorageQueryRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<StorageResult> DeleteAsync(
         StorageDeleteRequest request,
         CancellationToken cancellationToken = default);

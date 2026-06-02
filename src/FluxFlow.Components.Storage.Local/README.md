@@ -7,6 +7,7 @@ implementation and registration helpers for the existing storage nodes:
 
 - `storage.put`
 - `storage.get`
+- `storage.query`
 - `storage.delete`
 
 ## Register
@@ -28,6 +29,8 @@ var registry = new RuntimeNodeFactoryRegistry()
 - create, replace, and upsert write modes
 - optimistic version checks through `ExpectedVersion`
 - expiration honored by `storage.get`
+- query by collection, key prefix, attributes, stored time bounds, expiration,
+  and limit
 - best-effort atomic writes through a temporary file then replace
 - owned store lifetime when created through `UseLocalStorage`
 

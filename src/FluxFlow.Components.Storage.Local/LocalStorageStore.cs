@@ -107,6 +107,62 @@ public sealed class LocalStorageStore : IStorageStore
         }
     }
 
+    public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+        StorageQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var collection = ResolveCollection(request.Collection);
+        var keyPrefix = Normalize(request.KeyPrefix);
+        var attributes = CopyAttributes(request.Attributes);
+        var limit = request.Limit ?? int.MaxValue;
+        if (limit <= 0)
+        {
+            throw new InvalidOperationException(
+                "Local storage query limit must be greater than zero.");
+        }
+
+        if (request.StoredFrom.HasValue &&
+            request.StoredTo.HasValue &&
+            request.StoredFrom.Value > request.StoredTo.Value)
+        {
+            throw new InvalidOperationException(
+                "Local storage query storedFrom cannot be later than storedTo.");
+        }
+
+        lock (_gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var root = GetStorePath();
+            if (!Directory.Exists(root))
+            {
+                return Task.FromResult<IReadOnlyList<StorageRecord>>([]);
+            }
+
+            var records = new List<StorageRecord>();
+            foreach (var path in Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var record = ReadRecord(path);
+                if (record is null || !Matches(record, collection, keyPrefix, attributes, request))
+                {
+                    continue;
+                }
+
+                records.Add(CopyRecord(record));
+            }
+
+            return Task.FromResult<IReadOnlyList<StorageRecord>>(
+                records
+                    .OrderBy(record => record.StoredAt)
+                    .ThenBy(record => record.Key, StringComparer.Ordinal)
+                    .Take(limit)
+                    .ToArray());
+        }
+    }
+
     public Task<StorageResult> DeleteAsync(
         StorageDeleteRequest request,
         CancellationToken cancellationToken = default)
@@ -190,6 +246,24 @@ public sealed class LocalStorageStore : IStorageStore
         string collection,
         string key)
     {
+        var record = ReadRecord(path);
+        if (record is null)
+        {
+            return null;
+        }
+
+        if (!StringComparer.Ordinal.Equals(record.Collection, collection) ||
+            !StringComparer.Ordinal.Equals(record.Key, key))
+        {
+            throw new InvalidOperationException(
+                "Local storage record path did not match record identity.");
+        }
+
+        return record;
+    }
+
+    private StorageRecord? ReadRecord(string path)
+    {
         if (!File.Exists(path))
         {
             return null;
@@ -204,13 +278,6 @@ public sealed class LocalStorageStore : IStorageStore
         {
             throw new InvalidOperationException(
                 $"Local storage record format version '{document.FormatVersion}' is not supported.");
-        }
-
-        if (!StringComparer.Ordinal.Equals(document.Collection, collection) ||
-            !StringComparer.Ordinal.Equals(document.Key, key))
-        {
-            throw new InvalidOperationException(
-                "Local storage record path did not match record identity.");
         }
 
         return document.ToRecord();
@@ -253,11 +320,62 @@ public sealed class LocalStorageStore : IStorageStore
 
     private string GetRecordPath(string collection, string key)
         => Path.Combine(
-            _settings.RootDirectory,
-            "stores",
-            Hash(_settings.StoreName),
+            GetStorePath(),
             Hash(collection),
             $"{Hash(key)}.json");
+
+    private string GetStorePath()
+        => Path.Combine(
+            _settings.RootDirectory,
+            "stores",
+            Hash(_settings.StoreName));
+
+    private static bool Matches(
+        StorageRecord record,
+        string collection,
+        string? keyPrefix,
+        Dictionary<string, string> attributes,
+        StorageQueryRequest request)
+    {
+        if (!StringComparer.Ordinal.Equals(record.Collection, collection))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyPrefix) &&
+            !record.Key.StartsWith(keyPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (request.StoredFrom.HasValue && record.StoredAt < request.StoredFrom.Value)
+        {
+            return false;
+        }
+
+        if (request.StoredTo.HasValue && record.StoredAt > request.StoredTo.Value)
+        {
+            return false;
+        }
+
+        if (record.ExpiresAt.HasValue &&
+            record.ExpiresAt.Value <= DateTimeOffset.UtcNow &&
+            request.IncludeExpired != true)
+        {
+            return false;
+        }
+
+        foreach (var (name, value) in attributes)
+        {
+            if (!record.Attributes.TryGetValue(name, out var current) ||
+                !StringComparer.Ordinal.Equals(current, value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static string Hash(string value)
     {

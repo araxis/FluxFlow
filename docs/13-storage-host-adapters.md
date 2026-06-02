@@ -5,7 +5,8 @@ contracts. It does not own a concrete database or persistence technology.
 
 That split is intentional:
 
-- The package owns `storage.put`, `storage.get`, and `storage.delete`.
+- The package owns `storage.put`, `storage.get`, `storage.query`, and
+  `storage.delete`.
 - The host owns where records live.
 - Optional adapter packages can be added later when a storage implementation is
   useful across more than one host.
@@ -49,7 +50,8 @@ FluxFlow.Components.Storage.Local
 Purpose:
 
 - provide a small local persisted `IStorageStore`
-- use the existing `storage.put`, `storage.get`, and `storage.delete` nodes
+- use the existing `storage.put`, `storage.get`, `storage.query`, and
+  `storage.delete` nodes
 - keep all host-specific app schema outside the package
 - avoid forcing a server or product database
 
@@ -88,7 +90,17 @@ The adapter should persist only the neutral storage contracts:
 - expiration timestamp
 - correlation id
 
-For v0.1, `StorageRecord.Value` can be serialized as a normal object payload.
+Query support should stay contract-shaped:
+
+- collection
+- key prefix
+- exact-match attributes
+- stored time bounds
+- expired-record policy
+- limit
+
+For the local adapter, `StorageRecord.Value` can be serialized as a normal
+object payload.
 Hosts that need exact payload control should compose serialization nodes before
 storage and store a string or byte-like value with a content type.
 
@@ -103,8 +115,9 @@ The first persisted adapter should be conservative:
 - preserve optimistic concurrency through `ExpectedVersion`
 - honor create, replace, and upsert modes
 - honor expiration on reads
+- honor query limits
 - keep writes ordered per node
-- avoid cross-process guarantees in v0.1 unless explicitly implemented
+- avoid cross-process guarantees unless explicitly implemented
 
 If a host needs multi-process coordination, shared server storage, backup
 policies, or encrypted-at-rest guarantees, it should provide its own adapter
@@ -115,8 +128,8 @@ until those requirements are stable enough to extract.
 For a host that already has internal storage nodes:
 
 1. Keep existing host-facing node ids if app files already depend on them.
-2. Map host request models into `StoragePutRequest`, `StorageGetRequest`, or
-   `StorageDeleteRequest`.
+2. Map host request models into `StoragePutRequest`, `StorageGetRequest`,
+   `StorageQueryRequest`, or `StorageDeleteRequest`.
 3. Implement `IStorageStore` over the host persistence layer.
 4. Register `FluxFlow.Components.Storage` with that store.
 5. Replace internal node behavior with package nodes or a thin host wrapper.
@@ -128,14 +141,14 @@ The wrapper can be removed later if the host can expose the package node ids
 directly. Keeping the wrapper first makes migration smaller and protects
 existing app definitions.
 
-## Acceptance For Adapter v0.1
+## Baseline Acceptance
 
 - no new workflow nodes
 - no host product concepts
 - no UI, dashboard, workspace, or scenario contracts
 - store options are explicit and validated
 - owned and shared lifetime paths are covered
-- put/get/delete behavior matches the base storage package tests
+- put/get/query/delete behavior matches the base storage package tests
 - persistence survives process restart in focused tests
 - corrupt or unreadable records fail clearly without crashing unrelated records
 - README shows the host registration pattern
