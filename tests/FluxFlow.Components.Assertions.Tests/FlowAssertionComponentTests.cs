@@ -205,6 +205,42 @@ public sealed class FlowAssertionComponentTests
     }
 
     [Fact]
+    public async Task FlowAssertionComponent_UsesMostSpecificAssignableContextFactory()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, context, _) => context.Variables["passed"]))
+                .RegisterType<MoreDerivedMessage>("message")
+                .UseContextFactory<BaseMessage>(new TestContextFactory<BaseMessage>(passed: false))
+                .UseContextFactory<DerivedMessage>(new TestContextFactory<DerivedMessage>(passed: true)),
+            new
+            {
+                expression = "passed",
+                inputType = "message"
+            });
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
+            .ShouldBeOfType<InputPort<MoreDerivedMessage>>();
+        var results = new BufferBlock<FlowAssertionResult>();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<FlowAssertionResult>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out var error);
+        error.ShouldBeNull();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new MoreDerivedMessage("value"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Passed.ShouldBeTrue();
+    }
+
+    [Fact]
     public void FlowAssertionComponent_RejectsMissingExpression()
     {
         var exception = Should.Throw<InvalidOperationException>(
@@ -227,6 +263,12 @@ public sealed class FlowAssertionComponentTests
 
     private sealed record InputMessage(int Score);
 
+    private record BaseMessage(string Value);
+
+    private record DerivedMessage(string Value) : BaseMessage(Value);
+
+    private sealed record MoreDerivedMessage(string Value) : DerivedMessage(Value);
+
     private sealed class InputMessageContextFactory : IFlowMapContextFactory<InputMessage>
     {
         public FlowMapContext Create(InputMessage input)
@@ -237,6 +279,20 @@ public sealed class FlowAssertionComponentTests
                     ["input"] = input,
                     ["value"] = input,
                     ["score"] = input.Score
+                }
+            };
+    }
+
+    private sealed class TestContextFactory<TInput>(bool passed) : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["passed"] = passed
                 }
             };
     }

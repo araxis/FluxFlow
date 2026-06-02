@@ -94,6 +94,7 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `88-routing-correlation-split-inputs.md`: routing correlation split input hardening and release-prep note.
 - `89-shared-expression-support.md`: shared expression support package and first Mapping migration.
 - `90-control-expression-support.md`: Control migration to shared expression support.
+- `91-assertions-expression-support.md`: Assertions migration to shared expression support.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

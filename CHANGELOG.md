@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Assertions 0.2.0-alpha.1
+
+Expression support hardening.
+
+- Uses `FluxFlow.Components.Expressions` internally for expression engine and
+  context factory registration.
+- Preserves the existing public Assertions registration API.
+- No assertion port or runtime behavior changes.
+
 ## FluxFlow.Components.Control 0.3.0-alpha.1
 
 Expression support hardening.
