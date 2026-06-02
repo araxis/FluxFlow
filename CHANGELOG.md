@@ -1,5 +1,22 @@
 # Changelog
 
+## FluxFlow.Engine 1.0.0
+
+Stable engine release.
+
+- Confirms `FluxFlow.Engine` as the stable protocol-neutral runtime package for
+  executable workflow definitions, typed ports, reliable fanout, conditional
+  links, runtime state, diagnostics, events, host lifecycle, and node authoring.
+- Keeps concrete protocols, storage backends, dashboards, scenarios, and
+  expression-language implementations outside the engine package.
+- Keeps component packages on their own independent prerelease or stable tracks.
+- Adds public API overview, compatibility guidance, and migration guidance from
+  the `0.5.0-alpha.1` line to the beta/stable boundary.
+- Validated the beta package with the first consumer migration before promoting
+  the engine to stable.
+- No public API changes were added after `0.6.0-beta.1`; `1.0.0` is the stable
+  promotion of the beta engine boundary.
+
 ## FluxFlow.Engine 0.6.0-beta.1
 
 Engine beta readiness release.
@@ -672,5 +689,5 @@ Initial prerelease of `FluxFlow.Engine`.
   and registration.
 - Runtime, workflow, host, event, error, and diagnostics streams.
 - Generic scenario runner with event expectations.
-- DynamicExpresso and JSONata expression adapters.
+- External expression adapter support.
 - NuGet packaging with README, symbols, repository metadata, and MIT license.

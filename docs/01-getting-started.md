@@ -6,10 +6,10 @@ sample, then build a graph from an application definition.
 ## Install
 
 ```sh
-dotnet add package FluxFlow.Engine --prerelease
+dotnet add package FluxFlow.Engine
 ```
 
-Use a prerelease version while the engine is still in alpha.
+Component packages can still be prerelease while the engine package is stable.
 
 ## Run The Sample
 
@@ -95,7 +95,8 @@ var registry = new RuntimeNodeFactoryRegistry()
 
 await using var host = FlowApplicationHost.Create(
     workspace.ToEngineDefinition(),
-    registry);
+    registry,
+    new SampleExpressionEngine());
 
 var result = await host.StartAsync();
 if (!result.IsSuccess)

@@ -74,6 +74,9 @@ for a new component package.
 11. [Package Versioning](11-package-versioning.md)
 12. [Component Composition](12-component-composition.md)
 13. [Storage Host Adapters](13-storage-host-adapters.md)
+14. [Public API Overview](14-public-api-overview.md)
+15. [Engine Compatibility](15-engine-compatibility.md)
+16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
 
 ## Current Boundary
 

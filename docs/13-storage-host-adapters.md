@@ -199,3 +199,5 @@ existing app definitions.
 - persistence survives process restart in focused tests
 - corrupt or unreadable records fail clearly without crashing unrelated records
 - README shows the host registration pattern
+
+Next: [Public API Overview](14-public-api-overview.md)
