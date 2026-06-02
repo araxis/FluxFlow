@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>0.7.0-alpha.1</Version>
+    <Version>0.8.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds split Request and Response input ports for flow.correlation while preserving the existing side-expression Input mode.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses shared component expression registration helpers while preserving the public Routing registration API.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -20,6 +20,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
     <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 

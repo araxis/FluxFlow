@@ -307,6 +307,40 @@ public sealed class FlowSwitchNodeTests
     }
 
     [Fact]
+    public async Task Switch_UsesMostSpecificAssignableContextFactory()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, context, _) => context.Variables["route"]))
+                .RegisterType<DerivedRouteMessage>("derived-route")
+                .UseContextFactory<BaseRouteMessage>(
+                    new RouteContextFactory<BaseRouteMessage>("base"))
+                .UseContextFactory<DerivedRouteMessage>(
+                    new RouteContextFactory<DerivedRouteMessage>("derived")),
+            new
+            {
+                expression = "route",
+                inputType = "derived-route",
+                routes = new[] { "base", "derived" }
+            });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<DerivedRouteMessage>>();
+        var results = new BufferBlock<FlowSwitchResult<DerivedRouteMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Result, results);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Default))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new DerivedRouteMessage("first"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.RouteKey.ShouldBe("derived");
+        result.Matched.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Switch_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(
@@ -461,6 +495,10 @@ public sealed class FlowSwitchNodeTests
 
     private sealed record InputMessage(string Id, string Category);
 
+    private abstract record BaseRouteMessage(string Id);
+
+    private sealed record DerivedRouteMessage(string Id) : BaseRouteMessage(Id);
+
     private sealed class InputMessageContextFactory : IFlowMapContextFactory<InputMessage>
     {
         public FlowMapContext Create(InputMessage input)
@@ -472,6 +510,20 @@ public sealed class FlowSwitchNodeTests
                     ["value"] = input,
                     ["id"] = input.Id,
                     ["category"] = input.Category
+                }
+            };
+    }
+
+    private sealed class RouteContextFactory<TInput>(string route) : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["route"] = route
                 }
             };
     }

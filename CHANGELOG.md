@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.8.0-alpha.1
+
+Expression support hardening.
+
+- Uses `FluxFlow.Components.Expressions` internally for expression engine and
+  context factory registration.
+- Preserves the existing public Routing registration API.
+- No routing node port or runtime behavior changes.
+
 ## FluxFlow.Components.Observability 0.2.0-alpha.1
 
 Expression support hardening.
