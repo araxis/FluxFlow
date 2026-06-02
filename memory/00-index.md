@@ -128,6 +128,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   result and workflow event timestamps.
 - `111-routing-result-timestamp-hardening.md`: routing result timestamp
   hardening for explicit package-clock-owned result times.
+- `112-sessions-query-component.md`: Sessions metadata query component and
+  package release record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -197,3 +197,6 @@ after the core component package has settled.
 36. Harden Routing result contracts by removing hidden current-time defaults
     and requiring explicit result timestamps. Done in
     `111-routing-result-timestamp-hardening.md`.
+37. Add a neutral Sessions metadata query node so hosts can list/filter sessions
+    before replay or dashboard projection. Done in
+    `112-sessions-query-component.md`.

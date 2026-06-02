@@ -233,6 +233,10 @@ Date: 2026-05-31
   timestamps so Routing contracts no longer create hidden current times.
 - Published `FluxFlow.Components.Routing` `0.10.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Sessions` `0.3.0-alpha.1` with a neutral
+  `session.query` node for session metadata queries.
+- Published `FluxFlow.Components.Sessions` `0.3.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
