@@ -162,6 +162,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Mqtt` `0.3.0-alpha.1` with optional adapter
   health forwarding through diagnostics and events while keeping reconnect
   policy host/adapter-owned.
+- Published `FluxFlow.Components.Mqtt` `0.3.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 

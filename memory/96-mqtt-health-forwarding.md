@@ -31,8 +31,16 @@ event channels.
 
 ## Verification
 
-Planned verification:
+Completed verification:
 
-- Focused MQTT tests for publish and subscribe health forwarding.
-- Full solution build and test pass.
-- Package pack and public package smoke after release.
+- `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj -c Release --no-restore`
+- `dotnet build FluxFlow.sln -c Release --no-restore`
+- `dotnet test FluxFlow.sln -c Release --no-restore`
+- `dotnet pack src\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- GitHub release workflow `26829389666`: passed.
+- Branch CI workflow `26829370331`: passed.
+- Fresh public-feed restore/build smoke: passed on attempt 11.
+
+Release tag:
+
+`components-mqtt-v0.3.0-alpha.1`
