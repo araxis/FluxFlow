@@ -9,5 +9,6 @@ public enum ApplicationRuntimeBuildErrorCode
     MissingOutputPort = 5,
     PortTypeMismatch = 6,
     LinkFailed = 7,
-    CleanupFailed = 8
+    CleanupFailed = 8,
+    MissingExpressionEngine = 9
 }

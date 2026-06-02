@@ -3,7 +3,7 @@ namespace FluxFlow.Engine.Mapping;
 /// <summary>
 /// Per-message mapping context passed to mapper functions and expression engines.
 /// The input remains the first-class Map argument; Variables carries named values
-/// used by expression engines such as Dynamic Expresso or Jsonata.
+/// used by host-provided expression engines.
 /// </summary>
 public sealed record FlowMapContext
 {

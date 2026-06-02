@@ -1,5 +1,6 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -101,7 +102,7 @@ public sealed class NodeAuthoringTests
                     }
                 }
             }
-        });
+        }, new EvenOddExpressionEngine());
 
         await using var _ = runtime;
         await runtime.StartAsync();
@@ -109,6 +110,87 @@ public sealed class NodeAuthoringTests
 
         evenValues.ShouldBe([2]);
         oddValues.ShouldBe([1, 3]);
+    }
+
+    [Fact]
+    public void RuntimeBuilder_ConditionalLinkWithoutExpressionEngine_ReturnsBuildError()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(new NodeType("test.sequence"), SequenceNode.Create)
+            .Register(new NodeType("test.collect"), context => CollectNode.Create(context, []));
+
+        var result = new ApplicationRuntimeBuilder(registry).Build(new ApplicationDefinition
+        {
+            Workflows = new Dictionary<string, WorkflowDefinition>
+            {
+                ["main"] = new()
+                {
+                    Nodes = new Dictionary<string, NodeDefinition>
+                    {
+                        ["source"] = new() { Type = new NodeType("test.sequence") },
+                        ["sink"] = new()
+                        {
+                            Type = new NodeType("test.collect"),
+                            Ports =
+                            {
+                                ["Input"] = JsonValue(new
+                                {
+                                    from = "source.Output",
+                                    when = "input % 2 == 0"
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Errors.ShouldContain(error =>
+            error.Code == ApplicationRuntimeBuildErrorCode.MissingExpressionEngine &&
+            error.Message.Contains("expression engine"));
+    }
+
+    [Fact]
+    public async Task FlowApplicationHost_CreateUsesConditionalLinkExpressionEngine()
+    {
+        var values = new List<int>();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .Register(new NodeType("test.sequence"), SequenceNode.Create)
+            .Register(new NodeType("test.collect"), context => CollectNode.Create(context, values));
+
+        var host = FlowApplicationHost.Create(new ApplicationDefinition
+        {
+            Workflows = new Dictionary<string, WorkflowDefinition>
+            {
+                ["main"] = new()
+                {
+                    Nodes = new Dictionary<string, NodeDefinition>
+                    {
+                        ["source"] = new() { Type = new NodeType("test.sequence") },
+                        ["sink"] = new()
+                        {
+                            Type = new NodeType("test.collect"),
+                            Ports =
+                            {
+                                ["Input"] = JsonValue(new
+                                {
+                                    from = "source.Output",
+                                    when = "input % 2 == 0"
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        }, registry, new EvenOddExpressionEngine());
+
+        await using var _ = host;
+        var result = await host.StartAsync();
+
+        result.IsSuccess.ShouldBeTrue(string.Join(Environment.NewLine, result.Errors.Select(e => e.Message)));
+        await host.Runtime!.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        values.ShouldBe([2]);
     }
 
     [Fact]
@@ -392,9 +474,12 @@ public sealed class NodeAuthoringTests
 
     private static ApplicationRuntime BuildRuntime(
         RuntimeNodeFactoryRegistry registry,
-        ApplicationDefinition definition)
+        ApplicationDefinition definition,
+        IFlowExpressionEngine? expressionEngine = null)
     {
-        var result = new ApplicationRuntimeBuilder(registry).Build(definition);
+        var result = new ApplicationRuntimeBuilder(
+            registry,
+            linkConditionExpressionEngine: expressionEngine).Build(definition);
         result.IsSuccess.ShouldBeTrue(string.Join(Environment.NewLine, result.Errors.Select(e => e.Message)));
         return result.Runtime!;
     }
@@ -420,6 +505,22 @@ public sealed class NodeAuthoringTests
             }
 
             CompleteOutput();
+        }
+    }
+
+    private sealed class EvenOddExpressionEngine : IFlowExpressionEngine
+    {
+        public string Name => "test";
+
+        public object? Evaluate(string expression, FlowMapContext context, Type resultType)
+        {
+            var input = (int)context.Variables["input"]!;
+            return expression switch
+            {
+                "input % 2 == 0" => input % 2 == 0,
+                "input % 2 != 0" => input % 2 != 0,
+                _ => throw new InvalidOperationException($"Unsupported test expression '{expression}'.")
+            };
         }
     }
 

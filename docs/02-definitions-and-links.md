@@ -95,8 +95,10 @@ $resources.shared.Output
 
 ## Conditional Links
 
-The default condition expression exposes the current output item as both
-`input` and `value`.
+Conditional links require the host to provide an `IFlowExpressionEngine` to
+`ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`. The default
+condition context used by `ExpressionFlowPredicate<TInput>` exposes the current
+output item as both `input` and `value`.
 
 ```json
 {
@@ -106,7 +108,8 @@ The default condition expression exposes the current output item as both
 ```
 
 If no `when` expression is set, the link receives every item from the source
-output.
+output. If a definition uses `when` and no expression engine is provided, the
+runtime build fails with `MissingExpressionEngine`.
 
 ## JSON Options
 

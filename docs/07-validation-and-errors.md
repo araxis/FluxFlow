@@ -8,7 +8,7 @@ application, then flatten them only when you need to show one list to a user.
 | Layer | API | What it catches |
 |-------|-----|-----------------|
 | Definition validation | `ApplicationDefinitionValidator.Validate()` | malformed executable definitions and invalid link references |
-| Runtime build | `ApplicationRuntimeBuilder.Build()` | unregistered node types, factory failures, missing ports, type mismatches, link failures, cleanup failures |
+| Runtime build | `ApplicationRuntimeBuilder.Build()` | unregistered node types, factory failures, missing expression engines, missing ports, type mismatches, link failures, cleanup failures |
 | Host lifecycle | `FlowApplicationHost.Build()` / `StartAsync()` | configuration loading failures and node startup failures |
 
 Definition validation is pure shape validation. It does not create nodes.
@@ -94,6 +94,7 @@ Runtime build error codes:
 | `MissingOutputPort` | The source node does not expose the requested output port. |
 | `PortTypeMismatch` | Source output and target input have different value types. |
 | `LinkFailed` | The output could not link to the input. |
+| `MissingExpressionEngine` | A link has `when`, but the host did not provide an expression engine. |
 | `CleanupFailed` | Runtime build failed, then cleanup also reported one or more failures. |
 
 `WorkflowName`, `NodeName`, and `PortName` point to the target side of the
@@ -185,6 +186,7 @@ structured error surface.
 | `MissingOutputPort` | The source node factory did not expose the named output. |
 | `PortTypeMismatch` | Make the source `OutputPort<T>` and target `InputPort<T>` use the same `T`. |
 | `LinkFailed` | Check conditional-link support and any custom output port implementation. |
+| `MissingExpressionEngine` | Pass an `IFlowExpressionEngine` to `ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`, or remove link `when` conditions. |
 | `StartFailed` | Inspect `LastException`, node diagnostics, and startup hooks. |
 | `CleanupFailed` | Treat it as a secondary failure after the primary build error. |
 

@@ -1,5 +1,6 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks.Dataflow;
@@ -51,13 +52,27 @@ public sealed class FlowApplicationHost(
     public static FlowApplicationHost Create(
         IConfiguration configuration,
         RuntimeNodeFactoryRegistry registry)
+        => Create(configuration, registry, linkConditionExpressionEngine: null);
+
+    /// <summary>
+    /// Creates a host backed by <paramref name="configuration"/>.
+    /// The caller provides a fully-configured <paramref name="registry"/> with all
+    /// application-specific node factories registered and an expression engine for
+    /// link `when` conditions.
+    /// </summary>
+    public static FlowApplicationHost Create(
+        IConfiguration configuration,
+        RuntimeNodeFactoryRegistry registry,
+        IFlowExpressionEngine? linkConditionExpressionEngine)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(registry);
 
         return new FlowApplicationHost(
             configuration,
-            new ApplicationRuntimeBuilder(registry));
+            new ApplicationRuntimeBuilder(
+                registry,
+                linkConditionExpressionEngine: linkConditionExpressionEngine));
     }
 
     /// <summary>
@@ -68,13 +83,27 @@ public sealed class FlowApplicationHost(
     public static FlowApplicationHost Create(
         ApplicationDefinition definition,
         RuntimeNodeFactoryRegistry registry)
+        => Create(definition, registry, linkConditionExpressionEngine: null);
+
+    /// <summary>
+    /// Creates a host from a pre-built <paramref name="definition"/>.
+    /// The caller provides a fully-configured <paramref name="registry"/> with all
+    /// application-specific node factories registered and an expression engine for
+    /// link `when` conditions.
+    /// </summary>
+    public static FlowApplicationHost Create(
+        ApplicationDefinition definition,
+        RuntimeNodeFactoryRegistry registry,
+        IFlowExpressionEngine? linkConditionExpressionEngine)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(registry);
 
         return new FlowApplicationHost(
             null,
-            new ApplicationRuntimeBuilder(registry),
+            new ApplicationRuntimeBuilder(
+                registry,
+                linkConditionExpressionEngine: linkConditionExpressionEngine),
             applicationDefinition: definition);
     }
 

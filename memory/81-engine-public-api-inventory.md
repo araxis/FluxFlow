@@ -166,38 +166,23 @@ The concrete implementation story is not settled. Two public expression adapter
 classes currently expose implementation/library names in the public API and
 force the engine package to carry concrete expression dependencies.
 
-Decision needed before beta:
+Decision resolved in `82-engine-expression-adapter-split.md`:
 
-- keep only expression abstractions in `FluxFlow.Engine`, or
-- keep one default link-condition expression implementation in the engine and
-  move other concrete engines to optional expression packages.
-
-Recommendation:
-
-Keep `IFlowExpressionEngine`, `IFlowPredicate<TInput>`,
-`ExpressionFlowPredicate<TInput>`, mapper contracts, and `FlowMapContext` in the
-engine. Move optional concrete expression-language adapters out before v1, or
-rename/scope them so the engine API does not harden around third-party adapter
-names.
+- keep only expression abstractions in `FluxFlow.Engine`
+- remove concrete expression-language adapters from the engine package
+- allow optional expression adapter packages later
 
 ### 2. Link Condition Default Engine Depends On That Decision
 
 `ApplicationRuntimeBuilder` currently creates a default expression engine for
 link `when` conditions when the host does not provide one.
 
-If concrete expression adapters move out of the engine, the builder needs a new
-policy:
+Concrete expression adapters moved out of the engine. The builder policy is:
 
-- require the host to pass a link-condition expression engine when `when`
-  clauses are used, or
-- keep a tiny built-in expression implementation only for link predicates, or
-- keep the current default through beta and document it as a v1 contract.
-
-Recommendation:
-
-Prefer explicit host-provided expression engines for serious applications, but
-decide whether no-setup `when` conditions are important enough to keep a default
-implementation in the engine.
+- definitions without `when` do not need an expression engine
+- definitions with resolved `when` conditions require a host-provided expression
+  engine
+- missing expression engines fail build with `MissingExpressionEngine`
 
 ### 3. FlowEvent Attribute Shape Should Be Confirmed
 
@@ -249,10 +234,9 @@ Add tests/docs only if a consumer finds the defaulting behavior surprising.
 
 ## Next Work
 
-1. Decide the expression adapter split/default policy.
-2. Update release notes for the `FlowNodeId` namespace change.
-3. Run full solution verification after the expression decision.
-4. Re-run docs snippets or add a compile-smoke sample for the README quick start
+1. Update release notes for the `FlowNodeId` namespace change and expression
+   adapter split.
+2. Re-run docs snippets or add a compile-smoke sample for the README quick start
    before beta.
 
 ## Verification

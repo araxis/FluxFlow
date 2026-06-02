@@ -42,7 +42,7 @@ protocol-specific dependencies.
 | **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
 | **Event stream** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
 | **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
-| **Expression mapping** | Built-in expression engines behind `IFlowExpressionEngine` |
+| **Expression boundary** | Host-provided expression engines behind `IFlowExpressionEngine` |
 | **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
 | **Package authoring helpers** | `IFlowNodeModule` and `FlowNodeRegistration` group component families explicitly |
 | **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
@@ -112,21 +112,19 @@ var result = await host.StartAsync();
   "workflows": {
     "main": {
       "source": { "type": "demo.numbers" },
-      "even": {
+      "printer": {
         "type": "demo.printer",
-        "Input": { "from": "source.Output", "when": "input % 2 == 0" }
-      },
-      "odd": {
-        "type": "demo.printer",
-        "Input": { "from": "source.Output", "when": "input % 2 != 0" }
+        "Input": { "from": "source.Output" }
       }
     }
   }
 }
 ```
 
-The default link condition engine exposes the current output item as `input`
-and `value`. If no `when` expression is set, the link receives every item.
+If no `when` expression is set, the link receives every item. If a definition
+uses `when`, the host must pass an `IFlowExpressionEngine` to
+`ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`; the engine
+does not ship a concrete expression language.
 
 ### 3. Register, build, run
 

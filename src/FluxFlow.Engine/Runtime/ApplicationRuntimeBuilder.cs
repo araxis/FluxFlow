@@ -7,7 +7,7 @@ public sealed class ApplicationRuntimeBuilder
 {
     private readonly RuntimeNodeFactoryRegistry _factories;
     private readonly ApplicationDefinitionValidator _validator;
-    private readonly IFlowExpressionEngine _linkConditionExpressionEngine;
+    private readonly IFlowExpressionEngine? _linkConditionExpressionEngine;
 
     public ApplicationRuntimeBuilder(
         RuntimeNodeFactoryRegistry factories,
@@ -16,7 +16,7 @@ public sealed class ApplicationRuntimeBuilder
     {
         _factories = factories;
         _validator = validator ?? new ApplicationDefinitionValidator();
-        _linkConditionExpressionEngine = linkConditionExpressionEngine ?? new DynamicExpressoFlowExpressionEngine();
+        _linkConditionExpressionEngine = linkConditionExpressionEngine;
     }
 
     public ApplicationRuntimeBuildResult Build(ApplicationDefinition definition)
@@ -191,7 +191,18 @@ public sealed class ApplicationRuntimeBuilder
                             continue;
                         }
 
-                        resolvedLinks.Add(new ResolvedOutputLink(output, CreateLinkCondition(link)));
+                        if (!TryCreateLinkCondition(
+                            link,
+                            workflowName,
+                            targetName,
+                            targetPortName,
+                            errors,
+                            out var condition))
+                        {
+                            continue;
+                        }
+
+                        resolvedLinks.Add(new ResolvedOutputLink(output, condition));
                     }
 
                     var shouldCoordinateCompletion = resolvedLinks.Count > 1;
@@ -232,10 +243,34 @@ public sealed class ApplicationRuntimeBuilder
         }
     }
 
-    private IFlowPredicate<object?>? CreateLinkCondition(LinkDefinition link)
-        => string.IsNullOrWhiteSpace(link.When)
-            ? null
-            : new ExpressionFlowPredicate<object?>(link.When, _linkConditionExpressionEngine);
+    private bool TryCreateLinkCondition(
+        LinkDefinition link,
+        string workflowName,
+        NodeName targetName,
+        PortName targetPortName,
+        List<ApplicationRuntimeBuildError> errors,
+        out IFlowPredicate<object?>? condition)
+    {
+        condition = null;
+        if (string.IsNullOrWhiteSpace(link.When))
+        {
+            return true;
+        }
+
+        if (_linkConditionExpressionEngine is null)
+        {
+            errors.Add(new(
+                ApplicationRuntimeBuildErrorCode.MissingExpressionEngine,
+                $"Link condition on node '{targetName}' port '{targetPortName}' requires an expression engine. Pass one to ApplicationRuntimeBuilder or FlowApplicationHost.Create when definitions use 'when'.",
+                workflowName,
+                targetName,
+                targetPortName));
+            return false;
+        }
+
+        condition = new ExpressionFlowPredicate<object?>(link.When, _linkConditionExpressionEngine);
+        return true;
+    }
 
     private static void DrainUnlinkedOutputs(
         IEnumerable<RuntimeNode> resources,

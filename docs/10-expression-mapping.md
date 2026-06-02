@@ -7,8 +7,8 @@ FluxFlow has two related concepts:
 | link condition predicates | decide whether an output item is routed to an input |
 | mapper contracts | help component authors transform values inside nodes |
 
-The engine uses expressions for link `when` conditions. Payload transformation
-still belongs in nodes and component packages.
+The engine can use host-provided expressions for link `when` conditions.
+Payload transformation still belongs in nodes and component packages.
 
 ## Link Conditions
 
@@ -24,7 +24,8 @@ input. If it returns `false`, that link skips the item.
 }
 ```
 
-The default link condition context exposes the current output item as:
+When the host provides an expression engine, the default link condition context
+exposes the current output item as:
 
 - `input`
 - `value`
@@ -67,9 +68,12 @@ If a link object sets `when` to `null`, the node default is used.
 Definition validation checks that `when` is a string or `null`. It does not
 fully evaluate the expression.
 
-The runtime evaluates the condition for each item as the output fanout pump
-delivers values. If expression evaluation throws, that is a runtime failure,
-not a build validation failure.
+Runtime build requires an expression engine when any resolved link condition is
+non-empty. If no expression engine is supplied, build fails with
+`MissingExpressionEngine`. When an expression engine is supplied, the runtime
+evaluates the condition for each item as the output fanout pump delivers values.
+If expression evaluation throws, that is a runtime failure, not a build
+validation failure.
 
 Keep link conditions:
 
@@ -79,7 +83,7 @@ Keep link conditions:
 - focused on routing, not transformation
 - limited to fields that exist on every expected message
 
-## Custom Expression Engine
+## Host Expression Engine
 
 `IFlowExpressionEngine` is the expression boundary:
 
@@ -91,13 +95,22 @@ public interface IFlowExpressionEngine
 }
 ```
 
-Pass a custom engine to `ApplicationRuntimeBuilder` when an application needs a
-different expression language or evaluation policy:
+Pass an engine to `ApplicationRuntimeBuilder` when an application uses link
+conditions:
 
 ```csharp
 var builder = new ApplicationRuntimeBuilder(
     registry,
     linkConditionExpressionEngine: new AppExpressionEngine());
+```
+
+For hosted applications, pass the same engine through the host factory:
+
+```csharp
+var host = FlowApplicationHost.Create(
+    definition,
+    registry,
+    new AppExpressionEngine());
 ```
 
 The runtime asks the engine for a `bool` result when evaluating link conditions.
@@ -214,6 +227,7 @@ For application-authored workflows:
 | Symptom | Check |
 |---------|-------|
 | item is not delivered | Verify the link condition returns `true` for that item. |
+| build fails with `MissingExpressionEngine` | Pass an `IFlowExpressionEngine` to `ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`, or remove link `when` conditions. |
 | build succeeds but runtime faults | Check condition syntax and message shape at runtime. |
 | expression cannot see data | Use `input` or `value`, or provide a custom context factory. |
 | mapper is not used | Register/use the mapper inside the node; graph links do not apply mappers automatically. |

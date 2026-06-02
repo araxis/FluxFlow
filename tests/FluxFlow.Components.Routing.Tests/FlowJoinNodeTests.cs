@@ -186,18 +186,22 @@ public sealed class FlowJoinNodeTests
         LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
         LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
         runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        var errorTask = errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var outputTask = output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
         await left.Target.SendAsync(new LeftMessage("A-100", "left-1"));
         await left.Target.SendAsync(new LeftMessage("A-101", "left-2"));
+
+        var error = await errorTask;
+        error.Code.ShouldBe(RoutingErrorCodes.JoinCapacityExceeded);
+        error.Context!.ShouldContain("key=A-101");
+
         await right.Target.SendAsync(new RightMessage("A-100", "right-1"));
         left.Target.Complete();
         right.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(RoutingErrorCodes.JoinCapacityExceeded);
-        error.Context!.ShouldContain("key=A-101");
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-100");
+        (await outputTask).Key.ShouldBe("A-100");
     }
 
     [Fact]

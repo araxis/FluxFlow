@@ -9,7 +9,7 @@
     <RootNamespace>FluxFlow.Engine</RootNamespace>
     <Version>0.5.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, expression mapping, diagnostics, and host lifecycle support.</Description>
+    <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, host-provided expression routing, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>Adds package-authoring registration helpers and a neutral consumer sample.</PackageReleaseNotes>
@@ -23,8 +23,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DynamicExpresso.Core" Version="2.19.3" />
-    <PackageReference Include="Jsonata.Net.Native" Version="3.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
     <!-- On net10 Dataflow ships inbox; keeping the explicit ref for net8/9 compat -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
