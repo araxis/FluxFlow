@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Http 0.2.0-alpha.1
+
+Deterministic HTTP request timing.
+
+- Adds `IHttpClock` and `SystemHttpClock`.
+- Adds `UseClock(...)` to `HttpComponentOptions`.
+- `http.request` now uses the configured clock for response and error
+  timestamps plus elapsed milliseconds.
+- `HttpRequestSenderContext` now exposes the configured clock to sender
+  factories.
+
 ## FluxFlow.Components.State 0.3.0-alpha.1
 
 Deterministic state result timestamps.
