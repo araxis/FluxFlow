@@ -182,6 +182,8 @@ Date: 2026-05-31
   fresh public-feed restore/build smoke test.
 - Started `FluxFlow.Components.Timers` `0.5.0-alpha.1` with host-provided
   timer clocks for deterministic timestamps and delays.
+- Published `FluxFlow.Components.Timers` `0.5.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 

@@ -35,8 +35,15 @@ clock.
   - `SystemTimerClock`
   - `TimerComponentOptions.UseClock(...)`
 
-## Planned Verification
+## Verification
 
-- Focused Timers tests.
-- Full solution build and tests.
-- Package pack and fresh public-feed restore/build smoke after release.
+- Focused Timers tests passed: 62 tests.
+- Full solution build passed in Release with 0 warnings.
+- Full solution tests passed in Release.
+- Package pack passed and produced
+  `FluxFlow.Components.Timers.0.5.0-alpha.1.nupkg`.
+- Release commit: `4fc5f7e`.
+- Release tag: `components-timers-v0.5.0-alpha.1`.
+- Release workflow run: `26835522422`, success.
+- Main verification run: `26835512082`, success.
+- Fresh public-feed restore/build smoke passed on attempt 6.

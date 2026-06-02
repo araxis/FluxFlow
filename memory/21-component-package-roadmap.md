@@ -167,4 +167,4 @@ after the core component package has settled.
     `99-sessions-clock-hardening.md`.
 26. Harden deterministic Timers behavior with a host-provided timer clock for
     timer timestamps, schedule due-time delays, delay, throttle, and debounce.
-    Started in `101-timers-clock-hardening.md`.
+    Done in `101-timers-clock-hardening.md`.
