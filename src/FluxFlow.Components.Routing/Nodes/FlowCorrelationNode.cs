@@ -1,6 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -13,6 +14,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     private readonly IFlowExpressionEngine _expressionEngine;
     private readonly IRoutingContextFactory _contextFactory;
     private readonly RoutingNodeContext _nodeContext;
+    private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingPair> _pending;
     private readonly StringComparer _comparer;
     private readonly string _requestSide;
@@ -32,11 +34,27 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
         RoutingNodeContext nodeContext)
+        : this(
+            options,
+            expressionEngine,
+            contextFactory,
+            nodeContext,
+            SystemRoutingClock.Instance)
+    {
+    }
+
+    public FlowCorrelationNode(
+        CorrelationRoutingOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IRoutingContextFactory contextFactory,
+        RoutingNodeContext nodeContext,
+        IRoutingClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.KeyExpression);
         if (options.TimeoutMilliseconds <= 0)
         {
@@ -184,7 +202,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         try
         {
             _processingCancellationToken.ThrowIfCancellationRequested();
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.UtcNow;
             await EmitExpiredAsync(now, force: false, _processingCancellationToken).ConfigureAwait(false);
             var item = Evaluate(input);
             if (!TryNormalizeSide(item.Side, out var side))
@@ -445,7 +463,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
 
         try
         {
-            await EmitExpiredAsync(DateTimeOffset.UtcNow, force: true, CancellationToken.None)
+            await EmitExpiredAsync(_clock.UtcNow, force: true, CancellationToken.None)
                 .ConfigureAwait(false);
             _matched.Complete();
             _timeouts.Complete();

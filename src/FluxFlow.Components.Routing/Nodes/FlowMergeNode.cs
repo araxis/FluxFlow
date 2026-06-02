@@ -1,6 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -9,6 +10,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 public sealed class FlowMergeNode<TInput> : FlowNodeBase
 {
     private readonly MergeRoutingOptions _options;
+    private readonly IRoutingClock _clock;
     private readonly Dictionary<string, ActionBlock<TInput>> _inputBlocks;
     private readonly IReadOnlyDictionary<string, ITargetBlock<TInput>> _inputs;
     private readonly ActionBlock<MergeCommand> _merge;
@@ -17,8 +19,16 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
     private long _nextSequence;
 
     public FlowMergeNode(MergeRoutingOptions options)
+        : this(options, SystemRoutingClock.Instance)
+    {
+    }
+
+    public FlowMergeNode(
+        MergeRoutingOptions options,
+        IRoutingClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.Inputs.Length == 0)
         {
             throw new ArgumentException(
@@ -130,7 +140,8 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
         {
             Sequence = Interlocked.Increment(ref _nextSequence),
             Source = command.Source,
-            Value = command.Value
+            Value = command.Value,
+            ReceivedAt = _clock.UtcNow
         };
         await _output.SendAsync(item, _processingCancellationToken).ConfigureAwait(false);
         TryEmitDiagnostic(

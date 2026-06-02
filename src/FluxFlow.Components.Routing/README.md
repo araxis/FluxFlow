@@ -20,9 +20,14 @@ more `IFlowExpressionEngine` implementations during registration.
 var registry = new RuntimeNodeFactoryRegistry()
     .RegisterRoutingComponents(options => options
         .UseExpressionEngine(appExpressionEngine)
+        .UseClock(routingClock)
         .RegisterType<AppMessage>("app.message")
         .UseContextFactory(new AppMessageContextFactory()));
 ```
+
+`UseClock(...)` is optional. Without it, routing nodes use the default system
+clock. Supplying a clock lets hosts and tests make route timestamps, window
+timers, join timeouts, and correlation timestamps deterministic.
 
 ## Switch
 

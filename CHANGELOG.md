@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.9.0-alpha.1
+
+Deterministic routing timing.
+
+- Adds `IRoutingClock` and `SystemRoutingClock`.
+- Adds `UseClock(...)` to `RoutingComponentOptions`.
+- `flow.switch`, `flow.merge`, `flow.window`, `flow.join`, and
+  `flow.correlation` now use the configured clock for emitted timestamps.
+- `flow.window` and `flow.join` now use the configured clock for timeout
+  delays.
+
 ## FluxFlow.Components.Metrics 0.2.0-alpha.1
 
 Deterministic metric fallback timestamps.

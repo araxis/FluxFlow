@@ -1,6 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -13,6 +14,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     private readonly IRoutingContextFactory _contextFactory;
     private readonly RoutingNodeContext _nodeContext;
     private readonly SwitchRoutingOptions _options;
+    private readonly IRoutingClock _clock;
     private readonly HashSet<string> _routes;
     private readonly Dictionary<string, string> _routeOutputPorts;
     private readonly Dictionary<string, BufferBlock<TInput>> _routeOutputBlocks;
@@ -29,11 +31,27 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
         RoutingNodeContext nodeContext)
+        : this(
+            options,
+            expressionEngine,
+            contextFactory,
+            nodeContext,
+            SystemRoutingClock.Instance)
+    {
+    }
+
+    public FlowSwitchNode(
+        SwitchRoutingOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IRoutingContextFactory contextFactory,
+        RoutingNodeContext nodeContext,
+        IRoutingClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
         if (options.BoundedCapacity <= 0)
         {
@@ -149,6 +167,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             return;
         }
 
+        var timestamp = _clock.UtcNow;
         var matched = IsMatch(routeKey);
         var result = new FlowSwitchResult<TInput>
         {
@@ -159,7 +178,8 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             ExpressionId = _options.ExpressionId,
             ExpressionName = _options.ExpressionName,
             InputType = _options.InputType,
-            Value = input
+            Value = input,
+            EvaluatedAt = timestamp
         };
 
         await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
@@ -191,7 +211,8 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
                     ExpressionId = _options.ExpressionId,
                     ExpressionName = _options.ExpressionName,
                     InputType = _options.InputType,
-                    Value = input
+                    Value = input,
+                    RoutedAt = timestamp
                 },
                 _processingCancellationToken).ConfigureAwait(false);
         }

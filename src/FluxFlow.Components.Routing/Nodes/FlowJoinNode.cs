@@ -1,6 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -15,6 +16,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     private readonly IRoutingContextFactory _rightContextFactory;
     private readonly RoutingNodeContext _leftNodeContext;
     private readonly RoutingNodeContext _rightNodeContext;
+    private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingBucket> _pending;
     private readonly TimeSpan _timeout;
     private readonly ActionBlock<TLeft> _left;
@@ -37,6 +39,25 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         IRoutingContextFactory rightContextFactory,
         RoutingNodeContext leftNodeContext,
         RoutingNodeContext rightNodeContext)
+        : this(
+            options,
+            expressionEngine,
+            leftContextFactory,
+            rightContextFactory,
+            leftNodeContext,
+            rightNodeContext,
+            SystemRoutingClock.Instance)
+    {
+    }
+
+    public FlowJoinNode(
+        JoinRoutingOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IRoutingContextFactory leftContextFactory,
+        IRoutingContextFactory rightContextFactory,
+        RoutingNodeContext leftNodeContext,
+        RoutingNodeContext rightNodeContext,
+        IRoutingClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
@@ -44,6 +65,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         _rightContextFactory = rightContextFactory ?? throw new ArgumentNullException(nameof(rightContextFactory));
         _leftNodeContext = leftNodeContext ?? throw new ArgumentNullException(nameof(leftNodeContext));
         _rightNodeContext = rightNodeContext ?? throw new ArgumentNullException(nameof(rightNodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.LeftKeyExpression);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.RightKeyExpression);
         if (options.TimeoutMilliseconds <= 0)
@@ -207,20 +229,20 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private async Task AddLeftAsync(TLeft input)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.UtcNow;
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
         var key = EvaluateLeftKey(input);
         await AddLeftCoreAsync(key, input, now).ConfigureAwait(false);
-        ScheduleTimer(DateTimeOffset.UtcNow);
+        ScheduleTimer(_clock.UtcNow);
     }
 
     private async Task AddRightAsync(TRight input)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.UtcNow;
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
         var key = EvaluateRightKey(input);
         await AddRightCoreAsync(key, input, now).ConfigureAwait(false);
-        ScheduleTimer(DateTimeOffset.UtcNow);
+        ScheduleTimer(_clock.UtcNow);
     }
 
     private string EvaluateLeftKey(TLeft input)
@@ -375,9 +397,9 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        await EmitExpiredAsync(DateTimeOffset.UtcNow, force: false, _lifecycleCancellation.Token)
+        await EmitExpiredAsync(_clock.UtcNow, force: false, _lifecycleCancellation.Token)
             .ConfigureAwait(false);
-        ScheduleTimer(DateTimeOffset.UtcNow);
+        ScheduleTimer(_clock.UtcNow);
     }
 
     private async Task EmitExpiredAsync(
@@ -550,7 +572,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         }
 
         _timerCancellation?.Cancel();
-        await EmitExpiredAsync(DateTimeOffset.UtcNow, force: true, CancellationToken.None)
+        await EmitExpiredAsync(_clock.UtcNow, force: true, CancellationToken.None)
             .ConfigureAwait(false);
         _commands.Complete();
     }
@@ -629,7 +651,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
             await _commands.SendAsync(
                 JoinCommand.Timer(version),
                 _lifecycleCancellation.Token).ConfigureAwait(false);

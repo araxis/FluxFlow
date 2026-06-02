@@ -188,7 +188,12 @@ Date: 2026-05-31
   metrics clock for deterministic fallback sample timestamps.
 - Published `FluxFlow.Components.Metrics` `0.2.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Routing` `0.9.0-alpha.1` with a host-provided
+  routing clock for deterministic route timestamps, windows, joins,
+  correlations, and timeout delays.
 
 ## Remaining
 
-- Return to the broader component maturity backlog.
+- Finish the Routing clock hardening release and public-feed smoke test.
+- Continue the broader component maturity backlog after Routing release
+  evidence is recorded.

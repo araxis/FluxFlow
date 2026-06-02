@@ -39,7 +39,7 @@ internal static class RoutingNodeFactory
             var method = CreateSwitchMethod.MakeGenericMethod(inputType);
             return (RuntimeNode)method.Invoke(
                 null,
-                [context, options, expressionEngine, contextFactory, nodeContext])!;
+                [context, options, expressionEngine, contextFactory, nodeContext, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -71,7 +71,7 @@ internal static class RoutingNodeFactory
             var method = CreateCorrelationMethod.MakeGenericMethod(inputType);
             return (RuntimeNode)method.Invoke(
                 null,
-                [context, options, expressionEngine, contextFactory, nodeContext])!;
+                [context, options, expressionEngine, contextFactory, nodeContext, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -93,7 +93,7 @@ internal static class RoutingNodeFactory
         try
         {
             var method = CreateWindowMethod.MakeGenericMethod(inputType);
-            return (RuntimeNode)method.Invoke(null, [context, options])!;
+            return (RuntimeNode)method.Invoke(null, [context, options, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -140,7 +140,8 @@ internal static class RoutingNodeFactory
                     leftContextFactory,
                     rightContextFactory,
                     leftNodeContext,
-                    rightNodeContext
+                    rightNodeContext,
+                    componentOptions.Clock
                 ])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
@@ -185,7 +186,7 @@ internal static class RoutingNodeFactory
         try
         {
             var method = CreateMergeMethod.MakeGenericMethod(inputType);
-            return (RuntimeNode)method.Invoke(null, [context, options])!;
+            return (RuntimeNode)method.Invoke(null, [context, options, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -199,13 +200,15 @@ internal static class RoutingNodeFactory
         SwitchRoutingOptions options,
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext)
+        RoutingNodeContext nodeContext,
+        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
         var node = new FlowSwitchNode<TInput>(
             options,
             expressionEngine,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            clock);
 
         var builder = context.CreateNode(node)
             .Input(RoutingComponentPorts.Input, node.Input)
@@ -228,13 +231,15 @@ internal static class RoutingNodeFactory
         CorrelationRoutingOptions options,
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext)
+        RoutingNodeContext nodeContext,
+        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
         var node = new FlowCorrelationNode<TInput>(
             options,
             expressionEngine,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            clock);
 
         var builder = context.CreateNode(node)
             .Output(RoutingComponentPorts.Matched, node.Matched)
@@ -261,9 +266,10 @@ internal static class RoutingNodeFactory
 
     private static RuntimeNode CreateWindowTyped<TInput>(
         RuntimeNodeFactoryContext context,
-        WindowRoutingOptions options)
+        WindowRoutingOptions options,
+        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
-        var node = new FlowWindowNode<TInput>(options);
+        var node = new FlowWindowNode<TInput>(options, clock);
 
         return context.CreateNode(node)
             .Input(RoutingComponentPorts.Input, node.Input)
@@ -279,7 +285,8 @@ internal static class RoutingNodeFactory
         IRoutingContextFactory leftContextFactory,
         IRoutingContextFactory rightContextFactory,
         RoutingNodeContext leftNodeContext,
-        RoutingNodeContext rightNodeContext)
+        RoutingNodeContext rightNodeContext,
+        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
         var node = new FlowJoinNode<TLeft, TRight>(
             options,
@@ -287,7 +294,8 @@ internal static class RoutingNodeFactory
             leftContextFactory,
             rightContextFactory,
             leftNodeContext,
-            rightNodeContext);
+            rightNodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(RoutingComponentPorts.Left, node.Left)
@@ -317,9 +325,10 @@ internal static class RoutingNodeFactory
 
     private static RuntimeNode CreateMergeTyped<TInput>(
         RuntimeNodeFactoryContext context,
-        MergeRoutingOptions options)
+        MergeRoutingOptions options,
+        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
-        var node = new FlowMergeNode<TInput>(options);
+        var node = new FlowMergeNode<TInput>(options, clock);
         var builder = context.CreateNode(node)
             .Output(RoutingComponentPorts.Output, node.Output)
             .Output(RoutingComponentPorts.Errors, node.Errors);
