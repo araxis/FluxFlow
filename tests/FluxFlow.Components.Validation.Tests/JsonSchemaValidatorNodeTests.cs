@@ -68,6 +68,41 @@ public sealed class JsonSchemaValidatorNodeTests
     }
 
     [Fact]
+    public async Task JsonSchemaValidator_UsesConfiguredClockForResultTimestamp()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
+        var runtimeNode = CreateNode(
+            options => options.UseClock(new RecordingValidationClock(timestamp)),
+            new
+            {
+                schema = OrderSchema(),
+                inputType = "json",
+                boundedCapacity = 4
+            });
+        await runtimeNode.Node.StartAsync();
+        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
+            .ShouldBeOfType<InputPort<JsonElement>>();
+        var results = new BufferBlock<JsonSchemaValidationResult<JsonElement>>();
+        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<JsonSchemaValidationResult<JsonElement>>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out var resultError);
+        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+        resultError.ShouldBeNull();
+
+        await input.Target.SendAsync(JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 }));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.Timestamp.ShouldBe(timestamp);
+    }
+
+    [Fact]
     public async Task JsonSchemaValidator_RoutesInvalidInputWithoutFlowError()
     {
         var runtimeNode = CreateNode(

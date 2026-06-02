@@ -211,6 +211,9 @@ Date: 2026-05-31
   enumerate timestamps.
 - Published `FluxFlow.Components.FileSystem` `0.5.0-alpha.1` and verified a
   fresh public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Validation` `0.2.0-alpha.1` with a
+  host-provided validation clock for deterministic JSON schema validation
+  result timestamps.
 
 ## Remaining
 

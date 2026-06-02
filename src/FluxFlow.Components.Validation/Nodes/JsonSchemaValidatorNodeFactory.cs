@@ -1,5 +1,6 @@
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
+using FluxFlow.Components.Validation.Timing;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
@@ -38,7 +39,7 @@ internal static class JsonSchemaValidatorNodeFactory
             var method = CreateTypedMethod.MakeGenericMethod(inputType);
             return (RuntimeNode)method.Invoke(
                 null,
-                [context, options, selector, nodeContext])!;
+                [context, options, selector, nodeContext, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -51,12 +52,14 @@ internal static class JsonSchemaValidatorNodeFactory
         RuntimeNodeFactoryContext context,
         JsonSchemaValidatorOptions options,
         ValidationComponentOptions.IValidationValueSelector selector,
-        JsonSchemaValidatorContext nodeContext)
+        JsonSchemaValidatorContext nodeContext,
+        IValidationClock clock)
     {
         var node = new JsonSchemaValidatorNode<TInput>(
             options,
             selector,
-            nodeContext);
+            nodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(ValidationComponentPorts.Input, node.Input)

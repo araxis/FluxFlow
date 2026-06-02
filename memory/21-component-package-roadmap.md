@@ -185,3 +185,6 @@ after the core component package has settled.
 32. Harden deterministic FileSystem behavior with a host-provided file system
     clock for write, read, watch, and enumerate timestamps. Done in
     `107-filesystem-clock-hardening.md`.
+33. Harden deterministic Validation behavior with a host-provided validation
+    clock for JSON schema validation result timestamps. In progress in
+    `108-validation-clock-hardening.md`.

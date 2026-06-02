@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Validation 0.2.0-alpha.1
+
+Deterministic validation result timestamps.
+
+- Adds `IValidationClock` and `SystemValidationClock`.
+- Adds `UseClock(...)` to `ValidationComponentOptions`.
+- `json.schema-validator` now uses the configured clock for
+  `JsonSchemaValidationResult<TInput>.Timestamp`.
+
 ## FluxFlow.Components.FileSystem 0.5.0-alpha.1
 
 Deterministic file system timestamps.

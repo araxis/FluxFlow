@@ -45,6 +45,17 @@ not reported as a processing error. Schema loading, value selection, value
 conversion, and evaluation failures emit `FlowError` and the node continues
 processing later messages where possible.
 
+## Runtime Timing
+
+Validation results use the package clock for `Timestamp`. Existing callers use
+the default system clock. Hosts and tests can provide a deterministic clock
+through registration:
+
+```csharp
+registry.RegisterValidationComponents(options => options
+    .UseClock(validationClock));
+```
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See
