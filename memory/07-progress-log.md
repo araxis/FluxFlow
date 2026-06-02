@@ -184,9 +184,10 @@ Date: 2026-05-31
   timer clocks for deterministic timestamps and delays.
 - Published `FluxFlow.Components.Timers` `0.5.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Metrics` `0.2.0-alpha.1` with a host-provided
+  metrics clock for deterministic fallback sample timestamps.
 
 ## Remaining
 
-- Return to the broader component maturity backlog. Current best next slice is
-  hardening generic source/replay behavior or adding concrete storage adapter
-  packages when a consumer needs them.
+- Return to the broader component maturity backlog after Metrics release
+  verification.

@@ -1,4 +1,5 @@
 using FluxFlow.Components.Metrics.Nodes;
+using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Engine.Runtime;
 
 namespace FluxFlow.Components.Metrics;
@@ -6,12 +7,19 @@ namespace FluxFlow.Components.Metrics;
 public sealed class MetricsComponentModule : IFlowNodeModule
 {
     public MetricsComponentModule()
+        : this(new MetricsComponentOptions())
     {
+    }
+
+    public MetricsComponentModule(MetricsComponentOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
         Registrations =
         [
             new FlowNodeRegistration(
                 MetricsComponentTypes.Aggregate,
-                MetricsAggregateNode.Create)
+                context => MetricsAggregateNode.Create(context, options))
         ];
     }
 

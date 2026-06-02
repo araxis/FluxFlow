@@ -60,6 +60,14 @@ new MetricSampleInput
 registry.RegisterMetricsComponents();
 ```
 
+Hosts that need deterministic fallback timestamps can provide a clock. Explicit
+sample timestamps always win; the clock is used only when `MetricSampleInput`
+does not include `Timestamp`.
+
+```csharp
+registry.RegisterMetricsComponents(options => options.UseClock(metricsClock));
+```
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

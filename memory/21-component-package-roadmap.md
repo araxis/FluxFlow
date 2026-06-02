@@ -168,3 +168,6 @@ after the core component package has settled.
 26. Harden deterministic Timers behavior with a host-provided timer clock for
     timer timestamps, schedule due-time delays, delay, throttle, and debounce.
     Done in `101-timers-clock-hardening.md`.
+27. Harden deterministic Metrics behavior with a host-provided metrics clock for
+    fallback sample timestamps when samples omit `Timestamp`. In progress in
+    `102-metrics-clock-hardening.md`.

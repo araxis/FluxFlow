@@ -1,6 +1,7 @@
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
+using FluxFlow.Components.Metrics.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -12,6 +13,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     private const string DefaultGroup = "default";
 
     private readonly MetricsAggregateOptions _options;
+    private readonly IMetricsClock _clock;
     private readonly TimeSpan _rateWindow;
     private readonly ActionBlock<MetricSampleInput> _input;
     private readonly BufferBlock<MetricSnapshotOutput> _output;
@@ -31,9 +33,12 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     private double? _maxValue;
     private long _totalSize;
 
-    private MetricsAggregateNode(MetricsAggregateOptions options)
+    private MetricsAggregateNode(
+        MetricsAggregateOptions options,
+        IMetricsClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -60,11 +65,17 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     public ISourceBlock<MetricSnapshotOutput> Output => _output;
 
     public static RuntimeNode Create(RuntimeNodeFactoryContext context)
+        => Create(context, new MetricsComponentOptions());
+
+    public static RuntimeNode Create(
+        RuntimeNodeFactoryContext context,
+        MetricsComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = MetricsOptionsReader.ReadAggregateOptions(context.Definition);
-        var node = new MetricsAggregateNode(options);
+        var node = new MetricsAggregateNode(options, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(MetricsComponentPorts.Input, node.Input)
@@ -112,7 +123,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase
         try
         {
             _processingCancellationToken.ThrowIfCancellationRequested();
-            var timestamp = sample.Timestamp ?? DateTimeOffset.UtcNow;
+            var timestamp = sample.Timestamp ?? _clock.UtcNow;
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
             var groupKey = ResolveGroup(sample);

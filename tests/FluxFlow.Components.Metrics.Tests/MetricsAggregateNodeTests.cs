@@ -1,5 +1,7 @@
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
+using FluxFlow.Components.Metrics.Options;
+using FluxFlow.Components.Metrics.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -234,6 +236,28 @@ public sealed class MetricsAggregateNodeTests
     }
 
     [Fact]
+    public async Task Aggregate_UsesConfiguredClockForMissingSampleTimestamp()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:42Z");
+        var clock = new FixedMetricsClock(timestamp);
+        var runtimeNode = CreateNode(
+            new { },
+            options => options.UseClock(clock));
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<MetricSnapshotOutput>(runtimeNode);
+
+        await input.Target.SendAsync(new MetricSampleInput());
+        input.Target.Complete();
+        var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        snapshot.Timestamp.ShouldBe(timestamp);
+        snapshot.Latest.ShouldNotBeNull();
+        snapshot.Latest.Timestamp.ShouldBe(timestamp);
+        snapshot.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
+    }
+
+    [Fact]
     public async Task Aggregate_RespectsMaxGroupLimit()
     {
         var runtimeNode = CreateNode(new
@@ -363,10 +387,12 @@ public sealed class MetricsAggregateNodeTests
         registry.TryGetFactory(MetricsComponentTypes.Aggregate, out _).ShouldBeTrue();
     }
 
-    private static RuntimeNode CreateNode(object configuration)
+    private static RuntimeNode CreateNode(
+        object configuration,
+        Action<MetricsComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMetricsComponents();
+            .RegisterMetricsComponents(options => configure?.Invoke(options));
         registry.TryGetFactory(MetricsComponentTypes.Aggregate, out var factory).ShouldBeTrue();
         return factory(CreateContext(configuration));
     }
@@ -406,5 +432,10 @@ public sealed class MetricsAggregateNodeTests
                 out var error);
         error.ShouldBeNull();
         return target;
+    }
+
+    private sealed class FixedMetricsClock(DateTimeOffset utcNow) : IMetricsClock
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
     }
 }

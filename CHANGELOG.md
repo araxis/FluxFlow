@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Metrics 0.2.0-alpha.1
+
+Deterministic metric fallback timestamps.
+
+- Adds `IMetricsClock` and `SystemMetricsClock`.
+- Adds `UseClock(...)` to `MetricsComponentOptions`.
+- `metrics.aggregate` now uses the configured clock only when a
+  `MetricSampleInput` omits `Timestamp`.
+
 ## FluxFlow.Components.Timers 0.5.0-alpha.1
 
 Deterministic timer timing.
