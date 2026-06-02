@@ -186,8 +186,9 @@ Date: 2026-05-31
   public-feed restore/build smoke test.
 - Started `FluxFlow.Components.Metrics` `0.2.0-alpha.1` with a host-provided
   metrics clock for deterministic fallback sample timestamps.
+- Published `FluxFlow.Components.Metrics` `0.2.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
-- Return to the broader component maturity backlog after Metrics release
-  verification.
+- Return to the broader component maturity backlog.

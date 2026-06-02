@@ -38,6 +38,8 @@ Completed local verification:
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
 - `dotnet pack src\FluxFlow.Components.Metrics\FluxFlow.Components.Metrics.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
-
-Release evidence will be added after full verification, tag publication, and
-public package smoke testing.
+- Commit: `94c3a2c` (`Add deterministic metrics clock`).
+- Tag: `components-metrics-v0.2.0-alpha.1`.
+- Release workflow: `26836596663`, success.
+- Main CI workflow: `26836597645`, success.
+- Public package restore/build smoke passed on attempt 9.
