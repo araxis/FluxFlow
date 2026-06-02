@@ -14,7 +14,8 @@ host code:
    streams that do not depend on a transport or app store.
 3. Add `flow.mapper` to translate from host input shapes into package request
    contracts.
-4. Add `flow.filter` and `flow.when` for expression-driven decisions.
+4. Add `flow.filter`, `flow.when`, or `flow.switch` for expression-driven
+   decisions.
 5. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
 6. Add `state.reducer` when later decisions depend on previous messages.
 7. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
@@ -112,7 +113,7 @@ source.generated -> flow.mapper -> flow.assert -> host sink
 Validation and routing:
 
 ```text
-host source -> flow.mapper -> json.schema-validator -> flow.when -> host sinks
+host source -> flow.mapper -> json.schema-validator -> flow.switch -> host sinks
 ```
 
 Recording and replay:

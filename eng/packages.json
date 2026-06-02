@@ -42,6 +42,13 @@
     "notesName": "FluxFlow.Components.Sources"
   },
   {
+    "alias": "components-routing",
+    "tagPrefix": "components-routing",
+    "packageId": "FluxFlow.Components.Routing",
+    "project": "src/FluxFlow.Components.Routing/FluxFlow.Components.Routing.csproj",
+    "notesName": "FluxFlow.Components.Routing"
+  },
+  {
     "alias": "components-validation",
     "tagPrefix": "components-validation",
     "packageId": "FluxFlow.Components.Validation",

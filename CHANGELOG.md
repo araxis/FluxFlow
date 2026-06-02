@@ -1,5 +1,28 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.1.0-alpha.1
+
+Initial reusable routing component package.
+
+- Added `FluxFlow.Components.Routing` as a separate source project, test
+  project, and package artifact.
+- Added `flow.switch` with `Input`, `Result`, `Matched`, `Default`, and
+  `Errors` ports.
+- Added `FlowSwitchResult<TInput>` route result contract.
+- Added host-provided expression engine resolution, type aliases, and context
+  factories.
+- Added configured route matching with optional case-insensitive comparison.
+- Added route-result output plus matched/default original input streams.
+- Added optional matched/default input emission controls.
+- Added per-message expression failures as `FlowError` so later messages
+  continue.
+- Added diagnostics with input type, engine, route key, match status,
+  expression id, and expression name metadata where available.
+- Added focused coverage for matched/default routing, empty route sets,
+  case-insensitive matching, suppression flags, expression failures,
+  diagnostics, registration, missing expression, unknown input types, and
+  invalid route config.
+
 ## FluxFlow.Components.Sources 0.1.0-alpha.1
 
 Initial reusable deterministic source component package.

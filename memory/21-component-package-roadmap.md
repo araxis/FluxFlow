@@ -56,6 +56,8 @@ Start with one package as the template before splitting everything:
   result and pass/fail routing.
 - `FluxFlow.Components.Sources`: deterministic generated and sequence source
   nodes without transport or app storage dependencies.
+- `FluxFlow.Components.Routing`: expression-driven switch routing, followed by
+  correlation, join, and window nodes after the route contract settles.
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
@@ -127,3 +129,5 @@ after the core component package has settled.
     `67-assertions-component-package.md`.
 12. Add deterministic generated and sequence sources. Done in
     `68-sources-component-package.md`.
+13. Add first expression-driven routing package. Done in
+    `69-routing-component-package.md`.
