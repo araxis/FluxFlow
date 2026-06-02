@@ -23,7 +23,13 @@ public sealed class RoutingComponentModule : IFlowNodeModule
                 context => RoutingNodeFactory.CreateWindow(context, options)),
             new FlowNodeRegistration(
                 RoutingComponentTypes.Join,
-                context => RoutingNodeFactory.CreateJoin(context, options))
+                context => RoutingNodeFactory.CreateJoin(context, options)),
+            new FlowNodeRegistration(
+                RoutingComponentTypes.Fork,
+                context => RoutingNodeFactory.CreateFork(context, options)),
+            new FlowNodeRegistration(
+                RoutingComponentTypes.Merge,
+                context => RoutingNodeFactory.CreateMerge(context, options))
         ];
     }
 

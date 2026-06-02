@@ -77,5 +77,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `71-routing-switch-output-ports.md`: switch route-specific output port hardening.
 - `72-routing-window-component.md`: count/time stream window component.
 - `73-routing-join-component.md`: two-stream key join component.
+- `74-routing-merge-fork-route-envelope.md`: merge, fork, and switch route envelope component additions.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

@@ -16,16 +16,19 @@ host code:
    contracts.
 4. Add `flow.filter`, `flow.when`, or `flow.switch` for expression-driven
    decisions.
-5. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
-6. Add `flow.correlation` when a single stream needs request/response pairing
+5. Add `flow.fork` when several branches must receive every input.
+6. Add `flow.merge` when same-type streams need to converge with source
+   metadata.
+7. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
+8. Add `flow.correlation` when a single stream needs request/response pairing
    by key.
-7. Add `flow.join` when two streams need to be paired by related keys.
-8. Add `state.reducer` when later decisions depend on previous messages.
-9. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+9. Add `flow.join` when two streams need to be paired by related keys.
+10. Add `state.reducer` when later decisions depend on previous messages.
+11. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
    runtime observation.
-10. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
+12. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
-11. Add edge packages for validation, serialization, payload inspection, HTTP,
+13. Add edge packages for validation, serialization, payload inspection, HTTP,
    file system operations, recording, replay, storage, or external transport
    adapters.
 
@@ -125,6 +128,27 @@ Switch with direct route outputs:
 host source -> flow.switch
                   |-> Priority -> host sink
                   |-> Standard -> host sink
+```
+
+Switch with a route envelope:
+
+```text
+host source -> flow.switch.Routed -> flow.mapper -> host sink
+```
+
+Reliable fan-out:
+
+```text
+host source -> flow.fork
+                  |-> Audit -> host sink
+                  |-> Work  -> flow.mapper -> host sink
+```
+
+Source-tagged merge:
+
+```text
+primary source -> flow.merge -> flow.assert -> host sink
+replay source  ->/
 ```
 
 Request/response pairing:

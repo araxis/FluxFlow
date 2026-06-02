@@ -15,4 +15,8 @@ public static class RoutingDiagnosticNames
     public const string JoinMatched = "flow.join.matched";
     public const string JoinTimedOut = "flow.join.timedOut";
     public const string JoinFailed = "flow.join.failed";
+
+    public const string ForkForwarded = "flow.fork.forwarded";
+
+    public const string MergeEmitted = "flow.merge.emitted";
 }

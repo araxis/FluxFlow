@@ -19,6 +19,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     private readonly IReadOnlyDictionary<string, ISourceBlock<TInput>> _routeOutputs;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowSwitchResult<TInput>> _result;
+    private readonly BufferBlock<FlowRoute<TInput>> _routed;
     private readonly BufferBlock<TInput> _matched;
     private readonly BufferBlock<TInput> _default;
     private readonly CancellationToken _processingCancellationToken;
@@ -62,6 +63,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(RouteAsync, inputOptions);
         _result = new BufferBlock<FlowSwitchResult<TInput>>(blockOptions);
+        _routed = new BufferBlock<FlowRoute<TInput>>(blockOptions);
         _matched = new BufferBlock<TInput>(blockOptions);
         _default = new BufferBlock<TInput>(blockOptions);
         _input.Completion.ContinueWith(
@@ -72,6 +74,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         CompleteWhen(Task.WhenAll(
             _routeOutputBlocks.Values
                 .Select(output => output.Completion)
+                .Append(_routed.Completion)
                 .Append(_result.Completion)
                 .Append(_matched.Completion)
                 .Append(_default.Completion)));
@@ -80,6 +83,8 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     public ITargetBlock<TInput> Input => _input;
 
     public ISourceBlock<FlowSwitchResult<TInput>> Result => _result;
+
+    public ISourceBlock<FlowRoute<TInput>> Routed => _routed;
 
     public ISourceBlock<TInput> Matched => _matched;
 
@@ -101,8 +106,13 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         {
             ((IDataflowBlock)_input).Fault(exception);
             ((IDataflowBlock)_result).Fault(exception);
+            ((IDataflowBlock)_routed).Fault(exception);
             ((IDataflowBlock)_matched).Fault(exception);
             ((IDataflowBlock)_default).Fault(exception);
+            foreach (var routeOutput in _routeOutputBlocks.Values)
+            {
+                ((IDataflowBlock)routeOutput).Fault(exception);
+            }
         }
     }
 
@@ -153,6 +163,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         };
 
         await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        string? outputPort = null;
         if (matched && _options.EmitMatchedInput)
         {
             await _matched.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
@@ -160,10 +171,29 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
 
         if (matched
             && routeKey is not null
-            && _routeOutputPorts.TryGetValue(routeKey, out var outputPort)
-            && _routeOutputBlocks.TryGetValue(outputPort, out var routeOutput))
+            && _routeOutputPorts.TryGetValue(routeKey, out var routeOutputPort)
+            && _routeOutputBlocks.TryGetValue(routeOutputPort, out var routeOutput))
         {
+            outputPort = routeOutputPort;
             await routeOutput.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+        }
+
+        if (_options.EmitRouteEnvelope)
+        {
+            await _routed.SendAsync(
+                new FlowRoute<TInput>
+                {
+                    RouteKey = routeKey,
+                    Route = matched ? routeKey : _options.DefaultRoute,
+                    Matched = matched,
+                    DefaultRoute = matched ? null : _options.DefaultRoute,
+                    OutputPort = outputPort,
+                    ExpressionId = _options.ExpressionId,
+                    ExpressionName = _options.ExpressionName,
+                    InputType = _options.InputType,
+                    Value = input
+                },
+                _processingCancellationToken).ConfigureAwait(false);
         }
 
         if (!matched && _options.EmitDefaultInput)
@@ -198,6 +228,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         if (completion.IsFaulted && completion.Exception is { } exception)
         {
             ((IDataflowBlock)_result).Fault(exception);
+            ((IDataflowBlock)_routed).Fault(exception);
             ((IDataflowBlock)_matched).Fault(exception);
             ((IDataflowBlock)_default).Fault(exception);
             foreach (var routeOutput in _routeOutputBlocks.Values)
@@ -209,6 +240,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         }
 
         _result.Complete();
+        _routed.Complete();
         _matched.Complete();
         _default.Complete();
         foreach (var routeOutput in _routeOutputBlocks.Values)

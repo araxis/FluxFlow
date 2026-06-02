@@ -46,14 +46,15 @@ Added package version `0.5.0-alpha.1` with:
 
 ## Deferred
 
+`flow.merge`, `flow.fork`, and optional switch route envelopes were added in
+`74-routing-merge-fork-route-envelope.md`.
+
 Future Routing candidates:
 
-- `flow.merge` for combining streams without key pairing.
-- `flow.fork` for duplicating a stream into named outputs.
-- route envelope helpers if consumers need one object output instead of
-  dynamic switch ports.
 - separate request and response input ports for correlation if consumers need
   that graph shape.
+- different-type merge if a real workflow needs one converged envelope over
+  heterogeneous inputs.
 
-The next recommendation is to wait for a consumer graph that proves whether
-merge/fork or route envelopes should come first.
+The next recommendation is to release-verify Routing before moving to the next
+package backlog item.

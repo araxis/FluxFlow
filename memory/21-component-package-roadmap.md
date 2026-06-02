@@ -57,7 +57,8 @@ Start with one package as the template before splitting everything:
 - `FluxFlow.Components.Sources`: deterministic generated and sequence source
   nodes without transport or app storage dependencies.
 - `FluxFlow.Components.Routing`: expression-driven switch routing, followed by
-  correlation, join, and window nodes after the route contract settles.
+  correlation, window, join, fork, and merge nodes after the route contract
+  settles.
 - `FluxFlow.Components.Observability`: neutral logger, metrics, and counter
   observer nodes.
 - `FluxFlow.Components.Timers`: neutral interval and scheduling source nodes.
@@ -139,3 +140,5 @@ after the core component package has settled.
     `72-routing-window-component.md`.
 17. Add two-stream key joins to routing. Done in
     `73-routing-join-component.md`.
+18. Add same-stream fork, source-tagged merge, and optional switch route
+    envelopes. Done in `74-routing-merge-fork-route-envelope.md`.

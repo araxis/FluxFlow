@@ -6,6 +6,7 @@ public static class RoutingComponentPorts
     public const string Left = "Left";
     public const string Right = "Right";
     public const string Output = "Output";
+    public const string Routed = "Routed";
     public const string Result = "Result";
     public const string Matched = "Matched";
     public const string Timeouts = "Timeouts";

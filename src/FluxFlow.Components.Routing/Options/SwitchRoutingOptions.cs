@@ -15,5 +15,6 @@ public sealed record SwitchRoutingOptions
     public bool CaseSensitive { get; init; } = true;
     public bool EmitMatchedInput { get; init; } = true;
     public bool EmitDefaultInput { get; init; } = true;
+    public bool EmitRouteEnvelope { get; init; }
     public int BoundedCapacity { get; init; } = 128;
 }

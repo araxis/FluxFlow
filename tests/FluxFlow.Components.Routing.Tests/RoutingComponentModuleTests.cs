@@ -43,6 +43,24 @@ public sealed class RoutingComponentModuleTests
     }
 
     [Fact]
+    public void RegisterRoutingComponents_AddsForkFactory()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(new RecordingExpressionEngine());
+
+        registry.TryGetFactory(RoutingComponentTypes.Fork, out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void RegisterRoutingComponents_AddsMergeFactory()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(new RecordingExpressionEngine());
+
+        registry.TryGetFactory(RoutingComponentTypes.Merge, out _).ShouldBeTrue();
+    }
+
+    [Fact]
     public void RegisterRoutingComponents_RequiresExpressionEngine()
     {
         var registry = new RuntimeNodeFactoryRegistry()

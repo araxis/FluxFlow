@@ -6,10 +6,12 @@ Reusable expression-driven routing components for FluxFlow.
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
-| `flow.switch` | `Input` -> `Result`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
+| `flow.switch` | `Input` -> `Result`, optional `Routed`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
 | `flow.correlation` | `Input` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key and side expressions. |
 | `flow.window` | `Input` -> `Output`, `Errors` | Groups input items into count or time based windows. |
 | `flow.join` | `Left`, `Right` -> `Output`, `Timeouts`, `Errors` | Joins two typed streams by per-side key expressions. |
+| `flow.fork` | `Input` -> configured named outputs, `Errors` | Copies every input to every configured output. |
+| `flow.merge` | configured named inputs -> `Output`, `Errors` | Combines several same-type streams into one source-tagged stream. |
 
 The package does not choose an expression language. Applications provide one or
 more `IFlowExpressionEngine` implementations during registration.
@@ -21,6 +23,8 @@ var registry = new RuntimeNodeFactoryRegistry()
         .RegisterType<AppMessage>("app.message")
         .UseContextFactory(new AppMessageContextFactory()));
 ```
+
+## Switch
 
 Basic configuration:
 
@@ -52,6 +56,11 @@ engine port names and cannot collide with built-in switch ports.
 If `routes` is empty, every non-empty route key is treated as matched. This lets
 hosts use the result envelope and link conditions without predeclaring every
 route key.
+
+Set `emitRouteEnvelope` to `true` when downstream nodes need one neutral route
+object instead of, or in addition to, direct route ports. `Routed` emits
+`FlowRoute<TInput>` with route key, selected route, match status, default route,
+matched output port, expression metadata, input type, and original value.
 
 Expression evaluation failures emit `FlowError` and the node continues
 processing later messages.
@@ -135,6 +144,41 @@ expires or when the node completes.
 Repeated keys are paired in FIFO order. Key evaluation failures, empty keys,
 and pending-capacity failures emit `FlowError` and the node continues
 processing later values.
+
+## Fork
+
+Use `flow.fork` when every downstream branch must receive every item.
+
+```json
+{
+  "type": "flow.fork",
+  "inputType": "app.message",
+  "outputs": [ "Audit", "Transform", "Dashboard" ]
+}
+```
+
+Each configured output port emits the original input type. The node sends each
+item to every output in configured order, then completes all outputs after the
+input completes. Output names must be valid engine port names and cannot collide
+with built-in fork ports.
+
+## Merge
+
+Use `flow.merge` when several same-type streams should converge while retaining
+the source port name.
+
+```json
+{
+  "type": "flow.merge",
+  "inputType": "app.message",
+  "inputs": [ "Primary", "Retry", "Replay" ]
+}
+```
+
+`Output` emits `FlowMergeItem<TInput>` with sequence number, source input port,
+received timestamp, and original value. The node completes only after every
+configured input completes. Input names must be valid engine port names and
+cannot collide with built-in merge ports.
 
 ## Composition Guidance
 

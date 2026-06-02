@@ -40,13 +40,9 @@ Added package version `0.4.0-alpha.1` with:
 
 ## Deferred
 
-The next Routing hardening choices are:
-
-- separate request and response input ports for correlation
-- route envelope helpers if consumers need one object output instead of
-  dynamic switch ports
-
 `flow.join` was added in `73-routing-join-component.md`.
+`flow.fork`, `flow.merge`, and switch route envelopes were added in
+`74-routing-merge-fork-route-envelope.md`.
 
-The recommended next step is route envelope helpers or merge/fork primitives,
-depending on which consumer graph shape appears first.
+The remaining hardening choice is separate request and response input ports for
+correlation if consumers need that graph shape.

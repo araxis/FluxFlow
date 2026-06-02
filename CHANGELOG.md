@@ -1,5 +1,29 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.6.0-alpha.1
+
+Merge, fork, and route-envelope primitives.
+
+- Added `flow.fork` with one typed `Input`, configured named outputs, and
+  `Errors`.
+- Added reliable per-message fan-out from `flow.fork` to every configured
+  output in configured order.
+- Added `flow.merge` with configured named inputs, `Output`, and `Errors`.
+- Added `FlowMergeItem<TInput>` with source input port, sequence number,
+  received timestamp, and original value.
+- Added optional `Routed` output on `flow.switch`.
+- Added `FlowRoute<TInput>` with route key, selected route, match status,
+  default route, matched output port, expression metadata, input type, and
+  original value.
+- Added switch `emitRouteEnvelope` option so hosts can compose route metadata
+  without relying only on dynamic route ports.
+- Added validation for fork output names and merge input names, including empty
+  values, duplicates, invalid port names, and built-in port collisions.
+- Added diagnostics for fork forwarding and merge output emission.
+- Added focused coverage for fork fan-out, merge source tagging, switch route
+  envelopes, completion, diagnostics, invalid config, unknown input types, and
+  module registration.
+
 ## FluxFlow.Components.Routing 0.5.0-alpha.1
 
 Two-stream join primitive.

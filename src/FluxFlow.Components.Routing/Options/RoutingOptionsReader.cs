@@ -171,6 +171,54 @@ internal static class RoutingOptionsReader
         return options;
     }
 
+    public static ForkRoutingOptions ReadForkOptions(NodeDefinition definition)
+    {
+        var options = Read<ForkRoutingOptions>(definition);
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException("flow.fork option 'inputType' cannot be empty.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException("flow.fork option 'boundedCapacity' must be greater than zero.");
+        }
+
+        ValidatePortNames(
+            "flow.fork",
+            "outputs",
+            options.Outputs,
+            [
+                RoutingComponentPorts.Input,
+                RoutingComponentPorts.Errors
+            ]);
+        return options;
+    }
+
+    public static MergeRoutingOptions ReadMergeOptions(NodeDefinition definition)
+    {
+        var options = Read<MergeRoutingOptions>(definition);
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException("flow.merge option 'inputType' cannot be empty.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException("flow.merge option 'boundedCapacity' must be greater than zero.");
+        }
+
+        ValidatePortNames(
+            "flow.merge",
+            "inputs",
+            options.Inputs,
+            [
+                RoutingComponentPorts.Output,
+                RoutingComponentPorts.Errors
+            ]);
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -198,6 +246,7 @@ internal static class RoutingOptionsReader
             [
                 RoutingComponentPorts.Input,
                 RoutingComponentPorts.Result,
+                RoutingComponentPorts.Routed,
                 RoutingComponentPorts.Matched,
                 RoutingComponentPorts.Default,
                 RoutingComponentPorts.Errors
@@ -246,6 +295,54 @@ internal static class RoutingOptionsReader
             {
                 throw new InvalidOperationException(
                     $"flow.switch route output '{normalizedRoute}' has invalid port '{normalizedPort}'.",
+                    exception);
+            }
+        }
+    }
+
+    private static void ValidatePortNames(
+        string nodeType,
+        string optionName,
+        IReadOnlyCollection<string> portNames,
+        IReadOnlyCollection<string> reservedPorts)
+    {
+        if (portNames.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option '{optionName}' must contain at least one value.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reserved = reservedPorts.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var portName in portNames)
+        {
+            if (string.IsNullOrWhiteSpace(portName))
+            {
+                throw new InvalidOperationException(
+                    $"{nodeType} option '{optionName}' cannot contain empty values.");
+            }
+
+            var normalized = portName.Trim();
+            if (!seen.Add(normalized))
+            {
+                throw new InvalidOperationException(
+                    $"{nodeType} option '{optionName}' contains duplicate port '{normalized}'.");
+            }
+
+            if (reserved.Contains(normalized))
+            {
+                throw new InvalidOperationException(
+                    $"{nodeType} option '{optionName}' cannot use built-in port '{normalized}'.");
+            }
+
+            try
+            {
+                _ = new PortName(normalized);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new InvalidOperationException(
+                    $"{nodeType} option '{optionName}' contains invalid port '{normalized}'.",
                     exception);
             }
         }

@@ -100,6 +100,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Mqtt` `0.2.0-alpha.1` with client factory
   context, explicit adapter ownership, subscription leases, retained
   subscription options, richer diagnostics/events, and split error codes.
+- Added Routing `0.6.0-alpha.1` work with `flow.fork`, `flow.merge`, and
+  optional switch route envelopes.
 
 ## Remaining
 

@@ -59,8 +59,10 @@ workflow models.
 Direct switch route outputs were added in `71-routing-switch-output-ports.md`.
 `flow.window` was added in `72-routing-window-component.md`.
 `flow.join` was added in `73-routing-join-component.md`.
-The remaining nodes need separate contracts for buffering, late events, missing
-events, and typed result shapes.
+`flow.fork`, `flow.merge`, and switch route envelopes were added in
+`74-routing-merge-fork-route-envelope.md`.
+Any remaining routing nodes need separate contracts for buffering, late events,
+missing events, and typed result shapes.
 
 ## Verification Plan
 

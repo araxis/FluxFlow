@@ -177,6 +177,62 @@ public sealed class FlowSwitchNodeTests
     }
 
     [Fact]
+    public async Task Switch_EmitsRouteEnvelopeWhenEnabled()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, context, _) => context.Variables["category"]))
+                .RegisterType<InputMessage>("app.input")
+                .UseContextFactory(new InputMessageContextFactory()),
+            new
+            {
+                expression = "category",
+                expressionId = "route-v1",
+                expressionName = "route-test",
+                inputType = "app.input",
+                routes = new[] { "priority" },
+                defaultRoute = "other",
+                emitRouteEnvelope = true,
+                routeOutputs = new Dictionary<string, string>
+                {
+                    ["priority"] = "Priority"
+                }
+            });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var routed = new BufferBlock<FlowRoute<InputMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Routed, routed);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Result))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Default))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName("Priority"))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new InputMessage("A-100", "priority"));
+        await input.Target.SendAsync(new InputMessage("A-101", "standard"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var envelopes = await DrainUntilCompletedAsync(routed);
+        envelopes.Count.ShouldBe(2);
+        envelopes[0].RouteKey.ShouldBe("priority");
+        envelopes[0].Route.ShouldBe("priority");
+        envelopes[0].Matched.ShouldBeTrue();
+        envelopes[0].DefaultRoute.ShouldBeNull();
+        envelopes[0].OutputPort.ShouldBe("Priority");
+        envelopes[0].ExpressionId.ShouldBe("route-v1");
+        envelopes[0].ExpressionName.ShouldBe("route-test");
+        envelopes[0].InputType.ShouldBe("app.input");
+        envelopes[0].Value!.Id.ShouldBe("A-100");
+        envelopes[1].RouteKey.ShouldBe("standard");
+        envelopes[1].Route.ShouldBe("other");
+        envelopes[1].Matched.ShouldBeFalse();
+        envelopes[1].DefaultRoute.ShouldBe("other");
+        envelopes[1].OutputPort.ShouldBeNull();
+        envelopes[1].Value!.Id.ShouldBe("A-101");
+    }
+
+    [Fact]
     public async Task Switch_CanMapSeveralRoutesToTheSameOutputPort()
     {
         var calls = 0;
