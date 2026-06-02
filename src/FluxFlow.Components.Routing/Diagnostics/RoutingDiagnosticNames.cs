@@ -4,4 +4,8 @@ public static class RoutingDiagnosticNames
 {
     public const string SwitchRouted = "flow.switch.routed";
     public const string SwitchFailed = "flow.switch.failed";
+
+    public const string CorrelationMatched = "flow.correlation.matched";
+    public const string CorrelationTimedOut = "flow.correlation.timedOut";
+    public const string CorrelationFailed = "flow.correlation.failed";
 }

@@ -17,6 +17,17 @@ internal static class RoutingTestHost
             "main",
             new Dictionary<NodeName, RuntimeNode>());
 
+    public static Dictionary<string, JsonElement> MergeConfiguration(object defaults, object overrides)
+    {
+        var result = ToConfiguration(defaults);
+        foreach (var (key, value) in ToConfiguration(overrides))
+        {
+            result[key] = value;
+        }
+
+        return result;
+    }
+
     public static Dictionary<string, JsonElement> ToConfiguration(object configuration)
     {
         var root = JsonSerializer.SerializeToElement(configuration);

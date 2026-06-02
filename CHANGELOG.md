@@ -1,5 +1,24 @@
 # Changelog
 
+## FluxFlow.Components.Routing 0.2.0-alpha.1
+
+Routing correlation addition.
+
+- Added `flow.correlation` with `Input`, `Matched`, `Timeouts`, and `Errors`
+  ports.
+- Added `FlowCorrelationMatch<TInput>` and `FlowCorrelationTimeout<TInput>`
+  contracts.
+- Added key and side expression evaluation through the host-provided expression
+  engine and context factories.
+- Added bounded pending-key tracking with configurable timeout, side names,
+  case sensitivity, max pending keys, and bounded capacity.
+- Added per-message errors for key failures, invalid keys, side failures,
+  invalid sides, duplicate sides, and pending capacity.
+- Added diagnostics for matched pairs, timeout output, and recoverable failures.
+- Added focused coverage for in-order and out-of-order matching, completion
+  timeouts, observed timeouts, expression failures, invalid sides, capacity,
+  diagnostics, invalid config, and module registration.
+
 ## FluxFlow.Components.Routing 0.1.0-alpha.1
 
 Initial reusable routing component package.

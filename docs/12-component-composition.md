@@ -17,12 +17,14 @@ host code:
 4. Add `flow.filter`, `flow.when`, or `flow.switch` for expression-driven
    decisions.
 5. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
-6. Add `state.reducer` when later decisions depend on previous messages.
-7. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+6. Add `flow.correlation` when a single stream needs request/response pairing
+   by key.
+7. Add `state.reducer` when later decisions depend on previous messages.
+8. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
    runtime observation.
-8. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
+9. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
-9. Add edge packages for validation, serialization, payload inspection, HTTP,
+10. Add edge packages for validation, serialization, payload inspection, HTTP,
    file system operations, recording, replay, storage, or external transport
    adapters.
 
@@ -114,6 +116,12 @@ Validation and routing:
 
 ```text
 host source -> flow.mapper -> json.schema-validator -> flow.switch -> host sinks
+```
+
+Request/response pairing:
+
+```text
+host source -> flow.correlation -> flow.assert -> host sink
 ```
 
 Recording and replay:

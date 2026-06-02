@@ -131,3 +131,5 @@ after the core component package has settled.
     `68-sources-component-package.md`.
 13. Add first expression-driven routing package. Done in
     `69-routing-component-package.md`.
+14. Add key-based request/response correlation to routing. Done in
+    `70-routing-correlation-component.md`.

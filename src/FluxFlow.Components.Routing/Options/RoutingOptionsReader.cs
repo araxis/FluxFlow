@@ -36,6 +36,63 @@ internal static class RoutingOptionsReader
         return options;
     }
 
+    public static CorrelationRoutingOptions ReadCorrelationOptions(NodeDefinition definition)
+    {
+        var options = Read<CorrelationRoutingOptions>(definition);
+        if (string.IsNullOrWhiteSpace(options.KeyExpression))
+        {
+            throw new InvalidOperationException("flow.correlation requires configuration value 'keyExpression'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.SideExpression))
+        {
+            throw new InvalidOperationException("flow.correlation requires configuration value 'sideExpression'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException("flow.correlation option 'inputType' cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.RequestSide))
+        {
+            throw new InvalidOperationException("flow.correlation option 'requestSide' cannot be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ResponseSide))
+        {
+            throw new InvalidOperationException("flow.correlation option 'responseSide' cannot be empty.");
+        }
+
+        var comparer = options.CaseSensitive
+            ? StringComparer.Ordinal
+            : StringComparer.OrdinalIgnoreCase;
+        if (comparer.Equals(options.RequestSide.Trim(), options.ResponseSide.Trim()))
+        {
+            throw new InvalidOperationException(
+                "flow.correlation options 'requestSide' and 'responseSide' must be different.");
+        }
+
+        if (options.TimeoutMilliseconds <= 0)
+        {
+            throw new InvalidOperationException(
+                "flow.correlation option 'timeoutMilliseconds' must be greater than zero.");
+        }
+
+        if (options.MaxPending <= 0)
+        {
+            throw new InvalidOperationException("flow.correlation option 'maxPending' must be greater than zero.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                "flow.correlation option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return options;
+    }
+
     private static T Read<T>(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);

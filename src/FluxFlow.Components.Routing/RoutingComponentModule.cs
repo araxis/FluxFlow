@@ -14,7 +14,10 @@ public sealed class RoutingComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 RoutingComponentTypes.Switch,
-                context => RoutingNodeFactory.CreateSwitch(context, options))
+                context => RoutingNodeFactory.CreateSwitch(context, options)),
+            new FlowNodeRegistration(
+                RoutingComponentTypes.Correlation,
+                context => RoutingNodeFactory.CreateCorrelation(context, options))
         ];
     }
 

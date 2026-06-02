@@ -1,0 +1,297 @@
+using FluxFlow.Components.Routing.Contracts;
+using FluxFlow.Components.Routing.Diagnostics;
+using FluxFlow.Engine.Components;
+using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
+using FluxFlow.Engine.Runtime;
+using Shouldly;
+using System.Threading.Tasks.Dataflow;
+using Xunit;
+
+namespace FluxFlow.Components.Routing.Tests;
+
+public sealed class FlowCorrelationNodeTests
+{
+    [Fact]
+    public async Task Correlation_MatchesRequestAndResponseByKey()
+    {
+        var runtimeNode = CreateNode(new { });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        match.Key.ShouldBe("A-100");
+        match.Request.Payload.ShouldBe("start");
+        match.Response.Payload.ShouldBe("done");
+        match.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task Correlation_MatchesOutOfOrderResponseAndRequest()
+    {
+        var runtimeNode = CreateNode(new { });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        match.Request.Payload.ShouldBe("start");
+        match.Response.Payload.ShouldBe("done");
+    }
+
+    [Fact]
+    public async Task Correlation_EmitsTimeoutsForUnmatchedInputsOnCompletion()
+    {
+        var runtimeNode = CreateNode(new { timeoutMilliseconds = 10 });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        timeout.Key.ShouldBe("A-100");
+        timeout.Side.ShouldBe("request");
+        timeout.Value.Payload.ShouldBe("start");
+        timeout.Timeout.ShouldBe(TimeSpan.FromMilliseconds(10));
+    }
+
+    [Fact]
+    public async Task Correlation_ExpiresPendingInputsBeforeProcessingNextInput()
+    {
+        var runtimeNode = CreateNode(new { timeoutMilliseconds = 1 });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        await Task.Delay(20);
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var firstTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var secondTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        firstTimeout.Side.ShouldBe("request");
+        secondTimeout.Side.ShouldBe("response");
+        matched.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Correlation_ReportsExpressionFailureAndContinues()
+    {
+        var runtimeNode = CreateNode(
+            new { expressionName = "pairing" },
+            (expression, context, _) =>
+            {
+                if (context.Variables["payload"]?.Equals("throw") == true)
+                {
+                    throw new InvalidOperationException("key failed");
+                }
+
+                return expression switch
+                {
+                    "key" => context.Variables["key"],
+                    "side" => context.Variables["side"],
+                    _ => null
+                };
+            });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var errors = new BufferBlock<FlowError>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "throw"));
+        await input.Target.SendAsync(new CorrelationMessage("A-101", "request", "start"));
+        await input.Target.SendAsync(new CorrelationMessage("A-101", "response", "done"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
+        error.Context!.ShouldContain("expressionName=pairing");
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-101");
+    }
+
+    [Fact]
+    public async Task Correlation_RejectsInvalidSideAndContinues()
+    {
+        var runtimeNode = CreateNode(new { });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var errors = new BufferBlock<FlowError>();
+        var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
+        LinkOutput(runtimeNode, RoutingComponentPorts.Matched, matched);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "other", "bad"));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(RoutingErrorCodes.CorrelationInvalidSide);
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-100");
+    }
+
+    [Fact]
+    public async Task Correlation_ReportsCapacityLimitAndContinues()
+    {
+        var runtimeNode = CreateNode(new { maxPending = 1 });
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var errors = new BufferBlock<FlowError>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        await input.Target.SendAsync(new CorrelationMessage("A-101", "request", "next"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(RoutingErrorCodes.CorrelationCapacityExceeded);
+        error.Context!.ShouldContain("key=A-101");
+    }
+
+    [Fact]
+    public async Task Correlation_EmitsDiagnostics()
+    {
+        var runtimeNode = CreateNode(new { expressionId = "corr-v1" });
+        var diagnostics = new BufferBlock<FlowDiagnostic>();
+        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
+            .Diagnostics.LinkTo(diagnostics);
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        diagnostic.Name.ShouldBe(RoutingDiagnosticNames.CorrelationMatched);
+        diagnostic.Attributes["key"].ShouldBe("A-100");
+        diagnostic.Attributes["expressionId"].ShouldBe("corr-v1");
+    }
+
+    [Fact]
+    public void Correlation_RejectsMissingKeyExpression()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(new { keyExpression = "" }));
+
+        exception.Message.ShouldContain("keyExpression");
+    }
+
+    [Fact]
+    public void Correlation_RejectsEqualSides()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(new
+            {
+                requestSide = "message",
+                responseSide = "message"
+            }));
+
+        exception.Message.ShouldContain("different");
+    }
+
+    private static RuntimeNode CreateNode(
+        object overrides,
+        Func<string, FlowMapContext, Type, object?>? evaluate = null)
+    {
+        var configuration = RoutingTestHost.MergeConfiguration(
+            new
+            {
+                keyExpression = "key",
+                sideExpression = "side",
+                inputType = "app.correlation"
+            },
+            overrides);
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: evaluate ?? EvaluateCorrelationExpression))
+                .RegisterType<CorrelationMessage>("app.correlation")
+                .UseContextFactory(new CorrelationMessageContextFactory()));
+        registry.TryGetFactory(RoutingComponentTypes.Correlation, out var factory).ShouldBeTrue();
+        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Correlation, configuration));
+    }
+
+    private static object? EvaluateCorrelationExpression(
+        string expression,
+        FlowMapContext context,
+        Type resultType)
+    {
+        return expression switch
+        {
+            "key" => context.Variables["key"],
+            "side" => context.Variables["side"],
+            _ => context.Variables["input"]
+        };
+    }
+
+    private static void LinkOutput<T>(
+        RuntimeNode runtimeNode,
+        string port,
+        BufferBlock<T> target)
+    {
+        runtimeNode.FindOutput(new PortName(port))!
+            .TryLinkTo(
+                new InputPort<T>(
+                    new PortAddress("test", new NodeName(port), new PortName("Input")),
+                    target),
+                propagateCompletion: true,
+                out var error);
+        error.ShouldBeNull();
+    }
+
+    private sealed record CorrelationMessage(string Key, string Side, string Payload);
+
+    private sealed class CorrelationMessageContextFactory : IFlowMapContextFactory<CorrelationMessage>
+    {
+        public FlowMapContext Create(CorrelationMessage input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["key"] = input.Key,
+                    ["side"] = input.Side,
+                    ["payload"] = input.Payload
+                }
+            };
+    }
+}

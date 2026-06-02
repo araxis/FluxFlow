@@ -16,6 +16,15 @@ public sealed class RoutingComponentModuleTests
     }
 
     [Fact]
+    public void RegisterRoutingComponents_AddsCorrelationFactory()
+    {
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterRoutingComponents(new RecordingExpressionEngine());
+
+        registry.TryGetFactory(RoutingComponentTypes.Correlation, out _).ShouldBeTrue();
+    }
+
+    [Fact]
     public void RegisterRoutingComponents_RequiresExpressionEngine()
     {
         var registry = new RuntimeNodeFactoryRegistry()
