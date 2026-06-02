@@ -191,3 +191,6 @@ after the core component package has settled.
 34. Harden deterministic Storage behavior with a host-provided storage clock
     for logical storage node results and backend adapter timestamps. Done in
     `109-storage-clock-hardening.md`.
+35. Harden deterministic MQTT behavior with a host-provided MQTT clock for
+    publish result timestamps and package-owned MQTT workflow events. Done in
+    `110-mqtt-clock-hardening.md`.

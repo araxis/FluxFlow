@@ -224,6 +224,11 @@ Date: 2026-05-31
   `FluxFlow.Components.Storage.FileSystem` `0.2.0-alpha.1`, and
   `FluxFlow.Components.Storage.SqlFile` `0.2.0-alpha.1`; verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Mqtt` `0.4.0-alpha.1` with a host-provided MQTT
+  clock for deterministic publish result and package-owned workflow event
+  timestamps.
+- Published `FluxFlow.Components.Mqtt` `0.4.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
