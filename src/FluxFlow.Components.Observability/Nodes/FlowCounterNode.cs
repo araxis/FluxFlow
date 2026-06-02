@@ -1,6 +1,7 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -13,6 +14,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
     private readonly IFlowExpressionEngine? _expressionEngine;
     private readonly IObservabilityContextFactory _contextFactory;
     private readonly ObservabilityNodeContext _nodeContext;
+    private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowCounterSnapshot> _snapshots;
     private readonly CancellationToken _processingCancellationToken;
@@ -24,11 +26,22 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
         IFlowExpressionEngine? expressionEngine,
         IObservabilityContextFactory contextFactory,
         ObservabilityNodeContext nodeContext)
+        : this(options, expressionEngine, contextFactory, nodeContext, SystemObservabilityClock.Instance)
+    {
+    }
+
+    internal FlowCounterNode(
+        FlowCounterOptions options,
+        IFlowExpressionEngine? expressionEngine,
+        IObservabilityContextFactory contextFactory,
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine;
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -82,7 +95,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
             return;
         }
 
-        var observedAt = DateTimeOffset.UtcNow;
+        var observedAt = _clock.UtcNow;
         var count = Interlocked.Increment(ref _count);
         var snapshot = new FlowCounterSnapshot
         {

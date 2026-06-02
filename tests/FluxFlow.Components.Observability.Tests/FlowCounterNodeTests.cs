@@ -91,8 +91,10 @@ public sealed class FlowCounterNodeTests
     [Fact]
     public async Task Counter_WithoutPredicateDoesNotRequireExpressionEngine()
     {
+        var timestamp = new DateTimeOffset(2026, 6, 2, 18, 31, 0, TimeSpan.Zero);
+        var clock = new RecordingObservabilityClock(timestamp);
         var runtimeNode = CreateNode(
-            _ => { },
+            options => options.UseClock(clock),
             new
             {
                 inputType = "string"
@@ -108,6 +110,8 @@ public sealed class FlowCounterNodeTests
 
         var snapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         snapshot.Count.ShouldBe(1);
+        snapshot.Timestamp.ShouldBe(timestamp);
+        snapshot.LastObservedAt.ShouldBe(timestamp);
     }
 
     [Fact]

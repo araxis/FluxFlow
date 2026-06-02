@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.3.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable observer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Uses shared component expression registration helpers while preserving the public Observability registration API.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds host-provided observability clocks for deterministic logger, counter, and metrics timestamps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

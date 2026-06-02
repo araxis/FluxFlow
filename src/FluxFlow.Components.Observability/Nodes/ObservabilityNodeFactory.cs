@@ -1,5 +1,6 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
@@ -39,7 +40,8 @@ internal static class ObservabilityNodeFactory
             options,
             expressionEngine,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            componentOptions.Clock);
     }
 
     public static RuntimeNode CreateLogger(
@@ -69,7 +71,8 @@ internal static class ObservabilityNodeFactory
             context,
             options,
             attributeSelectors,
-            nodeContext);
+            nodeContext,
+            componentOptions.Clock);
     }
 
     public static RuntimeNode CreateMetrics(
@@ -96,7 +99,8 @@ internal static class ObservabilityNodeFactory
             context,
             options,
             sizeSelector,
-            nodeContext);
+            nodeContext,
+            componentOptions.Clock);
     }
 
     private static RuntimeNode Create(
@@ -121,13 +125,15 @@ internal static class ObservabilityNodeFactory
         FlowCounterOptions options,
         IFlowExpressionEngine? expressionEngine,
         IObservabilityContextFactory contextFactory,
-        ObservabilityNodeContext nodeContext)
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         var node = new FlowCounterNode<TInput>(
             options,
             expressionEngine,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
@@ -139,12 +145,14 @@ internal static class ObservabilityNodeFactory
         RuntimeNodeFactoryContext context,
         FlowLoggerOptions options,
         IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
-        ObservabilityNodeContext nodeContext)
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         var node = new FlowLoggerNode<TInput>(
             options,
             attributeSelectors,
-            nodeContext);
+            nodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
@@ -156,12 +164,14 @@ internal static class ObservabilityNodeFactory
         RuntimeNodeFactoryContext context,
         FlowMetricsOptions options,
         ObservabilityComponentOptions.IValueSelector? sizeSelector,
-        ObservabilityNodeContext nodeContext)
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         var node = new FlowMetricsNode<TInput>(
             options,
             sizeSelector,
-            nodeContext);
+            nodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)

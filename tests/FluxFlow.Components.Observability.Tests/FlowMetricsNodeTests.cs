@@ -15,8 +15,12 @@ public sealed class FlowMetricsNodeTests
     [Fact]
     public async Task Metrics_TracksCountRateAndSize()
     {
+        var firstObservedAt = new DateTimeOffset(2026, 6, 2, 18, 32, 0, TimeSpan.Zero);
+        var secondObservedAt = firstObservedAt.AddSeconds(2);
+        var clock = new RecordingObservabilityClock(firstObservedAt, secondObservedAt);
         var runtimeNode = CreateNode(
             options => options
+                .UseClock(clock)
                 .RegisterType<InputMessage>("message")
                 .UseValueSelector<InputMessage>("payloadBytes", (message, _) => message.Payload.Length),
             new
@@ -31,7 +35,6 @@ public sealed class FlowMetricsNodeTests
         LinkSnapshots(runtimeNode, snapshots);
 
         await input.Target.SendAsync(new InputMessage("first", [1, 2], true));
-        await Task.Delay(20);
         await input.Target.SendAsync(new InputMessage("second", [1, 2, 3, 4], true));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -39,14 +42,18 @@ public sealed class FlowMetricsNodeTests
         var first = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var second = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         first.Count.ShouldBe(1);
+        first.Timestamp.ShouldBe(firstObservedAt);
+        first.LastObservedAt.ShouldBe(firstObservedAt);
         first.LastSize.ShouldBe(2);
         first.TotalSize.ShouldBe(2);
         second.Count.ShouldBe(2);
+        second.Timestamp.ShouldBe(secondObservedAt);
+        second.LastObservedAt.ShouldBe(secondObservedAt);
         second.LastSize.ShouldBe(4);
         second.TotalSize.ShouldBe(6);
         second.AverageSize.ShouldBe(3);
-        second.CurrentRatePerSecond.ShouldBeGreaterThan(0);
-        second.AverageRatePerSecond.ShouldBeGreaterThan(0);
+        second.CurrentRatePerSecond.ShouldBe(0.5d);
+        second.AverageRatePerSecond.ShouldBe(1d);
     }
 
     [Fact]

@@ -112,6 +112,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   fallback sample timestamps.
 - `103-routing-clock-hardening.md`: routing clock hardening for deterministic
   route timestamps, windows, joins, correlations, and timeout delays.
+- `104-observability-clock-hardening.md`: observability clock hardening for
+  deterministic logger, counter, and metrics timestamps.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -193,6 +193,9 @@ Date: 2026-05-31
   correlations, and timeout delays.
 - Published `FluxFlow.Components.Routing` `0.9.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Observability` `0.3.0-alpha.1` with a
+  host-provided observability clock for deterministic logger, counter, and
+  metrics timestamps.
 
 ## Remaining
 

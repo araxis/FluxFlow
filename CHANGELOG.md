@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Observability 0.3.0-alpha.1
+
+Deterministic observer timestamps.
+
+- Adds `IObservabilityClock` and `SystemObservabilityClock`.
+- Adds `UseClock(...)` to `ObservabilityComponentOptions`.
+- `flow.logger`, `flow.counter`, and `flow.metrics` now use the configured
+  clock for emitted timestamps.
+- `flow.metrics` rate calculations now use the configured clock.
+
 ## FluxFlow.Components.Routing 0.9.0-alpha.1
 
 Deterministic routing timing.

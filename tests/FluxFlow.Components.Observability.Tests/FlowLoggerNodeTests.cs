@@ -15,8 +15,11 @@ public sealed class FlowLoggerNodeTests
     [Fact]
     public async Task Logger_EmitsStructuredEntry()
     {
+        var timestamp = new DateTimeOffset(2026, 6, 2, 18, 30, 0, TimeSpan.Zero);
+        var clock = new RecordingObservabilityClock(timestamp);
         var runtimeNode = CreateNode(
             options => options
+                .UseClock(clock)
                 .RegisterType<InputMessage>("message")
                 .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind)
                 .UseValueSelector<InputMessage>("size", (message, _) => message.Payload.Length),
@@ -43,6 +46,7 @@ public sealed class FlowLoggerNodeTests
         entry.Message.ShouldBe("Observed alpha:3 #1");
         entry.InputType.ShouldBe("message");
         entry.Sequence.ShouldBe(1);
+        entry.Timestamp.ShouldBe(timestamp);
         entry.Attributes["kind"].ShouldBe("alpha");
         entry.Attributes["size"].ShouldBe(3);
     }

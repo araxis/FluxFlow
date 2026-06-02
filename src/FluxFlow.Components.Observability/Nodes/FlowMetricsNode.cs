@@ -1,6 +1,7 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -11,6 +12,7 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
     private readonly FlowMetricsOptions _options;
     private readonly ObservabilityComponentOptions.IValueSelector? _sizeSelector;
     private readonly ObservabilityNodeContext _nodeContext;
+    private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowMetricSnapshot> _snapshots;
     private readonly CancellationToken _processingCancellationToken;
@@ -23,10 +25,20 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
         FlowMetricsOptions options,
         ObservabilityComponentOptions.IValueSelector? sizeSelector,
         ObservabilityNodeContext nodeContext)
+        : this(options, sizeSelector, nodeContext, SystemObservabilityClock.Instance)
+    {
+    }
+
+    internal FlowMetricsNode(
+        FlowMetricsOptions options,
+        ObservabilityComponentOptions.IValueSelector? sizeSelector,
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _sizeSelector = sizeSelector;
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -76,7 +88,7 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
     private async Task ObserveAsync(TInput input)
     {
         _processingCancellationToken.ThrowIfCancellationRequested();
-        var observedAt = DateTimeOffset.UtcNow;
+        var observedAt = _clock.UtcNow;
         var count = Interlocked.Increment(ref _count);
         _firstObservedAt ??= observedAt;
         var previousObservedAt = _previousObservedAt;

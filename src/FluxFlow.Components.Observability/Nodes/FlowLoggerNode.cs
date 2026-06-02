@@ -1,6 +1,7 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -12,6 +13,7 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
     private readonly FlowLogLevel _level;
     private readonly IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> _attributeSelectors;
     private readonly ObservabilityNodeContext _nodeContext;
+    private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowLogEntry> _entries;
     private readonly CancellationToken _processingCancellationToken;
@@ -21,11 +23,21 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
         FlowLoggerOptions options,
         IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
         ObservabilityNodeContext nodeContext)
+        : this(options, attributeSelectors, nodeContext, SystemObservabilityClock.Instance)
+    {
+    }
+
+    internal FlowLoggerNode(
+        FlowLoggerOptions options,
+        IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
+        ObservabilityNodeContext nodeContext,
+        IObservabilityClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _level = ObservabilityOptionsReader.ResolveLogLevel(options.Level);
         _attributeSelectors = attributeSelectors ?? throw new ArgumentNullException(nameof(attributeSelectors));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -76,7 +88,7 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
     {
         _processingCancellationToken.ThrowIfCancellationRequested();
         var sequence = Interlocked.Increment(ref _sequence);
-        var timestamp = DateTimeOffset.UtcNow;
+        var timestamp = _clock.UtcNow;
         var attributes = CreateSelectedAttributes(input);
         var messageValues = CreateMessageValues(input, sequence, attributes);
         var entry = new FlowLogEntry

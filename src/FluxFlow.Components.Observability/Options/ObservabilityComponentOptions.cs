@@ -1,5 +1,6 @@
 using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Observability.Contracts;
+using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Mapping;
 using System.Text.Json;
 
@@ -34,6 +35,9 @@ public sealed class ObservabilityComponentOptions
     private readonly FlowContextFactoryRegistry<IObservabilityContextFactory> _contextFactories =
         new(new DefaultObservabilityContextFactory());
     private readonly Dictionary<SelectorKey, IValueSelector> _valueSelectors = [];
+    private IObservabilityClock _clock = SystemObservabilityClock.Instance;
+
+    public IObservabilityClock Clock => _clock;
 
     public ObservabilityComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -50,6 +54,12 @@ public sealed class ObservabilityComponentOptions
         Func<string?, IFlowExpressionEngine> resolver)
     {
         _expressionEngines.UseResolver(resolver);
+        return this;
+    }
+
+    public ObservabilityComponentOptions UseClock(IObservabilityClock clock)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;
     }
 
