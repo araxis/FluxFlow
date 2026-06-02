@@ -1,5 +1,6 @@
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
+using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -51,6 +52,33 @@ public sealed class SequenceSourceNodeTests
 
         var item = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         item.Timestamp.ShouldBeGreaterThan(startedAt.AddMilliseconds(20));
+    }
+
+    [Fact]
+    public async Task Sequence_UsesConfiguredClockForTimingAndTimestamp()
+    {
+        var clock = new RecordingSourceClock
+        {
+            UtcNow = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero)
+        };
+        var runtimeNode = CreateNode(
+            options => options.UseClock(clock),
+            new
+            {
+                initialDelayMilliseconds = 10,
+                intervalMilliseconds = 25,
+                count = 2
+            });
+        var output = new BufferBlock<SourceSequenceItem>();
+        LinkOutput(runtimeNode, output);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var items = await DrainUntilCompletedAsync(output);
+        items.Count.ShouldBe(2);
+        items.ShouldAllBe(item => item.Timestamp == clock.UtcNow);
+        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(25)]);
     }
 
     [Fact]
@@ -124,9 +152,14 @@ public sealed class SequenceSourceNodeTests
     }
 
     private static RuntimeNode CreateNode(object configuration)
+        => CreateNode(_ => { }, configuration);
+
+    private static RuntimeNode CreateNode(
+        Action<Options.SourcesComponentOptions> configure,
+        object configuration)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSourcesComponents();
+            .RegisterSourcesComponents(configure);
         registry.TryGetFactory(SourcesComponentTypes.Sequence, out var factory).ShouldBeTrue();
         return factory(SourcesTestHost.CreateContext(
             SourcesComponentTypes.Sequence,
@@ -176,5 +209,21 @@ public sealed class SequenceSourceNodeTests
         }
 
         return entries;
+    }
+
+    private sealed class RecordingSourceClock : ISourceClock
+    {
+        public DateTimeOffset UtcNow { get; init; }
+
+        public List<TimeSpan> Delays { get; } = [];
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Delays.Add(delay);
+            return ValueTask.CompletedTask;
+        }
     }
 }

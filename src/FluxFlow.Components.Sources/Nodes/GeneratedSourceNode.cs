@@ -1,5 +1,6 @@
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,6 +11,7 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     private readonly object _stateLock = new();
     private readonly GeneratedSourceOptions _options;
     private readonly IReadOnlyList<TOutput> _items;
+    private readonly ISourceClock _clock;
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
@@ -18,10 +20,19 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items)
+        : this(options, items, SystemSourceClock.Instance)
+    {
+    }
+
+    internal GeneratedSourceNode(
+        GeneratedSourceOptions options,
+        IReadOnlyList<TOutput> items,
+        ISourceClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _items = items ?? throw new ArgumentNullException(nameof(items));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -100,6 +111,7 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
                 attributes: CreateAttributes(emitted));
             await SourceNodeTiming.DelayInitialAsync(
                 _options.InitialDelayMilliseconds,
+                _clock,
                 cancellationToken).ConfigureAwait(false);
 
             var targetCount = ResolveTargetCount();
@@ -117,6 +129,7 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
                 {
                     await SourceNodeTiming.DelayIntervalAsync(
                         _options.IntervalMilliseconds,
+                        _clock,
                         cancellationToken).ConfigureAwait(false);
                 }
             }

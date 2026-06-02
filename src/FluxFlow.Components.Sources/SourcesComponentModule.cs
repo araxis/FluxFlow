@@ -17,7 +17,7 @@ public sealed class SourcesComponentModule : IFlowNodeModule
                 context => SourceNodeFactory.CreateGenerated(context, options)),
             new FlowNodeRegistration(
                 SourcesComponentTypes.Sequence,
-                SourceNodeFactory.CreateSequence)
+                context => SourceNodeFactory.CreateSequence(context, options))
         ];
     }
 

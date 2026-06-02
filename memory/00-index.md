@@ -101,6 +101,7 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `95-expression-support-migration-complete.md`: expression-support migration closure.
 - `96-mqtt-health-forwarding.md`: MQTT adapter health forwarding.
 - `97-storage-sqlfile-adapter-package.md`: single-file SQL storage adapter package.
+- `98-sources-clock-hardening.md`: source clock hardening for deterministic timing.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

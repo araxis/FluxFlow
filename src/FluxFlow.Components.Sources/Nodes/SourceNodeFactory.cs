@@ -32,12 +32,15 @@ internal static class SourceNodeFactory
         }
     }
 
-    public static RuntimeNode CreateSequence(RuntimeNodeFactoryContext context)
+    public static RuntimeNode CreateSequence(
+        RuntimeNodeFactoryContext context,
+        SourcesComponentOptions componentOptions)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(componentOptions);
 
         var options = SourceOptionsReader.ReadSequenceOptions(context.Definition);
-        var node = new SequenceSourceNode(options);
+        var node = new SequenceSourceNode(options, componentOptions.Clock);
         return context.CreateNode(node)
             .Output(SourcesComponentPorts.Output, node.Output)
             .Output(SourcesComponentPorts.Errors, node.Errors)
@@ -50,7 +53,7 @@ internal static class SourceNodeFactory
         SourcesComponentOptions componentOptions)
     {
         var items = componentOptions.DeserializeItems<TOutput>(options);
-        var node = new GeneratedSourceNode<TOutput>(options, items);
+        var node = new GeneratedSourceNode<TOutput>(options, items, componentOptions.Clock);
         return context.CreateNode(node)
             .Output(SourcesComponentPorts.Output, node.Output)
             .Output(SourcesComponentPorts.Errors, node.Errors)

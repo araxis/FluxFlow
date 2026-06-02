@@ -1,4 +1,5 @@
 using FluxFlow.Components.Sources.Diagnostics;
+using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -56,6 +57,29 @@ public sealed class GeneratedSourceNodeTests
 
         var items = await DrainUntilCompletedAsync(output);
         items.ShouldBe([1, 2, 1, 2, 1]);
+    }
+
+    [Fact]
+    public async Task Generated_UsesConfiguredClockForTiming()
+    {
+        var clock = new RecordingSourceClock();
+        var runtimeNode = CreateNode(
+            options => options.UseClock(clock),
+            new
+            {
+                outputType = "string",
+                items = new[] { "one", "two" },
+                initialDelayMilliseconds = 15,
+                intervalMilliseconds = 30
+            });
+        var output = new BufferBlock<string>();
+        LinkOutput(runtimeNode, output);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await DrainUntilCompletedAsync(output)).ShouldBe(["one", "two"]);
+        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(15), TimeSpan.FromMilliseconds(30)]);
     }
 
     [Fact]
@@ -240,4 +264,20 @@ public sealed class GeneratedSourceNodeTests
     }
 
     private sealed record InputMessage(string Id, int Value);
+
+    private sealed class RecordingSourceClock : ISourceClock
+    {
+        public DateTimeOffset UtcNow { get; } = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+
+        public List<TimeSpan> Delays { get; } = [];
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Delays.Add(delay);
+            return ValueTask.CompletedTask;
+        }
+    }
 }

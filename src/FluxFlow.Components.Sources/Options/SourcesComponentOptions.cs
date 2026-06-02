@@ -1,3 +1,4 @@
+using FluxFlow.Components.Sources.Timing;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Sources.Options;
@@ -32,6 +33,10 @@ public sealed class SourcesComponentOptions
         PropertyNameCaseInsensitive = true
     };
 
+    private ISourceClock _clock = SystemSourceClock.Instance;
+
+    public ISourceClock Clock => _clock;
+
     public SourcesComponentOptions RegisterType<T>(string name)
         => RegisterType(name, typeof(T));
 
@@ -48,6 +53,12 @@ public sealed class SourcesComponentOptions
     public SourcesComponentOptions UseJsonSerializerOptions(JsonSerializerOptions serializerOptions)
     {
         _serializerOptions = serializerOptions ?? throw new ArgumentNullException(nameof(serializerOptions));
+        return this;
+    }
+
+    public SourcesComponentOptions UseClock(ISourceClock clock)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;
     }
 

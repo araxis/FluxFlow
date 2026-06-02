@@ -1,6 +1,7 @@
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,15 +11,24 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
 {
     private readonly object _stateLock = new();
     private readonly SequenceSourceOptions _options;
+    private readonly ISourceClock _clock;
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
     private bool _disposed;
 
     public SequenceSourceNode(SequenceSourceOptions options)
+        : this(options, SystemSourceClock.Instance)
+    {
+    }
+
+    internal SequenceSourceNode(
+        SequenceSourceOptions options,
+        ISourceClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -97,6 +107,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                 attributes: CreateAttributes(emitted));
             await SourceNodeTiming.DelayInitialAsync(
                 _options.InitialDelayMilliseconds,
+                _clock,
                 cancellationToken).ConfigureAwait(false);
 
             for (var index = 0; index < _options.Count; index++)
@@ -109,7 +120,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                     Value = _options.Start + (_options.Step * index),
                     Start = _options.Start,
                     Step = _options.Step,
-                    Timestamp = DateTimeOffset.UtcNow
+                    Timestamp = _clock.UtcNow
                 };
                 await SendOutputAsync(item, cancellationToken).ConfigureAwait(false);
                 emitted++;
@@ -121,6 +132,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                 {
                     await SourceNodeTiming.DelayIntervalAsync(
                         _options.IntervalMilliseconds,
+                        _clock,
                         cancellationToken).ConfigureAwait(false);
                 }
             }

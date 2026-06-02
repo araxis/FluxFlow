@@ -19,6 +19,14 @@ var registry = new RuntimeNodeFactoryRegistry()
         .RegisterType<AppMessage>("app.message"));
 ```
 
+Hosts that need deterministic timing can provide a clock:
+
+```csharp
+var registry = new RuntimeNodeFactoryRegistry()
+    .RegisterSourcesComponents(options => options
+        .UseClock(sourceClock));
+```
+
 Generated source configuration:
 
 ```json
@@ -45,11 +53,14 @@ Sequence source configuration:
 }
 ```
 
-Timing options are deliberately simple in this first slice:
+Timing options are deliberately simple:
 
 - `initialDelayMilliseconds`
 - `intervalMilliseconds`
 - `maxItems` and `loop` for generated lists
+
+`UseClock(...)` controls delay scheduling and source timestamps. Without it,
+sources use the system clock.
 
 Generic replay is intentionally left out of this package for now. Use the
 sessions package for stored session replay, and add a dedicated replay source

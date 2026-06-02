@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Sources 0.2.0-alpha.1
+
+Deterministic source timing.
+
+- Adds `ISourceClock` and `SystemSourceClock`.
+- Adds `UseClock(...)` to `SourcesComponentOptions`.
+- `source.sequence` now uses the configured clock for item timestamps.
+- `source.generated` and `source.sequence` use the configured clock for
+  initial and interval delays.
+
 ## FluxFlow.Components.Storage.SqlFile 0.1.0-alpha.1
 
 First single-file SQL storage adapter package.
