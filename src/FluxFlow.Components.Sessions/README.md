@@ -20,6 +20,14 @@ registry.RegisterSessionsComponents(options =>
     options.UseStore(context => new MySessionStore(context.StoreName)));
 ```
 
+Hosts that need deterministic recording or replay timing can provide a clock:
+
+```csharp
+registry.RegisterSessionsComponents(options => options
+    .UseStore(context => new MySessionStore(context.StoreName))
+    .UseClock(sessionClock));
+```
+
 ## Recorder
 
 ```json
@@ -38,6 +46,9 @@ registry.RegisterSessionsComponents(options =>
 `session.recorder` consumes `SessionRecordInput` and emits the stored
 `SessionRecord` returned by the store. Startup opens the session. Completion
 closes the session with the final message count.
+
+`UseClock(...)` controls session start/end timestamps and default message
+timestamps when `SessionRecordInput.Timestamp` is not set.
 
 ## Replay
 
@@ -61,15 +72,19 @@ Replay modes:
 
 `startSequence` and `maxMessages` can limit the replay range.
 
+`UseClock(...)` controls replay delays for fixed interval, real-time, and
+multiplier modes. Without it, sessions use the system clock.
+
 ## Contracts
 
-The first slice includes:
+The package includes:
 
 - `SessionRecordInput`
 - `SessionRecord`
 - `SessionMetadata`
 - `ISessionStore`
 - `ISessionStoreFactory`
+- `ISessionClock`
 
 Records carry neutral fields: session id, sequence, timestamp, type, name,
 payload, content type, and string attributes. Hosts can map their own envelope

@@ -1,6 +1,7 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
+using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -12,6 +13,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
     private readonly object _stateLock = new();
     private readonly SessionRecorderOptions _options;
     private readonly ISessionStore _store;
+    private readonly ISessionClock _clock;
     private readonly ActionBlock<SessionRecordInput> _input;
     private readonly BufferBlock<SessionRecord> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
@@ -22,10 +24,12 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
 
     private SessionRecorderNode(
         SessionRecorderOptions options,
-        ISessionStore store)
+        ISessionStore store,
+        ISessionClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -69,7 +73,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
             StoreName = Normalize(options.Store),
             SessionId = Normalize(options.SessionId)
         }) ?? throw new InvalidOperationException("session.recorder store factory returned null.");
-        var node = new SessionRecorderNode(options, store);
+        var node = new SessionRecorderNode(options, store, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(SessionsComponentPorts.Input, node.Input)
@@ -99,7 +103,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                 {
                     SessionId = Normalize(_options.SessionId),
                     Name = Normalize(_options.Name),
-                    StartedAt = DateTimeOffset.UtcNow,
+                    StartedAt = _clock.UtcNow,
                     Notes = Normalize(_options.Notes),
                     Tags = CopyDictionary(_options.Tags)
                 },
@@ -195,7 +199,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
         }
 
         var sequence = _sequence + 1;
-        var timestamp = input.Timestamp ?? DateTimeOffset.UtcNow;
+        var timestamp = input.Timestamp ?? _clock.UtcNow;
 
         try
         {
@@ -254,7 +258,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                     new SessionCompleteRequest
                     {
                         Session = session,
-                        EndedAt = DateTimeOffset.UtcNow,
+                        EndedAt = _clock.UtcNow,
                         MessageCount = _sequence
                     },
                     CancellationToken.None).ConfigureAwait(false);

@@ -1,6 +1,7 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
+using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
@@ -12,6 +13,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
     private readonly object _stateLock = new();
     private readonly SessionReplayOptions _options;
     private readonly ISessionStore _store;
+    private readonly ISessionClock _clock;
     private readonly string _sessionId;
     private CancellationTokenSource? _replayCancellation;
     private Task? _replayTask;
@@ -20,11 +22,13 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
 
     private SessionReplayNode(
         SessionReplayOptions options,
-        ISessionStore store)
+        ISessionStore store,
+        ISessionClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _sessionId = Normalize(options.SessionId)
             ?? throw new ArgumentException("session.replay requires a session id.", nameof(options));
         if (options.BoundedCapacity <= 0)
@@ -50,7 +54,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
             StoreName = Normalize(options.Store),
             SessionId = Normalize(options.SessionId)
         }) ?? throw new InvalidOperationException("session.replay store factory returned null.");
-        var node = new SessionReplayNode(options, store);
+        var node = new SessionReplayNode(options, store, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Output(SessionsComponentPorts.Output, node.Output)
@@ -212,14 +216,14 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
         }
     }
 
-    private Task DelayForRecordAsync(
+    private async Task DelayForRecordAsync(
         SessionRecord? previous,
         SessionRecord current,
         CancellationToken cancellationToken)
     {
         if (previous is null || _options.Mode == SessionReplayMode.Instant)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var delay = _options.Mode switch
@@ -231,9 +235,12 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
             _ => TimeSpan.Zero
         };
 
-        return delay <= TimeSpan.Zero
-            ? Task.CompletedTask
-            : Task.Delay(delay, cancellationToken);
+        if (delay <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
     }
 
     private void TryReportReplayError(

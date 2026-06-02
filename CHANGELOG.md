@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Sessions 0.2.0-alpha.1
+
+Deterministic session timing.
+
+- Adds `ISessionClock` and `SystemSessionClock`.
+- Adds `UseClock(...)` to `SessionsComponentOptions`.
+- `session.recorder` uses the configured clock for session start/end
+  timestamps and default message timestamps.
+- `session.replay` uses the configured clock for replay delays.
+
 ## FluxFlow.Components.Sources 0.2.0-alpha.1
 
 Deterministic source timing.

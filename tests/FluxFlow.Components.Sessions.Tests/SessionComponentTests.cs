@@ -1,10 +1,11 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
+using FluxFlow.Components.Sessions.Options;
+using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -112,6 +113,35 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Recorder_UsesConfiguredClockForDefaultTimestamps()
+    {
+        var timestamp = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+        var clock = new RecordingSessionClock { UtcNow = timestamp };
+        var store = new TestSessionStore();
+        var runtimeNode = CreateRecorder(
+            new
+            {
+                sessionId = "session-1"
+            },
+            store,
+            options => options.UseClock(clock));
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<SessionRecord>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new SessionRecordInput { Name = "timed" });
+        input.Target.Complete();
+
+        var record = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        record.Timestamp.ShouldBe(timestamp);
+        store.Metadata.ShouldNotBeNull();
+        store.Metadata.StartedAt.ShouldBe(timestamp);
+        store.Metadata.EndedAt.ShouldBe(timestamp);
+    }
+
+    [Fact]
     public async Task Replay_EmitsMessagesInOrder()
     {
         var store = CreateStoreWithRecords();
@@ -132,23 +162,28 @@ public sealed class SessionComponentTests
     [Fact]
     public async Task Replay_SupportsFixedInterval()
     {
-        var store = CreateStoreWithRecords(count: 2);
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "session-1",
-            mode = "fixedInterval",
-            fixedIntervalMilliseconds = 40
-        }, store);
+        var clock = new RecordingSessionClock();
+        var store = CreateStoreWithRecords(count: 3);
+        var runtimeNode = CreateReplay(
+            new
+            {
+                sessionId = "session-1",
+                mode = "fixedInterval",
+                fixedIntervalMilliseconds = 40
+            },
+            store,
+            options => options.UseClock(clock));
         var output = LinkOutput<SessionRecord>(runtimeNode);
-        var stopwatch = Stopwatch.StartNew();
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        stopwatch.Stop();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(25);
+        (await DrainUntilCompletedAsync(output)).Count.ShouldBe(3);
+        clock.Delays.ShouldBe(
+            [
+                TimeSpan.FromMilliseconds(40),
+                TimeSpan.FromMilliseconds(40)
+            ]);
     }
 
     [Fact]
@@ -175,25 +210,26 @@ public sealed class SessionComponentTests
     [Fact]
     public async Task Replay_UsesMultiplierTiming()
     {
+        var clock = new RecordingSessionClock();
         var store = CreateStoreWithRecords(
             count: 2,
             step: TimeSpan.FromMilliseconds(80));
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "session-1",
-            mode = "multiplier",
-            speedMultiplier = 4
-        }, store);
+        var runtimeNode = CreateReplay(
+            new
+            {
+                sessionId = "session-1",
+                mode = "multiplier",
+                speedMultiplier = 4
+            },
+            store,
+            options => options.UseClock(clock));
         var output = LinkOutput<SessionRecord>(runtimeNode);
-        var stopwatch = Stopwatch.StartNew();
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        stopwatch.Stop();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(10);
+        (await DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
+        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(20)]);
     }
 
     [Fact]
@@ -273,20 +309,30 @@ public sealed class SessionComponentTests
 
     private static RuntimeNode CreateRecorder(
         object configuration,
-        TestSessionStore store)
+        TestSessionStore store,
+        Action<SessionsComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options => options.UseStore(_ => store));
+            .RegisterSessionsComponents(options =>
+            {
+                options.UseStore(_ => store);
+                configure?.Invoke(options);
+            });
         registry.TryGetFactory(SessionsComponentTypes.Recorder, out var factory).ShouldBeTrue();
         return factory(CreateContext(SessionsComponentTypes.Recorder, configuration));
     }
 
     private static RuntimeNode CreateReplay(
         object configuration,
-        TestSessionStore store)
+        TestSessionStore store,
+        Action<SessionsComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options => options.UseStore(_ => store));
+            .RegisterSessionsComponents(options =>
+            {
+                options.UseStore(_ => store);
+                configure?.Invoke(options);
+            });
         registry.TryGetFactory(SessionsComponentTypes.Replay, out var factory).ShouldBeTrue();
         return factory(CreateContext(SessionsComponentTypes.Replay, configuration));
     }
@@ -484,6 +530,23 @@ public sealed class SessionComponentTests
                 await Task.Yield();
                 yield return record;
             }
+        }
+    }
+
+    private sealed class RecordingSessionClock : ISessionClock
+    {
+        public DateTimeOffset UtcNow { get; init; } =
+            new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+
+        public List<TimeSpan> Delays { get; } = [];
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Delays.Add(delay);
+            return ValueTask.CompletedTask;
         }
     }
 }
