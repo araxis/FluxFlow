@@ -11,11 +11,16 @@ the boundary, and component packages now cover the common reusable workflow
 building blocks. The next phase is to make the public engine surface boring,
 documented, and stable.
 
-## Baseline
+## Result
 
-- Main branch CI is green at commit `8bc5e83`.
-- `FluxFlow.Engine` is published at `0.6.0-beta.1`.
-- The first consumer has migrated to the engine successfully.
+- Main branch CI is green at commit `7c5e4a9`.
+- `FluxFlow.Engine` is published at `1.0.0`.
+- The first consumer migrated to the beta engine successfully before the stable
+  release.
+- Rebuilt component packages have been published against the `1.0.0` engine
+  boundary.
+- A fresh public-feed restore/build smoke passed for `FluxFlow.Engine` `1.0.0`
+  plus all rebuilt component packages.
 - Independent package releases are working.
 - Public docs exist for getting started, definitions, node authoring, package
   authoring, hosting, validation, runtime states, JSON conversion, expression
@@ -23,9 +28,12 @@ documented, and stable.
 - The old location-based storage adapter package id has been removed from
   public discovery.
 
-## Temporary Freeze
+## Stabilization Outcome
 
-Until the engine v1 readiness pass is complete:
+The engine v1 readiness pass is complete.
+
+The following freeze rules remain useful when preparing the next stable
+component line:
 
 - Do not add new component package families.
 - Do not add speculative node features.
@@ -36,7 +44,7 @@ Until the engine v1 readiness pass is complete:
   first consumer or expose a v1 engine issue.
 
 This freeze is about focus, not abandonment. Component packages can remain
-prerelease while the engine reaches a stable version.
+prerelease while the engine is stable.
 
 ## Version 1 Scope
 
@@ -137,33 +145,32 @@ more consumer time.
 
 ### 5. Release Path
 
-Recommended sequence:
+Completed sequence:
 
 1. Complete engine API audit.
 2. Fix API/docs issues found by the audit.
 3. Release `FluxFlow.Engine 0.6.0-beta.1`.
 4. Move the first consumer to the beta package.
-5. Resolve only real compatibility or usability issues.
+5. Resolve the real package-set compatibility issue by rebuilding component
+   packages against the stable engine boundary.
 6. Release `FluxFlow.Engine 1.0.0`.
+7. Publish rebuilt component packages.
+8. Verify public restore/build from a clean package cache.
 
 ## Current Risk Assessment
 
-Engine v1 readiness is close, but not finished.
+Engine v1 is complete.
 
 Main risks:
 
-- broad public API surface that has not had a dedicated stability audit
-- docs and examples may lag behind current source
-- built-in expression dependencies may be too much for a minimal engine package
+- component package maturity should not be confused with engine stability
 - component package pace has been faster than consumer soak time
-- component package maturity should not be confused with engine readiness
+- future stable component lines still need their own compatibility gates
 
 ## Immediate Next Work
 
-1. Produce an engine public API inventory.
-2. Review the inventory for accidental or unstable public surface.
-3. Fix docs/examples that do not compile against current package names.
-4. Move the first consumer to the beta package.
-5. Resolve only real compatibility or usability issues.
-6. Release `FluxFlow.Engine` `1.0.0` when no public API rename is still
-   expected.
+1. Let the first consumer run against `FluxFlow.Engine` `1.0.0` and the rebuilt
+   component packages.
+2. Keep component packages prerelease until their own consumer feedback settles.
+3. Resume the backlog from the next component package or hardening item, without
+   changing the stable engine boundary casually.

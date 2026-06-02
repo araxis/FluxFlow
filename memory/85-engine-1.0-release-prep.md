@@ -33,8 +33,10 @@ is ready to be promoted to a stable engine release.
 - Local package pack: passed.
 - Local package install smoke test: passed.
 - Branch CI after release-prep commit: passed (`26814635047`).
-- Release workflow after tag.
-- Public package restore smoke test.
+- Branch CI after component compatibility rebuild commit: passed
+  (`26816952571`).
+- Release workflow after tag: passed (`26817066115`).
+- Public package restore smoke test: passed.
 
 The package smoke restored `FluxFlow.Engine` `1.0.0` from the local package
 output and compiled a minimal consumer against:
@@ -43,8 +45,14 @@ output and compiled a minimal consumer against:
 - `RuntimeNodeFactoryRegistry`
 - `FlowNodeId` from `FluxFlow.Engine.Components`
 
-## Next Step
+## Result
 
-Publish `FluxFlow.Engine` `1.0.0` only after the component compatibility
-rebuild commit is also green. Then publish the rebuilt component packages so
-consumers do not mix the stable engine boundary with old component binaries.
+Published `FluxFlow.Engine` `1.0.0` from commit `7c5e4a9` with tag
+`engine-v1.0.0`.
+
+Release:
+
+https://github.com/araxis/FluxFlow/releases/tag/engine-v1.0.0
+
+The package restored and built from the public feed in a fresh `net8.0`
+consumer project.

@@ -110,8 +110,18 @@ Date: 2026-05-31
   sample app update, package pack, and local install smoke test.
 - Published `FluxFlow.Engine` `0.6.0-beta.1` and verified a fresh public
   package restore/build smoke test.
+- Recorded the first consumer beta migration success and promoted
+  `FluxFlow.Engine` to `1.0.0`.
+- Published `FluxFlow.Engine` `1.0.0` and verified a fresh public
+  package restore/build smoke test.
+- Rebuilt and published all current component packages against the stable engine
+  boundary to avoid old component binaries referencing the previous
+  `FlowNodeId` location.
+- Verified a fresh public-feed restore/build smoke with `FluxFlow.Engine`
+  `1.0.0` plus all rebuilt component packages.
 
 ## Remaining
 
-- Move the first consumer to the engine beta package and record compatibility
-  feedback before `1.0.0`.
+- Run the first consumer against `FluxFlow.Engine` `1.0.0` and the rebuilt
+  component packages, then continue component hardening while keeping the engine
+  boundary stable.

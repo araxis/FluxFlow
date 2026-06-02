@@ -59,12 +59,28 @@ The rebuild packages should:
 
 - Full solution build: passed.
 - Full solution tests: passed.
+- Branch CI after compatibility rebuild commit: passed (`26816952571`).
 - Release alias and changelog resolution: passed for engine plus all component
   packages.
 - Local package pack: passed for engine plus all eighteen component packages.
 - Package dependency inspection: passed for all component packages.
 - Local package-set restore/build smoke: passed with a fresh `net8.0` consumer
   referencing the local engine package plus all rebuilt component packages.
+- Public package-set restore/build smoke: passed with a fresh `net8.0` consumer
+  and clean package cache on restore attempt 15, after public feed indexing
+  caught up.
+
+## Release Result
+
+- Engine tag: `engine-v1.0.0`, release workflow `26817066115`, passed.
+- First component batch: seventeen package releases started through
+  `workflow_dispatch`, all passed.
+- Storage file-system adapter tag:
+  `components-storage-filesystem-v0.1.1-alpha.1`, release workflow
+  `26817442913`, passed.
+- Bulk-pushing seventeen component tags in one command did not create release
+  workflow runs. For future batches, either push tags one at a time or use
+  `workflow_dispatch` intentionally.
 
 ## Risk
 
