@@ -189,5 +189,5 @@ after the core component package has settled.
     clock for JSON schema validation result timestamps. Done in
     `108-validation-clock-hardening.md`.
 34. Harden deterministic Storage behavior with a host-provided storage clock
-    for logical storage node results and backend adapter timestamps. In
-    progress in `109-storage-clock-hardening.md`.
+    for logical storage node results and backend adapter timestamps. Done in
+    `109-storage-clock-hardening.md`.

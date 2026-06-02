@@ -60,11 +60,24 @@ Each package remains independently released. The coordinated version update is
 needed because the shared clock is in the logical package and both adapter
 packages depend on the updated context behavior.
 
+## Release
+
+- Tag: `components-storage-v0.3.0-alpha.1`
+- Release workflow: `26843828935`, succeeded.
+- Tag: `components-storage-filesystem-v0.2.0-alpha.1`
+- Release workflow: `26843829777`, succeeded.
+- Tag: `components-storage-sqlfile-v0.2.0-alpha.1`
+- Release workflow: `26843829430`, succeeded.
+
 ## Verification
 
 - `dotnet test tests\FluxFlow.Components.Storage.Tests\FluxFlow.Components.Storage.Tests.csproj -c Release --no-restore`
 - `dotnet test tests\FluxFlow.Components.Storage.FileSystem.Tests\FluxFlow.Components.Storage.FileSystem.Tests.csproj -c Release --no-restore`
 - `dotnet test tests\FluxFlow.Components.Storage.SqlFile.Tests\FluxFlow.Components.Storage.SqlFile.Tests.csproj -c Release --no-restore`
-
-The first focused pass passed for all three test projects. A full solution
-build/test and package smoke check remain before publishing.
+- `dotnet build FluxFlow.sln -c Release --no-restore /nr:false`
+- `dotnet test FluxFlow.sln -c Release --no-restore /nr:false`
+- `dotnet pack src\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\FluxFlow.Components.Storage.FileSystem\FluxFlow.Components.Storage.FileSystem.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- `dotnet pack src\FluxFlow.Components.Storage.SqlFile\FluxFlow.Components.Storage.SqlFile.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
+- Public package restore/build smoke passed on attempt 4 after public-feed
+  propagation caught up.
