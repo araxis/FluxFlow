@@ -176,6 +176,8 @@ Date: 2026-05-31
   session clocks for deterministic recorder timestamps and replay timing.
 - Published `FluxFlow.Components.Sessions` `0.2.0-alpha.1` and verified a
   fresh public-feed restore/build smoke test.
+- Started `FluxFlow.Components.FileSystem` `0.4.2-alpha.1` to make
+  `directory.enumerate.started` deterministic before enumeration work begins.
 
 ## Remaining
 

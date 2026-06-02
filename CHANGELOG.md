@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.FileSystem 0.4.2-alpha.1
+
+Directory enumerate diagnostic reliability.
+
+- `directory.enumerate` now emits `directory.enumerate.started` before the
+  background enumeration task begins.
+- Fixes a race where very fast enumerations could complete diagnostics before
+  the startup diagnostic was accepted.
+
 ## FluxFlow.Components.Sessions 0.2.0-alpha.1
 
 Deterministic session timing.

@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>0.4.1-alpha.1</Version>
+    <Version>0.4.2-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable file system components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilds the package against FluxFlow.Engine 1.0.0 and its stable node identity boundary.</PackageReleaseNotes>
+    <PackageReleaseNotes>Ensures directory.enumerate emits its started diagnostic before enumeration work begins.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

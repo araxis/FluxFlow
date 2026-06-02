@@ -104,6 +104,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `98-sources-clock-hardening.md`: source clock hardening for deterministic timing.
 - `99-sessions-clock-hardening.md`: session clock hardening for deterministic
   recording and replay timing.
+- `100-filesystem-enumerate-start-diagnostic.md`: directory enumerate startup
+  diagnostic race fix.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

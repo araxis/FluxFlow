@@ -71,13 +71,13 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
             {
                 _resolvedDirectory = resolvedDirectory;
                 _enumerationCancellation = enumerationCancellation;
+                TryEmitDiagnostic(
+                    FileSystemDiagnosticNames.DirectoryEnumerateStarted,
+                    message: $"Started directory enumeration '{resolvedDirectory}'.",
+                    attributes: CreateAttributes(resolvedDirectory));
                 _enumerationTask = RunEnumerationAsync(resolvedDirectory, enumerationCancellation.Token);
             }
 
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateStarted,
-                message: $"Started directory enumeration '{resolvedDirectory}'.",
-                attributes: CreateAttributes(resolvedDirectory));
             return Task.CompletedTask;
         }
         catch (FileSystemPathResolutionException exception)
