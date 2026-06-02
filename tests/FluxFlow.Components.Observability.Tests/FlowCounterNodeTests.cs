@@ -3,6 +3,7 @@ using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
+using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -110,6 +111,36 @@ public sealed class FlowCounterNodeTests
     }
 
     [Fact]
+    public async Task Counter_UsesMostSpecificAssignableContextFactory()
+    {
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+                    (_, context, _) => context.Variables["accepted"]))
+                .RegisterType<DerivedCounterMessage>("derived-message")
+                .UseContextFactory<BaseCounterMessage>(
+                    new TestContextFactory<BaseCounterMessage>(accepted: false))
+                .UseContextFactory<DerivedCounterMessage>(
+                    new TestContextFactory<DerivedCounterMessage>(accepted: true)),
+            new
+            {
+                inputType = "derived-message",
+                predicate = "accepted"
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<DerivedCounterMessage>>();
+        var snapshots = new BufferBlock<FlowCounterSnapshot>();
+        LinkSnapshots(runtimeNode, snapshots);
+
+        await input.Target.SendAsync(new DerivedCounterMessage("first"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var snapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        snapshot.Count.ShouldBe(1);
+        snapshot.RejectedCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Counter_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(
@@ -163,4 +194,21 @@ public sealed class FlowCounterNodeTests
     }
 
     private sealed record InputMessage(string Kind, byte[] Payload, bool Enabled);
+
+    private abstract record BaseCounterMessage(string Name);
+
+    private sealed record DerivedCounterMessage(string Name) : BaseCounterMessage(Name);
+
+    private sealed class TestContextFactory<TInput>(bool accepted) : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["accepted"] = accepted
+                }
+            };
+    }
 }

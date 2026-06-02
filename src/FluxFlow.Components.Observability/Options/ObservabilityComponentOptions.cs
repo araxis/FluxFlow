@@ -1,3 +1,4 @@
+using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Engine.Mapping;
 using System.Text.Json;
@@ -29,13 +30,10 @@ public sealed class ObservabilityComponentOptions
         [typeof(JsonElement).FullName!] = typeof(JsonElement)
     };
 
-    private readonly Dictionary<string, IFlowExpressionEngine> _expressionEngines =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<Type, IObservabilityContextFactory> _contextFactories = [];
+    private readonly FlowExpressionEngineRegistry _expressionEngines = new("Observability");
+    private readonly FlowContextFactoryRegistry<IObservabilityContextFactory> _contextFactories =
+        new(new DefaultObservabilityContextFactory());
     private readonly Dictionary<SelectorKey, IValueSelector> _valueSelectors = [];
-    private IFlowExpressionEngine? _defaultExpressionEngine;
-    private Func<string?, IFlowExpressionEngine>? _expressionEngineResolver;
-    private IObservabilityContextFactory _defaultContextFactory = new DefaultObservabilityContextFactory();
 
     public ObservabilityComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -44,19 +42,14 @@ public sealed class ObservabilityComponentOptions
         ArgumentNullException.ThrowIfNull(expressionEngine);
         ArgumentException.ThrowIfNullOrWhiteSpace(expressionEngine.Name);
 
-        _expressionEngines[expressionEngine.Name] = expressionEngine;
-        if (useAsDefault || _defaultExpressionEngine is null)
-        {
-            _defaultExpressionEngine = expressionEngine;
-        }
-
+        _expressionEngines.Use(expressionEngine, useAsDefault);
         return this;
     }
 
     public ObservabilityComponentOptions UseExpressionEngineResolver(
         Func<string?, IFlowExpressionEngine> resolver)
     {
-        _expressionEngineResolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
+        _expressionEngines.UseResolver(resolver);
         return this;
     }
 
@@ -76,7 +69,7 @@ public sealed class ObservabilityComponentOptions
     public ObservabilityComponentOptions UseDefaultContextFactory(
         IObservabilityContextFactory contextFactory)
     {
-        _defaultContextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        _contextFactories.UseDefault(contextFactory);
         return this;
     }
 
@@ -84,7 +77,7 @@ public sealed class ObservabilityComponentOptions
         IFlowMapContextFactory<TInput> contextFactory)
     {
         ArgumentNullException.ThrowIfNull(contextFactory);
-        _contextFactories[typeof(TInput)] = new TypedContextFactory<TInput>(contextFactory);
+        _contextFactories.Register(typeof(TInput), new TypedContextFactory<TInput>(contextFactory));
         return this;
     }
 
@@ -109,28 +102,7 @@ public sealed class ObservabilityComponentOptions
     }
 
     internal IFlowExpressionEngine ResolveExpressionEngine(string? name)
-    {
-        if (_expressionEngineResolver is not null)
-        {
-            var resolved = _expressionEngineResolver(name);
-            return resolved ?? throw new InvalidOperationException(
-                "Observability expression engine resolver returned null.");
-        }
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return _defaultExpressionEngine ?? throw new InvalidOperationException(
-                "Observability components require an expression engine for predicates.");
-        }
-
-        if (_expressionEngines.TryGetValue(name.Trim(), out var expressionEngine))
-        {
-            return expressionEngine;
-        }
-
-        throw new InvalidOperationException(
-            $"Observability expression engine '{name}' is not registered.");
-    }
+        => _expressionEngines.Resolve(name);
 
     internal Type ResolveType(string name)
     {
@@ -157,20 +129,7 @@ public sealed class ObservabilityComponentOptions
     {
         ArgumentNullException.ThrowIfNull(inputType);
 
-        if (_contextFactories.TryGetValue(inputType, out var exact))
-        {
-            return exact;
-        }
-
-        foreach (var (candidateType, factory) in _contextFactories)
-        {
-            if (candidateType.IsAssignableFrom(inputType))
-            {
-                return factory;
-            }
-        }
-
-        return _defaultContextFactory;
+        return _contextFactories.Resolve(inputType);
     }
 
     internal IValueSelector? ResolveOptionalValueSelector(Type inputType, string? name)
