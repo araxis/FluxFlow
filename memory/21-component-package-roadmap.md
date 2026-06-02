@@ -144,3 +144,7 @@ after the core component package has settled.
     envelopes. Done in `74-routing-merge-fork-route-envelope.md`.
 19. Add logical storage query and local adapter query support. Done in
     `75-storage-query-component.md`.
+20. Record the storage adapter package rule: base storage stays logical, and
+    each reusable persistence implementation lives in its own
+    `FluxFlow.Components.Storage.*` package. Done in
+    `76-storage-adapter-package-rule.md`.

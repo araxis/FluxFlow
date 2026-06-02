@@ -76,3 +76,6 @@ For a host with existing internal storage nodes:
 
 Implement the adapter package only after choosing the persisted format and
 single-process versus multi-process expectations.
+
+The per-persistence-style adapter package rule was formalized later in
+`76-storage-adapter-package-rule.md`.

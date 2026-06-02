@@ -79,5 +79,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `73-routing-join-component.md`: two-stream key join component.
 - `74-routing-merge-fork-route-envelope.md`: merge, fork, and switch route envelope component additions.
 - `75-storage-query-component.md`: storage query node and local adapter query support.
+- `76-storage-adapter-package-rule.md`: official per-persistence-style storage adapter package rule.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

@@ -39,6 +39,50 @@ shape. Good signals:
 The adapter package should not add new workflow nodes. It should only provide a
 store implementation and registration helpers for the existing storage nodes.
 
+## Adapter Package Rule
+
+Every reusable persistence implementation must live in its own package under
+the storage adapter namespace:
+
+```text
+FluxFlow.Components.Storage.*
+```
+
+The base package stays fixed as the logical workflow package:
+
+```text
+FluxFlow.Components.Storage
+```
+
+It owns contracts, store abstractions, leases, node options, diagnostics, and
+the `storage.put`, `storage.get`, `storage.query`, and `storage.delete` nodes.
+It must not grow concrete persistence implementations.
+
+Adapter packages own one persistence style each. They can provide:
+
+- one `IStorageStore` implementation
+- one `IStorageStoreFactory` implementation when useful
+- registration helpers such as `UseLocalStorage(...)`
+- adapter-specific options and validation
+- adapter-specific tests and README content
+
+Adapter packages should avoid adding workflow node types. If a persistence
+adapter appears to require new nodes, first check whether the base storage
+contracts need a neutral extension instead.
+
+Use neutral adapter package suffixes that describe the persistence style rather
+than one host application. Examples:
+
+```text
+FluxFlow.Components.Storage.Local
+FluxFlow.Components.Storage.EmbeddedDocument
+FluxFlow.Components.Storage.EmbeddedSql
+FluxFlow.Components.Storage.ServerSql
+```
+
+This keeps consumers free to reference only the persistence style they need and
+lets each adapter move on its own release cadence.
+
 ## First Adapter Package
 
 Package:
