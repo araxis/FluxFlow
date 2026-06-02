@@ -44,30 +44,28 @@ Use package suffixes that identify the backend clearly enough for consumers to
 choose dependencies intentionally:
 
 ```text
-FluxFlow.Components.Storage.Local
-FluxFlow.Components.Storage.LiteDb
-FluxFlow.Components.Storage.Sqlite
-FluxFlow.Components.Storage.Postgres
+FluxFlow.Components.Storage.FileSystem
+FluxFlow.Components.Storage.<BackendName>
 ```
 
-Avoid broad family names such as `EmbeddedDocument` or `EmbeddedSql` when that
-name could hide multiple unrelated implementations in one package.
+Avoid broad family names when that name could hide multiple unrelated
+implementations in one package.
 
 Avoid naming adapter packages after one consuming application or one product
 workflow.
 
 ## Current Status
 
-`FluxFlow.Components.Storage.Local` already follows the rule:
+`FluxFlow.Components.Storage.FileSystem` follows the rule:
 
 - it is a separate source project
 - it is adapter-only
 - it adds no workflow nodes
-- it exposes `LocalStorageStore`, `LocalStorageStoreFactory`, options, and
-  registration helpers
+- it exposes `FileSystemStorageStore`, `FileSystemStorageStoreFactory`,
+  options, and registration helpers
 
 ## Next
 
 Do not add another storage adapter until a real workflow proves the need.
 When that need appears, create a separate `FluxFlow.Components.Storage.*`
-package instead of extending the base storage package or the local adapter.
+package instead of extending the base storage package or the file-system adapter.

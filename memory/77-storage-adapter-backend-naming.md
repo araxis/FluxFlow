@@ -24,8 +24,8 @@ family.
 
 ## Why
 
-Broad suffixes such as `EmbeddedDocument` can become misleading. If two embedded
-document backends are useful later, putting both into one package would create:
+Broad suffixes can become misleading. If two backends fit the same broad
+category, putting both into one package would create:
 
 - unnecessary dependencies for consumers
 - harder versioning
@@ -40,24 +40,15 @@ One backend per package keeps references explicit and keeps adapters small.
 Good package shapes:
 
 ```text
-FluxFlow.Components.Storage.Local
-FluxFlow.Components.Storage.LiteDb
-FluxFlow.Components.Storage.Sqlite
-FluxFlow.Components.Storage.Postgres
+FluxFlow.Components.Storage.FileSystem
+FluxFlow.Components.Storage.<BackendName>
 ```
 
-Avoid category-only names when the category can contain multiple backends:
-
-```text
-FluxFlow.Components.Storage.EmbeddedDocument
-FluxFlow.Components.Storage.EmbeddedSql
-FluxFlow.Components.Storage.ServerSql
-```
+Avoid category-only names when the category can contain multiple backends.
 
 ## Current Status
 
 No new storage adapter package should be created only because a category sounds
 useful. Add the next adapter when a real workflow needs that concrete backend.
 
-The existing local adapter remains the first adapter and keeps its current
-package name.
+The file-system adapter is the first adapter package under the refined rule.

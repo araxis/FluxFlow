@@ -63,7 +63,7 @@ provide:
 
 - one `IStorageStore` implementation
 - one `IStorageStoreFactory` implementation when useful
-- registration helpers such as `UseLocalStorage(...)`
+- registration helpers such as `UseFileSystemStorage(...)`
 - adapter-specific options and validation
 - adapter-specific tests and README content
 
@@ -75,13 +75,11 @@ Use adapter package suffixes that identify the backend clearly enough for a
 consumer to choose dependencies intentionally. Do not use broad family names
 that could hide several unrelated implementations in one package.
 
-Examples:
+Shape:
 
 ```text
-FluxFlow.Components.Storage.Local
-FluxFlow.Components.Storage.LiteDb
-FluxFlow.Components.Storage.Sqlite
-FluxFlow.Components.Storage.Postgres
+FluxFlow.Components.Storage.FileSystem
+FluxFlow.Components.Storage.<BackendName>
 ```
 
 If two backends fit the same broad category, they still get two packages. This
@@ -93,12 +91,12 @@ adapter move on its own release cadence.
 Package:
 
 ```text
-FluxFlow.Components.Storage.Local
+FluxFlow.Components.Storage.FileSystem
 ```
 
 Purpose:
 
-- provide a small local persisted `IStorageStore`
+- provide a small file-system-backed `IStorageStore`
 - use the existing `storage.put`, `storage.get`, `storage.query`, and
   `storage.delete` nodes
 - keep all host-specific app schema outside the package
@@ -106,10 +104,10 @@ Purpose:
 
 Expected public shape:
 
-- `LocalStorageStore`
-- `LocalStorageStoreOptions`
-- `LocalStorageStoreFactory`
-- `UseLocalStorage(...)` registration helper
+- `FileSystemStorageStore`
+- `FileSystemStorageStoreOptions`
+- `FileSystemStorageStoreFactory`
+- `UseFileSystemStorage(...)` registration helper
 
 Expected options:
 
@@ -122,7 +120,7 @@ Expected options:
 - `flushOnWrite`
 
 The package uses `StorageStoreLease.Owned(...)` when it creates the store. Hosts
-can still pass a shared `LocalStorageStore` through the base storage package
+can still pass a shared `FileSystemStorageStore` through the base storage package
 when they want to own the lifetime.
 
 ## Record Model
@@ -148,7 +146,7 @@ Query support should stay contract-shaped:
 - expired-record policy
 - limit
 
-For the local adapter, `StorageRecord.Value` can be serialized as a normal
+For the file-system adapter, `StorageRecord.Value` can be serialized as a normal
 object payload.
 Hosts that need exact payload control should compose serialization nodes before
 storage and store a string or byte-like value with a content type.

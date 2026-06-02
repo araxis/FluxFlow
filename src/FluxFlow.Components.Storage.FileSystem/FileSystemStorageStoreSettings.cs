@@ -1,6 +1,6 @@
-namespace FluxFlow.Components.Storage.Local;
+namespace FluxFlow.Components.Storage.FileSystem;
 
-internal sealed record LocalStorageStoreSettings(
+internal sealed record FileSystemStorageStoreSettings(
     string RootDirectory,
     string StoreName,
     string? DefaultCollection,

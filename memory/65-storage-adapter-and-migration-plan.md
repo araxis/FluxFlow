@@ -13,11 +13,11 @@ add concrete persistence there.
 Plan the first optional persisted adapter as:
 
 ```text
-FluxFlow.Components.Storage.Local
+FluxFlow.Components.Storage.FileSystem
 ```
 
-This adapter should provide a small local `IStorageStore` implementation and
-registration helpers. It should not add new node types.
+This adapter should provide a small file-system-backed `IStorageStore`
+implementation and registration helpers. It should not add new node types.
 
 ## Why
 
@@ -34,10 +34,10 @@ next useful artifact is a reusable adapter, but only if it stays neutral:
 
 Public shape:
 
-- `LocalStorageStore`
-- `LocalStorageStoreOptions`
-- `LocalStorageStoreFactory`
-- `UseLocalStorage(...)`
+- `FileSystemStorageStore`
+- `FileSystemStorageStoreOptions`
+- `FileSystemStorageStoreFactory`
+- `UseFileSystemStorage(...)`
 
 Core behavior:
 

@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace FluxFlow.Components.Storage.Local;
+namespace FluxFlow.Components.Storage.FileSystem;
 
-public sealed class LocalStorageStore : IStorageStore
+public sealed class FileSystemStorageStore : IStorageStore
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -13,15 +13,15 @@ public sealed class LocalStorageStore : IStorageStore
     };
 
     private readonly object _gate = new();
-    private readonly LocalStorageStoreSettings _settings;
+    private readonly FileSystemStorageStoreSettings _settings;
 
-    public LocalStorageStore(LocalStorageStoreOptions options)
+    public FileSystemStorageStore(FileSystemStorageStoreOptions options)
         : this(options, context: null)
     {
     }
 
-    public LocalStorageStore(
-        LocalStorageStoreOptions options,
+    public FileSystemStorageStore(
+        FileSystemStorageStoreOptions options,
         StorageStoreContext? context)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -45,18 +45,18 @@ public sealed class LocalStorageStore : IStorageStore
             var mode = request.Mode ?? StorageWriteMode.Upsert;
             if (mode == StorageWriteMode.Create && existing is not null)
             {
-                throw new InvalidOperationException("Local storage record already exists.");
+                throw new InvalidOperationException("File-system storage record already exists.");
             }
 
             if (mode == StorageWriteMode.Replace && existing is null)
             {
-                throw new InvalidOperationException("Local storage record does not exist.");
+                throw new InvalidOperationException("File-system storage record does not exist.");
             }
 
             if (request.ExpectedVersion.HasValue &&
                 (existing?.Version ?? 0) != request.ExpectedVersion.Value)
             {
-                throw new InvalidOperationException("Local storage record version did not match.");
+                throw new InvalidOperationException("File-system storage record version did not match.");
             }
 
             var value = CreateStoredValue(request.Value);
@@ -121,7 +121,7 @@ public sealed class LocalStorageStore : IStorageStore
         if (limit <= 0)
         {
             throw new InvalidOperationException(
-                "Local storage query limit must be greater than zero.");
+                "File-system storage query limit must be greater than zero.");
         }
 
         if (request.StoredFrom.HasValue &&
@@ -129,7 +129,7 @@ public sealed class LocalStorageStore : IStorageStore
             request.StoredFrom.Value > request.StoredTo.Value)
         {
             throw new InvalidOperationException(
-                "Local storage query storedFrom cannot be later than storedTo.");
+                "File-system storage query storedFrom cannot be later than storedTo.");
         }
 
         lock (_gate)
@@ -205,7 +205,7 @@ public sealed class LocalStorageStore : IStorageStore
         if (collection is null)
         {
             throw new InvalidOperationException(
-                "Local storage request requires a collection.");
+                "File-system storage request requires a collection.");
         }
 
         return collection;
@@ -217,7 +217,7 @@ public sealed class LocalStorageStore : IStorageStore
         if (key is null)
         {
             throw new InvalidOperationException(
-                "Local storage request requires a key.");
+                "File-system storage request requires a key.");
         }
 
         return key;
@@ -235,7 +235,7 @@ public sealed class LocalStorageStore : IStorageStore
         if (valueBytes > _settings.MaxValueBytes)
         {
             throw new InvalidOperationException(
-                $"Local storage value exceeds {_settings.MaxValueBytes} bytes.");
+                $"File-system storage value exceeds {_settings.MaxValueBytes} bytes.");
         }
 
         return new StoredJsonValue(element, valueBytes);
@@ -256,7 +256,7 @@ public sealed class LocalStorageStore : IStorageStore
             !StringComparer.Ordinal.Equals(record.Key, key))
         {
             throw new InvalidOperationException(
-                "Local storage record path did not match record identity.");
+                "File-system storage record path did not match record identity.");
         }
 
         return record;
@@ -273,11 +273,11 @@ public sealed class LocalStorageStore : IStorageStore
         var document = JsonSerializer.Deserialize<StoredStorageRecord>(
             stream,
             SerializerOptions) ?? throw new InvalidOperationException(
-                "Local storage record was empty.");
+                "File-system storage record was empty.");
         if (document.FormatVersion != 1)
         {
             throw new InvalidOperationException(
-                $"Local storage record format version '{document.FormatVersion}' is not supported.");
+                $"File-system storage record format version '{document.FormatVersion}' is not supported.");
         }
 
         return document.ToRecord();
@@ -417,7 +417,7 @@ public sealed class LocalStorageStore : IStorageStore
             : new Dictionary<string, string>(source, StringComparer.Ordinal);
 
     private static string? Normalize(string? value)
-        => LocalStorageStoreOptions.Normalize(value);
+        => FileSystemStorageStoreOptions.Normalize(value);
 
     private sealed record StoredJsonValue(JsonElement Element, long ByteCount);
 

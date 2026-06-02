@@ -1,4 +1,4 @@
-# Storage Local Adapter Package
+# Storage FileSystem Adapter Package
 
 Date: 2026-06-01
 
@@ -8,14 +8,14 @@ Implemented the first persisted storage adapter package.
 
 Package:
 
-- `FluxFlow.Components.Storage.Local`
+- `FluxFlow.Components.Storage.FileSystem`
 
 Public shape:
 
-- `LocalStorageStore`
-- `LocalStorageStoreOptions`
-- `LocalStorageStoreFactory`
-- `UseLocalStorage(...)`
+- `FileSystemStorageStore`
+- `FileSystemStorageStoreOptions`
+- `FileSystemStorageStoreFactory`
+- `UseFileSystemStorage(...)`
 
 ## Decisions
 
@@ -40,7 +40,7 @@ Added focused tests for:
 - maximum serialized value size
 - factory context defaults and owned leases
 - option validation
-- storage node registration through `UseLocalStorage(...)`
+- storage node registration through `UseFileSystemStorage(...)`
 
-Query support for the local adapter was added later in
+Query support for the file-system adapter was added later in
 `75-storage-query-component.md`.

@@ -126,10 +126,10 @@
     "notesName": "FluxFlow.Components.Storage"
   },
   {
-    "alias": "components-storage-local",
-    "tagPrefix": "components-storage-local",
-    "packageId": "FluxFlow.Components.Storage.Local",
-    "project": "src/FluxFlow.Components.Storage.Local/FluxFlow.Components.Storage.Local.csproj",
-    "notesName": "FluxFlow.Components.Storage.Local"
+    "alias": "components-storage-filesystem",
+    "tagPrefix": "components-storage-filesystem",
+    "packageId": "FluxFlow.Components.Storage.FileSystem",
+    "project": "src/FluxFlow.Components.Storage.FileSystem/FluxFlow.Components.Storage.FileSystem.csproj",
+    "notesName": "FluxFlow.Components.Storage.FileSystem"
   }
 ]

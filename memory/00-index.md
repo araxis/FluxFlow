@@ -69,7 +69,7 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `63-storage-component-package.md`: first generic logical storage component package.
 - `64-storage-composition-sample.md`: runnable logical storage composition sample.
 - `65-storage-adapter-and-migration-plan.md`: persisted storage adapter and host migration plan.
-- `66-storage-local-adapter-package.md`: first file-backed local storage adapter package.
+- `66-storage-filesystem-adapter-package.md`: first file-system-backed storage adapter package.
 - `67-assertions-component-package.md`: assertion package split from control and release notes.
 - `68-sources-component-package.md`: deterministic source package and deferred replay boundary.
 - `69-routing-component-package.md`: first routing package with switch and deferred correlation/window scope.
@@ -78,8 +78,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `72-routing-window-component.md`: count/time stream window component.
 - `73-routing-join-component.md`: two-stream key join component.
 - `74-routing-merge-fork-route-envelope.md`: merge, fork, and switch route envelope component additions.
-- `75-storage-query-component.md`: storage query node and local adapter query support.
+- `75-storage-query-component.md`: storage query node and file-system adapter query support.
 - `76-storage-adapter-package-rule.md`: official per-persistence-style storage adapter package rule.
 - `77-storage-adapter-backend-naming.md`: concrete-backend adapter package naming refinement.
+- `78-storage-filesystem-adapter-rename.md`: storage adapter rename from location-based to backend-based naming.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: preserved pre-cleanup docs for reference while rewriting.

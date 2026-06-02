@@ -1,12 +1,12 @@
 using FluxFlow.Components.Storage.Contracts;
 
-namespace FluxFlow.Components.Storage.Local;
+namespace FluxFlow.Components.Storage.FileSystem;
 
-public sealed class LocalStorageStoreFactory : IStorageStoreFactory
+public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
 {
-    private readonly LocalStorageStoreOptions _options;
+    private readonly FileSystemStorageStoreOptions _options;
 
-    public LocalStorageStoreFactory(LocalStorageStoreOptions options)
+    public FileSystemStorageStoreFactory(FileSystemStorageStoreOptions options)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
@@ -18,7 +18,7 @@ public sealed class LocalStorageStoreFactory : IStorageStoreFactory
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var store = new LocalStorageStore(_options, context);
+        var store = new FileSystemStorageStore(_options, context);
         return ValueTask.FromResult(StorageStoreLease.Owned(store));
     }
 }

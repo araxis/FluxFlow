@@ -7,9 +7,9 @@ using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
-namespace FluxFlow.Components.Storage.Local.Tests;
+namespace FluxFlow.Components.Storage.FileSystem.Tests;
 
-public sealed class LocalStorageStoreTests
+public sealed class FileSystemStorageStoreTests
 {
     [Fact]
     public async Task Put_PersistsRecordAcrossStoreInstances()
@@ -263,7 +263,7 @@ public sealed class LocalStorageStoreTests
     public async Task Put_RejectsValuesAboveConfiguredLimit()
     {
         using var temp = TempDirectory.Create();
-        var store = new LocalStorageStore(new LocalStorageStoreOptions
+        var store = new FileSystemStorageStore(new FileSystemStorageStoreOptions
         {
             RootDirectory = temp.Path,
             MaxValueBytes = 5
@@ -281,7 +281,7 @@ public sealed class LocalStorageStoreTests
     public async Task Factory_UsesContextDefaultsAndCreatesOwnedLease()
     {
         using var temp = TempDirectory.Create();
-        var factory = new LocalStorageStoreFactory(new LocalStorageStoreOptions
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
         {
             RootDirectory = temp.Path
         });
@@ -309,12 +309,12 @@ public sealed class LocalStorageStoreTests
     public void Options_ValidateRootDirectory()
     {
         Should.Throw<InvalidOperationException>(
-            () => new LocalStorageStore(new LocalStorageStoreOptions()));
+            () => new FileSystemStorageStore(new FileSystemStorageStoreOptions()));
 
         using var temp = TempDirectory.Create();
         var missing = Path.Combine(temp.Path, "missing");
         Should.Throw<DirectoryNotFoundException>(
-            () => new LocalStorageStore(new LocalStorageStoreOptions
+            () => new FileSystemStorageStore(new FileSystemStorageStoreOptions
             {
                 RootDirectory = missing,
                 CreateDirectory = false
@@ -326,7 +326,7 @@ public sealed class LocalStorageStoreTests
     {
         using var temp = TempDirectory.Create();
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseLocalStorage(temp.Path));
+            .RegisterStorageComponents(options => options.UseFileSystemStorage(temp.Path));
         registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
         var runtimeNode = factory(CreateContext(StorageComponentTypes.Put, new
         {
@@ -367,7 +367,7 @@ public sealed class LocalStorageStoreTests
             Value = "first"
         });
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseLocalStorage(temp.Path));
+            .RegisterStorageComponents(options => options.UseFileSystemStorage(temp.Path));
         registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
         var runtimeNode = factory(CreateContext(StorageComponentTypes.Query, new
         {
@@ -389,8 +389,8 @@ public sealed class LocalStorageStoreTests
         result.Records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
     }
 
-    private static LocalStorageStore CreateStore(string rootDirectory)
-        => new(new LocalStorageStoreOptions
+    private static FileSystemStorageStore CreateStore(string rootDirectory)
+        => new(new FileSystemStorageStoreOptions
         {
             RootDirectory = rootDirectory
         });
@@ -443,7 +443,7 @@ public sealed class LocalStorageStoreTests
         {
             var path = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(),
-                "fluxflow-storage-local-tests",
+                "fluxflow-storage-filesystem-tests",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(path);
             return new TempDirectory(path);

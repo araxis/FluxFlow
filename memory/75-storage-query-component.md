@@ -5,7 +5,7 @@ Date: 2026-06-02
 ## Decision
 
 Add `storage.query` to `FluxFlow.Components.Storage` and query support to the
-file-backed local storage adapter.
+file-system-backed storage adapter.
 
 Query is a generic logical storage primitive. It stays neutral and does not
 know any dashboard, workspace, scenario, or product storage schema.
@@ -26,10 +26,10 @@ Added core package version `0.2.0-alpha.1` with:
 - diagnostics for query completion and failures
 - per-message query failures as `FlowError`
 
-Added local adapter package version `0.2.0-alpha.1` with:
+Added file-system adapter package version `0.1.0-alpha.1` with:
 
-- `LocalStorageStore.QueryAsync(...)`
-- scan-based query over existing local record files
+- `FileSystemStorageStore.QueryAsync(...)`
+- scan-based query over existing record files
 - unchanged persisted record format
 - deterministic output order by stored timestamp and key
 
@@ -42,7 +42,7 @@ Added local adapter package version `0.2.0-alpha.1` with:
 The node validates the collection and limit, applies configured defaults, and
 continues after recoverable store failures.
 
-The local adapter scans the current store directory and filters records without
+The file-system adapter scans the current store directory and filters records without
 using collection or key values as raw path segments.
 
 ## Verification
@@ -54,8 +54,8 @@ Added focused tests for:
 - suppressed result payloads and record outputs
 - query failure continuation
 - node registration
-- local adapter filters
-- local adapter expired-record query behavior
+- file-system adapter filters
+- file-system adapter expired-record query behavior
 - storage sample query workflow
 
 ## Next
@@ -63,5 +63,5 @@ Added focused tests for:
 Storage hardening can pause here. The next storage candidates are:
 
 - retention/delete-by-query if a consumer needs cleanup policies
-- separate indexed storage adapters if scan-based local query becomes too slow
+- separate indexed storage adapters if scan-based file-system query becomes too slow
 - database adapters only when a real host workflow needs one

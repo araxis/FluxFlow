@@ -1,9 +1,9 @@
 using FluxFlow.Components.Storage.Contracts;
 using System.IO;
 
-namespace FluxFlow.Components.Storage.Local;
+namespace FluxFlow.Components.Storage.FileSystem;
 
-public sealed record LocalStorageStoreOptions
+public sealed record FileSystemStorageStoreOptions
 {
     public string? RootDirectory { get; init; }
     public string? StoreName { get; init; }
@@ -13,25 +13,25 @@ public sealed record LocalStorageStoreOptions
     public string? DefaultCollection { get; init; }
     public bool FlushOnWrite { get; init; } = true;
 
-    internal LocalStorageStoreSettings Resolve(StorageStoreContext? context = null)
+    internal FileSystemStorageStoreSettings Resolve(StorageStoreContext? context = null)
     {
         var rootDirectory = Normalize(RootDirectory);
         if (rootDirectory is null)
         {
             throw new InvalidOperationException(
-                "Local storage requires a root directory.");
+                "File-system storage requires a root directory.");
         }
 
         if (Path.IsPathRooted(rootDirectory) && !AllowAbsoluteRootDirectory)
         {
             throw new InvalidOperationException(
-                "Local storage root directory cannot be absolute when absolute roots are disabled.");
+                "File-system storage root directory cannot be absolute when absolute roots are disabled.");
         }
 
         if (MaxValueBytes <= 0)
         {
             throw new InvalidOperationException(
-                "Local storage max value bytes must be greater than zero.");
+                "File-system storage max value bytes must be greater than zero.");
         }
 
         var fullRoot = Path.GetFullPath(rootDirectory);
@@ -43,14 +43,14 @@ public sealed record LocalStorageStoreOptions
         if (!CreateDirectory)
         {
             throw new DirectoryNotFoundException(
-                $"Local storage root directory '{fullRoot}' does not exist.");
+                $"File-system storage root directory '{fullRoot}' does not exist.");
         }
 
         Directory.CreateDirectory(fullRoot);
         return CreateSettings(fullRoot, context);
     }
 
-    private LocalStorageStoreSettings CreateSettings(
+    private FileSystemStorageStoreSettings CreateSettings(
         string fullRoot,
         StorageStoreContext? context)
         => new(

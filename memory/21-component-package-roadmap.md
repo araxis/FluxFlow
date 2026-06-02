@@ -124,8 +124,8 @@ after the core component package has settled.
    workflow storage. Done in `63-storage-component-package.md`.
 9. Plan a neutral persisted storage adapter package and host migration path.
    Done in `65-storage-adapter-and-migration-plan.md`.
-10. Add the first file-backed local storage adapter package. Done in
-    `66-storage-local-adapter-package.md`.
+10. Add the first file-system-backed storage adapter package. Done in
+    `66-storage-filesystem-adapter-package.md`.
 11. Split expression-driven assertions out of the control package. Done in
     `67-assertions-component-package.md`.
 12. Add deterministic generated and sequence sources. Done in
@@ -142,7 +142,7 @@ after the core component package has settled.
     `73-routing-join-component.md`.
 18. Add same-stream fork, source-tagged merge, and optional switch route
     envelopes. Done in `74-routing-merge-fork-route-envelope.md`.
-19. Add logical storage query and local adapter query support. Done in
+19. Add logical storage query and file-system adapter query support. Done in
     `75-storage-query-component.md`.
 20. Record the storage adapter package rule: base storage stays logical, and
     each reusable persistence implementation lives in its own
@@ -151,3 +151,6 @@ after the core component package has settled.
 21. Refine storage adapter naming so each adapter package maps to exactly one
     concrete backend, not a broad persistence family. Done in
     `77-storage-adapter-backend-naming.md`.
+22. Rename the first persisted storage adapter to a backend-based
+    file-system package and API. Done in
+    `78-storage-filesystem-adapter-rename.md`.

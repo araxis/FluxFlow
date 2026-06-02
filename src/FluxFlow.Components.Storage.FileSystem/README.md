@@ -1,6 +1,6 @@
-# FluxFlow.Components.Storage.Local
+# FluxFlow.Components.Storage.FileSystem
 
-File-backed local storage adapter for `FluxFlow.Components.Storage`.
+File-system-backed storage adapter for `FluxFlow.Components.Storage`.
 
 This package does not add workflow nodes. It provides an `IStorageStore`
 implementation and registration helpers for the existing storage nodes:
@@ -15,7 +15,7 @@ implementation and registration helpers for the existing storage nodes:
 ```csharp
 var registry = new RuntimeNodeFactoryRegistry()
     .RegisterStorageComponents(options => options
-        .UseLocalStorage(new LocalStorageStoreOptions
+        .UseFileSystemStorage(new FileSystemStorageStoreOptions
         {
             RootDirectory = "data/storage",
             DefaultCollection = "items"
@@ -32,9 +32,9 @@ var registry = new RuntimeNodeFactoryRegistry()
 - query by collection, key prefix, attributes, stored time bounds, expiration,
   and limit
 - best-effort atomic writes through a temporary file then replace
-- owned store lifetime when created through `UseLocalStorage`
+- owned store lifetime when created through `UseFileSystemStorage`
 
-The adapter is intended for local workflows, samples, tests, and simple desktop
+The adapter is intended for single-machine workflows, samples, tests, and simple desktop
 or service hosts. It does not claim cross-process write coordination in this
 first version.
 
