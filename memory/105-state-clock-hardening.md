@@ -35,3 +35,9 @@ Completed local verification:
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
 - `dotnet pack src\FluxFlow.Components.State\FluxFlow.Components.State.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
+- Commit: `32aa8b0` (`Add deterministic state clock`).
+- Tag: `components-state-v0.3.0-alpha.1`.
+- Release workflow: `26839708645`, success.
+- Main CI workflow: `26839700691`, success.
+- Public package restore/build smoke passed on attempt 9 after public-feed
+  indexing caught up.
