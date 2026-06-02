@@ -160,5 +160,5 @@ after the core component package has settled.
     `89-shared-expression-support.md` through
     `95-expression-support-migration-complete.md`.
 24. Harden deterministic Sources behavior with a host-provided source clock for
-    delay scheduling and sequence timestamps. Started in
+    delay scheduling and sequence timestamps. Done in
     `98-sources-clock-hardening.md`.

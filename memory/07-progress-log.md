@@ -170,6 +170,8 @@ Date: 2026-05-31
   a fresh public-feed restore/build smoke test.
 - Started `FluxFlow.Components.Sources` `0.2.0-alpha.1` with host-provided
   source clocks for deterministic delays and sequence timestamps.
+- Published `FluxFlow.Components.Sources` `0.2.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
