@@ -172,5 +172,5 @@ after the core component package has settled.
     fallback sample timestamps when samples omit `Timestamp`. Done in
     `102-metrics-clock-hardening.md`.
 28. Harden deterministic Routing behavior with a host-provided routing clock for
-    route timestamps, windows, joins, correlations, and timeout delays. In
-    progress in `103-routing-clock-hardening.md`.
+    route timestamps, windows, joins, correlations, and timeout delays. Done in
+    `103-routing-clock-hardening.md`.

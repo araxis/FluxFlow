@@ -191,9 +191,9 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Routing` `0.9.0-alpha.1` with a host-provided
   routing clock for deterministic route timestamps, windows, joins,
   correlations, and timeout delays.
+- Published `FluxFlow.Components.Routing` `0.9.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 
-- Finish the Routing clock hardening release and public-feed smoke test.
-- Continue the broader component maturity backlog after Routing release
-  evidence is recorded.
+- Continue the broader component maturity backlog.
