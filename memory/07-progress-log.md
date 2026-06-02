@@ -229,6 +229,10 @@ Date: 2026-05-31
   timestamps.
 - Published `FluxFlow.Components.Mqtt` `0.4.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Routing` `0.10.0-alpha.1` with explicit result
+  timestamps so Routing contracts no longer create hidden current times.
+- Published `FluxFlow.Components.Routing` `0.10.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 

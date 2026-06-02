@@ -194,3 +194,6 @@ after the core component package has settled.
 35. Harden deterministic MQTT behavior with a host-provided MQTT clock for
     publish result timestamps and package-owned MQTT workflow events. Done in
     `110-mqtt-clock-hardening.md`.
+36. Harden Routing result contracts by removing hidden current-time defaults
+    and requiring explicit result timestamps. Done in
+    `111-routing-result-timestamp-hardening.md`.

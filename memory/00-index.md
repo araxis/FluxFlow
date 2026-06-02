@@ -126,6 +126,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   logical storage and adapter timestamps.
 - `110-mqtt-clock-hardening.md`: MQTT clock hardening for deterministic publish
   result and workflow event timestamps.
+- `111-routing-result-timestamp-hardening.md`: routing result timestamp
+  hardening for explicit package-clock-owned result times.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
