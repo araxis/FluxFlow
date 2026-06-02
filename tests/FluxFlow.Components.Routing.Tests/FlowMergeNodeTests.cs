@@ -34,12 +34,10 @@ public sealed class FlowMergeNodeTests
 
         var values = await DrainUntilCompletedAsync(output);
         values.Count.ShouldBe(2);
-        values[0].Sequence.ShouldBe(1);
-        values[0].Source.ShouldBe("First");
-        values[0].Value.ShouldBe("one");
-        values[1].Sequence.ShouldBe(2);
-        values[1].Source.ShouldBe("Second");
-        values[1].Value.ShouldBe("two");
+        values.Select(item => item.Sequence).ShouldBe([1, 2]);
+        var bySource = values.ToDictionary(item => item.Source, StringComparer.Ordinal);
+        bySource["First"].Value.ShouldBe("one");
+        bySource["Second"].Value.ShouldBe("two");
     }
 
     [Fact]
@@ -59,7 +57,11 @@ public sealed class FlowMergeNodeTests
         right.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        (await DrainUntilCompletedAsync(output)).Select(item => item.Value).ShouldBe([1, 2]);
+        var values = await DrainUntilCompletedAsync(output);
+        values.Select(item => item.Sequence).ShouldBe([1, 2]);
+        var bySource = values.ToDictionary(item => item.Source, StringComparer.Ordinal);
+        bySource[RoutingComponentPorts.Left].Value.ShouldBe(1);
+        bySource[RoutingComponentPorts.Right].Value.ShouldBe(2);
     }
 
     [Fact]
