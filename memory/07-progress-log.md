@@ -214,6 +214,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Validation` `0.2.0-alpha.1` with a
   host-provided validation clock for deterministic JSON schema validation
   result timestamps.
+- Published `FluxFlow.Components.Validation` `0.2.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
 
 ## Remaining
 

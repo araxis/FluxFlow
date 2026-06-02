@@ -186,5 +186,5 @@ after the core component package has settled.
     clock for write, read, watch, and enumerate timestamps. Done in
     `107-filesystem-clock-hardening.md`.
 33. Harden deterministic Validation behavior with a host-provided validation
-    clock for JSON schema validation result timestamps. In progress in
+    clock for JSON schema validation result timestamps. Done in
     `108-validation-clock-hardening.md`.
