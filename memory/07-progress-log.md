@@ -108,9 +108,10 @@ Date: 2026-05-31
 - Prepared `FluxFlow.Engine` `0.6.0-beta.1` with the public API namespace
   cleanup, host-provided expression boundary, release notes, package metadata,
   sample app update, package pack, and local install smoke test.
+- Published `FluxFlow.Engine` `0.6.0-beta.1` and verified a fresh public
+  package restore/build smoke test.
 
 ## Remaining
 
-- Publish `FluxFlow.Engine` `0.6.0-beta.1` after branch CI passes.
 - Move the first consumer to the engine beta package and record compatibility
   feedback before `1.0.0`.

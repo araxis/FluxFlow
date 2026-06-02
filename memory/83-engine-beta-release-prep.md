@@ -30,7 +30,7 @@ line to the beta line.
 - Release tag: `engine-v0.6.0-beta.1`.
 - Changelog section: `FluxFlow.Engine 0.6.0-beta.1`.
 
-## Verification Plan
+## Verification
 
 - Full solution build: passed.
 - Full solution tests: passed.
@@ -38,8 +38,9 @@ line to the beta line.
 - Release-note extraction: passed.
 - Local package pack: passed.
 - Local package install smoke test: passed.
-- Branch CI after commit.
-- Release workflow after tag.
+- Branch CI after commit: passed, run `26811346515`.
+- Release workflow after tag: passed, run `26811451074`.
+- Public package restore smoke test: passed.
 
 The package smoke restored `FluxFlow.Engine` `0.6.0-beta.1` from the local
 package output and compiled a minimal consumer against:
@@ -48,7 +49,15 @@ package output and compiled a minimal consumer against:
 - `RuntimeNodeFactoryRegistry`
 - `FlowNodeId` from `FluxFlow.Engine.Components`
 
+## Release Result
+
+- Commit: `7818fb4`.
+- Tag: `engine-v0.6.0-beta.1`.
+- Release record: `https://github.com/araxis/FluxFlow/releases/tag/engine-v0.6.0-beta.1`.
+- Package publication: passed.
+
 ## Next Step
 
-Run the beta gates, commit the release-prep changes, push `main`, then publish
-by pushing `engine-v0.6.0-beta.1` once branch CI is green.
+Move the first consumer to `FluxFlow.Engine` `0.6.0-beta.1` and record any
+compatibility feedback before deciding whether the next engine release can be
+`1.0.0`.

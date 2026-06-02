@@ -14,8 +14,7 @@ documented, and stable.
 ## Baseline
 
 - Main branch CI is green at commit `8bc5e83`.
-- `FluxFlow.Engine` is published at `0.5.0-alpha.1`; `0.6.0-beta.1`
-  preparation is in progress.
+- `FluxFlow.Engine` is published at `0.6.0-beta.1`.
 - The first consumer has migrated to the engine successfully.
 - Independent package releases are working.
 - Public docs exist for getting started, definitions, node authoring, package
@@ -164,6 +163,7 @@ Main risks:
 1. Produce an engine public API inventory.
 2. Review the inventory for accidental or unstable public surface.
 3. Fix docs/examples that do not compile against current package names.
-4. Run the focused engine verification gates.
-5. Prepare the `0.6.0-beta.1` release notes.
-6. Publish `0.6.0-beta.1` after the release-prep commit is verified.
+4. Move the first consumer to the beta package.
+5. Resolve only real compatibility or usability issues.
+6. Release `FluxFlow.Engine` `1.0.0` when no public API rename is still
+   expected.
