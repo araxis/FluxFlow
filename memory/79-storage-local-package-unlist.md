@@ -40,3 +40,12 @@ FluxFlow.Components.Storage.<BackendName>
 Use the manual package maintenance workflow for package unlisting. It keeps the
 package-feed key inside the repository secret path and limits package operations
 to the `FluxFlow.` package family.
+
+## Result
+
+Workflow run `26807164052` completed successfully on 2026-06-02.
+
+The package feed accepted unlist calls for both old versions. Public package
+search returned zero results for the old package id immediately after the run.
+Some package metadata endpoints can continue returning cached version metadata
+for a while, but the package is removed from public discovery.
