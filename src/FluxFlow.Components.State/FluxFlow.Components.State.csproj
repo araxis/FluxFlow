@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Components.State</PackageId>
     <AssemblyName>FluxFlow.Components.State</AssemblyName>
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.3.0-alpha.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable state reducer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Uses shared component expression registration helpers while preserving the public State registration API.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds host-provided state clocks for deterministic state.reducer result timestamps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

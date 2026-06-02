@@ -46,8 +46,14 @@ State updates are serial, so each key observes deterministic ordered changes.
 
 ```csharp
 registry.RegisterStateComponents(options =>
-    options.UseExpressionEngine(myExpressionEngine));
+    options
+        .UseExpressionEngine(myExpressionEngine)
+        .UseClock(stateClock));
 ```
+
+`UseClock(...)` is optional. Without it, `state.reducer` uses the default
+system clock. Supplying a clock lets hosts and tests make `StateReducerResult`
+timestamps deterministic.
 
 ## Composition Guidance
 

@@ -1,6 +1,7 @@
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Components.State.Options;
+using FluxFlow.Components.State.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
@@ -12,6 +13,7 @@ public sealed class StateReducerNode : FlowNodeBase
 {
     private readonly StateReducerOptions _options;
     private readonly IFlowExpressionEngine _expressionEngine;
+    private readonly IStateClock _clock;
     private readonly ActionBlock<StateReducerInput> _input;
     private readonly BufferBlock<StateReducerResult> _output;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
@@ -20,10 +22,12 @@ public sealed class StateReducerNode : FlowNodeBase
 
     private StateReducerNode(
         StateReducerOptions options,
-        IFlowExpressionEngine expressionEngine)
+        IFlowExpressionEngine expressionEngine,
+        IStateClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -57,7 +61,7 @@ public sealed class StateReducerNode : FlowNodeBase
 
         var options = StateOptionsReader.ReadReducerOptions(context.Definition);
         var expressionEngine = componentOptions.ResolveExpressionEngine(options.Engine);
-        var node = new StateReducerNode(options, expressionEngine);
+        var node = new StateReducerNode(options, expressionEngine, componentOptions.Clock);
 
         return context.CreateNode(node)
             .Input(StateComponentPorts.Input, node.Input)
@@ -209,7 +213,7 @@ public sealed class StateReducerNode : FlowNodeBase
             Input = input.Input,
             NewState = null,
             Version = current is null ? 0 : current.Version + 1,
-            UpdatedAt = DateTimeOffset.UtcNow
+            UpdatedAt = _clock.UtcNow
         };
     }
 
@@ -314,7 +318,7 @@ public sealed class StateReducerNode : FlowNodeBase
         return new FlowMapContext { Variables = variables };
     }
 
-    private static StateReducerResult CreateResult(
+    private StateReducerResult CreateResult(
         string key,
         StateReducerInput input,
         object? previousState,
@@ -326,7 +330,7 @@ public sealed class StateReducerNode : FlowNodeBase
             Input = input.Input,
             NewState = next.State,
             Version = next.Version,
-            UpdatedAt = DateTimeOffset.UtcNow
+            UpdatedAt = _clock.UtcNow
         };
 
     private void ReportReducerError(

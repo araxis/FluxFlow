@@ -177,3 +177,5 @@ after the core component package has settled.
 29. Harden deterministic Observability behavior with a host-provided
     observability clock for logger, counter, and metrics timestamps. Done in
     `104-observability-clock-hardening.md`.
+30. Harden deterministic State behavior with a host-provided state clock for
+    reducer result timestamps. In progress in `105-state-clock-hardening.md`.

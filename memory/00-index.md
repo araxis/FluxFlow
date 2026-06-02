@@ -114,6 +114,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   route timestamps, windows, joins, correlations, and timeout delays.
 - `104-observability-clock-hardening.md`: observability clock hardening for
   deterministic logger, counter, and metrics timestamps.
+- `105-state-clock-hardening.md`: state clock hardening for deterministic
+  reducer result timestamps.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

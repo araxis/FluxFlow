@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.State 0.3.0-alpha.1
+
+Deterministic state result timestamps.
+
+- Adds `IStateClock` and `SystemStateClock`.
+- Adds `UseClock(...)` to `StateComponentOptions`.
+- `state.reducer` now uses the configured clock for `StateReducerResult`
+  timestamps on reduce, reset, and clear operations.
+
 ## FluxFlow.Components.Observability 0.3.0-alpha.1
 
 Deterministic observer timestamps.

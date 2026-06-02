@@ -1,5 +1,6 @@
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
+using FluxFlow.Components.State.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -152,6 +153,48 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
+    public async Task Reducer_UsesConfiguredClockForResults()
+    {
+        var reduceAt = new DateTimeOffset(2026, 6, 2, 18, 45, 0, TimeSpan.Zero);
+        var resetAt = reduceAt.AddSeconds(1);
+        var clearAt = resetAt.AddSeconds(1);
+        var clock = new RecordingStateClock(reduceAt, resetAt, clearAt);
+        var runtimeNode = CreateNode(
+            new
+            {
+                reducer = "count",
+                initialState = 5
+            },
+            new SampleExpressionEngine(),
+            options => options.UseClock(clock));
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<StateReducerResult>(runtimeNode);
+
+        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
+        await input.Target.SendAsync(new StateReducerInput
+        {
+            Key = "a",
+            InitialState = 100,
+            Operation = StateReducerOperation.Reset
+        });
+        await input.Target.SendAsync(new StateReducerInput
+        {
+            Key = "a",
+            Operation = StateReducerOperation.Clear
+        });
+        input.Target.Complete();
+
+        var reduce = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var reset = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var clear = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        reduce.UpdatedAt.ShouldBe(reduceAt);
+        reset.UpdatedAt.ShouldBe(resetAt);
+        clear.UpdatedAt.ShouldBe(clearAt);
+    }
+
+    [Fact]
     public async Task Reducer_ReportsReducerFailuresAndContinues()
     {
         var runtimeNode = CreateNode(
@@ -291,10 +334,15 @@ public sealed class StateReducerNodeTests
 
     private static RuntimeNode CreateNode(
         object configuration,
-        IFlowExpressionEngine expressionEngine)
+        IFlowExpressionEngine expressionEngine,
+        Action<StateComponentOptions>? configure = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStateComponents(options => options.UseExpressionEngine(expressionEngine));
+            .RegisterStateComponents(options =>
+            {
+                options.UseExpressionEngine(expressionEngine);
+                configure?.Invoke(options);
+            });
         registry.TryGetFactory(StateComponentTypes.Reducer, out var factory).ShouldBeTrue();
         return factory(CreateContext(configuration));
     }
