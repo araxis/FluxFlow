@@ -196,6 +196,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Observability` `0.3.0-alpha.1` with a
   host-provided observability clock for deterministic logger, counter, and
   metrics timestamps.
+- Published `FluxFlow.Components.Observability` `0.3.0-alpha.1` and verified a
+  fresh public-feed restore/build smoke test.
 
 ## Remaining
 

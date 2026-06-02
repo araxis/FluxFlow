@@ -175,5 +175,5 @@ after the core component package has settled.
     route timestamps, windows, joins, correlations, and timeout delays. Done in
     `103-routing-clock-hardening.md`.
 29. Harden deterministic Observability behavior with a host-provided
-    observability clock for logger, counter, and metrics timestamps. In
-    progress in `104-observability-clock-hardening.md`.
+    observability clock for logger, counter, and metrics timestamps. Done in
+    `104-observability-clock-hardening.md`.

@@ -40,3 +40,9 @@ Completed local verification:
 - `dotnet test FluxFlow.sln -c Release --no-restore` passed.
 - `dotnet pack src\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj -c Release --no-build --no-restore /nr:false -o artifacts\packages`
   created the package and symbol package.
+- Commit: `a591f80` (`Add deterministic observability clock`).
+- Tag: `components-observability-v0.3.0-alpha.1`.
+- Release workflow: `26838896223`, success.
+- Main CI workflow: `26838884366`, success.
+- Public package restore/build smoke passed on attempt 9 after public-feed
+  indexing caught up.
