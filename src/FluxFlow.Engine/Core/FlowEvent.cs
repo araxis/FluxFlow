@@ -1,5 +1,3 @@
-using FluxFlow.Engine.Core;
-
 namespace FluxFlow.Engine.Components;
 
 public sealed record FlowEvent

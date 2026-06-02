@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Core;
+namespace FluxFlow.Engine.Components;
 
 public readonly record struct FlowNodeId(Guid Value)
 {
