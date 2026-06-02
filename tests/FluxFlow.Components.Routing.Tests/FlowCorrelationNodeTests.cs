@@ -78,7 +78,19 @@ public sealed class FlowCorrelationNodeTests
     [Fact]
     public async Task Correlation_ExpiresPendingInputsBeforeProcessingNextInput()
     {
-        var runtimeNode = CreateNode(new { timeoutMilliseconds = 1 });
+        var firstInputEvaluated = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var runtimeNode = CreateNode(
+            new { timeoutMilliseconds = 25 },
+            (expression, context, resultType) =>
+            {
+                if (context.Variables["payload"]?.Equals("start") == true)
+                {
+                    firstInputEvaluated.TrySetResult(null);
+                }
+
+                return EvaluateCorrelationExpression(expression, context, resultType);
+            });
         var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
             .ShouldBeOfType<InputPort<CorrelationMessage>>();
         var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
@@ -87,7 +99,8 @@ public sealed class FlowCorrelationNodeTests
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
 
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
-        await Task.Delay(20);
+        await firstInputEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
