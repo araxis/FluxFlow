@@ -272,6 +272,11 @@ Date: 2026-05-31
   `FluxFlow.Components.Storage.FileSystem` `0.3.0-alpha.1`, and
   `FluxFlow.Components.Storage.SqlFile` `0.3.0-alpha.1`; verified a fresh
   public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Secrets` `0.1.0-alpha.1` with neutral secret
+  references, descriptors, resolver contracts, redaction helpers, structured
+  diagnostics, and an in-memory resolver for tests and host composition.
+- Published `FluxFlow.Components.Secrets` `0.1.0-alpha.1` and verified a fresh
+  public-feed restore/run smoke test.
 
 ## Remaining
 
