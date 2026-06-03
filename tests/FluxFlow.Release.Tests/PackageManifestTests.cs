@@ -28,6 +28,29 @@ public sealed class PackageManifestTests
         }
     }
 
+    [Fact]
+    public void Package_manifest_contains_all_source_package_projects()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest.Read(root);
+        var manifestProjects = entries
+            .Select(entry => NormalizeManifestPath(entry.Project))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var sourceProjects = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !string.IsNullOrWhiteSpace(ReadOptionalProperty(XDocument.Load(path), "PackageId")))
+            .Select(path => NormalizeManifestPath(Path.GetRelativePath(root, path)))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        var missingProjects = sourceProjects
+            .Where(project => !manifestProjects.Contains(project))
+            .ToArray();
+
+        missingProjects.ShouldBeEmpty("all source package projects must be listed in the release manifest.");
+    }
+
     private static void AssertManifestEntry(string root, string changelog, PackageManifestEntry entry)
     {
         entry.Alias.ShouldSatisfyAllConditions(
@@ -106,6 +129,13 @@ public sealed class PackageManifestTests
         return value!;
     }
 
+    private static string? ReadOptionalProperty(XDocument project, string name)
+        => project
+            .Descendants()
+            .Where(element => element.Name.LocalName == name)
+            .Select(element => element.Value.Trim())
+            .FirstOrDefault(value => value.Length > 0);
+
     private static void AssertUnique(IEnumerable<string> values, string label)
     {
         var duplicates = values
@@ -122,4 +152,6 @@ public sealed class PackageManifestTests
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
 
+    private static string NormalizeManifestPath(string path)
+        => path.Replace('\\', '/');
 }

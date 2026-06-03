@@ -7,6 +7,9 @@ Added a release-audit test project for package metadata drift.
 Extended it with script-level checks for the release resolver and release-notes
 extractor.
 
+Extended it again with manifest coverage and failure-path checks for helper
+scripts.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -30,6 +33,8 @@ does not drift away from the manifest contract.
 - Verifies each project exists and has matching `PackageId`.
 - Verifies each project has `Version`, `PackageReadmeFile`, and
   `PackageReleaseNotes`.
+- Verifies every source package project with a `PackageId` is listed in the
+  package manifest.
 - Verifies the configured readme file is packed and exists on disk.
 - Verifies `CHANGELOG.md` contains a heading for each manifest package using
   `notesName` and the project version.
@@ -37,6 +42,8 @@ does not drift away from the manifest contract.
   loading, and script-host lookup.
 - Added release helper script tests for alias resolution, tag-name resolution,
   environment-file output, and release-note extraction.
+- Added release helper script failure-path tests for mismatched package/tag
+  inputs, version mismatches, and missing release-note sections.
 
 ## Verification
 

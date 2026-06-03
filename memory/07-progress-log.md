@@ -290,6 +290,8 @@ Date: 2026-05-31
   match project metadata, packed readmes, and changelog headings.
 - Extended release-audit tests to cover release resolver and release-notes helper
   scripts directly.
+- Extended release-audit tests to ensure all source package projects are listed
+  in the package manifest and helper scripts reject invalid inputs.
 
 ## Remaining
 

@@ -70,6 +70,50 @@ public sealed class ReleaseScriptTests
     }
 
     [Fact]
+    public async Task Resolve_package_release_rejects_mismatched_package_and_tag()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+        var otherPackage = PackageManifest
+            .Read(root)
+            .First(entry => entry.PackageId != package.PackageId);
+        var version = ReadProjectVersion(root, package);
+
+        var result = await RunScriptAsync(
+            root,
+            "resolve-package-release.ps1",
+            "-Package",
+            otherPackage.Alias,
+            "-RefName",
+            $"{package.TagPrefix}-v{version}",
+            "-ManifestPath",
+            Path.Combine(root, "eng", "packages.json"));
+
+        result.ExitCode.ShouldNotBe(0);
+        result.ToString().ShouldContain("does not match tag package");
+    }
+
+    [Fact]
+    public async Task Resolve_package_release_rejects_version_mismatch()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+
+        var result = await RunScriptAsync(
+            root,
+            "resolve-package-release.ps1",
+            "-Package",
+            package.Alias,
+            "-Version",
+            "9.9.9",
+            "-ManifestPath",
+            Path.Combine(root, "eng", "packages.json"));
+
+        result.ExitCode.ShouldNotBe(0);
+        result.ToString().ShouldContain("does not match project version");
+    }
+
+    [Fact]
     public async Task Get_release_notes_writes_current_package_section_only()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -98,6 +142,38 @@ public sealed class ReleaseScriptTests
             notes.ShouldContain("Configuration validation report package.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
+    [Fact]
+    public async Task Get_release_notes_rejects_missing_package_section()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+        var outputPath = Path.Combine(Path.GetTempPath(), $"fluxflow-release-notes-{Guid.NewGuid():N}.md");
+
+        try
+        {
+            var result = await RunScriptAsync(
+                root,
+                "get-release-notes.ps1",
+                "-PackageName",
+                package.NotesName,
+                "-Version",
+                "9.9.9",
+                "-ChangelogPath",
+                Path.Combine(root, "CHANGELOG.md"),
+                "-OutputPath",
+                outputPath);
+
+            result.ExitCode.ShouldNotBe(0);
+            result.ToString().ShouldContain("does not contain a section");
+            File.Exists(outputPath).ShouldBeFalse();
         }
         finally
         {
