@@ -258,6 +258,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Resources` `0.1.0-alpha.1` with neutral named
   resource references, descriptors, lookup results, diagnostics, and catalog
   helpers.
+- Published `FluxFlow.Components.Resources` `0.1.0-alpha.1` and verified a
+  fresh public-feed restore/run smoke test.
 
 ## Remaining
 

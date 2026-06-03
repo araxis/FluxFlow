@@ -57,3 +57,9 @@ packages to a concrete lifecycle owner.
 - Full solution tests passed in Release.
 - Package pack passed and produced
   `FluxFlow.Components.Resources.0.1.0-alpha.1.nupkg`.
+- Release commit: `cedfa25`.
+- Release tag: `components-resources-v0.1.0-alpha.1`.
+- Release workflow run: `26898117265`, success.
+- Main verification run: `26898105577`, success.
+- Fresh public-feed restore/run smoke passed and returned
+  `True:primary-profile:1`.
