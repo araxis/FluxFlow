@@ -294,6 +294,8 @@ Date: 2026-05-31
   in the package manifest and helper scripts reject invalid inputs.
 - Added release-audit package convention checks for target frameworks, package
   metadata, symbol settings, and manifested project references.
+- Added a package consumer smoke harness and wired release flow to restore,
+  build, run, and load package types from the packed artifact before publishing.
 
 ## Remaining
 

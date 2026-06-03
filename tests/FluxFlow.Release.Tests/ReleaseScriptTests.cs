@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Xml.Linq;
 using Shouldly;
 using Xunit;
@@ -17,7 +16,7 @@ public sealed class ReleaseScriptTests
 
         try
         {
-            var result = await RunScriptAsync(
+            var result = await ReleaseScriptRunner.RunAsync(
                 root,
                 "resolve-package-release.ps1",
                 "-Package",
@@ -54,7 +53,7 @@ public sealed class ReleaseScriptTests
         var package = GetConfigurationPackage(root);
         var version = ReadProjectVersion(root, package);
 
-        var result = await RunScriptAsync(
+        var result = await ReleaseScriptRunner.RunAsync(
             root,
             "resolve-package-release.ps1",
             "-RefName",
@@ -79,7 +78,7 @@ public sealed class ReleaseScriptTests
             .First(entry => entry.PackageId != package.PackageId);
         var version = ReadProjectVersion(root, package);
 
-        var result = await RunScriptAsync(
+        var result = await ReleaseScriptRunner.RunAsync(
             root,
             "resolve-package-release.ps1",
             "-Package",
@@ -99,7 +98,7 @@ public sealed class ReleaseScriptTests
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var package = GetConfigurationPackage(root);
 
-        var result = await RunScriptAsync(
+        var result = await ReleaseScriptRunner.RunAsync(
             root,
             "resolve-package-release.ps1",
             "-Package",
@@ -123,7 +122,7 @@ public sealed class ReleaseScriptTests
 
         try
         {
-            var result = await RunScriptAsync(
+            var result = await ReleaseScriptRunner.RunAsync(
                 root,
                 "get-release-notes.ps1",
                 "-PackageName",
@@ -159,7 +158,7 @@ public sealed class ReleaseScriptTests
 
         try
         {
-            var result = await RunScriptAsync(
+            var result = await ReleaseScriptRunner.RunAsync(
                 root,
                 "get-release-notes.ps1",
                 "-PackageName",
@@ -198,56 +197,8 @@ public sealed class ReleaseScriptTests
             .First(value => value.Length > 0);
     }
 
-    private static async Task<ScriptResult> RunScriptAsync(
-        string root,
-        string scriptName,
-        params string[] arguments)
-    {
-        var executable = ReleaseTestPaths.FindScriptHost();
-        var scriptPath = Path.Combine(root, "eng", scriptName);
-        var startInfo = new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = root,
-            RedirectStandardError = true,
-            RedirectStandardOutput = true
-        };
-
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(scriptPath);
-
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"Could not start {executable}.");
-
-        var standardOutput = await process.StandardOutput.ReadToEndAsync();
-        var standardError = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        return new ScriptResult(process.ExitCode, standardOutput, standardError);
-    }
-
     private static string NormalizePath(string path)
         => path
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
-
-    private sealed record ScriptResult(int ExitCode, string StandardOutput, string StandardError)
-    {
-        public override string ToString()
-            => $"""
-                Exit code: {ExitCode}
-                Output:
-                {StandardOutput}
-                Error:
-                {StandardError}
-                """;
-    }
 }

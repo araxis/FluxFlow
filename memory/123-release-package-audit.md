@@ -14,6 +14,10 @@ Added package project convention checks so releasable projects stay aligned on
 target frameworks, package metadata, symbol settings, and package reference
 shape.
 
+Added a package consumer smoke harness that generates a throwaway console
+consumer, restores from a package source, builds, runs, and loads package types
+before release artifacts move forward.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -51,10 +55,17 @@ does not drift away from the manifest contract.
 - Added package project convention tests for target frameworks, assembly names,
   root namespaces, authors, descriptions, tags, license expression, readme
   metadata, symbols metadata, release notes, and manifested project references.
+- Added `eng/package-consumer-smoke.ps1`.
+- Added release script tests that validate smoke project generation and missing
+  package-file failure behavior.
+- Wired the release workflow to run the consumer smoke harness after pack and
+  before release artifact publication.
 
 ## Verification
 
 - Focused release-audit tests passed.
+- Local consumer smoke harness passed against an existing configuration package
+  artifact.
 - Full solution build passed.
 - Full solution tests passed.
 

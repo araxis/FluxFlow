@@ -57,6 +57,10 @@ jobs:
         shell: pwsh
         run: dotnet pack "${{ env.PACKAGE_PROJECT }}" --configuration Release --no-build --output artifacts/packages
 
+      - name: Smoke package consumer
+        shell: pwsh
+        run: ./eng/package-consumer-smoke.ps1 -PackageId "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -PackageSource artifacts/packages
+
       - name: Prepare release notes
         shell: pwsh
         run: ./eng/get-release-notes.ps1 -PackageName "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -OutputPath artifacts/release-notes.md
