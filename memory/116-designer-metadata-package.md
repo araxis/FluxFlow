@@ -60,3 +60,8 @@ specific renderer or host application.
 - Full solution tests passed in Release.
 - Package pack passed and produced
   `FluxFlow.Components.Designer.0.1.0-alpha.1.nupkg`.
+- Release commit: `c81cfec`.
+- Release tag: `components-designer-v0.1.0-alpha.1`.
+- Release workflow run: `26875082488`, success.
+- Main verification run: `26875074734`, success.
+- Fresh public-feed restore/run smoke passed and returned `True:1:Input`.
