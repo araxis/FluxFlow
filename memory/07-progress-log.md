@@ -292,6 +292,8 @@ Date: 2026-05-31
   scripts directly.
 - Extended release-audit tests to ensure all source package projects are listed
   in the package manifest and helper scripts reject invalid inputs.
+- Added release-audit package convention checks for target frameworks, package
+  metadata, symbol settings, and manifested project references.
 
 ## Remaining
 

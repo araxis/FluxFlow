@@ -10,6 +10,10 @@ extractor.
 Extended it again with manifest coverage and failure-path checks for helper
 scripts.
 
+Added package project convention checks so releasable projects stay aligned on
+target frameworks, package metadata, symbol settings, and package reference
+shape.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -44,10 +48,13 @@ does not drift away from the manifest contract.
   environment-file output, and release-note extraction.
 - Added release helper script failure-path tests for mismatched package/tag
   inputs, version mismatches, and missing release-note sections.
+- Added package project convention tests for target frameworks, assembly names,
+  root namespaces, authors, descriptions, tags, license expression, readme
+  metadata, symbols metadata, release notes, and manifested project references.
 
 ## Verification
 
-- Focused release-audit test passed.
+- Focused release-audit tests passed.
 - Full solution build passed.
 - Full solution tests passed.
 
