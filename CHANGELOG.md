@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Configuration 0.1.0-alpha.1
+
+Configuration validation report package.
+
+- Adds `FluxFlow.Components.Configuration`.
+- Adds neutral validation report contracts for resource and secret references.
+- Adds `ConfigurationValidator` for resource-only, secret-only, and combined
+  validation.
+- Preserves ordered diagnostics with source, code, severity, path, name, kind,
+  and metadata.
+
 ## FluxFlow.Components.Secrets 0.2.0-alpha.1
 
 Secret option reference helpers.
