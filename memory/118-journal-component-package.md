@@ -35,8 +35,22 @@ contracts and an in-memory store.
 - `dotnet build FluxFlow.sln --configuration Release`
 - `dotnet test FluxFlow.sln --configuration Release --no-build`
 - `dotnet pack src\FluxFlow.Components.Journal\FluxFlow.Components.Journal.csproj --configuration Release --no-build --output artifacts\packages`
+- Release workflow run `26900270288` completed successfully for
+  `components-journal-v0.1.0-alpha.1`.
+- Public-feed restore/run smoke test restored
+  `FluxFlow.Components.Journal` `0.1.0-alpha.1` into a fresh console app and
+  returned `1:evt-1:False`.
+
+## History
+
+- The first tag run failed because `eng/packages.json` did not yet contain the
+  `components-journal` release prefix. Added the package map entry and moved the
+  tag forward.
+- The second tag run failed because `CHANGELOG.md` did not yet contain release
+  notes for `FluxFlow.Components.Journal` `0.1.0-alpha.1`. Added the changelog
+  entry, validated the release-notes script locally, and moved the tag forward.
 
 ## Next
 
-- Publish `FluxFlow.Components.Journal` `0.1.0-alpha.1`.
-- Verify a fresh public-feed restore/run smoke test after the release completes.
+- Continue the broader component maturity backlog. Current likely next target:
+  storage adapter hardening or the next runtime package from the backlog.

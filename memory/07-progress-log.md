@@ -263,6 +263,8 @@ Date: 2026-05-31
 - Started `FluxFlow.Components.Journal` `0.1.0-alpha.1` with neutral journal
   records, query filters, store abstraction, retention options, an in-memory
   store, and focused tests.
+- Published `FluxFlow.Components.Journal` `0.1.0-alpha.1` and verified a fresh
+  public-feed restore/run smoke test.
 
 ## Remaining
 
