@@ -147,22 +147,17 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(request);
 
         var collection = ResolveCollection(request.Collection);
-        var keyPrefix = Normalize(request.KeyPrefix);
-        var attributes = CopyAttributes(request.Attributes);
-        var limit = request.Limit ?? int.MaxValue;
-        if (limit <= 0)
+        var query = request with
         {
-            throw new InvalidOperationException(
-                "SQL file storage query limit must be greater than zero.");
-        }
-
-        if (request.StoredFrom.HasValue &&
-            request.StoredTo.HasValue &&
-            request.StoredFrom.Value > request.StoredTo.Value)
-        {
-            throw new InvalidOperationException(
-                "SQL file storage query storedFrom cannot be later than storedTo.");
-        }
+            Collection = collection,
+            KeyPrefix = Normalize(request.KeyPrefix),
+            Attributes = CopyAttributes(request.Attributes),
+            Offset = request.Offset ?? 0,
+            Limit = request.Limit ?? int.MaxValue
+        };
+        StorageQueryMatcher.Validate(query);
+        var limit = query.Limit!.Value;
+        var offset = query.Offset!.Value;
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -175,14 +170,15 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             var records = await ReadCollectionAsync(
                     connection,
                     collection,
-                    request,
+                    query,
                     cancellationToken)
                 .ConfigureAwait(false);
 
             return records
-                .Where(record => Matches(record, keyPrefix, attributes, request))
+                .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal)
+                .Skip(offset)
                 .Take(limit)
                 .Select(CopyRecord)
                 .ToArray();
@@ -540,35 +536,6 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         }
 
         return key;
-    }
-
-    private bool Matches(
-        StorageRecord record,
-        string? keyPrefix,
-        Dictionary<string, string> attributes,
-        StorageQueryRequest request)
-    {
-        if (!string.IsNullOrWhiteSpace(keyPrefix) &&
-            !record.Key.StartsWith(keyPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (IsExpired(record, request.IncludeExpired))
-        {
-            return false;
-        }
-
-        foreach (var (name, value) in attributes)
-        {
-            if (!record.Attributes.TryGetValue(name, out var current) ||
-                !StringComparer.Ordinal.Equals(current, value))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private bool IsExpired(StorageRecord record, bool? includeExpired)

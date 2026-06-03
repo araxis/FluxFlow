@@ -326,6 +326,55 @@ public sealed class StorageComponentTests
     }
 
     [Fact]
+    public async Task Query_AppliesConfiguredOffset()
+    {
+        var storedAt = new DateTimeOffset(2026, 2, 3, 4, 8, 9, TimeSpan.Zero);
+        var store = new TestStorageStore();
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a-1",
+            Value = "one",
+            Version = 1,
+            StoredAt = storedAt
+        });
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a-2",
+            Value = "two",
+            Version = 1,
+            StoredAt = storedAt.AddMinutes(1)
+        });
+        store.Seed(new StorageRecord
+        {
+            Collection = "items",
+            Key = "a-3",
+            Value = "three",
+            Version = 1,
+            StoredAt = storedAt.AddMinutes(2)
+        });
+        var runtimeNode = CreateQuery(new
+        {
+            collection = "items",
+            offset = 1,
+            limit = 1
+        }, store);
+        var input = GetInput<StorageQueryRequest>(runtimeNode);
+        var output = LinkOutput<StorageQueryResult>(runtimeNode);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync(new StorageQueryRequest());
+        input.Target.Complete();
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Count.ShouldBe(1);
+        result.Records.ShouldHaveSingleItem().Key.ShouldBe("a-2");
+    }
+
+    [Fact]
     public async Task Query_CanSuppressRecordPayloadsAndOutputs()
     {
         var store = new TestStorageStore();
@@ -794,18 +843,15 @@ public sealed class StorageComponentTests
                 throw new InvalidOperationException("query failed");
             }
 
+            StorageQueryMatcher.Validate(request);
             var records = _records.Values
-                .Where(record => StringComparer.Ordinal.Equals(record.Collection, request.Collection))
-                .Where(record => string.IsNullOrWhiteSpace(request.KeyPrefix) ||
-                    record.Key.StartsWith(request.KeyPrefix, StringComparison.Ordinal))
-                .Where(record => !request.StoredFrom.HasValue || record.StoredAt >= request.StoredFrom.Value)
-                .Where(record => !request.StoredTo.HasValue || record.StoredAt <= request.StoredTo.Value)
-                .Where(record => !record.ExpiresAt.HasValue ||
-                    record.ExpiresAt.Value > DateTimeOffset.UtcNow ||
-                    request.IncludeExpired == true)
-                .Where(record => MatchesAttributes(record, request.Attributes))
+                .Where(record => StorageQueryMatcher.IsMatch(
+                    record,
+                    request,
+                    DateTimeOffset.UtcNow))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal)
+                .Skip(request.Offset ?? 0)
                 .Take(request.Limit ?? int.MaxValue)
                 .Select(CopyRecord)
                 .ToArray();
@@ -853,21 +899,6 @@ public sealed class StorageComponentTests
                 ? []
                 : new Dictionary<string, string>(attributes, StringComparer.Ordinal);
 
-        private static bool MatchesAttributes(
-            StorageRecord record,
-            Dictionary<string, string> attributes)
-        {
-            foreach (var (name, value) in attributes)
-            {
-                if (!record.Attributes.TryGetValue(name, out var current) ||
-                    !StringComparer.Ordinal.Equals(current, value))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
     }
 
     private sealed class DisposableStorageStore : TestStorageStore, IAsyncDisposable

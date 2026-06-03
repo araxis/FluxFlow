@@ -224,6 +224,40 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Query_HonorsOffset()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a-1",
+            Value = "one"
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a-2",
+            Value = "two"
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a-3",
+            Value = "three"
+        });
+
+        var records = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Offset = 1,
+            Limit = 1
+        });
+
+        records.ShouldHaveSingleItem().Key.ShouldBe("a-2");
+    }
+
+    [Fact]
     public async Task Delete_ReturnsFoundAndMissingResults()
     {
         using var temp = TempDirectory.Create();

@@ -35,7 +35,7 @@ adapter-specific override.
 - optimistic version checks through `ExpectedVersion`
 - expiration honored by `storage.get` and `storage.query`
 - query by collection, key prefix, attributes, stored time bounds, expiration,
-  and limit
+  offset, and limit
 - owned store lifetime when created through `UseSqlFileStorage`
 
 The adapter is intended for single-machine workflows, service hosts, and desktop

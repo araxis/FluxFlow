@@ -115,22 +115,17 @@ public sealed class FileSystemStorageStore : IStorageStore
         cancellationToken.ThrowIfCancellationRequested();
 
         var collection = ResolveCollection(request.Collection);
-        var keyPrefix = Normalize(request.KeyPrefix);
-        var attributes = CopyAttributes(request.Attributes);
+        var query = request with
+        {
+            Collection = collection,
+            KeyPrefix = Normalize(request.KeyPrefix),
+            Attributes = CopyAttributes(request.Attributes),
+            Offset = request.Offset ?? 0,
+            Limit = request.Limit ?? int.MaxValue
+        };
+        StorageQueryMatcher.Validate(query);
         var limit = request.Limit ?? int.MaxValue;
-        if (limit <= 0)
-        {
-            throw new InvalidOperationException(
-                "File-system storage query limit must be greater than zero.");
-        }
-
-        if (request.StoredFrom.HasValue &&
-            request.StoredTo.HasValue &&
-            request.StoredFrom.Value > request.StoredTo.Value)
-        {
-            throw new InvalidOperationException(
-                "File-system storage query storedFrom cannot be later than storedTo.");
-        }
+        var offset = request.Offset ?? 0;
 
         lock (_gate)
         {
@@ -146,7 +141,8 @@ public sealed class FileSystemStorageStore : IStorageStore
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var record = ReadRecord(path);
-                if (record is null || !Matches(record, collection, keyPrefix, attributes, request))
+                if (record is null ||
+                    !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
                 {
                     continue;
                 }
@@ -158,6 +154,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 records
                     .OrderBy(record => record.StoredAt)
                     .ThenBy(record => record.Key, StringComparer.Ordinal)
+                    .Skip(offset)
                     .Take(limit)
                     .ToArray());
         }
@@ -329,53 +326,6 @@ public sealed class FileSystemStorageStore : IStorageStore
             _settings.RootDirectory,
             "stores",
             Hash(_settings.StoreName));
-
-    private bool Matches(
-        StorageRecord record,
-        string collection,
-        string? keyPrefix,
-        Dictionary<string, string> attributes,
-        StorageQueryRequest request)
-    {
-        if (!StringComparer.Ordinal.Equals(record.Collection, collection))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrWhiteSpace(keyPrefix) &&
-            !record.Key.StartsWith(keyPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (request.StoredFrom.HasValue && record.StoredAt < request.StoredFrom.Value)
-        {
-            return false;
-        }
-
-        if (request.StoredTo.HasValue && record.StoredAt > request.StoredTo.Value)
-        {
-            return false;
-        }
-
-        if (record.ExpiresAt.HasValue &&
-            record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
-            request.IncludeExpired != true)
-        {
-            return false;
-        }
-
-        foreach (var (name, value) in attributes)
-        {
-            if (!record.Attributes.TryGetValue(name, out var current) ||
-                !StringComparer.Ordinal.Equals(current, value))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     private static string Hash(string value)
     {

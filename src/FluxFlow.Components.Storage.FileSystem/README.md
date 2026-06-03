@@ -35,7 +35,7 @@ adapter-specific override.
 - optimistic version checks through `ExpectedVersion`
 - expiration honored by `storage.get`
 - query by collection, key prefix, attributes, stored time bounds, expiration,
-  and limit
+  offset, and limit
 - best-effort atomic writes through a temporary file then replace
 - owned store lifetime when created through `UseFileSystemStorage`
 

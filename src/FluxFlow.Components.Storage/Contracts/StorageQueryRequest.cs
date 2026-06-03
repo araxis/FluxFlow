@@ -8,6 +8,7 @@ public sealed record StorageQueryRequest
     public DateTimeOffset? StoredFrom { get; init; }
     public DateTimeOffset? StoredTo { get; init; }
     public bool? IncludeExpired { get; init; }
+    public int? Offset { get; init; }
     public int? Limit { get; init; }
     public string? CorrelationId { get; init; }
 }

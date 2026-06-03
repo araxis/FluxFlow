@@ -45,6 +45,7 @@ internal static class StorageOptionsReader
         ValidateBoundedCapacity("storage.query", options.BoundedCapacity);
         ValidateOptionalText("storage.query", "store", options.Store);
         ValidateOptionalText("storage.query", "collection", options.Collection);
+        ValidateOffset("storage.query", options.Offset);
         ValidateLimit("storage.query", options.Limit);
         return options;
     }
@@ -85,6 +86,15 @@ internal static class StorageOptionsReader
         {
             throw new InvalidOperationException(
                 $"{nodeType} option 'limit' must be greater than zero.");
+        }
+    }
+
+    private static void ValidateOffset(string nodeType, int offset)
+    {
+        if (offset < 0)
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'offset' cannot be negative.");
         }
     }
 }

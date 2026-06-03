@@ -88,6 +88,7 @@ errors.
   "type": "storage.query",
   "store": "default",
   "collection": "items",
+  "offset": 0,
   "limit": 100,
   "includeExpired": false,
   "emitRecordsInResult": true,
@@ -101,8 +102,8 @@ errors.
 `StorageRecord` when `emitRecordOutputs` is true.
 
 Requests can filter by collection, key prefix, exact-match attributes, stored
-time bounds, expired-record policy, and limit. Store failures emit `FlowError`
-and the node continues processing later messages.
+time bounds, expired-record policy, offset, and limit. Store failures emit
+`FlowError` and the node continues processing later messages.
 
 ## Delete
 

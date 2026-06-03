@@ -251,21 +251,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
 
     private StorageQueryRequest NormalizeRequest(StorageQueryRequest input)
     {
-        var limit = input.Limit ?? _options.Limit;
-        if (limit <= 0)
-        {
-            throw new InvalidOperationException("storage.query request limit must be greater than zero.");
-        }
-
-        if (input.StoredFrom.HasValue &&
-            input.StoredTo.HasValue &&
-            input.StoredFrom.Value > input.StoredTo.Value)
-        {
-            throw new InvalidOperationException(
-                "storage.query request storedFrom cannot be later than storedTo.");
-        }
-
-        return input with
+        var request = input with
         {
             Collection = StorageNodeSupport.ResolveCollection(
                 "storage.query",
@@ -274,9 +260,12 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             KeyPrefix = StorageNodeSupport.Normalize(input.KeyPrefix),
             Attributes = StorageNodeSupport.CopyAttributes(input.Attributes),
             IncludeExpired = input.IncludeExpired ?? _options.IncludeExpired,
-            Limit = limit,
+            Offset = input.Offset ?? _options.Offset,
+            Limit = input.Limit ?? _options.Limit,
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
         };
+        StorageQueryMatcher.Validate(request);
+        return request;
     }
 
     private StorageQueryResult CreateResult(

@@ -1,5 +1,28 @@
 # Changelog
 
+## FluxFlow.Components.Storage.SqlFile 0.3.0-alpha.1
+
+Storage query paging support.
+
+- Adds `StorageQueryRequest.Offset` support to the single-file SQL adapter.
+- Uses the shared storage query matcher from `FluxFlow.Components.Storage`.
+
+## FluxFlow.Components.Storage.FileSystem 0.3.0-alpha.1
+
+Storage query paging support.
+
+- Adds `StorageQueryRequest.Offset` support to the file-system adapter.
+- Uses the shared storage query matcher from `FluxFlow.Components.Storage`.
+
+## FluxFlow.Components.Storage 0.4.0-alpha.1
+
+Storage query paging support.
+
+- Adds `StorageQueryRequest.Offset`.
+- Adds `StorageQueryMatcher` for shared query validation and matching.
+- Keeps `storage.query` result and record outputs capped by the normalized
+  limit.
+
 ## FluxFlow.Components.Journal 0.1.0-alpha.1
 
 Journal package.
