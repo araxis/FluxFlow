@@ -277,6 +277,11 @@ Date: 2026-05-31
   diagnostics, and an in-memory resolver for tests and host composition.
 - Published `FluxFlow.Components.Secrets` `0.1.0-alpha.1` and verified a fresh
   public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Secrets` `0.2.0-alpha.1` with option-facing
+  secret reference helpers so component options can hold `SecretReference`
+  while hosts own resolution.
+- Published `FluxFlow.Components.Secrets` `0.2.0-alpha.1` and verified a fresh
+  public-feed restore/run smoke test.
 
 ## Remaining
 
