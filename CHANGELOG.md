@@ -1,5 +1,17 @@
 # Changelog
 
+## FluxFlow.Components.Secrets 0.2.0-alpha.1
+
+Secret option reference helpers.
+
+- Adds `SecretOptionReference` for component option models that expose a
+  `SecretReference`.
+- Adds `SecretOptionResolver` for required, optional, and ordered batch
+  resolution through a host-provided resolver.
+- Adds `SecretOptionResolution` for option-level resolved, missing, and
+  diagnostic outcomes.
+- Adds option validation diagnostics with option path metadata.
+
 ## FluxFlow.Components.Secrets 0.1.0-alpha.1
 
 Secrets package.

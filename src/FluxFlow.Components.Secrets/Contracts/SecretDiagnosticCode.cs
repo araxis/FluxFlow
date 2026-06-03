@@ -8,5 +8,6 @@ public enum SecretDiagnosticCode
     AmbiguousSecret = 4,
     KindMismatch = 5,
     AccessDenied = 6,
-    ResolveFailed = 7
+    ResolveFailed = 7,
+    MissingSecretReference = 8
 }

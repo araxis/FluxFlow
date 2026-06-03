@@ -15,6 +15,11 @@ is controlled, how values are refreshed, and how ownership is handled.
 - `SecretValue`: resolved value wrapper with redacted string formatting.
 - `ISecretResolver`: runtime abstraction for resolving a reference.
 - `SecretResolveResult`: resolved value or structured diagnostic.
+- `SecretOptionReference`: an option path plus optional secret reference.
+- `SecretOptionResolver`: helper for resolving required or optional secret
+  option references through a host-provided resolver.
+- `SecretOptionResolution`: option-level resolved value, missing state, or
+  structured diagnostic.
 - `SecretDiagnostic`: stable diagnostics for missing, duplicate, ambiguous,
   kind mismatch, denied, failed, and invalid secret references.
 - `SecretRedactor`: helper for redacting text and sensitive attribute values.
@@ -48,11 +53,43 @@ Console.WriteLine(result.Resolved);
 Console.WriteLine(result.Value);
 ```
 
+## Component Options
+
+Component option models should store references, not resolved values:
+
+```csharp
+using FluxFlow.Components.Secrets;
+using FluxFlow.Components.Secrets.Contracts;
+
+public sealed record SenderOptions
+{
+    public SecretReference? Credential { get; init; }
+}
+
+var optionResult = await SecretOptionResolver.ResolveRequiredAsync(
+    hostResolver,
+    options.Credential,
+    "credential",
+    cancellationToken);
+
+if (!optionResult.Resolved)
+{
+    Console.WriteLine(optionResult.Diagnostic);
+    return;
+}
+
+var credential = optionResult.Value.Reveal();
+```
+
+The component owns its option shape and error handling. The host owns the
+resolver implementation and decides where the value comes from.
+
 ## Diagnostics
 
 Use `SecretDiagnostics` to:
 
 - validate secret records and references
+- validate option references
 - find duplicate declarations
 - find references that cannot be resolved
 

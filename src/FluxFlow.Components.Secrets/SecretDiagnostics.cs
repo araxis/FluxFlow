@@ -48,6 +48,46 @@ public static class SecretDiagnostics
         return diagnostics;
     }
 
+    public static IReadOnlyList<SecretDiagnostic> ValidateOptionReference(SecretOptionReference option)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+
+        var diagnostics = new List<SecretDiagnostic>();
+        if (string.IsNullOrWhiteSpace(option.OptionPath))
+            diagnostics.Add(Invalid("option.path", "Secret option path is required."));
+
+        ValidateMap(option.Metadata, "option.metadata", diagnostics);
+
+        if (option.Reference is null)
+        {
+            if (option.Required)
+            {
+                diagnostics.Add(new SecretDiagnostic
+                {
+                    Code = SecretDiagnosticCode.MissingSecretReference,
+                    Severity = SecretDiagnosticSeverity.Error,
+                    Message = $"Secret option '{option.OptionPath}' requires a reference.",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["path"] = option.OptionPath
+                    }
+                });
+            }
+
+            return diagnostics;
+        }
+
+        foreach (var diagnostic in ValidateReference(option.Reference))
+        {
+            diagnostics.Add(diagnostic with
+            {
+                Metadata = AddPath(diagnostic.Metadata, option.OptionPath)
+            });
+        }
+
+        return diagnostics;
+    }
+
     public static void ThrowIfInvalid(IEnumerable<SecretRecord> records)
     {
         var diagnostics = ValidateRecords(records);
@@ -58,6 +98,12 @@ public static class SecretDiagnostics
     {
         var diagnostics = ValidateReference(reference);
         ThrowIfAny(diagnostics, "Secret reference is invalid");
+    }
+
+    public static void ThrowIfInvalid(SecretOptionReference option)
+    {
+        var diagnostics = ValidateOptionReference(option);
+        ThrowIfAny(diagnostics, "Secret option reference is invalid");
     }
 
     public static IReadOnlyList<SecretDiagnostic> FindDuplicateSecrets(IEnumerable<SecretRecord> records)
@@ -168,6 +214,19 @@ public static class SecretDiagnostics
             if (string.IsNullOrWhiteSpace(value.Value))
                 diagnostics.Add(Invalid($"{path}.{value.Key}", "Values are required."));
         }
+    }
+
+    private static IReadOnlyDictionary<string, string> AddPath(
+        IReadOnlyDictionary<string, string> metadata,
+        string optionPath)
+    {
+        var values = metadata.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        if (values.TryGetValue("path", out var referencePath))
+            values["referencePath"] = referencePath;
+
+        values["path"] = optionPath;
+        values["optionPath"] = optionPath;
+        return values;
     }
 
     private readonly record struct SecretRecordKey(SecretName Name, string? Version);
