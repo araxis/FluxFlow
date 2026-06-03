@@ -140,6 +140,13 @@
     "notesName": "FluxFlow.Components.Resources"
   },
   {
+    "alias": "components-journal",
+    "tagPrefix": "components-journal",
+    "packageId": "FluxFlow.Components.Journal",
+    "project": "src/FluxFlow.Components.Journal/FluxFlow.Components.Journal.csproj",
+    "notesName": "FluxFlow.Components.Journal"
+  },
+  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
