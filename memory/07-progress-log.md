@@ -298,6 +298,9 @@ Date: 2026-05-31
   build, run, and load package types from the packed artifact before publishing.
 - Added a package archive inspection harness and wired release flow to validate
   packed archive contents before consumer smoke.
+- Added a post-publish package feed verification harness and wired release flow
+  to restore, build, run, and load the exact published package version from an
+  isolated consumer cache.
 
 ## Remaining
 

@@ -21,6 +21,10 @@ before release artifacts move forward.
 Added a package archive inspector that checks packed archive contents before the
 consumer smoke harness runs.
 
+Added a post-publish package feed verifier that restores, builds, runs, and
+loads the exact package version from a configured package source using an
+isolated package cache.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -68,6 +72,11 @@ does not drift away from the manifest contract.
   symbol entries.
 - Wired the release workflow to inspect package archives after pack and before
   consumer smoke.
+- Added `eng/package-feed-verify.ps1`.
+- Added release script tests that validate generated feed verification projects,
+  retry input validation, and local package source validation.
+- Wired the release workflow to verify the package from the configured package
+  source after publish.
 
 ## Verification
 
@@ -76,6 +85,8 @@ does not drift away from the manifest contract.
   package artifact.
 - Local consumer smoke harness passed against an existing configuration package
   artifact.
+- Local package feed verification passed against existing configuration package
+  artifacts.
 - Full solution build passed.
 - Full solution tests passed.
 
