@@ -1,5 +1,14 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt 0.5.0-alpha.1
+
+Adapter-owned reconnect policy hints.
+
+- Adds `MqttReconnectPolicy`.
+- Adds optional `reconnect` settings to `mqtt.publish` and `mqtt.subscribe`.
+- Passes reconnect policy hints through `MqttClientFactoryContext`.
+- Keeps retry loops and connection recovery owned by host adapters.
+
 ## FluxFlow.Components.Sessions 0.3.0-alpha.1
 
 Session metadata query node.

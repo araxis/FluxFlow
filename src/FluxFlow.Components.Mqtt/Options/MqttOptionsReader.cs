@@ -1,3 +1,4 @@
+using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Definitions;
 using System.Text.Json;
@@ -15,6 +16,7 @@ internal static class MqttOptionsReader
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
         EnsureValidPublishTopic(options.DefaultTopic, nameof(options.DefaultTopic), required: false);
+        EnsureValidReconnectPolicy(options.Reconnect);
         return options;
     }
 
@@ -25,6 +27,7 @@ internal static class MqttOptionsReader
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
 
         EnsureValidSubscriptionFilter(options.TopicFilter, nameof(options.TopicFilter));
+        EnsureValidReconnectPolicy(options.Reconnect);
 
         return options;
     }
@@ -80,6 +83,60 @@ internal static class MqttOptionsReader
         if (!result.IsValid)
         {
             throw new InvalidOperationException($"MQTT option '{name}' is invalid: {result.Message}");
+        }
+    }
+
+    private static void EnsureValidReconnectPolicy(MqttReconnectPolicy? policy)
+    {
+        if (policy is null)
+        {
+            return;
+        }
+
+        if (policy.MaxAttempts.HasValue && policy.MaxAttempts.Value < 0)
+        {
+            throw new InvalidOperationException(
+                "MQTT option 'reconnect.maxAttempts' must be zero or greater when set.");
+        }
+
+        if (policy.InitialDelayMilliseconds.HasValue && policy.InitialDelayMilliseconds.Value < 0)
+        {
+            throw new InvalidOperationException(
+                "MQTT option 'reconnect.initialDelayMilliseconds' must be zero or greater when set.");
+        }
+
+        if (policy.MaxDelayMilliseconds.HasValue && policy.MaxDelayMilliseconds.Value < 0)
+        {
+            throw new InvalidOperationException(
+                "MQTT option 'reconnect.maxDelayMilliseconds' must be zero or greater when set.");
+        }
+
+        if (policy.InitialDelayMilliseconds.HasValue &&
+            policy.MaxDelayMilliseconds.HasValue &&
+            policy.InitialDelayMilliseconds.Value > policy.MaxDelayMilliseconds.Value)
+        {
+            throw new InvalidOperationException(
+                "MQTT option 'reconnect.initialDelayMilliseconds' cannot be greater than reconnect.maxDelayMilliseconds.");
+        }
+
+        if (policy.BackoffMultiplier.HasValue && policy.BackoffMultiplier.Value <= 0)
+        {
+            throw new InvalidOperationException(
+                "MQTT option 'reconnect.backoffMultiplier' must be greater than zero when set.");
+        }
+
+        if (policy.Attributes is null)
+        {
+            return;
+        }
+
+        foreach (var (key, _) in policy.Attributes)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidOperationException(
+                    "MQTT option 'reconnect.attributes' cannot contain an empty key.");
+            }
         }
     }
 

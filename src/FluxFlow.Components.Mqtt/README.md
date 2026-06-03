@@ -66,6 +66,31 @@ diagnostics and events named `mqtt.connection.healthChanged`.
 The package does not own reconnect policy. Adapters decide how to connect,
 reconnect, and report state.
 
+## Reconnect Policy Hints
+
+Nodes can optionally set `reconnect` to pass policy hints to the host adapter
+through `MqttClientFactoryContext.Reconnect`.
+
+```json
+{
+  "type": "mqtt.publish",
+  "name": "publisher",
+  "defaultTopic": "devices/state",
+  "reconnect": {
+    "enabled": true,
+    "maxAttempts": 5,
+    "initialDelayMilliseconds": 100,
+    "maxDelayMilliseconds": 5000,
+    "backoffMultiplier": 2,
+    "useJitter": true
+  }
+}
+```
+
+These values are advisory. The package validates them and passes them to the
+adapter factory. The adapter still owns connection state, retry loops, shared
+client behavior, and broker-specific recovery.
+
 ## Topic validation
 
 Use `MqttTopicValidator.ValidatePublishTopic` and

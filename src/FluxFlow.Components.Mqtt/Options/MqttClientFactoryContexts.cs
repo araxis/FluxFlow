@@ -10,18 +10,19 @@ internal static class MqttClientFactoryContexts
         RuntimeNodeFactoryContext context,
         MqttPublishOptions options,
         IMqttClock clock)
-        => Create(context, options.ConnectionName, options.Connection, clock);
+        => Create(context, options.ConnectionName, options.Connection, options.Reconnect, clock);
 
     public static MqttClientFactoryContext Create(
         RuntimeNodeFactoryContext context,
         MqttSubscriptionOptions options,
         IMqttClock clock)
-        => Create(context, options.ConnectionName, options.Connection, clock);
+        => Create(context, options.ConnectionName, options.Connection, options.Reconnect, clock);
 
     private static MqttClientFactoryContext Create(
         RuntimeNodeFactoryContext context,
         string? connectionName,
         MqttConnectionProfile profile,
+        MqttReconnectPolicy? reconnect,
         IMqttClock clock)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -35,7 +36,18 @@ internal static class MqttClientFactoryContexts
                 ? profile.Name
                 : connectionName,
             Profile = profile,
+            Reconnect = CopyReconnectPolicy(reconnect),
             Clock = clock
         };
     }
+
+    private static MqttReconnectPolicy? CopyReconnectPolicy(MqttReconnectPolicy? reconnect)
+        => reconnect is null
+            ? null
+            : reconnect with
+            {
+                Attributes = reconnect.Attributes is null
+                    ? []
+                    : new Dictionary<string, string>(reconnect.Attributes, StringComparer.Ordinal)
+            };
 }

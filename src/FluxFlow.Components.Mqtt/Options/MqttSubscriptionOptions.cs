@@ -10,5 +10,6 @@ public sealed record MqttSubscriptionOptions
     public MqttQualityOfService QualityOfService { get; init; } = MqttQualityOfService.AtMostOnce;
     public bool ReceiveRetainedMessages { get; init; } = true;
     public bool RetainAsPublished { get; init; }
+    public MqttReconnectPolicy? Reconnect { get; init; }
     public int BoundedCapacity { get; init; } = 128;
 }

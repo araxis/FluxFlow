@@ -31,6 +31,19 @@ public sealed class MqttPublishNodeTests
                 defaultTopic = "devices/temperature",
                 retain = true,
                 qualityOfService = "AtLeastOnce",
+                reconnect = new
+                {
+                    enabled = true,
+                    maxAttempts = 5,
+                    initialDelayMilliseconds = 100,
+                    maxDelayMilliseconds = 5000,
+                    backoffMultiplier = 1.5,
+                    useJitter = false,
+                    attributes = new Dictionary<string, string>
+                    {
+                        ["policy"] = "publish"
+                    }
+                },
                 boundedCapacity = 4
             }));
 
@@ -67,6 +80,14 @@ public sealed class MqttPublishNodeTests
         clientFactory.Contexts[0].Address.ToString().ShouldBe("main.node");
         clientFactory.Contexts[0].ConnectionName.ShouldBe("main-broker");
         clientFactory.Contexts[0].Clock.ShouldBe(clock);
+        var reconnect = clientFactory.Contexts[0].Reconnect.ShouldNotBeNull();
+        reconnect.Enabled.ShouldBeTrue();
+        reconnect.MaxAttempts.ShouldBe(5);
+        reconnect.InitialDelayMilliseconds.ShouldBe(100);
+        reconnect.MaxDelayMilliseconds.ShouldBe(5000);
+        reconnect.BackoffMultiplier.ShouldBe(1.5);
+        reconnect.UseJitter.ShouldBe(false);
+        reconnect.Attributes["policy"].ShouldBe("publish");
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         result.Timestamp.ShouldBe(clock.UtcNow);
@@ -148,6 +169,28 @@ public sealed class MqttPublishNodeTests
             () => factory(CreateContext(MqttComponentTypes.Publish, new { defaultTopic = "devices/#" })));
 
         exception.Message.ShouldContain("defaultTopic");
+    }
+
+    [Fact]
+    public void PublishNode_RejectsInvalidReconnectPolicy()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(CreateContext(
+                MqttComponentTypes.Publish,
+                new
+                {
+                    reconnect = new
+                    {
+                        maxAttempts = -1
+                    }
+                })));
+
+        exception.Message.ShouldContain("reconnect.maxAttempts");
     }
 
     [Fact]

@@ -9,5 +9,6 @@ public sealed record MqttPublishOptions
     public string? DefaultTopic { get; init; }
     public MqttQualityOfService QualityOfService { get; init; } = MqttQualityOfService.AtMostOnce;
     public bool Retain { get; init; }
+    public MqttReconnectPolicy? Reconnect { get; init; }
     public int BoundedCapacity { get; init; } = 128;
 }

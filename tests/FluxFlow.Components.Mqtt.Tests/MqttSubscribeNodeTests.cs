@@ -40,6 +40,15 @@ public sealed class MqttSubscribeNodeTests
                 qualityOfService = "AtLeastOnce",
                 receiveRetainedMessages = false,
                 retainAsPublished = true,
+                reconnect = new
+                {
+                    enabled = false,
+                    maxAttempts = 0,
+                    attributes = new Dictionary<string, string>
+                    {
+                        ["policy"] = "subscribe"
+                    }
+                },
                 boundedCapacity = 4
             }));
         var output = runtimeNode.FindOutput(new PortName(MqttComponentPorts.Output));
@@ -68,6 +77,10 @@ public sealed class MqttSubscribeNodeTests
         adapter.SubscriptionOptions.RetainAsPublished.ShouldBeTrue();
         clientFactory.Contexts.Count.ShouldBe(1);
         clientFactory.Contexts[0].Clock.ShouldBe(clock);
+        var reconnect = clientFactory.Contexts[0].Reconnect.ShouldNotBeNull();
+        reconnect.Enabled.ShouldBeFalse();
+        reconnect.MaxAttempts.ShouldBe(0);
+        reconnect.Attributes["policy"].ShouldBe("subscribe");
 
         if (runtimeNode.Node is IAsyncDisposable disposable)
         {
