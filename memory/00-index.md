@@ -134,6 +134,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   hints and package release record.
 - `114-projections-component-package.md`: neutral event projection package and
   release record.
+- `115-expectations-component-package.md`: neutral event expectation package and
+  release record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

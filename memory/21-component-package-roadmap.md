@@ -205,3 +205,5 @@ after the core component package has settled.
 39. Add a neutral event projections package for runtime event count,
     latest-event, and rolling-rate snapshots. Done in
     `114-projections-component-package.md`.
+40. Add a neutral event expectations package for event wait and guard results.
+    Done in `115-expectations-component-package.md`.

@@ -246,6 +246,11 @@ Date: 2026-05-31
   rolling-rate snapshots, deterministic projection clocks, and focused tests.
 - Published `FluxFlow.Components.Projections` `0.1.0-alpha.1` and verified a
   fresh public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Expectations` `0.1.0-alpha.1` with neutral
+  `event.expect` and `event.guard` nodes, expectation result contracts,
+  deterministic timeout clocks, and focused tests.
+- Published `FluxFlow.Components.Expectations` `0.1.0-alpha.1` and verified a
+  fresh public-feed restore/run smoke test.
 
 ## Remaining
 
