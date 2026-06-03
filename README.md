@@ -215,6 +215,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Expectations` | `event.expect`, `event.guard` | Runtime event expectation and guard results. |
 | `FluxFlow.Components.Designer` | metadata contracts | Component, option, and port metadata for host-generated editors. |
 | `FluxFlow.Components.Resources` | resource contracts | Named resource references, descriptors, lookup, and diagnostics. |
+| `FluxFlow.Components.Journal` | journal contracts | Event journal records, queries, retention options, and in-memory store. |
 | `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay`, `session.query` | Host-store-backed session recording, replay, and metadata query. |
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
 | `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.query`, `storage.delete` | Host-store-backed logical record storage. |
