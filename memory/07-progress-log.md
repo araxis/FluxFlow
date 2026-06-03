@@ -286,6 +286,8 @@ Date: 2026-05-31
   validation report for resource references and secret-backed option references.
 - Published `FluxFlow.Components.Configuration` `0.1.0-alpha.1` and verified a
   fresh public-feed restore/run smoke test.
+- Added a release-audit test project that verifies package manifest entries
+  match project metadata, packed readmes, and changelog headings.
 
 ## Remaining
 

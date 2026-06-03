@@ -137,6 +137,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Configu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Configuration.Tests", "tests\FluxFlow.Components.Configuration.Tests\FluxFlow.Components.Configuration.Tests.csproj", "{1FDA9FC4-9BD0-45DD-B789-7F0A9AA550A7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Release.Tests", "tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj", "{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -915,6 +917,18 @@ Global
 		{1FDA9FC4-9BD0-45DD-B789-7F0A9AA550A7}.Release|x64.Build.0 = Release|Any CPU
 		{1FDA9FC4-9BD0-45DD-B789-7F0A9AA550A7}.Release|x86.ActiveCfg = Release|Any CPU
 		{1FDA9FC4-9BD0-45DD-B789-7F0A9AA550A7}.Release|x86.Build.0 = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|x64.Build.0 = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Debug|x86.Build.0 = Debug|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|x64.ActiveCfg = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|x64.Build.0 = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|x86.ActiveCfg = Release|Any CPU
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -981,5 +995,6 @@ Global
 		{4885F777-4A09-4D09-8870-CE23F1E89FCB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{C49E5122-6B39-4C1F-99A1-77669C776D8E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1FDA9FC4-9BD0-45DD-B789-7F0A9AA550A7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{57BAFB0D-D015-4ADD-956E-6E71A10A00F3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
