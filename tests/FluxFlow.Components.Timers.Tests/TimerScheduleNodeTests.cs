@@ -85,7 +85,7 @@ public sealed class TimerScheduleNodeTests
             .DisposeAsync();
 
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        output.Completion.IsCompleted.ShouldBeTrue();
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

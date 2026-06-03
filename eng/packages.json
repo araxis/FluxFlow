@@ -112,6 +112,13 @@
     "notesName": "FluxFlow.Components.Metrics"
   },
   {
+    "alias": "components-projections",
+    "tagPrefix": "components-projections",
+    "packageId": "FluxFlow.Components.Projections",
+    "project": "src/FluxFlow.Components.Projections/FluxFlow.Components.Projections.csproj",
+    "notesName": "FluxFlow.Components.Projections"
+  },
+  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",

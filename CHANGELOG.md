@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Projections 0.1.0-alpha.1
+
+Event projection package.
+
+- Adds `FluxFlow.Components.Projections`.
+- Adds `event.projection` for in-memory runtime event projections.
+- Adds `EventFilter`, `EventSummary`, and `EventProjectionSnapshot`.
+- Supports count, latest matching event, payload preview, and rolling rate.
+- Supports deterministic snapshot timestamps through a host-provided projection
+  clock.
+
 ## FluxFlow.Components.Mqtt 0.5.0-alpha.1
 
 Adapter-owned reconnect policy hints.
