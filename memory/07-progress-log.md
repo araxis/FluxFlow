@@ -282,6 +282,10 @@ Date: 2026-05-31
   while hosts own resolution.
 - Published `FluxFlow.Components.Secrets` `0.2.0-alpha.1` and verified a fresh
   public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Configuration` `0.1.0-alpha.1` with a combined
+  validation report for resource references and secret-backed option references.
+- Published `FluxFlow.Components.Configuration` `0.1.0-alpha.1` and verified a
+  fresh public-feed restore/run smoke test.
 
 ## Remaining
 
