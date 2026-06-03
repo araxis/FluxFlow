@@ -288,6 +288,8 @@ Date: 2026-05-31
   fresh public-feed restore/run smoke test.
 - Added a release-audit test project that verifies package manifest entries
   match project metadata, packed readmes, and changelog headings.
+- Extended release-audit tests to cover release resolver and release-notes helper
+  scripts directly.
 
 ## Remaining
 

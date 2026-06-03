@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
@@ -13,8 +12,8 @@ public sealed class PackageManifestTests
     [Fact]
     public void Package_manifest_matches_project_metadata()
     {
-        var root = FindRepositoryRoot();
-        var entries = ReadPackageEntries(root);
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest.Read(root);
         var changelog = File.ReadAllText(Path.Combine(root, "CHANGELOG.md"));
 
         entries.ShouldNotBeEmpty();
@@ -107,17 +106,6 @@ public sealed class PackageManifestTests
         return value!;
     }
 
-    private static IReadOnlyList<PackageManifestEntry> ReadPackageEntries(string root)
-    {
-        var manifestPath = Path.Combine(root, "eng", "packages.json");
-        var entries = JsonSerializer.Deserialize<IReadOnlyList<PackageManifestEntry>>(
-            File.ReadAllText(manifestPath),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-        entries.ShouldNotBeNull();
-        return entries;
-    }
-
     private static void AssertUnique(IEnumerable<string> values, string label)
     {
         var duplicates = values
@@ -134,27 +122,4 @@ public sealed class PackageManifestTests
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "eng", "packages.json")))
-                return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not find the repository root.");
-    }
-
-    private sealed record PackageManifestEntry
-    {
-        public required string Alias { get; init; }
-        public required string TagPrefix { get; init; }
-        public required string PackageId { get; init; }
-        public required string Project { get; init; }
-        public required string NotesName { get; init; }
-    }
 }
