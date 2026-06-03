@@ -1,5 +1,17 @@
 # Changelog
 
+## FluxFlow.Components.Journal 0.1.0-alpha.1
+
+Journal package.
+
+- Adds `FluxFlow.Components.Journal`.
+- Adds `JournalRecord`, `JournalQuery`, and `JournalQueryResult` contracts.
+- Adds `IJournalStore` with append, query, and prune operations.
+- Adds `JournalQueryMatcher` for reusable event record filtering.
+- Adds `InMemoryJournalStore` with duplicate id checks, paging, and retention.
+- Adds `FlowEventJournalRecordMapper` for the neutral engine runtime event
+  contract.
+
 ## FluxFlow.Components.Resources 0.1.0-alpha.1
 
 Resources package.
