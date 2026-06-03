@@ -241,6 +241,11 @@ Date: 2026-05-31
   reconnect policy hints on the MQTT client factory context.
 - Published `FluxFlow.Components.Mqtt` `0.5.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Projections` `0.1.0-alpha.1` with a neutral
+  `event.projection` node, event filter contracts, latest-event summaries,
+  rolling-rate snapshots, deterministic projection clocks, and focused tests.
+- Published `FluxFlow.Components.Projections` `0.1.0-alpha.1` and verified a
+  fresh public-feed restore/run smoke test.
 
 ## Remaining
 

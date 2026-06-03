@@ -132,6 +132,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   package release record.
 - `113-mqtt-reconnect-policy-hints.md`: MQTT adapter-owned reconnect policy
   hints and package release record.
+- `114-projections-component-package.md`: neutral event projection package and
+  release record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

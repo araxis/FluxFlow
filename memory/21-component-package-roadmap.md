@@ -202,3 +202,6 @@ after the core component package has settled.
     `112-sessions-query-component.md`.
 38. Add adapter-owned MQTT reconnect policy hints without moving retry loops
     into the package. Done in `113-mqtt-reconnect-policy-hints.md`.
+39. Add a neutral event projections package for runtime event count,
+    latest-event, and rolling-rate snapshots. Done in
+    `114-projections-component-package.md`.
