@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Designer 0.1.0-alpha.1
+
+Designer metadata package.
+
+- Adds `FluxFlow.Components.Designer`.
+- Adds neutral component display metadata contracts.
+- Adds option metadata for text, number, boolean, enum, multiline text, JSON,
+  expression, duration, and secret values.
+- Adds port metadata for ordering and grouping.
+- Adds a catalog and provider helper for host composition.
+
 ## FluxFlow.Components.Expectations 0.1.0-alpha.1
 
 Event expectations package.

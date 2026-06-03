@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Designer</PackageId>
+    <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Reusable component metadata contracts for FluxFlow.</Description>
+    <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Adds neutral component, option, and port metadata contracts.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

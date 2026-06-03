@@ -251,6 +251,8 @@ Date: 2026-05-31
   deterministic timeout clocks, and focused tests.
 - Published `FluxFlow.Components.Expectations` `0.1.0-alpha.1` and verified a
   fresh public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Designer` `0.1.0-alpha.1` with neutral
+  component, option, and port metadata contracts plus catalog/provider helpers.
 
 ## Remaining
 

@@ -126,6 +126,13 @@
     "notesName": "FluxFlow.Components.Expectations"
   },
   {
+    "alias": "components-designer",
+    "tagPrefix": "components-designer",
+    "packageId": "FluxFlow.Components.Designer",
+    "project": "src/FluxFlow.Components.Designer/FluxFlow.Components.Designer.csproj",
+    "notesName": "FluxFlow.Components.Designer"
+  },
+  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
