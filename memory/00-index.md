@@ -130,6 +130,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   hardening for explicit package-clock-owned result times.
 - `112-sessions-query-component.md`: Sessions metadata query component and
   package release record.
+- `113-mqtt-reconnect-policy-hints.md`: MQTT adapter-owned reconnect policy
+  hints and package release record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -237,6 +237,10 @@ Date: 2026-05-31
   `session.query` node for session metadata queries.
 - Published `FluxFlow.Components.Sessions` `0.3.0-alpha.1` and verified a fresh
   public-feed restore/build smoke test.
+- Started `FluxFlow.Components.Mqtt` `0.5.0-alpha.1` with adapter-owned
+  reconnect policy hints on the MQTT client factory context.
+- Published `FluxFlow.Components.Mqtt` `0.5.0-alpha.1` and verified a fresh
+  public-feed restore/build smoke test.
 
 ## Remaining
 

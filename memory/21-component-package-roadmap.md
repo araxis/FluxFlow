@@ -200,3 +200,5 @@ after the core component package has settled.
 37. Add a neutral Sessions metadata query node so hosts can list/filter sessions
     before replay or dashboard projection. Done in
     `112-sessions-query-component.md`.
+38. Add adapter-owned MQTT reconnect policy hints without moving retry loops
+    into the package. Done in `113-mqtt-reconnect-policy-hints.md`.
