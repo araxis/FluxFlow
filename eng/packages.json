@@ -119,6 +119,13 @@
     "notesName": "FluxFlow.Components.Projections"
   },
   {
+    "alias": "components-expectations",
+    "tagPrefix": "components-expectations",
+    "packageId": "FluxFlow.Components.Expectations",
+    "project": "src/FluxFlow.Components.Expectations/FluxFlow.Components.Expectations.csproj",
+    "notesName": "FluxFlow.Components.Expectations"
+  },
+  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",

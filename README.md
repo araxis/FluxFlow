@@ -212,6 +212,7 @@ Reusable components live outside `FluxFlow.Engine` and are released separately.
 | `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |
 | `FluxFlow.Components.Timers` | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` | Interval, cron schedule, delay, rate-limit, and quiet-period timing nodes. |
 | `FluxFlow.Components.Projections` | `event.projection` | Runtime event count, latest-event, and rolling-rate projection snapshots. |
+| `FluxFlow.Components.Expectations` | `event.expect`, `event.guard` | Runtime event expectation and guard results. |
 | `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay`, `session.query` | Host-store-backed session recording, replay, and metadata query. |
 | `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
 | `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.query`, `storage.delete` | Host-store-backed logical record storage. |

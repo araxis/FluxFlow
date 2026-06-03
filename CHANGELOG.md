@@ -1,5 +1,18 @@
 # Changelog
 
+## FluxFlow.Components.Expectations 0.1.0-alpha.1
+
+Event expectations package.
+
+- Adds `FluxFlow.Components.Expectations`.
+- Adds `event.expect` for matching expected runtime events.
+- Adds `event.guard` for guarding against matching runtime events.
+- Adds `EventExpectationResult` and expectation result kind contracts.
+- Reuses the neutral event filter and event summary contracts from
+  `FluxFlow.Components.Projections`.
+- Supports timeout results and deterministic evaluation timestamps through a
+  host-provided expectation clock.
+
 ## FluxFlow.Components.Projections 0.1.0-alpha.1
 
 Event projection package.
