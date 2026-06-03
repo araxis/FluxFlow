@@ -140,6 +140,13 @@
     "notesName": "FluxFlow.Components.Resources"
   },
   {
+    "alias": "components-secrets",
+    "tagPrefix": "components-secrets",
+    "packageId": "FluxFlow.Components.Secrets",
+    "project": "src/FluxFlow.Components.Secrets/FluxFlow.Components.Secrets.csproj",
+    "notesName": "FluxFlow.Components.Secrets"
+  },
+  {
     "alias": "components-journal",
     "tagPrefix": "components-journal",
     "packageId": "FluxFlow.Components.Journal",

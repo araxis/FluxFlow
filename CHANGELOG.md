@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Secrets 0.1.0-alpha.1
+
+Secrets package.
+
+- Adds `FluxFlow.Components.Secrets`.
+- Adds neutral secret reference, descriptor, value, and resolver contracts.
+- Adds structured diagnostics for missing, duplicate, ambiguous, kind mismatch,
+  denied, failed, and invalid secret references.
+- Adds redaction helpers for values and sensitive attributes.
+- Adds an in-memory resolver for tests and host composition.
+
 ## FluxFlow.Components.Storage.SqlFile 0.3.0-alpha.1
 
 Storage query paging support.
