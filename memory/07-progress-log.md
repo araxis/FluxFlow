@@ -265,6 +265,13 @@ Date: 2026-05-31
   store, and focused tests.
 - Published `FluxFlow.Components.Journal` `0.1.0-alpha.1` and verified a fresh
   public-feed restore/run smoke test.
+- Started storage query paging hardening with shared query validation and
+  `Offset` support across core storage contracts plus file-backed and
+  single-file SQL-backed adapters.
+- Published `FluxFlow.Components.Storage` `0.4.0-alpha.1`,
+  `FluxFlow.Components.Storage.FileSystem` `0.3.0-alpha.1`, and
+  `FluxFlow.Components.Storage.SqlFile` `0.3.0-alpha.1`; verified a fresh
+  public-feed restore/run smoke test.
 
 ## Remaining
 
