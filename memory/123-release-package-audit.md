@@ -18,6 +18,9 @@ Added a package consumer smoke harness that generates a throwaway console
 consumer, restores from a package source, builds, runs, and loads package types
 before release artifacts move forward.
 
+Added a package archive inspector that checks packed archive contents before the
+consumer smoke harness runs.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -60,10 +63,17 @@ does not drift away from the manifest contract.
   package-file failure behavior.
 - Wired the release workflow to run the consumer smoke harness after pack and
   before release artifact publication.
+- Added `eng/package-archive-inspect.ps1`.
+- Added release script tests that validate expected archive contents and missing
+  symbol entries.
+- Wired the release workflow to inspect package archives after pack and before
+  consumer smoke.
 
 ## Verification
 
 - Focused release-audit tests passed.
+- Local package archive inspection passed against an existing configuration
+  package artifact.
 - Local consumer smoke harness passed against an existing configuration package
   artifact.
 - Full solution build passed.
