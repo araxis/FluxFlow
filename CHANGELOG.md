@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Components.Resources 0.1.0-alpha.1
+
+Resources package.
+
+- Adds `FluxFlow.Components.Resources`.
+- Adds neutral named resource reference and descriptor contracts.
+- Adds lookup result contracts with structured resource diagnostics.
+- Adds missing, duplicate, unused, kind mismatch, and invalid resource
+  diagnostics.
+- Adds an in-memory descriptor catalog for host composition.
+
 ## FluxFlow.Components.Designer 0.1.0-alpha.1
 
 Designer metadata package.

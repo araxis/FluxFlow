@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Resources</PackageId>
+    <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Reusable named resource contracts for FluxFlow.</Description>
+    <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Adds neutral named resource reference, descriptor, lookup, and diagnostic contracts.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

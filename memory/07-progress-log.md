@@ -255,6 +255,9 @@ Date: 2026-05-31
   component, option, and port metadata contracts plus catalog/provider helpers.
 - Published `FluxFlow.Components.Designer` `0.1.0-alpha.1` and verified a
   fresh public-feed restore/run smoke test.
+- Started `FluxFlow.Components.Resources` `0.1.0-alpha.1` with neutral named
+  resource references, descriptors, lookup results, diagnostics, and catalog
+  helpers.
 
 ## Remaining
 

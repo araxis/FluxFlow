@@ -138,6 +138,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   release record.
 - `116-designer-metadata-package.md`: neutral component designer metadata
   contracts and package record.
+- `117-resources-component-package.md`: neutral named resource contracts and
+  package record.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

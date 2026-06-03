@@ -133,6 +133,13 @@
     "notesName": "FluxFlow.Components.Designer"
   },
   {
+    "alias": "components-resources",
+    "tagPrefix": "components-resources",
+    "packageId": "FluxFlow.Components.Resources",
+    "project": "src/FluxFlow.Components.Resources/FluxFlow.Components.Resources.csproj",
+    "notesName": "FluxFlow.Components.Resources"
+  },
+  {
     "alias": "components-sessions",
     "tagPrefix": "components-sessions",
     "packageId": "FluxFlow.Components.Sessions",
