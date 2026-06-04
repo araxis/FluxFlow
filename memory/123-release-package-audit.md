@@ -29,6 +29,10 @@ Added a local release dry-run script that resolves a package, optionally runs
 solution restore/build/test, packs the selected project, inspects the package
 archives, runs local consumer smoke, and runs local feed-style verification.
 
+Added a guarded release tag helper that resolves the package, requires a clean
+working tree, refuses existing tags, runs the local dry run, and creates the tag
+only after the dry run passes.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -84,6 +88,9 @@ does not drift away from the manifest contract.
 - Added `eng/package-release-dry-run.ps1`.
 - Added release script tests that validate dry-run package resolution, package
   source preparation, and invalid input rejection.
+- Added `eng/package-release-tag.ps1`.
+- Added release script tests that validate tag resolution, custom tag messages,
+  and invalid remote rejection.
 
 ## Verification
 
@@ -96,6 +103,7 @@ does not drift away from the manifest contract.
   artifacts.
 - Local release dry run passed for the configuration package using existing
   build outputs.
+- Local release tag helper preparation passed for the configuration package.
 - Full solution build passed.
 - Full solution tests passed.
 

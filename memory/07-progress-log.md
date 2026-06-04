@@ -304,6 +304,9 @@ Date: 2026-05-31
 - Added a local package release dry-run harness that resolves one package, packs
   it, inspects archives, runs local consumer smoke, and runs local feed-style
   verification.
+- Added a guarded release tag helper that resolves one package, requires a clean
+  working tree, runs the local dry run, and creates the release tag only after
+  the dry run passes.
 
 ## Remaining
 
