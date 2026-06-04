@@ -140,6 +140,19 @@ This folder records the extraction work for `FluxFlow.Engine`.
   contracts and package record.
 - `117-resources-component-package.md`: neutral named resource contracts and
   package record.
+- `118-journal-component-package.md`: neutral event journal contracts and
+  package record.
+- `119-storage-query-paging.md`: storage query paging and offset hardening.
+- `120-secrets-component-package.md`: neutral secret references and resolver
+  contracts.
+- `121-secrets-option-resolution-helpers.md`: option-facing secret reference
+  helpers.
+- `122-configuration-validation-package.md`: resource and secret option
+  configuration validation package.
+- `123-release-package-audit.md`: release package audit, helper scripts, and
+  guardrails.
+- `124-release-operator-note.md`: local package release dry-run and guarded tag
+  command note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

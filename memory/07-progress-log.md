@@ -307,6 +307,8 @@ Date: 2026-05-31
 - Added a guarded release tag helper that resolves one package, requires a clean
   working tree, runs the local dry run, and creates the release tag only after
   the dry run passes.
+- Added a package release operator note with the local dry-run and guarded tag
+  commands.
 
 ## Remaining
 

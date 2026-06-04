@@ -33,6 +33,9 @@ Added a guarded release tag helper that resolves the package, requires a clean
 working tree, refuses existing tags, runs the local dry run, and creates the tag
 only after the dry run passes.
 
+Added an operator note that documents the local dry-run and guarded tag command
+path for package releases.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -91,6 +94,9 @@ does not drift away from the manifest contract.
 - Added `eng/package-release-tag.ps1`.
 - Added release script tests that validate tag resolution, custom tag messages,
   and invalid remote rejection.
+- Added `memory/124-release-operator-note.md`.
+- Added a release test that keeps the operator note linked from the memory index
+  and checks the guarded command examples.
 
 ## Verification
 
@@ -104,6 +110,7 @@ does not drift away from the manifest contract.
 - Local release dry run passed for the configuration package using existing
   build outputs.
 - Local release tag helper preparation passed for the configuration package.
+- Operator note guard test passed.
 - Full solution build passed.
 - Full solution tests passed.
 
