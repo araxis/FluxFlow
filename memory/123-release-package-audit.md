@@ -25,6 +25,10 @@ Added a post-publish package feed verifier that restores, builds, runs, and
 loads the exact package version from a configured package source using an
 isolated package cache.
 
+Added a local release dry-run script that resolves a package, optionally runs
+solution restore/build/test, packs the selected project, inspects the package
+archives, runs local consumer smoke, and runs local feed-style verification.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -77,6 +81,9 @@ does not drift away from the manifest contract.
   retry input validation, and local package source validation.
 - Wired the release workflow to verify the package from the configured package
   source after publish.
+- Added `eng/package-release-dry-run.ps1`.
+- Added release script tests that validate dry-run package resolution, package
+  source preparation, and invalid input rejection.
 
 ## Verification
 
@@ -87,6 +94,8 @@ does not drift away from the manifest contract.
   artifact.
 - Local package feed verification passed against existing configuration package
   artifacts.
+- Local release dry run passed for the configuration package using existing
+  build outputs.
 - Full solution build passed.
 - Full solution tests passed.
 

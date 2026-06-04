@@ -301,6 +301,9 @@ Date: 2026-05-31
 - Added a post-publish package feed verification harness and wired release flow
   to restore, build, run, and load the exact published package version from an
   isolated consumer cache.
+- Added a local package release dry-run harness that resolves one package, packs
+  it, inspects archives, runs local consumer smoke, and runs local feed-style
+  verification.
 
 ## Remaining
 
