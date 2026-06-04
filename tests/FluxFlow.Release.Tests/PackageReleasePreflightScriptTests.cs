@@ -25,6 +25,8 @@ public sealed class PackageReleasePreflightScriptTests
         result.StandardOutput.ShouldContain($"PREFLIGHT_PACKAGE_PROJECT={package.Project}");
         result.StandardOutput.ShouldContain($"PREFLIGHT_PACKAGE_VERSION={version}");
         result.StandardOutput.ShouldContain($"PREFLIGHT_RELEASE_TAG={package.TagPrefix}-v{version}");
+        result.StandardOutput.ShouldContain($"PREFLIGHT_CHANGELOG_NAME={package.NotesName}");
+        result.StandardOutput.ShouldContain("PREFLIGHT_CHANGELOG_OK=True");
         result.StandardOutput.ShouldContain(
             $"PREFLIGHT_DRY_RUN_COMMAND=./eng/package-release-dry-run.ps1 -Package {package.Alias} -Version {version}");
         result.StandardOutput.ShouldContain(
@@ -33,6 +35,36 @@ public sealed class PackageReleasePreflightScriptTests
             $"PREFLIGHT_TAG_COMMAND=./eng/package-release-tag.ps1 -Package {package.Alias} -Version {version}");
         result.StandardOutput.ShouldContain(
             $"PREFLIGHT_TAG_PUSH_COMMAND=./eng/package-release-tag.ps1 -Package {package.Alias} -Version {version} -Push");
+    }
+
+    [Fact]
+    public async Task Release_preflight_script_rejects_missing_changelog_section()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+        var changelogPath = Path.Combine(Path.GetTempPath(), $"fluxflow-empty-changelog-{Guid.NewGuid():N}.md");
+
+        try
+        {
+            File.WriteAllText(changelogPath, "# Changelog");
+
+            var result = await ReleaseScriptRunner.RunAsync(
+                root,
+                "package-release-preflight.ps1",
+                "-Package",
+                package.Alias,
+                "-ChangelogPath",
+                changelogPath);
+
+            result.ExitCode.ShouldNotBe(0);
+            result.ToString().ShouldContain("does not contain a section");
+            result.StandardOutput.ShouldNotContain("PREFLIGHT_TAG_COMMAND");
+        }
+        finally
+        {
+            if (File.Exists(changelogPath))
+                File.Delete(changelogPath);
+        }
     }
 
     [Fact]

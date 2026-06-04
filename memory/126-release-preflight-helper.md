@@ -8,9 +8,10 @@ Added a read-only release preflight helper:
 ./eng/package-release-preflight.ps1 -Package components-configuration
 ```
 
-It resolves the package alias, current version, release tag, package id, and
-project path. It also prints the exact dry-run and guarded tag commands with the
-resolved version included.
+It resolves the package alias, current version, release tag, package id, project
+path, and changelog name. It verifies the selected package has a changelog
+section for the resolved version before printing the exact dry-run and guarded
+tag commands.
 
 ## Decision
 
@@ -19,9 +20,11 @@ command that shows the selected package and the next commands exactly as they
 should be executed.
 
 The helper is intentionally read-only. It delegates package resolution to the
-existing resolver and does not pack, tag, publish, or mutate the working tree.
+existing resolver and changelog extractor. It does not pack, tag, publish, or
+mutate the working tree.
 
 ## Verification
 
-- Added script tests for command output and version mismatch handling.
+- Added script tests for command output, version mismatch handling, and missing
+  changelog section handling.
 - Focused release tests passed.

@@ -42,6 +42,9 @@ versions, release tags, package ids, and project paths before a release command.
 Added a read-only release preflight helper that resolves one package and prints
 the exact dry-run and guarded tag commands with the current version filled in.
 
+Extended release preflight to verify the selected package changelog section
+before printing guarded tag commands.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -60,6 +63,9 @@ opening the manifest and project files by hand.
 
 Release operators should also be able to resolve one package and copy the next
 commands without manually composing versioned command lines.
+
+Preflight must fail before showing tag commands when the selected package does
+not have matching release notes for the resolved version.
 
 ## Scope
 
@@ -117,6 +123,7 @@ commands without manually composing versioned command lines.
 - Added release script tests for preflight command output and version mismatch
   handling.
 - Added `memory/126-release-preflight-helper.md`.
+- Extended preflight tests to cover missing changelog section handling.
 
 ## Verification
 
@@ -133,6 +140,7 @@ commands without manually composing versioned command lines.
 - Operator note guard test passed.
 - Package list helper tests passed.
 - Package release preflight helper tests passed.
+- Package release preflight changelog guard tests passed.
 - Full solution build passed.
 - Full solution tests passed.
 

@@ -25,6 +25,9 @@ Resolve the selected package and print the exact next commands:
 ./eng/package-release-preflight.ps1 -Package components-configuration
 ```
 
+Preflight verifies the selected package changelog section before it prints tag
+commands.
+
 ## Local Dry Run
 
 Run this first when checking a package locally:

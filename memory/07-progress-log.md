@@ -313,6 +313,8 @@ Date: 2026-05-31
   versions, release tags, package ids, and project paths.
 - Added a read-only release preflight helper that resolves one package and
   prints exact dry-run and guarded tag commands with the current version.
+- Extended release preflight to verify the selected package changelog section
+  before printing guarded tag commands.
 
 ## Remaining
 
