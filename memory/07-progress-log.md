@@ -309,6 +309,8 @@ Date: 2026-05-31
   the dry run passes.
 - Added a package release operator note with the local dry-run and guarded tag
   commands.
+- Added a read-only package listing helper that prints package aliases, current
+  versions, release tags, package ids, and project paths.
 
 ## Remaining
 

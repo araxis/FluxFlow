@@ -5,6 +5,20 @@ Date: 2026-06-04
 This note records the package release command path for one package at a time.
 Use package aliases from `eng/packages.json`.
 
+## Package Lookup
+
+List the known aliases and current versions before selecting a package:
+
+```powershell
+./eng/list-package-releases.ps1
+```
+
+Inspect one package when needed:
+
+```powershell
+./eng/list-package-releases.ps1 -Package components-configuration
+```
+
 ## Local Dry Run
 
 Run this first when checking a package locally:

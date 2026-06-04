@@ -36,6 +36,9 @@ only after the dry run passes.
 Added an operator note that documents the local dry-run and guarded tag command
 path for package releases.
 
+Added a read-only package listing helper for checking package aliases, current
+versions, release tags, package ids, and project paths before a release command.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -48,6 +51,9 @@ without a packed readme, or a release missing its changelog heading.
 
 The release helper scripts are also covered directly so automation behavior
 does not drift away from the manifest contract.
+
+Release operators should be able to inspect package aliases and versions without
+opening the manifest and project files by hand.
 
 ## Scope
 
@@ -97,6 +103,10 @@ does not drift away from the manifest contract.
 - Added `memory/124-release-operator-note.md`.
 - Added a release test that keeps the operator note linked from the memory index
   and checks the guarded command examples.
+- Added `eng/list-package-releases.ps1`.
+- Added release script tests for full package listing, single-package filtering,
+  and missing manifest rejection.
+- Added `memory/125-release-package-list-helper.md`.
 
 ## Verification
 
@@ -111,6 +121,7 @@ does not drift away from the manifest contract.
   build outputs.
 - Local release tag helper preparation passed for the configuration package.
 - Operator note guard test passed.
+- Package list helper tests passed.
 - Full solution build passed.
 - Full solution tests passed.
 

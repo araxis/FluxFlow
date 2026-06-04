@@ -153,6 +153,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   guardrails.
 - `124-release-operator-note.md`: local package release dry-run and guarded tag
   command note.
+- `125-release-package-list-helper.md`: read-only package alias and version
+  listing helper.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
