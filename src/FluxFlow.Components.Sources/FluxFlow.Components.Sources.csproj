@@ -1,5 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -7,28 +6,24 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>0.2.0-alpha.1</Version>
+    <Version>1.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable deterministic source components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds host-provided source clocks for deterministic source timing and timestamps.</PackageReleaseNotes>
+    <PackageReleaseNotes>Stable 1.0.0 component package boundary for FluxFlow.Engine 1.0.0 with package-owned contracts, neutral diagnostics, and release readiness documentation.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
-
 </Project>

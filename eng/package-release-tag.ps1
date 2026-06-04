@@ -8,6 +8,8 @@ param(
 
     [string] $PackageSource = "artifacts/packages",
 
+    [string[]] $AdditionalPackageSources = @(),
+
     [string] $Framework = "net8.0",
 
     [string] $TagMessage = "",
@@ -194,6 +196,7 @@ try {
         Package = $Package
         Configuration = $Configuration
         PackageSource = $PackageSource
+        AdditionalPackageSources = $AdditionalPackageSources
         Framework = $Framework
     }
 

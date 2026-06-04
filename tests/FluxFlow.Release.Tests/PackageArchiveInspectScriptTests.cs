@@ -7,8 +7,11 @@ namespace FluxFlow.Release.Tests;
 
 public sealed class PackageArchiveInspectScriptTests
 {
-    private static readonly string PackageMetadataNamespace =
+    private static readonly string CurrentPackageMetadataNamespace =
         "h" + "ttp://schemas.microsoft.com/packaging/2013/05/nuspec.xsd";
+
+    private static readonly string PackToolPackageMetadataNamespace =
+        "h" + "ttp://schemas.microsoft.com/packaging/2012/06/nuspec.xsd";
 
     [Fact]
     public async Task Archive_inspect_script_accepts_expected_archives()
@@ -38,6 +41,40 @@ public sealed class PackageArchiveInspectScriptTests
             result.StandardOutput.ShouldContain($"ARCHIVE_OK={package.PackageId}");
             result.StandardOutput.ShouldContain($"{package.PackageId}.{version}.nupkg");
             result.StandardOutput.ShouldContain($"{package.PackageId}.{version}.snupkg");
+        }
+        finally
+        {
+            if (Directory.Exists(packageSource))
+                Directory.Delete(packageSource, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Archive_inspect_script_accepts_pack_tool_schema()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+        var version = ReadProjectVersion(root, package);
+        var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(packageSource);
+            CreatePackageArchive(packageSource, package.PackageId, version, PackToolPackageMetadataNamespace);
+            CreateSymbolArchive(packageSource, package.PackageId, version, PackToolPackageMetadataNamespace);
+
+            var result = await ReleaseScriptRunner.RunAsync(
+                root,
+                "package-archive-inspect.ps1",
+                "-PackageId",
+                package.PackageId,
+                "-Version",
+                version,
+                "-PackageSource",
+                packageSource);
+
+            result.ExitCode.ShouldBe(0, result.ToString());
+            result.StandardOutput.ShouldContain($"ARCHIVE_OK={package.PackageId}");
         }
         finally
         {
@@ -97,12 +134,19 @@ public sealed class PackageArchiveInspectScriptTests
             .First(value => value.Length > 0);
     }
 
-    private static void CreatePackageArchive(string packageSource, string packageId, string version)
+    private static void CreatePackageArchive(
+        string packageSource,
+        string packageId,
+        string version,
+        string metadataNamespace = "")
     {
         var archivePath = Path.Combine(packageSource, $"{packageId}.{version}.nupkg");
         using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
 
-        AddEntry(archive, $"{packageId}.nuspec", CreatePackageNuspec(packageId, version));
+        AddEntry(archive, $"{packageId}.nuspec", CreatePackageNuspec(
+            packageId,
+            version,
+            ResolveMetadataNamespace(metadataNamespace)));
         AddEntry(archive, "README.md", "# Package");
         AddEntry(archive, $"lib/net8.0/{packageId}.dll", "net8");
         AddEntry(archive, $"lib/net10.0/{packageId}.dll", "net10");
@@ -112,22 +156,26 @@ public sealed class PackageArchiveInspectScriptTests
         string packageSource,
         string packageId,
         string version,
+        string metadataNamespace = "",
         bool includeNet10Symbol = true)
     {
         var archivePath = Path.Combine(packageSource, $"{packageId}.{version}.snupkg");
         using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
 
-        AddEntry(archive, $"{packageId}.nuspec", CreateSymbolNuspec(packageId, version));
+        AddEntry(archive, $"{packageId}.nuspec", CreateSymbolNuspec(
+            packageId,
+            version,
+            ResolveMetadataNamespace(metadataNamespace)));
         AddEntry(archive, $"lib/net8.0/{packageId}.pdb", "net8");
 
         if (includeNet10Symbol)
             AddEntry(archive, $"lib/net10.0/{packageId}.pdb", "net10");
     }
 
-    private static string CreatePackageNuspec(string packageId, string version)
+    private static string CreatePackageNuspec(string packageId, string version, string metadataNamespace)
         => $$"""
            <?xml version="1.0" encoding="utf-8"?>
-           <package xmlns="{{PackageMetadataNamespace}}">
+           <package xmlns="{{metadataNamespace}}">
              <metadata>
                <id>{{packageId}}</id>
                <version>{{version}}</version>
@@ -136,10 +184,10 @@ public sealed class PackageArchiveInspectScriptTests
            </package>
            """;
 
-    private static string CreateSymbolNuspec(string packageId, string version)
+    private static string CreateSymbolNuspec(string packageId, string version, string metadataNamespace)
         => $$"""
            <?xml version="1.0" encoding="utf-8"?>
-           <package xmlns="{{PackageMetadataNamespace}}">
+           <package xmlns="{{metadataNamespace}}">
              <metadata>
                <id>{{packageId}}</id>
                <version>{{version}}</version>
@@ -149,6 +197,11 @@ public sealed class PackageArchiveInspectScriptTests
              </metadata>
            </package>
            """;
+
+    private static string ResolveMetadataNamespace(string metadataNamespace)
+        => string.IsNullOrWhiteSpace(metadataNamespace)
+            ? CurrentPackageMetadataNamespace
+            : metadataNamespace;
 
     private static void AddEntry(ZipArchive archive, string name, string content)
     {

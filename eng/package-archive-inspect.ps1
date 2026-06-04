@@ -15,8 +15,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $semver = "^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$"
-$nuspecNamespace = "h" + "ttp://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"
-
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Assert-Entry {
@@ -75,9 +73,7 @@ function Read-NuspecValue {
         [string] $Name
     )
 
-    $namespaceManager = [System.Xml.XmlNamespaceManager]::new($Nuspec.NameTable)
-    $namespaceManager.AddNamespace("n", $nuspecNamespace)
-    $node = $Nuspec.SelectSingleNode("//n:metadata/n:$Name", $namespaceManager)
+    $node = $Nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='$Name']")
     if ($null -eq $node) {
         return ""
     }
@@ -113,9 +109,7 @@ function Assert-NuspecIdentity {
     }
 
     if ($ExpectSymbolsPackageType) {
-        $namespaceManager = [System.Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-        $namespaceManager.AddNamespace("n", $nuspecNamespace)
-        $node = $nuspec.SelectSingleNode("//n:metadata/n:packageTypes/n:packageType[@name='SymbolsPackage']", $namespaceManager)
+        $node = $nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='packageTypes']/*[local-name()='packageType' and @name='SymbolsPackage']")
         if ($null -eq $node) {
             throw "Archive '$ArchivePath' does not declare SymbolsPackage package type."
         }

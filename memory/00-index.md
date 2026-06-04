@@ -156,6 +156,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `125-release-package-list-helper.md`: read-only package alias and version
   listing helper.
 - `126-release-preflight-helper.md`: read-only release preflight summary helper.
+- `127-component-v1-readiness.md`: component package stable release readiness
+  matrix.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -315,7 +315,16 @@ Date: 2026-05-31
   prints exact dry-run and guarded tag commands with the current version.
 - Extended release preflight to verify the selected package changelog section
   before printing guarded tag commands.
+- Started component package `1.0.0` readiness with a wave-based readiness
+  matrix, package version bumps, and changelog entries for all components.
+- Fixed package archive inspection to accept the schema emitted by the pack
+  tool and extended local feed-style verification to allow an extra dependency
+  source when a local dry run verifies packages with shared dependencies.
+- Completed component package `1.0.0` local gates across all four waves:
+  full Release build, full no-build test suite, release preflight for every
+  component, and package dry runs from the local v1 package source.
 
 ## Remaining
 
-- Continue the broader component maturity backlog.
+- Commit and push the readiness changes, then create stable component release
+  tags in dependency wave order and verify each package after publication.

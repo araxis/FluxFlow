@@ -8,6 +8,8 @@ param(
 
     [string] $PackageSource = "artifacts/packages",
 
+    [string[]] $AdditionalPackageSources = @(),
+
     [string] $Framework = "net8.0",
 
     [switch] $SkipSolutionBuild,
@@ -152,7 +154,22 @@ try {
 
     & $archiveInspectorPath -PackageId $packageId -Version $packageVersion -PackageSource $sourcePath
     & $consumerSmokePath -PackageId $packageId -Version $packageVersion -PackageSource $sourcePath -Framework $Framework
-    & $feedVerifyPath -PackageId $packageId -Version $packageVersion -PackageSource $sourcePath -Framework $Framework -Attempts 1 -DelaySeconds 0
+
+    $feedVerifyArgs = @{
+        PackageId = $packageId
+        Version = $packageVersion
+        PackageSource = $sourcePath
+        Framework = $Framework
+        Attempts = 1
+        DelaySeconds = 0
+    }
+
+    $resolvedAdditionalSources = @($AdditionalPackageSources | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($resolvedAdditionalSources.Count -gt 0) {
+        $feedVerifyArgs.Add("AdditionalPackageSources", $resolvedAdditionalSources)
+    }
+
+    & $feedVerifyPath @feedVerifyArgs
 
     Write-Host "DRY_RUN_OK=$packageId"
 }

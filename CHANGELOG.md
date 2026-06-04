@@ -1,5 +1,217 @@
 # Changelog
 
+## FluxFlow.Components.Resources 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Resources` to `1.0.0`.
+- Freezes neutral resource reference, descriptor, lookup result, and diagnostic
+  contracts for the stable component line.
+
+## FluxFlow.Components.Secrets 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Secrets` to `1.0.0`.
+- Freezes neutral secret reference, descriptor, resolver, redaction, and option
+  resolution contracts for the stable component line.
+
+## FluxFlow.Components.Configuration 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Configuration` to `1.0.0`.
+- Freezes configuration validation report contracts for resource and secret
+  option checks.
+
+## FluxFlow.Components.Designer 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Designer` to `1.0.0`.
+- Freezes neutral component, option, and port metadata contracts for
+  host-generated editors.
+
+## FluxFlow.Components.Expressions 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Expressions` to `1.0.0`.
+- Freezes expression engine registration, context factory, and evaluation
+  contracts for expression-backed components.
+
+## FluxFlow.Components.Serialization 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Serialization` to `1.0.0`.
+- Freezes JSON, text, and base64 parse/format node contracts.
+
+## FluxFlow.Components.Payloads 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Payloads` to `1.0.0`.
+- Freezes payload inspection request, result, preview, and classification
+  contracts.
+
+## FluxFlow.Components.Validation 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Validation` to `1.0.0`.
+- Freezes JSON schema validation options, result, valid, invalid, and error
+  routing contracts.
+
+## FluxFlow.Components.Mapping 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Mapping` to `1.0.0`.
+- Freezes mapping options, typed mapper node registration, result, error, and
+  diagnostic contracts.
+
+## FluxFlow.Components.Control 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Control` to `1.0.0`.
+- Freezes filter and when-node expression options, route outputs, errors, and
+  diagnostics.
+
+## FluxFlow.Components.Assertions 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Assertions` to `1.0.0`.
+- Freezes assertion input, result, passed, failed, error, and diagnostic
+  contracts.
+
+## FluxFlow.Components.Sources 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Sources` to `1.0.0`.
+- Freezes generated and sequence source options, outputs, completion, and clock
+  contracts.
+
+## FluxFlow.Components.Timers 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Timers` to `1.0.0`.
+- Freezes interval, schedule, delay, throttle, and debounce timer node
+  contracts.
+
+## FluxFlow.Components.Routing 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Routing` to `1.0.0`.
+- Freezes switch, correlation, window, join, fork, merge, route envelope, and
+  timestamp contracts.
+
+## FluxFlow.Components.Metrics 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Metrics` to `1.0.0`.
+- Freezes metric sample, aggregate snapshot, grouping, rate, and clock
+  contracts.
+
+## FluxFlow.Components.Observability 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Observability` to `1.0.0`.
+- Freezes logger, metrics, counter, structured entry, and diagnostic contracts.
+
+## FluxFlow.Components.Projections 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Projections` to `1.0.0`.
+- Freezes event filter, event summary, projection snapshot, and rate contracts.
+
+## FluxFlow.Components.Expectations 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Expectations` to `1.0.0`.
+- Freezes event expectation, guard, timeout, result, and diagnostic contracts.
+
+## FluxFlow.Components.Journal 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Journal` to `1.0.0`.
+- Freezes journal record, query, query result, retention, and in-memory store
+  contracts.
+
+## FluxFlow.Components.State 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.State` to `1.0.0`.
+- Freezes reducer input, state result, per-key state, reset, clear, and clock
+  contracts.
+
+## FluxFlow.Components.Sessions 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Sessions` to `1.0.0`.
+- Freezes session recorder, replay, query, metadata, timing, and store
+  abstraction contracts.
+
+## FluxFlow.Components.Storage 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Storage` to `1.0.0`.
+- Freezes logical storage request, record, result, query, matcher, delete, and
+  clock contracts.
+
+## FluxFlow.Components.Storage.FileSystem 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Storage.FileSystem` to `1.0.0`.
+- Freezes the file-backed storage adapter options, query, retention, and
+  timestamp behavior.
+
+## FluxFlow.Components.Storage.SqlFile 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Storage.SqlFile` to `1.0.0`.
+- Freezes the SQL-file storage adapter options, query, retention, and timestamp
+  behavior.
+
+## FluxFlow.Components.FileSystem 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.FileSystem` to `1.0.0`.
+- Freezes file write, read, watch, directory enumerate, path policy, and clock
+  contracts.
+
+## FluxFlow.Components.Http 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Http` to `1.0.0`.
+- Freezes request, response, error, sender abstraction, timeout, and clock
+  contracts.
+
+## FluxFlow.Components.Mqtt 1.0.0
+
+Stable component package boundary.
+
+- Promotes `FluxFlow.Components.Mqtt` to `1.0.0`.
+- Freezes publish, subscribe, message, result, adapter factory, reconnect hint,
+  health event, and clock contracts.
+
 ## FluxFlow.Components.Configuration 0.1.0-alpha.1
 
 Configuration validation report package.
