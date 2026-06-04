@@ -19,6 +19,12 @@ Inspect one package when needed:
 ./eng/list-package-releases.ps1 -Package components-configuration
 ```
 
+Resolve the selected package and print the exact next commands:
+
+```powershell
+./eng/package-release-preflight.ps1 -Package components-configuration
+```
+
 ## Local Dry Run
 
 Run this first when checking a package locally:

@@ -311,6 +311,8 @@ Date: 2026-05-31
   commands.
 - Added a read-only package listing helper that prints package aliases, current
   versions, release tags, package ids, and project paths.
+- Added a read-only release preflight helper that resolves one package and
+  prints exact dry-run and guarded tag commands with the current version.
 
 ## Remaining
 

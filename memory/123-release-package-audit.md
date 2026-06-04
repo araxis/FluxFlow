@@ -39,6 +39,9 @@ path for package releases.
 Added a read-only package listing helper for checking package aliases, current
 versions, release tags, package ids, and project paths before a release command.
 
+Added a read-only release preflight helper that resolves one package and prints
+the exact dry-run and guarded tag commands with the current version filled in.
+
 ## Decision
 
 Stabilization work should include guardrails around release metadata, not only
@@ -54,6 +57,9 @@ does not drift away from the manifest contract.
 
 Release operators should be able to inspect package aliases and versions without
 opening the manifest and project files by hand.
+
+Release operators should also be able to resolve one package and copy the next
+commands without manually composing versioned command lines.
 
 ## Scope
 
@@ -107,6 +113,10 @@ opening the manifest and project files by hand.
 - Added release script tests for full package listing, single-package filtering,
   and missing manifest rejection.
 - Added `memory/125-release-package-list-helper.md`.
+- Added `eng/package-release-preflight.ps1`.
+- Added release script tests for preflight command output and version mismatch
+  handling.
+- Added `memory/126-release-preflight-helper.md`.
 
 ## Verification
 
@@ -122,6 +132,7 @@ opening the manifest and project files by hand.
 - Local release tag helper preparation passed for the configuration package.
 - Operator note guard test passed.
 - Package list helper tests passed.
+- Package release preflight helper tests passed.
 - Full solution build passed.
 - Full solution tests passed.
 

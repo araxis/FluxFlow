@@ -16,6 +16,7 @@ public sealed class ReleaseOperatorNoteTests
 
         var note = File.ReadAllText(notePath);
         note.ShouldContain("./eng/list-package-releases.ps1");
+        note.ShouldContain("./eng/package-release-preflight.ps1 -Package components-configuration");
         note.ShouldContain("./eng/package-release-dry-run.ps1 -Package components-configuration");
         note.ShouldContain("./eng/package-release-tag.ps1 -Package components-configuration");
         note.ShouldContain("./eng/package-release-tag.ps1 -Package components-configuration -Push");
