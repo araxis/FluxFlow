@@ -201,6 +201,13 @@ received timestamp, and original value. The node completes only after every
 configured input completes. Input names must be valid engine port names and
 cannot collide with built-in merge ports.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

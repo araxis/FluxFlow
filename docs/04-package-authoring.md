@@ -62,6 +62,8 @@ Each component package should own:
 - package-specific validation
 - diagnostics and event names
 - registration module
+- package-owned design metadata provider when designer-friendly host
+  composition is useful
 - tests
 - a small runnable sample when useful
 
@@ -72,10 +74,22 @@ Avoid:
 - global mutable state
 - hidden dependency lookups
 - app workspace schemas
-- UI metadata
+- renderer-specific UI metadata
 
 Dependencies should be passed through constructors, delegates, or package-owned
 options.
+
+## Design Metadata
+
+Reusable packages can expose an `IComponentDesignMetadataProvider` from
+`FluxFlow.Components.Designer` when hosts need package-owned palette entries,
+option editor hints, port labels, validation-facing option shape, or generated
+documentation.
+
+Keep this metadata neutral and tied to the package's public node type constants.
+Hosts compose package providers into a `ComponentDesignMetadataCatalog`, then add
+app-specific rendering, localization, resource pickers, and behavior overrides
+outside the package descriptor.
 
 ## Copyable Template
 
@@ -89,6 +103,7 @@ the expected package pieces:
 - node type and port constants
 - node implementation
 - module and registry extension
+- design metadata provider when useful
 - focused tests
 
 Use it as the starting shape for new component families, then replace the

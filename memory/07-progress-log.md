@@ -2,6 +2,22 @@
 
 Date: 2026-05-31
 
+## 2026-06-05 - Component design metadata providers
+
+- Added package-owned `IComponentDesignMetadataProvider` implementations for
+  reusable component packages.
+- Added `FluxFlow.Components.Designer` project references to the packages that
+  expose provider metadata.
+- Added coverage tests in `FluxFlow.Components.Designer.Tests` to compose all
+  package providers and verify public component type constants have metadata.
+- Documented the reusable host-facing model: packages own palette, editor,
+  option, port, validation, and documentation metadata; hosts compose providers
+  into catalogs and layer host-specific behavior separately.
+- Prepared package release metadata for Designer `1.0.1` and affected runtime
+  component packages `1.1.0`, keeping the engine at `1.0.1`.
+- Verified focused designer metadata tests, release guard tests, full Release
+  build, and full Release no-build solution tests.
+
 ## Completed
 
 - Inspected `D:\Projects\FluxFlow` and `D:\Projects\FluxMq`.
@@ -333,6 +349,9 @@ Date: 2026-05-31
 - Re-ran the full Release build successfully with no warnings or errors.
 - Re-ran the full Release no-build test suite successfully across 30 test
   assemblies and 595 tests.
+- Added package-owned design metadata providers for reusable component
+  packages so host catalog adapters can compose package descriptors directly
+  while keeping host-only overrides outside reusable package metadata.
 
 ## Remaining
 

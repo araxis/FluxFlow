@@ -66,6 +66,13 @@ Generic replay is intentionally left out of this package for now. Use the
 sessions package for stored session replay, and add a dedicated replay source
 only when a second neutral replay shape is proven.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

@@ -1,5 +1,200 @@
 # Changelog
 
+## FluxFlow.Components.Designer 1.0.1
+
+Documentation maintenance release.
+
+- Updates the packaged README guidance for package-owned design metadata
+  providers and host catalog composition.
+- Keeps Designer public contracts unchanged.
+
+## FluxFlow.Components.Mqtt 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Mapping 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Control 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Assertions 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Sources 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Routing 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Validation 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.FileSystem 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Observability 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Timers 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Payloads 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Http 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Serialization 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Metrics 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Sessions 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.State 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
+## FluxFlow.Components.Storage 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` for public component
+  type constants.
+- Adds a dependency on `FluxFlow.Components.Designer` for neutral palette,
+  editor, validation, and documentation metadata.
+- Keeps runtime behavior, node contracts, definitions, JSON shape, and
+  registration APIs unchanged.
+
 ## FluxFlow.Engine 1.0.1
 
 Documentation maintenance release.

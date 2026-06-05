@@ -56,6 +56,10 @@ a host-owned store adapter.
 Add `FluxFlow.Components.Storage.FileSystem` when a workflow needs a simple
 file-backed file-system store for the storage package.
 
+Add `FluxFlow.Components.Designer` when a host needs reusable component design
+metadata contracts, catalogs, and provider composition for palettes, editors,
+validation views, or generated documentation.
+
 Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
 for a new component package.
 
@@ -91,14 +95,11 @@ for a new component package.
 - structured validation and build errors
 - node and package authoring helpers
 
-Applications and component packages own:
+Applications and component packages own the pieces outside the engine boundary:
 
-- external protocols and clients
-- storage
-- UI metadata
-- dashboards and designers
-- test scenarios
-- app-specific validation
-- app-specific workspace files
+- component packages own external protocols, clients, storage adapters, and
+  reusable component design metadata
+- applications own renderer-specific UI state, dashboards, designers, test
+  scenarios, app-specific validation, and app-specific workspace files
 
 Historical extraction notes live under `memory`.
