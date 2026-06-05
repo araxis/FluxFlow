@@ -50,12 +50,17 @@ Each package provider implements `IComponentDesignMetadataProvider` and returns
 `ComponentDesignMetadata` for the public component type constants in that
 package.
 
-## Release Follow-up
+## Release Plan
 
-The provider classes are package public surface area. Before publishing any
-affected component package with this capability, choose package-local release
-versions and add matching `CHANGELOG.md` sections and package release notes.
-Do not republish the existing stable `1.0.0` package versions for this work.
+The provider classes are package public surface area.
+
+- Publish `FluxFlow.Components.Designer` `1.0.1` as a README/docs maintenance
+  patch for provider composition guidance.
+- Publish affected runtime component packages as `1.1.0` because they add
+  package-owned provider classes and a Designer dependency.
+- Keep `FluxFlow.Engine` at `1.0.1`; this work does not change engine public
+  APIs, runtime behavior, definitions, or JSON shape.
+- Do not republish the existing stable `1.0.0` package versions for this work.
 
 ## Verification
 

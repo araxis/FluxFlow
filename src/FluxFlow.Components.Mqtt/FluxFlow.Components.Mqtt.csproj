@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Stable 1.0.0 component package boundary for FluxFlow.Engine 1.0.0 with package-owned contracts, neutral diagnostics, and release readiness documentation.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

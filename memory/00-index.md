@@ -162,6 +162,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   completion record.
 - `129-component-design-metadata-providers.md`: package-owned component design
   metadata providers for host composition.
+- `130-component-design-metadata-provider-release.md`: component design metadata
+  provider release plan and metadata.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

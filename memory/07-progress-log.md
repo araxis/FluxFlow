@@ -13,6 +13,8 @@ Date: 2026-05-31
 - Documented the reusable host-facing model: packages own palette, editor,
   option, port, validation, and documentation metadata; hosts compose providers
   into catalogs and layer host-specific behavior separately.
+- Prepared package release metadata for Designer `1.0.1` and affected runtime
+  component packages `1.1.0`, keeping the engine at `1.0.1`.
 - Verified focused designer metadata tests, release guard tests, full Release
   build, and full Release no-build solution tests.
 
