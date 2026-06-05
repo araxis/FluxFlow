@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Engine 1.0.1
+
+Documentation maintenance release.
+
+- Updates the packaged README and public docs to reflect the stable component
+  package `1.0.0` line.
+- Records the completed component package stable release track in repository
+  memory notes.
+- Keeps engine public APIs, definitions, JSON shape, runtime behavior, and
+  component contracts unchanged.
+
 ## FluxFlow.Components.Resources 1.0.0
 
 Stable component package boundary.
