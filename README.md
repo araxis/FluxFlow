@@ -198,6 +198,7 @@ module registration, and tests.
 ## Component Packages
 
 Reusable components live outside `FluxFlow.Engine` and are released separately.
+All listed packages have a stable `1.0.0` line.
 
 | Package | Nodes | Purpose |
 |---------|-------|---------|

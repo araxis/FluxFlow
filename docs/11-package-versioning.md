@@ -2,10 +2,11 @@
 
 Use semantic versions for published packages.
 
-Current stable engine release:
+Current stable engine and component release line:
 
 ```text
-1.0.0
+FluxFlow.Engine              1.0.0
+FluxFlow.Components.*        1.0.0
 ```
 
 Prereleases use this shape:
@@ -18,7 +19,7 @@ Release tags use the package tag prefix, `-v`, and the package version:
 
 ```text
 engine-v1.0.0
-components-mqtt-v0.1.0-alpha.1
+components-mqtt-v1.0.0
 ```
 
 ## Source Of Truth
@@ -84,18 +85,18 @@ published component package that references the engine, even if the component
 behavior did not change. Use a patch prerelease bump and describe it as an
 engine compatibility rebuild.
 
-Recommended early pattern:
+Current stable pattern:
 
 ```text
 FluxFlow.Engine              1.0.0
-FluxFlow.Components.Example  0.1.0-alpha.1
+FluxFlow.Components.Example  1.0.0
 ```
 
 Do not bump the engine version when only a component package changes.
 
 ## Keep Releases Small
 
-Prefer small prereleases that prove one public change at a time:
+Prefer small releases that prove one public change at a time:
 
 - one engine feature
 - one component package template

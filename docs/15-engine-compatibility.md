@@ -105,9 +105,9 @@ item as `input` and `value` when `ExpressionFlowPredicate<TInput>` is used.
 
 ## Component Package Compatibility
 
-Component packages can stay prerelease while the engine is stable. A component
-package update does not require an engine update unless the component truly
-needs a new engine contract.
+Component packages release independently from the engine and now have their own
+stable `1.0.0` line. A component package update does not require an engine
+update unless the component truly needs a new engine contract.
 
 Recommended host rule:
 

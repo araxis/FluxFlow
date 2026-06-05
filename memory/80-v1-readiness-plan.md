@@ -21,6 +21,7 @@ documented, and stable.
   boundary.
 - A fresh public-feed restore/build smoke passed for `FluxFlow.Engine` `1.0.0`
   plus all rebuilt component packages.
+- All component packages have now completed their own `1.0.0` release track.
 - Independent package releases are working.
 - Public docs exist for getting started, definitions, node authoring, package
   authoring, hosting, validation, runtime states, JSON conversion, expression
@@ -43,8 +44,8 @@ component line:
 - Existing component packages may receive narrow patches when they unblock the
   first consumer or expose a v1 engine issue.
 
-This freeze is about focus, not abandonment. Component packages can remain
-prerelease while the engine is stable.
+This freeze is about focus, not abandonment. Component packages now have their
+own stable `1.0.0` line and continue to release independently from the engine.
 
 ## Version 1 Scope
 
@@ -61,8 +62,8 @@ Engine v1 should guarantee:
 - stable host lifecycle wrapper
 - stable package versioning and compatibility guidance
 
-Component packages do not all need v1 at the same time. Packages with younger
-APIs can stay on `0.x` until they have enough consumer use.
+Component packages reached `1.0.0` after their own wave-based readiness gates.
+Future component package changes follow package-local compatibility rules.
 
 ## Readiness Tracks
 
@@ -140,8 +141,9 @@ For each package:
 - verify bounded capacity and completion behavior.
 - verify diagnostics are useful but not app-specific.
 
-Packages can remain prerelease after engine v1 if their contracts still need
-more consumer time.
+The component package `1.0.0` line has now passed its release gates. Future
+component audits should focus on compatibility, consumer feedback, and targeted
+maintenance.
 
 ### 5. Release Path
 
@@ -156,21 +158,27 @@ Completed sequence:
 6. Release `FluxFlow.Engine 1.0.0`.
 7. Publish rebuilt component packages.
 8. Verify public restore/build from a clean package cache.
+9. Complete component package `1.0.0` readiness and release all component
+   packages.
+10. Verify stable component package tags, release records, public feed
+   visibility, release preflight, full Release build, and full Release tests.
 
 ## Current Risk Assessment
 
 Engine v1 is complete.
 
+Component package v1 is complete.
+
 Main risks:
 
-- component package maturity should not be confused with engine stability
-- component package pace has been faster than consumer soak time
+- consumer feedback may still expose targeted package fixes
 - future stable component lines still need their own compatibility gates
+- new component families should not disturb the stable engine boundary
 
 ## Immediate Next Work
 
-1. Let the first consumer run against `FluxFlow.Engine` `1.0.0` and the rebuilt
-   component packages.
-2. Keep component packages prerelease until their own consumer feedback settles.
+1. Let consumers run against `FluxFlow.Engine` `1.0.0` and the stable component
+   packages.
+2. Handle post-1.0 feedback as targeted package fixes or additive minors.
 3. Resume the backlog from the next component package or hardening item, without
    changing the stable engine boundary casually.

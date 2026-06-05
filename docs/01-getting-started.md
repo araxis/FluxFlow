@@ -9,7 +9,8 @@ sample, then build a graph from an application definition.
 dotnet add package FluxFlow.Engine
 ```
 
-Component packages can still be prerelease while the engine package is stable.
+Reusable component packages are released separately and now also have a stable
+`1.0.0` line. Add only the component packages your host needs.
 
 ## Run The Sample
 
