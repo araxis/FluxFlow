@@ -59,6 +59,13 @@ registry.RegisterHttpComponents(options => options
 The sender factory receives the resolved node options and configured clock. The
 package disposes senders it creates through the configured factory.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

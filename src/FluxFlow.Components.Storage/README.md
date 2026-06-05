@@ -146,6 +146,13 @@ components before storage.
 Per-message store failures emit `FlowError` and later messages continue.
 Startup fails clearly when the store cannot be opened.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

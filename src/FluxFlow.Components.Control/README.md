@@ -41,6 +41,13 @@ Expression evaluation failures emit `FlowError` and the node continues
 processing later messages. Nodes emit diagnostics with input type, engine,
 expression id, expression name, and route metadata where available.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

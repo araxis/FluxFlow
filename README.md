@@ -223,6 +223,12 @@ All listed packages have a stable `1.0.0` line.
 | `FluxFlow.Components.Storage.FileSystem` | adapter only | File-system-backed adapter for storage nodes. |
 | `FluxFlow.Components.Storage.SqlFile` | adapter only | Single-file SQL adapter for storage nodes. |
 
+Reusable runtime component packages can also expose package-owned
+`IComponentDesignMetadataProvider` implementations. Hosts compose those
+providers with `ComponentDesignMetadataCatalog` to populate palettes, editors,
+validation views, and generated documentation while keeping renderer-specific UI
+state in the application.
+
 ---
 
 ## Building
@@ -251,7 +257,8 @@ Applications add those behaviors by:
 
 Component packages should own their own options, validation, event names, tests,
 and documentation. They can expose an `IFlowNodeModule` or a registry extension
-that registers one module.
+that registers one module, plus a package-owned design metadata provider when a
+host should present the package's nodes.
 
 Applications are free to keep richer workspace files with dashboards, tests,
 connections, or UI state. Project only the executable resources and workflows

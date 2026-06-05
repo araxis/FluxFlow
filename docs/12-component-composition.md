@@ -45,6 +45,7 @@ The host should own:
 - app-specific input/output models
 - workspace projection into `ApplicationDefinition`
 - dashboard, designer, and activity projection
+- renderer-specific palette layout, localization, and design-system behavior
 - source and sink nodes that are still product-specific
 
 The host should avoid putting reusable processing logic inside adapters. If an
@@ -61,6 +62,8 @@ A component package should own:
 - per-message failures as `FlowError` where continuation is expected
 - startup failures when the node cannot begin safely
 - diagnostics and optional workflow events
+- package-owned design metadata for palettes, editors, validation, docs, and
+  host composition
 - lifecycle, completion, cancellation, and disposal behavior
 - tests that do not require a product host
 
@@ -71,6 +74,20 @@ Packages should not own:
 - product-specific names, scenarios, or storage paths
 - concrete external clients when a host adapter is reasonable
 - assumptions about how another app names sections or resources
+
+## Design Metadata Composition
+
+Reusable runtime packages can expose package-owned
+`IComponentDesignMetadataProvider` implementations for their public node type
+constants. Hosts compose those providers into a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, and generated documentation without copying package descriptors into the
+application.
+
+Package metadata should stay neutral: display names, categories, option editor
+hints, port labels, defaults, and documentation hints that travel with the
+package. Hosts can layer app-specific behavior, localization, resource pickers,
+or visual styling after catalog composition.
 
 ## Common Shapes
 
@@ -209,4 +226,5 @@ Keep the behavior in the host when:
 
 Adding a component package should not require an engine release unless the
 engine contract itself changes. A package can move independently when it only
-adds nodes, contracts, options, tests, and docs under its own project.
+adds nodes, contracts, options, design metadata providers, tests, and docs under
+its own project.

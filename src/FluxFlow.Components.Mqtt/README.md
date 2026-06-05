@@ -101,6 +101,13 @@ Publish topics must be present and cannot contain MQTT wildcards. Subscription
 filters may use `+` as a complete level and `#` only as the final complete
 level. Both helpers also reject null characters and oversized encoded topics.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

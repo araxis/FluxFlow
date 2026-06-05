@@ -55,6 +55,13 @@ registry.RegisterStateComponents(options =>
 system clock. Supplying a clock lets hosts and tests make `StateReducerResult`
 timestamps deterministic.
 
+## Design Metadata
+
+This package exposes a package-owned `IComponentDesignMetadataProvider` for its
+node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+populate palettes, editors, validation views, and documentation without
+duplicating package descriptors.
+
 ## Composition Guidance
 
 Use this package as one part of a host-composed graph. See

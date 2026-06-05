@@ -15,6 +15,8 @@ component without depending on a specific rendering framework.
   text, min/max values, choices, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
+- `IComponentDesignMetadataProvider`: package-owned metadata provider contract
+  for reusable component packages.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
 
@@ -79,6 +81,17 @@ var metadata = new ComponentDesignMetadata
 
 var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 ```
+
+## Package Providers
+
+Runtime component packages can ship an `IComponentDesignMetadataProvider` that
+returns metadata for their public node type constants. Hosts compose those
+providers into a `ComponentDesignMetadataCatalog` to build palettes, editors,
+validation views, and generated documentation without duplicating package
+descriptors.
+
+Hosts can layer app-specific behavior, localization, resource pickers, and
+rendering hints separately from package-owned metadata.
 
 ## Boundaries
 
