@@ -84,11 +84,27 @@ Highlights per area (full details in CHANGELOG.md):
   assemblies, 684 tests, 0 failures (was 595 tests; 89 added/extended).
 - Release guard tests pass with the new versions and changelog sections.
 
-## Release Plan
+## Release Result
 
-1. Merge `work/full-review-fixes` to `main` via PR after CI.
-2. Tag and publish in dependency-wave order: engine `1.1.0` first; then
-   engine-only dependents; then Expressions dependents (Mapping, Control,
-   Assertions, State, Observability, Routing) and Expectations (after
-   Projections). Local dry runs share `artifacts/packages` so freshly packed
-   dependencies resolve before they reach the public feed.
+The release is complete. All 25 packages (engine `1.1.0` + 24 component
+minors) were tagged via the guarded tag helper in dependency-wave order
+(engine -> engine-only dependents -> Expressions/Projections dependents),
+published by CI, and verified on the public feed:
+
+- PR #2 merged the remediation work; PR #3 fixed a release-tooling gap found
+  during the engine dry run (the guarded tag script's empty
+  `AdditionalPackageSources` default overrode the dry run's nuget.org
+  default, so local feed-style verification could not restore external
+  transitive dependencies).
+- All 25 publish workflow runs concluded successfully. Two runs needed a
+  rerun for transient causes, with no bad artifacts published: the Metrics
+  run hit the flaky `Expect_TimesOutWhenMatchIsNotObserved` Expectations
+  timing test at the Test step (before any push), and the Expressions and
+  State runs pushed successfully but exceeded the 20-attempt post-publish
+  feed verification window because of nuget.org indexing lag.
+- Public feed lookup confirmed all 25 new versions visible; the package list
+  helper reports all 28 aliases consistent with tags and project versions.
+
+Follow-up candidate for the next maintenance pass: stabilize the flaky
+Expectations timeout test and consider a longer post-publish verification
+window for nuget.org indexing lag.

@@ -363,6 +363,9 @@ Date: 2026-05-31
   Engine moved to 1.1.0 and 24 component packages to new minors with
   changelog sections; full Release suite green at 684 tests across 30
   assemblies (`132-review-remediation-release.md`).
+- Released the remediation wave: 25 guarded tags pushed in dependency-wave
+  order, all 25 publish workflow runs succeeded, and all new versions are
+  visible on the public package feed.
 
 ## Remaining
 
