@@ -177,5 +177,7 @@ jobs:
             -PackageId "$env:PACKAGE_ID" `
             -Version "$env:PACKAGE_VERSION" `
             -PackageSource "https://api.nuget.org/v3/index.json" `
+            -IndexAttempts 60 `
+            -IndexDelaySeconds 15 `
             -Attempts 20 `
             -DelaySeconds 15
