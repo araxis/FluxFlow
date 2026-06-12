@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Expectations 1.2.0
+
+Additive observability release.
+
+- Adds an `ObservedEventCount` property on the event expectation node so
+  hosts and tests can read the number of recorded events deterministically.
+- Makes the expectation timeout test deterministic by waiting for event
+  observation before completing the timeout delay; runtime behavior is
+  unchanged.
+
 ## FluxFlow.Engine 1.1.0
 
 Error-channel and fault-propagation hardening release.

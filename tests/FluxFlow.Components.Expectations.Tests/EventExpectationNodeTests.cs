@@ -88,6 +88,11 @@ public sealed class EventExpectationNodeTests
         clock.NextDelay.ShouldBe(TimeSpan.FromMilliseconds(500));
         await input.Target.SendAsync(CreateEvent(clock.UtcNow, "job.started"));
 
+        // The send only queues the event; wait until the node has recorded it
+        // so the timeout cannot resolve against an empty observation list.
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.EventExpectationNode>();
+        await WaitUntilAsync(() => node.ObservedEventCount == 1);
+
         clock.UtcNow = clock.UtcNow.AddMilliseconds(500);
         clock.CompleteNextDelay();
 
