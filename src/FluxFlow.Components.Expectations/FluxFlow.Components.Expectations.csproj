@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Expectations</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event expectation components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds a package-owned IComponentDesignMetadataProvider with a new dependency on FluxFlow.Components.Designer.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds an ObservedEventCount property on the event expectation node so hosts and tests can observe recorded event counts deterministically.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

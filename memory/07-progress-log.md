@@ -366,6 +366,10 @@ Date: 2026-05-31
 - Released the remediation wave: 25 guarded tags pushed in dependency-wave
   order, all 25 publish workflow runs succeeded, and all new versions are
   visible on the public package feed.
+- Made the expectation timeout test deterministic with an additive
+  `ObservedEventCount` node property and released
+  `FluxFlow.Components.Expectations` `1.2.0`
+  (`133-expectations-deterministic-timeout-test.md`).
 
 ## Remaining
 

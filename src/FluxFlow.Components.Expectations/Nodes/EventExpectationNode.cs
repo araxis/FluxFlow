@@ -56,6 +56,17 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
 
     public ISourceBlock<EventExpectationResult> Result => _result;
 
+    public int ObservedEventCount
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _observedEvents.Count;
+            }
+        }
+    }
+
     public static RuntimeNode Create(
         RuntimeNodeFactoryContext context,
         ExpectationsComponentOptions componentOptions,
