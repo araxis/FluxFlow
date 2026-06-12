@@ -11,6 +11,8 @@ namespace FluxFlow.Components.State.Nodes;
 
 public sealed class StateReducerNode : FlowNodeBase
 {
+    private const int MaxTrackedRejectedKeys = 1024;
+
     private readonly StateReducerOptions _options;
     private readonly IFlowExpressionEngine _expressionEngine;
     private readonly IStateClock _clock;
@@ -18,7 +20,7 @@ public sealed class StateReducerNode : FlowNodeBase
     private readonly BufferBlock<StateReducerResult> _output;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedKeys = new(StringComparer.Ordinal);
-    private readonly CancellationToken _processingCancellationToken;
+    private bool _rejectedKeyTrackingCapReached;
 
     private StateReducerNode(
         StateReducerOptions options,
@@ -41,7 +43,6 @@ public sealed class StateReducerNode : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<StateReducerInput>(ReduceAsync, inputOptions);
         _output = new BufferBlock<StateReducerResult>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -105,7 +106,6 @@ public sealed class StateReducerNode : FlowNodeBase
 
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             var key = ResolveKey(input);
             var result = input.Operation switch
             {
@@ -116,15 +116,11 @@ public sealed class StateReducerNode : FlowNodeBase
                     $"state.reducer operation '{input.Operation}' is not supported.")
             };
 
-            await _output.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+            await _output.SendAsync(result).ConfigureAwait(false);
             TryEmitDiagnostic(
                 ResolveDiagnosticName(input.Operation),
                 message: ResolveDiagnosticMessage(input.Operation),
                 attributes: CreateResultAttributes(result, input.Operation));
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (StateReducerException exception)
         {
@@ -264,6 +260,25 @@ public sealed class StateReducerNode : FlowNodeBase
         if (_states.Count < _options.MaxKeys)
         {
             return true;
+        }
+
+        if (_rejectedKeys.Count >= MaxTrackedRejectedKeys)
+        {
+            if (!_rejectedKeyTrackingCapReached)
+            {
+                _rejectedKeyTrackingCapReached = true;
+                TryEmitDiagnostic(
+                    StateDiagnosticNames.KeyLimitReached,
+                    FlowDiagnosticLevel.Warning,
+                    "state.reducer key limit reached; further rejections will not be itemized.",
+                    attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["maxKeys"] = _options.MaxKeys,
+                        ["maxTrackedRejectedKeys"] = MaxTrackedRejectedKeys
+                    });
+            }
+
+            return false;
         }
 
         if (_rejectedKeys.Add(key))

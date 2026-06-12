@@ -12,6 +12,8 @@ public sealed class FileSystemStorageStore : IStorageStore
         WriteIndented = true
     };
 
+    private static readonly JsonSerializerOptions CompactSerializerOptions = new(JsonSerializerDefaults.Web);
+
     private readonly object _gate = new();
     private readonly FileSystemStorageStoreSettings _settings;
 
@@ -28,6 +30,11 @@ public sealed class FileSystemStorageStore : IStorageStore
         _settings = options.Resolve(context);
     }
 
+    internal FileSystemStorageStore(FileSystemStorageStoreSettings settings)
+    {
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    }
+
     public Task<StorageRecord> PutAsync(
         StoragePutRequest request,
         CancellationToken cancellationToken = default)
@@ -42,6 +49,11 @@ public sealed class FileSystemStorageStore : IStorageStore
         {
             cancellationToken.ThrowIfCancellationRequested();
             var existing = ReadRecord(path, collection, key);
+            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.UtcNow)
+            {
+                existing = null;
+            }
+
             var mode = request.Mode ?? StorageWriteMode.Upsert;
             if (mode == StorageWriteMode.Create && existing is not null)
             {
@@ -130,17 +142,31 @@ public sealed class FileSystemStorageStore : IStorageStore
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var root = GetStorePath();
-            if (!Directory.Exists(root))
+            var directory = GetCollectionPath(collection);
+            if (!Directory.Exists(directory))
             {
                 return Task.FromResult<IReadOnlyList<StorageRecord>>([]);
             }
 
+            CleanupTempFiles(directory);
             var records = new List<StorageRecord>();
-            foreach (var path in Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories))
+            foreach (var path in Directory.EnumerateFiles(directory, "*.json", SearchOption.TopDirectoryOnly))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var record = ReadRecord(path);
+                StorageRecord? record;
+                try
+                {
+                    record = ReadRecord(path);
+                }
+                catch (JsonException)
+                {
+                    continue;
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+
                 if (record is null ||
                     !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
                 {
@@ -227,7 +253,7 @@ public sealed class FileSystemStorageStore : IStorageStore
             return null;
         }
 
-        var element = JsonSerializer.SerializeToElement(value, SerializerOptions);
+        var element = JsonSerializer.SerializeToElement(value, CompactSerializerOptions);
         var valueBytes = Encoding.UTF8.GetByteCount(element.GetRawText());
         if (valueBytes > _settings.MaxValueBytes)
         {
@@ -317,15 +343,36 @@ public sealed class FileSystemStorageStore : IStorageStore
 
     private string GetRecordPath(string collection, string key)
         => Path.Combine(
-            GetStorePath(),
-            Hash(collection),
+            GetCollectionPath(collection),
             $"{Hash(key)}.json");
+
+    private string GetCollectionPath(string collection)
+        => Path.Combine(
+            GetStorePath(),
+            Hash(collection));
 
     private string GetStorePath()
         => Path.Combine(
             _settings.RootDirectory,
             "stores",
             Hash(_settings.StoreName));
+
+    private static void CleanupTempFiles(string directory)
+    {
+        try
+        {
+            foreach (var path in Directory.EnumerateFiles(directory, "*.tmp", SearchOption.TopDirectoryOnly))
+            {
+                TryDelete(path);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 
     private static string Hash(string value)
     {

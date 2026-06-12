@@ -128,6 +128,21 @@ public sealed class PayloadInspectNode : FlowNodeBase
 
     private PayloadInspectionResult Inspect(PayloadInspectionRequest request)
     {
+        var inputByteCount = request.Bytes?.Length
+            ?? (request.Text is null ? 0 : Encoding.UTF8.GetByteCount(request.Text));
+        if (inputByteCount > _options.MaxInputBytes)
+        {
+            return new PayloadInspectionResult
+            {
+                Kind = request.Text is null ? PayloadKind.Binary : PayloadKind.Text,
+                ContentType = NormalizeContentType(request.ContentType),
+                ByteCount = inputByteCount,
+                FormattedPreview =
+                    $"payload too large: {inputByteCount} bytes exceeds maxInputBytes {_options.MaxInputBytes}.",
+                FormattedPreviewTruncated = true
+            };
+        }
+
         var payload = ResolvePayload(request);
         if (payload.ByteCount == 0 && string.IsNullOrEmpty(payload.Text))
         {

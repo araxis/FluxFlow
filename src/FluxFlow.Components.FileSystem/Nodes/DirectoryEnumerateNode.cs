@@ -86,7 +86,9 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
                     FileSystemDiagnosticNames.DirectoryEnumerateStarted,
                     message: $"Started directory enumeration '{resolvedDirectory}'.",
                     attributes: CreateAttributes(resolvedDirectory));
-                _enumerationTask = RunEnumerationAsync(resolvedDirectory, enumerationCancellation.Token);
+                _enumerationTask = Task.Run(
+                    () => RunEnumerationAsync(resolvedDirectory, enumerationCancellation.Token),
+                    CancellationToken.None);
             }
 
             return Task.CompletedTask;
@@ -192,7 +194,11 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
                     break;
                 }
 
-                await SendOutputAsync(entry, cancellationToken).ConfigureAwait(false);
+                if (!await SendOutputAsync(entry, cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
                 emitted++;
 
                 TryEmitDiagnostic(
@@ -246,16 +252,22 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 
     private IEnumerable<DirectoryEnumerateEntry> Enumerate(string resolvedDirectory)
     {
-        var searchOption = _options.IncludeSubdirectories
-            ? SearchOption.AllDirectories
-            : SearchOption.TopDirectoryOnly;
+        var enumerationOptions = new EnumerationOptions
+        {
+            RecurseSubdirectories = _options.IncludeSubdirectories,
+            IgnoreInaccessible = false,
+            MatchType = MatchType.Win32,
+            AttributesToSkip = _options.IncludeSubdirectories
+                ? FileAttributes.ReparsePoint
+                : FileAttributes.None
+        };
 
         if (_options.IncludeDirectories)
         {
             foreach (var directory in System.IO.Directory.EnumerateDirectories(
                          resolvedDirectory,
                          _options.Filter,
-                         searchOption))
+                         enumerationOptions))
             {
                 yield return CreateDirectoryEntry(new DirectoryInfo(directory), resolvedDirectory);
             }
@@ -266,7 +278,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
             foreach (var file in System.IO.Directory.EnumerateFiles(
                          resolvedDirectory,
                          _options.Filter,
-                         searchOption))
+                         enumerationOptions))
             {
                 yield return CreateFileEntry(new FileInfo(file), resolvedDirectory);
             }

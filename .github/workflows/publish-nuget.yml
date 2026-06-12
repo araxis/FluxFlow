@@ -37,11 +37,15 @@ jobs:
 
       - name: Resolve release package
         shell: pwsh
+        env:
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           ./eng/resolve-package-release.ps1 `
-            -Package "${{ inputs.package }}" `
-            -Version "${{ inputs.version }}" `
-            -RefName "${{ github.ref_name }}" `
+            -Package "$env:INPUT_PACKAGE" `
+            -Version "$env:INPUT_VERSION" `
+            -RefName "$env:REF_NAME" `
             -EnvironmentPath $env:GITHUB_ENV
 
       - name: Restore
@@ -55,19 +59,19 @@ jobs:
 
       - name: Pack
         shell: pwsh
-        run: dotnet pack "${{ env.PACKAGE_PROJECT }}" --configuration Release --no-build --output artifacts/packages
+        run: dotnet pack "$env:PACKAGE_PROJECT" --configuration Release --no-build --output artifacts/packages
 
       - name: Inspect package archive
         shell: pwsh
-        run: ./eng/package-archive-inspect.ps1 -PackageId "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -PackageSource artifacts/packages
+        run: ./eng/package-archive-inspect.ps1 -PackageId "$env:PACKAGE_ID" -Version "$env:PACKAGE_VERSION" -PackageSource artifacts/packages
 
       - name: Smoke package consumer
         shell: pwsh
-        run: ./eng/package-consumer-smoke.ps1 -PackageId "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -PackageSource artifacts/packages
+        run: ./eng/package-consumer-smoke.ps1 -PackageId "$env:PACKAGE_ID" -Version "$env:PACKAGE_VERSION" -PackageSource artifacts/packages
 
       - name: Prepare release notes
         shell: pwsh
-        run: ./eng/get-release-notes.ps1 -PackageName "${{ env.PACKAGE_ID }}" -Version "${{ env.PACKAGE_VERSION }}" -OutputPath artifacts/release-notes.md
+        run: ./eng/get-release-notes.ps1 -PackageName "$env:PACKAGE_ID" -Version "$env:PACKAGE_VERSION" -OutputPath artifacts/release-notes.md
 
       - name: Upload workflow package artifacts
         uses: actions/upload-artifact@v7.0.1
@@ -84,8 +88,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ env.RELEASE_TAG }}"
-          $releaseTitle = "${{ env.PACKAGE_ID }} ${{ env.PACKAGE_VERSION }}"
+          $tag = $env:RELEASE_TAG
+          $releaseTitle = "$env:PACKAGE_ID $env:PACKAGE_VERSION"
           $notesPath = "artifacts/release-notes.md"
           $files = Get-ChildItem -LiteralPath "artifacts/packages" -File |
             Where-Object { $_.Extension -in ".nupkg", ".snupkg" } |
@@ -117,9 +121,9 @@ jobs:
               "--notes-file",
               $notesPath,
               "--target",
-              "${{ github.sha }}"
+              $env:GITHUB_SHA
             )
-            if ("${{ env.IS_PRERELEASE }}" -eq "True") {
+            if ($env:IS_PRERELEASE -eq "True") {
               $editArgs += "--prerelease"
             }
 
@@ -140,10 +144,10 @@ jobs:
             "--notes-file",
             $notesPath,
             "--target",
-            "${{ github.sha }}"
+            $env:GITHUB_SHA
           )
 
-          if ("${{ env.IS_PRERELEASE }}" -eq "True") {
+          if ($env:IS_PRERELEASE -eq "True") {
             $createArgs += "--prerelease"
           }
 
@@ -169,10 +173,9 @@ jobs:
       - name: Verify package feed
         shell: pwsh
         run: |
-          $packageSource = "h" + "ttps://api.nu" + "get.org/v3/index.json"
           ./eng/package-feed-verify.ps1 `
-            -PackageId "${{ env.PACKAGE_ID }}" `
-            -Version "${{ env.PACKAGE_VERSION }}" `
-            -PackageSource $packageSource `
+            -PackageId "$env:PACKAGE_ID" `
+            -Version "$env:PACKAGE_VERSION" `
+            -PackageSource "https://api.nuget.org/v3/index.json" `
             -Attempts 20 `
             -DelaySeconds 15

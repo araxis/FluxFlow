@@ -15,7 +15,7 @@ public sealed class SqlFileStorageStoreTests
     {
         using var temp = TempDirectory.Create();
         var path = Path.Combine(temp.Path, "records.db");
-        var store = CreateStore(path);
+        await using var store = CreateStore(path);
 
         var saved = await store.PutAsync(new StoragePutRequest
         {
@@ -30,7 +30,7 @@ public sealed class SqlFileStorageStoreTests
             CorrelationId = "c-1"
         });
 
-        var reopened = CreateStore(path);
+        await using var reopened = CreateStore(path);
         var loaded = await reopened.GetAsync(new StorageGetRequest
         {
             Collection = "items",
@@ -51,7 +51,7 @@ public sealed class SqlFileStorageStoreTests
         var now = new DateTimeOffset(2026, 2, 3, 6, 1, 2, TimeSpan.Zero);
         var clock = new RecordingStorageClock(now);
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
 
         var saved = await store.PutAsync(new StoragePutRequest
         {
@@ -73,7 +73,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Put_HonorsWriteModesAndExpectedVersion()
     {
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
 
         var created = await store.PutAsync(new StoragePutRequest
         {
@@ -123,7 +123,7 @@ public sealed class SqlFileStorageStoreTests
         var now = new DateTimeOffset(2026, 2, 3, 6, 2, 3, TimeSpan.Zero);
         var clock = new RecordingStorageClock(now);
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -150,10 +150,64 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_CreateSucceedsOverExpiredRecord()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 6, 5, 6, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        using var temp = TempDirectory.Create();
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "old",
+            ExpiresAt = now.AddMinutes(-1)
+        });
+
+        var created = await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "new",
+            Mode = StorageWriteMode.Create
+        });
+
+        created.Version.ShouldBe(1);
+        created.Value.ShouldBe("new");
+    }
+
+    [Fact]
+    public async Task Put_ReturnsTimestampsMatchingPersistedRecord()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 6, 6, 7, 123, TimeSpan.Zero).AddTicks(4567);
+        var clock = new RecordingStorageClock(now);
+        using var temp = TempDirectory.Create();
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
+
+        var saved = await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first",
+            ExpiresAt = now.AddMinutes(5).AddTicks(789)
+        });
+        var loaded = await store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        });
+
+        loaded.ShouldNotBeNull();
+        saved.StoredAt.ShouldBe(loaded.StoredAt);
+        saved.ExpiresAt.ShouldBe(loaded.ExpiresAt);
+        saved.Version.ShouldBe(loaded.Version);
+    }
+
+    [Fact]
     public async Task Query_FiltersRecordsAndHonorsLimit()
     {
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -200,7 +254,7 @@ public sealed class SqlFileStorageStoreTests
         var now = new DateTimeOffset(2026, 2, 3, 6, 3, 4, TimeSpan.Zero);
         var clock = new RecordingStorageClock(now);
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -227,7 +281,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Query_HonorsOffset()
     {
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -258,10 +312,100 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Query_PagesWithoutDuplicatesOrGaps()
+    {
+        using var temp = TempDirectory.Create();
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        foreach (var index in Enumerable.Range(0, 9))
+        {
+            await store.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = $"page-{index}",
+                Value = index
+            });
+        }
+
+        var keys = new List<string>();
+        foreach (var offset in new[] { 0, 3, 6 })
+        {
+            var page = await store.QueryAsync(new StorageQueryRequest
+            {
+                Collection = "items",
+                KeyPrefix = "page-",
+                Offset = offset,
+                Limit = 3
+            });
+            page.Count.ShouldBe(3);
+            keys.AddRange(page.Select(record => record.Key));
+        }
+
+        keys.ShouldBe(Enumerable.Range(0, 9).Select(index => $"page-{index}"));
+    }
+
+    [Fact]
+    public async Task Query_EscapesKeyPrefixWildcards()
+    {
+        using var temp = TempDirectory.Create();
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a%b-1",
+            Value = "percent"
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "axb-1",
+            Value = "other"
+        });
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "a_b-1",
+            Value = "underscore"
+        });
+
+        var percent = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            KeyPrefix = "a%b"
+        });
+        var underscore = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            KeyPrefix = "a_b"
+        });
+
+        percent.ShouldHaveSingleItem().Key.ShouldBe("a%b-1");
+        underscore.ShouldHaveSingleItem().Key.ShouldBe("a_b-1");
+    }
+
+    [Fact]
+    public async Task DisposeAsync_ReleasesDatabaseFile()
+    {
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+        var store = CreateStore(path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first"
+        });
+
+        await store.DisposeAsync();
+        File.Delete(path);
+
+        File.Exists(path).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Delete_ReturnsFoundAndMissingResults()
     {
         using var temp = TempDirectory.Create();
-        var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -294,7 +438,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Put_RejectsValuesAboveConfiguredLimit()
     {
         using var temp = TempDirectory.Create();
-        var store = new SqlFileStorageStore(new SqlFileStorageStoreOptions
+        await using var store = new SqlFileStorageStore(new SqlFileStorageStoreOptions
         {
             DatabasePath = Path.Combine(temp.Path, "records.db"),
             MaxValueBytes = 5
@@ -384,6 +528,7 @@ public sealed class SqlFileStorageStoreTests
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await DisposeNodeAsync(runtimeNode);
 
         result.Collection.ShouldBe("items");
         result.Key.ShouldBe("alpha");
@@ -423,6 +568,7 @@ public sealed class SqlFileStorageStoreTests
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await DisposeNodeAsync(runtimeNode);
 
         result.Timestamp.ShouldBe(now);
         result.Record.ShouldNotBeNull();
@@ -434,7 +580,7 @@ public sealed class SqlFileStorageStoreTests
     {
         using var temp = TempDirectory.Create();
         var path = Path.Combine(temp.Path, "records.db");
-        var store = CreateStore(path);
+        await using var store = CreateStore(path);
         await store.PutAsync(new StoragePutRequest
         {
             Collection = "items",
@@ -459,6 +605,7 @@ public sealed class SqlFileStorageStoreTests
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await DisposeNodeAsync(runtimeNode);
 
         result.Count.ShouldBe(1);
         result.Records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
@@ -490,6 +637,14 @@ public sealed class SqlFileStorageStoreTests
             },
             "main",
             new Dictionary<NodeName, RuntimeNode>());
+    }
+
+    private static async Task DisposeNodeAsync(RuntimeNode runtimeNode)
+    {
+        if (runtimeNode.Node is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
     }
 
     private static BufferBlock<T> LinkOutput<T>(
@@ -529,18 +684,25 @@ internal sealed class TempDirectory : IDisposable
 
     public void Dispose()
     {
-        try
+        for (var attempt = 0; ; attempt++)
         {
-            if (Directory.Exists(Path))
+            try
             {
-                Directory.Delete(Path, recursive: true);
+                if (Directory.Exists(Path))
+                {
+                    Directory.Delete(Path, recursive: true);
+                }
+
+                return;
             }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
+            catch (IOException) when (attempt < 5)
+            {
+            }
+            catch (UnauthorizedAccessException) when (attempt < 5)
+            {
+            }
+
+            Thread.Sleep(100);
         }
     }
 }

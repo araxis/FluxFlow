@@ -15,10 +15,10 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
     private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowMetricSnapshot> _snapshots;
-    private readonly CancellationToken _processingCancellationToken;
     private DateTimeOffset? _firstObservedAt;
     private DateTimeOffset? _previousObservedAt;
     private long _count;
+    private long _sizeCount;
     private double? _totalSize;
 
     internal FlowMetricsNode(
@@ -52,7 +52,6 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(ObserveAsync, inputOptions);
         _snapshots = new BufferBlock<FlowMetricSnapshot>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -87,7 +86,6 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
 
     private async Task ObserveAsync(TInput input)
     {
-        _processingCancellationToken.ThrowIfCancellationRequested();
         var observedAt = _clock.UtcNow;
         var count = Interlocked.Increment(ref _count);
         _firstObservedAt ??= observedAt;
@@ -97,9 +95,11 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
         var lastSize = TrySelectSize(input);
         if (lastSize.HasValue)
         {
+            _sizeCount++;
             _totalSize = (_totalSize ?? 0) + lastSize.Value;
         }
 
+        var sizeCount = _sizeCount;
         var totalSize = _totalSize;
         var snapshot = new FlowMetricSnapshot
         {
@@ -112,10 +112,10 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
             AverageRatePerSecond = CalculateAverageRate(_firstObservedAt.Value, observedAt, count),
             LastSize = lastSize,
             TotalSize = totalSize,
-            AverageSize = totalSize.HasValue ? totalSize.Value / count : null
+            AverageSize = totalSize.HasValue && sizeCount > 0 ? totalSize.Value / sizeCount : null
         };
 
-        await _snapshots.SendAsync(snapshot, _processingCancellationToken).ConfigureAwait(false);
+        await _snapshots.SendAsync(snapshot).ConfigureAwait(false);
         TryEmitDiagnostic(
             ObservabilityDiagnosticNames.MetricsObserved,
             message: "flow.metrics observed input.",

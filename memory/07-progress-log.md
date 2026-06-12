@@ -352,6 +352,17 @@ Date: 2026-05-31
 - Added package-owned design metadata providers for reusable component
   packages so host catalog adapters can compose package descriptors directly
   while keeping host-only overrides outside reusable package metadata.
+- Completed a read-only full-solution code review (engine, all component
+  packages, release tooling) and recorded findings, test gaps, and
+  remediation priorities in `131-full-code-review.md`.
+- Fixed all review findings: engine error channels became broadcast fanout
+  sources with runtime/workflow/host error streams, link-failure isolation,
+  fault propagation, and stricter validation; registered missing Errors
+  ports; hardened Http/FileSystem/Mqtt/storage security and concurrency;
+  corrected designer metadata; fixed release tooling injection and gates.
+  Engine moved to 1.1.0 and 24 component packages to new minors with
+  changelog sections; full Release suite green at 684 tests across 30
+  assemblies (`132-review-remediation-release.md`).
 
 ## Remaining
 

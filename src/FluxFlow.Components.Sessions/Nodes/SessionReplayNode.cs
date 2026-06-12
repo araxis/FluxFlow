@@ -183,7 +183,11 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
                                .ConfigureAwait(false))
             {
                 await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
-                await SendOutputAsync(CopyRecord(record), cancellationToken).ConfigureAwait(false);
+                if (!await SendOutputAsync(CopyRecord(record), cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
                 emitted++;
                 previous = record;
                 TryEmitDiagnostic(

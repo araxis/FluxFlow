@@ -17,7 +17,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
     private readonly BufferBlock<FlowWindow<TInput>> _output;
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly List<TInput> _items = [];
-    private CancellationTokenSource? _timerCancellation;
+    private volatile CancellationTokenSource? _timerCancellation;
     private DateTimeOffset? _startedAt;
     private long _nextSequence;
     private long _windowVersion;
@@ -103,7 +103,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         try
         {
             _lifecycleCancellation.Cancel();
-            _timerCancellation?.Cancel();
+            TryCancelTimer();
             FaultNode(exception);
         }
         finally
@@ -123,9 +123,19 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 
         _disposed = true;
         Complete();
-        await Completion.ConfigureAwait(false);
-        _timerCancellation?.Dispose();
-        _lifecycleCancellation.Dispose();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispose must not throw when the node faulted.
+        }
+        finally
+        {
+            _timerCancellation?.Dispose();
+            _lifecycleCancellation.Dispose();
+        }
     }
 
     private async Task ProcessCommandAsync(WindowCommand command)
@@ -198,7 +208,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private async Task CompleteWindowAsync()
     {
-        _timerCancellation?.Cancel();
+        TryCancelTimer();
         if (_items.Count > 0 && _options.EmitPartialOnCompletion)
         {
             await EmitWindowAsync(FlowWindowEmitReason.Completion, _clock.UtcNow)
@@ -225,7 +235,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        _timerCancellation?.Cancel();
+        TryCancelTimer();
         var window = new FlowWindow<TInput>
         {
             Sequence = ++_nextSequence,
@@ -262,6 +272,24 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         _timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _lifecycleCancellation.Token);
         _ = RunTimerAsync(version, _timerCancellation.Token);
+    }
+
+    private void TryCancelTimer()
+    {
+        var timerCancellation = _timerCancellation;
+        if (timerCancellation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            timerCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // ScheduleTimer disposed the source on the processor thread.
+        }
     }
 
     private async Task RunTimerAsync(
@@ -303,7 +331,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private void CompleteOutput(Task completion)
     {
-        _timerCancellation?.Cancel();
+        TryCancelTimer();
         if (completion.IsFaulted && completion.Exception is { } exception)
         {
             ((IDataflowBlock)_output).Fault(exception);

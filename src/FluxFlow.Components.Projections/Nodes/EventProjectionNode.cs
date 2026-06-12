@@ -16,13 +16,11 @@ public sealed class EventProjectionNode : FlowNodeBase
     private readonly ActionBlock<FlowEvent> _input;
     private readonly BufferBlock<EventProjectionSnapshot> _output;
     private readonly Queue<DateTimeOffset> _rateSamples = new();
-    private readonly CancellationToken _processingCancellationToken;
     private long _observedCount;
     private long _matchedCount;
     private DateTimeOffset? _firstMatchedAt;
     private DateTimeOffset? _lastMatchedAt;
     private EventSummary? _latest;
-    private EventProjectionSnapshot? _latestSnapshot;
 
     private EventProjectionNode(
         EventProjectionOptions options,
@@ -44,7 +42,6 @@ public sealed class EventProjectionNode : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<FlowEvent>(ProjectAsync, inputOptions);
         _output = new BufferBlock<EventProjectionSnapshot>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -94,7 +91,7 @@ public sealed class EventProjectionNode : FlowNodeBase
         if (_options.EmitFinalSnapshot)
         {
             var timestamp = _clock.UtcNow;
-            EmitSnapshot(CreateSnapshot(timestamp, timestamp));
+            EmitSnapshot(CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp));
         }
 
         _output.Complete();
@@ -112,7 +109,6 @@ public sealed class EventProjectionNode : FlowNodeBase
         try
         {
             ArgumentNullException.ThrowIfNull(flowEvent);
-            _processingCancellationToken.ThrowIfCancellationRequested();
             _observedCount++;
 
             if (!EventFilterMatcher.IsMatch(flowEvent, _options.Filter))
@@ -127,7 +123,6 @@ public sealed class EventProjectionNode : FlowNodeBase
             AddRateSample(flowEvent.Timestamp);
 
             var snapshot = CreateSnapshot(_clock.UtcNow, flowEvent.Timestamp);
-            _latestSnapshot = snapshot;
             if (_options.EmitEveryMatch)
             {
                 EmitSnapshot(snapshot);
@@ -137,10 +132,6 @@ public sealed class EventProjectionNode : FlowNodeBase
                 ProjectionDiagnosticNames.ProjectionUpdated,
                 message: "event.projection updated snapshot.",
                 attributes: CreateSnapshotAttributes(snapshot));
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {

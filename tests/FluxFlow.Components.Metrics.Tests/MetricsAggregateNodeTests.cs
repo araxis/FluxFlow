@@ -285,6 +285,68 @@ public sealed class MetricsAggregateNodeTests
     }
 
     [Fact]
+    public async Task Aggregate_KeepsGlobalTotalsForRejectedGroupSamples()
+    {
+        var runtimeNode = CreateNode(new
+        {
+            maxGroups = 1,
+            emitEverySample = false
+        });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<MetricSnapshotOutput>(runtimeNode);
+        LinkOutput<FlowError>(runtimeNode, MetricsComponentPorts.Errors);
+
+        await input.Target.SendAsync(new MetricSampleInput { Group = "a", Value = 1 });
+        await input.Target.SendAsync(new MetricSampleInput { Group = "b", Value = 2 });
+        input.Target.Complete();
+
+        var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        snapshot.SampleCount.ShouldBe(2);
+        snapshot.ValueCount.ShouldBe(2);
+        snapshot.TotalValue.ShouldBe(3);
+        snapshot.Groups.Keys.ShouldBe(["a"]);
+    }
+
+    [Fact]
+    public async Task Aggregate_CapsRejectedGroupTrackingWithSummaryError()
+    {
+        var runtimeNode = CreateNode(new
+        {
+            maxGroups = 1,
+            emitEverySample = false
+        });
+        var input = GetInput(runtimeNode);
+        LinkOutput<MetricSnapshotOutput>(runtimeNode);
+        var errors = LinkOutput<FlowError>(
+            runtimeNode,
+            MetricsComponentPorts.Errors);
+
+        await input.Target.SendAsync(new MetricSampleInput { Group = "tracked" });
+        for (var index = 0; index < 1030; index++)
+        {
+            await input.Target.SendAsync(new MetricSampleInput { Group = $"rejected-{index}" });
+        }
+
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var received = new List<FlowError>();
+        while (await errors.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+        {
+            while (errors.TryReceive(out var error))
+            {
+                received.Add(error);
+            }
+        }
+
+        received.ShouldAllBe(error => error.Code == MetricsErrorCodes.GroupLimitReached);
+        received.Count.ShouldBe(1025);
+        received[^1].Message.ShouldContain("not itemized");
+    }
+
+    [Fact]
     public async Task Aggregate_ReportsInvalidSizeAndContinues()
     {
         var runtimeNode = CreateNode(new { });

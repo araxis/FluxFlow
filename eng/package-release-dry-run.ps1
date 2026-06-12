@@ -8,7 +8,7 @@ param(
 
     [string] $PackageSource = "artifacts/packages",
 
-    [string[]] $AdditionalPackageSources = @(),
+    [string[]] $AdditionalPackageSources = @("https://api.nuget.org/v3/index.json"),
 
     [string] $Framework = "net8.0",
 
@@ -141,6 +141,11 @@ try {
             "--no-build"
         ) "Solution tests failed."
     }
+
+    $stalePackagePattern = "^$([regex]::Escape($packageId))\.\d[^/\\]*\.s?nupkg$"
+    Get-ChildItem -LiteralPath $sourcePath -File |
+        Where-Object { $_.Name -match $stalePackagePattern } |
+        Remove-Item -Force
 
     Invoke-Step "dotnet" @(
         "pack",

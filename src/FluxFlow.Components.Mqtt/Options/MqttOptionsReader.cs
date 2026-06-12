@@ -14,6 +14,7 @@ internal static class MqttOptionsReader
     {
         var options = Read<MqttPublishOptions>(definition);
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
+        EnsurePositive(options.PublishTimeoutMilliseconds, nameof(options.PublishTimeoutMilliseconds));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
         EnsureValidPublishTopic(options.DefaultTopic, nameof(options.DefaultTopic), required: false);
         EnsureValidReconnectPolicy(options.Reconnect);

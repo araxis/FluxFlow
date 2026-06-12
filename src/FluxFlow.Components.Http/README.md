@@ -32,6 +32,33 @@ Non-success status codes do not fault the node. Responses are emitted with
 `Success = false`. When `treatNonSuccessStatusAsError` is enabled, the response
 is still emitted and a matching error item is also emitted.
 
+## Security
+
+By default the node accepts any absolute per-message URL, which preserves 1.x
+behavior. Hosts that process untrusted message URLs should restrict where
+requests can go, because `defaultHeaders` (often credentials) are attached to
+every request:
+
+```json
+{
+  "type": "http.request",
+  "baseUrl": "https://api.internal.example",
+  "restrictToBaseUrlOrigin": true,
+  "allowedHosts": [ "api.internal.example", ".internal.example" ]
+}
+```
+
+- `allowedHosts` (default empty = allow all): when non-empty, the resolved
+  absolute URL host must match one entry. Entries match case-insensitively,
+  either exactly or as a leading-dot suffix such as `.internal.example`.
+- `restrictToBaseUrlOrigin` (default `false`): when `true`, absolute message
+  URLs must match the `baseUrl` scheme, host, and port.
+
+Violations are reported per message through the `Errors` port with kind
+`UrlNotAllowed` and the message is dropped. Header names and values containing
+CR, LF, or NUL characters are also rejected per message before the request is
+sent.
+
 ## Runtime Timing
 
 Responses and request errors use the package clock for timestamps and elapsed

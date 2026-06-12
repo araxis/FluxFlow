@@ -18,6 +18,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
     private CancellationTokenSource? _scheduleCancellation;
     private Task? _scheduleTask;
     private bool _started;
+    private bool _completedBeforeStart;
     private bool _disposed;
 
     private TimerScheduleNode(
@@ -52,6 +53,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
 
         return context.CreateNode(node)
             .Output(TimerComponentPorts.Output, node.Output)
+            .Output(TimerComponentPorts.Errors, node.Errors)
             .Build();
     }
 
@@ -61,6 +63,11 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
 
         lock (_stateLock)
         {
+            if (_completedBeforeStart)
+            {
+                return Task.CompletedTask;
+            }
+
             if (_started)
             {
                 throw new InvalidOperationException("timer.schedule node has already started.");
@@ -84,6 +91,10 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         lock (_stateLock)
         {
             cancellation = _scheduleCancellation;
+            if (cancellation is null)
+            {
+                _completedBeforeStart = true;
+            }
         }
 
         if (cancellation is null)
@@ -92,13 +103,28 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
             return;
         }
 
-        cancellation.Cancel();
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the schedule loop has stopped.
+        }
     }
 
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        _scheduleCancellation?.Cancel();
+        try
+        {
+            _scheduleCancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the schedule loop has stopped.
+        }
+
         base.Fault(exception);
     }
 
@@ -145,12 +171,18 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
                     ?? throw new InvalidOperationException(
                         $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
                 await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
-                sequence = await EmitTickAsync(
+                var emitted = await EmitTickAsync(
                     sequence,
                     startedAt,
                     dueAt,
                     cancellationToken).ConfigureAwait(false);
+                if (emitted is null)
+                {
+                    CompleteSchedule(startedAt, sequence);
+                    return;
+                }
 
+                sequence = emitted.Value;
                 if (_settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value)
                 {
                     CompleteSchedule(startedAt, sequence);
@@ -190,7 +222,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         }
     }
 
-    private async Task<long> EmitTickAsync(
+    private async Task<long?> EmitTickAsync(
         long currentSequence,
         DateTimeOffset startedAt,
         DateTimeOffset dueAt,
@@ -212,7 +244,12 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
             Drift = timestamp - dueAt
         };
 
-        await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false);
+        if (!await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false))
+        {
+            // The output declined the tick because it has completed; stop the loop.
+            return null;
+        }
+
         TryEmitDiagnostic(
             TimerDiagnosticNames.ScheduleTick,
             message: $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",

@@ -14,6 +14,12 @@ internal static class PayloadOptionsReader
     {
         var options = Read<PayloadInspectOptions>(definition);
 
+        if (options.MaxInputBytes <= 0)
+        {
+            throw new InvalidOperationException(
+                "payload.inspect option 'maxInputBytes' must be greater than zero.");
+        }
+
         if (options.MaxPreviewBytes <= 0)
         {
             throw new InvalidOperationException(

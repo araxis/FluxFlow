@@ -1,4 +1,5 @@
 using FluxFlow.Components.Assertions.Contracts;
+using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Components.Expressions;
 using FluxFlow.Engine.Mapping;
 using System.Text.Json;
@@ -7,6 +8,7 @@ namespace FluxFlow.Components.Assertions.Options;
 
 public sealed class AssertionsComponentOptions
 {
+    private readonly object _typesLock = new();
     private readonly Dictionary<string, Type> _types = new(StringComparer.OrdinalIgnoreCase)
     {
         [AssertionOptions.ObjectTypeName] = typeof(object),
@@ -33,6 +35,15 @@ public sealed class AssertionsComponentOptions
     private readonly FlowExpressionEngineRegistry _expressionEngines = new("Assertion");
     private readonly FlowContextFactoryRegistry<IAssertionContextFactory> _contextFactories =
         new(new DefaultAssertionContextFactory());
+    private IAssertionClock _clock = SystemAssertionClock.Instance;
+
+    public IAssertionClock Clock => _clock;
+
+    public AssertionsComponentOptions UseClock(IAssertionClock clock)
+    {
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        return this;
+    }
 
     public AssertionsComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -86,16 +97,19 @@ public sealed class AssertionsComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var key = name.Trim();
 
-        if (_types.TryGetValue(key, out var type))
+        lock (_typesLock)
         {
-            return type;
-        }
+            if (_types.TryGetValue(key, out var type))
+            {
+                return type;
+            }
 
-        var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
-        if (resolved is not null)
-        {
-            _types[key] = resolved;
-            return resolved;
+            var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
+            if (resolved is not null)
+            {
+                _types[key] = resolved;
+                return resolved;
+            }
         }
 
         throw new InvalidOperationException(

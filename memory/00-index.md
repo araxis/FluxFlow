@@ -164,6 +164,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   metadata providers for host composition.
 - `130-component-design-metadata-provider-release.md`: component design metadata
   provider release plan and metadata.
+- `131-full-code-review.md`: full-solution code review findings and
+  remediation priorities.
+- `132-review-remediation-release.md`: review remediation fixes, engine 1.1.0
+  error-channel rework, component minor releases, and release plan.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

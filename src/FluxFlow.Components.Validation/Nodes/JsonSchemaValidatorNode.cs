@@ -27,7 +27,6 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
     private readonly BufferBlock<JsonSchemaValidationResult<TInput>> _result;
     private readonly BufferBlock<TInput> _valid;
     private readonly BufferBlock<TInput> _invalid;
-    private readonly CancellationToken _processingCancellationToken;
     private JsonSchema? _schema;
 
     internal JsonSchemaValidatorNode(
@@ -53,7 +52,6 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(ValidateAsync, inputOptions);
         _result = new BufferBlock<JsonSchemaValidationResult<TInput>>(blockOptions);
         _valid = new BufferBlock<TInput>(blockOptions);
@@ -143,12 +141,7 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
         object? selectedValue;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             selectedValue = _selector.Select(input, _nodeContext);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {
@@ -199,9 +192,9 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
             Issues = issues
         };
 
-        await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        await _result.SendAsync(result).ConfigureAwait(false);
         await (evaluation.IsValid ? _valid : _invalid)
-            .SendAsync(input, _processingCancellationToken)
+            .SendAsync(input)
             .ConfigureAwait(false);
 
         TryEmitDiagnostic(

@@ -208,6 +208,32 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Replay_StopsWhenOutputDeclinesDelivery()
+    {
+        var clock = new RecordingSessionClock();
+        var store = CreateStoreWithRecords(count: 3);
+        var runtimeNode = CreateReplay(
+            new
+            {
+                sessionId = "session-1",
+                mode = "fixedInterval",
+                fixedIntervalMilliseconds = 10
+            },
+            store,
+            options => options.UseClock(clock));
+
+        // Completing the node before the replay starts completes the output,
+        // so every subsequent send is declined.
+        runtimeNode.Node.Complete();
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The replay loop must stop on the first declined send instead of
+        // iterating (and delaying) through the remaining records.
+        clock.Delays.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Replay_UsesMultiplierTiming()
     {
         var clock = new RecordingSessionClock();

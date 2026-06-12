@@ -187,9 +187,38 @@ public sealed class EventProjectionNodeTests
         var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         snapshot.Timestamp.ShouldBe(clock.UtcNow);
         snapshot.MatchedCount.ShouldBe(2);
-        snapshot.CurrentRate.ShouldBe(0);
+        snapshot.CurrentRate.ShouldBe(0.2);
         snapshot.Latest.ShouldNotBeNull();
         snapshot.Latest.Type.ShouldBe("task.completed");
+    }
+
+    [Fact]
+    public async Task Projection_FinalSnapshotKeepsRateForReplayedEventTimestamps()
+    {
+        var eventTime = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+        var clock = new RecordingProjectionClock(eventTime.AddDays(30));
+        var runtimeNode = CreateProjection(new
+        {
+            rateWindowSeconds = 10,
+            emitEveryMatch = false,
+            emitFinalSnapshot = true
+        },
+        clock);
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput(runtimeNode);
+
+        await runtimeNode.Node.StartAsync();
+        await input.Target.SendAsync(CreateEvent(eventTime, "replayed.first"));
+        await input.Target.SendAsync(CreateEvent(eventTime.AddSeconds(1), "replayed.second"));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The rate window is trimmed against the last event timestamp, so replayed
+        // streams with old event timestamps keep a meaningful final rate.
+        var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        snapshot.Timestamp.ShouldBe(clock.UtcNow);
+        snapshot.MatchedCount.ShouldBe(2);
+        snapshot.CurrentRate.ShouldBe(0.2);
     }
 
     [Fact]

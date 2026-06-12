@@ -2,6 +2,8 @@ namespace FluxFlow.Components.FileSystem.Options;
 
 public sealed record FileReadOptions
 {
+    public const long DefaultMaxBytes = 16_777_216;
+
     public int BoundedCapacity { get; init; } = 128;
     public string? BaseDirectory { get; init; }
     public bool AllowAbsolutePaths { get; init; }

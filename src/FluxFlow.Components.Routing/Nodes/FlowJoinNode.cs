@@ -18,6 +18,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     private readonly RoutingNodeContext _rightNodeContext;
     private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingBucket> _pending;
+    private readonly Queue<JoinDeadline> _deadlines = new();
     private readonly TimeSpan _timeout;
     private readonly ActionBlock<TLeft> _left;
     private readonly ActionBlock<TRight> _right;
@@ -25,7 +26,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     private readonly BufferBlock<FlowJoinResult<TLeft, TRight>> _output;
     private readonly BufferBlock<FlowJoinTimeout<TLeft, TRight>> _timeouts;
     private readonly CancellationTokenSource _lifecycleCancellation = new();
-    private CancellationTokenSource? _timerCancellation;
+    private volatile CancellationTokenSource? _timerCancellation;
     private long _timerVersion;
     private int _pendingCount;
     private bool _leftCompleted;
@@ -154,7 +155,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         try
         {
             _lifecycleCancellation.Cancel();
-            _timerCancellation?.Cancel();
+            TryCancelTimer();
             FaultNode(exception);
         }
         finally
@@ -176,9 +177,19 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
         _disposed = true;
         Complete();
-        await Completion.ConfigureAwait(false);
-        _timerCancellation?.Dispose();
-        _lifecycleCancellation.Dispose();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispose must not throw when the node faulted.
+        }
+        finally
+        {
+            _timerCancellation?.Dispose();
+            _lifecycleCancellation.Dispose();
+        }
     }
 
     private async Task ProcessCommandAsync(JoinCommand command)
@@ -331,6 +342,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
         bucket = GetOrCreateBucket(key);
         bucket.Lefts.Enqueue(new PendingEntry<TLeft>(input, now));
+        _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Left, now));
         _pendingCount++;
     }
 
@@ -357,6 +369,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
         bucket = GetOrCreateBucket(key);
         bucket.Rights.Enqueue(new PendingEntry<TRight>(input, now));
+        _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Right, now));
         _pendingCount++;
     }
 
@@ -409,39 +422,63 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     {
         if (_pendingCount == 0)
         {
+            _deadlines.Clear();
             return;
         }
 
-        foreach (var (key, bucket) in _pending.ToArray())
+        while (_deadlines.Count > 0)
         {
-            while (bucket.Lefts.Count > 0
-                   && (force || now - bucket.Lefts.Peek().ReceivedAt >= _timeout))
+            var deadline = _deadlines.Peek();
+            if (!TryPeekPendingEntry(deadline, out var bucket))
+            {
+                _deadlines.Dequeue();
+                continue;
+            }
+
+            if (!force && now - deadline.ReceivedAt < _timeout)
+            {
+                return;
+            }
+
+            _deadlines.Dequeue();
+            _pendingCount--;
+            if (deadline.Side == FlowJoinSide.Left)
             {
                 var entry = bucket.Lefts.Dequeue();
-                _pendingCount--;
+                RemoveIfEmpty(deadline.Key, bucket);
                 await EmitTimeoutAsync(
-                    key,
+                    deadline.Key,
                     FlowJoinSide.Left,
                     entry,
                     now,
                     cancellationToken).ConfigureAwait(false);
             }
-
-            while (bucket.Rights.Count > 0
-                   && (force || now - bucket.Rights.Peek().ReceivedAt >= _timeout))
+            else
             {
                 var entry = bucket.Rights.Dequeue();
-                _pendingCount--;
+                RemoveIfEmpty(deadline.Key, bucket);
                 await EmitTimeoutAsync(
-                    key,
+                    deadline.Key,
                     FlowJoinSide.Right,
                     entry,
                     now,
                     cancellationToken).ConfigureAwait(false);
             }
-
-            RemoveIfEmpty(key, bucket);
         }
+    }
+
+    private bool TryPeekPendingEntry(
+        JoinDeadline deadline,
+        out PendingBucket bucket)
+    {
+        if (!_pending.TryGetValue(deadline.Key, out bucket!))
+        {
+            return false;
+        }
+
+        return deadline.Side == FlowJoinSide.Left
+            ? bucket.Lefts.Count > 0 && bucket.Lefts.Peek().ReceivedAt == deadline.ReceivedAt
+            : bucket.Rights.Count > 0 && bucket.Rights.Peek().ReceivedAt == deadline.ReceivedAt;
     }
 
     private async Task EmitResultAsync(
@@ -571,7 +608,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        _timerCancellation?.Cancel();
+        TryCancelTimer();
         await EmitExpiredAsync(_clock.UtcNow, force: true, CancellationToken.None)
             .ConfigureAwait(false);
         _commands.Complete();
@@ -579,7 +616,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private void CompleteOutputs(Task completion)
     {
-        _timerCancellation?.Cancel();
+        TryCancelTimer();
         if (completion.IsFaulted && completion.Exception is { } exception)
         {
             ((IDataflowBlock)_output).Fault(exception);
@@ -620,29 +657,37 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private DateTimeOffset? GetNextDueAt()
     {
-        DateTimeOffset? next = null;
-        foreach (var bucket in _pending.Values)
+        while (_deadlines.Count > 0)
         {
-            foreach (var entry in bucket.Lefts)
+            var deadline = _deadlines.Peek();
+            if (TryPeekPendingEntry(deadline, out _))
             {
-                next = Min(next, entry.ReceivedAt + _timeout);
+                return deadline.ReceivedAt + _timeout;
             }
 
-            foreach (var entry in bucket.Rights)
-            {
-                next = Min(next, entry.ReceivedAt + _timeout);
-            }
+            _deadlines.Dequeue();
         }
 
-        return next;
+        return null;
     }
 
-    private static DateTimeOffset Min(
-        DateTimeOffset? current,
-        DateTimeOffset candidate)
-        => current is null || candidate < current.Value
-            ? candidate
-            : current.Value;
+    private void TryCancelTimer()
+    {
+        var timerCancellation = _timerCancellation;
+        if (timerCancellation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            timerCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // ScheduleTimer disposed the source on the processor thread.
+        }
+    }
 
     private async Task RunTimerAsync(
         long version,
@@ -702,6 +747,11 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private sealed record PendingEntry<TValue>(
         TValue Value,
+        DateTimeOffset ReceivedAt);
+
+    private sealed record JoinDeadline(
+        string Key,
+        FlowJoinSide Side,
         DateTimeOffset ReceivedAt);
 
     private sealed class PendingBucket

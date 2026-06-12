@@ -147,6 +147,29 @@ public sealed class TimerDebounceNodeTests
     }
 
     [Fact]
+    public async Task Debounce_DisposeAfterFaultDoesNotThrow()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                inputType = "string",
+                quietPeriodMilliseconds = 1
+            });
+        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
+            .LinkToDiscard();
+
+        runtimeNode.Node.Fault(new InvalidOperationException("boom"));
+        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => runtimeNode.Node.Completion);
+    }
+
+    [Fact]
     public void Debounce_RejectsMissingQuietPeriod()
     {
         var exception = Should.Throw<InvalidOperationException>(

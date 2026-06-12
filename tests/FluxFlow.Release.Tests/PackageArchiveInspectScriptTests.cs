@@ -7,11 +7,11 @@ namespace FluxFlow.Release.Tests;
 
 public sealed class PackageArchiveInspectScriptTests
 {
-    private static readonly string CurrentPackageMetadataNamespace =
-        "h" + "ttp://schemas.microsoft.com/packaging/2013/05/nuspec.xsd";
+    private const string CurrentPackageMetadataNamespace =
+        "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd";
 
-    private static readonly string PackToolPackageMetadataNamespace =
-        "h" + "ttp://schemas.microsoft.com/packaging/2012/06/nuspec.xsd";
+    private const string PackToolPackageMetadataNamespace =
+        "http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd";
 
     [Fact]
     public async Task Archive_inspect_script_accepts_expected_archives()

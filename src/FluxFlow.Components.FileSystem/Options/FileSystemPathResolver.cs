@@ -25,21 +25,26 @@ internal static class FileSystemPathResolver
         {
             if (string.IsNullOrWhiteSpace(policy.BaseDirectory))
             {
-                return Path.GetFullPath(requestPath);
+                if (policy.AllowAbsolutePaths)
+                {
+                    return Path.GetFullPath(requestPath);
+                }
+
+                return ResolveUnderBaseDirectory(
+                    requestPath,
+                    System.IO.Directory.GetCurrentDirectory(),
+                    policy,
+                    "the working directory");
             }
 
             var baseDirectory = Path.GetFullPath(policy.BaseDirectory);
             if (!isAbsolute)
             {
-                var resolvedPath = Path.GetFullPath(Path.Combine(baseDirectory, requestPath));
-                if (!IsUnderBaseDirectory(baseDirectory, resolvedPath))
-                {
-                    throw new FileSystemPathResolutionException(
-                        policy.InvalidPathCode,
-                        $"{policy.NodeType} path escapes the configured baseDirectory.");
-                }
-
-                return resolvedPath;
+                return ResolveUnderBaseDirectory(
+                    requestPath,
+                    baseDirectory,
+                    policy,
+                    "the configured baseDirectory");
             }
 
             return Path.GetFullPath(requestPath);
@@ -55,6 +60,24 @@ internal static class FileSystemPathResolver
                 $"{policy.NodeType} request path is invalid: {exception.Message}",
                 exception);
         }
+    }
+
+    private static string ResolveUnderBaseDirectory(
+        string requestPath,
+        string baseDirectory,
+        FileSystemPathPolicy policy,
+        string baseDescription)
+    {
+        var resolvedBase = Path.GetFullPath(baseDirectory);
+        var resolvedPath = Path.GetFullPath(Path.Combine(resolvedBase, requestPath));
+        if (!IsUnderBaseDirectory(resolvedBase, resolvedPath))
+        {
+            throw new FileSystemPathResolutionException(
+                policy.InvalidPathCode,
+                $"{policy.NodeType} path escapes {baseDescription}.");
+        }
+
+        return resolvedPath;
     }
 
     private static bool IsUnderBaseDirectory(string baseDirectory, string path)

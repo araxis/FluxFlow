@@ -2,6 +2,7 @@ using FluxFlow.Components.Assertions;
 using FluxFlow.Components.Control;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Expectations;
 using FluxFlow.Components.FileSystem;
 using FluxFlow.Components.Http;
 using FluxFlow.Components.Mapping;
@@ -9,6 +10,7 @@ using FluxFlow.Components.Metrics;
 using FluxFlow.Components.Mqtt;
 using FluxFlow.Components.Observability;
 using FluxFlow.Components.Payloads;
+using FluxFlow.Components.Projections;
 using FluxFlow.Components.Routing;
 using FluxFlow.Components.Serialization;
 using FluxFlow.Components.Sessions;
@@ -59,6 +61,7 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
     [
         new AssertionsComponentDesignMetadataProvider(),
         new ControlComponentDesignMetadataProvider(),
+        new ExpectationsComponentDesignMetadataProvider(),
         new FileSystemComponentDesignMetadataProvider(),
         new HttpComponentDesignMetadataProvider(),
         new MappingComponentDesignMetadataProvider(),
@@ -66,6 +69,7 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         new MqttComponentDesignMetadataProvider(),
         new ObservabilityComponentDesignMetadataProvider(),
         new PayloadComponentDesignMetadataProvider(),
+        new ProjectionsComponentDesignMetadataProvider(),
         new RoutingComponentDesignMetadataProvider(),
         new SerializationComponentDesignMetadataProvider(),
         new SessionsComponentDesignMetadataProvider(),
@@ -81,6 +85,8 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         AssertionsComponentTypes.Assert,
         ControlComponentTypes.Filter,
         ControlComponentTypes.When,
+        ExpectationsComponentTypes.Expect,
+        ExpectationsComponentTypes.Guard,
         FileSystemComponentTypes.DirectoryEnumerate,
         FileSystemComponentTypes.FileRead,
         FileSystemComponentTypes.FileWatch,
@@ -94,6 +100,7 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         ObservabilityComponentTypes.Logger,
         ObservabilityComponentTypes.Metrics,
         PayloadComponentTypes.Inspect,
+        ProjectionsComponentTypes.EventProjection,
         RoutingComponentTypes.Correlation,
         RoutingComponentTypes.Fork,
         RoutingComponentTypes.Join,

@@ -34,6 +34,9 @@ jobs:
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          INPUT_PACKAGE_ID: ${{ inputs.package_id }}
+          INPUT_VERSIONS: ${{ inputs.versions }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
@@ -42,7 +45,7 @@ jobs:
             throw "Add the package feed repository secret before package maintenance."
           }
 
-          $packageId = "${{ inputs.package_id }}".Trim()
+          $packageId = "$env:INPUT_PACKAGE_ID".Trim()
           if ([string]::IsNullOrWhiteSpace($packageId)) {
             throw "Package id is required."
           }
@@ -51,7 +54,7 @@ jobs:
             throw "Package id '$packageId' is outside the allowed package family."
           }
 
-          $versions = @("${{ inputs.versions }}".Split(",", [StringSplitOptions]::RemoveEmptyEntries) |
+          $versions = @("$env:INPUT_VERSIONS".Split(",", [StringSplitOptions]::RemoveEmptyEntries) |
             ForEach-Object { $_.Trim() } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
@@ -60,11 +63,11 @@ jobs:
           }
 
           foreach ($version in $versions) {
-            if ($version -notmatch "^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$") {
+            if ($version -notmatch "^\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$") {
               throw "Package version '$version' is not a valid semantic version."
             }
 
-            if ("${{ inputs.dry_run }}" -eq "true") {
+            if ($env:INPUT_DRY_RUN -eq "true") {
               Write-Host "Would unlist $packageId $version."
               continue
             }

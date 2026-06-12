@@ -72,6 +72,7 @@ internal static class ControlNodeFactory
         return context.CreateNode(node)
             .Input(ControlComponentPorts.Input, node.Input)
             .Output(ControlComponentPorts.Output, node.Output)
+            .Output(ControlComponentPorts.Errors, node.Errors)
             .Build();
     }
 
@@ -92,6 +93,7 @@ internal static class ControlNodeFactory
             .Input(ControlComponentPorts.Input, node.Input)
             .Output(ControlComponentPorts.WhenTrue, node.WhenTrue)
             .Output(ControlComponentPorts.WhenFalse, node.WhenFalse)
+            .Output(ControlComponentPorts.Errors, node.Errors)
             .Build();
     }
 

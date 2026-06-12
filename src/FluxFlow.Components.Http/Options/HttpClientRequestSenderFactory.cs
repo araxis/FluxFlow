@@ -12,9 +12,10 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(context.Clock);
 
-        var handler = new HttpClientHandler
+        var handler = new SocketsHttpHandler
         {
-            AllowAutoRedirect = context.Options.FollowRedirects
+            AllowAutoRedirect = context.Options.FollowRedirects,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
         };
         var client = new HttpClient(handler, disposeHandler: true)
         {

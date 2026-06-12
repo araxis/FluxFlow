@@ -5,16 +5,29 @@ namespace FluxFlow.Engine.Runtime;
 public sealed class RuntimeNodeFactoryRegistry
 {
     private readonly Dictionary<NodeType, RuntimeNodeFactory> _factories = [];
+    private readonly object _gate = new();
 
-    public IReadOnlyDictionary<NodeType, RuntimeNodeFactory> Factories => _factories;
+    public IReadOnlyDictionary<NodeType, RuntimeNodeFactory> Factories
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return new Dictionary<NodeType, RuntimeNodeFactory>(_factories);
+            }
+        }
+    }
 
     public RuntimeNodeFactoryRegistry Register(NodeType type, RuntimeNodeFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
-        if (!_factories.TryAdd(type, factory))
+        lock (_gate)
         {
-            throw new InvalidOperationException($"A flow node factory is already registered for '{type}'.");
+            if (!_factories.TryAdd(type, factory))
+            {
+                throw new InvalidOperationException($"A flow node factory is already registered for '{type}'.");
+            }
         }
 
         return this;
@@ -30,5 +43,10 @@ public sealed class RuntimeNodeFactoryRegistry
     }
 
     public bool TryGetFactory(NodeType type, out RuntimeNodeFactory factory)
-        => _factories.TryGetValue(type, out factory!);
+    {
+        lock (_gate)
+        {
+            return _factories.TryGetValue(type, out factory!);
+        }
+    }
 }

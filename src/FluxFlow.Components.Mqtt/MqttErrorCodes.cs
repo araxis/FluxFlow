@@ -7,6 +7,7 @@ public static class MqttErrorCodes
     public const int PublishInvalidTopic = 2002;
     public const int PublishInvalidPayload = 2003;
     public const int PublishInvalidQualityOfService = 2004;
+    public const int PublishTimedOut = 2005;
     public const int SubscribeFailed = 2100;
     public const int SubscribeStartupFailed = 2101;
     public const int SubscribeInvalidTopic = 2102;

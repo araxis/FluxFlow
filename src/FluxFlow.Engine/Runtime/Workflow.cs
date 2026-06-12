@@ -13,8 +13,9 @@ public sealed class Workflow(
     private readonly IReadOnlyList<RuntimeNode> _entryNodes = entryNodes ?? throw new ArgumentNullException(nameof(entryNodes));
     private readonly BroadcastBlock<WorkflowStateChanged> _stateChanges = new(s => s);
     private readonly FlowDiagnosticCollector _diagnosticCollector = new(nodes ?? throw new ArgumentNullException(nameof(nodes)));
+    private readonly FlowErrorCollector _errorCollector = new(nodes ?? throw new ArgumentNullException(nameof(nodes)));
     private readonly object _stateLock = new();
-    private bool _disposed;
+    private int _disposed;
     private WorkflowState _state = WorkflowState.Idle;
 
     public WorkflowName Name { get; } = name;
@@ -26,6 +27,8 @@ public sealed class Workflow(
     public ISourceBlock<WorkflowStateChanged> StateChanges => _stateChanges;
 
     public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnosticCollector.Diagnostics;
+
+    public ISourceBlock<RuntimeFlowError> Errors => _errorCollector.Errors;
 
     public Task Completion => Task.WhenAll(Nodes.Select(node => node.Node.Completion));
 
@@ -65,6 +68,7 @@ public sealed class Workflow(
         SetState(WorkflowState.Running);
         var completion = Completion;
         _diagnosticCollector.CompleteWhen(completion);
+        _errorCollector.CompleteWhen(completion);
         _ = completion.ContinueWith(t =>
         {
             SetState(t.IsFaulted ? WorkflowState.Faulted : WorkflowState.Stopped,
@@ -115,12 +119,11 @@ public sealed class Workflow(
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         var errors = new List<Exception>();
         var owner = $"Workflow '{Name}'";
 
@@ -140,6 +143,7 @@ public sealed class Workflow(
         }
 
         RuntimeCleanup.TryDisposeDiagnostics(_diagnosticCollector, errors, owner);
+        RuntimeCleanup.TryDisposeErrors(_errorCollector, errors, owner);
 
         _stateChanges.Complete();
         RuntimeCleanup.ThrowIfErrors(
@@ -149,12 +153,11 @@ public sealed class Workflow(
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         var errors = new List<Exception>();
         var owner = $"Workflow '{Name}'";
 
@@ -174,6 +177,7 @@ public sealed class Workflow(
         }
 
         await RuntimeCleanup.TryDisposeDiagnosticsAsync(_diagnosticCollector, errors, owner).ConfigureAwait(false);
+        await RuntimeCleanup.TryDisposeErrorsAsync(_errorCollector, errors, owner).ConfigureAwait(false);
 
         _stateChanges.Complete();
         RuntimeCleanup.ThrowIfErrors(

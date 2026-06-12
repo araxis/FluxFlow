@@ -18,6 +18,17 @@ public abstract class OutputPort : IDisposable, IAsyncDisposable
     public abstract Task Completion { get; }
     public abstract bool DrainWhenUnlinked { get; }
 
+    /// <summary>
+    /// Raised when a message could not be delivered over a specific link:
+    /// either a conditional link predicate threw (the message is dropped for
+    /// that link) or a linked input rejected the message because it already
+    /// completed (the link is detached). Sibling links are unaffected.
+    /// </summary>
+    public event Action<OutputPortLinkFailure>? LinkFailed;
+
+    private protected void ReportLinkFailure(OutputPortLinkFailure failure)
+        => LinkFailed?.Invoke(failure);
+
     public abstract IDisposable? TryLinkTo(
         InputPort input,
         bool propagateCompletion,
@@ -80,7 +91,7 @@ public sealed class OutputPort<T> : OutputPort
         _sourceLink = source.LinkTo(
             _queue,
             new DataflowLinkOptions { PropagateCompletion = true });
-        DrainWhenUnlinked = drainWhenUnlinked && typeof(T) != typeof(FlowError);
+        DrainWhenUnlinked = drainWhenUnlinked;
     }
 
     public override IDisposable? TryLinkTo(
@@ -117,6 +128,25 @@ public sealed class OutputPort<T> : OutputPort
                     RemoveLink);
                 _links.Add(link);
                 StartPumpIfNeeded();
+            }
+
+            if (Completion.IsCompleted)
+            {
+                // The pump finished before this link was added; propagate the
+                // outcome directly so the target is not left dangling.
+                link.Dispose();
+                if (propagateCompletion)
+                {
+                    if (Completion.IsFaulted)
+                    {
+                        typedInput.Target.Fault(
+                            Completion.Exception?.InnerException ?? Completion.Exception!);
+                    }
+                    else
+                    {
+                        typedInput.Target.Complete();
+                    }
+                }
             }
 
             error = null;
@@ -216,12 +246,28 @@ public sealed class OutputPort<T> : OutputPort
                         continue;
                     }
 
-                    await Task.WhenAll(links.Select(link => SendToLinkAsync(link, item))).ConfigureAwait(false);
+                    if (links.Length == 1)
+                    {
+                        await SendToLinkAsync(links[0], item).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    var sends = new Task[links.Length];
+                    for (var i = 0; i < links.Length; i++)
+                    {
+                        sends[i] = SendToLinkAsync(links[i], item);
+                    }
+
+                    await Task.WhenAll(sends).ConfigureAwait(false);
                 }
             }
 
-            CompleteLinkedTargets();
+            // Surface a faulted source to linked targets instead of downgrading
+            // the fault to a normal completion.
+            await _queue.Completion.ConfigureAwait(false);
+
             _completion.TrySetResult();
+            CompleteLinkedTargets();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -229,8 +275,11 @@ public sealed class OutputPort<T> : OutputPort
         }
         catch (Exception exception)
         {
-            FaultLinkedTargets(exception);
-            _completion.TrySetException(exception);
+            var unwrapped = exception is AggregateException aggregate
+                ? aggregate.GetBaseException()
+                : exception;
+            _completion.TrySetException(unwrapped);
+            FaultLinkedTargets(unwrapped);
         }
         finally
         {
@@ -265,7 +314,7 @@ public sealed class OutputPort<T> : OutputPort
     private void ThrowIfDisposed()
         => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
-    private static async Task SendToLinkAsync(FanoutLink link, T item)
+    private async Task SendToLinkAsync(FanoutLink link, T item)
     {
         if (link.IsDisposed)
         {
@@ -278,11 +327,33 @@ public sealed class OutputPort<T> : OutputPort
             {
                 return;
             }
+        }
+        catch (Exception exception)
+        {
+            // A throwing link condition drops the message for this link only;
+            // other links and later messages are unaffected.
+            ReportLinkFailure(new OutputPortLinkFailure
+            {
+                Port = Address,
+                Reason = OutputPortLinkFailureReason.ConditionFailed,
+                Exception = exception
+            });
+            return;
+        }
 
+        try
+        {
             var accepted = await link.Target.SendAsync(item, link.CancellationToken).ConfigureAwait(false);
             if (!accepted && !link.IsDisposed)
             {
-                throw new InvalidOperationException("A linked input rejected a workflow message.");
+                // The target completed or faulted; detach it so the remaining
+                // links keep receiving messages instead of faulting the port.
+                link.Dispose();
+                ReportLinkFailure(new OutputPortLinkFailure
+                {
+                    Port = Address,
+                    Reason = OutputPortLinkFailureReason.TargetRejected
+                });
             }
         }
         catch (OperationCanceledException) when (link.IsDisposed)

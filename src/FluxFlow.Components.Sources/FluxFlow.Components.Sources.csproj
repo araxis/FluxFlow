@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable deterministic source components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Source nodes latch completion before start, stop when the output declines deliveries, and guard cancellation against disposed token sources. The generated source constructor validates loop/maxItems invariants and type alias resolution caching is thread-safe.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

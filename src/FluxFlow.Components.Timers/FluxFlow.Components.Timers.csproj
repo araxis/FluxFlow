@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Timers</PackageId>
     <AssemblyName>FluxFlow.Components.Timers</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable timer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;timers</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>All timer nodes now expose Errors output ports, cron schedules fire after DST spring-forward gaps with vixie value/step semantics, and timer.delay applies a constant arrival+delay offset to bursts. Dispose is prompt and tolerant of faulted nodes, and interval/schedule nodes latch completion before start.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

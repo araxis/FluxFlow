@@ -141,7 +141,7 @@ if ($Push) {
 }
 
 $repoRoot = (Get-Location).Path
-$tool = "g" + "it"
+$tool = "git"
 $toolCommand = Get-Command $tool -ErrorAction SilentlyContinue
 if ($null -eq $toolCommand) {
     throw "Required version-control tool was not found."
@@ -150,6 +150,32 @@ if ($null -eq $toolCommand) {
 $environmentPath = Join-Path ([System.IO.Path]::GetTempPath()) "fluxflow-tag-$([Guid]::NewGuid().ToString('N')).env"
 $resolverPath = Join-Path $repoRoot "eng/resolve-package-release.ps1"
 $dryRunPath = Join-Path $repoRoot "eng/package-release-dry-run.ps1"
+$releaseNotesPath = Join-Path $repoRoot "eng/get-release-notes.ps1"
+
+function Assert-ReleaseNotesExist {
+    param(
+        [string] $ScriptPath,
+        [string] $PackageId,
+        [string] $PackageVersion
+    )
+
+    $notesOutputPath = Join-Path ([System.IO.Path]::GetTempPath()) "fluxflow-tag-notes-$([Guid]::NewGuid().ToString('N')).md"
+    try {
+        & $ScriptPath -PackageName $PackageId -Version $PackageVersion -OutputPath $notesOutputPath
+
+        if (-not (Test-Path -LiteralPath $notesOutputPath)) {
+            throw "Release notes for '$PackageId' version '$PackageVersion' were not produced."
+        }
+
+        $notes = Get-Content -LiteralPath $notesOutputPath -Raw
+        if ([string]::IsNullOrWhiteSpace($notes)) {
+            throw "Release notes for '$PackageId' version '$PackageVersion' are empty."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $notesOutputPath -Force -ErrorAction SilentlyContinue
+    }
+}
 
 try {
     $resolveArgs = @{
@@ -192,6 +218,13 @@ try {
         Assert-RemoteTagMissing $tool $Remote $releaseTag
     }
 
+    Assert-ReleaseNotesExist $releaseNotesPath $packageId $packageVersion
+
+    $tagTarget = "$(& $tool @("rev-parse", "HEAD"))".Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tagTarget)) {
+        throw "Could not resolve the current commit for tagging."
+    }
+
     $dryRunArgs = @{
         Package = $Package
         Configuration = $Configuration
@@ -210,7 +243,9 @@ try {
 
     & $dryRunPath @dryRunArgs
 
-    Invoke-Step $tool @("tag", "-a", $releaseTag, "-m", $message) "Tag creation failed."
+    Assert-CleanWorkingTree $tool
+
+    Invoke-Step $tool @("tag", "-a", $releaseTag, $tagTarget, "-m", $message) "Tag creation failed."
     Write-Host "TAG_CREATED=$releaseTag"
 
     if ($Push) {

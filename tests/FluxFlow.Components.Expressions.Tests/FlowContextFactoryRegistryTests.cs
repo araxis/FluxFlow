@@ -61,6 +61,34 @@ public sealed class FlowContextFactoryRegistryTests
         registry.Resolve(typeof(int)).ShouldBeSameAs(second);
     }
 
+    [Fact]
+    public void Resolve_ThrowsForIncomparableAssignableCandidates()
+    {
+        var defaultFactory = new TestFactory("default");
+        var registry = new FlowContextFactoryRegistry<TestFactory>(defaultFactory)
+            .Register(typeof(IFirstMarker), new TestFactory("first"))
+            .Register(typeof(ISecondMarker), new TestFactory("second"));
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => registry.Resolve(typeof(BothMarkersMessage)));
+
+        exception.Message.ShouldContain(nameof(IFirstMarker));
+        exception.Message.ShouldContain(nameof(ISecondMarker));
+    }
+
+    [Fact]
+    public void Resolve_PrefersCandidateAssignableToAllOtherCandidates()
+    {
+        var defaultFactory = new TestFactory("default");
+        var exactBase = new TestFactory("both-markers");
+        var registry = new FlowContextFactoryRegistry<TestFactory>(defaultFactory)
+            .Register(typeof(IFirstMarker), new TestFactory("first"))
+            .Register(typeof(ISecondMarker), new TestFactory("second"))
+            .Register(typeof(BothMarkersMessage), exactBase);
+
+        registry.Resolve(typeof(DerivedBothMarkersMessage)).ShouldBeSameAs(exactBase);
+    }
+
     private sealed record TestFactory(string Name);
 
     private record BaseMessage;
@@ -68,4 +96,12 @@ public sealed class FlowContextFactoryRegistryTests
     private record DerivedMessage : BaseMessage;
 
     private sealed record MoreDerivedMessage : DerivedMessage;
+
+    private interface IFirstMarker;
+
+    private interface ISecondMarker;
+
+    private record BothMarkersMessage : IFirstMarker, ISecondMarker;
+
+    private sealed record DerivedBothMarkersMessage : BothMarkersMessage;
 }

@@ -15,6 +15,7 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
+    private bool _completedBeforeStart;
     private bool _disposed;
 
     public GeneratedSourceNode(
@@ -39,6 +40,20 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
                 nameof(options),
                 "source.generated bounded capacity must be greater than zero.");
         }
+
+        if (options.MaxItems.HasValue && options.MaxItems.Value <= 0)
+        {
+            throw new ArgumentException(
+                "source.generated option 'maxItems' must be greater than zero.",
+                nameof(options));
+        }
+
+        if (options.Loop && !options.MaxItems.HasValue)
+        {
+            throw new ArgumentException(
+                "source.generated option 'maxItems' is required when 'loop' is true.",
+                nameof(options));
+        }
     }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
@@ -46,6 +61,11 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
         cancellationToken.ThrowIfCancellationRequested();
         lock (_stateLock)
         {
+            if (_completedBeforeStart)
+            {
+                return Task.CompletedTask;
+            }
+
             if (_startRequested)
             {
                 throw new InvalidOperationException("source.generated node has already started.");
@@ -65,6 +85,10 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
         lock (_stateLock)
         {
             cancellation = _runCancellation;
+            if (cancellation is null)
+            {
+                _completedBeforeStart = true;
+            }
         }
 
         if (cancellation is null)
@@ -73,13 +97,28 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
             return;
         }
 
-        cancellation.Cancel();
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the run loop has stopped.
+        }
     }
 
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        _runCancellation?.Cancel();
+        try
+        {
+            _runCancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the run loop has stopped.
+        }
+
         base.Fault(exception);
     }
 
@@ -119,7 +158,12 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = _items[index % _items.Count];
-                await SendOutputAsync(item, cancellationToken).ConfigureAwait(false);
+                if (!await SendOutputAsync(item, cancellationToken).ConfigureAwait(false))
+                {
+                    CompleteGenerated(emitted, "source.generated stopped.");
+                    return;
+                }
+
                 emitted++;
                 TryEmitDiagnostic(
                     SourceDiagnosticNames.GeneratedEmitted,

@@ -8,6 +8,13 @@ namespace FluxFlow.Components.Serialization.Nodes;
 
 internal static class SerializationConverters
 {
+    private static readonly JsonSerializerOptions IndentedSerializerOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    private static readonly JsonSerializerOptions CompactSerializerOptions = new();
+
     public static JsonParseResult ParseJson(
         JsonParseRequest request,
         SerializationNodeOptions options)
@@ -22,13 +29,12 @@ internal static class SerializationConverters
         try
         {
             var documentOptions = CreateDocumentOptions(options);
-            using var document = JsonDocument.Parse(payload.Text, documentOptions);
             var node = JsonNode.Parse(payload.Text, documentOptions: documentOptions);
 
             return new JsonParseResult
             {
                 Value = node,
-                Kind = document.RootElement.ValueKind,
+                Kind = node?.GetValueKind() ?? JsonValueKind.Null,
                 Text = payload.Text,
                 ByteCount = payload.ByteCount,
                 Encoding = payload.Encoding.WebName
@@ -48,10 +54,9 @@ internal static class SerializationConverters
         SerializationNodeOptions options)
     {
         var encoding = ResolveEncoding(request.Encoding, options.DefaultEncoding);
-        var serializerOptions = new JsonSerializerOptions
-        {
-            WriteIndented = request.WriteIndented ?? options.WriteIndented
-        };
+        var serializerOptions = (request.WriteIndented ?? options.WriteIndented)
+            ? IndentedSerializerOptions
+            : CompactSerializerOptions;
 
         string text;
         try

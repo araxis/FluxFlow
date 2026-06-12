@@ -247,6 +247,45 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
+    public async Task Reducer_CapsItemizedRejectedKeyDiagnostics()
+    {
+        var runtimeNode = CreateNode(
+            new
+            {
+                reducer = "count",
+                maxKeys = 1
+            },
+            new SampleExpressionEngine());
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<StateReducerResult>(runtimeNode);
+        var errors = LinkOutput<FlowError>(runtimeNode, StateComponentPorts.Errors);
+        var diagnostics = new BufferBlock<FlowDiagnostic>();
+        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
+            .Diagnostics.LinkTo(
+                diagnostics,
+                new DataflowLinkOptions { PropagateCompletion = true });
+
+        await input.Target.SendAsync(new StateReducerInput { Key = "tracked" });
+        for (var index = 0; index < 1100; index++)
+        {
+            await input.Target.SendAsync(new StateReducerInput { Key = $"rejected-{index}" });
+        }
+
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("tracked");
+        var keyLimitDiagnostics = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
+            .Where(diagnostic => diagnostic.Name == StateDiagnosticNames.KeyLimitReached)
+            .ToList();
+        keyLimitDiagnostics.Count.ShouldBe(1025);
+        keyLimitDiagnostics
+            .Count(diagnostic => diagnostic.Message!.Contains("will not be itemized"))
+            .ShouldBe(1);
+        (await DrainErrorsUntilCompletedAsync(errors)).Count.ShouldBe(1100);
+    }
+
+    [Fact]
     public async Task Reducer_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(
@@ -382,6 +421,38 @@ public sealed class StateReducerNodeTests
                 out var error);
         error.ShouldBeNull();
         return target;
+    }
+
+    private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
+        BufferBlock<FlowDiagnostic> diagnostics)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var entries = new List<FlowDiagnostic>();
+        while (await diagnostics.OutputAvailableAsync(cancellation.Token))
+        {
+            while (diagnostics.TryReceive(out var entry))
+            {
+                entries.Add(entry);
+            }
+        }
+
+        return entries;
+    }
+
+    private static async Task<List<FlowError>> DrainErrorsUntilCompletedAsync(
+        BufferBlock<FlowError> errors)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var entries = new List<FlowError>();
+        while (await errors.OutputAvailableAsync(cancellation.Token))
+        {
+            while (errors.TryReceive(out var entry))
+            {
+                entries.Add(entry);
+            }
+        }
+
+        return entries;
     }
 
     private static long ReadNumber(object? value)

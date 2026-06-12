@@ -340,7 +340,7 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
-    public async Task Factory_UsesContextDefaultsAndCreatesOwnedLease()
+    public async Task Factory_UsesContextDefaultsAndCreatesSharedLease()
     {
         using var temp = TempDirectory.Create();
         var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
@@ -361,10 +361,163 @@ public sealed class FileSystemStorageStoreTests
             Value = "first"
         });
 
-        lease.OwnsStore.ShouldBeTrue();
+        lease.OwnsStore.ShouldBeFalse();
         saved.Collection.ShouldBe("items");
         Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Factory_SerializesVersionedPutsAcrossLeases()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        var successes = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(async index =>
+        {
+            var store = index % 2 == 0 ? first.Store : second.Store;
+            while (true)
+            {
+                var current = await store.GetAsync(new StorageGetRequest
+                {
+                    Collection = "items",
+                    Key = "counter"
+                });
+                try
+                {
+                    await store.PutAsync(new StoragePutRequest
+                    {
+                        Collection = "items",
+                        Key = "counter",
+                        Value = index,
+                        ExpectedVersion = current?.Version ?? 0
+                    });
+                    Interlocked.Increment(ref successes);
+                    return;
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }));
+        var final = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "counter"
+        });
+
+        successes.ShouldBe(100);
+        final.ShouldNotBeNull();
+        final.Version.ShouldBe(100);
+    }
+
+    [Fact]
+    public async Task Factory_SerializesCreateModeAcrossLeases()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        var successes = 0;
+        var conflicts = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(async index =>
+        {
+            var store = index % 2 == 0 ? first.Store : second.Store;
+            try
+            {
+                await store.PutAsync(new StoragePutRequest
+                {
+                    Collection = "items",
+                    Key = "singleton",
+                    Value = index,
+                    Mode = StorageWriteMode.Create
+                });
+                Interlocked.Increment(ref successes);
+            }
+            catch (InvalidOperationException)
+            {
+                Interlocked.Increment(ref conflicts);
+            }
+        }));
+        var final = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "singleton"
+        });
+
+        successes.ShouldBe(1);
+        conflicts.ShouldBe(99);
+        final.ShouldNotBeNull();
+        final.Version.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Put_CreateSucceedsOverExpiredRecord()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 5, 6, TimeSpan.Zero);
+        var clock = new RecordingStorageClock(now);
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path, clock);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "old",
+            ExpiresAt = now.AddMinutes(-1)
+        });
+
+        var created = await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "new",
+            Mode = StorageWriteMode.Create
+        });
+
+        created.Version.ShouldBe(1);
+        created.Value.ShouldBe("new");
+    }
+
+    [Fact]
+    public async Task Query_SkipsCorruptRecordFilesAndRemovesTempFiles()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first"
+        });
+        var collectionDirectory = Path.GetDirectoryName(
+            Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+                .ShouldHaveSingleItem())!;
+        var garbagePath = Path.Combine(collectionDirectory, "garbage.json");
+        var unsupportedPath = Path.Combine(collectionDirectory, "unsupported.json");
+        var tempPath = Path.Combine(collectionDirectory, $"orphan.{Guid.NewGuid():N}.tmp");
+        await File.WriteAllTextAsync(garbagePath, "not-json");
+        await File.WriteAllTextAsync(
+            unsupportedPath,
+            """{"formatVersion":99,"collection":"items","key":"beta"}""");
+        await File.WriteAllTextAsync(tempPath, "leftover");
+
+        var records = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items"
+        });
+
+        records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
+        File.Exists(tempPath).ShouldBeFalse();
     }
 
     [Fact]
@@ -497,6 +650,15 @@ public sealed class FileSystemStorageStoreTests
             RootDirectory = rootDirectory,
             Clock = clock
         });
+
+    private static StorageStoreContext CreateStoreContext()
+        => new()
+        {
+            Address = new NodeAddress("main", new NodeName("store")),
+            NodeType = new NodeType("storage.put"),
+            StoreName = "tenant-a",
+            Collection = "items"
+        };
 
     private static RuntimeNodeFactoryContext CreateContext(
         NodeType nodeType,

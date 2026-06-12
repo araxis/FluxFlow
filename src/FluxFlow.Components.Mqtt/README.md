@@ -24,6 +24,11 @@ var registry = new RuntimeNodeFactoryRegistry()
 
 Options are static node settings. Requests and messages are per-item data.
 
+`mqtt.publish` bounds each adapter publish with `publishTimeoutMilliseconds`
+(default `30000`). A publish that exceeds the timeout is reported as a
+per-message error and the node continues with later requests, so a hung
+adapter cannot wedge the node.
+
 `MqttClientFactoryContext` includes the runtime node address, connection name,
 and connection profile. Hosts can use `ConnectionName` to resolve app-owned
 resources instead of placing all broker settings inline.

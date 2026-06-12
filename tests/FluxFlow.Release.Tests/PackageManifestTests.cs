@@ -81,6 +81,25 @@ public sealed class PackageManifestTests
         var heading = $"## {entry.NotesName} {version}";
         changelog.Contains(heading, StringComparison.Ordinal)
             .ShouldBeTrue($"CHANGELOG.md must contain '{heading}'.");
+        AssertChangelogSectionIsNotEmpty(changelog, heading);
+    }
+
+    private static void AssertChangelogSectionIsNotEmpty(string changelog, string heading)
+    {
+        var lines = changelog
+            .Split('\n')
+            .Select(line => line.TrimEnd('\r'))
+            .ToArray();
+
+        var headingIndex = Array.FindIndex(lines, line => line.Trim() == heading);
+        headingIndex.ShouldBeGreaterThanOrEqualTo(0, $"CHANGELOG.md must contain a '{heading}' heading line.");
+
+        var section = lines
+            .Skip(headingIndex + 1)
+            .TakeWhile(line => !Regex.IsMatch(line, @"^\s*##\s"));
+
+        string.Join('\n', section).Trim()
+            .ShouldNotBeEmpty($"CHANGELOG.md section '{heading}' must not be empty.");
     }
 
     private static void AssertReadmeIsPacked(

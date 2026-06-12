@@ -1,5 +1,6 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -118,6 +119,122 @@ public sealed class TimerDelayNodeTests
     }
 
     [Fact]
+    public async Task Delay_BurstEmitsItemsWithConstantOffset()
+    {
+        var clock = new GatedVirtualClock(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var runtimeNode = CreateNode(
+            options => options.UseClock(clock),
+            new
+            {
+                inputType = "int",
+                delayMilliseconds = 50,
+                boundedCapacity = 8
+            });
+        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
+            .ShouldBeOfType<InputPort<int>>();
+        var output = new BufferBlock<int>();
+        LinkOutput(runtimeNode, output);
+
+        await input.Target.SendAsync(1);
+        await input.Target.SendAsync(2);
+        await input.Target.SendAsync(3);
+        input.Target.Complete();
+        // The intake block stamps every item on arrival; wait until the burst is
+        // stamped before letting the first (and only) clock delay elapse.
+        await input.Target.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        clock.ReleaseDelays();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
+        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(50)]);
+    }
+
+    [Fact]
+    public async Task Delay_ErrorsPortReceivesPerMessageFailures()
+    {
+        var clock = new ThrowOnceClock();
+        var runtimeNode = CreateNode(
+            options => options.UseClock(clock),
+            new
+            {
+                inputType = "string",
+                delayMilliseconds = 5
+            });
+        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
+            .ShouldBeOfType<InputPort<string>>();
+        var output = new BufferBlock<string>();
+        var errors = new BufferBlock<FlowError>();
+        LinkOutput(runtimeNode, output);
+        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Errors))!
+            .TryLinkTo(
+                new InputPort<FlowError>(
+                    new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                    errors),
+                propagateCompletion: true,
+                out var linkError);
+        linkError.ShouldBeNull();
+
+        await input.Target.SendAsync("bad");
+        await input.Target.SendAsync("good");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(TimerErrorCodes.DelayFailed);
+        (await DrainUntilCompletedAsync(output)).ShouldBe(["good"]);
+    }
+
+    [Fact]
+    public async Task Delay_DisposeAfterFaultDoesNotThrow()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                inputType = "string",
+                delayMilliseconds = 1
+            });
+        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
+            .LinkToDiscard();
+
+        runtimeNode.Node.Fault(new InvalidOperationException("boom"));
+        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => runtimeNode.Node.Completion);
+    }
+
+    [Fact]
+    public async Task Delay_DisposePromptlyCancelsPendingDelays()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                inputType = "int",
+                delayMilliseconds = 30000,
+                boundedCapacity = 8
+            });
+        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
+            .ShouldBeOfType<InputPort<int>>();
+        var output = new BufferBlock<int>();
+        LinkOutput(runtimeNode, output);
+
+        await input.Target.SendAsync(1);
+        await input.Target.SendAsync(2);
+        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void Delay_RejectsMissingDelay()
     {
         var exception = Should.Throw<InvalidOperationException>(
@@ -232,4 +349,80 @@ public sealed class TimerDelayNodeTests
     }
 
     private sealed record InputMessage(string Value);
+
+    private sealed class GatedVirtualClock(DateTimeOffset utcNow) : ITimerClock
+    {
+        private readonly object _gate = new();
+        private readonly List<TimeSpan> _delays = [];
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private DateTimeOffset _utcNow = utcNow;
+
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _utcNow;
+                }
+            }
+        }
+
+        public IReadOnlyList<TimeSpan> Delays
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _delays.ToArray();
+                }
+            }
+        }
+
+        public void ReleaseDelays()
+            => _release.TrySetResult();
+
+        public async ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (delay <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _delays.Add(delay);
+            }
+
+            await _release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            lock (_gate)
+            {
+                _utcNow += delay;
+            }
+        }
+    }
+
+    private sealed class ThrowOnceClock : ITimerClock
+    {
+        private int _calls;
+
+        public DateTimeOffset UtcNow { get; } = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                throw new InvalidOperationException("clock failed");
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
 }

@@ -3,6 +3,7 @@ using FluxFlow.Components.Observability.Options;
 using FluxFlow.Engine.Mapping;
 using System.Collections;
 using System.Globalization;
+using System.Text;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
@@ -50,16 +51,33 @@ internal static class ObservabilityNodeSupport
         string template,
         IReadOnlyDictionary<string, object?> values)
     {
-        var rendered = template;
-        foreach (var (key, value) in values)
+        var rendered = new StringBuilder(template.Length);
+        var position = 0;
+        while (position < template.Length)
         {
-            rendered = rendered.Replace(
-                "{" + key + "}",
-                Convert.ToString(value, CultureInfo.InvariantCulture),
-                StringComparison.Ordinal);
+            var start = template.IndexOf('{', position);
+            var end = start < 0 ? -1 : template.IndexOf('}', start + 1);
+            if (end < 0)
+            {
+                rendered.Append(template, position, template.Length - position);
+                break;
+            }
+
+            var key = template.Substring(start + 1, end - start - 1);
+            if (values.TryGetValue(key, out var value))
+            {
+                rendered.Append(template, position, start - position);
+                rendered.Append(Convert.ToString(value, CultureInfo.InvariantCulture));
+                position = end + 1;
+            }
+            else
+            {
+                rendered.Append(template, position, start + 1 - position);
+                position = start + 1;
+            }
         }
 
-        return rendered;
+        return rendered.ToString();
     }
 
     public static Dictionary<string, object?> CreateAttributes(

@@ -94,6 +94,59 @@ public sealed class FilterNodeTests
     }
 
     [Fact]
+    public async Task FilterNode_ErrorsPortReceivesPerMessageFailures()
+    {
+        var calls = 0;
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+                evaluate: (_, context, _) =>
+                {
+                    calls++;
+                    if (calls == 1)
+                    {
+                        throw new InvalidOperationException("predicate failed");
+                    }
+
+                    return (int)context.Variables["input"]! > 1;
+                })),
+            new
+            {
+                expression = "test",
+                expressionName = "filter-test",
+                inputType = "int"
+            });
+        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
+            .ShouldBeOfType<InputPort<int>>();
+        var errors = new BufferBlock<FlowError>();
+        var results = new BufferBlock<int>();
+        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Errors))!
+            .TryLinkTo(
+                new InputPort<FlowError>(
+                    new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                    errors),
+                propagateCompletion: true,
+                out var linkError);
+        linkError.ShouldBeNull();
+        runtimeNode.FindOutput(new PortName(ControlComponentPorts.Output))!
+            .TryLinkTo(
+                new InputPort<int>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out _);
+
+        await input.Target.SendAsync(1);
+        await input.Target.SendAsync(2);
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(ControlErrorCodes.FilterExpressionFailed);
+        error.Context!.ShouldContain("expressionName=filter-test");
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(2);
+    }
+
+    [Fact]
     public async Task FilterNode_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(

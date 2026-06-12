@@ -17,6 +17,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     private readonly ActionBlock<MqttPublishRequest> _input;
     private readonly BufferBlock<MqttPublishResult> _result;
     private readonly MqttPublishOptions _options;
+    private readonly CancellationTokenSource _lifecycleCancellation = new();
     private MqttHealthMonitor? _healthMonitor;
     private MqttClientLease? _clientLease;
     private bool _disposed;
@@ -77,6 +78,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
+        _lifecycleCancellation.Cancel();
         try
         {
             FaultNode(exception);
@@ -96,12 +98,24 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         }
 
         _disposed = true;
+        Complete();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+        }
+
+        _lifecycleCancellation.Cancel();
         await StopHealthMonitorAsync().ConfigureAwait(false);
 
         if (_clientLease is not null)
         {
             await _clientLease.DisposeAsync().ConfigureAwait(false);
         }
+
+        _lifecycleCancellation.Dispose();
     }
 
     protected override void OnNodeCompleted()
@@ -210,9 +224,16 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
             return;
         }
 
+        var publishTimeout = TimeSpan.FromMilliseconds(_options.PublishTimeoutMilliseconds);
+        using var publishCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifecycleCancellation.Token);
+        publishCancellation.CancelAfter(publishTimeout);
         try
         {
-            await _clientLease.Adapter.PublishAsync(request).ConfigureAwait(false);
+            await _clientLease.Adapter.PublishAsync(request, publishCancellation.Token)
+                .AsTask()
+                .WaitAsync(publishTimeout, _lifecycleCancellation.Token)
+                .ConfigureAwait(false);
 
             var result = new MqttPublishResult
             {
@@ -237,6 +258,32 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 MqttDiagnosticNames.PublishSucceeded,
                 message: $"Published MQTT message to '{request.Topic}'.",
                 attributes: CreateDiagnosticAttributes(request, result.PayloadBytes));
+        }
+        catch (Exception exception) when (
+            exception is TimeoutException ||
+            (exception is OperationCanceledException &&
+             publishCancellation.IsCancellationRequested &&
+             !_lifecycleCancellation.IsCancellationRequested))
+        {
+            ReportPublishError(
+                MqttErrorCodes.PublishTimedOut,
+                $"MQTT publish timed out after {_options.PublishTimeoutMilliseconds} ms.",
+                request,
+                exception);
+            EmitMqttEvent(
+                type: MqttEventNames.PublishFailed,
+                subject: request.Topic,
+                status: "failed",
+                channel: MqttEventNames.PublishFailed,
+                payloadBytes: request.Payload.Length,
+                payloadPreview: request.PayloadPreview,
+                attributes: CreateEventAttributes(request, request.Payload.Length));
+            TryEmitDiagnostic(
+                MqttDiagnosticNames.PublishFailed,
+                FlowDiagnosticLevel.Error,
+                $"MQTT publish timed out for '{request.Topic}'.",
+                exception,
+                CreateDiagnosticAttributes(request, request.Payload.Length));
         }
         catch (Exception exception)
         {

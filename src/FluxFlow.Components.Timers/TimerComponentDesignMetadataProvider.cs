@@ -67,7 +67,8 @@ public sealed class TimerComponentDesignMetadataProvider : IComponentDesignMetad
             Options = options,
             Ports =
             [
-                Port(TimerComponentPorts.Output, PortDirection.Output, outputType, true)
+                Port(TimerComponentPorts.Output, PortDirection.Output, outputType, true),
+                Port(TimerComponentPorts.Errors, PortDirection.Output, "FlowError", false, 1)
             ]
         };
 
@@ -89,7 +90,8 @@ public sealed class TimerComponentDesignMetadataProvider : IComponentDesignMetad
             Ports =
             [
                 Port(TimerComponentPorts.Input, PortDirection.Input, "Configured input type", true),
-                Port(TimerComponentPorts.Output, PortDirection.Output, "Configured input type", true, 1)
+                Port(TimerComponentPorts.Output, PortDirection.Output, "Configured input type", true, 1),
+                Port(TimerComponentPorts.Errors, PortDirection.Output, "FlowError", false, 2)
             ]
         };
 

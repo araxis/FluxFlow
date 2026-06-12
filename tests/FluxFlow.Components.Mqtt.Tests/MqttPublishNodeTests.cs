@@ -1,5 +1,6 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
+using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
@@ -267,6 +268,75 @@ public sealed class MqttPublishNodeTests
     }
 
     [Fact]
+    public async Task PublishNode_ReportsTimeoutForHungAdapterAndContinues()
+    {
+        var adapter = new HangingMqttClientAdapter(hangCount: 1);
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new DelegateMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var runtimeNode = factory(CreateContext(
+            MqttComponentTypes.Publish,
+            new
+            {
+                defaultTopic = "devices/state",
+                publishTimeoutMilliseconds = 100
+            }));
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttPublishNode>();
+        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
+            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
+        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
+        var results = new BufferBlock<MqttPublishResult>();
+        node.Errors.LinkTo(errors);
+        runtimeNode.FindOutput(new PortName(MqttComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<MqttPublishResult>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out _);
+
+        await node.StartAsync();
+        await input.Target.SendAsync(new MqttPublishRequest
+        {
+            Payload = [1],
+            CorrelationId = "hung"
+        });
+        await input.Target.SendAsync(new MqttPublishRequest
+        {
+            Payload = [2],
+            CorrelationId = "after"
+        });
+        input.Target.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MqttErrorCodes.PublishTimedOut);
+        error.Context.ShouldNotBeNull();
+        error.Context.ShouldContain("correlationId=hung");
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.CorrelationId.ShouldBe("after");
+
+        await node.DisposeAsync();
+    }
+
+    [Fact]
+    public void PublishNode_RejectsInvalidPublishTimeout()
+    {
+        var adapter = new RecordingMqttClientAdapter();
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(new RecordingMqttClientFactory(adapter)));
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(CreateContext(
+                MqttComponentTypes.Publish,
+                new { publishTimeoutMilliseconds = 0 })));
+
+        exception.Message.ShouldContain("PublishTimeoutMilliseconds");
+    }
+
+    [Fact]
     public async Task PublishNode_EmitsDiagnosticsAndEvents()
     {
         var adapter = new RecordingMqttClientAdapter();
@@ -377,5 +447,36 @@ public sealed class MqttPublishNodeTests
         var root = JsonSerializer.SerializeToElement(configuration);
         return root.EnumerateObject()
             .ToDictionary(property => property.Name, property => property.Value.Clone());
+    }
+
+    private sealed class DelegateMqttClientFactory(IMqttClientAdapter adapter) : IMqttClientFactory
+    {
+        public ValueTask<MqttClientLease> CreateAsync(
+            MqttClientFactoryContext context,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(MqttClientLease.Owned(adapter));
+    }
+
+    private sealed class HangingMqttClientAdapter(int hangCount) : IMqttClientAdapter
+    {
+        private int _publishCount;
+
+        public async ValueTask PublishAsync(
+            MqttPublishRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (_publishCount++ < hangCount)
+            {
+                await new TaskCompletionSource().Task;
+            }
+        }
+
+        public ValueTask<IMqttSubscription> SubscribeAsync(
+            MqttSubscriptionOptions options,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask DisposeAsync()
+            => ValueTask.CompletedTask;
     }
 }

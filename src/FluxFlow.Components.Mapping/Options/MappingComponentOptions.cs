@@ -7,6 +7,7 @@ namespace FluxFlow.Components.Mapping.Options;
 
 public sealed class MappingComponentOptions
 {
+    private readonly object _typesLock = new();
     private readonly Dictionary<string, Type> _types = new(StringComparer.OrdinalIgnoreCase)
     {
         [MapperOptions.ObjectTypeName] = typeof(object),
@@ -86,16 +87,19 @@ public sealed class MappingComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var key = name.Trim();
 
-        if (_types.TryGetValue(key, out var type))
+        lock (_typesLock)
         {
-            return type;
-        }
+            if (_types.TryGetValue(key, out var type))
+            {
+                return type;
+            }
 
-        var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
-        if (resolved is not null)
-        {
-            _types[key] = resolved;
-            return resolved;
+            var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
+            if (resolved is not null)
+            {
+                _types[key] = resolved;
+                return resolved;
+            }
         }
 
         throw new InvalidOperationException(

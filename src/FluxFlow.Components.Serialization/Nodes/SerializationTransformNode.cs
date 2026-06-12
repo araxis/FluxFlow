@@ -16,7 +16,6 @@ internal sealed class SerializationTransformNode<TInput, TOutput> : FlowNodeBase
     private readonly Func<TOutput, IReadOnlyDictionary<string, object?>> _outputAttributes;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TOutput> _output;
-    private readonly CancellationToken _processingCancellationToken;
 
     public SerializationTransformNode(
         string nodeType,
@@ -56,7 +55,6 @@ internal sealed class SerializationTransformNode<TInput, TOutput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(ConvertAsync, inputOptions);
         _output = new BufferBlock<TOutput>(blockOptions);
         _input.Completion.ContinueWith(
@@ -95,13 +93,7 @@ internal sealed class SerializationTransformNode<TInput, TOutput> : FlowNodeBase
         TOutput result;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             result = _convert(input, _options);
-            _processingCancellationToken.ThrowIfCancellationRequested();
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (SerializationNodeException exception)
         {
@@ -122,7 +114,7 @@ internal sealed class SerializationTransformNode<TInput, TOutput> : FlowNodeBase
             return;
         }
 
-        await _output.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        await _output.SendAsync(result).ConfigureAwait(false);
         TryEmitDiagnostic(
             _successDiagnosticName,
             message: $"{_nodeType} converted input.",

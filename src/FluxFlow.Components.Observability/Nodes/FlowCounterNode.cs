@@ -17,7 +17,6 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
     private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowCounterSnapshot> _snapshots;
-    private readonly CancellationToken _processingCancellationToken;
     private long _count;
     private long _rejectedCount;
 
@@ -55,7 +54,6 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(ObserveAsync, inputOptions);
         _snapshots = new BufferBlock<FlowCounterSnapshot>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -107,7 +105,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
             LastObservedAt = observedAt
         };
 
-        await _snapshots.SendAsync(snapshot, _processingCancellationToken).ConfigureAwait(false);
+        await _snapshots.SendAsync(snapshot).ConfigureAwait(false);
         TryEmitDiagnostic(
             ObservabilityDiagnosticNames.CounterIncremented,
             message: "flow.counter incremented.",
@@ -128,7 +126,6 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
 
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             var accepted = ObservabilityNodeSupport.EvaluatePredicate(
                 _expressionEngine ?? throw new InvalidOperationException(
                     "flow.counter requires an expression engine when a predicate is configured."),
@@ -151,10 +148,6 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
             }
 
             return accepted;
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {

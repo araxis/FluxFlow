@@ -9,4 +9,5 @@ public sealed record FileWatchOptions
     public string Filter { get; init; } = "*";
     public bool IncludeSubdirectories { get; init; }
     public string[] NotifyFilters { get; init; } = [];
+    public int? InternalBufferSize { get; init; }
 }

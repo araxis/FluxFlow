@@ -11,5 +11,5 @@ public readonly record struct ResourceName
     }
 
     public string Value { get; }
-    public override string ToString() => Value;
+    public override string ToString() => Value ?? string.Empty;
 }

@@ -13,8 +13,11 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
+    private readonly CancellationTokenSource _disposeCancellation = new();
+    private readonly CancellationTokenSource _delayCancellation;
     private DateTimeOffset? _lastEmittedAt;
     private long _emitted;
+    private bool _disposed;
 
     internal TimerThrottleNode(
         TimerThrottleSettings settings,
@@ -29,6 +32,9 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
                 "Timer throttle bounded capacity must be greater than zero.");
         }
 
+        _delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _processingCancellation.Token,
+            _disposeCancellation.Token);
         var blockOptions = new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity };
         var inputOptions = new ExecutionDataflowBlockOptions
         {
@@ -58,7 +64,7 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(exception);
         try
         {
-            _processingCancellation.Cancel();
+            TryCancel(_processingCancellation);
             FaultNode(exception);
         }
         finally
@@ -70,8 +76,25 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         Complete();
-        await Completion.ConfigureAwait(false);
+        TryCancel(_disposeCancellation);
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Dispose tolerates nodes that completed in a faulted or canceled state.
+        }
+
+        _delayCancellation.Dispose();
+        _disposeCancellation.Dispose();
         _processingCancellation.Dispose();
     }
 
@@ -92,6 +115,10 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
+        {
+            // Dispose cancels in-flight delays so disposal drains promptly.
         }
         catch (Exception exception)
         {
@@ -124,7 +151,19 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
 
         if (delay > TimeSpan.Zero)
         {
-            await _clock.DelayAsync(delay, _processingCancellation.Token).ConfigureAwait(false);
+            await _clock.DelayAsync(delay, _delayCancellation.Token).ConfigureAwait(false);
+        }
+    }
+
+    private static void TryCancel(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; cancellation is no longer required.
         }
     }
 

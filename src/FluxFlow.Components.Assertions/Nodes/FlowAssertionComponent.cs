@@ -1,6 +1,7 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
 using FluxFlow.Components.Assertions.Options;
+using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -13,22 +14,33 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
     private readonly IAssertionContextFactory _contextFactory;
     private readonly AssertionNodeContext _nodeContext;
     private readonly AssertionOptions _options;
+    private readonly IAssertionClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowAssertionResult> _result;
     private readonly BufferBlock<TInput> _passed;
     private readonly BufferBlock<TInput> _failed;
-    private readonly CancellationToken _processingCancellationToken;
 
     public FlowAssertionComponent(
         AssertionOptions options,
         IFlowExpressionEngine expressionEngine,
         IAssertionContextFactory contextFactory,
         AssertionNodeContext nodeContext)
+        : this(options, expressionEngine, contextFactory, nodeContext, SystemAssertionClock.Instance)
+    {
+    }
+
+    public FlowAssertionComponent(
+        AssertionOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IAssertionContextFactory contextFactory,
+        AssertionNodeContext nodeContext,
+        IAssertionClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
         if (options.BoundedCapacity <= 0)
         {
@@ -43,7 +55,6 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(EvaluateAsync, inputOptions);
         _result = new BufferBlock<FlowAssertionResult>(blockOptions);
         _passed = new BufferBlock<TInput>(blockOptions);
@@ -88,17 +99,12 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             passed = AssertionNodeSupport.Evaluate(
                 _expressionEngine,
                 _options,
                 _contextFactory,
                 _nodeContext,
                 input);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {
@@ -117,15 +123,15 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         }
 
         var result = CreateResult(input, passed);
-        await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        await _result.SendAsync(result).ConfigureAwait(false);
         if (passed && _options.EmitPassedInput)
         {
-            await _passed.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+            await _passed.SendAsync(input).ConfigureAwait(false);
         }
 
         if (!passed && _options.EmitFailedInput)
         {
-            await _failed.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+            await _failed.SendAsync(input).ConfigureAwait(false);
         }
 
         TryEmitDiagnostic(
@@ -149,6 +155,7 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
             Status = status,
             Message = passed ? "Assertion passed." : _options.EffectiveFailureMessage,
             Value = input,
+            EvaluatedAt = _clock.UtcNow,
             Failure = passed
                 ? null
                 : new AssertionFailure

@@ -11,9 +11,11 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         Metadata(FileSystemComponentTypes.FileWrite, "File Write", "fileWrite", "Writes files from explicit file write requests.",
             "FileWriteRequest", "FileWriteResult"),
         Metadata(FileSystemComponentTypes.FileRead, "File Read", "fileRead", "Reads files from explicit file read requests.",
-            "FileReadRequest", "FileReadResult"),
+            "FileReadRequest", "FileReadResult",
+            Number("maxBytes", "Max bytes", 16777216, 1)),
         Metadata(FileSystemComponentTypes.FileWatch, "File Watch", "fileWatch", "Watches a configured path and emits file change events.",
-            null, "FileWatchEvent"),
+            null, "FileWatchEvent",
+            Number("internalBufferSize", "Internal buffer bytes", 8192, 4096, 65536)),
         Metadata(FileSystemComponentTypes.DirectoryEnumerate, "Directory Enumerate", "directoryEnumerate", "Enumerates directory entries from explicit requests.",
             "DirectoryEnumerateRequest", "DirectoryEnumerateEntry")
     ];
@@ -24,7 +26,8 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         string preferredName,
         string summary,
         string? inputType,
-        string outputType) => new()
+        string outputType,
+        params OptionDesignMetadata[] extraOptions) => new()
         {
             Type = type,
             DisplayName = displayName,
@@ -36,7 +39,8 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             Options =
             [
                 Text("path", "Path"),
-                Number("boundedCapacity", "Capacity", 128, 1)
+                Number("boundedCapacity", "Capacity", 128, 1),
+                .. extraOptions
             ],
             Ports = inputType is null
                 ? [Port(FileSystemComponentPorts.Output, PortDirection.Output, outputType, true)]
@@ -53,14 +57,20 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         DisplayName = displayName
     };
 
-    private static OptionDesignMetadata Number(string name, string displayName, object defaultValue, double min) => new()
-    {
-        Name = name,
-        Kind = OptionValueKind.Number,
-        DisplayName = displayName,
-        DefaultValue = defaultValue,
-        Min = min
-    };
+    private static OptionDesignMetadata Number(
+        string name,
+        string displayName,
+        object defaultValue,
+        double min,
+        double? max = null) => new()
+        {
+            Name = name,
+            Kind = OptionValueKind.Number,
+            DisplayName = displayName,
+            DefaultValue = defaultValue,
+            Min = min,
+            Max = max
+        };
 
     private static PortDesignMetadata Port(string name, PortDirection direction, string valueType, bool primary, int order = 0) => new()
     {

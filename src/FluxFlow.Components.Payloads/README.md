@@ -14,6 +14,7 @@ Reusable payload inspection components for FluxFlow.
 {
   "type": "payload.inspect",
   "name": "inspect",
+  "maxInputBytes": 1048576,
   "maxPreviewBytes": 1024,
   "maxFormattedChars": 4096,
   "detectBase64": true,
@@ -34,6 +35,10 @@ formatted preview, parse error text when applicable, and truncation flags.
 Malformed JSON or XML remains a normal inspection result. Unexpected
 processing failures are emitted as `FlowError` values and the node continues
 with later messages.
+
+Payloads larger than `maxInputBytes` (default 1048576) are not classified or
+formatted. They still emit a normal `PayloadInspectionResult` with the byte
+count and a "payload too large" formatted preview, not an error.
 
 ## Request
 

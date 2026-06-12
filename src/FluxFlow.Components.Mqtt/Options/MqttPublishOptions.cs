@@ -10,5 +10,6 @@ public sealed record MqttPublishOptions
     public MqttQualityOfService QualityOfService { get; init; } = MqttQualityOfService.AtMostOnce;
     public bool Retain { get; init; }
     public MqttReconnectPolicy? Reconnect { get; init; }
+    public int PublishTimeoutMilliseconds { get; init; } = 30_000;
     public int BoundedCapacity { get; init; } = 128;
 }

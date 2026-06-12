@@ -121,6 +121,40 @@ internal static class RuntimeCleanup
         }
     }
 
+    public static void TryDisposeErrors(
+        FlowErrorCollector collector,
+        ICollection<Exception> errors,
+        string owner)
+    {
+        try
+        {
+            collector.Dispose();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(new InvalidOperationException(
+                $"{owner} failed while disposing error collector.",
+                exception));
+        }
+    }
+
+    public static async ValueTask TryDisposeErrorsAsync(
+        FlowErrorCollector collector,
+        ICollection<Exception> errors,
+        string owner)
+    {
+        try
+        {
+            await collector.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            errors.Add(new InvalidOperationException(
+                $"{owner} failed while disposing error collector.",
+                exception));
+        }
+    }
+
     public static void ThrowIfErrors(string message, IReadOnlyCollection<Exception> errors)
     {
         if (errors.Count > 0)

@@ -1,5 +1,6 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
+using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
@@ -34,7 +35,7 @@ internal static class AssertionNodeFactory
             var method = CreateAssertMethod.MakeGenericMethod(inputType);
             return (RuntimeNode)method.Invoke(
                 null,
-                [context, options, expressionEngine, contextFactory, nodeContext])!;
+                [context, options, expressionEngine, contextFactory, nodeContext, componentOptions.Clock])!;
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -48,13 +49,15 @@ internal static class AssertionNodeFactory
         AssertionOptions options,
         IFlowExpressionEngine expressionEngine,
         IAssertionContextFactory contextFactory,
-        AssertionNodeContext nodeContext)
+        AssertionNodeContext nodeContext,
+        IAssertionClock clock)
     {
         var node = new FlowAssertionComponent<TInput>(
             options,
             expressionEngine,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            clock);
 
         return context.CreateNode(node)
             .Input(AssertionsComponentPorts.Input, node.Input)

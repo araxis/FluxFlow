@@ -15,6 +15,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
+    private bool _completedBeforeStart;
     private bool _disposed;
 
     public SequenceSourceNode(SequenceSourceOptions options)
@@ -42,6 +43,11 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
         cancellationToken.ThrowIfCancellationRequested();
         lock (_stateLock)
         {
+            if (_completedBeforeStart)
+            {
+                return Task.CompletedTask;
+            }
+
             if (_startRequested)
             {
                 throw new InvalidOperationException("source.sequence node has already started.");
@@ -61,6 +67,10 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
         lock (_stateLock)
         {
             cancellation = _runCancellation;
+            if (cancellation is null)
+            {
+                _completedBeforeStart = true;
+            }
         }
 
         if (cancellation is null)
@@ -69,13 +79,28 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
             return;
         }
 
-        cancellation.Cancel();
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the run loop has stopped.
+        }
     }
 
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        _runCancellation?.Cancel();
+        try
+        {
+            _runCancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the run loop has stopped.
+        }
+
         base.Fault(exception);
     }
 
@@ -122,7 +147,12 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                     Step = _options.Step,
                     Timestamp = _clock.UtcNow
                 };
-                await SendOutputAsync(item, cancellationToken).ConfigureAwait(false);
+                if (!await SendOutputAsync(item, cancellationToken).ConfigureAwait(false))
+                {
+                    CompleteSequence(emitted, "source.sequence stopped.");
+                    return;
+                }
+
                 emitted++;
                 TryEmitDiagnostic(
                     SourceDiagnosticNames.SequenceEmitted,

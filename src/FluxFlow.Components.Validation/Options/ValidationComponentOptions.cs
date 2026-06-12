@@ -29,6 +29,7 @@ public sealed class ValidationComponentOptions
         [typeof(JsonElement).FullName!] = typeof(JsonElement)
     };
 
+    private readonly object _typesLock = new();
     private readonly Dictionary<SelectorKey, IValidationValueSelector> _selectors = [];
     private IValidationClock _clock = SystemValidationClock.Instance;
 
@@ -48,8 +49,12 @@ public sealed class ValidationComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(type);
 
-        _types[name.Trim()] = type;
-        _types[type.FullName ?? type.Name] = type;
+        lock (_typesLock)
+        {
+            _types[name.Trim()] = type;
+            _types[type.FullName ?? type.Name] = type;
+        }
+
         return this;
     }
 
@@ -78,15 +83,22 @@ public sealed class ValidationComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var key = name.Trim();
 
-        if (_types.TryGetValue(key, out var type))
+        lock (_typesLock)
         {
-            return type;
+            if (_types.TryGetValue(key, out var type))
+            {
+                return type;
+            }
         }
 
         var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
         if (resolved is not null)
         {
-            _types[key] = resolved;
+            lock (_typesLock)
+            {
+                _types[key] = resolved;
+            }
+
             return resolved;
         }
 

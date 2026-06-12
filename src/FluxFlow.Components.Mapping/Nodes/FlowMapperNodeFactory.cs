@@ -65,6 +65,7 @@ internal static class FlowMapperNodeFactory
         return context.CreateNode(node)
             .Input(MappingComponentPorts.Input, node.Input)
             .Output(MappingComponentPorts.Output, node.Output)
+            .Output(MappingComponentPorts.Errors, node.Errors)
             .Build();
     }
 }
