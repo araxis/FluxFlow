@@ -16,6 +16,10 @@ param(
 
     [int] $DelaySeconds = 15,
 
+    [int] $IndexAttempts = 40,
+
+    [int] $IndexDelaySeconds = 15,
+
     [string] $WorkDirectory = "",
 
     [switch] $KeepWorkDirectory,
@@ -75,6 +79,75 @@ function Invoke-Step {
     }
 }
 
+function Resolve-FlatContainerBase {
+    param([string] $ServiceIndexUrl)
+
+    try {
+        $index = Invoke-RestMethod -Uri $ServiceIndexUrl -Method Get -TimeoutSec 30
+    }
+    catch {
+        return $null
+    }
+
+    if ($null -eq $index -or $null -eq $index.resources) {
+        return $null
+    }
+
+    $resource = $index.resources |
+        Where-Object { $_.'@type' -eq 'PackageBaseAddress/3.0.0' } |
+        Select-Object -First 1
+
+    if ($null -eq $resource) {
+        return $null
+    }
+
+    $base = [string] $resource.'@id'
+    if ([string]::IsNullOrWhiteSpace($base)) {
+        return $null
+    }
+
+    if (-not $base.EndsWith("/")) {
+        $base += "/"
+    }
+
+    return $base
+}
+
+function Wait-PackageIndexed {
+    param(
+        [string] $FlatContainerBase,
+        [string] $PackageId,
+        [string] $Version,
+        [int] $Attempts,
+        [int] $DelaySeconds
+    )
+
+    $indexUrl = "$FlatContainerBase$($PackageId.ToLowerInvariant())/index.json"
+
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        Write-Host "INDEX_WAIT_ATTEMPT=$attempt"
+        try {
+            $listing = Invoke-RestMethod -Uri $indexUrl -Method Get -TimeoutSec 30
+            if ($null -ne $listing -and
+                $null -ne $listing.versions -and
+                ($listing.versions -contains $Version)) {
+                Write-Host "INDEX_OK=$PackageId/$Version"
+                return $true
+            }
+        }
+        catch {
+            # A 404 until the first version is indexed, or a transient network
+            # error, both mean the version is not visible yet.
+        }
+
+        if ($attempt -lt $Attempts) {
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+
+    return $false
+}
+
 function Invoke-ConsumerCheck {
     param(
         [string] $ProjectPath,
@@ -129,6 +202,14 @@ if ($Attempts -lt 1) {
 
 if ($DelaySeconds -lt 0) {
     throw "Delay seconds cannot be negative."
+}
+
+if ($IndexAttempts -lt 0) {
+    throw "Index attempts cannot be negative."
+}
+
+if ($IndexDelaySeconds -lt 0) {
+    throw "Index delay seconds cannot be negative."
 }
 
 $resolvedSources = @()
@@ -192,6 +273,29 @@ Write-Host "PACKAGE_CACHE=$packageCachePath"
 
 if ($PrepareOnly) {
     return
+}
+
+# Poll the flat-container listing before the restore-based check. The listing
+# is exactly what `dotnet restore` reads for the version, and a GET is far
+# cheaper than a restore, so this absorbs nuget.org indexing lag without
+# burning restore attempts. Skipped for local directory sources.
+$primaryIsHttpSource = -not (Test-Path -LiteralPath $PackageSource -PathType Container)
+if ($IndexAttempts -ge 1 -and $primaryIsHttpSource) {
+    $flatContainerBase = Resolve-FlatContainerBase $PackageSource
+    if ($null -ne $flatContainerBase) {
+        Write-Host "FLAT_CONTAINER_BASE=$flatContainerBase"
+        if (-not (Wait-PackageIndexed `
+                    -FlatContainerBase $flatContainerBase `
+                    -PackageId $PackageId `
+                    -Version $Version `
+                    -Attempts $IndexAttempts `
+                    -DelaySeconds $IndexDelaySeconds)) {
+            Write-Host "INDEX_WAIT_TIMED_OUT=$PackageId/$Version"
+        }
+    }
+    else {
+        Write-Host "FLAT_CONTAINER_BASE=unavailable"
+    }
 }
 
 $lastError = $null

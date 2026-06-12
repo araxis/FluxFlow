@@ -170,6 +170,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   error-channel rework, component minor releases, and release plan.
 - `133-expectations-deterministic-timeout-test.md`: flaky expectation timeout
   test fix with the additive observed-event-count property.
+- `134-feed-verify-index-precheck.md`: flat-container index pre-check that
+  makes post-publish feed verification robust to nuget.org indexing lag.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

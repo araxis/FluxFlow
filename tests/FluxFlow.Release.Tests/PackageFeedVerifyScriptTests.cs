@@ -94,6 +94,41 @@ public sealed class PackageFeedVerifyScriptTests
     }
 
     [Fact]
+    public async Task Feed_verify_script_rejects_negative_index_attempts()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var package = GetConfigurationPackage(root);
+        var version = ReadProjectVersion(root, package);
+        var packageSource = Path.Combine(Path.GetTempPath(), $"fluxflow-package-source-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(packageSource);
+
+            var result = await ReleaseScriptRunner.RunAsync(
+                root,
+                "package-feed-verify.ps1",
+                "-PackageId",
+                package.PackageId,
+                "-Version",
+                version,
+                "-PackageSource",
+                packageSource,
+                "-IndexAttempts",
+                "-1",
+                "-PrepareOnly");
+
+            result.ExitCode.ShouldNotBe(0);
+            result.ToString().ShouldContain("Index attempts cannot be negative");
+        }
+        finally
+        {
+            if (Directory.Exists(packageSource))
+                Directory.Delete(packageSource, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Feed_verify_script_rejects_unknown_local_source()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();

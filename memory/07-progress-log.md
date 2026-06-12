@@ -370,6 +370,9 @@ Date: 2026-05-31
   `ObservedEventCount` node property and released
   `FluxFlow.Components.Expectations` `1.2.0`
   (`133-expectations-deterministic-timeout-test.md`).
+- Added a flat-container index pre-check to `package-feed-verify.ps1` so the
+  post-publish verification step absorbs nuget.org indexing lag instead of
+  burning restore attempts (`134-feed-verify-index-precheck.md`).
 
 ## Remaining
 

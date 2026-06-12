@@ -105,6 +105,8 @@ published by CI, and verified on the public feed:
 - Public feed lookup confirmed all 25 new versions visible; the package list
   helper reports all 28 aliases consistent with tags and project versions.
 
-Follow-up candidate for the next maintenance pass: stabilize the flaky
-Expectations timeout test and consider a longer post-publish verification
-window for nuget.org indexing lag.
+Both follow-ups are done: the flaky Expectations timeout test was made
+deterministic and released as Expectations `1.2.0`
+(`133-expectations-deterministic-timeout-test.md`), and the post-publish
+feed verification now absorbs nuget.org indexing lag
+(`134-feed-verify-index-precheck.md`).
