@@ -23,8 +23,10 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             [
                 Port(RoutingComponentPorts.Input, PortDirection.Input, "Configured input type", true),
                 Port(RoutingComponentPorts.Result, PortDirection.Output, "FlowSwitchResult", true, 1),
-                Port(RoutingComponentPorts.Default, PortDirection.Output, "Configured input type", false, 2),
-                Port(RoutingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 3)
+                Port(RoutingComponentPorts.Routed, PortDirection.Output, "FlowRoute", false, 2),
+                Port(RoutingComponentPorts.Matched, PortDirection.Output, "Configured input type", false, 3),
+                Port(RoutingComponentPorts.Default, PortDirection.Output, "Configured input type", false, 4),
+                Port(RoutingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 5)
             ]),
         Metadata(
             RoutingComponentTypes.Correlation,
@@ -37,14 +39,16 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 Expression("sideExpression", "Side expression", "request"),
                 Text("requestSide", "Request side", "request"),
                 Text("responseSide", "Response side", "response"),
-                Number("timeoutMilliseconds", "Timeout ms", 5000, 1),
+                Number("timeoutMilliseconds", "Timeout ms", 30000, 1),
                 Capacity()
             ],
             [
                 Port(RoutingComponentPorts.Input, PortDirection.Input, "Configured input type", true),
-                Port(RoutingComponentPorts.Matched, PortDirection.Output, "FlowCorrelationMatch", true, 1),
-                Port(RoutingComponentPorts.Timeouts, PortDirection.Output, "FlowCorrelationTimeout", false, 2),
-                Port(RoutingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 3)
+                Port(RoutingComponentPorts.Request, PortDirection.Input, "Configured input type", false, 1),
+                Port(RoutingComponentPorts.Response, PortDirection.Input, "Configured input type", false, 2),
+                Port(RoutingComponentPorts.Matched, PortDirection.Output, "FlowCorrelationMatch", true, 3),
+                Port(RoutingComponentPorts.Timeouts, PortDirection.Output, "FlowCorrelationTimeout", false, 4),
+                Port(RoutingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 5)
             ]),
         Metadata(
             RoutingComponentTypes.Window,
@@ -73,7 +77,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 Text("rightInputType", "Right input type", "object"),
                 Expression("leftKeyExpression", "Left key expression", "input.key"),
                 Expression("rightKeyExpression", "Right key expression", "input.key"),
-                Number("timeoutMilliseconds", "Timeout ms", 5000, 1),
+                Number("timeoutMilliseconds", "Timeout ms", 30000, 1),
                 Capacity()
             ],
             [

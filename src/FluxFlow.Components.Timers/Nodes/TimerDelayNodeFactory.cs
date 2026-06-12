@@ -29,6 +29,7 @@ internal static class TimerDelayNodeFactory
         return context.CreateNode(node)
             .Input(TimerComponentPorts.Input, node.Input)
             .Output(TimerComponentPorts.Output, node.Output)
+            .Output(TimerComponentPorts.Errors, node.Errors)
             .Build();
     }
 

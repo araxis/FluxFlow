@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Payloads</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable payload inspection components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a maxInputBytes option (default 1 MiB); oversized payloads produce a bounded "payload too large" inspection result instead of fully formatting arbitrarily large inputs.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

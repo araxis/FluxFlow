@@ -1,5 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
+using FluxFlow.Components.Routing.Nodes;
+using FluxFlow.Components.Routing.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -231,6 +233,33 @@ public sealed class FlowJoinNodeTests
     }
 
     [Fact]
+    public async Task Join_DisposeAfterFaultDoesNotThrow()
+    {
+        var leftNodeContext = new RoutingNodeContext
+        {
+            Address = new NodeAddress("main", new NodeName("join")),
+            NodeType = RoutingComponentTypes.Join,
+            InputType = typeof(LeftMessage)
+        };
+        var node = new FlowJoinNode<LeftMessage, RightMessage>(
+            new JoinRoutingOptions
+            {
+                LeftKeyExpression = "key",
+                RightKeyExpression = "key"
+            },
+            new RecordingExpressionEngine(),
+            new TestRoutingContextFactory(),
+            new TestRoutingContextFactory(),
+            leftNodeContext,
+            leftNodeContext with { InputType = typeof(RightMessage) });
+
+        node.Fault(new InvalidOperationException("boom"));
+        await node.DisposeAsync();
+
+        node.Completion.IsFaulted.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Join_RejectsMissingLeftKeyExpression()
     {
         var exception = Should.Throw<InvalidOperationException>(
@@ -306,6 +335,19 @@ public sealed class FlowJoinNodeTests
     private sealed record LeftMessage(string Key, string Payload);
 
     private sealed record RightMessage(string Key, string Payload);
+
+    private sealed class TestRoutingContextFactory : IRoutingContextFactory
+    {
+        public FlowMapContext Create(object? input, RoutingNodeContext context)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input
+                }
+            };
+    }
 
     private sealed class LeftMessageContextFactory : IFlowMapContextFactory<LeftMessage>
     {

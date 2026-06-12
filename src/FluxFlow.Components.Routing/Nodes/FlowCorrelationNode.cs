@@ -8,7 +8,7 @@ using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
-public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
+public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly CorrelationRoutingOptions _options;
     private readonly IFlowExpressionEngine _expressionEngine;
@@ -16,18 +16,22 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     private readonly RoutingNodeContext _nodeContext;
     private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingPair> _pending;
+    private readonly Queue<CorrelationDeadline> _deadlines = new();
     private readonly StringComparer _comparer;
     private readonly string _requestSide;
     private readonly string _responseSide;
     private readonly TimeSpan _timeout;
     private readonly List<IDataflowBlock> _inputBlocks = [];
-    private readonly ActionBlock<CorrelationInput> _processor;
-    private readonly TransformBlock<TInput, CorrelationInput>? _input;
-    private readonly TransformBlock<TInput, CorrelationInput>? _request;
-    private readonly TransformBlock<TInput, CorrelationInput>? _response;
+    private readonly ActionBlock<CorrelationCommand> _processor;
+    private readonly TransformBlock<TInput, CorrelationCommand>? _input;
+    private readonly TransformBlock<TInput, CorrelationCommand>? _request;
+    private readonly TransformBlock<TInput, CorrelationCommand>? _response;
     private readonly BufferBlock<FlowCorrelationMatch<TInput>> _matched;
     private readonly BufferBlock<FlowCorrelationTimeout<TInput>> _timeouts;
-    private readonly CancellationToken _processingCancellationToken;
+    private readonly CancellationTokenSource _lifecycleCancellation = new();
+    private volatile CancellationTokenSource? _timerCancellation;
+    private long _timerVersion;
+    private bool _disposed;
 
     public FlowCorrelationNode(
         CorrelationRoutingOptions options,
@@ -99,16 +103,18 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
-        _processor = new ActionBlock<CorrelationInput>(CorrelateAsync, inputOptions);
+        _processor = new ActionBlock<CorrelationCommand>(ProcessCommandAsync, inputOptions);
         if (options.UsesSideExpression)
         {
-            _input = CreateInputBlock(value => new CorrelationInput(value, Side: null));
+            _input = CreateInputBlock(value => CorrelationCommand.FromInput(
+                new CorrelationInput(value, Side: null)));
         }
         else
         {
-            _request = CreateInputBlock(value => new CorrelationInput(value, _requestSide));
-            _response = CreateInputBlock(value => new CorrelationInput(value, _responseSide));
+            _request = CreateInputBlock(value => CorrelationCommand.FromInput(
+                new CorrelationInput(value, _requestSide)));
+            _response = CreateInputBlock(value => CorrelationCommand.FromInput(
+                new CorrelationInput(value, _responseSide)));
         }
 
         _matched = new BufferBlock<FlowCorrelationMatch<TInput>>(blockOptions);
@@ -149,6 +155,8 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         ArgumentNullException.ThrowIfNull(exception);
         try
         {
+            _lifecycleCancellation.Cancel();
+            TryCancelTimer();
             FaultNode(exception);
         }
         finally
@@ -164,10 +172,34 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         }
     }
 
-    private TransformBlock<TInput, CorrelationInput> CreateInputBlock(
-        Func<TInput, CorrelationInput> transform)
+    public async ValueTask DisposeAsync()
     {
-        var input = new TransformBlock<TInput, CorrelationInput>(
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Complete();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispose must not throw when the node faulted.
+        }
+        finally
+        {
+            _timerCancellation?.Dispose();
+            _lifecycleCancellation.Dispose();
+        }
+    }
+
+    private TransformBlock<TInput, CorrelationCommand> CreateInputBlock(
+        Func<TInput, CorrelationCommand> transform)
+    {
+        var input = new TransformBlock<TInput, CorrelationCommand>(
             transform,
             new ExecutionDataflowBlockOptions
             {
@@ -197,57 +229,24 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         _processor.Complete();
     }
 
-    private async Task CorrelateAsync(CorrelationInput input)
+    private async Task ProcessCommandAsync(CorrelationCommand command)
     {
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
-            var now = _clock.UtcNow;
-            await EmitExpiredAsync(now, force: false, _processingCancellationToken).ConfigureAwait(false);
-            var item = Evaluate(input);
-            if (!TryNormalizeSide(item.Side, out var side))
+            switch (command.Kind)
             {
-                ReportCorrelationError(
-                    RoutingErrorCodes.CorrelationInvalidSide,
-                    $"flow.correlation side '{item.Side}' is not supported.",
-                    null,
-                    item.Key,
-                    item.Side);
-                return;
+                case CorrelationCommandKind.Input:
+                    await CorrelateAsync(command.Input!).ConfigureAwait(false);
+                    break;
+                case CorrelationCommandKind.Timer:
+                    await ExpireByTimerAsync(command.TimerVersion).ConfigureAwait(false);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"flow.correlation command '{command.Kind}' is not supported.");
             }
-
-            if (!TryGetOrCreatePending(item.Key, out var pending))
-            {
-                ReportCorrelationError(
-                    RoutingErrorCodes.CorrelationCapacityExceeded,
-                    $"flow.correlation maxPending limit reached; key '{item.Key}' was not tracked.",
-                    null,
-                    item.Key,
-                    side);
-                return;
-            }
-
-            var entry = new PendingEntry(input.Value, side, now);
-            if (pending.HasSide(side, _comparer))
-            {
-                ReportCorrelationError(
-                    RoutingErrorCodes.CorrelationDuplicateSide,
-                    $"flow.correlation replaced duplicate side '{side}' for key '{item.Key}'.",
-                    null,
-                    item.Key,
-                    side);
-            }
-
-            pending.Set(side, entry, _requestSide, _comparer);
-            if (pending.Request is null || pending.Response is null)
-            {
-                return;
-            }
-
-            _pending.Remove(item.Key);
-            await EmitMatchAsync(item.Key, pending.Request, pending.Response, now).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
         {
             throw;
         }
@@ -267,6 +266,79 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
                 $"flow.correlation failed: {exception.Message}",
                 exception);
         }
+    }
+
+    private async Task CorrelateAsync(CorrelationInput input)
+    {
+        try
+        {
+            var now = _clock.UtcNow;
+            await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
+            var item = Evaluate(input);
+            if (!TryNormalizeSide(item.Side, out var side))
+            {
+                ReportCorrelationError(
+                    RoutingErrorCodes.CorrelationInvalidSide,
+                    $"flow.correlation side '{item.Side}' is not supported.",
+                    null,
+                    item.Key,
+                    item.Side);
+                return;
+            }
+
+            if (!TryGetOrCreatePending(item.Key, out var pending, out var created))
+            {
+                ReportCorrelationError(
+                    RoutingErrorCodes.CorrelationCapacityExceeded,
+                    $"flow.correlation maxPending limit reached; key '{item.Key}' was not tracked.",
+                    null,
+                    item.Key,
+                    side);
+                return;
+            }
+
+            var entry = new PendingEntry(input.Value, side, now);
+            if (pending.Get(side, _comparer) is { } existing)
+            {
+                ReportCorrelationError(
+                    RoutingErrorCodes.CorrelationDuplicateSide,
+                    $"flow.correlation replaced duplicate side '{side}' for key '{item.Key}'.",
+                    null,
+                    item.Key,
+                    side);
+                entry = entry with { ReceivedAt = existing.ReceivedAt };
+            }
+
+            pending.Set(side, entry, _requestSide, _comparer);
+            if (created)
+            {
+                _deadlines.Enqueue(new CorrelationDeadline(item.Key, entry.ReceivedAt));
+            }
+
+            if (pending.Request is null || pending.Response is null)
+            {
+                return;
+            }
+
+            _pending.Remove(item.Key);
+            await EmitMatchAsync(item.Key, pending.Request, pending.Response, now).ConfigureAwait(false);
+        }
+        finally
+        {
+            ScheduleTimer(_clock.UtcNow);
+        }
+    }
+
+    private async Task ExpireByTimerAsync(long version)
+    {
+        if (version != _timerVersion)
+        {
+            return;
+        }
+
+        await EmitExpiredAsync(_clock.UtcNow, force: false, _lifecycleCancellation.Token)
+            .ConfigureAwait(false);
+        ScheduleTimer(_clock.UtcNow);
     }
 
     private CorrelationItem Evaluate(CorrelationInput input)
@@ -349,8 +421,10 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
 
     private bool TryGetOrCreatePending(
         string key,
-        out PendingPair pending)
+        out PendingPair pending,
+        out bool created)
     {
+        created = false;
         if (_pending.TryGetValue(key, out pending!))
         {
             return true;
@@ -364,6 +438,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
 
         pending = new PendingPair();
         _pending[key] = pending;
+        created = true;
         return true;
     }
 
@@ -374,23 +449,30 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     {
         if (_pending.Count == 0)
         {
+            _deadlines.Clear();
             return;
         }
 
-        foreach (var (key, pending) in _pending.ToArray())
+        while (_deadlines.Count > 0)
         {
-            var entries = pending.Entries
-                .Where(entry => force || now - entry.ReceivedAt >= _timeout)
-                .ToArray();
-            if (entries.Length == 0)
+            var deadline = _deadlines.Peek();
+            if (!_pending.TryGetValue(deadline.Key, out var pending)
+                || pending.ReceivedAt != deadline.ReceivedAt)
             {
+                _deadlines.Dequeue();
                 continue;
             }
 
-            _pending.Remove(key);
-            foreach (var entry in entries)
+            if (!force && now - deadline.ReceivedAt < _timeout)
             {
-                await EmitTimeoutAsync(key, entry, now, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            _deadlines.Dequeue();
+            _pending.Remove(deadline.Key);
+            foreach (var entry in pending.Entries)
+            {
+                await EmitTimeoutAsync(deadline.Key, entry, now, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -413,7 +495,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
                 ? request.ReceivedAt
                 : response.ReceivedAt)
         };
-        await _matched.SendAsync(match, _processingCancellationToken).ConfigureAwait(false);
+        await _matched.SendAsync(match, _lifecycleCancellation.Token).ConfigureAwait(false);
         TryEmitDiagnostic(
             RoutingDiagnosticNames.CorrelationMatched,
             message: "flow.correlation matched pair.",
@@ -454,6 +536,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
 
     private async Task CompleteOutputsAsync(Task completion)
     {
+        TryCancelTimer();
         if (completion.IsFaulted && completion.Exception is { } completionException)
         {
             ((IDataflowBlock)_matched).Fault(completionException);
@@ -472,6 +555,87 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         {
             ((IDataflowBlock)_matched).Fault(exception);
             ((IDataflowBlock)_timeouts).Fault(exception);
+        }
+    }
+
+    private void ScheduleTimer(DateTimeOffset now)
+    {
+        var timerCancellation = _timerCancellation;
+        timerCancellation?.Cancel();
+        timerCancellation?.Dispose();
+        _timerVersion++;
+        if (_pending.Count == 0)
+        {
+            _timerCancellation = null;
+            return;
+        }
+
+        var dueAt = GetNextDueAt();
+        if (dueAt is null)
+        {
+            _timerCancellation = null;
+            return;
+        }
+
+        var delay = dueAt.Value <= now
+            ? TimeSpan.Zero
+            : dueAt.Value - now;
+        var version = _timerVersion;
+        timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifecycleCancellation.Token);
+        _timerCancellation = timerCancellation;
+        _ = RunTimerAsync(version, delay, timerCancellation.Token);
+    }
+
+    private DateTimeOffset? GetNextDueAt()
+    {
+        while (_deadlines.Count > 0)
+        {
+            var deadline = _deadlines.Peek();
+            if (_pending.TryGetValue(deadline.Key, out var pending)
+                && pending.ReceivedAt == deadline.ReceivedAt)
+            {
+                return deadline.ReceivedAt + _timeout;
+            }
+
+            _deadlines.Dequeue();
+        }
+
+        return null;
+    }
+
+    private void TryCancelTimer()
+    {
+        var timerCancellation = _timerCancellation;
+        if (timerCancellation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            timerCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // ScheduleTimer disposed the source on the processor thread.
+        }
+    }
+
+    private async Task RunTimerAsync(
+        long version,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            await _processor.SendAsync(
+                CorrelationCommand.Timer(version),
+                _lifecycleCancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -508,6 +672,28 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
         TInput Value,
         string? Side);
 
+    private sealed record CorrelationCommand(
+        CorrelationCommandKind Kind,
+        CorrelationInput? Input = null,
+        long TimerVersion = 0)
+    {
+        public static CorrelationCommand FromInput(CorrelationInput input)
+            => new(CorrelationCommandKind.Input, input);
+
+        public static CorrelationCommand Timer(long version)
+            => new(CorrelationCommandKind.Timer, TimerVersion: version);
+    }
+
+    private enum CorrelationCommandKind
+    {
+        Input,
+        Timer
+    }
+
+    private sealed record CorrelationDeadline(
+        string Key,
+        DateTimeOffset ReceivedAt);
+
     private sealed record PendingEntry(
         TInput Value,
         string Side,
@@ -517,6 +703,9 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
     {
         public PendingEntry? Request { get; private set; }
         public PendingEntry? Response { get; private set; }
+
+        public DateTimeOffset? ReceivedAt
+            => Request?.ReceivedAt ?? Response?.ReceivedAt;
 
         public IEnumerable<PendingEntry> Entries
         {
@@ -534,9 +723,12 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase
             }
         }
 
-        public bool HasSide(string side, StringComparer comparer)
+        public PendingEntry? Get(string side, StringComparer comparer)
             => Request is not null && comparer.Equals(Request.Side, side)
-               || Response is not null && comparer.Equals(Response.Side, side);
+                ? Request
+                : Response is not null && comparer.Equals(Response.Side, side)
+                    ? Response
+                    : null;
 
         public void Set(
             string side,

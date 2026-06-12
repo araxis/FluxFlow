@@ -141,6 +141,53 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_applies_max_records_retention_on_append()
+    {
+        var store = new InMemoryJournalStore(new JournalRetentionOptions
+        {
+            MaxRecords = 2
+        });
+
+        await store.AppendAsync(CreateRecord("1", timestamp: Timestamp(0)));
+        await store.AppendAsync(CreateRecord("2", timestamp: Timestamp(1)));
+        await store.AppendAsync(CreateRecord("3", timestamp: Timestamp(2)));
+        var result = await store.QueryAsync(new JournalQuery());
+
+        result.Records.Select(record => record.Id).ShouldBe(["2", "3"]);
+    }
+
+    [Fact]
+    public void Constructor_rejects_negative_max_records_retention()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new InMemoryJournalStore(new JournalRetentionOptions
+            {
+                MaxRecords = -1
+            }));
+    }
+
+    [Fact]
+    public async Task AppendAsync_detects_duplicates_after_retention_and_prune()
+    {
+        var store = new InMemoryJournalStore(new JournalRetentionOptions
+        {
+            MaxRecords = 2
+        });
+        await store.AppendAsync(CreateRecord("1", timestamp: Timestamp(0)));
+        await store.AppendAsync(CreateRecord("2", timestamp: Timestamp(1)));
+
+        await store.PruneAsync(new JournalRetentionOptions { MaxRecords = 1 });
+
+        // "1" was pruned, so its id can be appended again; "2" still exists.
+        await store.AppendAsync(CreateRecord("1", timestamp: Timestamp(2)));
+        await Should.ThrowAsync<InvalidOperationException>(() =>
+            store.AppendAsync(CreateRecord("2", timestamp: Timestamp(3))).AsTask());
+
+        var result = await store.QueryAsync(new JournalQuery());
+        result.Records.Select(record => record.Id).ShouldBe(["2", "1"]);
+    }
+
+    [Fact]
     public async Task AppendAsync_rejects_duplicate_record_ids()
     {
         var store = new InMemoryJournalStore();

@@ -16,7 +16,6 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
     private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowLogEntry> _entries;
-    private readonly CancellationToken _processingCancellationToken;
     private long _sequence;
 
     internal FlowLoggerNode(
@@ -51,7 +50,6 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(LogAsync, inputOptions);
         _entries = new BufferBlock<FlowLogEntry>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -86,7 +84,6 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
 
     private async Task LogAsync(TInput input)
     {
-        _processingCancellationToken.ThrowIfCancellationRequested();
         var sequence = Interlocked.Increment(ref _sequence);
         var timestamp = _clock.UtcNow;
         var attributes = CreateSelectedAttributes(input);
@@ -104,7 +101,7 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
             Attributes = attributes
         };
 
-        await _entries.SendAsync(entry, _processingCancellationToken).ConfigureAwait(false);
+        await _entries.SendAsync(entry).ConfigureAwait(false);
         TryEmitDiagnostic(
             ObservabilityDiagnosticNames.LoggerEmitted,
             message: "flow.logger emitted entry.",

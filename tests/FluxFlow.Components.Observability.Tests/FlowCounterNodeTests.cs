@@ -89,6 +89,39 @@ public sealed class FlowCounterNodeTests
     }
 
     [Fact]
+    public async Task Counter_ExposesErrorsPortAndDeliversPredicateFailures()
+    {
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+                (_, _, _) => throw new InvalidOperationException("predicate failed"))),
+            new
+            {
+                inputType = "int",
+                predicate = "ok"
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<int>>();
+        var errorsPort = runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Errors));
+        errorsPort.ShouldNotBeNull();
+        var errors = new BufferBlock<FlowError>();
+        errorsPort.TryLinkTo(
+            new InputPort<FlowError>(
+                new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                errors),
+            propagateCompletion: true,
+            out var linkError);
+        linkError.ShouldBeNull();
+        LinkSnapshots(runtimeNode, new BufferBlock<FlowCounterSnapshot>());
+
+        await input.Target.SendAsync(1);
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(ObservabilityErrorCodes.CounterPredicateFailed);
+    }
+
+    [Fact]
     public async Task Counter_WithoutPredicateDoesNotRequireExpressionEngine()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 18, 31, 0, TimeSpan.Zero);

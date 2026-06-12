@@ -138,6 +138,7 @@ internal static class ObservabilityNodeFactory
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
             .Output(ObservabilityComponentPorts.Snapshots, node.Snapshots)
+            .Output(ObservabilityComponentPorts.Errors, node.Errors)
             .Build();
     }
 
@@ -157,6 +158,7 @@ internal static class ObservabilityNodeFactory
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
             .Output(ObservabilityComponentPorts.Entries, node.Entries)
+            .Output(ObservabilityComponentPorts.Errors, node.Errors)
             .Build();
     }
 
@@ -176,6 +178,7 @@ internal static class ObservabilityNodeFactory
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
             .Output(ObservabilityComponentPorts.Snapshots, node.Snapshots)
+            .Output(ObservabilityComponentPorts.Errors, node.Errors)
             .Build();
     }
 

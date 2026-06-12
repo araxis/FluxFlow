@@ -29,16 +29,20 @@ public sealed class FlowApplicationHost(
     private readonly FlowApplicationConfigurationLoader _configurationLoader = configurationLoader ?? new FlowApplicationConfigurationLoader();
     private readonly ApplicationDefinition? _applicationDefinition = applicationDefinition;
     private readonly FlowFanoutSource<RuntimeFlowDiagnostic> _diagnostics = new();
+    private readonly FlowFanoutSource<RuntimeFlowError> _errors = new();
     private ApplicationDefinition? _definition;
     private ApplicationRuntime? _runtime;
     private IDisposable? _runtimeDiagnosticsLink;
     private ITargetBlock<RuntimeFlowDiagnostic>? _runtimeDiagnosticsTarget;
-    private bool _disposed;
+    private IDisposable? _runtimeErrorsLink;
+    private ITargetBlock<RuntimeFlowError>? _runtimeErrorsTarget;
+    private int _disposed;
 
     public FlowApplicationHostState State { get; private set; } = FlowApplicationHostState.Empty;
     public ApplicationDefinition? Definition => _definition;
     public ApplicationRuntime? Runtime => _runtime;
     public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnostics;
+    public ISourceBlock<RuntimeFlowError> Errors => _errors;
     public FlowApplicationHostBuildResult? LastBuildResult { get; private set; }
     public Exception? LastException { get; private set; }
 
@@ -254,8 +258,7 @@ public sealed class FlowApplicationHost(
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         try
         {
             DisposeRuntime();
@@ -263,13 +266,13 @@ public sealed class FlowApplicationHost(
         finally
         {
             _diagnostics.Complete();
+            _errors.Complete();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         try
         {
             await DisposeRuntimeAsync().ConfigureAwait(false);
@@ -277,6 +280,7 @@ public sealed class FlowApplicationHost(
         finally
         {
             _diagnostics.Complete();
+            _errors.Complete();
         }
     }
 
@@ -321,6 +325,11 @@ public sealed class FlowApplicationHost(
         _runtimeDiagnosticsLink = runtime.Diagnostics.LinkTo(
             _runtimeDiagnosticsTarget,
             new DataflowLinkOptions { PropagateCompletion = true });
+        _runtimeErrorsTarget = new ActionBlock<RuntimeFlowError>(
+            error => _errors.Post(error));
+        _runtimeErrorsLink = runtime.Errors.LinkTo(
+            _runtimeErrorsTarget,
+            new DataflowLinkOptions { PropagateCompletion = true });
     }
 
     private void DetachRuntimeDiagnostics()
@@ -329,6 +338,10 @@ public sealed class FlowApplicationHost(
         _runtimeDiagnosticsTarget?.Complete();
         _runtimeDiagnosticsLink = null;
         _runtimeDiagnosticsTarget = null;
+        _runtimeErrorsLink?.Dispose();
+        _runtimeErrorsTarget?.Complete();
+        _runtimeErrorsLink = null;
+        _runtimeErrorsTarget = null;
     }
 
     private async ValueTask DisposeRuntimeAfterFailedStartAsync()
@@ -361,5 +374,5 @@ public sealed class FlowApplicationHost(
         return _configurationLoader.Load(_configuration, sectionName);
     }
 
-    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

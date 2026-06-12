@@ -227,6 +227,68 @@ public sealed class PayloadInspectNodeTests
     }
 
     [Fact]
+    public async Task Inspect_ReportsOversizedTextPayloadWithoutFormatting()
+    {
+        var runtimeNode = CreateNode(new { maxInputBytes = 8 });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<PayloadInspectionResult>(
+            runtimeNode,
+            PayloadComponentPorts.Output);
+        var errors = LinkOutput<FlowError>(
+            runtimeNode,
+            PayloadComponentPorts.Errors);
+        var text = """{"name":"flux","count":2}""";
+
+        await input.Target.SendAsync(new PayloadInspectionRequest
+        {
+            Text = text,
+            ContentType = "application/json"
+        });
+        input.Target.Complete();
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Kind.ShouldBe(PayloadKind.Text);
+        result.ByteCount.ShouldBe(Encoding.UTF8.GetByteCount(text));
+        result.FormattedPreview.ShouldNotBeNull();
+        result.FormattedPreview.ShouldContain("payload too large");
+        result.FormattedPreviewTruncated.ShouldBeTrue();
+        errors.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Inspect_ReportsOversizedBytePayloadWithoutFormatting()
+    {
+        var runtimeNode = CreateNode(new { maxInputBytes = 4 });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<PayloadInspectionResult>(
+            runtimeNode,
+            PayloadComponentPorts.Output);
+
+        await input.Target.SendAsync(new PayloadInspectionRequest
+        {
+            Bytes = [1, 2, 3, 4, 5]
+        });
+        input.Target.Complete();
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        result.Kind.ShouldBe(PayloadKind.Binary);
+        result.ByteCount.ShouldBe(5);
+        result.FormattedPreview.ShouldNotBeNull();
+        result.FormattedPreview.ShouldContain("payload too large");
+    }
+
+    [Fact]
+    public void Inspect_RejectsInvalidMaxInputBytes()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(new { maxInputBytes = 0 }));
+
+        exception.Message.ShouldContain("maxInputBytes");
+    }
+
+    [Fact]
     public async Task Inspect_EmitsErrorsAndContinues()
     {
         var runtimeNode = CreateNode(new { });

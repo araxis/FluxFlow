@@ -11,7 +11,6 @@ public sealed class FlowForkNode<TInput> : FlowNodeBase
     private readonly Dictionary<string, BufferBlock<TInput>> _outputBlocks;
     private readonly IReadOnlyDictionary<string, ISourceBlock<TInput>> _outputs;
     private readonly ActionBlock<TInput> _input;
-    private readonly CancellationToken _processingCancellationToken;
 
     public FlowForkNode(ForkRoutingOptions options)
     {
@@ -46,7 +45,6 @@ public sealed class FlowForkNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(ForkAsync, inputOptions);
         _input.Completion.ContinueWith(
             CompleteOutputs,
@@ -82,11 +80,9 @@ public sealed class FlowForkNode<TInput> : FlowNodeBase
 
     private async Task ForkAsync(TInput input)
     {
-        _processingCancellationToken.ThrowIfCancellationRequested();
         foreach (var output in _outputBlocks.Values)
         {
-            await output.SendAsync(input, _processingCancellationToken)
-                .ConfigureAwait(false);
+            await output.SendAsync(input).ConfigureAwait(false);
         }
 
         TryEmitDiagnostic(

@@ -9,11 +9,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() =>
     [
         Metadata(ObservabilityComponentTypes.Logger, "Logger", "logger", "Creates log entries from observed input values.",
-            ObservabilityComponentPorts.Entries, "FlowLogEntry"),
+            LoggerOptions(), ObservabilityComponentPorts.Entries, "FlowLogEntry"),
         Metadata(ObservabilityComponentTypes.Metrics, "Flow Metrics", "flowMetrics", "Creates metric snapshots from observed input values.",
-            ObservabilityComponentPorts.Snapshots, "FlowMetricSnapshot"),
+            MetricsOptions(), ObservabilityComponentPorts.Snapshots, "FlowMetricSnapshot"),
         Metadata(ObservabilityComponentTypes.Counter, "Counter", "counter", "Counts observed input values and emits counter snapshots.",
-            ObservabilityComponentPorts.Snapshots, "FlowCounterSnapshot")
+            CounterOptions(), ObservabilityComponentPorts.Snapshots, "FlowCounterSnapshot")
     ];
 
     private static ComponentDesignMetadata Metadata(
@@ -21,6 +21,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         string displayName,
         string preferredName,
         string summary,
+        IReadOnlyList<OptionDesignMetadata> options,
         string outputPort,
         string outputType) => new()
         {
@@ -31,19 +32,61 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             IconKey = "observability",
             PreferredNodeName = preferredName,
             SuggestedEditorWidth = 480,
-            Options =
-            [
-                Text("inputType", "Input type", "object"),
-                Text("category", "Category", "workflow"),
-                Text("messageTemplate", "Message template"),
-                Number("boundedCapacity", "Capacity", 128, 1)
-            ],
+            Options = options,
             Ports =
             [
                 Port(ObservabilityComponentPorts.Input, PortDirection.Input, "Configured input type", true),
-                Port(outputPort, PortDirection.Output, outputType, true, 1)
+                Port(outputPort, PortDirection.Output, outputType, true, 1),
+                Port(ObservabilityComponentPorts.Errors, PortDirection.Output, "FlowError", false, 2)
             ]
         };
+
+    private static IReadOnlyList<OptionDesignMetadata> CounterOptions() =>
+    [
+        Text("inputType", "Input type", "object"),
+        Text("name", "Name", "counter"),
+        Text("engine", "Expression engine"),
+        Expression("predicate", "Predicate"),
+        Expression("expression", "Expression"),
+        Text("expressionId", "Expression id"),
+        Text("expressionName", "Expression name"),
+        Number("boundedCapacity", "Capacity", 128, 1)
+    ];
+
+    private static IReadOnlyList<OptionDesignMetadata> LoggerOptions() =>
+    [
+        Text("inputType", "Input type", "object"),
+        Level(),
+        Text("category", "Category", "workflow"),
+        Text("messageTemplate", "Message template", "Observed {inputType} item #{sequence}."),
+        Json("attributeSelectors", "Attribute selectors"),
+        Number("boundedCapacity", "Capacity", 128, 1)
+    ];
+
+    private static IReadOnlyList<OptionDesignMetadata> MetricsOptions() =>
+    [
+        Text("inputType", "Input type", "object"),
+        Text("name", "Name", "metrics"),
+        Text("sizeSelector", "Size selector"),
+        Number("boundedCapacity", "Capacity", 128, 1)
+    ];
+
+    private static OptionDesignMetadata Level() => new()
+    {
+        Name = "level",
+        Kind = OptionValueKind.Enum,
+        DisplayName = "Level",
+        DefaultValue = "Information",
+        Choices =
+        [
+            new() { Value = "Trace" },
+            new() { Value = "Debug" },
+            new() { Value = "Information" },
+            new() { Value = "Warning" },
+            new() { Value = "Error" },
+            new() { Value = "Critical" }
+        ]
+    };
 
     private static OptionDesignMetadata Text(string name, string displayName, object? defaultValue = null) => new()
     {
@@ -51,6 +94,20 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         Kind = OptionValueKind.Text,
         DisplayName = displayName,
         DefaultValue = defaultValue
+    };
+
+    private static OptionDesignMetadata Expression(string name, string displayName) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Expression,
+        DisplayName = displayName
+    };
+
+    private static OptionDesignMetadata Json(string name, string displayName) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Json,
+        DisplayName = displayName
     };
 
     private static OptionDesignMetadata Number(string name, string displayName, object defaultValue, double min) => new()

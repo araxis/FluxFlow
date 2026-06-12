@@ -65,6 +65,11 @@ internal static class FileSystemOptionsReader
                 "file.read option 'maxBytes' must be greater than zero when set.");
         }
 
+        if (!HasOption(definition, "maxBytes"))
+        {
+            options = options with { MaxBytes = FileReadOptions.DefaultMaxBytes };
+        }
+
         return options;
     }
 
@@ -83,6 +88,12 @@ internal static class FileSystemOptionsReader
         {
             throw new InvalidOperationException(
                 "file.watch option 'filter' cannot be empty.");
+        }
+
+        if (options.InternalBufferSize is < 4096 or > 65536)
+        {
+            throw new InvalidOperationException(
+                "file.watch option 'internalBufferSize' must be between 4096 and 65536 bytes when set.");
         }
 
         ResolveNotifyFilters(options);
@@ -126,6 +137,10 @@ internal static class FileSystemOptionsReader
         return JsonSerializer.Deserialize<T>(json, SerializerOptions)
             ?? throw new InvalidOperationException($"Could not read {typeof(T).Name}.");
     }
+
+    private static bool HasOption(NodeDefinition definition, string name)
+        => definition.Configuration.Keys.Any(
+            key => key.Equals(name, StringComparison.OrdinalIgnoreCase));
 
     private static void ValidateBoundedCapacity(string nodeType, int boundedCapacity)
     {

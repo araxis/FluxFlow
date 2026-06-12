@@ -21,6 +21,18 @@ internal static class HttpOptionsReader
                 "http.request option 'baseUrl' must be an absolute URL.");
         }
 
+        if (options.RestrictToBaseUrlOrigin && string.IsNullOrWhiteSpace(options.BaseUrl))
+        {
+            throw new InvalidOperationException(
+                "http.request option 'restrictToBaseUrlOrigin' requires 'baseUrl'.");
+        }
+
+        if (options.AllowedHosts.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException(
+                "http.request option 'allowedHosts' cannot contain empty entries.");
+        }
+
         if (options.DefaultTimeoutMilliseconds <= 0)
         {
             throw new InvalidOperationException(

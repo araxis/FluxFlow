@@ -1,5 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -163,6 +164,61 @@ public sealed class FlowCorrelationNodeTests
     }
 
     [Fact]
+    public async Task Correlation_DuplicateSideReplacesPayloadAndKeepsOriginalDeadline()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var clock = new ManualRoutingClock(startedAt);
+        var firstEvaluated = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var duplicateEvaluated = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var runtimeNode = CreateNode(
+            new { timeoutMilliseconds = 100 },
+            (expression, context, resultType) =>
+            {
+                if (context.Variables["payload"]?.Equals("first") == true)
+                {
+                    firstEvaluated.TrySetResult(null);
+                }
+
+                if (context.Variables["payload"]?.Equals("second") == true)
+                {
+                    duplicateEvaluated.TrySetResult(null);
+                }
+
+                return EvaluateCorrelationExpression(expression, context, resultType);
+            },
+            clock);
+        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<CorrelationMessage>>();
+        var errors = new BufferBlock<FlowError>();
+        var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
+        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "first"));
+        await firstEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        clock.SetUtcNow(startedAt.AddMilliseconds(50));
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "second"));
+        await duplicateEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        clock.SetUtcNow(startedAt.AddMilliseconds(120));
+        await input.Target.SendAsync(new CorrelationMessage("B-200", "request", "other"));
+
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Code.ShouldBe(RoutingErrorCodes.CorrelationDuplicateSide);
+        timeout.Key.ShouldBe("A-100");
+        timeout.Side.ShouldBe("request");
+        timeout.Value.Payload.ShouldBe("second");
+        timeout.ReceivedAt.ShouldBe(startedAt);
+        timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(120));
+    }
+
+    [Fact]
     public async Task Correlation_ReportsExpressionFailureAndContinues()
     {
         var runtimeNode = CreateNode(
@@ -292,7 +348,8 @@ public sealed class FlowCorrelationNodeTests
 
     private static RuntimeNode CreateNode(
         object overrides,
-        Func<string, FlowMapContext, Type, object?>? evaluate = null)
+        Func<string, FlowMapContext, Type, object?>? evaluate = null,
+        IRoutingClock? clock = null)
     {
         var configuration = RoutingTestHost.MergeConfiguration(
             new
@@ -303,11 +360,18 @@ public sealed class FlowCorrelationNodeTests
             },
             overrides);
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterRoutingComponents(options => options
-                .UseExpressionEngine(new RecordingExpressionEngine(
-                    evaluate: evaluate ?? EvaluateCorrelationExpression))
-                .RegisterType<CorrelationMessage>("app.correlation")
-                .UseContextFactory(new CorrelationMessageContextFactory()));
+            .RegisterRoutingComponents(options =>
+            {
+                options
+                    .UseExpressionEngine(new RecordingExpressionEngine(
+                        evaluate: evaluate ?? EvaluateCorrelationExpression))
+                    .RegisterType<CorrelationMessage>("app.correlation")
+                    .UseContextFactory(new CorrelationMessageContextFactory());
+                if (clock is not null)
+                {
+                    options.UseClock(clock);
+                }
+            });
         registry.TryGetFactory(RoutingComponentTypes.Correlation, out var factory).ShouldBeTrue();
         return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Correlation, configuration));
     }
@@ -362,6 +426,36 @@ public sealed class FlowCorrelationNodeTests
     }
 
     private sealed record CorrelationMessage(string Key, string Side, string Payload);
+
+    private sealed class ManualRoutingClock(DateTimeOffset utcNow) : IRoutingClock
+    {
+        private readonly object _gate = new();
+        private DateTimeOffset _utcNow = utcNow;
+
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _utcNow;
+                }
+            }
+        }
+
+        public void SetUtcNow(DateTimeOffset utcNow)
+        {
+            lock (_gate)
+            {
+                _utcNow = utcNow;
+            }
+        }
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
+    }
 
     private sealed class CorrelationMessageContextFactory : IFlowMapContextFactory<CorrelationMessage>
     {

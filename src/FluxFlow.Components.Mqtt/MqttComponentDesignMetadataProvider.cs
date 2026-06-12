@@ -46,6 +46,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
                 Option("defaultTopic", OptionValueKind.Text, "Default topic"),
                 QualityOfServiceOption(),
                 Option("retain", OptionValueKind.Boolean, "Retain", defaultValue: false),
+                PublishTimeoutOption(),
                 CapacityOption()
             ],
             Ports =
@@ -84,6 +85,15 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             new() { Value = "AtLeastOnce", DisplayName = "At least once" },
             new() { Value = "ExactlyOnce", DisplayName = "Exactly once" }
         ]
+    };
+
+    private static OptionDesignMetadata PublishTimeoutOption() => new()
+    {
+        Name = "publishTimeoutMilliseconds",
+        Kind = OptionValueKind.Number,
+        DisplayName = "Publish timeout ms",
+        DefaultValue = 30000,
+        Min = 1
     };
 
     private static OptionDesignMetadata CapacityOption() => new()

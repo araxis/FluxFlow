@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.State</PackageId>
     <AssemblyName>FluxFlow.Components.State</AssemblyName>
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable state reducer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rejected-key warning tracking is capped with a single summary diagnostic so high-cardinality key streams cannot grow memory without bound. Dead internal cancellation plumbing was removed.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

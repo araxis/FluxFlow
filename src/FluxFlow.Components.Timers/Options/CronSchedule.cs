@@ -150,9 +150,14 @@ internal sealed class CronSchedule
                         var local = date.AddHours(hour).AddMinutes(minute).AddSeconds(second);
                         if (timeZone.IsInvalidTime(local))
                         {
-                            continue;
+                            // The occurrence falls inside a spring-forward gap; standard
+                            // cron behavior runs it at the first valid instant after the gap.
+                            return ResolveGapOccurrence(local, timeZone);
                         }
 
+                        // Ambiguous (fall-back) local times deliberately resolve to the
+                        // offset returned by GetUtcOffset, which is the time zone's
+                        // standard offset and therefore the second occurrence.
                         return new DateTimeOffset(
                             local,
                             timeZone.GetUtcOffset(local));
@@ -164,6 +169,29 @@ internal sealed class CronSchedule
         }
 
         return null;
+    }
+
+    private static DateTimeOffset ResolveGapOccurrence(
+        DateTime local,
+        TimeZoneInfo timeZone)
+    {
+        // Daylight saving transitions happen on whole minutes, so stepping the
+        // truncated minute forward finds the first valid instant after the gap.
+        var candidate = new DateTime(
+            local.Year,
+            local.Month,
+            local.Day,
+            local.Hour,
+            local.Minute,
+            0,
+            local.Kind);
+        do
+        {
+            candidate = candidate.AddMinutes(1);
+        }
+        while (timeZone.IsInvalidTime(candidate));
+
+        return new DateTimeOffset(candidate, timeZone.GetUtcOffset(candidate));
     }
 
     private bool MatchesDay(DateTime date)
@@ -284,9 +312,13 @@ internal sealed class CronSchedule
             }
 
             var start = ParseValue(rangeSplit[0], minimum, maximum, names);
+            // Vixie cron treats a step on a single value (e.g. "5/2") as a range
+            // running from that value to the field maximum.
             var end = rangeSplit.Length == 2
                 ? ParseValue(rangeSplit[1], minimum, maximum, names)
-                : start;
+                : stepSplit.Length == 2
+                    ? maximum
+                    : start;
             if (end < start)
             {
                 throw new InvalidOperationException($"Cron field value '{part}' has an invalid range.");

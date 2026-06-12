@@ -18,6 +18,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
     private CancellationTokenSource? _timerCancellation;
     private Task? _timerTask;
     private bool _started;
+    private bool _completedBeforeStart;
     private bool _disposed;
 
     private TimerIntervalNode(
@@ -52,6 +53,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
 
         return context.CreateNode(node)
             .Output(TimerComponentPorts.Output, node.Output)
+            .Output(TimerComponentPorts.Errors, node.Errors)
             .Build();
     }
 
@@ -61,6 +63,11 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
 
         lock (_stateLock)
         {
+            if (_completedBeforeStart)
+            {
+                return Task.CompletedTask;
+            }
+
             if (_started)
             {
                 throw new InvalidOperationException("timer.interval node has already started.");
@@ -84,6 +91,10 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         lock (_stateLock)
         {
             cancellation = _timerCancellation;
+            if (cancellation is null)
+            {
+                _completedBeforeStart = true;
+            }
         }
 
         if (cancellation is null)
@@ -92,13 +103,28 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
             return;
         }
 
-        cancellation.Cancel();
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the timer loop has stopped.
+        }
     }
 
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        _timerCancellation?.Cancel();
+        try
+        {
+            _timerCancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The node was already disposed; the timer loop has stopped.
+        }
+
         base.Fault(exception);
     }
 
@@ -142,11 +168,18 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         {
             if (_settings.EmitImmediately)
             {
-                sequence = await EmitTickAsync(
+                var emitted = await EmitTickAsync(
                     sequence,
                     startedAt,
                     nextDueAt,
                     cancellationToken).ConfigureAwait(false);
+                if (emitted is null)
+                {
+                    CompleteTimer(startedAt, sequence);
+                    return;
+                }
+
+                sequence = emitted.Value;
                 if (HasReachedMaxTicks(sequence))
                 {
                     CompleteTimer(startedAt, sequence);
@@ -159,11 +192,18 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
             while (true)
             {
                 await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
-                sequence = await EmitTickAsync(
+                var emitted = await EmitTickAsync(
                     sequence,
                     startedAt,
                     nextDueAt,
                     cancellationToken).ConfigureAwait(false);
+                if (emitted is null)
+                {
+                    CompleteTimer(startedAt, sequence);
+                    return;
+                }
+
+                sequence = emitted.Value;
                 if (HasReachedMaxTicks(sequence))
                 {
                     CompleteTimer(startedAt, sequence);
@@ -217,7 +257,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         }
     }
 
-    private async Task<long> EmitTickAsync(
+    private async Task<long?> EmitTickAsync(
         long currentSequence,
         DateTimeOffset startedAt,
         DateTimeOffset dueAt,
@@ -239,7 +279,12 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
             Drift = timestamp - dueAt
         };
 
-        await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false);
+        if (!await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false))
+        {
+            // The output declined the tick because it has completed; stop the loop.
+            return null;
+        }
+
         TryEmitDiagnostic(
             TimerDiagnosticNames.IntervalTick,
             message: $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",

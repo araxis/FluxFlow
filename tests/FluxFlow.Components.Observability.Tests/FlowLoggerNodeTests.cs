@@ -84,6 +84,66 @@ public sealed class FlowLoggerNodeTests
     }
 
     [Fact]
+    public async Task Logger_ExposesErrorsPortAndDeliversSelectorFailures()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .RegisterType<InputMessage>("message")
+                .UseValueSelector<InputMessage>("broken", (_, _) => throw new InvalidOperationException("select failed")),
+            new
+            {
+                inputType = "message",
+                attributeSelectors = new[] { "broken" }
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var errorsPort = runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Errors));
+        errorsPort.ShouldNotBeNull();
+        var errors = new BufferBlock<FlowError>();
+        errorsPort.TryLinkTo(
+            new InputPort<FlowError>(
+                new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                errors),
+            propagateCompletion: true,
+            out var linkError);
+        linkError.ShouldBeNull();
+        LinkEntries(runtimeNode, new BufferBlock<FlowLogEntry>());
+
+        await input.Target.SendAsync(new InputMessage("alpha", [1], true));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(ObservabilityErrorCodes.LoggerAttributeSelectorFailed);
+    }
+
+    [Fact]
+    public async Task Logger_DoesNotExpandPlaceholdersFromSubstitutedValues()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .RegisterType<InputMessage>("message")
+                .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind),
+            new
+            {
+                inputType = "message",
+                messageTemplate = "Observed {kind}",
+                attributeSelectors = new[] { "kind" }
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var entries = new BufferBlock<FlowLogEntry>();
+        LinkEntries(runtimeNode, entries);
+
+        await input.Target.SendAsync(new InputMessage("{category}", [1], true));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var entry = await entries.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        entry.Message.ShouldBe("Observed {category}");
+    }
+
+    [Fact]
     public async Task Logger_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(

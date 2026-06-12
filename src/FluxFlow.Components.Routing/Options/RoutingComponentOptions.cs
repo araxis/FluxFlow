@@ -2,13 +2,14 @@ using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Mapping;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Routing.Options;
 
 public sealed class RoutingComponentOptions
 {
-    private readonly Dictionary<string, Type> _types = new(StringComparer.OrdinalIgnoreCase)
+    private readonly ConcurrentDictionary<string, Type> _types = new(StringComparer.OrdinalIgnoreCase)
     {
         [SwitchRoutingOptions.ObjectTypeName] = typeof(object),
         [typeof(object).FullName!] = typeof(object),

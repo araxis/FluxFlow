@@ -54,6 +54,10 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                     key,
                     cancellationToken)
                 .ConfigureAwait(false);
+            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.UtcNow)
+            {
+                existing = null;
+            }
 
             if (mode == StorageWriteMode.Create && existing is not null)
             {
@@ -73,7 +77,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
             var storedValue = CreateStoredValue(request.Value);
             var attributes = CopyAttributes(request.Attributes);
-            var storedAt = _settings.Clock.UtcNow;
+            var storedAt = TruncateToMilliseconds(_settings.Clock.UtcNow);
             var record = new StorageRecord
             {
                 Collection = collection,
@@ -83,7 +87,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                 Attributes = attributes,
                 Version = (existing?.Version ?? 0) + 1,
                 StoredAt = storedAt,
-                ExpiresAt = request.ExpiresAt,
+                ExpiresAt = TruncateToMilliseconds(request.ExpiresAt),
                 CorrelationId = Normalize(request.CorrelationId)
             };
 
@@ -158,6 +162,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         StorageQueryMatcher.Validate(query);
         var limit = query.Limit!.Value;
         var offset = query.Offset!.Value;
+        var pagingPushedDown = query.Attributes.Count == 0;
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -171,15 +176,18 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                     connection,
                     collection,
                     query,
+                    pagingPushedDown,
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            return records
+            var matches = records
                 .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
                 .OrderBy(record => record.StoredAt)
-                .ThenBy(record => record.Key, StringComparer.Ordinal)
-                .Skip(offset)
-                .Take(limit)
+                .ThenBy(record => record.Key, StringComparer.Ordinal);
+            var page = pagingPushedDown
+                ? matches
+                : matches.Skip(offset).Take(limit);
+            return page
                 .Select(CopyRecord)
                 .ToArray();
         }
@@ -269,6 +277,8 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         {
             _gate.Release();
         }
+
+        SqliteConnection.ClearPool(new SqliteConnection(CreateConnectionString()));
     }
 
     private void InitializeDatabase()
@@ -398,6 +408,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         SqliteConnection connection,
         string collection,
         StorageQueryRequest request,
+        bool pagingPushedDown,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -420,10 +431,17 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         Add(command, "$storeName", _settings.StoreName);
         Add(command, "$collection", collection);
 
+        if (request.KeyPrefix is not null)
+        {
+            ApplyCaseSensitiveLike(connection);
+            text.AppendLine(@"  AND record_key LIKE $keyPrefix || '%' ESCAPE '\'");
+            Add(command, "$keyPrefix", EscapeLikePrefix(request.KeyPrefix));
+        }
+
         if (request.StoredFrom.HasValue)
         {
             text.AppendLine("  AND stored_at_ms >= $storedFromMs");
-            Add(command, "$storedFromMs", request.StoredFrom.Value.ToUnixTimeMilliseconds());
+            Add(command, "$storedFromMs", ToCeilingUnixTimeMilliseconds(request.StoredFrom.Value));
         }
 
         if (request.StoredTo.HasValue)
@@ -438,7 +456,15 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             Add(command, "$nowMs", _settings.Clock.UtcNow.ToUnixTimeMilliseconds());
         }
 
-        text.AppendLine("ORDER BY stored_at_ms, record_key;");
+        text.AppendLine("ORDER BY stored_at_ms, record_key");
+        if (pagingPushedDown)
+        {
+            text.AppendLine("LIMIT $limit OFFSET $offset");
+            Add(command, "$limit", request.Limit!.Value);
+            Add(command, "$offset", request.Offset!.Value);
+        }
+
+        text.Append(';');
         command.CommandText = text.ToString();
 
         var records = new List<StorageRecord>();
@@ -544,17 +570,19 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             includeExpired != true;
 
     private SqliteConnection CreateConnection()
+        => new(CreateConnectionString());
+
+    private string CreateConnectionString()
     {
         var builder = new SqliteConnectionStringBuilder
         {
             DataSource = _settings.DatabasePath,
             Mode = _settings.CreateDatabase
                 ? SqliteOpenMode.ReadWriteCreate
-                : SqliteOpenMode.ReadWrite,
-            Cache = SqliteCacheMode.Shared
+                : SqliteOpenMode.ReadWrite
         };
 
-        return new SqliteConnection(builder.ToString());
+        return builder.ToString();
     }
 
     private void ApplyBusyTimeout(SqliteConnection connection)
@@ -562,6 +590,43 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         using var command = connection.CreateCommand();
         command.CommandText = $"PRAGMA busy_timeout = {_settings.BusyTimeoutMilliseconds};";
         command.ExecuteNonQuery();
+    }
+
+    private static void ApplyCaseSensitiveLike(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA case_sensitive_like = ON;";
+        command.ExecuteNonQuery();
+    }
+
+    private static string EscapeLikePrefix(string prefix)
+    {
+        var builder = new StringBuilder(prefix.Length);
+        foreach (var character in prefix)
+        {
+            if (character is '%' or '_' or '\\')
+            {
+                builder.Append('\\');
+            }
+
+            builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
+
+    private static DateTimeOffset TruncateToMilliseconds(DateTimeOffset value)
+        => DateTimeOffset.FromUnixTimeMilliseconds(value.ToUnixTimeMilliseconds());
+
+    private static DateTimeOffset? TruncateToMilliseconds(DateTimeOffset? value)
+        => value.HasValue ? TruncateToMilliseconds(value.Value) : null;
+
+    private static long ToCeilingUnixTimeMilliseconds(DateTimeOffset value)
+    {
+        var milliseconds = value.ToUnixTimeMilliseconds();
+        return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) < value
+            ? milliseconds + 1
+            : milliseconds;
     }
 
     private void ThrowIfDisposed()

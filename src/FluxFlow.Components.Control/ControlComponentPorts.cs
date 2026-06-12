@@ -6,4 +6,5 @@ public static class ControlComponentPorts
     public const string Output = "Output";
     public const string WhenTrue = "WhenTrue";
     public const string WhenFalse = "WhenFalse";
+    public const string Errors = "Errors";
 }

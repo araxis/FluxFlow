@@ -16,8 +16,10 @@ public sealed class ApplicationRuntime(
     private readonly BroadcastBlock<ApplicationStateChanged> _stateChanges = new(s => s);
     private readonly FlowEventCollector _eventCollector = new(resources.Concat(workflows.SelectMany(workflow => workflow.Nodes)));
     private readonly FlowDiagnosticCollector _diagnosticCollector = new(resources.Concat(workflows.SelectMany(workflow => workflow.Nodes)));
+    private readonly FlowErrorCollector _errorCollector = new(resources.Concat(workflows.SelectMany(workflow => workflow.Nodes)));
     private readonly object _stateLock = new();
-    private bool _disposed;
+    private int _disposed;
+    private int _linkFailuresAttached;
     private ApplicationState _state = ApplicationState.Idle;
 
     public IReadOnlyList<RuntimeNode> Resources { get; } = resources ?? throw new ArgumentNullException(nameof(resources));
@@ -33,10 +35,22 @@ public sealed class ApplicationRuntime(
 
     public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnosticCollector.Diagnostics;
 
+    public ISourceBlock<RuntimeFlowError> Errors => _errorCollector.Errors;
+
     public Task Completion => Task.WhenAll(Nodes.Select(node => node.Node.Completion));
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        lock (_stateLock)
+        {
+            if (_state != ApplicationState.Idle)
+            {
+                throw new InvalidOperationException(
+                    $"Flow application runtime cannot start from state '{_state}'.");
+            }
+        }
+
+        AttachLinkFailureHandlers();
         SetState(ApplicationState.Starting);
         foreach (var workflow in Workflows) workflow.BeginStartup();
         try
@@ -83,6 +97,7 @@ public sealed class ApplicationRuntime(
         var completion = Completion;
         _eventCollector.CompleteWhen(completion);
         _diagnosticCollector.CompleteWhen(completion);
+        _errorCollector.CompleteWhen(completion);
         _ = completion.ContinueWith(t =>
         {
             SetState(t.IsFaulted ? ApplicationState.Faulted : ApplicationState.Stopped,
@@ -144,14 +159,77 @@ public sealed class ApplicationRuntime(
         Exception exception)
         => new($"Node '{address}' failed while faulting runtime.", exception);
 
-    public void Dispose()
+    private void AttachLinkFailureHandlers()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _linkFailuresAttached, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
+        foreach (var node in Nodes)
+        {
+            foreach (var output in node.Outputs)
+            {
+                var owner = node;
+                output.LinkFailed += failure => HandleLinkFailure(owner, failure);
+            }
+        }
+    }
+
+    private void HandleLinkFailure(RuntimeNode node, OutputPortLinkFailure failure)
+    {
+        var conditionFailed = failure.Reason == OutputPortLinkFailureReason.ConditionFailed;
+        _diagnosticCollector.Post(new RuntimeFlowDiagnostic
+        {
+            NodeAddress = node.Address,
+            NodeId = node.Node.Id,
+            NodeType = node.Type,
+            NodePhase = node.Phase,
+            Diagnostic = new FlowDiagnostic
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                Name = conditionFailed
+                    ? RuntimeDiagnosticNames.LinkConditionFailed
+                    : RuntimeDiagnosticNames.LinkTargetRejected,
+                Level = FlowDiagnosticLevel.Warning,
+                Message = conditionFailed
+                    ? $"Link condition on output '{failure.Port}' failed; the message was dropped for that link."
+                    : $"Output '{failure.Port}' detached a link whose target no longer accepts messages.",
+                Exception = failure.Exception,
+                Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["port"] = failure.Port.ToString()
+                }
+            }
+        });
+
+        if (conditionFailed)
+        {
+            _errorCollector.Post(new RuntimeFlowError
+            {
+                NodeAddress = node.Address,
+                NodeId = node.Node.Id,
+                NodeType = node.Type,
+                NodePhase = node.Phase,
+                Error = new FlowError
+                {
+                    NodeId = node.Node.Id,
+                    Code = FlowErrorCodes.DynamicExpressionFailed,
+                    Message = $"Link condition on output '{failure.Port}' failed: {failure.Exception?.Message}",
+                    Exception = failure.Exception,
+                    Context = failure.Port.ToString()
+                }
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         var errors = new List<Exception>();
 
         foreach (var workflow in Workflows)
@@ -195,6 +273,7 @@ public sealed class ApplicationRuntime(
         }
 
         RuntimeCleanup.TryDisposeDiagnostics(_diagnosticCollector, errors, "Runtime");
+        RuntimeCleanup.TryDisposeErrors(_errorCollector, errors, "Runtime");
 
         _stateChanges.Complete();
         RuntimeCleanup.ThrowIfErrors(
@@ -204,12 +283,11 @@ public sealed class ApplicationRuntime(
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         var errors = new List<Exception>();
 
         foreach (var workflow in Workflows)
@@ -253,6 +331,7 @@ public sealed class ApplicationRuntime(
         }
 
         await RuntimeCleanup.TryDisposeDiagnosticsAsync(_diagnosticCollector, errors, "Runtime").ConfigureAwait(false);
+        await RuntimeCleanup.TryDisposeErrorsAsync(_errorCollector, errors, "Runtime").ConfigureAwait(false);
 
         _stateChanges.Complete();
         RuntimeCleanup.ThrowIfErrors(

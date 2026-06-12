@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Expressions</PackageId>
     <AssemblyName>FluxFlow.Components.Expressions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expressions</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Shared expression registration helpers for FluxFlow component packages.</Description>
     <PackageTags>workflow;dataflow;components;expressions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Stable 1.0.0 component package boundary for FluxFlow.Engine 1.0.0 with package-owned contracts, neutral diagnostics, and release readiness documentation.</PackageReleaseNotes>
+    <PackageReleaseNotes>The context factory registry now throws a descriptive error for ambiguous incomparable candidate types instead of picking one by dictionary order.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

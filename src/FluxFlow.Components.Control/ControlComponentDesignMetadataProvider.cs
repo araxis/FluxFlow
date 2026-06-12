@@ -21,7 +21,8 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
             Ports =
             [
                 Port(ControlComponentPorts.Input, PortDirection.Input, "Configured input type", true),
-                Port(ControlComponentPorts.Output, PortDirection.Output, "Configured input type", true, 1)
+                Port(ControlComponentPorts.Output, PortDirection.Output, "Configured input type", true, 1),
+                Port(ControlComponentPorts.Errors, PortDirection.Output, "FlowError", false, 2)
             ]
         },
         new()
@@ -38,7 +39,8 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
             [
                 Port(ControlComponentPorts.Input, PortDirection.Input, "Configured input type", true),
                 Port(ControlComponentPorts.WhenTrue, PortDirection.Output, "Configured input type", true, 1),
-                Port(ControlComponentPorts.WhenFalse, PortDirection.Output, "Configured input type", false, 2)
+                Port(ControlComponentPorts.WhenFalse, PortDirection.Output, "Configured input type", false, 2),
+                Port(ControlComponentPorts.Errors, PortDirection.Output, "FlowError", false, 3)
             ]
         }
     ];

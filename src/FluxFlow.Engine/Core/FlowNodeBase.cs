@@ -4,7 +4,7 @@ namespace FluxFlow.Engine.Components;
 
 public abstract class FlowNodeBase : IFlowNode, IFlowDiagnosticSource
 {
-    private readonly BufferBlock<FlowError> _errors = new();
+    private readonly FlowFanoutSource<FlowError> _errors = new();
     private readonly FlowFanoutSource<FlowDiagnostic> _diagnostics = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -168,6 +168,11 @@ public abstract class FlowNodeBase : IFlowNode, IFlowDiagnosticSource
         try
         {
             await completion.ConfigureAwait(false);
+            CompleteNode();
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancellation is a requested stop, not a node failure.
             CompleteNode();
         }
         catch (Exception exception)

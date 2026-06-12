@@ -64,12 +64,15 @@ use the request `Encoding` value when provided, otherwise `defaultEncoding`.
   "notifyFilters": [ "FileName", "LastWrite", "Size" ],
   "baseDirectory": "data",
   "allowAbsolutePaths": false,
+  "internalBufferSize": 8192,
   "boundedCapacity": 128
 }
 ```
 
 `file.watch` emits `FileWatchEvent` values with the changed path, directory,
-name, change type, and old path/name for rename events.
+name, change type, and old path/name for rename events. `internalBufferSize`
+optionally sets the underlying watcher buffer and must be between 4096 and
+65536 bytes when set.
 
 ## Directory Enumerate Output
 
@@ -107,7 +110,13 @@ file attributes.
 
 Relative paths are resolved under `baseDirectory` when it is set. Relative
 paths that escape the base directory are rejected. Absolute paths are rejected
-unless `allowAbsolutePaths` is true.
+unless `allowAbsolutePaths` is true. When `baseDirectory` is not set and
+`allowAbsolutePaths` is false, the current working directory is the implicit
+base and relative paths that escape it are rejected.
+
+`maxBytes` defaults to 16777216 (16 MiB) when the option is absent. Set it
+higher for larger files, or set it explicitly to `null` to keep unlimited
+reads.
 
 Supported write modes:
 

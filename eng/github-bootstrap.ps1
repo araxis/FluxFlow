@@ -8,23 +8,50 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-gh auth status
+function Invoke-Step {
+    param(
+        [string] $Command,
+        [string[]] $Arguments,
+        [string] $FailureMessage
+    )
+
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw $FailureMessage
+    }
+}
+
+Invoke-Step "gh" @("auth", "status") "GitHub CLI authentication check failed."
 
 if (-not (Test-Path -LiteralPath ".git")) {
-    git init
-    git branch -M main
+    Invoke-Step "git" @("init") "Repository initialization failed."
+    Invoke-Step "git" @("branch", "-M", "main") "Default branch rename failed."
 }
 
 & gh repo view $Repository *> $null
 $repoExists = $LASTEXITCODE -eq 0
 
 if (-not $repoExists) {
-    gh repo create $Repository --private --source . --remote origin
+    Invoke-Step "gh" @(
+        "repo",
+        "create",
+        $Repository,
+        "--private",
+        "--source",
+        ".",
+        "--remote",
+        "origin"
+    ) "Repository creation failed."
 }
 else {
     & git remote get-url origin *> $null
     if ($LASTEXITCODE -ne 0) {
-        git remote add origin "https://github.com/$Repository.git"
+        Invoke-Step "git" @(
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/$Repository.git"
+        ) "Adding the origin remote failed."
     }
 }
 
@@ -33,8 +60,11 @@ if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
 }
 else {
     $env:NUGET_API_KEY | gh secret set NUGET_API_KEY --repo $Repository
+    if ($LASTEXITCODE -ne 0) {
+        throw "Storing the NUGET_API_KEY repository secret failed."
+    }
 }
 
 if ($Push) {
-    git push -u origin HEAD:main
+    Invoke-Step "git" @("push", "-u", "origin", "HEAD:main") "Pushing main to origin failed."
 }

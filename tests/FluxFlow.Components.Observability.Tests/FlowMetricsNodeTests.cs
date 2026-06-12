@@ -101,6 +101,71 @@ public sealed class FlowMetricsNodeTests
     }
 
     [Fact]
+    public async Task Metrics_ExposesErrorsPortAndDeliversSizeSelectorFailures()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .RegisterType<InputMessage>("message")
+                .UseValueSelector<InputMessage>("payloadBytes", (_, _) => throw new InvalidOperationException("size failed")),
+            new
+            {
+                inputType = "message",
+                sizeSelector = "payloadBytes"
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var errorsPort = runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Errors));
+        errorsPort.ShouldNotBeNull();
+        var errors = new BufferBlock<FlowError>();
+        errorsPort.TryLinkTo(
+            new InputPort<FlowError>(
+                new PortAddress("test", new NodeName("errors"), new PortName("Input")),
+                errors),
+            propagateCompletion: true,
+            out var linkError);
+        linkError.ShouldBeNull();
+        LinkSnapshots(runtimeNode, new BufferBlock<FlowMetricSnapshot>());
+
+        await input.Target.SendAsync(new InputMessage("first", [1], true));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(ObservabilityErrorCodes.MetricsSizeSelectorFailed);
+    }
+
+    [Fact]
+    public async Task Metrics_AveragesSizeOverSizedObservationsOnly()
+    {
+        var runtimeNode = CreateNode(
+            options => options
+                .RegisterType<InputMessage>("message")
+                .UseValueSelector<InputMessage>("payloadBytes", (message, _) =>
+                    message.Enabled ? message.Payload.Length : (object?)null),
+            new
+            {
+                inputType = "message",
+                sizeSelector = "payloadBytes"
+            });
+        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
+            .ShouldBeOfType<InputPort<InputMessage>>();
+        var snapshots = new BufferBlock<FlowMetricSnapshot>();
+        LinkSnapshots(runtimeNode, snapshots);
+
+        await input.Target.SendAsync(new InputMessage("first", [1, 2], false));
+        await input.Target.SendAsync(new InputMessage("second", [1, 2, 3, 4], true));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var first = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        first.AverageSize.ShouldBeNull();
+        second.Count.ShouldBe(2);
+        second.TotalSize.ShouldBe(4);
+        second.AverageSize.ShouldBe(4);
+    }
+
+    [Fact]
     public async Task Metrics_EmitsDiagnostics()
     {
         var runtimeNode = CreateNode(

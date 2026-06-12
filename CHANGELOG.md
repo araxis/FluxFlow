@@ -1,5 +1,266 @@
 # Changelog
 
+## FluxFlow.Engine 1.1.0
+
+Error-channel and fault-propagation hardening release.
+
+- Node error channels are now broadcast fanout sources so every linked
+  consumer receives every error and unobserved errors are discarded instead
+  of buffered without bound.
+- Unlinked error output ports are drained by the runtime.
+- New runtime/workflow/host `Errors` streams (`RuntimeFlowError`, error
+  collectors) surface enriched node errors centrally.
+- Output ports detach a link whose target no longer accepts messages instead
+  of faulting sibling links (new `OutputPort.LinkFailed` event plus
+  `flow.link.target.rejected` diagnostic).
+- Throwing conditional-link predicates drop the message for that link only
+  and report `DynamicExpressionFailed` errors plus
+  `flow.link.condition.failed` diagnostics.
+- Upstream faults now propagate to linked targets instead of downgrading to
+  normal completion.
+- Validation rejects node/workflow/resource names containing '.', the
+  reserved `$resources` workflow name, and cyclic link paths.
+- Node cancellation now completes nodes as stopped instead of faulted.
+- `ApplicationRuntime.StartAsync` rejects re-entrant starts.
+- Factory registry is thread-safe.
+- Configuration scalar coercion only rewrites values that round-trip
+  losslessly.
+
+## FluxFlow.Components.Expressions 1.1.0
+
+Context factory resolution hardening release.
+
+- The context factory registry now throws a descriptive error for ambiguous
+  incomparable candidate types instead of picking one by dictionary order.
+
+## FluxFlow.Components.Control 1.2.0
+
+Error-port and thread-safety release.
+
+- `flow.filter` and `flow.when` now expose an `Errors` output port (declared
+  in design metadata) so flows can observe per-message expression failures.
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Mapping 1.2.0
+
+Error-port and thread-safety release.
+
+- `flow.mapper` now exposes an `Errors` output port (declared in design
+  metadata).
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Assertions 1.2.0
+
+Deterministic assertion clock release.
+
+- Adds an assertion clock abstraction (`IAssertionClock`, options
+  `Clock`/`UseClock`) and stamps `FlowAssertionResult.EvaluatedAt`
+  deterministically from it.
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Timers 1.2.0
+
+Timer correctness and error-port release.
+
+- All timer nodes now expose `Errors` output ports (declared in design
+  metadata).
+- Cron schedules fire at the first valid instant after a DST spring-forward
+  gap instead of skipping the occurrence, and `value/step` cron fields follow
+  vixie semantics (value through max).
+- `timer.delay` applies a constant arrival+delay offset to bursts instead of
+  cumulative serialized delays.
+- Dispose is prompt and tolerant of faulted nodes (pending clock delays are
+  cancelled).
+- Interval/schedule nodes latch completion before start and stop when the
+  output declines deliveries.
+- Type alias resolution cache is thread-safe.
+
+## FluxFlow.Components.Sources 1.2.0
+
+Source lifecycle hardening release.
+
+- Source nodes latch completion before start, stop when the output declines
+  deliveries, and guard cancellation against disposed token sources.
+- The generated source constructor validates loop/maxItems invariants.
+- Type alias resolution cache is thread-safe.
+
+## FluxFlow.Components.State 1.2.0
+
+Bounded diagnostics release.
+
+- Rejected-key warning tracking is capped with a single summary diagnostic so
+  high-cardinality key streams cannot grow memory without bound.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Routing 1.2.0
+
+Correlation timeout and design metadata correctness release.
+
+- Correlation timeouts now fire proactively from the package clock without
+  requiring subsequent traffic (matching the join node's timer pattern).
+- Expiry scanning is arrival-ordered instead of full-map scans per message.
+- Duplicate correlation sides preserve the original timeout deadline.
+- Join/window timer cancellation is race-free and dispose tolerates faulted
+  nodes.
+- Design metadata now declares the switch `Matched`/`Routed` ports,
+  correlation `Request`/`Response` split inputs, and the correct 30000 ms
+  timeout defaults.
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Http 1.2.0
+
+SSRF and header-injection hardening release.
+
+- Adds `allowedHosts` and `restrictToBaseUrlOrigin` options so hosts can
+  restrict per-message request destinations (SSRF hardening; defaults
+  preserve existing behavior).
+- Rejects header names/values containing CR/LF/NUL before sending.
+- Uses a pooled connection lifetime so DNS changes are observed.
+- README gains a Security section.
+
+## FluxFlow.Components.FileSystem 1.2.0
+
+Path policy and enumeration hardening release.
+
+- Path policy now treats the working directory as the implicit base when no
+  `baseDirectory` is set and absolute paths are disallowed, so relative `..`
+  paths can no longer escape (security hardening).
+- `file.read` `maxBytes` defaults to 16 MiB when unset (explicit null keeps
+  unlimited).
+- Directory enumeration no longer blocks startup, skips reparse points when
+  recursing, and stops when the output declines.
+- `file.watch` exposes `internalBufferSize`, publishes watcher state before
+  enabling events, and no longer mislabels shutdown as a full queue.
+
+## FluxFlow.Components.Mqtt 1.2.0
+
+Publish timeout and shutdown hardening release.
+
+- Publishes are bounded by a new `publishTimeoutMilliseconds` option (default
+  30000) so a hung adapter can no longer wedge the node.
+- Dispose drains pending publishes before releasing the client lease.
+- Subscribe handles completion racing startup and stops pumping when the
+  output declines.
+
+## FluxFlow.Components.Serialization 1.2.0
+
+Performance maintenance release.
+
+- JSON stringify reuses cached serializer options and parse parses input once
+  (performance).
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Payloads 1.2.0
+
+Bounded payload inspection release.
+
+- Adds a `maxInputBytes` option (default 1 MiB); oversized payloads produce a
+  bounded "payload too large" inspection result instead of fully formatting
+  arbitrarily large inputs.
+
+## FluxFlow.Components.Validation 1.2.0
+
+Thread-safety maintenance release.
+
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Observability 1.2.0
+
+Error-port and metadata accuracy release.
+
+- Counter/logger/metrics nodes now expose `Errors` output ports.
+- Design metadata declares accurate per-node option lists instead of one
+  shared list.
+- Log message rendering is single-pass so substituted values cannot inject
+  further placeholders.
+- Metrics `AverageSize` divides by sized observations only.
+- Type alias resolution cache is thread-safe.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Metrics 1.2.0
+
+Bounded tracking and snapshot performance release.
+
+- Rejected-group tracking is capped with a single summary notice.
+- Snapshots are built only when emitted (performance) with the final snapshot
+  rebuilt at completion.
+- Removes dead internal cancellation plumbing.
+
+## FluxFlow.Components.Journal 1.1.0
+
+Retention and lookup performance release.
+
+- The in-memory journal store gains an optional retention-options constructor
+  that enforces `MaxRecords` on append.
+- Duplicate-id detection is O(1).
+
+## FluxFlow.Components.Sessions 1.2.0
+
+Design metadata accuracy release.
+
+- Design metadata now matches the actual nodes (query `Output`/`Sessions`
+  ports and real recorder/replay/query options, replay `sessionId` required).
+- Replay stops when the output declines deliveries instead of counting them
+  as emitted.
+
+## FluxFlow.Components.Projections 1.1.0
+
+Design metadata and rate-window correctness release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` (new dependency on
+  `FluxFlow.Components.Designer`).
+- Final snapshots compute the rate window against the last matched event
+  timestamp so replayed streams report correct rates.
+
+## FluxFlow.Components.Expectations 1.1.0
+
+Additive design metadata provider release.
+
+- Adds a package-owned `IComponentDesignMetadataProvider` (new dependency on
+  `FluxFlow.Components.Designer`).
+
+## FluxFlow.Components.Secrets 1.1.0
+
+Redaction coverage release.
+
+- Default redaction fragments now cover pwd, passphrase, auth, bearer,
+  connectionstring, cert, pin, and salt.
+- `ShouldRedact` is null-safe.
+
+## FluxFlow.Components.Resources 1.1.0
+
+Default-instance correctness release.
+
+- `ResourceName.ToString()` returns an empty string for default instances
+  instead of null.
+
+## FluxFlow.Components.Storage.FileSystem 1.1.0
+
+Concurrency and query correctness release.
+
+- Store instances are shared per resolved root so optimistic concurrency
+  (`ExpectedVersion`, Create mode) is serialized across nodes.
+- Queries scan only the resolved collection directory, skip corrupt record
+  files, and clean up orphaned temp files.
+- Expired records no longer block Create-mode writes.
+- Value size limits are measured against compact JSON.
+
+## FluxFlow.Components.Storage.SqlFile 1.1.0
+
+Timestamp and query correctness release.
+
+- Put results now carry the persisted millisecond-precision timestamps so
+  re-reads and time-window queries agree.
+- Expired records no longer block Create-mode writes.
+- Key-prefix and paging filters are pushed into SQL.
+- Dispose clears the connection pool so the database file is released.
+- A private connection cache replaces the shared cache.
+
 ## FluxFlow.Components.Designer 1.0.1
 
 Documentation maintenance release.

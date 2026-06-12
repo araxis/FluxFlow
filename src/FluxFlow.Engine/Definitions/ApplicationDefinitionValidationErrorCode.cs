@@ -12,5 +12,9 @@ public enum ApplicationDefinitionValidationErrorCode
     MissingSourceNode = 8,
     EmptySourcePort = 9,
     EmptyTargetPort = 10,
-    DuplicateLink = 11
+    DuplicateLink = 11,
+    InvalidNodeName = 12,
+    InvalidWorkflowName = 13,
+    InvalidResourceName = 14,
+    CyclicLink = 15
 }

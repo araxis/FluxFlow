@@ -127,10 +127,35 @@ public sealed class RoutingClockTests
     }
 
     [Fact]
+    public async Task Correlation_UsesConfiguredClockForTimeoutDelay()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:05Z");
+        var clock = new RecordingRoutingClock(startedAt);
+        var runtimeNode = CreateCorrelationNode(
+            clock,
+            new { timeoutMilliseconds = 25 });
+        var input = GetInput<CorrelationMessage>(runtimeNode, RoutingComponentPorts.Input);
+        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
+        var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+
+        await input.Target.SendAsync(new CorrelationMessage("A-100", "request"));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(25)]);
+        timeout.Key.ShouldBe("A-100");
+        timeout.Side.ShouldBe("request");
+        timeout.ReceivedAt.ShouldBe(startedAt);
+        timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
+    }
+
+    [Fact]
     public async Task Correlation_UsesConfiguredClockForMatchTimestamps()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:04Z");
-        var clock = new RecordingRoutingClock(timestamp);
+        var clock = new FixedRoutingClock(timestamp);
         var runtimeNode = CreateCorrelationNode(clock);
         var input = GetInput<CorrelationMessage>(runtimeNode, RoutingComponentPorts.Input);
         var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
@@ -185,15 +210,19 @@ public sealed class RoutingClockTests
                 .UseContextFactory(new RightContextFactory()));
     }
 
-    private static RuntimeNode CreateCorrelationNode(RecordingRoutingClock clock)
+    private static RuntimeNode CreateCorrelationNode(
+        IRoutingClock clock,
+        object? overrides = null)
         => CreateNode(
             RoutingComponentTypes.Correlation,
-            new
-            {
-                keyExpression = "key",
-                sideExpression = "side",
-                inputType = "clock.correlation"
-            },
+            RoutingTestHost.MergeConfiguration(
+                new
+                {
+                    keyExpression = "key",
+                    sideExpression = "side",
+                    inputType = "clock.correlation"
+                },
+                overrides ?? new { }),
             options => options
                 .UseClock(clock)
                 .UseExpressionEngine(new RecordingExpressionEngine(
@@ -271,6 +300,16 @@ public sealed class RoutingClockTests
 
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FixedRoutingClock(DateTimeOffset utcNow) : IRoutingClock
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private sealed record LeftMessage(string Key);

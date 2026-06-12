@@ -16,6 +16,7 @@ public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
     private readonly Task _processingTask;
     private int _faulted;
     private long _emitted;
+    private bool _disposed;
 
     internal TimerDebounceNode(
         TimerDebounceSettings settings,
@@ -50,7 +51,15 @@ public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
         Interlocked.Exchange(ref _faulted, 1);
         try
         {
-            _processingCancellation.Cancel();
+            try
+            {
+                _processingCancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The node was already disposed; cancellation is no longer required.
+            }
+
             FaultNode(exception);
         }
         finally
@@ -62,9 +71,31 @@ public sealed class TimerDebounceNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         Complete();
-        await Completion.ConfigureAwait(false);
-        await _processingTask.ConfigureAwait(false);
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Dispose tolerates nodes that completed in a faulted or canceled state.
+        }
+
+        try
+        {
+            await _processingTask.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Dispose tolerates a processing loop that ended in a faulted state.
+        }
+
         _processingCancellation.Dispose();
     }
 

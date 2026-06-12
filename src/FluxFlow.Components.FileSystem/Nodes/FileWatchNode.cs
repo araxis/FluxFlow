@@ -88,18 +88,35 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
                 NotifyFilter = _notifyFilters,
                 EnableRaisingEvents = false
             };
+            if (_options.InternalBufferSize.HasValue)
+            {
+                watcher.InternalBufferSize = _options.InternalBufferSize.Value;
+            }
 
             watcher.Created += OnChanged;
             watcher.Changed += OnChanged;
             watcher.Deleted += OnChanged;
             watcher.Renamed += OnRenamed;
             watcher.Error += OnError;
-            watcher.EnableRaisingEvents = true;
 
             lock (_stateLock)
             {
                 _resolvedDirectory = resolvedDirectory;
                 _watcher = watcher;
+            }
+
+            try
+            {
+                watcher.EnableRaisingEvents = true;
+            }
+            catch
+            {
+                lock (_stateLock)
+                {
+                    _watcher = null;
+                }
+
+                throw;
             }
 
             watcher = null;
@@ -253,6 +270,11 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     {
         if (!PostOutput(watchEvent))
         {
+            if (Output.Completion.IsCompleted)
+            {
+                return;
+            }
+
             ReportWatchError(
                 FileSystemErrorCodes.FileWatchOutputFull,
                 $"file.watch output queue is full for '{watchEvent.Path}'.");

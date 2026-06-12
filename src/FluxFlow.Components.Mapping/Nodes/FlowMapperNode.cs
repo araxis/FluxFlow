@@ -15,7 +15,6 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
     private readonly MapperOptions _options;
     private readonly TransformManyBlock<TInput, TOutput> _input;
     private readonly BufferBlock<TOutput> _output;
-    private readonly CancellationToken _processingCancellationToken;
 
     public FlowMapperNode(
         MapperOptions options,
@@ -40,7 +39,6 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new TransformManyBlock<TInput, TOutput>(MapAsync, inputOptions);
         _output = new BufferBlock<TOutput>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -75,14 +73,11 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
     {
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
-
             var context = _contextFactory.Create(input, _nodeContext);
             var value = _expressionEngine.Evaluate(
                 _options.Expression!,
                 context,
                 typeof(TOutput));
-            _processingCancellationToken.ThrowIfCancellationRequested();
 
             var output = CoerceOutput(value);
             TryEmitDiagnostic(
@@ -91,10 +86,6 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
                 attributes: CreateAttributes());
 
             return Task.FromResult<IEnumerable<TOutput>>([output]);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {

@@ -1,4 +1,6 @@
 using FluxFlow.Components.Sources.Diagnostics;
+using FluxFlow.Components.Sources.Nodes;
+using FluxFlow.Components.Sources.Options;
 using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
@@ -149,6 +151,37 @@ public sealed class GeneratedSourceNodeTests
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Generated_StartAfterCompleteDoesNotEmit()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                outputType = "string",
+                items = new[] { "one" }
+            });
+        var output = new BufferBlock<string>();
+        LinkOutput(runtimeNode, output);
+
+        runtimeNode.Node.Complete();
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Generated_ConstructorRejectsLoopWithoutMaxItems()
+    {
+        var options = new GeneratedSourceOptions { Loop = true };
+
+        var exception = Should.Throw<ArgumentException>(
+            () => new GeneratedSourceNode<string>(options, ["one"]));
+
+        exception.Message.ShouldContain("maxItems");
     }
 
     [Fact]

@@ -11,6 +11,7 @@ namespace FluxFlow.Components.Metrics.Nodes;
 public sealed class MetricsAggregateNode : FlowNodeBase
 {
     private const string DefaultGroup = "default";
+    private const int MaxTrackedRejectedGroups = 1024;
 
     private readonly MetricsAggregateOptions _options;
     private readonly IMetricsClock _clock;
@@ -20,9 +21,9 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
-    private readonly CancellationToken _processingCancellationToken;
     private DateTimeOffset? _firstTimestamp;
-    private MetricSnapshotOutput? _latestSnapshot;
+    private DateTimeOffset? _latestTimestamp;
+    private bool _rejectedGroupTrackingCapped;
     private MetricSampleInput? _latest;
     private string? _latestName;
     private string? _latestUnit;
@@ -53,7 +54,6 @@ public sealed class MetricsAggregateNode : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<MetricSampleInput>(AggregateAsync, inputOptions);
         _output = new BufferBlock<MetricSnapshotOutput>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -103,9 +103,9 @@ public sealed class MetricsAggregateNode : FlowNodeBase
 
     protected override void OnNodeCompleted()
     {
-        if (!_options.EmitEverySample && _latestSnapshot is not null)
+        if (!_options.EmitEverySample && _latestTimestamp.HasValue)
         {
-            EmitSnapshot(_latestSnapshot);
+            EmitSnapshot(CreateSnapshot(_latestTimestamp.Value));
         }
 
         _output.Complete();
@@ -122,13 +122,13 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     {
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             var timestamp = sample.Timestamp ?? _clock.UtcNow;
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
             var groupKey = ResolveGroup(sample);
 
             _firstTimestamp ??= timestamp;
+            _latestTimestamp = timestamp;
             _sampleCount++;
             _latestName = Normalize(sample.Name);
             _latestUnit = Normalize(sample.Unit);
@@ -158,22 +158,18 @@ public sealed class MetricsAggregateNode : FlowNodeBase
                 _totalSize += size.Value;
             }
 
+            // Samples whose group was rejected by maxGroups intentionally still update
+            // the global aggregates; only the per-group itemization is skipped.
             UpdateGroup(groupKey, timestamp, value, size);
-            var snapshot = CreateSnapshot(timestamp);
-            _latestSnapshot = snapshot;
             if (_options.EmitEverySample)
             {
-                EmitSnapshot(snapshot);
+                EmitSnapshot(CreateSnapshot(timestamp));
             }
 
             TryEmitDiagnostic(
                 MetricsDiagnosticNames.AggregateUpdated,
                 message: "metrics.aggregate updated snapshot.",
-                attributes: CreateSnapshotAttributes(snapshot));
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
+                attributes: CreateUpdateAttributes(timestamp));
         }
         catch (MetricsAggregateException exception)
         {
@@ -286,6 +282,33 @@ public sealed class MetricsAggregateNode : FlowNodeBase
 
     private void ReportGroupLimit(string groupKey)
     {
+        if (_rejectedGroups.Count >= MaxTrackedRejectedGroups)
+        {
+            if (_rejectedGroups.Contains(groupKey) || _rejectedGroupTrackingCapped)
+            {
+                return;
+            }
+
+            _rejectedGroupTrackingCapped = true;
+            var summary =
+                $"metrics.aggregate rejected group tracking limit of {MaxTrackedRejectedGroups} reached; " +
+                "further rejected groups are not itemized.";
+            TryReportError(
+                MetricsErrorCodes.GroupLimitReached,
+                summary,
+                context: $"maxGroups={_options.MaxGroups}; maxTrackedRejectedGroups={MaxTrackedRejectedGroups}");
+            TryEmitDiagnostic(
+                MetricsDiagnosticNames.AggregateGroupLimitReached,
+                FlowDiagnosticLevel.Warning,
+                summary,
+                attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["maxGroups"] = _options.MaxGroups,
+                    ["maxTrackedRejectedGroups"] = MaxTrackedRejectedGroups
+                });
+            return;
+        }
+
         if (!_rejectedGroups.Add(groupKey))
         {
             return;
@@ -413,15 +436,15 @@ public sealed class MetricsAggregateNode : FlowNodeBase
                 : new Dictionary<string, string>(sample.Tags, StringComparer.Ordinal)
         };
 
-    private static Dictionary<string, object?> CreateSnapshotAttributes(MetricSnapshotOutput snapshot)
+    private Dictionary<string, object?> CreateUpdateAttributes(DateTimeOffset timestamp)
         => new(StringComparer.Ordinal)
         {
-            ["sampleCount"] = snapshot.SampleCount,
-            ["valueCount"] = snapshot.ValueCount,
-            ["groupCount"] = snapshot.Groups.Count,
-            ["currentRate"] = snapshot.CurrentRate,
-            ["averageRate"] = snapshot.AverageRate,
-            ["totalSize"] = snapshot.TotalSize
+            ["sampleCount"] = _sampleCount,
+            ["valueCount"] = _valueCount,
+            ["groupCount"] = _groups.Count,
+            ["currentRate"] = CalculateWindowRate(_rateSamples, timestamp),
+            ["averageRate"] = CalculateAverageRate(timestamp),
+            ["totalSize"] = _options.TrackSize ? _totalSize : (long?)null
         };
 
     private static Dictionary<string, object?> CreateSampleAttributes(MetricSampleInput sample)

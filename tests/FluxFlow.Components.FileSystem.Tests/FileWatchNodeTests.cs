@@ -206,6 +206,34 @@ public sealed class FileWatchNodeTests
     }
 
     [Fact]
+    public void FileWatch_RejectsInternalBufferSizeOutsideRange()
+    {
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(new { directory = ".", internalBufferSize = 1024 }));
+
+        exception.Message.ShouldContain("internalBufferSize");
+    }
+
+    [Fact]
+    public async Task FileWatch_StartsWithConfiguredInternalBufferSize()
+    {
+        using var directory = TempDirectory.Create();
+        var runtimeNode = CreateNode(new
+        {
+            directory = ".",
+            baseDirectory = directory.Path,
+            internalBufferSize = 16384
+        });
+        var output = new BufferBlock<FileWatchEvent>();
+        LinkOutput(runtimeNode, output);
+
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        runtimeNode.Node.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await DisposeAsync(runtimeNode);
+    }
+
+    [Fact]
     public void FileWatch_RejectsUnsupportedNotifyFilter()
     {
         var exception = Should.Throw<InvalidOperationException>(

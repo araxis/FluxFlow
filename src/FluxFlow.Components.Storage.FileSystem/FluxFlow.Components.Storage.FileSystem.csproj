@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.FileSystem</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Stable 1.0.0 component package boundary for FluxFlow.Engine 1.0.0 with package-owned contracts, neutral diagnostics, and release readiness documentation.</PackageReleaseNotes>
+    <PackageReleaseNotes>Store instances are shared per resolved root so optimistic concurrency is serialized across nodes, queries scan only the resolved collection directory and skip corrupt record files, expired records no longer block Create-mode writes, and value size limits are measured against compact JSON.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

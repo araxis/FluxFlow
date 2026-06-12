@@ -1,5 +1,6 @@
 using FluxFlow.Components.Secrets.Contracts;
 using Shouldly;
+using System.Text.Json;
 using Xunit;
 
 namespace FluxFlow.Components.Secrets.Tests;
@@ -167,6 +168,56 @@ public sealed class SecretResolverTests
         redacted["name"].ShouldBe("primary");
         redacted["accessToken"].ShouldBe(SecretRedactor.RedactedText);
         redacted["custom"].ShouldBe(SecretRedactor.RedactedText);
+    }
+
+    [Theory]
+    [InlineData("dbPwd")]
+    [InlineData("PassPhrase")]
+    [InlineData("authorizationHeader")]
+    [InlineData("bearerValue")]
+    [InlineData("ConnectionString")]
+    [InlineData("clientCertificate")]
+    [InlineData("cardPin")]
+    [InlineData("hashSalt")]
+    public void Redactor_treats_extended_fragments_as_sensitive(string key)
+    {
+        SecretRedactor.ShouldRedact(key).ShouldBeTrue(key);
+    }
+
+    [Fact]
+    public void Redactor_handles_null_key_safely()
+    {
+        SecretRedactor.ShouldRedact(null).ShouldBeFalse();
+        SecretRedactor.ShouldRedact(null, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "custom" })
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SecretValue_to_string_is_always_redacted()
+    {
+        new SecretValue("raw-secret-value").ToString().ShouldBe("[redacted]");
+        SecretRedactor.RedactedText.ShouldBe("[redacted]");
+    }
+
+    [Fact]
+    public void SecretValue_json_serialization_does_not_emit_raw_value()
+    {
+        var json = JsonSerializer.Serialize(new SecretValue("raw-secret-value"));
+
+        json.ShouldNotContain("raw-secret-value");
+    }
+
+    [Fact]
+    public void SecretResolveResult_json_serialization_does_not_emit_raw_value()
+    {
+        var result = SecretResolveResult.ResolvedResult(
+            new SecretReference { Name = new SecretName("primary") },
+            new SecretDescriptor { Name = new SecretName("primary") },
+            new SecretValue("raw-secret-value"));
+
+        var json = JsonSerializer.Serialize(result);
+
+        json.ShouldNotContain("raw-secret-value");
     }
 
     [Fact]

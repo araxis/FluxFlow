@@ -291,20 +291,61 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         var value = url.Trim();
         if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
         {
-            return absolute;
+            return EnsureUrlAllowed(absolute);
         }
 
         if (!string.IsNullOrWhiteSpace(_options.BaseUrl) &&
             Uri.TryCreate(_options.BaseUrl, UriKind.Absolute, out var baseUrl) &&
             Uri.TryCreate(baseUrl, value, out var combined))
         {
-            return combined;
+            return EnsureUrlAllowed(combined);
         }
 
         throw new HttpRequestNodeException(
             HttpErrorCodes.InvalidUrl,
             HttpErrorKind.InvalidUrl,
             $"http.request URL '{url}' is invalid.");
+    }
+
+    private Uri EnsureUrlAllowed(Uri resolved)
+    {
+        if (_options.RestrictToBaseUrlOrigin &&
+            !string.IsNullOrWhiteSpace(_options.BaseUrl) &&
+            Uri.TryCreate(_options.BaseUrl, UriKind.Absolute, out var baseUrl) &&
+            !IsSameOrigin(resolved, baseUrl))
+        {
+            throw new HttpRequestNodeException(
+                HttpErrorCodes.UrlNotAllowed,
+                HttpErrorKind.UrlNotAllowed,
+                $"http.request URL '{resolved}' does not match the baseUrl origin.");
+        }
+
+        if (_options.AllowedHosts.Count > 0 &&
+            !_options.AllowedHosts.Any(entry => MatchesAllowedHost(resolved.Host, entry)))
+        {
+            throw new HttpRequestNodeException(
+                HttpErrorCodes.UrlNotAllowed,
+                HttpErrorKind.UrlNotAllowed,
+                $"http.request URL host '{resolved.Host}' is not in allowedHosts.");
+        }
+
+        return resolved;
+    }
+
+    private static bool IsSameOrigin(Uri resolved, Uri baseUrl)
+        => string.Equals(resolved.Scheme, baseUrl.Scheme, StringComparison.OrdinalIgnoreCase) &&
+           string.Equals(resolved.Host, baseUrl.Host, StringComparison.OrdinalIgnoreCase) &&
+           resolved.Port == baseUrl.Port;
+
+    private static bool MatchesAllowedHost(string host, string entry)
+    {
+        var allowed = entry.Trim();
+        if (allowed.StartsWith('.'))
+        {
+            return host.EndsWith(allowed, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return host.Equals(allowed, StringComparison.OrdinalIgnoreCase);
     }
 
     private TimeSpan ResolveTimeout(int? timeoutMilliseconds)
@@ -328,11 +369,27 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
             StringComparer.OrdinalIgnoreCase);
         foreach (var header in input.Headers)
         {
+            if (ContainsForbiddenHeaderCharacters(header.Key) ||
+                ContainsForbiddenHeaderCharacters(header.Value))
+            {
+                throw new HttpRequestNodeException(
+                    HttpErrorCodes.InvalidRequest,
+                    HttpErrorKind.InvalidRequest,
+                    $"http.request header '{SanitizeHeaderName(header.Key)}' contains forbidden characters.");
+            }
+
             headers[header.Key] = header.Value;
         }
 
         return headers;
     }
+
+    private static bool ContainsForbiddenHeaderCharacters(string? value)
+        => value?.AsSpan().IndexOfAny('\r', '\n', '\0') >= 0;
+
+    private static string SanitizeHeaderName(string? name)
+        => string.Concat((name ?? string.Empty)
+            .Where(static character => character is not '\r' and not '\n' and not '\0'));
 
     private static byte[]? ResolveBodyBytes(HttpRequestInput input)
     {

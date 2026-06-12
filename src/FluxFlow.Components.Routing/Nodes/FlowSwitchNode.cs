@@ -24,7 +24,6 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     private readonly BufferBlock<FlowRoute<TInput>> _routed;
     private readonly BufferBlock<TInput> _matched;
     private readonly BufferBlock<TInput> _default;
-    private readonly CancellationToken _processingCancellationToken;
 
     public FlowSwitchNode(
         SwitchRoutingOptions options,
@@ -78,7 +77,6 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(RouteAsync, inputOptions);
         _result = new BufferBlock<FlowSwitchResult<TInput>>(blockOptions);
         _routed = new BufferBlock<FlowRoute<TInput>>(blockOptions);
@@ -139,17 +137,12 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         string? routeKey;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             routeKey = RoutingNodeSupport.EvaluateRouteKey(
                 _expressionEngine,
                 _options,
                 _contextFactory,
                 _nodeContext,
                 input);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {
@@ -182,11 +175,11 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             EvaluatedAt = timestamp
         };
 
-        await _result.SendAsync(result, _processingCancellationToken).ConfigureAwait(false);
+        await _result.SendAsync(result).ConfigureAwait(false);
         string? outputPort = null;
         if (matched && _options.EmitMatchedInput)
         {
-            await _matched.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+            await _matched.SendAsync(input).ConfigureAwait(false);
         }
 
         if (matched
@@ -195,7 +188,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             && _routeOutputBlocks.TryGetValue(routeOutputPort, out var routeOutput))
         {
             outputPort = routeOutputPort;
-            await routeOutput.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+            await routeOutput.SendAsync(input).ConfigureAwait(false);
         }
 
         if (_options.EmitRouteEnvelope)
@@ -213,13 +206,12 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
                     InputType = _options.InputType,
                     Value = input,
                     RoutedAt = timestamp
-                },
-                _processingCancellationToken).ConfigureAwait(false);
+                }).ConfigureAwait(false);
         }
 
         if (!matched && _options.EmitDefaultInput)
         {
-            await _default.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+            await _default.SendAsync(input).ConfigureAwait(false);
         }
 
         TryEmitDiagnostic(

@@ -19,6 +19,7 @@ public sealed class PayloadComponentDesignMetadataProvider : IComponentDesignMet
             SuggestedEditorWidth = 460,
             Options =
             [
+                Number("maxInputBytes", "Max input bytes", 1048576, 1),
                 Number("maxPreviewBytes", "Max preview bytes", 1024, 1),
                 Number("maxFormattedChars", "Max formatted chars", 4096, 1),
                 Boolean("detectBase64", "Detect base64", true),

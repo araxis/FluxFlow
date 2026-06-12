@@ -247,6 +247,128 @@ public sealed class HttpRequestNodeTests
     }
 
     [Fact]
+    public async Task Request_AllowsHostMatchingAllowedHosts()
+    {
+        var runtimeNode = CreateNode(
+            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
+                Task.FromResult(CreateResponse(context, 200, "ok")))),
+            new
+            {
+                allowedHosts = new[] { "api.example.test", ".internal.example" }
+            });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(
+            runtimeNode,
+            HttpComponentPorts.Output);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://api.example.test/items" });
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://service.internal.example/items" });
+        input.Target.Complete();
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        first.Success.ShouldBeTrue();
+        second.Success.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Request_RejectsHostOutsideAllowedHostsWithoutSending()
+    {
+        var sent = false;
+        var runtimeNode = CreateNode(
+            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
+            {
+                sent = true;
+                return Task.FromResult(CreateResponse(context, 200, "ok"));
+            })),
+            new
+            {
+                allowedHosts = new[] { "api.example.test" }
+            });
+        var input = GetInput(runtimeNode);
+        var errors = LinkOutput<HttpErrorOutput>(
+            runtimeNode,
+            HttpComponentPorts.Errors);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://evil.example.test/items" });
+        input.Target.Complete();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Kind.ShouldBe(HttpErrorKind.UrlNotAllowed);
+        sent.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Request_RestrictToBaseUrlOriginBlocksCrossOriginAbsoluteUrl()
+    {
+        HttpRequestSendContext? captured = null;
+        var runtimeNode = CreateNode(
+            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
+            {
+                captured = context;
+                return Task.FromResult(CreateResponse(context, 200, "ok"));
+            })),
+            new
+            {
+                baseUrl = "https://example.test/api/",
+                restrictToBaseUrlOrigin = true
+            });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(
+            runtimeNode,
+            HttpComponentPorts.Output);
+        var errors = LinkOutput<HttpErrorOutput>(
+            runtimeNode,
+            HttpComponentPorts.Errors);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://attacker.test/steal" });
+        await input.Target.SendAsync(new HttpRequestInput { Url = "items" });
+        input.Target.Complete();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Kind.ShouldBe(HttpErrorKind.UrlNotAllowed);
+        response.Success.ShouldBeTrue();
+        captured.ShouldNotBeNull();
+        captured.Url.ToString().ShouldBe("https://example.test/api/items");
+    }
+
+    [Fact]
+    public async Task Request_RejectsHeadersWithForbiddenCharacters()
+    {
+        var sent = false;
+        var runtimeNode = CreateNode(
+            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
+            {
+                sent = true;
+                return Task.FromResult(CreateResponse(context, 200, "ok"));
+            })),
+            new { });
+        var input = GetInput(runtimeNode);
+        var errors = LinkOutput<HttpErrorOutput>(
+            runtimeNode,
+            HttpComponentPorts.Errors);
+
+        await input.Target.SendAsync(new HttpRequestInput
+        {
+            Url = "https://example.test/items",
+            Headers = new Dictionary<string, string>
+            {
+                ["X-Injected"] = "value\r\nHost: attacker.test"
+            }
+        });
+        input.Target.Complete();
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Kind.ShouldBe(HttpErrorKind.InvalidRequest);
+        sent.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Request_EmitsTimeoutError()
     {
         var runtimeNode = CreateNode(

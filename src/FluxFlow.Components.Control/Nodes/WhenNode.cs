@@ -16,7 +16,6 @@ public sealed class WhenNode<TInput> : FlowNodeBase
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _whenTrue;
     private readonly BufferBlock<TInput> _whenFalse;
-    private readonly CancellationToken _processingCancellationToken;
 
     public WhenNode(
         ControlExpressionOptions options,
@@ -41,7 +40,6 @@ public sealed class WhenNode<TInput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = inputOptions.CancellationToken;
         _input = new ActionBlock<TInput>(RouteAsync, inputOptions);
         _whenTrue = new BufferBlock<TInput>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
@@ -84,17 +82,12 @@ public sealed class WhenNode<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             passed = ControlNodeSupport.Evaluate(
                 _expressionEngine,
                 _options,
                 _contextFactory,
                 _nodeContext,
                 input);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {
@@ -123,7 +116,7 @@ public sealed class WhenNode<TInput> : FlowNodeBase
                 route));
 
         var target = passed ? _whenTrue : _whenFalse;
-        await target.SendAsync(input, _processingCancellationToken).ConfigureAwait(false);
+        await target.SendAsync(input).ConfigureAwait(false);
     }
 
     private void CompleteOutputs(Task completion)

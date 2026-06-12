@@ -8,9 +8,17 @@ public static class SecretRedactor
     [
         "secret",
         "password",
+        "pwd",
+        "passphrase",
         "token",
         "credential",
-        "key"
+        "key",
+        "auth",
+        "bearer",
+        "connectionstring",
+        "cert",
+        "pin",
+        "salt"
     ];
 
     public static string Redact(string? value)
@@ -29,8 +37,11 @@ public static class SecretRedactor
             StringComparer.Ordinal);
     }
 
-    public static bool ShouldRedact(string key, ISet<string>? protectedKeys = null)
+    public static bool ShouldRedact(string? key, ISet<string>? protectedKeys = null)
     {
+        if (key is null)
+            return false;
+
         if (protectedKeys is not null && protectedKeys.Contains(key))
             return true;
 

@@ -14,7 +14,6 @@ public sealed class FilterNode<TInput> : FlowNodeBase
     private readonly ControlNodeContext _nodeContext;
     private readonly ControlExpressionOptions _options;
     private readonly TransformManyBlock<TInput, TInput> _block;
-    private readonly CancellationToken _processingCancellationToken;
 
     public FilterNode(
         ControlExpressionOptions options,
@@ -39,7 +38,6 @@ public sealed class FilterNode<TInput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
-        _processingCancellationToken = blockOptions.CancellationToken;
         _block = new TransformManyBlock<TInput, TInput>(Filter, blockOptions);
         CompleteWhen(_block.Completion);
     }
@@ -69,17 +67,12 @@ public sealed class FilterNode<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            _processingCancellationToken.ThrowIfCancellationRequested();
             passed = ControlNodeSupport.Evaluate(
                 _expressionEngine,
                 _options,
                 _contextFactory,
                 _nodeContext,
                 input);
-        }
-        catch (OperationCanceledException) when (_processingCancellationToken.IsCancellationRequested)
-        {
-            throw;
         }
         catch (Exception exception)
         {

@@ -23,6 +23,12 @@ public sealed class ApplicationDefinitionValidator
                     ApplicationDefinitionValidationErrorCode.EmptyResourceName,
                     "Resource name cannot be empty."));
             }
+            else if (resource.Key.Contains('.'))
+            {
+                errors.Add(new(
+                    ApplicationDefinitionValidationErrorCode.InvalidResourceName,
+                    $"Resource name '{resource.Key}' cannot contain '.'."));
+            }
 
             ValidateNode(null, resource.Key, resource.Value, errors);
         }
@@ -34,6 +40,20 @@ public sealed class ApplicationDefinitionValidator
                 errors.Add(new(
                     ApplicationDefinitionValidationErrorCode.EmptyWorkflowName,
                     "Workflow name cannot be empty."));
+            }
+            else if (workflow.Key.Contains('.'))
+            {
+                errors.Add(new(
+                    ApplicationDefinitionValidationErrorCode.InvalidWorkflowName,
+                    $"Workflow name '{workflow.Key}' cannot contain '.'.",
+                    workflow.Key));
+            }
+            else if (workflow.Key == WellKnownScopes.Resources)
+            {
+                errors.Add(new(
+                    ApplicationDefinitionValidationErrorCode.InvalidWorkflowName,
+                    $"Workflow name '{workflow.Key}' is reserved for the resource scope.",
+                    workflow.Key));
             }
 
             if (workflow.Value.Nodes.Count == 0)
@@ -51,6 +71,11 @@ public sealed class ApplicationDefinitionValidator
             ValidateLinks(workflow.Key, workflow.Value.Nodes, definition, errors);
         }
 
+        if (errors.Count == 0)
+        {
+            ValidateAcyclic(definition, errors);
+        }
+
         return new ApplicationDefinitionValidationResult(errors);
     }
 
@@ -65,6 +90,14 @@ public sealed class ApplicationDefinitionValidator
             errors.Add(new(
                 ApplicationDefinitionValidationErrorCode.EmptyNodeName,
                 "Flow node name cannot be empty.",
+                workflowName,
+                nodeName));
+        }
+        else if (nodeName.Contains('.'))
+        {
+            errors.Add(new(
+                ApplicationDefinitionValidationErrorCode.InvalidNodeName,
+                $"Flow node name '{nodeName}' cannot contain '.'.",
                 workflowName,
                 nodeName));
         }
@@ -188,6 +221,108 @@ public sealed class ApplicationDefinitionValidator
                 targetNodeName,
                 targetPortName));
         }
+    }
+
+    private static void ValidateAcyclic(
+        ApplicationDefinition definition,
+        List<ApplicationDefinitionValidationError> errors)
+    {
+        // Edges run from each link source node to its target node across all
+        // workflows. Cycles can never complete gracefully (every node waits on
+        // an upstream that transitively waits on it), so they are rejected.
+        var edges = new Dictionary<(string Scope, string Node), List<(string Scope, string Node)>>();
+
+        foreach (var workflow in definition.Workflows)
+        {
+            foreach (var node in workflow.Value.Nodes)
+            {
+                foreach (var port in node.Value.Ports)
+                {
+                    IReadOnlyList<LinkDefinition> links;
+                    try
+                    {
+                        links = node.Value.GetPortLinks(port.Key, workflow.Key);
+                    }
+                    catch (Exception exception) when (
+                        exception is FormatException or System.Text.Json.JsonException or ArgumentException)
+                    {
+                        continue;
+                    }
+
+                    foreach (var link in links)
+                    {
+                        if (link.From.Scope == WellKnownScopes.Resources)
+                        {
+                            continue;
+                        }
+
+                        var source = (link.From.Scope, link.From.Node.Value);
+                        if (!edges.TryGetValue(source, out var targets))
+                        {
+                            targets = [];
+                            edges[source] = targets;
+                        }
+
+                        targets.Add((workflow.Key, node.Key));
+                    }
+                }
+            }
+        }
+
+        var states = new Dictionary<(string Scope, string Node), int>();
+        foreach (var start in edges.Keys)
+        {
+            if (TryFindCycle(start, edges, states, [], out var cycle))
+            {
+                errors.Add(new(
+                    ApplicationDefinitionValidationErrorCode.CyclicLink,
+                    $"Flow application definition contains a cyclic link path: {cycle}.",
+                    cycle.Split('.')[0]));
+                return;
+            }
+        }
+    }
+
+    private static bool TryFindCycle(
+        (string Scope, string Node) start,
+        IReadOnlyDictionary<(string Scope, string Node), List<(string Scope, string Node)>> edges,
+        Dictionary<(string Scope, string Node), int> states,
+        List<(string Scope, string Node)> path,
+        out string cycle)
+    {
+        cycle = string.Empty;
+        if (states.TryGetValue(start, out var state))
+        {
+            if (state == 2)
+            {
+                return false;
+            }
+
+            var cycleStart = path.IndexOf(start);
+            var nodes = path.Skip(Math.Max(cycleStart, 0)).Append(start);
+            cycle = string.Join(" -> ", nodes.Select(n => $"{n.Scope}.{n.Node}"));
+            return true;
+        }
+
+        if (!edges.TryGetValue(start, out var targets))
+        {
+            states[start] = 2;
+            return false;
+        }
+
+        states[start] = 1;
+        path.Add(start);
+        foreach (var target in targets)
+        {
+            if (TryFindCycle(target, edges, states, path, out cycle))
+            {
+                return true;
+            }
+        }
+
+        path.RemoveAt(path.Count - 1);
+        states[start] = 2;
+        return false;
     }
 
     private sealed record LinkKey(

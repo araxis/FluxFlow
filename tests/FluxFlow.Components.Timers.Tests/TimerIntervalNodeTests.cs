@@ -131,6 +131,24 @@ public sealed class TimerIntervalNodeTests
     }
 
     [Fact]
+    public async Task Interval_CompleteBeforeStartPreventsLaterStart()
+    {
+        var runtimeNode = CreateNode(new
+        {
+            intervalMilliseconds = 10,
+            emitImmediately = true
+        });
+        var output = new BufferBlock<TimerTick>();
+        LinkOutput(runtimeNode, output);
+
+        runtimeNode.Node.Complete();
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Interval_RejectsSecondStart()
     {
         var runtimeNode = CreateNode(new

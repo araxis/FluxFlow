@@ -173,6 +173,57 @@ public sealed class TimerThrottleNodeTests
     }
 
     [Fact]
+    public async Task Throttle_DisposeAfterFaultDoesNotThrow()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                inputType = "string",
+                intervalMilliseconds = 1
+            });
+        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
+            .LinkToDiscard();
+
+        runtimeNode.Node.Fault(new InvalidOperationException("boom"));
+        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => runtimeNode.Node.Completion);
+    }
+
+    [Fact]
+    public async Task Throttle_DisposePromptlyCancelsPendingDelays()
+    {
+        var runtimeNode = CreateNode(
+            _ => { },
+            new
+            {
+                inputType = "int",
+                intervalMilliseconds = 30000,
+                emitFirstImmediately = false,
+                boundedCapacity = 8
+            });
+        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
+            .ShouldBeOfType<InputPort<int>>();
+        var output = new BufferBlock<int>();
+        LinkOutput(runtimeNode, output);
+
+        await input.Target.SendAsync(1);
+        await input.Target.SendAsync(2);
+        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
+            .DisposeAsync()
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public void Throttle_RejectsMissingInterval()
     {
         var exception = Should.Throw<InvalidOperationException>(

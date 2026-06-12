@@ -77,12 +77,17 @@ public sealed class FlowApplicationConfigurationLoader
             return JsonValue.Create(boolean);
         }
 
-        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
+        // Coerce numbers only when the text round-trips losslessly, so values
+        // such as "0123", "1.10", or "1e5" stay strings instead of being
+        // silently rewritten.
+        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) &&
+            integer.ToString(CultureInfo.InvariantCulture) == value)
         {
             return JsonValue.Create(integer);
         }
 
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
+            number.ToString(CultureInfo.InvariantCulture) == value)
         {
             return JsonValue.Create(number);
         }

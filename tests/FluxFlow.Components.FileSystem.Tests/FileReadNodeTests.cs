@@ -161,6 +161,113 @@ public sealed class FileReadNodeTests
     }
 
     [Fact]
+    public async Task FileRead_RejectsRelativePathThatEscapesWorkingDirectoryByDefault()
+    {
+        var runtimeNode = CreateNode(new { });
+        var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var errors = new BufferBlock<FlowError>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+        runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new FileReadRequest { Path = "../outside.txt" });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadInvalidPath);
+        error.Message.ShouldContain("working directory");
+    }
+
+    [Fact]
+    public async Task FileRead_ReadsWorkingDirectoryRelativePathByDefault()
+    {
+        var fileName = $"fluxflow-read-cwd-{Guid.NewGuid():N}.txt";
+        var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
+        await File.WriteAllTextAsync(filePath, "local");
+        try
+        {
+            var runtimeNode = CreateNode(new { });
+            var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+                .ShouldBeOfType<InputPort<FileReadRequest>>();
+            var results = new BufferBlock<FileReadResult>();
+            LinkResult(runtimeNode, results);
+
+            await input.Target.SendAsync(new FileReadRequest { Path = fileName });
+            input.Target.Complete();
+            await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            result.Content.ShouldBe("local");
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task FileRead_DefaultsMaxBytesToSixteenMebibytes()
+    {
+        using var directory = TempDirectory.Create();
+        var filePath = Path.Combine(directory.Path, "large.bin");
+        await using (var stream = File.Create(filePath))
+        {
+            stream.SetLength(FileReadOptions.DefaultMaxBytes + 1);
+        }
+
+        var runtimeNode = CreateNode(new { baseDirectory = directory.Path });
+        var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var errors = new BufferBlock<FlowError>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+        runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Result))!.LinkToDiscard();
+
+        await input.Target.SendAsync(new FileReadRequest
+        {
+            Path = "large.bin",
+            ReadAs = FileReadMode.Bytes
+        });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(FileSystemErrorCodes.FileReadTooLarge);
+    }
+
+    [Fact]
+    public async Task FileRead_ExplicitNullMaxBytesKeepsUnlimitedReads()
+    {
+        using var directory = TempDirectory.Create();
+        var filePath = Path.Combine(directory.Path, "large.bin");
+        await using (var stream = File.Create(filePath))
+        {
+            stream.SetLength(FileReadOptions.DefaultMaxBytes + 1);
+        }
+
+        var runtimeNode = CreateNode(new
+        {
+            baseDirectory = directory.Path,
+            maxBytes = (long?)null
+        });
+        var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
+            .ShouldBeOfType<InputPort<FileReadRequest>>();
+        var results = new BufferBlock<FileReadResult>();
+        LinkResult(runtimeNode, results);
+
+        await input.Target.SendAsync(new FileReadRequest
+        {
+            Path = "large.bin",
+            ReadAs = FileReadMode.Bytes
+        });
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.BytesRead.ShouldBe(FileReadOptions.DefaultMaxBytes + 1);
+    }
+
+    [Fact]
     public async Task FileRead_UsesRequestEncoding()
     {
         using var directory = TempDirectory.Create();

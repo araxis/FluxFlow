@@ -23,6 +23,8 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 Number("maxResponseBodyBytes", "Max response body bytes", 1048576, 1),
                 Boolean("followRedirects", "Follow redirects", true),
                 Boolean("treatNonSuccessStatusAsError", "Treat non-success status as error", false),
+                Boolean("restrictToBaseUrlOrigin", "Restrict to baseUrl origin", false),
+                AllowedHosts(),
                 Number("boundedCapacity", "Capacity", 128, 1)
             ],
             Ports =
@@ -41,6 +43,14 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
         DisplayName = displayName,
         DefaultValue = defaultValue,
         Min = min
+    };
+
+    private static OptionDesignMetadata AllowedHosts() => new()
+    {
+        Name = "allowedHosts",
+        Kind = OptionValueKind.Json,
+        DisplayName = "Allowed hosts",
+        HelperText = "JSON array of host names. Exact match or leading-dot suffix match like \".internal.example\"."
     };
 
     private static OptionDesignMetadata Boolean(string name, string displayName, bool defaultValue) => new()

@@ -53,6 +53,23 @@ public sealed class FlowContextFactoryRegistry<TFactory>
             }
         }
 
-        return bestFactory ?? _defaultFactory;
+        if (bestType is null)
+        {
+            return _defaultFactory;
+        }
+
+        foreach (var (candidateType, _) in _factories)
+        {
+            if (candidateType.IsAssignableFrom(inputType) &&
+                !candidateType.IsAssignableFrom(bestType))
+            {
+                throw new InvalidOperationException(
+                    $"Context factory resolution for input type '{inputType}' is ambiguous: " +
+                    $"registrations for '{bestType}' and '{candidateType}' both match and neither is more specific. " +
+                    $"Register a context factory for '{inputType}' to disambiguate.");
+            }
+        }
+
+        return bestFactory!;
     }
 }

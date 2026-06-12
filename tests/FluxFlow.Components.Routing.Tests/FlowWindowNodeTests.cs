@@ -1,5 +1,7 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
+using FluxFlow.Components.Routing.Nodes;
+using FluxFlow.Components.Routing.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -153,6 +155,17 @@ public sealed class FlowWindowNodeTests
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.WindowEmitted);
         diagnostic.Attributes["count"].ShouldBe(1);
         diagnostic.Attributes["reason"].ShouldBe(FlowWindowEmitReason.Count.ToString());
+    }
+
+    [Fact]
+    public async Task Window_DisposeAfterFaultDoesNotThrow()
+    {
+        var node = new FlowWindowNode<int>(new WindowRoutingOptions { MaxItems = 2 });
+
+        node.Fault(new InvalidOperationException("boom"));
+        await node.DisposeAsync();
+
+        node.Completion.IsFaulted.ShouldBeTrue();
     }
 
     [Fact]

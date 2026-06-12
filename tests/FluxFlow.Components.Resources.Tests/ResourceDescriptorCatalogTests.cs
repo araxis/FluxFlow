@@ -58,6 +58,12 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Default_resource_name_to_string_returns_empty()
+    {
+        default(ResourceName).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
     public void Duplicate_helper_reports_duplicate_names()
     {
         var diagnostics = ResourceDiagnostics.FindDuplicateResources(

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven assertion components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds an assertion clock abstraction (IAssertionClock, options Clock/UseClock) and stamps FlowAssertionResult.EvaluatedAt deterministically from it. Type alias resolution caching is thread-safe and dead internal cancellation plumbing was removed.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

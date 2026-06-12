@@ -22,6 +22,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private MqttClientLease? _clientLease;
     private IMqttSubscription? _subscription;
     private bool _started;
+    private bool _completed;
     private bool _disposed;
 
     private MqttSubscribeNode(
@@ -65,6 +66,11 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                 throw new InvalidOperationException("MQTT subscribe node has already started.");
             }
 
+            if (_completed)
+            {
+                return;
+            }
+
             _started = true;
         }
 
@@ -92,6 +98,10 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                 _subscription = subscription;
                 _subscriptionCancellation = subscriptionCancellation;
                 _subscriptionTask = RunSubscriptionAsync(subscription, subscriptionCancellation.Token);
+                if (_completed)
+                {
+                    subscriptionCancellation.Cancel();
+                }
             }
 
             StartHealthMonitor(clientLease.Adapter);
@@ -131,13 +141,17 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
     public override void Complete()
     {
-        if (_subscriptionCancellation is null)
+        lock (_stateLock)
         {
-            base.Complete();
-            return;
-        }
+            _completed = true;
+            if (_subscriptionCancellation is null)
+            {
+                base.Complete();
+                return;
+            }
 
-        _subscriptionCancellation.Cancel();
+            _subscriptionCancellation.Cancel();
+        }
     }
 
     public override void Fault(Exception exception)
@@ -201,7 +215,10 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                     });
                 EmitReceivedEvent(message, payloadBytes);
 
-                await SendOutputAsync(message, cancellationToken).ConfigureAwait(false);
+                if (!await SendOutputAsync(message, cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
             }
 
             TryEmitDiagnostic(

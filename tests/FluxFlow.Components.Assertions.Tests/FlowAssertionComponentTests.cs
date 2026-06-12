@@ -1,5 +1,6 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
+using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -241,6 +242,40 @@ public sealed class FlowAssertionComponentTests
     }
 
     [Fact]
+    public async Task FlowAssertionComponent_UsesConfiguredClockForEvaluatedAt()
+    {
+        var evaluatedAt = new DateTimeOffset(2026, 6, 2, 9, 30, 0, TimeSpan.Zero);
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(new RecordingExpressionEngine(
+                    evaluate: (_, _, _) => true))
+                .UseClock(new FixedAssertionClock(evaluatedAt)),
+            new
+            {
+                expression = "assert"
+            });
+        var input = runtimeNode.FindInput(new PortName(AssertionsComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var results = new BufferBlock<FlowAssertionResult>();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<FlowAssertionResult>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out _);
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Passed))!.LinkToDiscard();
+        runtimeNode.FindOutput(new PortName(AssertionsComponentPorts.Failed))!.LinkToDiscard();
+
+        await input.Target.SendAsync("value");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .EvaluatedAt.ShouldBe(evaluatedAt);
+    }
+
+    [Fact]
     public void FlowAssertionComponent_RejectsMissingExpression()
     {
         var exception = Should.Throw<InvalidOperationException>(
@@ -295,5 +330,10 @@ public sealed class FlowAssertionComponentTests
                     ["passed"] = passed
                 }
             };
+    }
+
+    private sealed class FixedAssertionClock(DateTimeOffset utcNow) : IAssertionClock
+    {
+        public DateTimeOffset UtcNow => utcNow;
     }
 }

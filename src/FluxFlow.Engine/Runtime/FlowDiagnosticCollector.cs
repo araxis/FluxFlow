@@ -20,6 +20,9 @@ internal sealed class FlowDiagnosticCollector : IDisposable, IAsyncDisposable
 
     public ISourceBlock<RuntimeFlowDiagnostic> Diagnostics => _diagnostics;
 
+    public bool Post(RuntimeFlowDiagnostic diagnostic)
+        => _diagnostics.Post(diagnostic);
+
     public void CompleteWhen(Task runtimeCompletion)
     {
         ArgumentNullException.ThrowIfNull(runtimeCompletion);

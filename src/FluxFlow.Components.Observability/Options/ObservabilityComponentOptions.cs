@@ -35,6 +35,7 @@ public sealed class ObservabilityComponentOptions
     private readonly FlowContextFactoryRegistry<IObservabilityContextFactory> _contextFactories =
         new(new DefaultObservabilityContextFactory());
     private readonly Dictionary<SelectorKey, IValueSelector> _valueSelectors = [];
+    private readonly object _typesLock = new();
     private IObservabilityClock _clock = SystemObservabilityClock.Instance;
 
     public IObservabilityClock Clock => _clock;
@@ -119,15 +120,22 @@ public sealed class ObservabilityComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var key = name.Trim();
 
-        if (_types.TryGetValue(key, out var type))
+        lock (_typesLock)
         {
-            return type;
+            if (_types.TryGetValue(key, out var type))
+            {
+                return type;
+            }
         }
 
         var resolved = Type.GetType(key, throwOnError: false, ignoreCase: false);
         if (resolved is not null)
         {
-            _types[key] = resolved;
+            lock (_typesLock)
+            {
+                _types[key] = resolved;
+            }
+
             return resolved;
         }
 

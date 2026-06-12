@@ -6,7 +6,26 @@ public sealed class InMemoryJournalStore : IJournalStore
 {
     private readonly object gate = new();
     private readonly List<JournalEntry> entries = [];
+    private readonly HashSet<string> ids = new(StringComparer.Ordinal);
+    private readonly JournalRetentionOptions? retention;
     private long nextPosition;
+
+    public InMemoryJournalStore()
+        : this(retention: null)
+    {
+    }
+
+    public InMemoryJournalStore(JournalRetentionOptions? retention)
+    {
+        if (retention?.MaxRecords is < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(retention),
+                "Maximum journal records cannot be negative.");
+        }
+
+        this.retention = retention;
+    }
 
     public ValueTask<JournalAppendResult> AppendAsync(
         JournalRecord record,
@@ -18,13 +37,14 @@ public sealed class InMemoryJournalStore : IJournalStore
         var normalized = NormalizeRecord(record);
         lock (gate)
         {
-            if (entries.Any(entry => StringComparer.Ordinal.Equals(entry.Record.Id, normalized.Id)))
+            if (!ids.Add(normalized.Id))
             {
                 throw new InvalidOperationException($"Journal record '{normalized.Id}' already exists.");
             }
 
             var position = nextPosition++;
             entries.Add(new JournalEntry(position, normalized));
+            ApplyAppendRetention();
             return ValueTask.FromResult(new JournalAppendResult
             {
                 Record = normalized,
@@ -82,13 +102,21 @@ public sealed class InMemoryJournalStore : IJournalStore
             var before = entries.Count;
             if (cutoff.HasValue)
             {
-                entries.RemoveAll(entry => entry.Record.Timestamp < cutoff.Value);
+                entries.RemoveAll(entry =>
+                {
+                    if (entry.Record.Timestamp >= cutoff.Value)
+                    {
+                        return false;
+                    }
+
+                    ids.Remove(entry.Record.Id);
+                    return true;
+                });
             }
 
             if (options.MaxRecords.HasValue && entries.Count > options.MaxRecords.Value)
             {
-                var excess = entries.Count - options.MaxRecords.Value;
-                entries.RemoveRange(0, excess);
+                RemoveOldest(entries.Count - options.MaxRecords.Value);
             }
 
             return ValueTask.FromResult(new JournalPruneResult
@@ -99,6 +127,26 @@ public sealed class InMemoryJournalStore : IJournalStore
                 MaxRecords = options.MaxRecords
             });
         }
+    }
+
+    private void ApplyAppendRetention()
+    {
+        if (retention?.MaxRecords is not { } maxRecords || entries.Count <= maxRecords)
+        {
+            return;
+        }
+
+        RemoveOldest(entries.Count - maxRecords);
+    }
+
+    private void RemoveOldest(int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            ids.Remove(entries[index].Record.Id);
+        }
+
+        entries.RemoveRange(0, count);
     }
 
     private static JournalRecord NormalizeRecord(JournalRecord record)

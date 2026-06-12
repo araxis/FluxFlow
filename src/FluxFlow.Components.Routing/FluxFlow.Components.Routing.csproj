@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds package-owned IComponentDesignMetadataProvider metadata for host palettes, editors, validation views, generated docs, and catalog composition while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Correlation timeouts now fire proactively from the package clock without requiring subsequent traffic, expiry scanning is arrival-ordered, and join/window timer cancellation is race-free. Design metadata now declares the switch Matched/Routed ports, correlation Request/Response split inputs, and the correct 30000 ms timeout defaults.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

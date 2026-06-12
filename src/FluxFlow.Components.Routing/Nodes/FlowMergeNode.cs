@@ -15,7 +15,6 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
     private readonly IReadOnlyDictionary<string, ITargetBlock<TInput>> _inputs;
     private readonly ActionBlock<MergeCommand> _merge;
     private readonly BufferBlock<FlowMergeItem<TInput>> _output;
-    private readonly CancellationToken _processingCancellationToken;
     private long _nextSequence;
 
     public FlowMergeNode(MergeRoutingOptions options)
@@ -56,7 +55,6 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
-        _processingCancellationToken = mergeOptions.CancellationToken;
         _output = new BufferBlock<FlowMergeItem<TInput>>(blockOptions);
         _merge = new ActionBlock<MergeCommand>(
             EmitAsync,
@@ -126,8 +124,7 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
         TInput input)
     {
         var accepted = await _merge.SendAsync(
-            new MergeCommand(source, input),
-            _processingCancellationToken).ConfigureAwait(false);
+            new MergeCommand(source, input)).ConfigureAwait(false);
         if (!accepted)
         {
             throw new InvalidOperationException("flow.merge rejected queued input.");
@@ -143,7 +140,7 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
             Value = command.Value,
             ReceivedAt = _clock.UtcNow
         };
-        await _output.SendAsync(item, _processingCancellationToken).ConfigureAwait(false);
+        await _output.SendAsync(item).ConfigureAwait(false);
         TryEmitDiagnostic(
             RoutingDiagnosticNames.MergeEmitted,
             message: "flow.merge emitted value.",

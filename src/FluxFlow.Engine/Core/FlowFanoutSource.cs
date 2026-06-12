@@ -192,8 +192,12 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
                 }
             }
 
-            CompleteLinkedTargets();
+            // Surface a faulted source to linked targets instead of downgrading
+            // the fault to a normal completion.
+            await _queue.Completion.ConfigureAwait(false);
+
             _completion.TrySetResult();
+            CompleteLinkedTargets();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -201,8 +205,11 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         }
         catch (Exception exception)
         {
-            FaultLinkedTargets(exception);
-            _completion.TrySetException(exception);
+            var unwrapped = exception is AggregateException aggregate
+                ? aggregate.GetBaseException()
+                : exception;
+            _completion.TrySetException(unwrapped);
+            FaultLinkedTargets(unwrapped);
         }
     }
 
@@ -218,15 +225,15 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         try
         {
             var accepted = await link.Target.SendAsync(item, link.CancellationToken).ConfigureAwait(false);
-            if (!accepted && !link.IsDisposed)
+            if (!accepted)
             {
-                throw new InvalidOperationException("A linked diagnostics target rejected a message.");
+                // The target completed or faulted; detach it so the remaining
+                // links keep receiving messages instead of faulting the pump.
+                link.Dispose();
+                return;
             }
 
-            if (accepted)
-            {
-                link.MarkMessageDelivered();
-            }
+            link.MarkMessageDelivered();
         }
         catch (OperationCanceledException) when (link.IsDisposed)
         {
