@@ -8,7 +8,7 @@ param(
 
     [string] $PackageSource = "artifacts/packages",
 
-    [string[]] $AdditionalPackageSources = @(),
+    [string[]] $AdditionalPackageSources = @("https://api.nuget.org/v3/index.json"),
 
     [string] $Framework = "net8.0",
 
