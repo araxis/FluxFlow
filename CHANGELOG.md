@@ -1,5 +1,19 @@
 # Changelog
 
+## FluxFlow.Engine 1.2.0
+
+Build-time expression compile seam (Wave 1 architecture-review remediation).
+
+- Adds `IFlowExpressionEngine.Compile<T>(string)` returning a reusable
+  `IFlowCompiledExpression<T>`. It is default-implemented (defers to `Evaluate`),
+  so existing engines keep working unchanged; engines that can pre-parse should
+  override it so parsing happens once at build time rather than per message.
+- `ExpressionFlowPredicate<TInput>` now compiles its expression once at
+  construction and only evaluates the compiled form per message; a new
+  `ExpressionFlowMapper<TInput, TOutput>` mirrors this for mapping.
+- The engine's own conditional links (`when`) therefore compile once at build
+  time instead of re-evaluating the expression string per message.
+
 ## FluxFlow.Components.Routing 1.2.1
 
 Correctness fixes (Wave 0 architecture-review remediation).

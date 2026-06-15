@@ -2,8 +2,7 @@ namespace FluxFlow.Engine.Mapping;
 
 public sealed class ExpressionFlowPredicate<TInput> : IFlowPredicate<TInput>
 {
-    private readonly string _expression;
-    private readonly IFlowExpressionEngine _engine;
+    private readonly IFlowCompiledExpression<bool> _compiled;
     private readonly IFlowMapContextFactory<TInput> _contextFactory;
 
     public ExpressionFlowPredicate(
@@ -19,13 +18,14 @@ public sealed class ExpressionFlowPredicate<TInput> : IFlowPredicate<TInput>
         IFlowMapContextFactory<TInput> contextFactory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
-        _expression = expression;
-        _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+        ArgumentNullException.ThrowIfNull(engine);
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        // Compile once here (build time); IsMatch only evaluates the compiled form.
+        _compiled = engine.Compile<bool>(expression);
     }
 
     public bool IsMatch(TInput input)
-        => _engine.Evaluate<bool>(_expression, _contextFactory.Create(input));
+        => _compiled.Evaluate(_contextFactory.Create(input));
 
     private sealed class DefaultFlowMapContextFactory : IFlowMapContextFactory<TInput>
     {
