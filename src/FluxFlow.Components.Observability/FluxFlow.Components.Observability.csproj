@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable observer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Makes the type-alias resolution cache fully thread-safe (register writes now share the resolve lock).</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: flow.counter now receives a predicate compiled once in the factory instead of evaluating an expression string per message; the node no longer holds the expression engine or context factory. Internal refactor, no runtime behavior change.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

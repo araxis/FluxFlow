@@ -1,6 +1,4 @@
-using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Mapping;
 using System.Collections;
 using System.Globalization;
 using System.Text;
@@ -9,25 +7,6 @@ namespace FluxFlow.Components.Observability.Nodes;
 
 internal static class ObservabilityNodeSupport
 {
-    public static bool EvaluatePredicate(
-        IFlowExpressionEngine expressionEngine,
-        IObservabilityContextFactory contextFactory,
-        ObservabilityNodeContext nodeContext,
-        string predicate,
-        object? input)
-    {
-        var context = contextFactory.Create(input, nodeContext);
-        var value = expressionEngine.Evaluate(predicate, context, typeof(bool));
-        return value switch
-        {
-            bool result => result,
-            null => throw new InvalidOperationException(
-                "Observability predicate returned null. Expected Boolean."),
-            _ => throw new InvalidOperationException(
-                $"Observability predicate returned '{value.GetType().Name}'. Expected Boolean.")
-        };
-    }
-
     public static double? ConvertSize(object? value)
     {
         if (value is null)
