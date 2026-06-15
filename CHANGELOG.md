@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Engine 1.3.0
+
+Additive resource accessor (Wave 3 groundwork).
+
+- Adds `RuntimeNodeFactoryContext.GetResource<T>(NodeName)`, a typed accessor
+  that resolves a resource node's component-defined handle (e.g. a shared
+  connection client) at build time, throwing a clear error if the resource is
+  missing or does not provide the requested type. Enables operation nodes to
+  reference connection/resource components by name. No existing engine APIs
+  change.
+
 ## FluxFlow.Components.Control 2.0.0-preview.1
 
 2.0 preview: compile-once predicates for flow.filter and flow.when.
