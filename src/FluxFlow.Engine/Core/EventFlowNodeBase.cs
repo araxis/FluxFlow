@@ -4,7 +4,9 @@ namespace FluxFlow.Engine.Components;
 
 public abstract class EventFlowNodeBase : FlowNodeBase, IFlowEventSource
 {
-    private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
+    // Non-lossy multi-consumer fanout (same primitive as Errors/Diagnostics):
+    // a slow or late event consumer must not silently miss events.
+    private readonly FlowFanoutSource<FlowEvent> _events = new();
 
     protected EventFlowNodeBase()
     {
@@ -43,12 +45,16 @@ public abstract class EventFlowNodeBase : FlowNodeBase, IFlowEventSource
             Channel = channel,
             PayloadBytes = payloadBytes,
             PayloadPreview = payloadPreview,
-            Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)
+            // Defensive copy so a caller cannot mutate attributes after emit and
+            // corrupt the event observed by other (fanned-out) consumers.
+            Attributes = attributes is null
+                ? new Dictionary<string, string>(StringComparer.Ordinal)
+                : new Dictionary<string, string>(attributes, StringComparer.Ordinal)
         });
 
     protected override void OnNodeCompleted()
         => _events.Complete();
 
     protected override void OnNodeFaulted(Exception exception)
-        => ((IDataflowBlock)_events).Fault(exception);
+        => _events.Fault(exception);
 }

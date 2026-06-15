@@ -230,6 +230,65 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
+    public async Task MapperNode_FailedPortReceivesDroppedInput()
+    {
+        var calls = 0;
+        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                throw new InvalidOperationException("bad expression");
+            }
+
+            return $"{context.Variables["input"]}-ok";
+        });
+        var runtimeNode = CreateNode(
+            options => options.UseExpressionEngine(engine),
+            new
+            {
+                expression = "map",
+                expressionName = "test-map"
+            });
+        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var errors = new BufferBlock<FlowError>();
+        var failed = new BufferBlock<object>();
+        var results = new BufferBlock<object>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Failed))!
+            .TryLinkTo(
+                new InputPort<object>(
+                    new PortAddress("test", new NodeName("failed"), new PortName("Input")),
+                    failed),
+                propagateCompletion: true,
+                out var failedLinkError);
+        failedLinkError.ShouldBeNull();
+        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output))!
+            .TryLinkTo(
+                new InputPort<object>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: true,
+                out _);
+
+        await input.Target.SendAsync("first");
+        await input.Target.SendAsync("second");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
+        error.Context!.ShouldContain("expressionName=test-map");
+
+        var dropped = await failed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        dropped.ShouldBe("first");
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.ShouldBe("second-ok");
+    }
+
+    [Fact]
     public async Task MapperNode_EmitsDiagnostics()
     {
         var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["input"]);

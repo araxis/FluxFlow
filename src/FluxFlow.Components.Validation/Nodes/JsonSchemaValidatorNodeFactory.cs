@@ -66,6 +66,7 @@ internal static class JsonSchemaValidatorNodeFactory
             .Output(ValidationComponentPorts.Result, node.Result)
             .Output(ValidationComponentPorts.Valid, node.Valid)
             .Output(ValidationComponentPorts.Invalid, node.Invalid)
+            .Output(ValidationComponentPorts.Errors, node.Errors)
             .Build();
     }
 }

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable mapping components for FluxFlow with pluggable expression engines and typed ports.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>flow.mapper now exposes an Errors output port (declared in design metadata) so flows can observe per-message mapping failures. Type alias resolution caching is thread-safe and dead internal cancellation plumbing was removed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a Failed output port to flow.mapper so inputs dropped on an expression/mapping failure are observable, mirroring flow.assert. The failed input is emitted on Failed in addition to the existing error report.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

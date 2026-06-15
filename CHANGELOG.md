@@ -1,5 +1,60 @@
 # Changelog
 
+## FluxFlow.Components.Mapping 1.3.0
+
+Failed-output observability release.
+
+- `flow.mapper` now exposes a `Failed` output port so inputs dropped on an
+  expression or mapping failure are observable, mirroring `flow.assert`.
+- The failed input is emitted on `Failed` in addition to the existing error
+  report.
+
+## FluxFlow.Components.Validation 1.3.0
+
+Errors-port release.
+
+- Registers and declares the `Errors` output port on the JSON schema validator
+  node so per-message validation errors are wireable and appear in design
+  metadata.
+
+## FluxFlow.Components.Sources 1.2.1
+
+Design-metadata correctness and thread-safety release.
+
+- Corrects the source design metadata to match the actual sequence and
+  generated-source options (`start`/`step`/`count`, `outputType`, `loop`,
+  `maxItems`, timing).
+- Makes the type-alias resolution cache fully thread-safe (register writes now
+  share the resolve lock).
+
+## FluxFlow.Components.Control 1.2.1
+
+Thread-safety release.
+
+- Makes the type-alias resolution cache fully thread-safe (register writes now
+  share the resolve lock).
+
+## FluxFlow.Components.Assertions 1.2.1
+
+Thread-safety release.
+
+- Makes the type-alias resolution cache fully thread-safe (register writes now
+  share the resolve lock).
+
+## FluxFlow.Components.Timers 1.2.1
+
+Thread-safety release.
+
+- Makes the type-alias resolution cache fully thread-safe (register writes now
+  share the resolve lock).
+
+## FluxFlow.Components.Observability 1.2.1
+
+Thread-safety release.
+
+- Makes the type-alias resolution cache fully thread-safe (register writes now
+  share the resolve lock).
+
 ## FluxFlow.Engine 1.2.0
 
 Build-time expression compile seam (Wave 1 architecture-review remediation).
@@ -13,6 +68,11 @@ Build-time expression compile seam (Wave 1 architecture-review remediation).
   `ExpressionFlowMapper<TInput, TOutput>` mirrors this for mapping.
 - The engine's own conditional links (`when`) therefore compile once at build
   time instead of re-evaluating the expression string per message.
+- Event channels (`EventFlowNodeBase`, the runtime event collector) now use the
+  non-lossy fanout source instead of a lossy `BroadcastBlock`, so a slow or late
+  event consumer no longer silently misses events.
+- `EventFlowNodeBase.EmitEvent` defensively copies event attributes so a caller
+  cannot mutate them after emit.
 
 ## FluxFlow.Components.Routing 1.2.1
 

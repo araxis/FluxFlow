@@ -15,6 +15,7 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
     private readonly MapperOptions _options;
     private readonly TransformManyBlock<TInput, TOutput> _input;
     private readonly BufferBlock<TOutput> _output;
+    private readonly BufferBlock<TInput> _failed;
 
     public FlowMapperNode(
         MapperOptions options,
@@ -39,18 +40,24 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true
         };
+        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
         _input = new TransformManyBlock<TInput, TOutput>(MapAsync, inputOptions);
-        _output = new BufferBlock<TOutput>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.LinkTo(
-            _output,
-            new DataflowLinkOptions { PropagateCompletion = true });
-        CompleteWhen(_output.Completion);
+        _output = new BufferBlock<TOutput>(blockOptions);
+        _failed = new BufferBlock<TInput>(blockOptions);
+        _input.LinkTo(_output);
+        _input.Completion.ContinueWith(
+            CompleteOutputs,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        CompleteWhen(Task.WhenAll(_output.Completion, _failed.Completion));
     }
 
     public ITargetBlock<TInput> Input => _input;
 
     public ISourceBlock<TOutput> Output => _output;
+
+    public ISourceBlock<TInput> Failed => _failed;
 
     public override void Complete()
         => _input.Complete();
@@ -66,10 +73,11 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         {
             ((IDataflowBlock)_input).Fault(exception);
             ((IDataflowBlock)_output).Fault(exception);
+            ((IDataflowBlock)_failed).Fault(exception);
         }
     }
 
-    private Task<IEnumerable<TOutput>> MapAsync(TInput input)
+    private async Task<IEnumerable<TOutput>> MapAsync(TInput input)
     {
         try
         {
@@ -85,7 +93,7 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
                 message: "Mapped workflow message.",
                 attributes: CreateAttributes());
 
-            return Task.FromResult<IEnumerable<TOutput>>([output]);
+            return [output];
         }
         catch (Exception exception)
         {
@@ -101,8 +109,23 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
                 exception,
                 CreateAttributes());
 
-            return Task.FromResult<IEnumerable<TOutput>>([]);
+            await _failed.SendAsync(input).ConfigureAwait(false);
+
+            return [];
         }
+    }
+
+    private void CompleteOutputs(Task completion)
+    {
+        if (completion.IsFaulted && completion.Exception is { } exception)
+        {
+            ((IDataflowBlock)_output).Fault(exception);
+            ((IDataflowBlock)_failed).Fault(exception);
+            return;
+        }
+
+        _output.Complete();
+        _failed.Complete();
     }
 
     private static TOutput CoerceOutput(object? value)
