@@ -398,6 +398,14 @@ Date: 2026-05-31
   IDisposable before IAsyncDisposable), and converting package event sources to
   wireable non-lossy ports (needs public FlowFanoutSource + the events-as-ports
   decision — Wave 2). Full Release suite green at 695 tests across 30 assemblies.
+- Scoped the breaking 2.0 work as a review-ready plan (`136-wave2-2.0-plan.md`):
+  per-node compile-once transformation, JsonSchemaValidator fix, factory
+  relocation worklist, breaking-surface summary, and sequencing.
+- Published the Waves 0+1 batch to NuGet (engine `1.2.0` first, then 11
+  components: Mapping/Validation `1.3.0`, Routing/Http/Metrics/Mqtt/Sources/
+  Control/Assertions/Timers/Observability `1.2.1`). All 12 publish runs
+  succeeded first try (flat-container pre-check absorbed indexing lag); all 12
+  versions verified live on the public feed.
 
 ## Remaining
 
