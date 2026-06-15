@@ -11,9 +11,8 @@ namespace FluxFlow.Components.Observability.Nodes;
 public sealed class FlowCounterNode<TInput> : FlowNodeBase
 {
     private readonly FlowCounterOptions _options;
-    private readonly IFlowExpressionEngine? _expressionEngine;
-    private readonly IObservabilityContextFactory _contextFactory;
-    private readonly ObservabilityNodeContext _nodeContext;
+    private readonly IFlowPredicate<TInput>? _acceptPredicate;
+    private readonly string? _engineName;
     private readonly IObservabilityClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowCounterSnapshot> _snapshots;
@@ -22,24 +21,21 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
 
     internal FlowCounterNode(
         FlowCounterOptions options,
-        IFlowExpressionEngine? expressionEngine,
-        IObservabilityContextFactory contextFactory,
-        ObservabilityNodeContext nodeContext)
-        : this(options, expressionEngine, contextFactory, nodeContext, SystemObservabilityClock.Instance)
+        IFlowPredicate<TInput>? acceptPredicate,
+        string? engineName)
+        : this(options, acceptPredicate, engineName, SystemObservabilityClock.Instance)
     {
     }
 
     internal FlowCounterNode(
         FlowCounterOptions options,
-        IFlowExpressionEngine? expressionEngine,
-        IObservabilityContextFactory contextFactory,
-        ObservabilityNodeContext nodeContext,
+        IFlowPredicate<TInput>? acceptPredicate,
+        string? engineName,
         IObservabilityClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine;
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _acceptPredicate = acceptPredicate;
+        _engineName = engineName;
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
@@ -118,21 +114,14 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
 
     private bool IsAccepted(TInput input)
     {
-        var predicate = _options.EffectivePredicate;
-        if (string.IsNullOrWhiteSpace(predicate))
+        if (_acceptPredicate is null)
         {
             return true;
         }
 
         try
         {
-            var accepted = ObservabilityNodeSupport.EvaluatePredicate(
-                _expressionEngine ?? throw new InvalidOperationException(
-                    "flow.counter requires an expression engine when a predicate is configured."),
-                _contextFactory,
-                _nodeContext,
-                predicate,
-                input);
+            var accepted = _acceptPredicate.IsMatch(input);
 
             if (!accepted)
             {
@@ -157,7 +146,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
                 exception,
                 ObservabilityNodeSupport.CreateExpressionContext(
                     _options,
-                    _expressionEngine?.Name));
+                    _engineName));
             TryEmitDiagnostic(
                 ObservabilityDiagnosticNames.CounterFailed,
                 FlowDiagnosticLevel.Error,

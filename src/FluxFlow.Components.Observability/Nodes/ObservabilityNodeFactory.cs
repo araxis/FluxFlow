@@ -128,11 +128,19 @@ internal static class ObservabilityNodeFactory
         ObservabilityNodeContext nodeContext,
         IObservabilityClock clock)
     {
+        // Compile the predicate expression once at build time (when present);
+        // when there is no predicate the node accepts every input and no engine
+        // is required.
+        var acceptPredicate = expressionEngine is null
+            ? null
+            : new ExpressionFlowPredicate<TInput>(
+                options.EffectivePredicate!,
+                expressionEngine,
+                new ObservabilityContextAdapter<TInput>(contextFactory, nodeContext));
         var node = new FlowCounterNode<TInput>(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext,
+            acceptPredicate,
+            expressionEngine?.Name,
             clock);
 
         return context.CreateNode(node)
@@ -200,4 +208,13 @@ internal static class ObservabilityNodeFactory
             name,
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException($"Could not find observability factory method '{name}'.");
+
+    private sealed class ObservabilityContextAdapter<TInput>(
+        IObservabilityContextFactory contextFactory,
+        ObservabilityNodeContext nodeContext)
+        : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => contextFactory.Create(input, nodeContext);
+    }
 }

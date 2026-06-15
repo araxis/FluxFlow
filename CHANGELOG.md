@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Observability 2.0.0-preview.1
+
+2.0 preview: compile-once predicate for flow.counter (no runtime behavior change).
+
+- `flow.counter` now receives an accept-predicate compiled once in the factory
+  (via the engine's build-time `Compile` seam) instead of evaluating the
+  predicate expression string on every message. The node no longer holds the
+  expression engine or the per-message context factory. Internal refactor;
+  node registration, options, ports, and runtime behavior are unchanged.
+
 ## FluxFlow.Components.Http 2.0.0-preview.1
 
 2.0 preview: node factory relocation (no runtime behavior change).
