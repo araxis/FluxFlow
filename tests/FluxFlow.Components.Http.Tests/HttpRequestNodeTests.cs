@@ -443,6 +443,53 @@ public sealed class HttpRequestNodeTests
     }
 
     [Fact]
+    public async Task Request_DoesNotFollowRedirectToDisallowedHostUnderAllowList()
+    {
+        await using var server = await RedirectingTestServer.StartAsync(
+            "https://attacker.test/steal");
+        var runtimeNode = CreateNode(_ => { }, new
+        {
+            allowedHosts = new[] { "127.0.0.1" }
+        });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(
+            runtimeNode,
+            HttpComponentPorts.Output);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
+        input.Target.Complete();
+        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        response.StatusCode.ShouldBe(302);
+        response.Headers["Location"].ShouldBe(["https://attacker.test/steal"]);
+        server.RequestCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Request_FollowsRedirectWhenNoAllowListGuardConfigured()
+    {
+        await using var target = await TestHttpServer.StartAsync(
+            "text/plain",
+            "redirected");
+        await using var server = await RedirectingTestServer.StartAsync(target.Url);
+        var runtimeNode = CreateNode(_ => { }, new { });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(
+            runtimeNode,
+            HttpComponentPorts.Output);
+
+        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
+        input.Target.Complete();
+        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        response.StatusCode.ShouldBe(200);
+        response.Body.ShouldBe("redirected");
+        server.RequestCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Request_EnforcesMaxResponseBodySize()
     {
         await using var server = await TestHttpServer.StartAsync(
@@ -658,6 +705,97 @@ public sealed class HttpRequestNodeTests
             var headerBytes = Encoding.ASCII.GetBytes(header);
             await stream.WriteAsync(headerBytes).ConfigureAwait(false);
             await stream.WriteAsync(bodyBytes).ConfigureAwait(false);
+        }
+
+        private static async Task ReadHeadersAsync(NetworkStream stream)
+        {
+            var buffer = new byte[1];
+            var previous = new Queue<byte>(4);
+            while (await stream.ReadAsync(buffer).ConfigureAwait(false) == 1)
+            {
+                previous.Enqueue(buffer[0]);
+                if (previous.Count > 4)
+                {
+                    previous.Dequeue();
+                }
+
+                if (previous.Count == 4 &&
+                    previous.SequenceEqual("\r\n\r\n"u8.ToArray()))
+                {
+                    return;
+                }
+            }
+        }
+    }
+
+    private sealed class RedirectingTestServer : IAsyncDisposable
+    {
+        private readonly TcpListener _listener;
+        private readonly string _location;
+        private readonly Task _serverTask;
+        private int _requestCount;
+
+        private RedirectingTestServer(
+            TcpListener listener,
+            string url,
+            string location)
+        {
+            _listener = listener;
+            Url = url;
+            _location = location;
+            _serverTask = AcceptAsync();
+        }
+
+        public string Url { get; }
+
+        public int RequestCount => Volatile.Read(ref _requestCount);
+
+        public static Task<RedirectingTestServer> StartAsync(string location)
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var endpoint = (IPEndPoint)listener.LocalEndpoint;
+            var server = new RedirectingTestServer(
+                listener,
+                $"http://127.0.0.1:{endpoint.Port}/",
+                location);
+            return Task.FromResult(server);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _listener.Stop();
+            try
+            {
+                await _serverTask.ConfigureAwait(false);
+            }
+            catch (SocketException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        private async Task AcceptAsync()
+        {
+            while (true)
+            {
+                using var client = await _listener.AcceptTcpClientAsync()
+                    .ConfigureAwait(false);
+                Interlocked.Increment(ref _requestCount);
+                await using var stream = client.GetStream();
+                await ReadHeadersAsync(stream).ConfigureAwait(false);
+
+                var header =
+                    "HTTP/1.1 302 Found\r\n" +
+                    $"Location: {_location}\r\n" +
+                    "Content-Length: 0\r\n" +
+                    "Connection: close\r\n" +
+                    "\r\n";
+                var headerBytes = Encoding.ASCII.GetBytes(header);
+                await stream.WriteAsync(headerBytes).ConfigureAwait(false);
+            }
         }
 
         private static async Task ReadHeadersAsync(NetworkStream stream)

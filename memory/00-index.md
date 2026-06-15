@@ -172,6 +172,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   test fix with the additive observed-event-count property.
 - `134-feed-verify-index-precheck.md`: flat-container index pre-check that
   makes post-publish feed verification robust to nuget.org indexing lag.
+- `135-architecture-review-and-roadmap.md`: per-component review against four
+  architecture principles, issue list, and the Wave 0-3 fix roadmap to 2.0.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

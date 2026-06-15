@@ -234,7 +234,6 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
                 RoutingErrorCodes.JoinFailed,
                 $"flow.join failed: {exception.Message}",
                 exception);
-            throw;
         }
     }
 
@@ -630,19 +629,18 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private void ScheduleTimer(DateTimeOffset now)
     {
-        _timerCancellation?.Cancel();
-        _timerCancellation?.Dispose();
+        var previous = Interlocked.Exchange(ref _timerCancellation, null);
+        previous?.Cancel();
+        previous?.Dispose();
         _timerVersion++;
         if (_pendingCount == 0 || _leftCompleted && _rightCompleted)
         {
-            _timerCancellation = null;
             return;
         }
 
         var dueAt = GetNextDueAt();
         if (dueAt is null)
         {
-            _timerCancellation = null;
             return;
         }
 
@@ -650,9 +648,10 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             ? TimeSpan.Zero
             : dueAt.Value - now;
         var version = _timerVersion;
-        _timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _lifecycleCancellation.Token);
-        _ = RunTimerAsync(version, delay, _timerCancellation.Token);
+        _timerCancellation = timerCancellation;
+        _ = RunTimerAsync(version, delay, timerCancellation.Token);
     }
 
     private DateTimeOffset? GetNextDueAt()
@@ -673,20 +672,9 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private void TryCancelTimer()
     {
-        var timerCancellation = _timerCancellation;
-        if (timerCancellation is null)
-        {
-            return;
-        }
-
-        try
-        {
-            timerCancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // ScheduleTimer disposed the source on the processor thread.
-        }
+        var timerCancellation = Interlocked.Exchange(ref _timerCancellation, null);
+        timerCancellation?.Cancel();
+        timerCancellation?.Dispose();
     }
 
     private async Task RunTimerAsync(

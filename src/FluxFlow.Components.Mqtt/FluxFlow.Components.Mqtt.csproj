@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Publishes are bounded by a new publishTimeoutMilliseconds option (default 30000) so a hung adapter can no longer wedge the node. Dispose drains pending publishes before releasing the client lease, and subscribe handles completion racing startup and stops pumping when the output declines.</PackageReleaseNotes>
+    <PackageReleaseNotes>Correctness fix: the subscribe node no longer opens a client lease, subscription, or health monitor when Complete() races StartAsync — the completed state is checked under the state lock before any resource is acquired.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

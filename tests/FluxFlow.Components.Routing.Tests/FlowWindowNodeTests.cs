@@ -2,6 +2,7 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -158,6 +159,30 @@ public sealed class FlowWindowNodeTests
     }
 
     [Fact]
+    public async Task Window_ReportsProcessingFailureAndContinues()
+    {
+        var clock = new ThrowOnceRoutingClock();
+        var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 8 },
+            clock);
+        var errors = new BufferBlock<FlowError>();
+        var output = new BufferBlock<FlowWindow<int>>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
+        node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
+
+        await node.Input.SendAsync(1);
+        await node.Input.SendAsync(2);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(RoutingErrorCodes.WindowFailed);
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        window.Items.ShouldBe([2]);
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Window_DisposeAfterFaultDoesNotThrow()
     {
         var node = new FlowWindowNode<int>(new WindowRoutingOptions { MaxItems = 2 });
@@ -224,6 +249,30 @@ public sealed class FlowWindowNodeTests
                 propagateCompletion: true,
                 out var error);
         error.ShouldBeNull();
+    }
+
+    private sealed class ThrowOnceRoutingClock : IRoutingClock
+    {
+        private readonly DateTimeOffset _utcNow = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        private int _calls;
+
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                if (Interlocked.Increment(ref _calls) == 1)
+                {
+                    throw new InvalidOperationException("clock failed.");
+                }
+
+                return _utcNow;
+            }
+        }
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private static async Task<List<FlowWindow<T>>> DrainUntilCompletedAsync<T>(

@@ -300,13 +300,17 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             var entry = new PendingEntry(input.Value, side, now);
             if (pending.Get(side, _comparer) is { } existing)
             {
-                ReportCorrelationError(
-                    RoutingErrorCodes.CorrelationDuplicateSide,
-                    $"flow.correlation replaced duplicate side '{side}' for key '{item.Key}'.",
-                    null,
-                    item.Key,
-                    side);
                 entry = entry with { ReceivedAt = existing.ReceivedAt };
+                TryEmitDiagnostic(
+                    RoutingDiagnosticNames.CorrelationDuplicateSide,
+                    FlowDiagnosticLevel.Warning,
+                    $"flow.correlation replaced duplicate side '{side}' for key '{item.Key}'.",
+                    attributes: CorrelationNodeSupport.CreateAttributes(
+                        _options,
+                        _expressionEngine,
+                        _pending.Count,
+                        item.Key,
+                        side));
             }
 
             pending.Set(side, entry, _requestSide, _comparer);
@@ -560,20 +564,18 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private void ScheduleTimer(DateTimeOffset now)
     {
-        var timerCancellation = _timerCancellation;
-        timerCancellation?.Cancel();
-        timerCancellation?.Dispose();
+        var previous = Interlocked.Exchange(ref _timerCancellation, null);
+        previous?.Cancel();
+        previous?.Dispose();
         _timerVersion++;
         if (_pending.Count == 0)
         {
-            _timerCancellation = null;
             return;
         }
 
         var dueAt = GetNextDueAt();
         if (dueAt is null)
         {
-            _timerCancellation = null;
             return;
         }
 
@@ -581,7 +583,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             ? TimeSpan.Zero
             : dueAt.Value - now;
         var version = _timerVersion;
-        timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _lifecycleCancellation.Token);
         _timerCancellation = timerCancellation;
         _ = RunTimerAsync(version, delay, timerCancellation.Token);
@@ -606,20 +608,9 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private void TryCancelTimer()
     {
-        var timerCancellation = _timerCancellation;
-        if (timerCancellation is null)
-        {
-            return;
-        }
-
-        try
-        {
-            timerCancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // ScheduleTimer disposed the source on the processor thread.
-        }
+        var timerCancellation = Interlocked.Exchange(ref _timerCancellation, null);
+        timerCancellation?.Cancel();
+        timerCancellation?.Dispose();
     }
 
     private async Task RunTimerAsync(

@@ -59,6 +59,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        CancellationTokenSource subscriptionCancellation;
         lock (_stateLock)
         {
             if (_started)
@@ -72,20 +73,36 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
             }
 
             _started = true;
+
+            // Publish the cancellation source under the lock so a concurrent Complete()
+            // always cancels this start in progress instead of racing ahead of it.
+            subscriptionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _subscriptionCancellation = subscriptionCancellation;
         }
 
         MqttClientLease? clientLease = null;
         try
         {
+            if (IsCompleted())
+            {
+                CompleteOutput();
+                return;
+            }
+
             clientLease = await _clientFactory.CreateAsync(_factoryContext, cancellationToken)
                 .ConfigureAwait(false);
             ArgumentNullException.ThrowIfNull(clientLease);
 
+            if (IsCompleted())
+            {
+                await clientLease.DisposeAsync().ConfigureAwait(false);
+                CompleteOutput();
+                return;
+            }
+
             var subscription = await clientLease.Adapter.SubscribeAsync(_options, cancellationToken)
                 .ConfigureAwait(false);
             ArgumentNullException.ThrowIfNull(subscription);
-
-            var subscriptionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             TryEmitDiagnostic(
                 MqttDiagnosticNames.SubscribeStarted,
@@ -96,7 +113,6 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
             {
                 _clientLease = clientLease;
                 _subscription = subscription;
-                _subscriptionCancellation = subscriptionCancellation;
                 _subscriptionTask = RunSubscriptionAsync(subscription, subscriptionCancellation.Token);
                 if (_completed)
                 {
@@ -151,6 +167,14 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
             }
 
             _subscriptionCancellation.Cancel();
+        }
+    }
+
+    private bool IsCompleted()
+    {
+        lock (_stateLock)
+        {
+            return _completed;
         }
     }
 

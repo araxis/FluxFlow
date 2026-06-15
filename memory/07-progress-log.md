@@ -373,6 +373,14 @@ Date: 2026-05-31
 - Added a flat-container index pre-check to `package-feed-verify.ps1` so the
   post-publish verification step absorbs nuget.org indexing lag instead of
   burning restore attempts (`134-feed-verify-index-precheck.md`).
+- Ran a deep per-component architecture review against four owner principles
+  and recorded the issue list + Wave 0-3 roadmap to 2.0
+  (`135-architecture-review-and-roadmap.md`).
+- Implemented Wave 0 correctness fixes (Routing join/window rethrow + timer
+  CTS race + correlation duplicate-side warning; HTTP redirect SSRF guard;
+  Metrics snapshot back-pressure; MQTT subscribe completed-before-start) with
+  regression tests; bumped Routing/Http/Metrics/Mqtt to 1.2.1; full Release
+  suite green at 691 tests across 30 assemblies.
 
 ## Remaining
 
