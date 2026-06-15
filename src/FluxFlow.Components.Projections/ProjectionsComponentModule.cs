@@ -19,7 +19,7 @@ public sealed class ProjectionsComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 ProjectionsComponentTypes.EventProjection,
-                context => EventProjectionNode.Create(context, options))
+                context => EventProjectionNodeFactory.Create(context, options))
         ];
     }
 

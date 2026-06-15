@@ -3,7 +3,6 @@ using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 
@@ -16,7 +15,7 @@ public sealed class FileWriteNode : FlowNodeBase
     private readonly ActionBlock<FileWriteRequest> _input;
     private readonly BufferBlock<FileWriteResult> _result;
 
-    private FileWriteNode(
+    internal FileWriteNode(
         FileWriteOptions options,
         IFileSystemClock clock)
     {
@@ -45,25 +44,6 @@ public sealed class FileWriteNode : FlowNodeBase
     public ITargetBlock<FileWriteRequest> Input => _input;
 
     public ISourceBlock<FileWriteResult> Result => _result;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-        => Create(context, new FileSystemComponentOptions());
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        FileSystemComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = FileSystemOptionsReader.ReadFileWriteOptions(context.Definition);
-        var node = new FileWriteNode(options, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Input(FileSystemComponentPorts.Input, node.Input)
-            .Output(FileSystemComponentPorts.Result, node.Result)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();

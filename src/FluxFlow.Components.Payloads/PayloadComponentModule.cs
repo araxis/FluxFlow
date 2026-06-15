@@ -11,7 +11,7 @@ public sealed class PayloadComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 PayloadComponentTypes.Inspect,
-                PayloadInspectNode.Create)
+                PayloadInspectNodeFactory.Create)
         ];
     }
 

@@ -14,13 +14,13 @@ public sealed class SessionsComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 SessionsComponentTypes.Recorder,
-                context => SessionRecorderNode.Create(context, options)),
+                context => SessionNodeFactory.CreateRecorder(context, options)),
             new FlowNodeRegistration(
                 SessionsComponentTypes.Replay,
-                context => SessionReplayNode.Create(context, options)),
+                context => SessionNodeFactory.CreateReplay(context, options)),
             new FlowNodeRegistration(
                 SessionsComponentTypes.Query,
-                context => SessionQueryNode.Create(context, options))
+                context => SessionNodeFactory.CreateQuery(context, options))
         ];
     }
 

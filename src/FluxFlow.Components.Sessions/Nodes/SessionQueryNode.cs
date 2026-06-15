@@ -2,7 +2,6 @@ using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Sessions.Nodes;
@@ -20,7 +19,7 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
     private bool _startRequested;
     private bool _disposed;
 
-    private SessionQueryNode(
+    internal SessionQueryNode(
         SessionQueryOptions options,
         ISessionStore store,
         SessionsComponentOptions componentOptions)
@@ -59,30 +58,6 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
     public ISourceBlock<SessionQueryResult> Output => _output;
 
     public ISourceBlock<SessionMetadata> Sessions => _sessions;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        SessionsComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = SessionsOptionsReader.ReadQueryOptions(context.Definition);
-        var store = componentOptions.StoreFactory.Create(new SessionStoreContext
-        {
-            Address = context.Address,
-            NodeType = SessionsComponentTypes.Query,
-            StoreName = Normalize(options.Store)
-        }) ?? throw new InvalidOperationException("session.query store factory returned null.");
-        var node = new SessionQueryNode(options, store, componentOptions);
-
-        return context.CreateNode(node)
-            .Input(SessionsComponentPorts.Input, node.Input)
-            .Output(SessionsComponentPorts.Output, node.Output)
-            .Output(SessionsComponentPorts.Sessions, node.Sessions)
-            .Output(SessionsComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
     {

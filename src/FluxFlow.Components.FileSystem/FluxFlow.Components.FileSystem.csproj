@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable file system components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Path policy now treats the working directory as the implicit base when no baseDirectory is set and absolute paths are disallowed, so relative '..' paths can no longer escape (security hardening), and file.read maxBytes defaults to 16 MiB. Directory enumeration no longer blocks startup and skips reparse points, and file.watch exposes internalBufferSize.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

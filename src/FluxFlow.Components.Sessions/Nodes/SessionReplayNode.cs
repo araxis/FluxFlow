@@ -3,7 +3,6 @@ using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Sessions.Nodes;
@@ -20,7 +19,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
     private bool _startRequested;
     private bool _disposed;
 
-    private SessionReplayNode(
+    internal SessionReplayNode(
         SessionReplayOptions options,
         ISessionStore store,
         ISessionClock clock)
@@ -37,29 +36,6 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
                 nameof(options),
                 "session.replay bounded capacity must be greater than zero.");
         }
-    }
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        SessionsComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = SessionsOptionsReader.ReadReplayOptions(context.Definition);
-        var store = componentOptions.StoreFactory.Create(new SessionStoreContext
-        {
-            Address = context.Address,
-            NodeType = SessionsComponentTypes.Replay,
-            StoreName = Normalize(options.Store),
-            SessionId = Normalize(options.SessionId)
-        }) ?? throw new InvalidOperationException("session.replay store factory returned null.");
-        var node = new SessionReplayNode(options, store, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Output(SessionsComponentPorts.Output, node.Output)
-            .Output(SessionsComponentPorts.Errors, node.Errors)
-            .Build();
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)

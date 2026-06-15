@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable HTTP request components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Security fix: when an allowedHosts or restrictToBaseUrlOrigin guard is configured, automatic redirect following is disabled so a server cannot 3xx-redirect a request to a host outside the allow-list (SSRF). Behavior is unchanged when no guard is configured.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

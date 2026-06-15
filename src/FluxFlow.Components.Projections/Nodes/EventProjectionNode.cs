@@ -3,7 +3,6 @@ using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Options;
 using FluxFlow.Components.Projections.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Projections.Nodes;
@@ -22,7 +21,7 @@ public sealed class EventProjectionNode : FlowNodeBase
     private DateTimeOffset? _lastMatchedAt;
     private EventSummary? _latest;
 
-    private EventProjectionNode(
+    internal EventProjectionNode(
         EventProjectionOptions options,
         IProjectionClock clock)
     {
@@ -51,23 +50,6 @@ public sealed class EventProjectionNode : FlowNodeBase
     public ITargetBlock<FlowEvent> Input => _input;
 
     public ISourceBlock<EventProjectionSnapshot> Output => _output;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        ProjectionsComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = ProjectionsOptionsReader.ReadEventProjectionOptions(context.Definition);
-        var node = new EventProjectionNode(options, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Input(ProjectionsComponentPorts.Input, node.Input)
-            .Output(ProjectionsComponentPorts.Output, node.Output)
-            .Output(ProjectionsComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();

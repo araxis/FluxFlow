@@ -3,7 +3,6 @@ using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Components.Metrics.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Metrics.Nodes;
@@ -36,7 +35,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     private long _totalSize;
     private bool _disposed;
 
-    private MetricsAggregateNode(
+    internal MetricsAggregateNode(
         MetricsAggregateOptions options,
         IMetricsClock clock)
     {
@@ -70,26 +69,6 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     public ITargetBlock<MetricSampleInput> Input => _input;
 
     public ISourceBlock<MetricSnapshotOutput> Output => _output;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-        => Create(context, new MetricsComponentOptions());
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        MetricsComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = MetricsOptionsReader.ReadAggregateOptions(context.Definition);
-        var node = new MetricsAggregateNode(options, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Input(MetricsComponentPorts.Input, node.Input)
-            .Output(MetricsComponentPorts.Output, node.Output)
-            .Output(MetricsComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();

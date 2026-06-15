@@ -14,16 +14,16 @@ public sealed class StorageComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 StorageComponentTypes.Put,
-                context => StoragePutNode.Create(context, options)),
+                context => StorageNodeFactory.CreatePut(context, options)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Get,
-                context => StorageGetNode.Create(context, options)),
+                context => StorageNodeFactory.CreateGet(context, options)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Query,
-                context => StorageQueryNode.Create(context, options)),
+                context => StorageNodeFactory.CreateQuery(context, options)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Delete,
-                context => StorageDeleteNode.Create(context, options))
+                context => StorageNodeFactory.CreateDelete(context, options))
         ];
     }
 

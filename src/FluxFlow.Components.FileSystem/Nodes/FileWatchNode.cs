@@ -3,7 +3,6 @@ using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
@@ -20,7 +19,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     private bool _started;
     private bool _disposed;
 
-    private FileWatchNode(
+    internal FileWatchNode(
         FileWatchOptions options,
         IFileSystemClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
@@ -38,24 +37,6 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     }
 
     public ISourceBlock<FlowEvent> Events => _events;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-        => Create(context, new FileSystemComponentOptions());
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        FileSystemComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = FileSystemOptionsReader.ReadFileWatchOptions(context.Definition);
-        var node = new FileWatchNode(options, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Output(FileSystemComponentPorts.Output, node.Output)
-            .Build();
-    }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
     {

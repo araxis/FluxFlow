@@ -19,10 +19,10 @@ public sealed class ExpectationsComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 ExpectationsComponentTypes.Expect,
-                context => EventExpectationNode.Create(context, options, EventExpectationNodeKind.Expect)),
+                context => EventExpectationNodeFactory.Create(context, options, EventExpectationNodeKind.Expect)),
             new FlowNodeRegistration(
                 ExpectationsComponentTypes.Guard,
-                context => EventExpectationNode.Create(context, options, EventExpectationNodeKind.Guard))
+                context => EventExpectationNodeFactory.Create(context, options, EventExpectationNodeKind.Guard))
         ];
     }
 

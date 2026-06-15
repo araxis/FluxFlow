@@ -3,7 +3,6 @@ using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Globalization;
 using System.Threading.Tasks.Dataflow;
 
@@ -21,7 +20,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
     private bool _completedBeforeStart;
     private bool _disposed;
 
-    private TimerScheduleNode(
+    internal TimerScheduleNode(
         TimerScheduleSettings settings,
         ITimerClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity })
@@ -37,25 +36,6 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
     }
 
     public ISourceBlock<FlowEvent> Events => _events;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-        => Create(context, new TimerComponentOptions());
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        TimerComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var settings = TimerOptionsReader.ReadScheduleSettings(context.Definition);
-        var node = new TimerScheduleNode(settings, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Output(TimerComponentPorts.Output, node.Output)
-            .Output(TimerComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
     {

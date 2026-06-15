@@ -3,7 +3,6 @@ using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
@@ -19,7 +18,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
     private bool _started;
     private bool _disposed;
 
-    private DirectoryEnumerateNode(
+    internal DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
         IFileSystemClock clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
@@ -32,24 +31,6 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
                 nameof(options),
                 "Directory enumerate bounded capacity must be greater than zero.");
         }
-    }
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-        => Create(context, new FileSystemComponentOptions());
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        FileSystemComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = FileSystemOptionsReader.ReadDirectoryEnumerateOptions(context.Definition);
-        var node = new DirectoryEnumerateNode(options, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Output(FileSystemComponentPorts.Output, node.Output)
-            .Build();
     }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
