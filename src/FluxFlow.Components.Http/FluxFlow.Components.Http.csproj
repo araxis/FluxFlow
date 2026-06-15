@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable HTTP request components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds allowedHosts and restrictToBaseUrlOrigin options so hosts can restrict per-message request destinations (SSRF hardening; defaults preserve existing behavior). Header names/values containing CR/LF/NUL are rejected before sending, and a pooled connection lifetime ensures DNS changes are observed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Security fix: when an allowedHosts or restrictToBaseUrlOrigin guard is configured, automatic redirect following is disabled so a server cannot 3xx-redirect a request to a host outside the allow-list (SSRF). Behavior is unchanged when no guard is configured.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -8,7 +8,7 @@ using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Metrics.Nodes;
 
-public sealed class MetricsAggregateNode : FlowNodeBase
+public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
 {
     private const string DefaultGroup = "default";
     private const int MaxTrackedRejectedGroups = 1024;
@@ -18,6 +18,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     private readonly TimeSpan _rateWindow;
     private readonly ActionBlock<MetricSampleInput> _input;
     private readonly BufferBlock<MetricSnapshotOutput> _output;
+    private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
@@ -33,6 +34,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase
     private double? _minValue;
     private double? _maxValue;
     private long _totalSize;
+    private bool _disposed;
 
     private MetricsAggregateNode(
         MetricsAggregateOptions options,
@@ -57,7 +59,12 @@ public sealed class MetricsAggregateNode : FlowNodeBase
         _input = new ActionBlock<MetricSampleInput>(AggregateAsync, inputOptions);
         _output = new BufferBlock<MetricSnapshotOutput>(
             new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        CompleteWhen(_input.Completion);
+        _input.Completion.ContinueWith(
+            completion => _ = CompleteOutputAsync(completion),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        CompleteWhen(_output.Completion);
     }
 
     public ITargetBlock<MetricSampleInput> Input => _input;
@@ -92,6 +99,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase
         ArgumentNullException.ThrowIfNull(exception);
         try
         {
+            _lifecycleCancellation.Cancel();
             FaultNode(exception);
         }
         finally
@@ -101,24 +109,30 @@ public sealed class MetricsAggregateNode : FlowNodeBase
         }
     }
 
-    protected override void OnNodeCompleted()
+    public async ValueTask DisposeAsync()
     {
-        if (!_options.EmitEverySample && _latestTimestamp.HasValue)
+        if (_disposed)
         {
-            EmitSnapshot(CreateSnapshot(_latestTimestamp.Value));
+            return;
         }
 
-        _output.Complete();
-        base.OnNodeCompleted();
+        _disposed = true;
+        Complete();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispose must not throw when the node faulted.
+        }
+        finally
+        {
+            _lifecycleCancellation.Dispose();
+        }
     }
 
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_output).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private Task AggregateAsync(MetricSampleInput sample)
+    private async Task AggregateAsync(MetricSampleInput sample)
     {
         try
         {
@@ -163,13 +177,18 @@ public sealed class MetricsAggregateNode : FlowNodeBase
             UpdateGroup(groupKey, timestamp, value, size);
             if (_options.EmitEverySample)
             {
-                EmitSnapshot(CreateSnapshot(timestamp));
+                await EmitSnapshotAsync(CreateSnapshot(timestamp)).ConfigureAwait(false);
             }
 
             TryEmitDiagnostic(
                 MetricsDiagnosticNames.AggregateUpdated,
                 message: "metrics.aggregate updated snapshot.",
                 attributes: CreateUpdateAttributes(timestamp));
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+            // The node is tearing down (dispose/fault); stop emitting rather than
+            // blocking forever on a dead consumer.
         }
         catch (MetricsAggregateException exception)
         {
@@ -187,8 +206,6 @@ public sealed class MetricsAggregateNode : FlowNodeBase
                 sample,
                 exception);
         }
-
-        return Task.CompletedTask;
     }
 
     private double? ResolveValue(MetricSampleInput sample)
@@ -330,27 +347,41 @@ public sealed class MetricsAggregateNode : FlowNodeBase
             });
     }
 
-    private void EmitSnapshot(MetricSnapshotOutput snapshot)
+    // Awaited, back-pressured emit: a slow consumer slows the single-DOP input
+    // pump instead of silently dropping snapshots. The lifecycle token lets
+    // dispose/fault release a send that is blocked on a dead consumer.
+    private Task EmitSnapshotAsync(MetricSnapshotOutput snapshot)
+        => _output.SendAsync(snapshot, _lifecycleCancellation.Token);
+
+    private async Task CompleteOutputAsync(Task completion)
     {
-        if (_output.Post(snapshot))
+        if (completion.IsFaulted && completion.Exception is { } completionException)
         {
+            ((IDataflowBlock)_output).Fault(completionException);
             return;
         }
 
-        var message = "metrics.aggregate snapshot output was full; snapshot was dropped.";
-        TryReportError(
-            MetricsErrorCodes.SnapshotDropped,
-            message,
-            context: $"sampleCount={snapshot.SampleCount}; boundedCapacity={_options.BoundedCapacity}");
-        TryEmitDiagnostic(
-            MetricsDiagnosticNames.AggregateSnapshotDropped,
-            FlowDiagnosticLevel.Warning,
-            message,
-            attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
+        try
+        {
+            if (!_options.EmitEverySample && _latestTimestamp.HasValue)
             {
-                ["sampleCount"] = snapshot.SampleCount,
-                ["boundedCapacity"] = _options.BoundedCapacity
-            });
+                // Final snapshot on completion shares the hot-path back-pressure so
+                // it is not dropped; the lifecycle token still unblocks teardown if
+                // the consumer is gone.
+                await EmitSnapshotAsync(CreateSnapshot(_latestTimestamp.Value))
+                    .ConfigureAwait(false);
+            }
+
+            _output.Complete();
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+            _output.Complete();
+        }
+        catch (Exception exception)
+        {
+            ((IDataflowBlock)_output).Fault(exception);
+        }
     }
 
     private MetricSnapshotOutput CreateSnapshot(DateTimeOffset timestamp)

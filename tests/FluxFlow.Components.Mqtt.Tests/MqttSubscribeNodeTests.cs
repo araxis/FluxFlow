@@ -117,6 +117,32 @@ public sealed class MqttSubscribeNodeTests
     }
 
     [Fact]
+    public async Task SubscribeNode_CompletedBeforeStartDoesNotOpenSubscription()
+    {
+        var adapter = new RecordingMqttClientAdapter(waitForCancellation: true);
+        var clientFactory = new RecordingMqttClientFactory(adapter);
+        var registry = new RuntimeNodeFactoryRegistry()
+            .RegisterMqttComponents(options => options.UseClientFactory(clientFactory));
+        registry.TryGetFactory(MqttComponentTypes.Subscribe, out var factory).ShouldBeTrue();
+
+        var runtimeNode = factory(CreateContext(MqttComponentTypes.Subscribe, new { topicFilter = "devices/+" }));
+
+        runtimeNode.Node.Complete();
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        clientFactory.Contexts.ShouldBeEmpty();
+        adapter.Subscriptions.ShouldBeEmpty();
+        adapter.SubscriptionOptions.ShouldBeNull();
+        adapter.Disposed.ShouldBeFalse();
+
+        if (runtimeNode.Node is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task SubscribeNode_DoesNotDisposeSharedAdapter()
     {
         var adapter = new RecordingMqttClientAdapter(waitForCancellation: true);

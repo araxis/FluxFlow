@@ -175,7 +175,6 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
                 "flow.window failed.",
                 exception,
                 CreateAttributes());
-            throw;
         }
     }
 
@@ -267,29 +266,20 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        _timerCancellation?.Cancel();
-        _timerCancellation?.Dispose();
-        _timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        var previous = Interlocked.Exchange(ref _timerCancellation, null);
+        previous?.Cancel();
+        previous?.Dispose();
+        var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _lifecycleCancellation.Token);
-        _ = RunTimerAsync(version, _timerCancellation.Token);
+        _timerCancellation = timerCancellation;
+        _ = RunTimerAsync(version, timerCancellation.Token);
     }
 
     private void TryCancelTimer()
     {
-        var timerCancellation = _timerCancellation;
-        if (timerCancellation is null)
-        {
-            return;
-        }
-
-        try
-        {
-            timerCancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // ScheduleTimer disposed the source on the processor thread.
-        }
+        var timerCancellation = Interlocked.Exchange(ref _timerCancellation, null);
+        timerCancellation?.Cancel();
+        timerCancellation?.Dispose();
     }
 
     private async Task RunTimerAsync(

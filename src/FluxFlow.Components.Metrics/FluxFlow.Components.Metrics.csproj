@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable metrics aggregation components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rejected-group tracking is capped with a single summary notice, and snapshots are built only when emitted (performance) with the final snapshot rebuilt at completion. Dead internal cancellation plumbing was removed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Correctness fix: aggregate snapshots are now emitted with back-pressure (awaited SendAsync) instead of being dropped when the output is full, so a slow consumer no longer loses snapshots.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

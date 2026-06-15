@@ -1,5 +1,44 @@
 # Changelog
 
+## FluxFlow.Components.Routing 1.2.1
+
+Correctness fixes (Wave 0 architecture-review remediation).
+
+- A per-message key/selector expression failure in the join and window nodes
+  now reports a `FlowError` and continues processing instead of rethrowing and
+  faulting the whole node, matching the correlation node's behavior.
+- Timer cancellation in the correlation, join, and window nodes uses an
+  interlocked swap so a cancel can no longer race a dispose of the same token
+  source.
+- A duplicate correlation side is reported as a warning diagnostic
+  (`flow.correlation.duplicateSide`) rather than an error, and the original
+  entry's timeout deadline is preserved.
+
+## FluxFlow.Components.Http 1.2.1
+
+Security fix (Wave 0 architecture-review remediation).
+
+- When an `allowedHosts` or `restrictToBaseUrlOrigin` guard is configured,
+  automatic redirect following is disabled so a server cannot 3xx-redirect a
+  request to a host outside the allow-list (SSRF). Behavior is unchanged when
+  no guard is configured.
+
+## FluxFlow.Components.Metrics 1.2.1
+
+Correctness fix (Wave 0 architecture-review remediation).
+
+- Aggregate snapshots are emitted with back-pressure (awaited `SendAsync`)
+  instead of being dropped when the bounded output is full, so a slow consumer
+  no longer silently loses snapshots.
+
+## FluxFlow.Components.Mqtt 1.2.1
+
+Correctness fix (Wave 0 architecture-review remediation).
+
+- The subscribe node no longer opens a client lease, subscription, or health
+  monitor when `Complete()` races `StartAsync` — the completed state is checked
+  under the state lock before any resource is acquired.
+
 ## FluxFlow.Components.Expectations 1.2.0
 
 Additive observability release.

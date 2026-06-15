@@ -386,13 +386,14 @@ public sealed class MetricsAggregateNodeTests
     }
 
     [Fact]
-    public async Task Aggregate_DoesNotBlockWhenUnlinkedOutputIsFull()
+    public async Task Aggregate_BackPressuresInsteadOfDroppingWhenOutputIsFull()
     {
         var runtimeNode = CreateNode(new
         {
             boundedCapacity = 1
         });
         var input = GetInput(runtimeNode);
+        var output = LinkOutput<MetricSnapshotOutput>(runtimeNode);
         var errors = LinkOutput<FlowError>(
             runtimeNode,
             MetricsComponentPorts.Errors);
@@ -401,10 +402,57 @@ public sealed class MetricsAggregateNodeTests
         await input.Target.SendAsync(new MetricSampleInput { Value = 2 });
         await input.Target.SendAsync(new MetricSampleInput { Value = 3 });
         input.Target.Complete();
+
+        // A slow consumer that drains one snapshot at a time still receives every
+        // snapshot rather than seeing any dropped once the bounded output fills.
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var third = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(MetricsErrorCodes.SnapshotDropped);
+        first.SampleCount.ShouldBe(1);
+        second.SampleCount.ShouldBe(2);
+        third.SampleCount.ShouldBe(3);
+        errors.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Aggregate_PausedConsumerReceivesEverySnapshotWithoutDropping()
+    {
+        const int sampleCount = 8;
+        var runtimeNode = CreateNode(new
+        {
+            boundedCapacity = 2
+        });
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<MetricSnapshotOutput>(runtimeNode);
+        var errors = LinkOutput<FlowError>(
+            runtimeNode,
+            MetricsComponentPorts.Errors);
+
+        // Send more samples than the bounded output can hold while the consumer is
+        // paused. Once the output fills, the single-DOP input must block on the
+        // back-pressured emit instead of dropping snapshots.
+        for (var index = 0; index < sampleCount; index++)
+        {
+            await input.Target.SendAsync(new MetricSampleInput { Value = index });
+        }
+
+        input.Target.Complete();
+
+        // Resume the consumer and drain every snapshot; all must arrive in order.
+        var counts = new List<long>();
+        for (var index = 0; index < sampleCount; index++)
+        {
+            var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            counts.Add(snapshot.SampleCount);
+        }
+
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        counts.ShouldBe(Enumerable.Range(1, sampleCount).Select(value => (long)value));
+        output.TryReceive(out _).ShouldBeFalse();
+        errors.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]

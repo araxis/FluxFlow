@@ -2,6 +2,7 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -176,6 +177,46 @@ public sealed class FlowJoinNodeTests
     }
 
     [Fact]
+    public async Task Join_ReportsProcessingFailureAndContinues()
+    {
+        var clock = new ThrowOnceRoutingClock();
+        var leftNodeContext = new RoutingNodeContext
+        {
+            Address = new NodeAddress("main", new NodeName("join")),
+            NodeType = RoutingComponentTypes.Join,
+            InputType = typeof(LeftMessage)
+        };
+        var node = new FlowJoinNode<LeftMessage, RightMessage>(
+            new JoinRoutingOptions
+            {
+                LeftKeyExpression = "key",
+                RightKeyExpression = "key"
+            },
+            new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["key"]),
+            new MessageContextFactory(),
+            new MessageContextFactory(),
+            leftNodeContext,
+            leftNodeContext with { InputType = typeof(RightMessage) },
+            clock);
+        var errors = new BufferBlock<FlowError>();
+        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
+        node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowJoinTimeout<LeftMessage, RightMessage>>());
+
+        await node.Left.SendAsync(new LeftMessage("A-100", "boom"));
+        await node.Left.SendAsync(new LeftMessage("A-101", "left"));
+        await node.Right.SendAsync(new RightMessage("A-101", "right"));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(RoutingErrorCodes.JoinFailed);
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-101");
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Join_ReportsCapacityLimitAndContinues()
     {
         var runtimeNode = CreateNode(new { maxPending = 1 });
@@ -347,6 +388,54 @@ public sealed class FlowJoinNodeTests
                     ["value"] = input
                 }
             };
+    }
+
+    private sealed class MessageContextFactory : IRoutingContextFactory
+    {
+        public FlowMapContext Create(object? input, RoutingNodeContext context)
+        {
+            var (key, payload) = input switch
+            {
+                LeftMessage left => (left.Key, left.Payload),
+                RightMessage right => (right.Key, right.Payload),
+                _ => (null, null)
+            };
+
+            return new FlowMapContext
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["key"] = key,
+                    ["payload"] = payload
+                }
+            };
+        }
+    }
+
+    private sealed class ThrowOnceRoutingClock : IRoutingClock
+    {
+        private readonly DateTimeOffset _utcNow = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        private int _calls;
+
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                if (Interlocked.Increment(ref _calls) == 1)
+                {
+                    throw new InvalidOperationException("clock failed.");
+                }
+
+                return _utcNow;
+            }
+        }
+
+        public ValueTask DelayAsync(
+            TimeSpan delay,
+            CancellationToken cancellationToken = default)
+            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private sealed class LeftMessageContextFactory : IFlowMapContextFactory<LeftMessage>

@@ -164,7 +164,7 @@ public sealed class FlowCorrelationNodeTests
     }
 
     [Fact]
-    public async Task Correlation_DuplicateSideReplacesPayloadAndKeepsOriginalDeadline()
+    public async Task Correlation_DuplicateSideWarnsAndKeepsOriginalDeadline()
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         var clock = new ManualRoutingClock(startedAt);
@@ -192,7 +192,10 @@ public sealed class FlowCorrelationNodeTests
         var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
             .ShouldBeOfType<InputPort<CorrelationMessage>>();
         var errors = new BufferBlock<FlowError>();
+        var diagnostics = new BufferBlock<FlowDiagnostic>();
         var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
+        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
+            .Diagnostics.LinkTo(diagnostics);
         LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
         runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
@@ -206,11 +209,16 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("B-200", "request", "other"));
 
         var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        error.Code.ShouldBe(RoutingErrorCodes.CorrelationDuplicateSide);
+        errors.TryReceive(out _).ShouldBeFalse();
+        var duplicate = await ReceiveDiagnosticAsync(
+            diagnostics,
+            RoutingDiagnosticNames.CorrelationDuplicateSide);
+        duplicate.Level.ShouldBe(FlowDiagnosticLevel.Warning);
+        duplicate.Attributes["key"].ShouldBe("A-100");
+        duplicate.Attributes["side"].ShouldBe("request");
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
         timeout.Value.Payload.ShouldBe("second");
@@ -423,6 +431,23 @@ public sealed class FlowCorrelationNodeTests
                 propagateCompletion: true,
                 out var error);
         error.ShouldBeNull();
+    }
+
+    private static async Task<FlowDiagnostic> ReceiveDiagnosticAsync(
+        BufferBlock<FlowDiagnostic> diagnostics,
+        string name)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (await diagnostics.OutputAvailableAsync(cancellation.Token))
+        {
+            var diagnostic = await diagnostics.ReceiveAsync(cancellation.Token);
+            if (diagnostic.Name == name)
+            {
+                return diagnostic;
+            }
+        }
+
+        throw new InvalidOperationException($"diagnostic '{name}' was not emitted.");
     }
 
     private sealed record CorrelationMessage(string Key, string Side, string Payload);
