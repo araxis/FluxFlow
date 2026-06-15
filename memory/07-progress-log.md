@@ -387,6 +387,17 @@ Date: 2026-05-31
   `ExpressionFlowMapper` compile once); engine bumped to 1.2.0; full Release
   suite green at 694 tests. (Wave 0 fixes remain merged-but-unpublished per
   owner decision to batch the release.)
+- Completed the rest of Wave 1: engine event channels now use the non-lossy
+  fanout source (EventFlowNodeBase + FlowEventCollector) with defensive event
+  attribute copies; flow.mapper gained a Failed output port (Mapping 1.3.0);
+  Validation declared/wired its Errors port (1.3.0); the type-alias resolution
+  cache is thread-safe and Sources design metadata corrected (Control/
+  Assertions/Timers/Sources/Observability 1.2.1). Deferred with rationale:
+  fanout-pump consolidation (#9, maintainability-only, real concurrency risk),
+  FlowNodeBase pump disposal (#12, unsafe because RuntimeNodeDisposal dispatches
+  IDisposable before IAsyncDisposable), and converting package event sources to
+  wireable non-lossy ports (needs public FlowFanoutSource + the events-as-ports
+  decision — Wave 2). Full Release suite green at 695 tests across 30 assemblies.
 
 ## Remaining
 

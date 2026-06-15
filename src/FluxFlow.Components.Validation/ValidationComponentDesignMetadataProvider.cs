@@ -35,7 +35,8 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 Port(ValidationComponentPorts.Input, PortDirection.Input, "Configured input type", true),
                 Port(ValidationComponentPorts.Result, PortDirection.Output, "JsonSchemaValidationResult", true, 1),
                 Port(ValidationComponentPorts.Valid, PortDirection.Output, "Configured input type", false, 2),
-                Port(ValidationComponentPorts.Invalid, PortDirection.Output, "Configured input type", false, 3)
+                Port(ValidationComponentPorts.Invalid, PortDirection.Output, "Configured input type", false, 3),
+                Port(ValidationComponentPorts.Errors, PortDirection.Output, "FlowError", false, 4)
             ]
         }
     ];

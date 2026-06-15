@@ -61,8 +61,12 @@ public sealed class ControlComponentOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(type);
 
-        _types[name.Trim()] = type;
-        _types[type.FullName ?? type.Name] = type;
+        lock (_typesLock)
+        {
+            _types[name.Trim()] = type;
+            _types[type.FullName ?? type.Name] = type;
+        }
+
         return this;
     }
 

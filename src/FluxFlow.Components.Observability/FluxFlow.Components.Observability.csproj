@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable observer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Counter, logger, and metrics nodes now expose Errors output ports, and design metadata declares accurate per-node option lists. Log message rendering is single-pass so substituted values cannot inject further placeholders, and metrics AverageSize divides by sized observations only.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes the type-alias resolution cache fully thread-safe (register writes now share the resolve lock).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

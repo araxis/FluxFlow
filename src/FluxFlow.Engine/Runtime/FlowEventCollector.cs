@@ -5,24 +5,16 @@ namespace FluxFlow.Engine.Runtime;
 
 internal sealed class FlowEventCollector : IDisposable
 {
-    private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
-    private readonly IReadOnlyList<IDisposable> _links;
-    private readonly IReadOnlyList<Task> _sourceCompletions;
+    private readonly FlowFanoutSource<FlowEvent> _events = new();
+    private readonly IReadOnlyList<Subscription> _subscriptions;
     private int _completed;
 
     public FlowEventCollector(IEnumerable<RuntimeNode> nodes)
     {
-        var eventSources = nodes
+        _subscriptions = nodes
             .Select(node => node.Node)
             .OfType<IFlowEventSource>()
-            .ToArray();
-
-        _links = eventSources
-            .Select(source => source.Events.LinkTo(_events))
-            .ToArray();
-
-        _sourceCompletions = eventSources
-            .Select(source => source.Events.Completion)
+            .Select(CreateSubscription)
             .ToArray();
     }
 
@@ -30,12 +22,18 @@ internal sealed class FlowEventCollector : IDisposable
 
     public void CompleteWhen(Task runtimeCompletion)
     {
-        _ = Task.WhenAll(_sourceCompletions.Append(runtimeCompletion)).ContinueWith(
+        ArgumentNullException.ThrowIfNull(runtimeCompletion);
+
+        var completions = _subscriptions
+            .Select(subscription => subscription.Target.Completion)
+            .Append(runtimeCompletion);
+
+        _ = Task.WhenAll(completions).ContinueWith(
             task =>
             {
                 if (task.IsFaulted)
                 {
-                    ((IDataflowBlock)_events).Fault(task.Exception?.InnerException ?? task.Exception!);
+                    _events.Fault(task.Exception?.InnerException ?? task.Exception!);
                     return;
                 }
 
@@ -48,12 +46,23 @@ internal sealed class FlowEventCollector : IDisposable
 
     public void Dispose()
     {
-        foreach (var link in _links)
+        foreach (var subscription in _subscriptions)
         {
-            link.Dispose();
+            subscription.Link.Dispose();
+            subscription.Target.Complete();
         }
 
         Complete();
+    }
+
+    private Subscription CreateSubscription(IFlowEventSource source)
+    {
+        var target = new ActionBlock<FlowEvent>(flowEvent => _events.Post(flowEvent));
+        var link = source.Events.LinkTo(
+            target,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        return new Subscription(link, target);
     }
 
     private void Complete()
@@ -63,4 +72,8 @@ internal sealed class FlowEventCollector : IDisposable
             _events.Complete();
         }
     }
+
+    private sealed record Subscription(
+        IDisposable Link,
+        ITargetBlock<FlowEvent> Target);
 }

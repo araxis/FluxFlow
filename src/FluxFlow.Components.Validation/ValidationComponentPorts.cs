@@ -6,4 +6,5 @@ public static class ValidationComponentPorts
     public const string Result = "Result";
     public const string Valid = "Valid";
     public const string Invalid = "Invalid";
+    public const string Errors = "Errors";
 }

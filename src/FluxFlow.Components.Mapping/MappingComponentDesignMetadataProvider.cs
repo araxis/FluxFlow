@@ -35,7 +35,8 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
             [
                 Port(MappingComponentPorts.Input, PortDirection.Input, "Configured input type", true),
                 Port(MappingComponentPorts.Output, PortDirection.Output, "Configured output type", true, 1),
-                Port(MappingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 2)
+                Port(MappingComponentPorts.Failed, PortDirection.Output, "Configured input type", false, 2),
+                Port(MappingComponentPorts.Errors, PortDirection.Output, "FlowError", false, 3)
             ]
         }
     ];

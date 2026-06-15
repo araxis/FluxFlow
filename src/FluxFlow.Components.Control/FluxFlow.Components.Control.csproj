@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven control components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>flow.filter and flow.when now expose an Errors output port (declared in design metadata) so flows can observe per-message expression failures. Type alias resolution caching is thread-safe and dead internal cancellation plumbing was removed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes the type-alias resolution cache fully thread-safe (register writes now share the resolve lock).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
