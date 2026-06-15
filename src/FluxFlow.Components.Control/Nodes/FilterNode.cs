@@ -1,4 +1,3 @@
-using FluxFlow.Components.Control.Contracts;
 using FluxFlow.Components.Control.Diagnostics;
 using FluxFlow.Components.Control.Options;
 using FluxFlow.Engine.Components;
@@ -9,23 +8,19 @@ namespace FluxFlow.Components.Control.Nodes;
 
 public sealed class FilterNode<TInput> : FlowNodeBase
 {
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IControlContextFactory _contextFactory;
-    private readonly ControlNodeContext _nodeContext;
+    private readonly IFlowPredicate<TInput> _predicate;
+    private readonly string _engineName;
     private readonly ControlExpressionOptions _options;
     private readonly TransformManyBlock<TInput, TInput> _block;
 
-    public FilterNode(
+    internal FilterNode(
         ControlExpressionOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IControlContextFactory contextFactory,
-        ControlNodeContext nodeContext)
+        IFlowPredicate<TInput> predicate,
+        string engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
+        _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -67,12 +62,7 @@ public sealed class FilterNode<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            passed = ControlNodeSupport.Evaluate(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input);
+            passed = _predicate.IsMatch(input);
         }
         catch (Exception exception)
         {
@@ -80,20 +70,20 @@ public sealed class FilterNode<TInput> : FlowNodeBase
                 ControlErrorCodes.FilterExpressionFailed,
                 $"flow.filter failed to evaluate input: {exception.Message}",
                 exception,
-                ControlNodeSupport.CreateErrorContext(_options, _expressionEngine));
+                ControlNodeSupport.CreateErrorContext(_options, _engineName));
             TryEmitDiagnostic(
                 ControlDiagnosticNames.FilterFailed,
                 FlowDiagnosticLevel.Error,
                 "flow.filter failed to evaluate input.",
                 exception,
-                ControlNodeSupport.CreateAttributes(_options, _expressionEngine));
+                ControlNodeSupport.CreateAttributes(_options, _engineName));
             yield break;
         }
 
         TryEmitDiagnostic(
             passed ? ControlDiagnosticNames.FilterPassed : ControlDiagnosticNames.FilterRejected,
             message: passed ? "flow.filter passed input." : "flow.filter rejected input.",
-            attributes: ControlNodeSupport.CreateAttributes(_options, _expressionEngine, passed));
+            attributes: ControlNodeSupport.CreateAttributes(_options, _engineName, passed));
 
         if (passed)
         {

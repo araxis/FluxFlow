@@ -63,11 +63,16 @@ internal static class ControlNodeFactory
         IControlContextFactory contextFactory,
         ControlNodeContext nodeContext)
     {
+        // Compile the predicate expression once at build time; the node only
+        // evaluates the compiled form per message.
+        var predicate = new ExpressionFlowPredicate<TInput>(
+            options.Expression!,
+            expressionEngine,
+            new ControlContextAdapter<TInput>(contextFactory, nodeContext));
         var node = new FilterNode<TInput>(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext);
+            predicate,
+            expressionEngine.Name);
 
         return context.CreateNode(node)
             .Input(ControlComponentPorts.Input, node.Input)
@@ -83,11 +88,16 @@ internal static class ControlNodeFactory
         IControlContextFactory contextFactory,
         ControlNodeContext nodeContext)
     {
+        // Compile the predicate expression once at build time; the node only
+        // evaluates the compiled form per message.
+        var predicate = new ExpressionFlowPredicate<TInput>(
+            options.Expression!,
+            expressionEngine,
+            new ControlContextAdapter<TInput>(contextFactory, nodeContext));
         var node = new WhenNode<TInput>(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext);
+            predicate,
+            expressionEngine.Name);
 
         return context.CreateNode(node)
             .Input(ControlComponentPorts.Input, node.Input)
@@ -102,4 +112,13 @@ internal static class ControlNodeFactory
             name,
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException($"Could not find control factory method '{name}'.");
+
+    private sealed class ControlContextAdapter<TInput>(
+        IControlContextFactory contextFactory,
+        ControlNodeContext nodeContext)
+        : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => contextFactory.Create(input, nodeContext);
+    }
 }

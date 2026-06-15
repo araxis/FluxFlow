@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven control components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Makes the type-alias resolution cache fully thread-safe (register writes now share the resolve lock).</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once predicates for flow.filter and flow.when.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

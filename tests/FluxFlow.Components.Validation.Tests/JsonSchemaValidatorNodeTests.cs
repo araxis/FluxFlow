@@ -192,43 +192,32 @@ public sealed class JsonSchemaValidatorNodeTests
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_ReportsMissingSchemaOnStart()
+    public void JsonSchemaValidator_FailsBuildWhenSchemaMissing()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "object"
-            });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(
+                _ => { },
+                new
+                {
+                    inputType = "object"
+                }));
 
         exception.Message.ShouldContain("schema");
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(ValidationErrorCodes.SchemaMissing);
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_ReportsMalformedSchemaOnStart()
+    public void JsonSchemaValidator_FailsBuildWhenSchemaMalformed()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = "{",
-                inputType = "object"
-            });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        var exception = Should.Throw<InvalidOperationException>(
+            () => CreateNode(
+                _ => { },
+                new
+                {
+                    schema = "{",
+                    inputType = "object"
+                }));
 
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(ValidationErrorCodes.SchemaLoadFailed);
+        exception.Message.ShouldContain("schema");
     }
 
     [Fact]

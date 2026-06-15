@@ -1,40 +1,19 @@
-using FluxFlow.Components.Control.Contracts;
 using FluxFlow.Components.Control.Options;
-using FluxFlow.Engine.Mapping;
 
 namespace FluxFlow.Components.Control.Nodes;
 
 internal static class ControlNodeSupport
 {
-    public static bool Evaluate(
-        IFlowExpressionEngine expressionEngine,
-        ControlExpressionOptions options,
-        IControlContextFactory contextFactory,
-        ControlNodeContext nodeContext,
-        object? input)
-    {
-        var context = contextFactory.Create(input, nodeContext);
-        var value = expressionEngine.Evaluate(options.Expression!, context, typeof(bool));
-        return value switch
-        {
-            bool result => result,
-            null => throw new InvalidOperationException(
-                "Control expression returned null. Expected Boolean."),
-            _ => throw new InvalidOperationException(
-                $"Control expression returned '{value.GetType().Name}'. Expected Boolean.")
-        };
-    }
-
     public static Dictionary<string, object?> CreateAttributes(
         ControlExpressionOptions options,
-        IFlowExpressionEngine expressionEngine,
+        string engineName,
         bool? passed = null,
         string? route = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["inputType"] = options.InputType,
-            ["engine"] = expressionEngine.Name
+            ["engine"] = engineName
         };
 
         if (passed.HasValue)
@@ -62,12 +41,12 @@ internal static class ControlNodeSupport
 
     public static string CreateErrorContext(
         ControlExpressionOptions options,
-        IFlowExpressionEngine expressionEngine)
+        string engineName)
     {
         var values = new List<string>
         {
             $"inputType={options.InputType}",
-            $"engine={expressionEngine.Name}"
+            $"engine={engineName}"
         };
 
         if (!string.IsNullOrWhiteSpace(options.ExpressionId))

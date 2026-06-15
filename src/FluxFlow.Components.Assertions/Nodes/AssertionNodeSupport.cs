@@ -1,39 +1,17 @@
 using FluxFlow.Components.Assertions.Contracts;
-using FluxFlow.Components.Assertions.Options;
-using FluxFlow.Engine.Mapping;
 
 namespace FluxFlow.Components.Assertions.Nodes;
 
 internal static class AssertionNodeSupport
 {
-    public static bool Evaluate(
-        IFlowExpressionEngine expressionEngine,
-        AssertionOptions options,
-        IAssertionContextFactory contextFactory,
-        AssertionNodeContext nodeContext,
-        object? input)
-    {
-        var context = contextFactory.Create(input, nodeContext);
-        var value = expressionEngine.Evaluate(options.Expression!, context, typeof(bool));
-        return value switch
-        {
-            bool result => result,
-            null => throw new InvalidOperationException(
-                "Assertion expression returned null. Expected Boolean."),
-            _ => throw new InvalidOperationException(
-                $"Assertion expression returned '{value.GetType().Name}'. Expected Boolean.")
-        };
-    }
-
     public static Dictionary<string, object?> CreateAttributes(
-        AssertionOptions options,
-        IFlowExpressionEngine expressionEngine,
+        AssertionResultMetadata metadata,
         bool? passed = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["inputType"] = options.InputType,
-            ["engine"] = expressionEngine.Name
+            ["inputType"] = metadata.InputType,
+            ["engine"] = metadata.EngineName
         };
 
         if (passed.HasValue)
@@ -41,37 +19,35 @@ internal static class AssertionNodeSupport
             attributes["passed"] = passed.Value;
         }
 
-        if (!string.IsNullOrWhiteSpace(options.ExpressionId))
+        if (!string.IsNullOrWhiteSpace(metadata.ExpressionId))
         {
-            attributes["expressionId"] = options.ExpressionId;
+            attributes["expressionId"] = metadata.ExpressionId;
         }
 
-        if (!string.IsNullOrWhiteSpace(options.ExpressionName))
+        if (!string.IsNullOrWhiteSpace(metadata.ExpressionName))
         {
-            attributes["expressionName"] = options.ExpressionName;
+            attributes["expressionName"] = metadata.ExpressionName;
         }
 
         return attributes;
     }
 
-    public static string CreateErrorContext(
-        AssertionOptions options,
-        IFlowExpressionEngine expressionEngine)
+    public static string CreateErrorContext(AssertionResultMetadata metadata)
     {
         var values = new List<string>
         {
-            $"inputType={options.InputType}",
-            $"engine={expressionEngine.Name}"
+            $"inputType={metadata.InputType}",
+            $"engine={metadata.EngineName}"
         };
 
-        if (!string.IsNullOrWhiteSpace(options.ExpressionId))
+        if (!string.IsNullOrWhiteSpace(metadata.ExpressionId))
         {
-            values.Add($"expressionId={options.ExpressionId}");
+            values.Add($"expressionId={metadata.ExpressionId}");
         }
 
-        if (!string.IsNullOrWhiteSpace(options.ExpressionName))
+        if (!string.IsNullOrWhiteSpace(metadata.ExpressionName))
         {
-            values.Add($"expressionName={options.ExpressionName}");
+            values.Add($"expressionName={metadata.ExpressionName}");
         }
 
         return string.Join("; ", values);

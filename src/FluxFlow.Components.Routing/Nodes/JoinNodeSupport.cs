@@ -1,41 +1,13 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Mapping;
-using System.Globalization;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
 internal static class JoinNodeSupport
 {
-    public static string? EvaluateLeftKey(
-        IFlowExpressionEngine expressionEngine,
-        JoinRoutingOptions options,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        object? input)
-        => EvaluateText(
-            expressionEngine,
-            options.LeftKeyExpression!,
-            contextFactory,
-            nodeContext,
-            input);
-
-    public static string? EvaluateRightKey(
-        IFlowExpressionEngine expressionEngine,
-        JoinRoutingOptions options,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        object? input)
-        => EvaluateText(
-            expressionEngine,
-            options.RightKeyExpression!,
-            contextFactory,
-            nodeContext,
-            input);
-
     public static Dictionary<string, object?> CreateAttributes(
         JoinRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
+        string? engineName,
         int pendingCount,
         string? key = null,
         FlowJoinSide? side = null)
@@ -44,7 +16,7 @@ internal static class JoinNodeSupport
         {
             ["leftInputType"] = options.LeftInputType,
             ["rightInputType"] = options.RightInputType,
-            ["engine"] = expressionEngine.Name,
+            ["engine"] = engineName,
             ["caseSensitive"] = options.CaseSensitive,
             ["timeoutMilliseconds"] = options.TimeoutMilliseconds,
             ["maxPending"] = options.MaxPending,
@@ -76,7 +48,7 @@ internal static class JoinNodeSupport
 
     public static string CreateErrorContext(
         JoinRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
+        string? engineName,
         string? key = null,
         FlowJoinSide? side = null)
     {
@@ -84,7 +56,7 @@ internal static class JoinNodeSupport
         {
             $"leftInputType={options.LeftInputType}",
             $"rightInputType={options.RightInputType}",
-            $"engine={expressionEngine.Name}",
+            $"engine={engineName}",
             $"timeoutMilliseconds={options.TimeoutMilliseconds}",
             $"maxPending={options.MaxPending}"
         };
@@ -111,28 +83,4 @@ internal static class JoinNodeSupport
 
         return string.Join("; ", values);
     }
-
-    private static string? EvaluateText(
-        IFlowExpressionEngine expressionEngine,
-        string expression,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        object? input)
-    {
-        var context = contextFactory.Create(input, nodeContext);
-        var value = expressionEngine.Evaluate(expression, context, typeof(object));
-        return NormalizeText(value);
-    }
-
-    private static string? NormalizeText(object? value)
-        => value switch
-        {
-            null => null,
-            string text => NormalizeString(text),
-            IFormattable formattable => NormalizeString(formattable.ToString(null, CultureInfo.InvariantCulture)),
-            _ => NormalizeString(value.ToString())
-        };
-
-    private static string? NormalizeString(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

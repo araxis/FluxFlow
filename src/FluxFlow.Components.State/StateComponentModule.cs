@@ -14,7 +14,7 @@ public sealed class StateComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 StateComponentTypes.Reducer,
-                context => StateReducerNode.Create(context, options))
+                context => StateReducerNodeFactory.Create(context, options))
         ];
     }
 

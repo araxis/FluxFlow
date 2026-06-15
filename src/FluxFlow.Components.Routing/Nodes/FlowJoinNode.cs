@@ -3,7 +3,6 @@ using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
@@ -11,11 +10,9 @@ namespace FluxFlow.Components.Routing.Nodes;
 public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 {
     private readonly JoinRoutingOptions _options;
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IRoutingContextFactory _leftContextFactory;
-    private readonly IRoutingContextFactory _rightContextFactory;
-    private readonly RoutingNodeContext _leftNodeContext;
-    private readonly RoutingNodeContext _rightNodeContext;
+    private readonly Func<TLeft, string?> _leftSelector;
+    private readonly Func<TRight, string?> _rightSelector;
+    private readonly string? _engineName;
     private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingBucket> _pending;
     private readonly Queue<JoinDeadline> _deadlines = new();
@@ -35,38 +32,30 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     public FlowJoinNode(
         JoinRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory leftContextFactory,
-        IRoutingContextFactory rightContextFactory,
-        RoutingNodeContext leftNodeContext,
-        RoutingNodeContext rightNodeContext)
+        Func<TLeft, string?> leftSelector,
+        Func<TRight, string?> rightSelector,
+        string? engineName)
         : this(
             options,
-            expressionEngine,
-            leftContextFactory,
-            rightContextFactory,
-            leftNodeContext,
-            rightNodeContext,
-            SystemRoutingClock.Instance)
+            leftSelector,
+            rightSelector,
+            SystemRoutingClock.Instance,
+            engineName)
     {
     }
 
     public FlowJoinNode(
         JoinRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory leftContextFactory,
-        IRoutingContextFactory rightContextFactory,
-        RoutingNodeContext leftNodeContext,
-        RoutingNodeContext rightNodeContext,
-        IRoutingClock clock)
+        Func<TLeft, string?> leftSelector,
+        Func<TRight, string?> rightSelector,
+        IRoutingClock clock,
+        string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _leftContextFactory = leftContextFactory ?? throw new ArgumentNullException(nameof(leftContextFactory));
-        _rightContextFactory = rightContextFactory ?? throw new ArgumentNullException(nameof(rightContextFactory));
-        _leftNodeContext = leftNodeContext ?? throw new ArgumentNullException(nameof(leftNodeContext));
-        _rightNodeContext = rightNodeContext ?? throw new ArgumentNullException(nameof(rightNodeContext));
+        _leftSelector = leftSelector ?? throw new ArgumentNullException(nameof(leftSelector));
+        _rightSelector = rightSelector ?? throw new ArgumentNullException(nameof(rightSelector));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _engineName = engineName;
         ArgumentException.ThrowIfNullOrWhiteSpace(options.LeftKeyExpression);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.RightKeyExpression);
         if (options.TimeoutMilliseconds <= 0)
@@ -260,12 +249,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         string? key;
         try
         {
-            key = JoinNodeSupport.EvaluateLeftKey(
-                _expressionEngine,
-                _options,
-                _leftContextFactory,
-                _leftNodeContext,
-                input);
+            key = _leftSelector(input);
         }
         catch (Exception exception)
         {
@@ -284,12 +268,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         string? key;
         try
         {
-            key = JoinNodeSupport.EvaluateRightKey(
-                _expressionEngine,
-                _options,
-                _rightContextFactory,
-                _rightNodeContext,
-                input);
+            key = _rightSelector(input);
         }
         catch (Exception exception)
         {
@@ -505,7 +484,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             message: "flow.join matched values.",
             attributes: JoinNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pendingCount,
                 key));
     }
@@ -563,7 +542,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             "flow.join emitted timeout.",
             attributes: JoinNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pendingCount,
                 key,
                 side));
@@ -717,7 +696,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             exception,
             JoinNodeSupport.CreateErrorContext(
                 _options,
-                _expressionEngine,
+                _engineName,
                 key,
                 side));
         TryEmitDiagnostic(
@@ -727,7 +706,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             exception,
             JoinNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pendingCount,
                 key,
                 side));

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
-using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
@@ -10,10 +9,8 @@ namespace FluxFlow.Components.Assertions.Nodes;
 
 public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
 {
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IAssertionContextFactory _contextFactory;
-    private readonly AssertionNodeContext _nodeContext;
-    private readonly AssertionOptions _options;
+    private readonly IFlowPredicate<TInput> _predicate;
+    private readonly AssertionResultMetadata _metadata;
     private readonly IAssertionClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowAssertionResult> _result;
@@ -21,38 +18,31 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
     private readonly BufferBlock<TInput> _failed;
 
     public FlowAssertionComponent(
-        AssertionOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IAssertionContextFactory contextFactory,
-        AssertionNodeContext nodeContext)
-        : this(options, expressionEngine, contextFactory, nodeContext, SystemAssertionClock.Instance)
+        IFlowPredicate<TInput> predicate,
+        AssertionResultMetadata metadata)
+        : this(predicate, metadata, SystemAssertionClock.Instance)
     {
     }
 
     public FlowAssertionComponent(
-        AssertionOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IAssertionContextFactory contextFactory,
-        AssertionNodeContext nodeContext,
+        IFlowPredicate<TInput> predicate,
+        AssertionResultMetadata metadata,
         IAssertionClock clock)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
-        if (options.BoundedCapacity <= 0)
+        if (metadata.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(options),
+                nameof(metadata),
                 "Assertion bounded capacity must be greater than zero.");
         }
 
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
+        var blockOptions = new DataflowBlockOptions { BoundedCapacity = metadata.BoundedCapacity };
         var inputOptions = new ExecutionDataflowBlockOptions
         {
-            BoundedCapacity = options.BoundedCapacity,
+            BoundedCapacity = metadata.BoundedCapacity,
             EnsureOrdered = true
         };
         _input = new ActionBlock<TInput>(EvaluateAsync, inputOptions);
@@ -99,12 +89,7 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            passed = AssertionNodeSupport.Evaluate(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input);
+            passed = _predicate.IsMatch(input);
         }
         catch (Exception exception)
         {
@@ -112,24 +97,24 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
                 AssertionErrorCodes.ExpressionFailed,
                 $"flow.assert failed to evaluate input: {exception.Message}",
                 exception,
-                AssertionNodeSupport.CreateErrorContext(_options, _expressionEngine));
+                AssertionNodeSupport.CreateErrorContext(_metadata));
             TryEmitDiagnostic(
                 AssertionDiagnosticNames.ExpressionFailed,
                 FlowDiagnosticLevel.Error,
                 "flow.assert failed to evaluate input.",
                 exception,
-                AssertionNodeSupport.CreateAttributes(_options, _expressionEngine));
+                AssertionNodeSupport.CreateAttributes(_metadata));
             return;
         }
 
         var result = CreateResult(input, passed);
         await _result.SendAsync(result).ConfigureAwait(false);
-        if (passed && _options.EmitPassedInput)
+        if (passed && _metadata.EmitPassedInput)
         {
             await _passed.SendAsync(input).ConfigureAwait(false);
         }
 
-        if (!passed && _options.EmitFailedInput)
+        if (!passed && _metadata.EmitFailedInput)
         {
             await _failed.SendAsync(input).ConfigureAwait(false);
         }
@@ -137,7 +122,7 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         TryEmitDiagnostic(
             AssertionDiagnosticNames.Evaluated,
             message: passed ? "flow.assert passed input." : "flow.assert failed input.",
-            attributes: AssertionNodeSupport.CreateAttributes(_options, _expressionEngine, passed));
+            attributes: AssertionNodeSupport.CreateAttributes(_metadata, passed));
     }
 
     private FlowAssertionResult CreateResult(TInput input, bool passed)
@@ -147,23 +132,23 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
             : FlowAssertionStatus.Failed;
         return new FlowAssertionResult
         {
-            Description = _options.EffectiveDescription,
-            Expression = _options.Expression!,
-            ExpressionId = _options.ExpressionId,
-            ExpressionName = _options.ExpressionName,
-            InputType = _options.InputType,
+            Description = _metadata.EffectiveDescription,
+            Expression = _metadata.Expression,
+            ExpressionId = _metadata.ExpressionId,
+            ExpressionName = _metadata.ExpressionName,
+            InputType = _metadata.InputType,
             Status = status,
-            Message = passed ? "Assertion passed." : _options.EffectiveFailureMessage,
+            Message = passed ? "Assertion passed." : _metadata.EffectiveFailureMessage,
             Value = input,
             EvaluatedAt = _clock.UtcNow,
             Failure = passed
                 ? null
                 : new AssertionFailure
                 {
-                    Description = _options.EffectiveDescription,
-                    Message = _options.EffectiveFailureMessage,
-                    Expression = _options.Expression!,
-                    InputType = _options.InputType,
+                    Description = _metadata.EffectiveDescription,
+                    Message = _metadata.EffectiveFailureMessage,
+                    Expression = _metadata.Expression,
+                    InputType = _metadata.InputType,
                     Value = input
                 }
         };

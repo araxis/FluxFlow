@@ -9,9 +9,10 @@ namespace FluxFlow.Components.Mapping.Nodes;
 
 public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
 {
-    private readonly IFlowExpressionEngine _expressionEngine;
+    private readonly IFlowMapper<TInput, TOutput> _mapper;
     private readonly IMappingContextFactory _contextFactory;
     private readonly MappingNodeContext _nodeContext;
+    private readonly string _engineName;
     private readonly MapperOptions _options;
     private readonly TransformManyBlock<TInput, TOutput> _input;
     private readonly BufferBlock<TOutput> _output;
@@ -19,15 +20,16 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
 
     public FlowMapperNode(
         MapperOptions options,
-        IFlowExpressionEngine expressionEngine,
+        IFlowMapper<TInput, TOutput> mapper,
         IMappingContextFactory contextFactory,
-        MappingNodeContext nodeContext)
+        MappingNodeContext nodeContext,
+        string engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
+        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -82,12 +84,7 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         try
         {
             var context = _contextFactory.Create(input, _nodeContext);
-            var value = _expressionEngine.Evaluate(
-                _options.Expression!,
-                context,
-                typeof(TOutput));
-
-            var output = CoerceOutput(value);
+            var output = _mapper.Map(input, context);
             TryEmitDiagnostic(
                 MappingDiagnosticNames.MapperSucceeded,
                 message: "Mapped workflow message.",
@@ -128,30 +125,13 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         _failed.Complete();
     }
 
-    private static TOutput CoerceOutput(object? value)
-    {
-        if (value is TOutput output)
-        {
-            return output;
-        }
-
-        if (value is null && default(TOutput) is null)
-        {
-            return default!;
-        }
-
-        var actualType = value?.GetType().Name ?? "null";
-        throw new InvalidOperationException(
-            $"Mapper expression returned '{actualType}', expected '{typeof(TOutput).Name}'.");
-    }
-
     private Dictionary<string, object?> CreateAttributes()
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["inputType"] = _options.InputType,
             ["outputType"] = _options.EffectiveOutputType,
-            ["engine"] = _expressionEngine.Name
+            ["engine"] = _engineName
         };
 
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
@@ -173,7 +153,7 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         {
             $"inputType={_options.InputType}",
             $"outputType={_options.EffectiveOutputType}",
-            $"engine={_expressionEngine.Name}"
+            $"engine={_engineName}"
         };
 
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))

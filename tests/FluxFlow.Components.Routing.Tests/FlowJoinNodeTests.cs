@@ -186,18 +186,20 @@ public sealed class FlowJoinNodeTests
             NodeType = RoutingComponentTypes.Join,
             InputType = typeof(LeftMessage)
         };
+        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["key"]);
+        var leftFactory = new MessageContextFactory();
+        var rightFactory = new MessageContextFactory();
+        var rightNodeContext = leftNodeContext with { InputType = typeof(RightMessage) };
         var node = new FlowJoinNode<LeftMessage, RightMessage>(
             new JoinRoutingOptions
             {
                 LeftKeyExpression = "key",
                 RightKeyExpression = "key"
             },
-            new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["key"]),
-            new MessageContextFactory(),
-            new MessageContextFactory(),
-            leftNodeContext,
-            leftNodeContext with { InputType = typeof(RightMessage) },
-            clock);
+            left => SelectKey(engine, "key", leftFactory, leftNodeContext, left),
+            right => SelectKey(engine, "key", rightFactory, rightNodeContext, right),
+            clock,
+            engine.Name);
         var errors = new BufferBlock<FlowError>();
         var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
         node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
@@ -282,17 +284,19 @@ public sealed class FlowJoinNodeTests
             NodeType = RoutingComponentTypes.Join,
             InputType = typeof(LeftMessage)
         };
+        var engine = new RecordingExpressionEngine();
+        var leftFactory = new TestRoutingContextFactory();
+        var rightFactory = new TestRoutingContextFactory();
+        var rightNodeContext = leftNodeContext with { InputType = typeof(RightMessage) };
         var node = new FlowJoinNode<LeftMessage, RightMessage>(
             new JoinRoutingOptions
             {
                 LeftKeyExpression = "key",
                 RightKeyExpression = "key"
             },
-            new RecordingExpressionEngine(),
-            new TestRoutingContextFactory(),
-            new TestRoutingContextFactory(),
-            leftNodeContext,
-            leftNodeContext with { InputType = typeof(RightMessage) });
+            left => SelectKey(engine, "key", leftFactory, leftNodeContext, left),
+            right => SelectKey(engine, "key", rightFactory, rightNodeContext, right),
+            engine.Name);
 
         node.Fault(new InvalidOperationException("boom"));
         await node.DisposeAsync();
@@ -357,6 +361,26 @@ public sealed class FlowJoinNodeTests
         FlowMapContext context,
         Type resultType)
         => context.Variables["key"];
+
+    // Reproduces the selector the factory compiles once at build time: evaluate
+    // the expression through the engine (RecordingExpressionEngine's default
+    // Compile defers to Evaluate, preserving interception) over the context the
+    // factory creates for the input, then normalize the result to a string.
+    private static string? SelectKey<TInput>(
+        IFlowExpressionEngine engine,
+        string expression,
+        IRoutingContextFactory factory,
+        RoutingNodeContext nodeContext,
+        TInput input)
+    {
+        var value = engine.Compile<object?>(expression).Evaluate(factory.Create(input, nodeContext));
+        return value switch
+        {
+            null => null,
+            string text => string.IsNullOrWhiteSpace(text) ? null : text.Trim(),
+            _ => string.IsNullOrWhiteSpace(value.ToString()) ? null : value.ToString()!.Trim()
+        };
+    }
 
     private static void LinkOutput<T>(
         RuntimeNode runtimeNode,

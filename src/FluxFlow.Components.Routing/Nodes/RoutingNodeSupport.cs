@@ -1,24 +1,10 @@
-using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Mapping;
 using System.Globalization;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
 internal static class RoutingNodeSupport
 {
-    public static string? EvaluateRouteKey(
-        IFlowExpressionEngine expressionEngine,
-        SwitchRoutingOptions options,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        object? input)
-    {
-        var context = contextFactory.Create(input, nodeContext);
-        var value = expressionEngine.Evaluate(options.Expression!, context, typeof(object));
-        return NormalizeRouteKey(value);
-    }
-
     public static HashSet<string> CreateRouteSet(SwitchRoutingOptions options)
     {
         var comparer = options.CaseSensitive
@@ -46,14 +32,14 @@ internal static class RoutingNodeSupport
 
     public static Dictionary<string, object?> CreateAttributes(
         SwitchRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
+        string? engineName,
         string? routeKey = null,
         bool? matched = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["inputType"] = options.InputType,
-            ["engine"] = expressionEngine.Name,
+            ["engine"] = engineName,
             ["routes"] = options.Routes.Length,
             ["routeOutputs"] = options.RouteOutputs.Count,
             ["caseSensitive"] = options.CaseSensitive
@@ -89,12 +75,12 @@ internal static class RoutingNodeSupport
 
     public static string CreateErrorContext(
         SwitchRoutingOptions options,
-        IFlowExpressionEngine expressionEngine)
+        string? engineName)
     {
         var values = new List<string>
         {
             $"inputType={options.InputType}",
-            $"engine={expressionEngine.Name}",
+            $"engine={engineName}",
             $"routes={options.Routes.Length}",
             $"routeOutputs={options.RouteOutputs.Count}"
         };
@@ -112,11 +98,20 @@ internal static class RoutingNodeSupport
         return string.Join("; ", values);
     }
 
-    private static string? NormalizeRouteKey(object? value)
+    public static string? NormalizeRouteKey(object? value)
         => value switch
         {
             null => null,
             string text => string.IsNullOrWhiteSpace(text) ? null : text.Trim(),
+            IFormattable formattable => NormalizeString(formattable.ToString(null, CultureInfo.InvariantCulture)),
+            _ => NormalizeString(value.ToString())
+        };
+
+    public static string? NormalizeText(object? value)
+        => value switch
+        {
+            null => null,
+            string text => NormalizeString(text),
             IFormattable formattable => NormalizeString(formattable.ToString(null, CultureInfo.InvariantCulture)),
             _ => NormalizeString(value.ToString())
         };

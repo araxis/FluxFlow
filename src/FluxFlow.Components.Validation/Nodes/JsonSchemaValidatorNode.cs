@@ -4,7 +4,6 @@ using FluxFlow.Components.Validation.Options;
 using FluxFlow.Components.Validation.Timing;
 using FluxFlow.Engine.Components;
 using Json.Schema;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks.Dataflow;
@@ -19,37 +18,40 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
         OutputFormat = OutputFormat.List
     };
 
-    private readonly JsonSchemaValidatorOptions _options;
+    private readonly JsonSchema _schema;
     private readonly ValidationComponentOptions.IValidationValueSelector _selector;
     private readonly JsonSchemaValidatorContext _nodeContext;
+    private readonly JsonSchemaValidatorMetadata _metadata;
     private readonly IValidationClock _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<JsonSchemaValidationResult<TInput>> _result;
     private readonly BufferBlock<TInput> _valid;
     private readonly BufferBlock<TInput> _invalid;
-    private JsonSchema? _schema;
 
     internal JsonSchemaValidatorNode(
-        JsonSchemaValidatorOptions options,
+        JsonSchema schema,
         ValidationComponentOptions.IValidationValueSelector selector,
         JsonSchemaValidatorContext nodeContext,
-        IValidationClock clock)
+        JsonSchemaValidatorMetadata metadata,
+        IValidationClock clock,
+        int boundedCapacity)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _schema = schema ?? throw new ArgumentNullException(nameof(schema));
         _selector = selector ?? throw new ArgumentNullException(nameof(selector));
         _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.BoundedCapacity <= 0)
+        if (boundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(options),
+                nameof(boundedCapacity),
                 "Validator bounded capacity must be greater than zero.");
         }
 
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
+        var blockOptions = new DataflowBlockOptions { BoundedCapacity = boundedCapacity };
         var inputOptions = new ExecutionDataflowBlockOptions
         {
-            BoundedCapacity = options.BoundedCapacity,
+            BoundedCapacity = boundedCapacity,
             EnsureOrdered = true
         };
         _input = new ActionBlock<TInput>(ValidateAsync, inputOptions);
@@ -74,38 +76,13 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
 
     public override Task StartAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            _schema = LoadSchema();
-            TryEmitDiagnostic(
-                ValidationDiagnosticNames.JsonSchemaLoaded,
-                message: "Loaded JSON schema validator.",
-                attributes: CreateAttributes());
+        cancellationToken.ThrowIfCancellationRequested();
+        TryEmitDiagnostic(
+            ValidationDiagnosticNames.JsonSchemaLoaded,
+            message: "Loaded JSON schema validator.",
+            attributes: CreateAttributes());
 
-            return Task.CompletedTask;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            var code = IsMissingSchema() ? ValidationErrorCodes.SchemaMissing : ValidationErrorCodes.SchemaLoadFailed;
-            TryReportError(
-                code,
-                $"json.schema-validator failed to load schema: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                ValidationDiagnosticNames.JsonSchemaFailed,
-                FlowDiagnosticLevel.Error,
-                "json.schema-validator failed to load schema.",
-                exception,
-                CreateAttributes());
-
-            throw new InvalidOperationException("json.schema-validator failed to load schema.", exception);
-        }
+        return Task.CompletedTask;
     }
 
     public override void Complete()
@@ -129,15 +106,6 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
 
     private async Task ValidateAsync(TInput input)
     {
-        if (_schema is null)
-        {
-            TryReportError(
-                ValidationErrorCodes.ValidatorNotStarted,
-                "json.schema-validator has not started.",
-                context: CreateErrorContext());
-            return;
-        }
-
         object? selectedValue;
         try
         {
@@ -187,8 +155,8 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
             Input = input,
             Value = selectedValue,
             IsValid = evaluation.IsValid,
-            SchemaId = _options.SchemaId,
-            ValueSelector = _options.EffectiveValueSelector,
+            SchemaId = _metadata.SchemaId,
+            ValueSelector = _metadata.ValueSelector,
             Issues = issues
         };
 
@@ -206,49 +174,6 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
                 : "json.schema-validator rejected input.",
             attributes: CreateAttributes(evaluation.IsValid, issues.Count));
     }
-
-    private JsonSchema LoadSchema()
-    {
-        var schemaText = ReadSchemaText();
-        var baseUri = ResolveSchemaBaseUri();
-        return baseUri is null
-            ? JsonSchema.FromText(schemaText)
-            : JsonSchema.FromText(schemaText, null, baseUri);
-    }
-
-    private Uri? ResolveSchemaBaseUri()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.SchemaId) &&
-            Uri.TryCreate(_options.SchemaId, UriKind.Absolute, out var schemaIdUri))
-        {
-            return schemaIdUri;
-        }
-
-        return string.IsNullOrWhiteSpace(_options.SchemaPath)
-            ? null
-            : new Uri(Path.GetFullPath(_options.SchemaPath));
-    }
-
-    private string ReadSchemaText()
-    {
-        if (_options.Schema.HasValue)
-        {
-            var schema = _options.Schema.Value;
-            return schema.ValueKind == JsonValueKind.String
-                ? schema.GetString() ?? throw new InvalidOperationException("Schema text was empty.")
-                : schema.GetRawText();
-        }
-
-        if (!string.IsNullOrWhiteSpace(_options.SchemaPath))
-        {
-            return File.ReadAllText(_options.SchemaPath);
-        }
-
-        throw new InvalidOperationException("Schema or schemaPath is required.");
-    }
-
-    private bool IsMissingSchema()
-        => !_options.Schema.HasValue && string.IsNullOrWhiteSpace(_options.SchemaPath);
 
     private static JsonElement ToJsonElement(object? value)
     {
@@ -357,18 +282,18 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["inputType"] = _options.InputType,
-            ["valueSelector"] = _options.EffectiveValueSelector
+            ["inputType"] = _metadata.InputType,
+            ["valueSelector"] = _metadata.ValueSelector
         };
 
-        if (!string.IsNullOrWhiteSpace(_options.SchemaId))
+        if (!string.IsNullOrWhiteSpace(_metadata.SchemaId))
         {
-            attributes["schemaId"] = _options.SchemaId;
+            attributes["schemaId"] = _metadata.SchemaId;
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.SchemaPath))
+        if (!string.IsNullOrWhiteSpace(_metadata.SchemaPath))
         {
-            attributes["schemaPath"] = _options.SchemaPath;
+            attributes["schemaPath"] = _metadata.SchemaPath;
         }
 
         if (isValid.HasValue)
@@ -388,18 +313,18 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
     {
         var values = new List<string>
         {
-            $"inputType={_options.InputType}",
-            $"valueSelector={_options.EffectiveValueSelector}"
+            $"inputType={_metadata.InputType}",
+            $"valueSelector={_metadata.ValueSelector}"
         };
 
-        if (!string.IsNullOrWhiteSpace(_options.SchemaId))
+        if (!string.IsNullOrWhiteSpace(_metadata.SchemaId))
         {
-            values.Add($"schemaId={_options.SchemaId}");
+            values.Add($"schemaId={_metadata.SchemaId}");
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.SchemaPath))
+        if (!string.IsNullOrWhiteSpace(_metadata.SchemaPath))
         {
-            values.Add($"schemaPath={_options.SchemaPath}");
+            values.Add($"schemaPath={_metadata.SchemaPath}");
         }
 
         return string.Join("; ", values);
