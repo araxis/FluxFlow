@@ -56,11 +56,17 @@ internal static class FlowMapperNodeFactory
         IMappingContextFactory contextFactory,
         MappingNodeContext nodeContext)
     {
+        // Compile the mapper expression once at build time; the node evaluates
+        // the compiled form per message via the supplied FlowMapContext.
+        var mapper = new ExpressionFlowMapper<TInput, TOutput>(
+            options.Expression!,
+            expressionEngine);
         var node = new FlowMapperNode<TInput, TOutput>(
             options,
-            expressionEngine,
+            mapper,
             contextFactory,
-            nodeContext);
+            nodeContext,
+            expressionEngine.Name);
 
         return context.CreateNode(node)
             .Input(MappingComponentPorts.Input, node.Input)

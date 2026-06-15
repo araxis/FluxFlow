@@ -3,7 +3,6 @@ using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
@@ -11,9 +10,9 @@ namespace FluxFlow.Components.Routing.Nodes;
 public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly CorrelationRoutingOptions _options;
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IRoutingContextFactory _contextFactory;
-    private readonly RoutingNodeContext _nodeContext;
+    private readonly Func<TInput, string?> _keySelector;
+    private readonly Func<TInput, string?>? _sideSelector;
+    private readonly string? _engineName;
     private readonly IRoutingClock _clock;
     private readonly Dictionary<string, PendingPair> _pending;
     private readonly Queue<CorrelationDeadline> _deadlines = new();
@@ -35,30 +34,30 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     public FlowCorrelationNode(
         CorrelationRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext)
+        Func<TInput, string?> keySelector,
+        Func<TInput, string?>? sideSelector,
+        string? engineName)
         : this(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext,
-            SystemRoutingClock.Instance)
+            keySelector,
+            sideSelector,
+            SystemRoutingClock.Instance,
+            engineName)
     {
     }
 
     public FlowCorrelationNode(
         CorrelationRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        IRoutingClock clock)
+        Func<TInput, string?> keySelector,
+        Func<TInput, string?>? sideSelector,
+        IRoutingClock clock,
+        string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
+        _sideSelector = sideSelector;
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _engineName = engineName;
         ArgumentException.ThrowIfNullOrWhiteSpace(options.KeyExpression);
         if (options.TimeoutMilliseconds <= 0)
         {
@@ -307,7 +306,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
                     $"flow.correlation replaced duplicate side '{side}' for key '{item.Key}'.",
                     attributes: CorrelationNodeSupport.CreateAttributes(
                         _options,
-                        _expressionEngine,
+                        _engineName,
                         _pending.Count,
                         item.Key,
                         side));
@@ -350,12 +349,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
         string? key;
         try
         {
-            key = CorrelationNodeSupport.EvaluateKey(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input.Value);
+            key = _keySelector(input.Value);
         }
         catch (Exception exception)
         {
@@ -373,16 +367,11 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
         }
 
         var side = input.Side;
-        if (string.IsNullOrWhiteSpace(side))
+        if (string.IsNullOrWhiteSpace(side) && _sideSelector is not null)
         {
             try
             {
-                side = CorrelationNodeSupport.EvaluateSide(
-                    _expressionEngine,
-                    _options,
-                    _contextFactory,
-                    _nodeContext,
-                    input.Value);
+                side = _sideSelector(input.Value);
             }
             catch (Exception exception)
             {
@@ -505,7 +494,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             message: "flow.correlation matched pair.",
             attributes: CorrelationNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pending.Count,
                 key));
     }
@@ -532,7 +521,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             "flow.correlation emitted timeout.",
             attributes: CorrelationNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pending.Count,
                 key,
                 entry.Side));
@@ -641,7 +630,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             code,
             message,
             exception,
-            CorrelationNodeSupport.CreateErrorContext(_options, _expressionEngine, key, side));
+            CorrelationNodeSupport.CreateErrorContext(_options, _engineName, key, side));
         TryEmitDiagnostic(
             RoutingDiagnosticNames.CorrelationFailed,
             FlowDiagnosticLevel.Error,
@@ -649,7 +638,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             exception,
             CorrelationNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 _pending.Count,
                 key,
                 side));

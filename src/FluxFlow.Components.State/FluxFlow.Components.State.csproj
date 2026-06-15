@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.State</PackageId>
     <AssemblyName>FluxFlow.Components.State</AssemblyName>
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable state reducer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rejected-key warning tracking is capped with a single summary diagnostic so high-cardinality key streams cannot grow memory without bound. Dead internal cancellation plumbing was removed.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once reducer + factory relocation for state.reducer.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

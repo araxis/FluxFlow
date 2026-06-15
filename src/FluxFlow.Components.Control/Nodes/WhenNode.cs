@@ -1,4 +1,3 @@
-using FluxFlow.Components.Control.Contracts;
 using FluxFlow.Components.Control.Diagnostics;
 using FluxFlow.Components.Control.Options;
 using FluxFlow.Engine.Components;
@@ -9,25 +8,21 @@ namespace FluxFlow.Components.Control.Nodes;
 
 public sealed class WhenNode<TInput> : FlowNodeBase
 {
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IControlContextFactory _contextFactory;
-    private readonly ControlNodeContext _nodeContext;
+    private readonly IFlowPredicate<TInput> _predicate;
+    private readonly string _engineName;
     private readonly ControlExpressionOptions _options;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _whenTrue;
     private readonly BufferBlock<TInput> _whenFalse;
 
-    public WhenNode(
+    internal WhenNode(
         ControlExpressionOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IControlContextFactory contextFactory,
-        ControlNodeContext nodeContext)
+        IFlowPredicate<TInput> predicate,
+        string engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
+        _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -82,12 +77,7 @@ public sealed class WhenNode<TInput> : FlowNodeBase
         bool passed;
         try
         {
-            passed = ControlNodeSupport.Evaluate(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input);
+            passed = _predicate.IsMatch(input);
         }
         catch (Exception exception)
         {
@@ -95,13 +85,13 @@ public sealed class WhenNode<TInput> : FlowNodeBase
                 ControlErrorCodes.WhenExpressionFailed,
                 $"flow.when failed to evaluate input: {exception.Message}",
                 exception,
-                ControlNodeSupport.CreateErrorContext(_options, _expressionEngine));
+                ControlNodeSupport.CreateErrorContext(_options, _engineName));
             TryEmitDiagnostic(
                 ControlDiagnosticNames.WhenFailed,
                 FlowDiagnosticLevel.Error,
                 "flow.when failed to evaluate input.",
                 exception,
-                ControlNodeSupport.CreateAttributes(_options, _expressionEngine));
+                ControlNodeSupport.CreateAttributes(_options, _engineName));
             return;
         }
 
@@ -111,7 +101,7 @@ public sealed class WhenNode<TInput> : FlowNodeBase
             message: $"flow.when routed input to {route}.",
             attributes: ControlNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 passed,
                 route));
 

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable expression-driven assertion components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Makes the type-alias resolution cache fully thread-safe (register writes now share the resolve lock).</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once predicate for flow.assert.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

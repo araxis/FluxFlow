@@ -3,16 +3,14 @@ using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
 public sealed class FlowSwitchNode<TInput> : FlowNodeBase
 {
-    private readonly IFlowExpressionEngine _expressionEngine;
-    private readonly IRoutingContextFactory _contextFactory;
-    private readonly RoutingNodeContext _nodeContext;
+    private readonly Func<TInput, string?> _routeKeySelector;
+    private readonly string? _engineName;
     private readonly SwitchRoutingOptions _options;
     private readonly IRoutingClock _clock;
     private readonly HashSet<string> _routes;
@@ -27,30 +25,26 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
 
     public FlowSwitchNode(
         SwitchRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext)
+        Func<TInput, string?> routeKeySelector,
+        string? engineName)
         : this(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext,
-            SystemRoutingClock.Instance)
+            routeKeySelector,
+            SystemRoutingClock.Instance,
+            engineName)
     {
     }
 
     public FlowSwitchNode(
         SwitchRoutingOptions options,
-        IFlowExpressionEngine expressionEngine,
-        IRoutingContextFactory contextFactory,
-        RoutingNodeContext nodeContext,
-        IRoutingClock clock)
+        Func<TInput, string?> routeKeySelector,
+        IRoutingClock clock,
+        string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
+        _routeKeySelector = routeKeySelector ?? throw new ArgumentNullException(nameof(routeKeySelector));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _engineName = engineName;
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Expression);
         if (options.BoundedCapacity <= 0)
         {
@@ -137,12 +131,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         string? routeKey;
         try
         {
-            routeKey = RoutingNodeSupport.EvaluateRouteKey(
-                _expressionEngine,
-                _options,
-                _contextFactory,
-                _nodeContext,
-                input);
+            routeKey = _routeKeySelector(input);
         }
         catch (Exception exception)
         {
@@ -150,13 +139,13 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
                 RoutingErrorCodes.SwitchExpressionFailed,
                 $"flow.switch failed to evaluate input: {exception.Message}",
                 exception,
-                RoutingNodeSupport.CreateErrorContext(_options, _expressionEngine));
+                RoutingNodeSupport.CreateErrorContext(_options, _engineName));
             TryEmitDiagnostic(
                 RoutingDiagnosticNames.SwitchFailed,
                 FlowDiagnosticLevel.Error,
                 "flow.switch failed to evaluate input.",
                 exception,
-                RoutingNodeSupport.CreateAttributes(_options, _expressionEngine));
+                RoutingNodeSupport.CreateAttributes(_options, _engineName));
             return;
         }
 
@@ -221,7 +210,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
                 : "flow.switch used default route.",
             attributes: RoutingNodeSupport.CreateAttributes(
                 _options,
-                _expressionEngine,
+                _engineName,
                 routeKey,
                 matched));
     }

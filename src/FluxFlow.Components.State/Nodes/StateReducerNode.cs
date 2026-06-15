@@ -4,7 +4,6 @@ using FluxFlow.Components.State.Options;
 using FluxFlow.Components.State.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.State.Nodes;
@@ -14,7 +13,8 @@ public sealed class StateReducerNode : FlowNodeBase
     private const int MaxTrackedRejectedKeys = 1024;
 
     private readonly StateReducerOptions _options;
-    private readonly IFlowExpressionEngine _expressionEngine;
+    private readonly IFlowReducer _reducer;
+    private readonly string _engineName;
     private readonly IStateClock _clock;
     private readonly ActionBlock<StateReducerInput> _input;
     private readonly BufferBlock<StateReducerResult> _output;
@@ -22,13 +22,15 @@ public sealed class StateReducerNode : FlowNodeBase
     private readonly HashSet<string> _rejectedKeys = new(StringComparer.Ordinal);
     private bool _rejectedKeyTrackingCapReached;
 
-    private StateReducerNode(
+    internal StateReducerNode(
         StateReducerOptions options,
-        IFlowExpressionEngine expressionEngine,
+        IFlowReducer reducer,
+        string engineName,
         IStateClock clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _expressionEngine = expressionEngine ?? throw new ArgumentNullException(nameof(expressionEngine));
+        _reducer = reducer ?? throw new ArgumentNullException(nameof(reducer));
+        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
@@ -52,24 +54,6 @@ public sealed class StateReducerNode : FlowNodeBase
     public ITargetBlock<StateReducerInput> Input => _input;
 
     public ISourceBlock<StateReducerResult> Output => _output;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        StateComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = StateOptionsReader.ReadReducerOptions(context.Definition);
-        var expressionEngine = componentOptions.ResolveExpressionEngine(options.Engine);
-        var node = new StateReducerNode(options, expressionEngine, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Input(StateComponentPorts.Input, node.Input)
-            .Output(StateComponentPorts.Output, node.Output)
-            .Output(StateComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();
@@ -160,10 +144,7 @@ public sealed class StateReducerNode : FlowNodeBase
         object? newState;
         try
         {
-            newState = _expressionEngine.Evaluate(
-                _options.Reducer,
-                context,
-                typeof(object));
+            newState = _reducer.Reduce(context);
         }
         catch (Exception exception)
         {
@@ -224,17 +205,8 @@ public sealed class StateReducerNode : FlowNodeBase
         {
             try
             {
-                var value = _expressionEngine.Evaluate(
-                    _options.KeyExpression!,
-                    CreateContext(input.Key, input, ResolveInitialState(input), 0),
-                    typeof(string));
-                key = value switch
-                {
-                    string text => text,
-                    null => null,
-                    _ => throw new InvalidOperationException(
-                        $"Key expression returned '{value.GetType().Name}', expected String.")
-                };
+                key = _reducer.ResolveKey(
+                    CreateContext(input.Key, input, ResolveInitialState(input), 0));
             }
             catch (Exception exception)
             {
@@ -372,7 +344,7 @@ public sealed class StateReducerNode : FlowNodeBase
             ["key"] = result.Key,
             ["version"] = result.Version,
             ["operation"] = operation.ToString(),
-            ["engine"] = _expressionEngine.Name,
+            ["engine"] = _engineName,
             ["keyCount"] = _states.Count
         };
 
@@ -394,7 +366,7 @@ public sealed class StateReducerNode : FlowNodeBase
         {
             ["key"] = input.Key,
             ["operation"] = input.Operation.ToString(),
-            ["engine"] = _expressionEngine.Name
+            ["engine"] = _engineName
         };
 
     private static string CreateInputContext(StateReducerInput input)

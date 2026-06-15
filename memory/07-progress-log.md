@@ -414,6 +414,19 @@ Date: 2026-05-31
   packages bumped to `2.0.0-preview.1` (removing the public `static Create` is
   breaking). Engine and the expression/State/Validation packages untouched in
   this step.
+- Wave 2 step 2: flow.counter compiles its accept-predicate once in the factory
+  (Observability `2.0.0-preview.1`) — proved the compile-once pattern.
+- Wave 2 steps 3-8: converted the remaining expression nodes to factory-compiled
+  delegates — flow.filter/flow.when (Control), flow.assert (Assertions),
+  flow.mapper (Mapping), state.reducer (State, via a new IFlowReducer + factory
+  relocation), flow.switch/correlation/join (Routing); and fixed the
+  JsonSchemaValidator config leak (schema read+compiled in the factory, no node
+  file I/O, options no longer leaked to selectors). Nodes now hold only typed
+  delegates + a precomputed engine-name string; public node ctors changed
+  (2.0 breaks on the direct-construction path). Control/Assertions/Mapping/
+  State/Routing/Validation bumped to `2.0.0-preview.1`. Full Release suite green
+  at 695 tests across 30 assemblies. Wave 2 implementation complete; the whole
+  2.0 set stays unpublished (preview) until release is approved.
 
 ## Remaining
 

@@ -52,12 +52,14 @@ internal static class AssertionNodeFactory
         AssertionNodeContext nodeContext,
         IAssertionClock clock)
     {
-        var node = new FlowAssertionComponent<TInput>(
-            options,
+        // Compile the predicate expression once at build time; IsMatch only
+        // evaluates the compiled form per message.
+        var predicate = new ExpressionFlowPredicate<TInput>(
+            options.Expression!,
             expressionEngine,
-            contextFactory,
-            nodeContext,
-            clock);
+            new AssertionContextAdapter<TInput>(contextFactory, nodeContext));
+        var metadata = CreateMetadata(options, expressionEngine.Name);
+        var node = new FlowAssertionComponent<TInput>(predicate, metadata, clock);
 
         return context.CreateNode(node)
             .Input(AssertionsComponentPorts.Input, node.Input)
@@ -68,9 +70,33 @@ internal static class AssertionNodeFactory
             .Build();
     }
 
+    private static AssertionResultMetadata CreateMetadata(AssertionOptions options, string engineName)
+        => new()
+        {
+            EffectiveDescription = options.EffectiveDescription,
+            Expression = options.Expression!,
+            ExpressionId = options.ExpressionId,
+            ExpressionName = options.ExpressionName,
+            EngineName = engineName,
+            InputType = options.InputType,
+            EffectiveFailureMessage = options.EffectiveFailureMessage,
+            EmitPassedInput = options.EmitPassedInput,
+            EmitFailedInput = options.EmitFailedInput,
+            BoundedCapacity = options.BoundedCapacity
+        };
+
     private static MethodInfo GetMethod(string name)
         => typeof(AssertionNodeFactory).GetMethod(
             name,
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException($"Could not find assertion factory method '{name}'.");
+
+    private sealed class AssertionContextAdapter<TInput>(
+        IAssertionContextFactory inner,
+        AssertionNodeContext nodeContext)
+        : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => inner.Create(input, nodeContext);
+    }
 }

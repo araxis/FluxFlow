@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Validation</PackageId>
     <AssemblyName>FluxFlow.Components.Validation</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable validation components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Registers and declares the Errors output port on the JSON schema validator node so per-message validation errors are wireable and appear in design metadata.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: schema compiled at build time for the JSON schema validator.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

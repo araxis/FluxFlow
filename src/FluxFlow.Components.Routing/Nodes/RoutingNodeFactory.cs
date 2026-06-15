@@ -203,12 +203,16 @@ internal static class RoutingNodeFactory
         RoutingNodeContext nodeContext,
         FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
+        // Compile the route key expression once at build time so the node calls
+        // a precomputed selector per message instead of holding the engine.
+        var compiled = expressionEngine.Compile<object?>(options.Expression!);
+        Func<TInput, string?> routeKeySelector = input =>
+            RoutingNodeSupport.NormalizeRouteKey(compiled.Evaluate(contextFactory.Create(input, nodeContext)));
         var node = new FlowSwitchNode<TInput>(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext,
-            clock);
+            routeKeySelector,
+            clock,
+            expressionEngine.Name);
 
         var builder = context.CreateNode(node)
             .Input(RoutingComponentPorts.Input, node.Input)
@@ -234,12 +238,25 @@ internal static class RoutingNodeFactory
         RoutingNodeContext nodeContext,
         FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
+        // Compile the key expression once; compile the side expression only when
+        // configured (otherwise the side is supplied by the request/response ports).
+        var compiledKey = expressionEngine.Compile<object?>(options.KeyExpression!);
+        Func<TInput, string?> keySelector = input =>
+            RoutingNodeSupport.NormalizeText(compiledKey.Evaluate(contextFactory.Create(input, nodeContext)));
+        Func<TInput, string?>? sideSelector = null;
+        if (options.UsesSideExpression)
+        {
+            var compiledSide = expressionEngine.Compile<object?>(options.SideExpression!);
+            sideSelector = input =>
+                RoutingNodeSupport.NormalizeText(compiledSide.Evaluate(contextFactory.Create(input, nodeContext)));
+        }
+
         var node = new FlowCorrelationNode<TInput>(
             options,
-            expressionEngine,
-            contextFactory,
-            nodeContext,
-            clock);
+            keySelector,
+            sideSelector,
+            clock,
+            expressionEngine.Name);
 
         var builder = context.CreateNode(node)
             .Output(RoutingComponentPorts.Matched, node.Matched)
@@ -288,14 +305,20 @@ internal static class RoutingNodeFactory
         RoutingNodeContext rightNodeContext,
         FluxFlow.Components.Routing.Timing.IRoutingClock clock)
     {
+        // Compile each side's key expression once; the two sides have independent
+        // context factories, node contexts, and input types.
+        var compiledLeft = expressionEngine.Compile<object?>(options.LeftKeyExpression!);
+        Func<TLeft, string?> leftSelector = input =>
+            RoutingNodeSupport.NormalizeText(compiledLeft.Evaluate(leftContextFactory.Create(input, leftNodeContext)));
+        var compiledRight = expressionEngine.Compile<object?>(options.RightKeyExpression!);
+        Func<TRight, string?> rightSelector = input =>
+            RoutingNodeSupport.NormalizeText(compiledRight.Evaluate(rightContextFactory.Create(input, rightNodeContext)));
         var node = new FlowJoinNode<TLeft, TRight>(
             options,
-            expressionEngine,
-            leftContextFactory,
-            rightContextFactory,
-            leftNodeContext,
-            rightNodeContext,
-            clock);
+            leftSelector,
+            rightSelector,
+            clock,
+            expressionEngine.Name);
 
         return context.CreateNode(node)
             .Input(RoutingComponentPorts.Left, node.Left)

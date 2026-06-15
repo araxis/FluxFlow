@@ -1,5 +1,68 @@
 # Changelog
 
+## FluxFlow.Components.Control 2.0.0-preview.1
+
+2.0 preview: compile-once predicates for flow.filter and flow.when.
+
+- `flow.filter` and `flow.when` receive an `IFlowPredicate` compiled once in the
+  factory; the node no longer holds the expression engine, the predicate string,
+  or the per-message context factory.
+- The public node constructors change (breaking on the direct-construction
+  path); registration, options, ports, JSON shape, and runtime behavior are
+  unchanged.
+
+## FluxFlow.Components.Assertions 2.0.0-preview.1
+
+2.0 preview: compile-once predicate for flow.assert.
+
+- `flow.assert` receives an `IFlowPredicate` compiled once in the factory;
+  assertion result/diagnostic data moves into an injected metadata record; the
+  node no longer holds the engine, the expression string, or the context
+  factory. The configured clock is still injected.
+- Public node constructors change (breaking); registration, options, ports, and
+  behavior unchanged.
+
+## FluxFlow.Components.Mapping 2.0.0-preview.1
+
+2.0 preview: compile-once mapper for flow.mapper.
+
+- `flow.mapper` receives an `IFlowMapper` compiled once in the factory instead of
+  holding the expression engine and string; it still builds its per-message
+  context. The public node constructor changes (breaking); registration,
+  options, ports, the Failed port, and behavior unchanged.
+
+## FluxFlow.Components.State 2.0.0-preview.1
+
+2.0 preview: compile-once reducer + factory relocation for state.reducer.
+
+- The reducer and optional key expression are compiled once in a new
+  `StateReducerNodeFactory` and injected via an `IFlowReducer`; the node no
+  longer holds the expression engine or references definition/registration
+  types.
+- The node's static `Create` is removed (relocated to the factory). Registration,
+  options, ports, and behavior unchanged.
+
+## FluxFlow.Components.Routing 2.0.0-preview.1
+
+2.0 preview: compile-once selectors for switch, correlation, and join.
+
+- `flow.switch`, `flow.correlation`, and `flow.join` receive their key/route
+  selectors as delegates compiled once in the factory; the nodes no longer hold
+  the expression engine or per-message context factories.
+- Public node constructors change (breaking); registration, options, ports, JSON
+  shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Validation 2.0.0-preview.1
+
+2.0 preview: schema compiled at build time for the JSON schema validator.
+
+- The JSON schema is now read and compiled once in the factory and injected
+  ready; the node performs no file I/O or schema compilation in `StartAsync`, and
+  schema-missing/load failures now surface at graph-build time.
+- `JsonSchemaValidatorContext` no longer exposes the raw options to value
+  selectors (public contract break). Node type, options, ports, and validation
+  behavior are unchanged.
+
 ## FluxFlow.Components.Observability 2.0.0-preview.1
 
 2.0 preview: compile-once predicate for flow.counter (no runtime behavior change).
