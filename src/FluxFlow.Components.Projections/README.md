@@ -64,7 +64,7 @@ timestamps in tests or hosts.
 
 ```csharp
 registry.RegisterProjectionsComponents(options =>
-    options.UseClock(projectionClock));
+    options.UseClock(timeProvider));
 ```
 
 Event rate uses matching event timestamps. Snapshot timestamps use the

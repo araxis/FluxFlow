@@ -1,7 +1,6 @@
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
-using FluxFlow.Components.Metrics.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -13,7 +12,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     private const int MaxTrackedRejectedGroups = 1024;
 
     private readonly MetricsAggregateOptions _options;
-    private readonly IMetricsClock _clock;
+    private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _rateWindow;
     private readonly ActionBlock<MetricSampleInput> _input;
     private readonly BufferBlock<MetricSnapshotOutput> _output;
@@ -37,10 +36,10 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
 
     internal MetricsAggregateNode(
         MetricsAggregateOptions options,
-        IMetricsClock clock)
+        TimeProvider timeProvider)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -115,7 +114,7 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            var timestamp = sample.Timestamp ?? _clock.UtcNow;
+            var timestamp = sample.Timestamp ?? _timeProvider.GetUtcNow();
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
             var groupKey = ResolveGroup(sample);

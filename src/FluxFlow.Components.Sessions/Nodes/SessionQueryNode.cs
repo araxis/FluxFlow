@@ -222,7 +222,7 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
         IReadOnlyList<SessionMetadata> sessions)
         => new()
         {
-            Timestamp = _componentOptions.Clock.UtcNow,
+            Timestamp = _componentOptions.Clock.GetUtcNow(),
             Operation = "query",
             Succeeded = true,
             Count = sessions.Count,

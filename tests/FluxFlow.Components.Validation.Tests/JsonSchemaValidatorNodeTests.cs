@@ -4,6 +4,7 @@ using FluxFlow.Components.Validation.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text;
 using System.Text.Json;
@@ -72,7 +73,7 @@ public sealed class JsonSchemaValidatorNodeTests
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
         var runtimeNode = CreateNode(
-            options => options.UseClock(new RecordingValidationClock(timestamp)),
+            options => options.UseClock(new FakeTimeProvider(timestamp)),
             new
             {
                 schema = OrderSchema(),
@@ -385,7 +386,9 @@ public sealed class JsonSchemaValidatorNodeTests
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        resultTarget.Completion.IsCompleted.ShouldBeTrue();
+        // Completion propagates through the output port pump asynchronously, so
+        // await it rather than checking IsCompleted synchronously.
+        await resultTarget.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]

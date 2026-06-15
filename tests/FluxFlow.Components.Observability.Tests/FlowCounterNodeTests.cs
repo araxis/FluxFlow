@@ -5,6 +5,7 @@ using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -125,9 +126,9 @@ public sealed class FlowCounterNodeTests
     public async Task Counter_WithoutPredicateDoesNotRequireExpressionEngine()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 18, 31, 0, TimeSpan.Zero);
-        var clock = new RecordingObservabilityClock(timestamp);
+        var timeProvider = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateNode(
-            options => options.UseClock(clock),
+            options => options.UseClock(timeProvider),
             new
             {
                 inputType = "string"

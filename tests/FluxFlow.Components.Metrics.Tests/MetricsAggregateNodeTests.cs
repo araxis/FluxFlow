@@ -1,10 +1,10 @@
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
-using FluxFlow.Components.Metrics.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -239,10 +239,10 @@ public sealed class MetricsAggregateNodeTests
     public async Task Aggregate_UsesConfiguredClockForMissingSampleTimestamp()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:42Z");
-        var clock = new FixedMetricsClock(timestamp);
+        var timeProvider = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateNode(
             new { },
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var input = GetInput(runtimeNode);
         var output = LinkOutput<MetricSnapshotOutput>(runtimeNode);
 
@@ -542,10 +542,5 @@ public sealed class MetricsAggregateNodeTests
                 out var error);
         error.ShouldBeNull();
         return target;
-    }
-
-    private sealed class FixedMetricsClock(DateTimeOffset utcNow) : IMetricsClock
-    {
-        public DateTimeOffset UtcNow { get; } = utcNow;
     }
 }

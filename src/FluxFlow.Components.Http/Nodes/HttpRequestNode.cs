@@ -12,7 +12,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 {
     private readonly HttpRequestNodeOptions _options;
     private readonly IHttpRequestSender _sender;
-    private readonly IHttpClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<HttpRequestInput> _input;
     private readonly BufferBlock<HttpResponseOutput> _output;
     private readonly BufferBlock<HttpErrorOutput> _errors;
@@ -21,7 +21,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     internal HttpRequestNode(
         HttpRequestNodeOptions options,
         IHttpRequestSender sender,
-        IHttpClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _sender = sender ?? throw new ArgumentNullException(nameof(sender));
@@ -96,7 +96,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var startedAt = _clock.UtcNow;
+        var startedAt = _clock.GetUtcNow();
         HttpRequestSendContext sendContext;
         try
         {
@@ -522,7 +522,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 
     private HttpRequestTiming CaptureTiming(DateTimeOffset startedAt)
     {
-        var completedAt = _clock.UtcNow;
+        var completedAt = _clock.GetUtcNow();
         return new HttpRequestTiming(
             completedAt,
             HttpClockSupport.GetElapsedMilliseconds(startedAt, completedAt));

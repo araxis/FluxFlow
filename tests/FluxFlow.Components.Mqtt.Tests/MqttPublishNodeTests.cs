@@ -3,6 +3,7 @@ using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -17,7 +18,7 @@ public sealed class MqttPublishNodeTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var clientFactory = new RecordingMqttClientFactory(adapter);
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterMqttComponents(options => options
                 .UseClientFactory(clientFactory)
@@ -91,7 +92,7 @@ public sealed class MqttPublishNodeTests
         reconnect.Attributes["policy"].ShouldBe("publish");
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Timestamp.ShouldBe(clock.UtcNow);
+        result.Timestamp.ShouldBe(clock.GetUtcNow());
         result.Topic.ShouldBe("devices/temperature");
         result.PayloadBytes.ShouldBe(3);
         result.CorrelationId.ShouldBe("abc");
@@ -340,7 +341,7 @@ public sealed class MqttPublishNodeTests
     public async Task PublishNode_EmitsDiagnosticsAndEvents()
     {
         var adapter = new RecordingMqttClientAdapter();
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 8, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 8, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterMqttComponents(options => options
                 .UseClientFactory(new RecordingMqttClientFactory(adapter))
@@ -371,7 +372,7 @@ public sealed class MqttPublishNodeTests
         diagnostic.Attributes["correlationId"].ShouldBe("abc");
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.PublishSucceeded);
-        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
+        flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
         flowEvent.Channel.ShouldBe(MqttEventNames.PublishSucceeded);
         flowEvent.PayloadPreview.ShouldBe("09");
         flowEvent.GetAttribute("correlationId").ShouldBe("abc");
@@ -381,7 +382,7 @@ public sealed class MqttPublishNodeTests
     public async Task PublishNode_ForwardsAdapterHealthEvents()
     {
         var adapter = new RecordingMqttClientAdapter();
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 9, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 9, 1, 2, TimeSpan.Zero));
         adapter.HealthEvents.Add(new MqttClientHealthEvent
         {
             State = MqttClientHealthState.Connected,
@@ -422,7 +423,7 @@ public sealed class MqttPublishNodeTests
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
-        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
+        flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
         flowEvent.Channel.ShouldBe(MqttEventNames.ConnectionHealthChanged);
         flowEvent.Status.ShouldBe("Connected");
         flowEvent.Subject.ShouldBe("main-broker");

@@ -111,11 +111,20 @@ public sealed class FlowMergeNodeTests
 
         await first.Target.SendAsync("one");
         first.Target.Complete();
+
+        // Establish a definitive sync point: once "one" has been emitted the node has
+        // observed First's value and completion, so checking IsCompleted here is no
+        // longer racing background processing. With Second still open the node must
+        // not have completed; awaiting the emitted item (rather than a synchronous
+        // IsCompleted check straight after Complete) keeps this deterministic under load.
+        var item = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        item.Value.ShouldBe("one");
         runtimeNode.Node.Completion.IsCompleted.ShouldBeFalse();
+
         second.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        (await DrainUntilCompletedAsync(output)).Single().Value.ShouldBe("one");
+        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
 
     [Fact]

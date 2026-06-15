@@ -1,5 +1,4 @@
 using FluxFlow.Components.Storage.Contracts;
-using FluxFlow.Components.Storage.Timing;
 using FluxFlow.Engine.Definitions;
 
 namespace FluxFlow.Components.Storage.Nodes;
@@ -19,7 +18,7 @@ internal static class StorageNodeSupport
         NodeType nodeType,
         string? store,
         string? collection,
-        IStorageClock clock)
+        TimeProvider clock)
         => new()
         {
             Address = address,
@@ -77,10 +76,10 @@ internal static class StorageNodeSupport
         StorageRecord record,
         bool includeRecord,
         string? correlationId,
-        IStorageClock clock)
+        TimeProvider clock)
         => new()
         {
-            Timestamp = clock.UtcNow,
+            Timestamp = clock.GetUtcNow(),
             Operation = operation,
             Collection = record.Collection,
             Key = record.Key,

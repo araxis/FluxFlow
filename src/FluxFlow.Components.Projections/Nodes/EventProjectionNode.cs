@@ -1,7 +1,6 @@
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Options;
-using FluxFlow.Components.Projections.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Projections.Nodes;
 public sealed class EventProjectionNode : FlowNodeBase
 {
     private readonly EventProjectionOptions _options;
-    private readonly IProjectionClock _clock;
+    private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _rateWindow;
     private readonly ActionBlock<FlowEvent> _input;
     private readonly BufferBlock<EventProjectionSnapshot> _output;
@@ -23,10 +22,10 @@ public sealed class EventProjectionNode : FlowNodeBase
 
     internal EventProjectionNode(
         EventProjectionOptions options,
-        IProjectionClock clock)
+        TimeProvider timeProvider)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -72,7 +71,7 @@ public sealed class EventProjectionNode : FlowNodeBase
     {
         if (_options.EmitFinalSnapshot)
         {
-            var timestamp = _clock.UtcNow;
+            var timestamp = _timeProvider.GetUtcNow();
             EmitSnapshot(CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp));
         }
 
@@ -104,7 +103,7 @@ public sealed class EventProjectionNode : FlowNodeBase
             _latest = CreateSummary(flowEvent);
             AddRateSample(flowEvent.Timestamp);
 
-            var snapshot = CreateSnapshot(_clock.UtcNow, flowEvent.Timestamp);
+            var snapshot = CreateSnapshot(_timeProvider.GetUtcNow(), flowEvent.Timestamp);
             if (_options.EmitEveryMatch)
             {
                 EmitSnapshot(snapshot);

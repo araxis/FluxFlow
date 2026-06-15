@@ -1,10 +1,8 @@
-using FluxFlow.Components.Mqtt.Timing;
-
 namespace FluxFlow.Components.Mqtt.Contracts;
 
 public sealed record MqttClientHealthEvent
 {
-    public DateTimeOffset Timestamp { get; init; } = SystemMqttClock.Instance.UtcNow;
+    public DateTimeOffset Timestamp { get; init; } = TimeProvider.System.GetUtcNow();
 
     public MqttClientHealthState State { get; init; } = MqttClientHealthState.Unknown;
 

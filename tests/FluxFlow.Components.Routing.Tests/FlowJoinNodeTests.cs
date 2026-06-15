@@ -2,7 +2,6 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -179,7 +178,7 @@ public sealed class FlowJoinNodeTests
     [Fact]
     public async Task Join_ReportsProcessingFailureAndContinues()
     {
-        var clock = new ThrowOnceRoutingClock();
+        var clock = new ThrowingTimeProvider();
         var leftNodeContext = new RoutingNodeContext
         {
             Address = new NodeAddress("main", new NodeName("join")),
@@ -436,30 +435,6 @@ public sealed class FlowJoinNodeTests
                 }
             };
         }
-    }
-
-    private sealed class ThrowOnceRoutingClock : IRoutingClock
-    {
-        private readonly DateTimeOffset _utcNow = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        private int _calls;
-
-        public DateTimeOffset UtcNow
-        {
-            get
-            {
-                if (Interlocked.Increment(ref _calls) == 1)
-                {
-                    throw new InvalidOperationException("clock failed.");
-                }
-
-                return _utcNow;
-            }
-        }
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private sealed class LeftMessageContextFactory : IFlowMapContextFactory<LeftMessage>

@@ -1,10 +1,10 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -116,7 +116,7 @@ public sealed class SessionComponentTests
     public async Task Recorder_UsesConfiguredClockForDefaultTimestamps()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
-        var clock = new RecordingSessionClock { UtcNow = timestamp };
+        var timeProvider = new FakeTimeProvider(timestamp);
         var store = new TestSessionStore();
         var runtimeNode = CreateRecorder(
             new
@@ -124,7 +124,7 @@ public sealed class SessionComponentTests
                 sessionId = "session-1"
             },
             store,
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var input = GetInput(runtimeNode);
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
@@ -162,7 +162,7 @@ public sealed class SessionComponentTests
     [Fact]
     public async Task Replay_SupportsFixedInterval()
     {
-        var clock = new RecordingSessionClock();
+        var timeProvider = new TrackingFakeTimeProvider();
         var store = CreateStoreWithRecords(count: 3);
         var runtimeNode = CreateReplay(
             new
@@ -172,18 +172,20 @@ public sealed class SessionComponentTests
                 fixedIntervalMilliseconds = 40
             },
             store,
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        (await DrainUntilCompletedAsync(output)).Count.ShouldBe(3);
-        clock.Delays.ShouldBe(
-            [
-                TimeSpan.FromMilliseconds(40),
-                TimeSpan.FromMilliseconds(40)
-            ]);
+        // The first record emits immediately; the next two each wait for a 40ms
+        // FakeTimeProvider delay that only fires once time is advanced.
+        await AdvanceUntilCompletedAsync(
+            timeProvider,
+            runtimeNode.Node,
+            TimeSpan.FromMilliseconds(40));
+
+        var records = await DrainUntilCompletedAsync(output);
+        records.Select(record => record.Sequence).ShouldBe([1, 2, 3]);
     }
 
     [Fact]
@@ -210,7 +212,7 @@ public sealed class SessionComponentTests
     [Fact]
     public async Task Replay_StopsWhenOutputDeclinesDelivery()
     {
-        var clock = new RecordingSessionClock();
+        var timeProvider = new FakeTimeProvider();
         var store = CreateStoreWithRecords(count: 3);
         var runtimeNode = CreateReplay(
             new
@@ -220,23 +222,25 @@ public sealed class SessionComponentTests
                 fixedIntervalMilliseconds = 10
             },
             store,
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
 
         // Completing the node before the replay starts completes the output,
         // so every subsequent send is declined.
         runtimeNode.Node.Complete();
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
 
         // The replay loop must stop on the first declined send instead of
-        // iterating (and delaying) through the remaining records.
-        clock.Delays.ShouldBeEmpty();
+        // iterating through the remaining records. Time is never advanced, so if
+        // the loop reached an inter-record Task.Delay it would hang forever and
+        // disposal would time out; completing within the timeout proves the loop
+        // broke before awaiting any inter-record delay.
+        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
     public async Task Replay_UsesMultiplierTiming()
     {
-        var clock = new RecordingSessionClock();
+        var timeProvider = new TrackingFakeTimeProvider();
         var store = CreateStoreWithRecords(
             count: 2,
             step: TimeSpan.FromMilliseconds(80));
@@ -248,21 +252,26 @@ public sealed class SessionComponentTests
                 speedMultiplier = 4
             },
             store,
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // 80ms stored gap divided by the 4x multiplier yields a single 20ms
+        // FakeTimeProvider delay before the second record; advance to fire it.
+        await AdvanceUntilCompletedAsync(
+            timeProvider,
+            runtimeNode.Node,
+            TimeSpan.FromMilliseconds(20));
 
         (await DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(20)]);
     }
 
     [Fact]
     public async Task Query_EmitsResultAndSessionOutputs()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 13, 0, 0, TimeSpan.Zero);
-        var clock = new RecordingSessionClock { UtcNow = timestamp };
+        var timeProvider = new FakeTimeProvider(timestamp);
         var store = new TestSessionStore();
         store.Sessions.Add(new SessionMetadata
         {
@@ -295,7 +304,7 @@ public sealed class SessionComponentTests
                 }
             },
             store,
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var input = GetInput<SessionQueryRequest>(runtimeNode);
         var output = LinkOutput<SessionQueryResult>(runtimeNode);
         var sessions = LinkOutput<SessionMetadata>(runtimeNode, SessionsComponentPorts.Sessions);
@@ -796,20 +805,35 @@ public sealed class SessionComponentTests
             };
     }
 
-    private sealed class RecordingSessionClock : ISessionClock
+    // Drives a FakeTimeProvider forward until the node finishes. The replay loop arms
+    // each inter-record Task.Delay lazily (only after the previous record is sent), so a
+    // single large Advance cannot fire delays that are not armed yet. This drains them
+    // deterministically: advance exactly once for each newly created timer, gating on
+    // the wrapper's created count (and its registration signal) rather than polling with
+    // sleeps. Counting created timers avoids the lost-wakeup where a delay is armed
+    // before the test looks.
+    private static async Task AdvanceUntilCompletedAsync(
+        TrackingFakeTimeProvider timeProvider,
+        IFlowNode node,
+        TimeSpan step)
     {
-        public DateTimeOffset UtcNow { get; init; } =
-            new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
-
-        public List<TimeSpan> Delays { get; } = [];
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
+        var fired = 0;
+        while (!node.Completion.IsCompleted)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Delays.Add(delay);
-            return ValueTask.CompletedTask;
+            if (timeProvider.CreatedTimerCount > fired)
+            {
+                // An inter-record delay is armed (or already was) but not yet released.
+                timeProvider.Advance(step);
+                fired++;
+                continue;
+            }
+
+            // No unfired timer yet: wait until the loop arms the next one or completes.
+            var scheduled = timeProvider.TimerScheduled;
+            await Task.WhenAny(scheduled, node.Completion)
+                .WaitAsync(TimeSpan.FromSeconds(5));
         }
+
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

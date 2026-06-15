@@ -2,6 +2,7 @@ using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -14,7 +15,7 @@ public sealed class EventExpectationNodeTests
     [Fact]
     public async Task Expect_MatchesEventAndEmitsSatisfiedResult()
     {
-        var clock = new RecordingExpectationClock(
+        var timeProvider = new FakeTimeProvider(
             new DateTimeOffset(2026, 6, 3, 8, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             ExpectationsComponentTypes.Expect,
@@ -30,7 +31,7 @@ public sealed class EventExpectationNodeTests
                     subjectPrefix = "orders/"
                 }
             },
-            clock);
+            timeProvider);
         var input = GetInput(runtimeNode);
         var results = LinkResult(runtimeNode);
         var timestamp = new DateTimeOffset(2026, 6, 3, 7, 59, 0, TimeSpan.Zero);
@@ -49,7 +50,7 @@ public sealed class EventExpectationNodeTests
             payloadPreview: "abcdef"));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.EvaluatedAt.ShouldBe(clock.UtcNow);
+        result.EvaluatedAt.ShouldBe(timeProvider.GetUtcNow());
         result.Name.ShouldBe("failed-order");
         result.Kind.ShouldBe(EventExpectationResultKind.Expect);
         result.Satisfied.ShouldBeTrue();
@@ -67,7 +68,8 @@ public sealed class EventExpectationNodeTests
     [Fact]
     public async Task Expect_TimesOutWhenMatchIsNotObserved()
     {
-        var clock = new RecordingExpectationClock(
+        var timeout = TimeSpan.FromMilliseconds(500);
+        var timeProvider = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 3, 9, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             ExpectationsComponentTypes.Expect,
@@ -79,22 +81,25 @@ public sealed class EventExpectationNodeTests
                     type = "job.finished"
                 }
             },
-            clock);
+            timeProvider);
         var input = GetInput(runtimeNode);
         var results = LinkResult(runtimeNode);
 
+        // Capture the timeout-timer registration before starting; the node arms its
+        // Task.Delay from a background loop, so advancing before it is registered would
+        // leave the delay pending forever (a hang under load).
+        var timerScheduled = timeProvider.TimerScheduled;
         await runtimeNode.Node.StartAsync();
-        await WaitUntilAsync(() => clock.PendingDelayCount == 1);
-        clock.NextDelay.ShouldBe(TimeSpan.FromMilliseconds(500));
-        await input.Target.SendAsync(CreateEvent(clock.UtcNow, "job.started"));
+        await input.Target.SendAsync(CreateEvent(timeProvider.GetUtcNow(), "job.started"));
 
         // The send only queues the event; wait until the node has recorded it
         // so the timeout cannot resolve against an empty observation list.
         var node = runtimeNode.Node.ShouldBeOfType<Nodes.EventExpectationNode>();
         await WaitUntilAsync(() => node.ObservedEventCount == 1);
 
-        clock.UtcNow = clock.UtcNow.AddMilliseconds(500);
-        clock.CompleteNextDelay();
+        // Only advance once the node has actually registered its timeout timer.
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        timeProvider.Advance(timeout);
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         result.Satisfied.ShouldBeFalse();
@@ -109,7 +114,7 @@ public sealed class EventExpectationNodeTests
     [Fact]
     public async Task Guard_SucceedsOnTimeoutWhenNoMatchArrives()
     {
-        var clock = new RecordingExpectationClock(
+        var timeProvider = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             ExpectationsComponentTypes.Guard,
@@ -121,13 +126,15 @@ public sealed class EventExpectationNodeTests
                     status = "failed"
                 }
             },
-            clock);
+            timeProvider);
         var results = LinkResult(runtimeNode);
 
+        // The node arms its timeout delay from a background loop; wait for that timer
+        // to be registered before advancing, otherwise the advance fires nothing.
+        var timerScheduled = timeProvider.TimerScheduled;
         await runtimeNode.Node.StartAsync();
-        await WaitUntilAsync(() => clock.PendingDelayCount == 1);
-        clock.UtcNow = clock.UtcNow.AddSeconds(1);
-        clock.CompleteNextDelay();
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         result.Kind.ShouldBe(EventExpectationResultKind.Guard);
@@ -209,7 +216,7 @@ public sealed class EventExpectationNodeTests
     [Fact]
     public async Task Dispose_CancelsTimeoutAndCompletesResult()
     {
-        var clock = new RecordingExpectationClock(
+        var timeProvider = new FakeTimeProvider(
             new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             ExpectationsComponentTypes.Expect,
@@ -217,11 +224,12 @@ public sealed class EventExpectationNodeTests
             {
                 timeoutMilliseconds = 1000
             },
-            clock);
+            timeProvider);
         var results = LinkResult(runtimeNode);
 
+        // StartAsync arms the timeout delay. Time is never advanced, so the
+        // delay stays pending and dispose must cancel it.
         await runtimeNode.Node.StartAsync();
-        await WaitUntilAsync(() => clock.PendingDelayCount == 1);
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync();
 
@@ -260,14 +268,14 @@ public sealed class EventExpectationNodeTests
     private static RuntimeNode CreateNode(
         NodeType nodeType,
         object configuration,
-        RecordingExpectationClock? clock = null)
+        FakeTimeProvider? timeProvider = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterExpectationsComponents(options =>
             {
-                if (clock is not null)
+                if (timeProvider is not null)
                 {
-                    options.UseClock(clock);
+                    options.UseClock(timeProvider);
                 }
             });
         registry.TryGetFactory(nodeType, out var factory).ShouldBeTrue();

@@ -1,7 +1,6 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -13,7 +12,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
     private readonly FlowCounterOptions _options;
     private readonly IFlowPredicate<TInput>? _acceptPredicate;
     private readonly string? _engineName;
-    private readonly IObservabilityClock _clock;
+    private readonly TimeProvider _timeProvider;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowCounterSnapshot> _snapshots;
     private long _count;
@@ -23,7 +22,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
         FlowCounterOptions options,
         IFlowPredicate<TInput>? acceptPredicate,
         string? engineName)
-        : this(options, acceptPredicate, engineName, SystemObservabilityClock.Instance)
+        : this(options, acceptPredicate, engineName, TimeProvider.System)
     {
     }
 
@@ -31,12 +30,12 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
         FlowCounterOptions options,
         IFlowPredicate<TInput>? acceptPredicate,
         string? engineName,
-        IObservabilityClock clock)
+        TimeProvider timeProvider)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _acceptPredicate = acceptPredicate;
         _engineName = engineName;
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -89,7 +88,7 @@ public sealed class FlowCounterNode<TInput> : FlowNodeBase
             return;
         }
 
-        var observedAt = _clock.UtcNow;
+        var observedAt = _timeProvider.GetUtcNow();
         var count = Interlocked.Increment(ref _count);
         var snapshot = new FlowCounterSnapshot
         {

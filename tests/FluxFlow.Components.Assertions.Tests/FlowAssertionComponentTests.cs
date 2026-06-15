@@ -1,10 +1,10 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
-using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -249,7 +249,7 @@ public sealed class FlowAssertionComponentTests
             options => options
                 .UseExpressionEngine(new RecordingExpressionEngine(
                     evaluate: (_, _, _) => true))
-                .UseClock(new FixedAssertionClock(evaluatedAt)),
+                .UseClock(new FakeTimeProvider(evaluatedAt)),
             new
             {
                 expression = "assert"
@@ -330,10 +330,5 @@ public sealed class FlowAssertionComponentTests
                     ["passed"] = passed
                 }
             };
-    }
-
-    private sealed class FixedAssertionClock(DateTimeOffset utcNow) : IAssertionClock
-    {
-        public DateTimeOffset UtcNow => utcNow;
     }
 }

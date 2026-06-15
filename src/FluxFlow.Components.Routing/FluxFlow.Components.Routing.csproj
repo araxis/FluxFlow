@@ -11,7 +11,7 @@
     <Description>Reusable expression-driven routing components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once selectors for switch, correlation, and join.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once selectors for switch, correlation, and join. Replaces the bespoke IRoutingClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

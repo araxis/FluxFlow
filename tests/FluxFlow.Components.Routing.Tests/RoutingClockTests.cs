@@ -1,9 +1,9 @@
 using FluxFlow.Components.Routing.Contracts;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -16,7 +16,7 @@ public sealed class RoutingClockTests
     public async Task Switch_UsesConfiguredClockForResultAndRouteEnvelope()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var clock = new RecordingRoutingClock(timestamp);
+        var clock = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateNode(
             RoutingComponentTypes.Switch,
             new
@@ -51,7 +51,7 @@ public sealed class RoutingClockTests
     public async Task Merge_UsesConfiguredClockForOutputTimestamp()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:01Z");
-        var clock = new RecordingRoutingClock(timestamp);
+        var clock = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateNode(
             RoutingComponentTypes.Merge,
             new
@@ -76,7 +76,7 @@ public sealed class RoutingClockTests
     public async Task Window_UsesConfiguredClockForTimeWindowDelay()
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:02Z");
-        var clock = new RecordingRoutingClock(startedAt);
+        var clock = new TrackingFakeTimeProvider(startedAt);
         var runtimeNode = CreateNode(
             RoutingComponentTypes.Window,
             new
@@ -90,12 +90,18 @@ public sealed class RoutingClockTests
         var output = new BufferBlock<FlowWindow<string>>();
         LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
 
+        var timerScheduled = clock.NextTimerScheduled;
         await input.Target.SendAsync("first");
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        // The time window stays pending until the fake clock is advanced; nothing
+        // should have been emitted while the delay is outstanding.
+        output.TryReceive(out _).ShouldBeFalse();
+
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(25)]);
         window.StartedAt.ShouldBe(startedAt);
         window.EmittedAt.ShouldBe(startedAt.AddMilliseconds(25));
         window.Duration.ShouldBe(TimeSpan.FromMilliseconds(25));
@@ -105,7 +111,7 @@ public sealed class RoutingClockTests
     public async Task Join_UsesConfiguredClockForTimeoutDelay()
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:03Z");
-        var clock = new RecordingRoutingClock(startedAt);
+        var clock = new TrackingFakeTimeProvider(startedAt);
         var runtimeNode = CreateJoinNode(
             clock,
             new { timeoutMilliseconds = 25 });
@@ -115,13 +121,18 @@ public sealed class RoutingClockTests
         var timeouts = new BufferBlock<FlowJoinTimeout<LeftMessage, RightMessage>>();
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
 
+        var timerScheduled = clock.NextTimerScheduled;
         await left.Target.SendAsync(new LeftMessage("A-100"));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        // The timeout timer waits on the fake clock; no timeout fires until it advances.
+        timeouts.TryReceive(out _).ShouldBeFalse();
+
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         left.Target.Complete();
         right.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(25)]);
         timeout.ReceivedAt.ShouldBe(startedAt);
         timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
     }
@@ -130,7 +141,7 @@ public sealed class RoutingClockTests
     public async Task Correlation_UsesConfiguredClockForTimeoutDelay()
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:05Z");
-        var clock = new RecordingRoutingClock(startedAt);
+        var clock = new TrackingFakeTimeProvider(startedAt);
         var runtimeNode = CreateCorrelationNode(
             clock,
             new { timeoutMilliseconds = 25 });
@@ -139,12 +150,17 @@ public sealed class RoutingClockTests
         var timeouts = new BufferBlock<FlowCorrelationTimeout<CorrelationMessage>>();
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
 
+        var timerScheduled = clock.NextTimerScheduled;
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request"));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        // The pending request waits for the timeout timer; advancing the clock fires it.
+        timeouts.TryReceive(out _).ShouldBeFalse();
+
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(25)]);
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
         timeout.ReceivedAt.ShouldBe(startedAt);
@@ -155,7 +171,9 @@ public sealed class RoutingClockTests
     public async Task Correlation_UsesConfiguredClockForMatchTimestamps()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:04Z");
-        var clock = new FixedRoutingClock(timestamp);
+        // Never advanced: equivalent to the old fixed clock whose delay never
+        // completes, so the match is driven purely by the two inputs.
+        var clock = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateCorrelationNode(clock);
         var input = GetInput<CorrelationMessage>(runtimeNode, RoutingComponentPorts.Input);
         var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
@@ -185,7 +203,7 @@ public sealed class RoutingClockTests
     }
 
     private static RuntimeNode CreateJoinNode(
-        RecordingRoutingClock clock,
+        FakeTimeProvider clock,
         object overrides)
     {
         var configuration = RoutingTestHost.MergeConfiguration(
@@ -211,7 +229,7 @@ public sealed class RoutingClockTests
     }
 
     private static RuntimeNode CreateCorrelationNode(
-        IRoutingClock clock,
+        FakeTimeProvider clock,
         object? overrides = null)
         => CreateNode(
             RoutingComponentTypes.Correlation,
@@ -254,62 +272,6 @@ public sealed class RoutingClockTests
                 propagateCompletion: true,
                 out var error);
         error.ShouldBeNull();
-    }
-
-    private sealed class RecordingRoutingClock(DateTimeOffset utcNow) : IRoutingClock
-    {
-        private readonly object _gate = new();
-        private readonly List<TimeSpan> _delays = [];
-        private DateTimeOffset _utcNow = utcNow;
-
-        public DateTimeOffset UtcNow
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _utcNow;
-                }
-            }
-        }
-
-        public IReadOnlyList<TimeSpan> Delays
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _delays.ToArray();
-                }
-            }
-        }
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            lock (_gate)
-            {
-                _delays.Add(delay);
-                if (delay > TimeSpan.Zero)
-                {
-                    _utcNow += delay;
-                }
-            }
-
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class FixedRoutingClock(DateTimeOffset utcNow) : IRoutingClock
-    {
-        public DateTimeOffset UtcNow { get; } = utcNow;
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private sealed record LeftMessage(string Key);

@@ -1,7 +1,6 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -12,7 +11,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
     private readonly object _stateLock = new();
     private readonly SessionRecorderOptions _options;
     private readonly ISessionStore _store;
-    private readonly ISessionClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<SessionRecordInput> _input;
     private readonly BufferBlock<SessionRecord> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
@@ -24,7 +23,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
     internal SessionRecorderNode(
         SessionRecorderOptions options,
         ISessionStore store,
-        ISessionClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -78,7 +77,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                 {
                     SessionId = Normalize(_options.SessionId),
                     Name = Normalize(_options.Name),
-                    StartedAt = _clock.UtcNow,
+                    StartedAt = _clock.GetUtcNow(),
                     Notes = Normalize(_options.Notes),
                     Tags = CopyDictionary(_options.Tags)
                 },
@@ -174,7 +173,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
         }
 
         var sequence = _sequence + 1;
-        var timestamp = input.Timestamp ?? _clock.UtcNow;
+        var timestamp = input.Timestamp ?? _clock.GetUtcNow();
 
         try
         {
@@ -233,7 +232,7 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                     new SessionCompleteRequest
                     {
                         Session = session,
-                        EndedAt = _clock.UtcNow,
+                        EndedAt = _clock.GetUtcNow(),
                         MessageCount = _sequence
                     },
                     CancellationToken.None).ConfigureAwait(false);

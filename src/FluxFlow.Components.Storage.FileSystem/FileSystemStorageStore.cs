@@ -49,7 +49,7 @@ public sealed class FileSystemStorageStore : IStorageStore
         {
             cancellationToken.ThrowIfCancellationRequested();
             var existing = ReadRecord(path, collection, key);
-            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.UtcNow)
+            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.GetUtcNow())
             {
                 existing = null;
             }
@@ -80,7 +80,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 ContentType = Normalize(request.ContentType),
                 Attributes = CopyAttributes(request.Attributes),
                 Version = (existing?.Version ?? 0) + 1,
-                StoredAt = _settings.Clock.UtcNow,
+                StoredAt = _settings.Clock.GetUtcNow(),
                 ExpiresAt = request.ExpiresAt,
                 CorrelationId = Normalize(request.CorrelationId)
             };
@@ -109,7 +109,7 @@ public sealed class FileSystemStorageStore : IStorageStore
             }
 
             if (record.ExpiresAt.HasValue &&
-                record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
+                record.ExpiresAt.Value <= _settings.Clock.GetUtcNow() &&
                 request.IncludeExpired != true)
             {
                 return Task.FromResult<StorageRecord?>(null);
@@ -168,7 +168,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 }
 
                 if (record is null ||
-                    !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
+                    !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
                 {
                     continue;
                 }
@@ -207,7 +207,7 @@ public sealed class FileSystemStorageStore : IStorageStore
 
             return Task.FromResult(new StorageResult
             {
-                Timestamp = _settings.Clock.UtcNow,
+                Timestamp = _settings.Clock.GetUtcNow(),
                 Operation = "delete",
                 Collection = collection,
                 Key = key,

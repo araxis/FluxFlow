@@ -1,7 +1,6 @@
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Globalization;
 using System.Threading.Tasks.Dataflow;
@@ -12,7 +11,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
 {
     private readonly object _stateLock = new();
     private readonly TimerIntervalSettings _settings;
-    private readonly ITimerClock _clock;
+    private readonly TimeProvider _clock;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private CancellationTokenSource? _timerCancellation;
     private Task? _timerTask;
@@ -22,7 +21,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
 
     internal TimerIntervalNode(
         TimerIntervalSettings settings,
-        ITimerClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity })
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -140,7 +139,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
 
     private async Task RunTimerAsync(CancellationToken cancellationToken)
     {
-        var startedAt = _clock.UtcNow;
+        var startedAt = _clock.GetUtcNow();
         var sequence = 0L;
         var nextDueAt = ResolveFirstDueAt(startedAt);
 
@@ -230,10 +229,10 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         DateTimeOffset dueAt,
         CancellationToken cancellationToken)
     {
-        var delay = dueAt - _clock.UtcNow;
+        var delay = dueAt - _clock.GetUtcNow();
         if (delay > TimeSpan.Zero)
         {
-            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -246,7 +245,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         cancellationToken.ThrowIfCancellationRequested();
 
         var sequence = currentSequence + 1;
-        var timestamp = _clock.UtcNow;
+        var timestamp = _clock.GetUtcNow();
         var tick = new TimerTick
         {
             Timestamp = timestamp,
@@ -281,7 +280,7 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         TryEmitDiagnostic(
             TimerDiagnosticNames.IntervalStopped,
             message: $"Stopped timer interval '{_settings.Name}'.",
-            attributes: CreateAttributes(sequence, _clock.UtcNow - startedAt));
+            attributes: CreateAttributes(sequence, _clock.GetUtcNow() - startedAt));
         CompleteOutput();
     }
 

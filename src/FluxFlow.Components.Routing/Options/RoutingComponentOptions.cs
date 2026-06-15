@@ -1,6 +1,5 @@
 using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Routing.Contracts;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Mapping;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -35,9 +34,9 @@ public sealed class RoutingComponentOptions
     private readonly FlowExpressionEngineRegistry _expressionEngines = new("Routing");
     private readonly FlowContextFactoryRegistry<IRoutingContextFactory> _contextFactories =
         new(new DefaultRoutingContextFactory());
-    private IRoutingClock _clock = SystemRoutingClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IRoutingClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
     public RoutingComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -70,7 +69,7 @@ public sealed class RoutingComponentOptions
         return this;
     }
 
-    public RoutingComponentOptions UseClock(IRoutingClock clock)
+    public RoutingComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

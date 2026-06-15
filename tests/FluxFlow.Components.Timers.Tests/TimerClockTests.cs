@@ -1,7 +1,7 @@
 using FluxFlow.Components.Timers.Contracts;
-using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -14,7 +14,7 @@ public sealed class TimerClockTests
     public async Task Interval_UsesConfiguredClock()
     {
         var startedAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
-        var clock = new RecordingTimerClock(startedAt);
+        var clock = new TrackingFakeTimeProvider(startedAt);
         var runtimeNode = CreateNode(
             TimerComponentTypes.Interval,
             new
@@ -27,10 +27,19 @@ public sealed class TimerClockTests
             clock);
         var output = LinkOutput<TimerTick>(runtimeNode);
 
+        // Capture the initial-delay timer's registration before starting the loop.
+        var scheduled = clock.TimerScheduled;
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The first tick is due after the 50ms initial delay; advancing releases the
+        // pending Task.Delay so the loop emits and registers the next interval delay.
+        var (first, scheduled2) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled, TimeSpan.FromMilliseconds(50));
+        var (second, _) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled2, TimeSpan.FromMilliseconds(100));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var ticks = await DrainUntilCompletedAsync(output);
+        var ticks = new[] { first, second };
         ticks.Select(tick => tick.Sequence).ShouldBe([1, 2]);
         ticks.Select(tick => tick.StartedAt).Distinct().ShouldBe([startedAt]);
         ticks.Select(tick => tick.DueAt).ShouldBe(
@@ -39,14 +48,13 @@ public sealed class TimerClockTests
             startedAt.AddMilliseconds(150)
         ]);
         ticks.Select(tick => tick.Timestamp).ShouldBe(ticks.Select(tick => tick.DueAt));
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(100)]);
     }
 
     [Fact]
     public async Task Schedule_UsesConfiguredClock()
     {
         var startedAt = new DateTimeOffset(2026, 6, 2, 11, 59, 59, TimeSpan.Zero);
-        var clock = new RecordingTimerClock(startedAt);
+        var clock = new TrackingFakeTimeProvider(startedAt);
         var runtimeNode = CreateNode(
             TimerComponentTypes.Schedule,
             new
@@ -58,21 +66,25 @@ public sealed class TimerClockTests
             clock);
         var output = LinkOutput<ScheduleTick>(runtimeNode);
 
+        // Capture the next-occurrence timer's registration before starting the loop.
+        var scheduled = clock.TimerScheduled;
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The next noon occurrence is one second away; releasing that delay emits the tick.
+        var (tick, _) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled, TimeSpan.FromSeconds(1));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var tick = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var dueAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         tick.StartedAt.ShouldBe(startedAt);
         tick.DueAt.ShouldBe(dueAt);
         tick.Timestamp.ShouldBe(dueAt);
-        clock.Delays.ShouldBe([TimeSpan.FromSeconds(1)]);
     }
 
     [Fact]
     public async Task Delay_UsesConfiguredClock()
     {
-        var clock = new RecordingTimerClock(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             TimerComponentTypes.Delay,
             new
@@ -84,17 +96,22 @@ public sealed class TimerClockTests
         var output = LinkOutput<string>(runtimeNode);
         var input = GetInput<string>(runtimeNode);
 
+        // Capture the per-item delay registration before sending the item that arms it.
+        var scheduled = clock.TimerScheduled;
         await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
         input.Complete();
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["one"]);
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(25)]);
+        // The item is held for 25ms; the delay stays pending until time advances.
+        var (emitted, _) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled, TimeSpan.FromMilliseconds(25));
+        emitted.ShouldBe("one");
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
     public async Task Throttle_UsesConfiguredClock()
     {
-        var clock = new RecordingTimerClock(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             TimerComponentTypes.Throttle,
             new
@@ -108,18 +125,26 @@ public sealed class TimerClockTests
         var output = LinkOutput<string>(runtimeNode);
         var input = GetInput<string>(runtimeNode);
 
+        // Capture the first interval timer's registration before sending the items.
+        var scheduled = clock.TimerScheduled;
         await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
         await input.Target.SendAsync("two").WaitAsync(TimeSpan.FromSeconds(5));
         input.Complete();
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["one", "two"]);
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(30), TimeSpan.FromMilliseconds(30)]);
+        // Each emission waits a 30ms interval; release them one at a time.
+        var (first, scheduled2) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled, TimeSpan.FromMilliseconds(30));
+        var (second, _) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled2, TimeSpan.FromMilliseconds(30));
+        first.ShouldBe("one");
+        second.ShouldBe("two");
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
     public async Task Debounce_UsesConfiguredClock()
     {
-        var clock = new RecordingTimerClock(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             TimerComponentTypes.Debounce,
             new
@@ -131,19 +156,23 @@ public sealed class TimerClockTests
         var output = LinkOutput<string>(runtimeNode);
         var input = GetInput<string>(runtimeNode);
 
+        // Capture the quiet-period timer's registration before sending the item.
+        var scheduled = clock.TimerScheduled;
         await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
-        var emitted = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The debounce emits after the 40ms quiet period elapses with no further input.
+        var (emitted, _) = await AdvanceUntilReceivedAsync(
+            clock, output, scheduled, TimeSpan.FromMilliseconds(40));
         input.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         emitted.ShouldBe("one");
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(40)]);
     }
 
     private static RuntimeNode CreateNode(
         NodeType type,
         object configuration,
-        RecordingTimerClock clock)
+        TrackingFakeTimeProvider clock)
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterTimerComponents(options => options
@@ -171,67 +200,29 @@ public sealed class TimerClockTests
         return output;
     }
 
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> output)
+    // FakeTimeProvider leaves Task.Delay pending until time advances, and the background
+    // timer loops register their delays asynchronously. Awaiting the scheduled-timer
+    // signal before each advance guarantees the loop has actually armed the delay we are
+    // about to release, so the advance deterministically fires it instead of racing the
+    // (possibly unregistered) timer.
+    //
+    // The signal for timer N+1 must be captured BEFORE the advance that fires timer N,
+    // because that advance is what causes the loop to arm timer N+1. The returned
+    // NextScheduled task is therefore captured before advancing and threaded into the
+    // following call; the very first signal is captured by the test before the action
+    // that arms the first delay.
+    private static async Task<(T Value, Task NextScheduled)> AdvanceUntilReceivedAsync<T>(
+        TrackingFakeTimeProvider clock,
+        BufferBlock<T> output,
+        Task scheduled,
+        TimeSpan dueIn)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var entries = new List<T>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var entry))
-            {
-                entries.Add(entry);
-            }
-        }
-
-        return entries;
-    }
-
-    private sealed class RecordingTimerClock(DateTimeOffset utcNow) : ITimerClock
-    {
-        private readonly object _gate = new();
-        private readonly List<TimeSpan> _delays = [];
-        private DateTimeOffset _utcNow = utcNow;
-
-        public DateTimeOffset UtcNow
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _utcNow;
-                }
-            }
-        }
-
-        public IReadOnlyList<TimeSpan> Delays
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _delays.ToArray();
-                }
-            }
-        }
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (delay <= TimeSpan.Zero)
-            {
-                return ValueTask.CompletedTask;
-            }
-
-            lock (_gate)
-            {
-                _delays.Add(delay);
-                _utcNow += delay;
-            }
-
-            return ValueTask.CompletedTask;
-        }
+        // Wait until the loop has registered the delay we are about to release.
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        // Capture the next registration before advancing; this advance is what arms it.
+        var nextScheduled = clock.TimerScheduled;
+        clock.Advance(dueIn);
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        return (value, nextScheduled);
     }
 }

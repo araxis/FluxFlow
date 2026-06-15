@@ -1,7 +1,6 @@
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Globalization;
 using System.Threading.Tasks.Dataflow;
@@ -12,7 +11,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
 {
     private readonly object _stateLock = new();
     private readonly TimerScheduleSettings _settings;
-    private readonly ITimerClock _clock;
+    private readonly TimeProvider _clock;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private CancellationTokenSource? _scheduleCancellation;
     private Task? _scheduleTask;
@@ -22,7 +21,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
 
     internal TimerScheduleNode(
         TimerScheduleSettings settings,
-        ITimerClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity })
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -140,14 +139,14 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
 
     private async Task RunScheduleAsync(CancellationToken cancellationToken)
     {
-        var startedAt = _clock.UtcNow;
+        var startedAt = _clock.GetUtcNow();
         var sequence = 0L;
 
         try
         {
             while (true)
             {
-                var dueAt = _settings.Schedule.GetNextOccurrence(_clock.UtcNow, _settings.TimeZone)
+                var dueAt = _settings.Schedule.GetNextOccurrence(_clock.GetUtcNow(), _settings.TimeZone)
                     ?? throw new InvalidOperationException(
                         $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
                 await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
@@ -195,10 +194,10 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         DateTimeOffset dueAt,
         CancellationToken cancellationToken)
     {
-        var delay = dueAt - _clock.UtcNow;
+        var delay = dueAt - _clock.GetUtcNow();
         if (delay > TimeSpan.Zero)
         {
-            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -211,7 +210,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         cancellationToken.ThrowIfCancellationRequested();
 
         var sequence = currentSequence + 1;
-        var timestamp = _clock.UtcNow;
+        var timestamp = _clock.GetUtcNow();
         var tick = new ScheduleTick
         {
             Timestamp = timestamp,
@@ -243,7 +242,7 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         TryEmitDiagnostic(
             TimerDiagnosticNames.ScheduleStopped,
             message: $"Stopped timer schedule '{_settings.Name}'.",
-            attributes: CreateAttributes(sequence, _clock.UtcNow - startedAt));
+            attributes: CreateAttributes(sequence, _clock.GetUtcNow() - startedAt));
         CompleteOutput();
     }
 

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -11,7 +10,7 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     private readonly object _stateLock = new();
     private readonly GeneratedSourceOptions _options;
     private readonly IReadOnlyList<TOutput> _items;
-    private readonly ISourceClock _clock;
+    private readonly TimeProvider _clock;
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
@@ -21,14 +20,14 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items)
-        : this(options, items, SystemSourceClock.Instance)
+        : this(options, items, TimeProvider.System)
     {
     }
 
     internal GeneratedSourceNode(
         GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items,
-        ISourceClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable deterministic source components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Corrects the source design metadata to match the actual sequence and generated-source options (start/step/count, outputType, loop, maxItems, timing), and makes the type-alias resolution cache fully thread-safe.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: TimeProvider clock migration. Replaces the package's bespoke clock abstraction with System.TimeProvider — the clock is now configured via UseClock(TimeProvider)/the TimeProvider-typed Clock option, and the old IXxxClock/System*Clock public types are removed (breaking). Runtime behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

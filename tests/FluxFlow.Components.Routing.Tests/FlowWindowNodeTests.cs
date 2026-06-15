@@ -2,7 +2,6 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -161,7 +160,7 @@ public sealed class FlowWindowNodeTests
     [Fact]
     public async Task Window_ReportsProcessingFailureAndContinues()
     {
-        var clock = new ThrowOnceRoutingClock();
+        var clock = new ThrowingTimeProvider();
         var node = new FlowWindowNode<int>(
             new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 8 },
             clock);
@@ -249,30 +248,6 @@ public sealed class FlowWindowNodeTests
                 propagateCompletion: true,
                 out var error);
         error.ShouldBeNull();
-    }
-
-    private sealed class ThrowOnceRoutingClock : IRoutingClock
-    {
-        private readonly DateTimeOffset _utcNow = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        private int _calls;
-
-        public DateTimeOffset UtcNow
-        {
-            get
-            {
-                if (Interlocked.Increment(ref _calls) == 1)
-                {
-                    throw new InvalidOperationException("clock failed.");
-                }
-
-                return _utcNow;
-            }
-        }
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
     }
 
     private static async Task<List<FlowWindow<T>>> DrainUntilCompletedAsync<T>(

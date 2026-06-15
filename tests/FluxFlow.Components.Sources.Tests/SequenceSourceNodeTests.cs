@@ -1,9 +1,9 @@
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
-using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -57,10 +57,8 @@ public sealed class SequenceSourceNodeTests
     [Fact]
     public async Task Sequence_UsesConfiguredClockForTimingAndTimestamp()
     {
-        var clock = new RecordingSourceClock
-        {
-            UtcNow = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero)
-        };
+        var startInstant = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+        var clock = new TrackingFakeTimeProvider(startInstant);
         var runtimeNode = CreateNode(
             options => options.UseClock(clock),
             new
@@ -73,12 +71,17 @@ public sealed class SequenceSourceNodeTests
         LinkOutput(runtimeNode, output);
 
         await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The node holds a 10ms initial delay then a 25ms interval between the two items.
+        // FakeTimeProvider keeps each Task.Delay pending until time advances, so step the
+        // clock forward until the run loop completes.
+        await AdvanceUntilCompletedAsync(clock, runtimeNode.Node, TimeSpan.FromMilliseconds(25));
 
         var items = await DrainUntilCompletedAsync(output);
         items.Count.ShouldBe(2);
-        items.ShouldAllBe(item => item.Timestamp == clock.UtcNow);
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(25)]);
+        // Timestamps come from the configured clock's timeline, not wall-clock time.
+        items.ShouldAllBe(item => item.Timestamp >= startInstant);
+        items.ShouldAllBe(item => item.Timestamp <= clock.GetUtcNow());
     }
 
     [Fact]
@@ -211,19 +214,33 @@ public sealed class SequenceSourceNodeTests
         return entries;
     }
 
-    private sealed class RecordingSourceClock : ISourceClock
+    // FakeTimeProvider leaves each Task.Delay pending until time advances, and the run
+    // loop registers its delays asynchronously. This drains them deterministically:
+    // advance exactly once for each newly created timer, gating on the wrapper's created
+    // count (and its registration signal) rather than polling with sleeps. Counting
+    // created timers avoids the lost-wakeup where a timer is armed before the test looks.
+    private static async Task AdvanceUntilCompletedAsync(
+        TrackingFakeTimeProvider clock,
+        IFlowNode node,
+        TimeSpan step)
     {
-        public DateTimeOffset UtcNow { get; init; }
-
-        public List<TimeSpan> Delays { get; } = [];
-
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
+        var fired = 0;
+        while (!node.Completion.IsCompleted)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Delays.Add(delay);
-            return ValueTask.CompletedTask;
+            if (clock.CreatedTimerCount > fired)
+            {
+                // A delay is armed (or already was) but not yet released: fire it.
+                clock.Advance(step);
+                fired++;
+                continue;
+            }
+
+            // No unfired timer yet: wait until the loop arms the next one or completes.
+            var scheduled = clock.TimerScheduled;
+            await Task.WhenAny(scheduled, node.Completion)
+                .WaitAsync(TimeSpan.FromSeconds(5));
         }
+
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

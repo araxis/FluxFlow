@@ -68,12 +68,12 @@ Filters use ordinal string comparison.
 
 ## Timing
 
-Use `ExpectationsComponentOptions.UseClock(...)` for deterministic timeout and
-result timestamps in tests or hosts.
+Use `ExpectationsComponentOptions.UseClock(...)` for deterministic timeout
+and result timestamps in tests or hosts.
 
 ```csharp
 registry.RegisterExpectationsComponents(options =>
-    options.UseClock(expectationClock));
+    options.UseClock(timeProvider));
 ```
 
 ## Boundaries

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
@@ -129,6 +128,13 @@ public sealed class FlowCorrelationNodeTests
     [Fact]
     public async Task Correlation_ExpiresPendingInputsBeforeProcessingNextInput()
     {
+        // Drive expiry through an explicitly-moved wall clock instead of a real-time
+        // sleep: ManualTimeProvider's timer never fires, so the first input can only
+        // expire via the EmitExpiredAsync at the start of processing the second input
+        // -- exactly what this test verifies. Advancing the clock past the timeout is
+        // deterministic under load, unlike a fixed Task.Delay.
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var clock = new ManualTimeProvider(startedAt);
         var firstInputEvaluated = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var runtimeNode = CreateNode(
@@ -141,7 +147,8 @@ public sealed class FlowCorrelationNodeTests
                 }
 
                 return EvaluateCorrelationExpression(expression, context, resultType);
-            });
+            },
+            clock);
         var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
             .ShouldBeOfType<InputPort<CorrelationMessage>>();
         var matched = new BufferBlock<FlowCorrelationMatch<CorrelationMessage>>();
@@ -151,7 +158,7 @@ public sealed class FlowCorrelationNodeTests
 
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         await firstInputEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        clock.SetUtcNow(startedAt.AddMilliseconds(100));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
@@ -167,7 +174,7 @@ public sealed class FlowCorrelationNodeTests
     public async Task Correlation_DuplicateSideWarnsAndKeepsOriginalDeadline()
     {
         var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        var clock = new ManualRoutingClock(startedAt);
+        var clock = new ManualTimeProvider(startedAt);
         var firstEvaluated = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var duplicateEvaluated = new TaskCompletionSource<object?>(
@@ -357,7 +364,7 @@ public sealed class FlowCorrelationNodeTests
     private static RuntimeNode CreateNode(
         object overrides,
         Func<string, FlowMapContext, Type, object?>? evaluate = null,
-        IRoutingClock? clock = null)
+        TimeProvider? clock = null)
     {
         var configuration = RoutingTestHost.MergeConfiguration(
             new
@@ -452,19 +459,21 @@ public sealed class FlowCorrelationNodeTests
 
     private sealed record CorrelationMessage(string Key, string Side, string Payload);
 
-    private sealed class ManualRoutingClock(DateTimeOffset utcNow) : IRoutingClock
+    // Replaces the old ManualRoutingClock: the wall clock is moved explicitly via
+    // SetUtcNow while the scheduled timer never fires. FakeTimeProvider cannot
+    // express this (its SetUtcNow/Advance fire due timers), so this test keeps a
+    // bespoke provider whose timers are inert and drives expiry through the
+    // input-time path exactly as the original test did.
+    private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private readonly object _gate = new();
         private DateTimeOffset _utcNow = utcNow;
 
-        public DateTimeOffset UtcNow
+        public override DateTimeOffset GetUtcNow()
         {
-            get
+            lock (_gate)
             {
-                lock (_gate)
-                {
-                    return _utcNow;
-                }
+                return _utcNow;
             }
         }
 
@@ -476,10 +485,23 @@ public sealed class FlowCorrelationNodeTests
             }
         }
 
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-            => new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
+            => new NeverFiringTimer();
+
+        private sealed class NeverFiringTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
     }
 
     private sealed class CorrelationMessageContextFactory : IFlowMapContextFactory<CorrelationMessage>

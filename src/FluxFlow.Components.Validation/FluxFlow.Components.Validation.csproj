@@ -11,7 +11,7 @@
     <Description>Reusable validation components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: schema compiled at build time for the JSON schema validator.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: schema compiled at build time for the JSON schema validator. Replaces the bespoke IValidationClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

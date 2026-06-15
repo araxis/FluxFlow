@@ -1,16 +1,15 @@
 using FluxFlow.Components.Sessions.Contracts;
-using FluxFlow.Components.Sessions.Timing;
 
 namespace FluxFlow.Components.Sessions.Options;
 
 public sealed class SessionsComponentOptions
 {
     private ISessionStoreFactory _storeFactory = new MissingSessionStoreFactory();
-    private ISessionClock _clock = SystemSessionClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
     public ISessionStoreFactory StoreFactory => _storeFactory;
 
-    public ISessionClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
     public SessionsComponentOptions UseStoreFactory(ISessionStoreFactory storeFactory)
     {
@@ -25,7 +24,7 @@ public sealed class SessionsComponentOptions
         return this;
     }
 
-    public SessionsComponentOptions UseClock(ISessionClock clock)
+    public SessionsComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

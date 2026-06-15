@@ -1,6 +1,5 @@
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
-using FluxFlow.Components.Validation.Timing;
 using FluxFlow.Engine.Runtime;
 using Json.Schema;
 using System.Reflection;
@@ -55,7 +54,7 @@ internal static class JsonSchemaValidatorNodeFactory
         JsonSchemaValidatorOptions options,
         ValidationComponentOptions.IValidationValueSelector selector,
         JsonSchemaValidatorContext nodeContext,
-        IValidationClock clock)
+        TimeProvider clock)
     {
         // Read the schema text and compile it once at build time so the node
         // never performs File I/O or schema compilation inside its lifecycle.

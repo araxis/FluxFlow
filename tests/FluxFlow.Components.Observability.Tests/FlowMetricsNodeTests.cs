@@ -4,6 +4,7 @@ using FluxFlow.Components.Observability.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -17,10 +18,13 @@ public sealed class FlowMetricsNodeTests
     {
         var firstObservedAt = new DateTimeOffset(2026, 6, 2, 18, 32, 0, TimeSpan.Zero);
         var secondObservedAt = firstObservedAt.AddSeconds(2);
-        var clock = new RecordingObservabilityClock(firstObservedAt, secondObservedAt);
+        // FakeTimeProvider returns the same instant until advanced, so the two
+        // observations are spaced by draining the first snapshot before advancing
+        // the clock and sending the second input.
+        var timeProvider = new FakeTimeProvider(firstObservedAt);
         var runtimeNode = CreateNode(
             options => options
-                .UseClock(clock)
+                .UseClock(timeProvider)
                 .RegisterType<InputMessage>("message")
                 .UseValueSelector<InputMessage>("payloadBytes", (message, _) => message.Payload.Length),
             new
@@ -35,12 +39,13 @@ public sealed class FlowMetricsNodeTests
         LinkSnapshots(runtimeNode, snapshots);
 
         await input.Target.SendAsync(new InputMessage("first", [1, 2], true));
+        var first = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        timeProvider.SetUtcNow(secondObservedAt);
         await input.Target.SendAsync(new InputMessage("second", [1, 2, 3, 4], true));
+        var second = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var first = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         first.Count.ShouldBe(1);
         first.Timestamp.ShouldBe(firstObservedAt);
         first.LastObservedAt.ShouldBe(firstObservedAt);

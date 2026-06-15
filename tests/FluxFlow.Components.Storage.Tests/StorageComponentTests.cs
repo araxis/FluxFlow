@@ -3,6 +3,7 @@ using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -52,7 +53,7 @@ public sealed class StorageComponentTests
     public async Task Put_UsesConfiguredClockForResultTimestamp()
     {
         var now = new DateTimeOffset(2026, 2, 3, 4, 5, 6, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         var store = new TestStorageStore();
         var runtimeNode = CreatePut(new
         {
@@ -173,7 +174,7 @@ public sealed class StorageComponentTests
     public async Task Get_UsesConfiguredClockForMissingResultTimestamp()
     {
         var now = new DateTimeOffset(2026, 2, 3, 4, 6, 7, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         var store = new TestStorageStore();
         var runtimeNode = CreateGet(new
         {
@@ -297,7 +298,7 @@ public sealed class StorageComponentTests
     public async Task Query_UsesConfiguredClockForResultTimestamp()
     {
         var now = new DateTimeOffset(2026, 2, 3, 4, 7, 8, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         var store = new TestStorageStore();
         store.Seed(new StorageRecord
         {
@@ -630,7 +631,7 @@ public sealed class StorageComponentTests
     private static RuntimeNode CreatePut(
         object configuration,
         TestStorageStore store,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
     {
         var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
@@ -640,7 +641,7 @@ public sealed class StorageComponentTests
     private static RuntimeNode CreateGet(
         object configuration,
         TestStorageStore store,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
     {
         var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Get, out var factory).ShouldBeTrue();
@@ -650,7 +651,7 @@ public sealed class StorageComponentTests
     private static RuntimeNode CreateDelete(
         object configuration,
         TestStorageStore store,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
     {
         var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Delete, out var factory).ShouldBeTrue();
@@ -660,7 +661,7 @@ public sealed class StorageComponentTests
     private static RuntimeNode CreateQuery(
         object configuration,
         TestStorageStore store,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
     {
         var registry = CreateRegistry(store, clock);
         registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
@@ -669,7 +670,7 @@ public sealed class StorageComponentTests
 
     private static RuntimeNodeFactoryRegistry CreateRegistry(
         TestStorageStore store,
-        RecordingStorageClock? clock)
+        FakeTimeProvider? clock)
         => new RuntimeNodeFactoryRegistry()
             .RegisterStorageComponents(options =>
             {

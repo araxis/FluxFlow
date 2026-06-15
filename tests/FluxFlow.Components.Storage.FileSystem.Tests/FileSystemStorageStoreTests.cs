@@ -2,6 +2,7 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -49,7 +50,7 @@ public sealed class FileSystemStorageStoreTests
     public async Task PutAndDelete_UseConfiguredClock()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 1, 2, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var store = CreateStore(temp.Path, clock);
 
@@ -121,7 +122,7 @@ public sealed class FileSystemStorageStoreTests
     public async Task Get_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 2, 3, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var store = CreateStore(temp.Path, clock);
         await store.PutAsync(new StoragePutRequest
@@ -198,7 +199,7 @@ public sealed class FileSystemStorageStoreTests
     public async Task Query_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 3, 4, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var store = CreateStore(temp.Path, clock);
         await store.PutAsync(new StoragePutRequest
@@ -465,7 +466,7 @@ public sealed class FileSystemStorageStoreTests
     public async Task Put_CreateSucceedsOverExpiredRecord()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 5, 6, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var store = CreateStore(temp.Path, clock);
         await store.PutAsync(new StoragePutRequest
@@ -574,7 +575,7 @@ public sealed class FileSystemStorageStoreTests
     public async Task Registration_PropagatesConfiguredClockToStoreContext()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 4, 5, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterStorageComponents(options =>
@@ -644,7 +645,7 @@ public sealed class FileSystemStorageStoreTests
 
     private static FileSystemStorageStore CreateStore(
         string rootDirectory,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
         => new(new FileSystemStorageStoreOptions
         {
             RootDirectory = rootDirectory,

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -9,7 +8,7 @@ namespace FluxFlow.Components.Timers.Nodes;
 public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly TimerThrottleSettings _settings;
-    private readonly ITimerClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<TInput> _output;
     private readonly CancellationTokenSource _processingCancellation = new();
@@ -21,7 +20,7 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     internal TimerThrottleNode(
         TimerThrottleSettings settings,
-        ITimerClock clock)
+        TimeProvider clock)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -103,7 +102,7 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         try
         {
             await WaitForSlotAsync().ConfigureAwait(false);
-            _lastEmittedAt = _clock.UtcNow;
+            _lastEmittedAt = _clock.GetUtcNow();
             await _output.SendAsync(input, _processingCancellation.Token).ConfigureAwait(false);
 
             var sequence = Interlocked.Increment(ref _emitted);
@@ -146,12 +145,12 @@ public sealed class TimerThrottleNode<TInput> : FlowNodeBase, IAsyncDisposable
         else
         {
             var nextAllowedAt = _lastEmittedAt.Value + _settings.Interval;
-            delay = nextAllowedAt - _clock.UtcNow;
+            delay = nextAllowedAt - _clock.GetUtcNow();
         }
 
         if (delay > TimeSpan.Zero)
         {
-            await _clock.DelayAsync(delay, _delayCancellation.Token).ConfigureAwait(false);
+            await Task.Delay(delay, _clock, _delayCancellation.Token).ConfigureAwait(false);
         }
     }
 

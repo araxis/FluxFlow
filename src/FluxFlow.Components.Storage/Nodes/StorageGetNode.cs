@@ -240,7 +240,7 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
     private StorageResult CreateMissingResult(StorageGetRequest request)
         => new()
         {
-            Timestamp = _componentOptions.Clock.UtcNow,
+            Timestamp = _componentOptions.Clock.GetUtcNow(),
             Operation = "get",
             Collection = request.Collection!,
             Key = request.Key,
