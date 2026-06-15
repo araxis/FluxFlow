@@ -174,6 +174,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   makes post-publish feed verification robust to nuget.org indexing lag.
 - `135-architecture-review-and-roadmap.md`: per-component review against four
   architecture principles, issue list, and the Wave 0-3 fix roadmap to 2.0.
+- `136-wave2-2.0-plan.md`: review-ready Wave 2 (2.0) plan — per-node
+  compile-once transformation, factory relocation, breaking-surface summary,
+  and sequencing.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
