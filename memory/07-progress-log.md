@@ -381,6 +381,12 @@ Date: 2026-05-31
   Metrics snapshot back-pressure; MQTT subscribe completed-before-start) with
   regression tests; bumped Routing/Http/Metrics/Mqtt to 1.2.1; full Release
   suite green at 691 tests across 30 assemblies.
+- Started Wave 1: added the build-time expression compile seam
+  (`IFlowExpressionEngine.Compile<T>` default-implemented +
+  `IFlowCompiledExpression<T>`; `ExpressionFlowPredicate`/new
+  `ExpressionFlowMapper` compile once); engine bumped to 1.2.0; full Release
+  suite green at 694 tests. (Wave 0 fixes remain merged-but-unpublished per
+  owner decision to batch the release.)
 
 ## Remaining
 
