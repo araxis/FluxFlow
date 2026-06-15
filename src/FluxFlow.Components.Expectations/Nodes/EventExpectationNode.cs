@@ -1,7 +1,6 @@
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Options;
-using FluxFlow.Components.Expectations.Timing;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
@@ -12,7 +11,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
 {
     private readonly object _stateLock = new();
     private readonly EventExpectationSettings _settings;
-    private readonly IExpectationClock _clock;
+    private readonly TimeProvider _clock;
     private readonly EventExpectationNodeKind _kind;
     private readonly ActionBlock<FlowEvent> _input;
     private readonly BufferBlock<EventExpectationResult> _result;
@@ -25,7 +24,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
 
     internal EventExpectationNode(
         EventExpectationSettings settings,
-        IExpectationClock clock,
+        TimeProvider clock,
         EventExpectationNodeKind kind)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -203,7 +202,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            await _clock.DelayAsync(_settings.Timeout!.Value, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(_settings.Timeout!.Value, _clock, cancellationToken).ConfigureAwait(false);
             if (_kind == EventExpectationNodeKind.Expect)
             {
                 Resolve(
@@ -268,7 +267,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
             _resolved = true;
             result = new EventExpectationResult
             {
-                EvaluatedAt = _clock.UtcNow,
+                EvaluatedAt = _clock.GetUtcNow(),
                 Name = _settings.Name,
                 Kind = _kind == EventExpectationNodeKind.Expect
                     ? EventExpectationResultKind.Expect

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
-using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -11,7 +10,7 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
 {
     private readonly IFlowPredicate<TInput> _predicate;
     private readonly AssertionResultMetadata _metadata;
-    private readonly IAssertionClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<FlowAssertionResult> _result;
     private readonly BufferBlock<TInput> _passed;
@@ -20,14 +19,14 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
     public FlowAssertionComponent(
         IFlowPredicate<TInput> predicate,
         AssertionResultMetadata metadata)
-        : this(predicate, metadata, SystemAssertionClock.Instance)
+        : this(predicate, metadata, TimeProvider.System)
     {
     }
 
     public FlowAssertionComponent(
         IFlowPredicate<TInput> predicate,
         AssertionResultMetadata metadata,
-        IAssertionClock clock)
+        TimeProvider clock)
     {
         _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
@@ -140,7 +139,7 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
             Status = status,
             Message = passed ? "Assertion passed." : _metadata.EffectiveFailureMessage,
             Value = input,
-            EvaluatedAt = _clock.UtcNow,
+            EvaluatedAt = _clock.GetUtcNow(),
             Failure = passed
                 ? null
                 : new AssertionFailure

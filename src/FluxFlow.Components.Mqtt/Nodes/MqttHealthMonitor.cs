@@ -1,12 +1,11 @@
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Timing;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
 internal sealed class MqttHealthMonitor : IAsyncDisposable
 {
     private readonly IMqttClientHealthSource _healthSource;
-    private readonly IMqttClock _clock;
+    private readonly TimeProvider _clock;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Action<MqttClientHealthEvent> _emitHealth;
     private readonly Action<MqttClientHealthEvent, Exception> _emitHealthFailure;
@@ -14,7 +13,7 @@ internal sealed class MqttHealthMonitor : IAsyncDisposable
 
     private MqttHealthMonitor(
         IMqttClientHealthSource healthSource,
-        IMqttClock clock,
+        TimeProvider clock,
         Action<MqttClientHealthEvent> emitHealth,
         Action<MqttClientHealthEvent, Exception> emitHealthFailure)
     {
@@ -27,7 +26,7 @@ internal sealed class MqttHealthMonitor : IAsyncDisposable
 
     public static MqttHealthMonitor? Start(
         IMqttClientAdapter adapter,
-        IMqttClock clock,
+        TimeProvider clock,
         Action<MqttClientHealthEvent> emitHealth,
         Action<MqttClientHealthEvent, Exception> emitHealthFailure)
     {
@@ -77,7 +76,7 @@ internal sealed class MqttHealthMonitor : IAsyncDisposable
         {
             var health = new MqttClientHealthEvent
             {
-                Timestamp = _clock.UtcNow,
+                Timestamp = _clock.GetUtcNow(),
                 State = MqttClientHealthState.Faulted,
                 Reason = exception.Message
             };

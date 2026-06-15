@@ -68,15 +68,16 @@ can return numeric values, strings, byte arrays, or collections.
 
 ```csharp
 registry.RegisterObservabilityComponents(options => options
-    .UseClock(observabilityClock)
+    .UseClock(timeProvider)
     .RegisterType<MyMessage>("message")
     .UseValueSelector<MyMessage>("kind", (message, _) => message.Kind)
     .UseValueSelector<MyMessage>("payloadBytes", (message, _) => message.Payload.Length));
 ```
 
-`UseClock(...)` is optional. Without it, observer nodes use the default system
-clock. Supplying a clock lets hosts and tests make log entry timestamps,
-counter snapshots, metrics snapshots, and rate calculations deterministic.
+`UseClock(...)` is optional. Without it, observer nodes use
+`TimeProvider.System`. Supplying a time provider lets hosts and tests make log
+entry timestamps, counter snapshots, metrics snapshots, and rate calculations
+deterministic.
 
 Register an expression engine only when using counter predicates:
 

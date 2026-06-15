@@ -1,5 +1,4 @@
 using FluxFlow.Components.Assertions.Contracts;
-using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Components.Expressions;
 using FluxFlow.Engine.Mapping;
 using System.Text.Json;
@@ -35,11 +34,11 @@ public sealed class AssertionsComponentOptions
     private readonly FlowExpressionEngineRegistry _expressionEngines = new("Assertion");
     private readonly FlowContextFactoryRegistry<IAssertionContextFactory> _contextFactories =
         new(new DefaultAssertionContextFactory());
-    private IAssertionClock _clock = SystemAssertionClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IAssertionClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public AssertionsComponentOptions UseClock(IAssertionClock clock)
+    public AssertionsComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

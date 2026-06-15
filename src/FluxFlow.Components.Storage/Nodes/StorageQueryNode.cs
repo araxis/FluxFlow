@@ -246,7 +246,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
         IReadOnlyList<StorageRecord> records)
         => new()
         {
-            Timestamp = _componentOptions.Clock.UtcNow,
+            Timestamp = _componentOptions.Clock.GetUtcNow(),
             Operation = "query",
             Collection = request.Collection!,
             Succeeded = true,

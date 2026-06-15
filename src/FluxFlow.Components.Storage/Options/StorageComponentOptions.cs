@@ -1,16 +1,15 @@
 using FluxFlow.Components.Storage.Contracts;
-using FluxFlow.Components.Storage.Timing;
 
 namespace FluxFlow.Components.Storage.Options;
 
 public sealed class StorageComponentOptions
 {
     private IStorageStoreFactory _storeFactory = new MissingStorageStoreFactory();
-    private IStorageClock _clock = SystemStorageClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
     public IStorageStoreFactory StoreFactory => _storeFactory;
 
-    public IStorageClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
     public StorageComponentOptions UseStoreFactory(IStorageStoreFactory storeFactory)
     {
@@ -40,7 +39,7 @@ public sealed class StorageComponentOptions
             (_, _) => ValueTask.FromResult(StorageStoreLease.Shared(store)));
     }
 
-    public StorageComponentOptions UseClock(IStorageClock clock)
+    public StorageComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

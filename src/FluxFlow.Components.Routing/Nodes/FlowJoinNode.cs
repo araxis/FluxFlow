@@ -1,7 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -13,7 +12,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     private readonly Func<TLeft, string?> _leftSelector;
     private readonly Func<TRight, string?> _rightSelector;
     private readonly string? _engineName;
-    private readonly IRoutingClock _clock;
+    private readonly TimeProvider _clock;
     private readonly Dictionary<string, PendingBucket> _pending;
     private readonly Queue<JoinDeadline> _deadlines = new();
     private readonly TimeSpan _timeout;
@@ -39,7 +38,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             options,
             leftSelector,
             rightSelector,
-            SystemRoutingClock.Instance,
+            TimeProvider.System,
             engineName)
     {
     }
@@ -48,7 +47,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         JoinRoutingOptions options,
         Func<TLeft, string?> leftSelector,
         Func<TRight, string?> rightSelector,
-        IRoutingClock clock,
+        TimeProvider clock,
         string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -228,20 +227,20 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private async Task AddLeftAsync(TLeft input)
     {
-        var now = _clock.UtcNow;
+        var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
         var key = EvaluateLeftKey(input);
         await AddLeftCoreAsync(key, input, now).ConfigureAwait(false);
-        ScheduleTimer(_clock.UtcNow);
+        ScheduleTimer(_clock.GetUtcNow());
     }
 
     private async Task AddRightAsync(TRight input)
     {
-        var now = _clock.UtcNow;
+        var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
         var key = EvaluateRightKey(input);
         await AddRightCoreAsync(key, input, now).ConfigureAwait(false);
-        ScheduleTimer(_clock.UtcNow);
+        ScheduleTimer(_clock.GetUtcNow());
     }
 
     private string EvaluateLeftKey(TLeft input)
@@ -388,9 +387,9 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        await EmitExpiredAsync(_clock.UtcNow, force: false, _lifecycleCancellation.Token)
+        await EmitExpiredAsync(_clock.GetUtcNow(), force: false, _lifecycleCancellation.Token)
             .ConfigureAwait(false);
-        ScheduleTimer(_clock.UtcNow);
+        ScheduleTimer(_clock.GetUtcNow());
     }
 
     private async Task EmitExpiredAsync(
@@ -587,7 +586,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         }
 
         TryCancelTimer();
-        await EmitExpiredAsync(_clock.UtcNow, force: true, CancellationToken.None)
+        await EmitExpiredAsync(_clock.GetUtcNow(), force: true, CancellationToken.None)
             .ConfigureAwait(false);
         _commands.Complete();
     }
@@ -663,7 +662,11 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+            }
+
             await _commands.SendAsync(
                 JoinCommand.Timer(version),
                 _lifecycleCancellation.Token).ConfigureAwait(false);

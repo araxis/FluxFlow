@@ -1,14 +1,12 @@
-using FluxFlow.Components.Projections.Timing;
-
 namespace FluxFlow.Components.Projections.Options;
 
 public sealed class ProjectionsComponentOptions
 {
-    private IProjectionClock _clock = SystemProjectionClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IProjectionClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public ProjectionsComponentOptions UseClock(IProjectionClock clock)
+    public ProjectionsComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

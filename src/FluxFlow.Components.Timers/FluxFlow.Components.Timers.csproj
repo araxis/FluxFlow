@@ -11,7 +11,7 @@
     <Description>Reusable timer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;timers</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke ITimerClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

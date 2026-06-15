@@ -1,11 +1,10 @@
-using FluxFlow.Components.Timers.Timing;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Timers.Options;
 
 public sealed class TimerComponentOptions
 {
-    private ITimerClock _clock = SystemTimerClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
     private readonly object _typesLock = new();
     private readonly Dictionary<string, Type> _types = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -30,9 +29,9 @@ public sealed class TimerComponentOptions
         [typeof(JsonElement).FullName!] = typeof(JsonElement)
     };
 
-    public ITimerClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public TimerComponentOptions UseClock(ITimerClock clock)
+    public TimerComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

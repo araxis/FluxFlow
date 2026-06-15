@@ -4,6 +4,7 @@ using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
@@ -51,7 +52,7 @@ public sealed class FileWriteNodeTests
         var writtenAt = DateTimeOffset.Parse("2026-06-02T12:00:00Z");
         var runtimeNode = CreateNode(
             new { baseDirectory = directory.Path },
-            options => options.UseClock(new RecordingFileSystemClock(writtenAt)));
+            options => options.UseClock(new FakeTimeProvider(writtenAt)));
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
             .ShouldBeOfType<InputPort<FileWriteRequest>>();
         var results = new BufferBlock<FileWriteResult>();

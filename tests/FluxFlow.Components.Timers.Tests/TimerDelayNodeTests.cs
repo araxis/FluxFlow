@@ -1,9 +1,9 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Components.Timers.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -121,7 +121,7 @@ public sealed class TimerDelayNodeTests
     [Fact]
     public async Task Delay_BurstEmitsItemsWithConstantOffset()
     {
-        var clock = new GatedVirtualClock(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateNode(
             options => options.UseClock(clock),
             new
@@ -135,24 +135,27 @@ public sealed class TimerDelayNodeTests
         var output = new BufferBlock<int>();
         LinkOutput(runtimeNode, output);
 
+        // Capture the shared delay's registration before sending the burst that arms it.
+        var scheduled = clock.TimerScheduled;
         await input.Target.SendAsync(1);
         await input.Target.SendAsync(2);
         await input.Target.SendAsync(3);
         input.Target.Complete();
-        // The intake block stamps every item on arrival; wait until the burst is
-        // stamped before letting the first (and only) clock delay elapse.
-        await input.Target.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        clock.ReleaseDelays();
+        // The intake block stamps every item on arrival with the same due time, so the
+        // whole burst shares one pending delay. Wait until the node has actually armed
+        // that Task.Delay before advancing the clock to release it; the later items then
+        // see a non-positive remaining delay and emit without waiting again.
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        clock.Advance(TimeSpan.FromMilliseconds(50));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
-        clock.Delays.ShouldBe([TimeSpan.FromMilliseconds(50)]);
     }
 
     [Fact]
     public async Task Delay_ErrorsPortReceivesPerMessageFailures()
     {
-        var clock = new ThrowOnceClock();
+        var clock = new ThrowingTimeProvider();
         var runtimeNode = CreateNode(
             options => options.UseClock(clock),
             new
@@ -350,79 +353,29 @@ public sealed class TimerDelayNodeTests
 
     private sealed record InputMessage(string Value);
 
-    private sealed class GatedVirtualClock(DateTimeOffset utcNow) : ITimerClock
-    {
-        private readonly object _gate = new();
-        private readonly List<TimeSpan> _delays = [];
-        private readonly TaskCompletionSource _release =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private DateTimeOffset _utcNow = utcNow;
-
-        public DateTimeOffset UtcNow
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _utcNow;
-                }
-            }
-        }
-
-        public IReadOnlyList<TimeSpan> Delays
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return _delays.ToArray();
-                }
-            }
-        }
-
-        public void ReleaseDelays()
-            => _release.TrySetResult();
-
-        public async ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (delay <= TimeSpan.Zero)
-            {
-                return;
-            }
-
-            lock (_gate)
-            {
-                _delays.Add(delay);
-            }
-
-            await _release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-            lock (_gate)
-            {
-                _utcNow += delay;
-            }
-        }
-    }
-
-    private sealed class ThrowOnceClock : ITimerClock
+    // FakeTimeProvider cannot be told to throw from a delay, so this bespoke provider
+    // throws from the timer/delay path exactly once to exercise clock-fault handling.
+    // GetUtcNow returns a fixed instant so the node sees a positive remaining delay and
+    // actually reaches Task.Delay (which creates a timer).
+    private sealed class ThrowingTimeProvider : TimeProvider
     {
         private int _calls;
 
-        public DateTimeOffset UtcNow { get; } = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow()
+            => new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
 
-        public ValueTask DelayAsync(
-            TimeSpan delay,
-            CancellationToken cancellationToken = default)
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _calls) == 1)
             {
                 throw new InvalidOperationException("clock failed");
             }
 
-            return ValueTask.CompletedTask;
+            return System.CreateTimer(callback, state, dueTime, period);
         }
     }
 }

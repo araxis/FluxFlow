@@ -1,5 +1,4 @@
 using FluxFlow.Components.Http.Contracts;
-using FluxFlow.Components.Http.Timing;
 
 namespace FluxFlow.Components.Http.Options;
 
@@ -7,11 +6,11 @@ public sealed class HttpComponentOptions
 {
     private IHttpRequestSenderFactory _requestSenderFactory =
         new HttpClientRequestSenderFactory();
-    private IHttpClock _clock = SystemHttpClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
     public IHttpRequestSenderFactory RequestSenderFactory => _requestSenderFactory;
 
-    public IHttpClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
     public HttpComponentOptions UseRequestSenderFactory(
         IHttpRequestSenderFactory requestSenderFactory)
@@ -29,7 +28,7 @@ public sealed class HttpComponentOptions
         return this;
     }
 
-    public HttpComponentOptions UseClock(IHttpClock clock)
+    public HttpComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

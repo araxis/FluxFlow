@@ -1,7 +1,6 @@
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Components.Sources.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -11,7 +10,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
 {
     private readonly object _stateLock = new();
     private readonly SequenceSourceOptions _options;
-    private readonly ISourceClock _clock;
+    private readonly TimeProvider _clock;
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private bool _startRequested;
@@ -19,13 +18,13 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
     private bool _disposed;
 
     public SequenceSourceNode(SequenceSourceOptions options)
-        : this(options, SystemSourceClock.Instance)
+        : this(options, TimeProvider.System)
     {
     }
 
     internal SequenceSourceNode(
         SequenceSourceOptions options,
-        ISourceClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -145,7 +144,7 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                     Value = _options.Start + (_options.Step * index),
                     Start = _options.Start,
                     Step = _options.Step,
-                    Timestamp = _clock.UtcNow
+                    Timestamp = _clock.GetUtcNow()
                 };
                 if (!await SendOutputAsync(item, cancellationToken).ConfigureAwait(false))
                 {

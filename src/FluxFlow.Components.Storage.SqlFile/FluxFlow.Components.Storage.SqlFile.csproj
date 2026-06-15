@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Put results now carry the persisted millisecond-precision timestamps so re-reads and time-window queries agree, expired records no longer block Create-mode writes, key-prefix and paging filters are pushed into SQL, and dispose clears the connection pool so the database file is released.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: TimeProvider clock migration. Replaces the package's bespoke clock abstraction with System.TimeProvider — the clock is now configured via UseClock(TimeProvider)/the TimeProvider-typed Clock option, and the old IXxxClock/System*Clock public types are removed (breaking). Runtime behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

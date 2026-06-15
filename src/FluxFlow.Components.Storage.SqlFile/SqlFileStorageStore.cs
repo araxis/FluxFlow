@@ -54,7 +54,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                     key,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.UtcNow)
+            if (existing?.ExpiresAt is { } expiresAt && expiresAt <= _settings.Clock.GetUtcNow())
             {
                 existing = null;
             }
@@ -77,7 +77,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
             var storedValue = CreateStoredValue(request.Value);
             var attributes = CopyAttributes(request.Attributes);
-            var storedAt = TruncateToMilliseconds(_settings.Clock.UtcNow);
+            var storedAt = TruncateToMilliseconds(_settings.Clock.GetUtcNow());
             var record = new StorageRecord
             {
                 Collection = collection,
@@ -181,7 +181,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
                 .ConfigureAwait(false);
 
             var matches = records
-                .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.UtcNow))
+                .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal);
             var page = pagingPushedDown
@@ -242,7 +242,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new StorageResult
             {
-                Timestamp = _settings.Clock.UtcNow,
+                Timestamp = _settings.Clock.GetUtcNow(),
                 Operation = "delete",
                 Collection = collection,
                 Key = key,
@@ -453,7 +453,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         if (request.IncludeExpired != true)
         {
             text.AppendLine("  AND (expires_at_ms IS NULL OR expires_at_ms > $nowMs)");
-            Add(command, "$nowMs", _settings.Clock.UtcNow.ToUnixTimeMilliseconds());
+            Add(command, "$nowMs", _settings.Clock.GetUtcNow().ToUnixTimeMilliseconds());
         }
 
         text.AppendLine("ORDER BY stored_at_ms, record_key");
@@ -566,7 +566,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
     private bool IsExpired(StorageRecord record, bool? includeExpired)
         => record.ExpiresAt.HasValue &&
-            record.ExpiresAt.Value <= _settings.Clock.UtcNow &&
+            record.ExpiresAt.Value <= _settings.Clock.GetUtcNow() &&
             includeExpired != true;
 
     private SqliteConnection CreateConnection()

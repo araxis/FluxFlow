@@ -1,7 +1,6 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Components.Sessions.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -12,7 +11,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
     private readonly object _stateLock = new();
     private readonly SessionReplayOptions _options;
     private readonly ISessionStore _store;
-    private readonly ISessionClock _clock;
+    private readonly TimeProvider _clock;
     private readonly string _sessionId;
     private CancellationTokenSource? _replayCancellation;
     private Task? _replayTask;
@@ -22,7 +21,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
     internal SessionReplayNode(
         SessionReplayOptions options,
         ISessionStore store,
-        ISessionClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -220,7 +219,7 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
             return;
         }
 
-        await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
     }
 
     private void TryReportReplayError(

@@ -1,6 +1,5 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
-using FluxFlow.Components.Assertions.Timing;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
@@ -50,7 +49,7 @@ internal static class AssertionNodeFactory
         IFlowExpressionEngine expressionEngine,
         IAssertionContextFactory contextFactory,
         AssertionNodeContext nodeContext,
-        IAssertionClock clock)
+        TimeProvider clock)
     {
         // Compile the predicate expression once at build time; IsMatch only
         // evaluates the compiled form per message.

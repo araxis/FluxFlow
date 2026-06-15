@@ -1,6 +1,5 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Components.Observability.Timing;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
@@ -126,7 +125,7 @@ internal static class ObservabilityNodeFactory
         IFlowExpressionEngine? expressionEngine,
         IObservabilityContextFactory contextFactory,
         ObservabilityNodeContext nodeContext,
-        IObservabilityClock clock)
+        TimeProvider timeProvider)
     {
         // Compile the predicate expression once at build time (when present);
         // when there is no predicate the node accepts every input and no engine
@@ -141,7 +140,7 @@ internal static class ObservabilityNodeFactory
             options,
             acceptPredicate,
             expressionEngine?.Name,
-            clock);
+            timeProvider);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
@@ -155,13 +154,13 @@ internal static class ObservabilityNodeFactory
         FlowLoggerOptions options,
         IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
         ObservabilityNodeContext nodeContext,
-        IObservabilityClock clock)
+        TimeProvider timeProvider)
     {
         var node = new FlowLoggerNode<TInput>(
             options,
             attributeSelectors,
             nodeContext,
-            clock);
+            timeProvider);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)
@@ -175,13 +174,13 @@ internal static class ObservabilityNodeFactory
         FlowMetricsOptions options,
         ObservabilityComponentOptions.IValueSelector? sizeSelector,
         ObservabilityNodeContext nodeContext,
-        IObservabilityClock clock)
+        TimeProvider timeProvider)
     {
         var node = new FlowMetricsNode<TInput>(
             options,
             sizeSelector,
             nodeContext,
-            clock);
+            timeProvider);
 
         return context.CreateNode(node)
             .Input(ObservabilityComponentPorts.Input, node.Input)

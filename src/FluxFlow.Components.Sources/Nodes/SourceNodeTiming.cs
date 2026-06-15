@@ -1,24 +1,22 @@
-using FluxFlow.Components.Sources.Timing;
-
 namespace FluxFlow.Components.Sources.Nodes;
 
 internal static class SourceNodeTiming
 {
     public static Task DelayInitialAsync(
         int initialDelayMilliseconds,
-        ISourceClock clock,
+        TimeProvider clock,
         CancellationToken cancellationToken)
         => DelayAsync(initialDelayMilliseconds, clock, cancellationToken);
 
     public static Task DelayIntervalAsync(
         int intervalMilliseconds,
-        ISourceClock clock,
+        TimeProvider clock,
         CancellationToken cancellationToken)
         => DelayAsync(intervalMilliseconds, clock, cancellationToken);
 
     private static async Task DelayAsync(
         int milliseconds,
-        ISourceClock clock,
+        TimeProvider clock,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(clock);
@@ -27,8 +25,9 @@ internal static class SourceNodeTiming
             return;
         }
 
-        await clock.DelayAsync(
+        await Task.Delay(
                 TimeSpan.FromMilliseconds(milliseconds),
+                clock,
                 cancellationToken)
             .ConfigureAwait(false);
     }

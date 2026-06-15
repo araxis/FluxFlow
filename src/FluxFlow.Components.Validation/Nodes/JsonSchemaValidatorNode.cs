@@ -1,7 +1,6 @@
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Diagnostics;
 using FluxFlow.Components.Validation.Options;
-using FluxFlow.Components.Validation.Timing;
 using FluxFlow.Engine.Components;
 using Json.Schema;
 using System.Text.Json;
@@ -22,7 +21,7 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
     private readonly ValidationComponentOptions.IValidationValueSelector _selector;
     private readonly JsonSchemaValidatorContext _nodeContext;
     private readonly JsonSchemaValidatorMetadata _metadata;
-    private readonly IValidationClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<TInput> _input;
     private readonly BufferBlock<JsonSchemaValidationResult<TInput>> _result;
     private readonly BufferBlock<TInput> _valid;
@@ -33,7 +32,7 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
         ValidationComponentOptions.IValidationValueSelector selector,
         JsonSchemaValidatorContext nodeContext,
         JsonSchemaValidatorMetadata metadata,
-        IValidationClock clock,
+        TimeProvider clock,
         int boundedCapacity)
     {
         _schema = schema ?? throw new ArgumentNullException(nameof(schema));
@@ -151,7 +150,7 @@ public sealed class JsonSchemaValidatorNode<TInput> : FlowNodeBase
         var issues = ReadIssues(evaluation);
         var result = new JsonSchemaValidationResult<TInput>
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Input = input,
             Value = selectedValue,
             IsValid = evaluation.IsValid,

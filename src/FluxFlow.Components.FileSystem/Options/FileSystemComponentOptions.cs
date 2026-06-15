@@ -1,14 +1,12 @@
-using FluxFlow.Components.FileSystem.Timing;
-
 namespace FluxFlow.Components.FileSystem.Options;
 
 public sealed class FileSystemComponentOptions
 {
-    private IFileSystemClock _clock = SystemFileSystemClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IFileSystemClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public FileSystemComponentOptions UseClock(IFileSystemClock clock)
+    public FileSystemComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

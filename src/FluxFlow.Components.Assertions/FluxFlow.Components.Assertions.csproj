@@ -11,7 +11,7 @@
     <Description>Reusable expression-driven assertion components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once predicate for flow.assert.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once predicate for flow.assert. Replaces the bespoke IAssertionClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

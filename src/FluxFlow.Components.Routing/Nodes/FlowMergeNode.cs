@@ -1,7 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 public sealed class FlowMergeNode<TInput> : FlowNodeBase
 {
     private readonly MergeRoutingOptions _options;
-    private readonly IRoutingClock _clock;
+    private readonly TimeProvider _clock;
     private readonly Dictionary<string, ActionBlock<TInput>> _inputBlocks;
     private readonly IReadOnlyDictionary<string, ITargetBlock<TInput>> _inputs;
     private readonly ActionBlock<MergeCommand> _merge;
@@ -18,13 +17,13 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
     private long _nextSequence;
 
     public FlowMergeNode(MergeRoutingOptions options)
-        : this(options, SystemRoutingClock.Instance)
+        : this(options, TimeProvider.System)
     {
     }
 
     public FlowMergeNode(
         MergeRoutingOptions options,
-        IRoutingClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -138,7 +137,7 @@ public sealed class FlowMergeNode<TInput> : FlowNodeBase
             Sequence = Interlocked.Increment(ref _nextSequence),
             Source = command.Source,
             Value = command.Value,
-            ReceivedAt = _clock.UtcNow
+            ReceivedAt = _clock.GetUtcNow()
         };
         await _output.SendAsync(item).ConfigureAwait(false);
         TryEmitDiagnostic(

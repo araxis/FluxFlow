@@ -4,6 +4,7 @@ using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -87,7 +88,7 @@ public sealed class FileWatchNodeTests
                 baseDirectory = directory.Path,
                 boundedCapacity = 16
             },
-            options => options.UseClock(new RecordingFileSystemClock(timestamp)));
+            options => options.UseClock(new FakeTimeProvider(timestamp)));
         var output = new BufferBlock<FileWatchEvent>();
         var diagnostics = new BufferBlock<FlowDiagnostic>();
         var events = new BufferBlock<FlowEvent>();

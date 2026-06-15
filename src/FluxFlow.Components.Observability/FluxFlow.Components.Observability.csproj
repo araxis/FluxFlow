@@ -11,7 +11,7 @@
     <Description>Reusable observer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: flow.counter now receives a predicate compiled once in the factory instead of evaluating an expression string per message; the node no longer holds the expression engine or context factory. Internal refactor, no runtime behavior change.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: flow.counter now receives a predicate compiled once in the factory instead of evaluating an expression string per message; the node no longer holds the expression engine or context factory. Internal refactor, no runtime behavior change. Replaces the bespoke IObservabilityClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

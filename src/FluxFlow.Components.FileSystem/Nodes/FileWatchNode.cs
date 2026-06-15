@@ -1,7 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -11,7 +10,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
 {
     private readonly object _stateLock = new();
     private readonly FileWatchOptions _options;
-    private readonly IFileSystemClock _clock;
+    private readonly TimeProvider _clock;
     private readonly NotifyFilters _notifyFilters;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private FileSystemWatcher? _watcher;
@@ -21,7 +20,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
 
     internal FileWatchNode(
         FileWatchOptions options,
-        IFileSystemClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -212,7 +211,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
 
         PublishChange(new FileWatchEvent
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Path = args.FullPath,
             Directory = _resolvedDirectory ?? System.IO.Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
             Name = args.Name,
@@ -223,7 +222,7 @@ public sealed class FileWatchNode : SourceFlowNode<FileWatchEvent>, IFlowEventSo
     private void OnRenamed(object sender, RenamedEventArgs args)
         => PublishChange(new FileWatchEvent
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Path = args.FullPath,
             Directory = _resolvedDirectory ?? System.IO.Directory.GetParent(args.FullPath)?.FullName ?? string.Empty,
             Name = args.Name,

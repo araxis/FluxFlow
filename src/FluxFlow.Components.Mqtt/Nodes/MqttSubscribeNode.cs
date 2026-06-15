@@ -1,7 +1,6 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
-using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -13,7 +12,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private readonly IMqttClientFactory _clientFactory;
     private readonly MqttClientFactoryContext _factoryContext;
     private readonly MqttSubscriptionOptions _options;
-    private readonly IMqttClock _clock;
+    private readonly TimeProvider _clock;
     private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
     private CancellationTokenSource? _subscriptionCancellation;
     private Task? _subscriptionTask;
@@ -28,7 +27,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
         MqttSubscriptionOptions options,
         MqttClientFactoryContext factoryContext,
         IMqttClientFactory clientFactory,
-        IMqttClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -313,7 +312,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private bool EmitHealthEvent(MqttClientHealthEvent health)
         => _events.Post(new FlowEvent
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Type = MqttEventNames.ConnectionHealthChanged,
             Source = Id.ToString(),
             SourceNodeId = Id,
@@ -391,7 +390,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
 
         return _events.Post(new FlowEvent
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Type = MqttEventNames.SubscribeReceived,
             Source = Id.ToString(),
             SourceNodeId = Id,

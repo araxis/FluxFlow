@@ -1,7 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -13,7 +12,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
     private readonly Func<TInput, string?> _keySelector;
     private readonly Func<TInput, string?>? _sideSelector;
     private readonly string? _engineName;
-    private readonly IRoutingClock _clock;
+    private readonly TimeProvider _clock;
     private readonly Dictionary<string, PendingPair> _pending;
     private readonly Queue<CorrelationDeadline> _deadlines = new();
     private readonly StringComparer _comparer;
@@ -41,7 +40,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             options,
             keySelector,
             sideSelector,
-            SystemRoutingClock.Instance,
+            TimeProvider.System,
             engineName)
     {
     }
@@ -50,7 +49,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
         CorrelationRoutingOptions options,
         Func<TInput, string?> keySelector,
         Func<TInput, string?>? sideSelector,
-        IRoutingClock clock,
+        TimeProvider clock,
         string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -271,7 +270,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            var now = _clock.UtcNow;
+            var now = _clock.GetUtcNow();
             await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
             var item = Evaluate(input);
             if (!TryNormalizeSide(item.Side, out var side))
@@ -328,7 +327,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
         }
         finally
         {
-            ScheduleTimer(_clock.UtcNow);
+            ScheduleTimer(_clock.GetUtcNow());
         }
     }
 
@@ -339,9 +338,9 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        await EmitExpiredAsync(_clock.UtcNow, force: false, _lifecycleCancellation.Token)
+        await EmitExpiredAsync(_clock.GetUtcNow(), force: false, _lifecycleCancellation.Token)
             .ConfigureAwait(false);
-        ScheduleTimer(_clock.UtcNow);
+        ScheduleTimer(_clock.GetUtcNow());
     }
 
     private CorrelationItem Evaluate(CorrelationInput input)
@@ -539,7 +538,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
 
         try
         {
-            await EmitExpiredAsync(_clock.UtcNow, force: true, CancellationToken.None)
+            await EmitExpiredAsync(_clock.GetUtcNow(), force: true, CancellationToken.None)
                 .ConfigureAwait(false);
             _matched.Complete();
             _timeouts.Complete();
@@ -609,7 +608,11 @@ public sealed class FlowCorrelationNode<TInput> : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            await _clock.DelayAsync(delay, cancellationToken).ConfigureAwait(false);
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+            }
+
             await _processor.SendAsync(
                 CorrelationCommand.Timer(version),
                 _lifecycleCancellation.Token).ConfigureAwait(false);

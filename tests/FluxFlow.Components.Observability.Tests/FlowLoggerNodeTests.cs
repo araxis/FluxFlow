@@ -4,6 +4,7 @@ using FluxFlow.Components.Observability.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -16,10 +17,10 @@ public sealed class FlowLoggerNodeTests
     public async Task Logger_EmitsStructuredEntry()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 18, 30, 0, TimeSpan.Zero);
-        var clock = new RecordingObservabilityClock(timestamp);
+        var timeProvider = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateNode(
             options => options
-                .UseClock(clock)
+                .UseClock(timeProvider)
                 .RegisterType<InputMessage>("message")
                 .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind)
                 .UseValueSelector<InputMessage>("size", (message, _) => message.Payload.Length),

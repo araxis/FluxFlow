@@ -1,5 +1,3 @@
-using FluxFlow.Components.Storage.Timing;
-
 namespace FluxFlow.Components.Storage.SqlFile;
 
 internal sealed record SqlFileStorageStoreSettings(
@@ -9,4 +7,4 @@ internal sealed record SqlFileStorageStoreSettings(
     long MaxValueBytes,
     int BusyTimeoutMilliseconds,
     bool CreateDatabase,
-    IStorageClock Clock);
+    TimeProvider Clock);

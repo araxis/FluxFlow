@@ -1,7 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -12,7 +11,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     private readonly Func<TInput, string?> _routeKeySelector;
     private readonly string? _engineName;
     private readonly SwitchRoutingOptions _options;
-    private readonly IRoutingClock _clock;
+    private readonly TimeProvider _clock;
     private readonly HashSet<string> _routes;
     private readonly Dictionary<string, string> _routeOutputPorts;
     private readonly Dictionary<string, BufferBlock<TInput>> _routeOutputBlocks;
@@ -30,7 +29,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
         : this(
             options,
             routeKeySelector,
-            SystemRoutingClock.Instance,
+            TimeProvider.System,
             engineName)
     {
     }
@@ -38,7 +37,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
     public FlowSwitchNode(
         SwitchRoutingOptions options,
         Func<TInput, string?> routeKeySelector,
-        IRoutingClock clock,
+        TimeProvider clock,
         string? engineName)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -149,7 +148,7 @@ public sealed class FlowSwitchNode<TInput> : FlowNodeBase
             return;
         }
 
-        var timestamp = _clock.UtcNow;
+        var timestamp = _clock.GetUtcNow();
         var matched = IsMatch(routeKey);
         var result = new FlowSwitchResult<TInput>
         {

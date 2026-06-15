@@ -1,6 +1,7 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -49,7 +50,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task PutAndDelete_UseConfiguredClock()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 1, 2, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
 
@@ -121,7 +122,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Get_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 2, 3, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
         await store.PutAsync(new StoragePutRequest
@@ -153,7 +154,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Put_CreateSucceedsOverExpiredRecord()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 5, 6, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
         await store.PutAsync(new StoragePutRequest
@@ -180,7 +181,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Put_ReturnsTimestampsMatchingPersistedRecord()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 6, 7, 123, TimeSpan.Zero).AddTicks(4567);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
 
@@ -252,7 +253,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Query_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 3, 4, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         await using var store = CreateStore(Path.Combine(temp.Path, "records.db"), clock);
         await store.PutAsync(new StoragePutRequest
@@ -540,7 +541,7 @@ public sealed class SqlFileStorageStoreTests
     public async Task Registration_PropagatesConfiguredClockToStoreContext()
     {
         var now = new DateTimeOffset(2026, 2, 3, 6, 4, 5, TimeSpan.Zero);
-        var clock = new RecordingStorageClock(now);
+        var clock = new FakeTimeProvider(now);
         using var temp = TempDirectory.Create();
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterStorageComponents(options =>
@@ -613,7 +614,7 @@ public sealed class SqlFileStorageStoreTests
 
     private static SqlFileStorageStore CreateStore(
         string databasePath,
-        RecordingStorageClock? clock = null)
+        FakeTimeProvider? clock = null)
         => new(new SqlFileStorageStoreOptions
         {
             DatabasePath = databasePath,

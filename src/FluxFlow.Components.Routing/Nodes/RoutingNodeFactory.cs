@@ -201,7 +201,7 @@ internal static class RoutingNodeFactory
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
         RoutingNodeContext nodeContext,
-        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
+        TimeProvider clock)
     {
         // Compile the route key expression once at build time so the node calls
         // a precomputed selector per message instead of holding the engine.
@@ -236,7 +236,7 @@ internal static class RoutingNodeFactory
         IFlowExpressionEngine expressionEngine,
         IRoutingContextFactory contextFactory,
         RoutingNodeContext nodeContext,
-        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
+        TimeProvider clock)
     {
         // Compile the key expression once; compile the side expression only when
         // configured (otherwise the side is supplied by the request/response ports).
@@ -284,7 +284,7 @@ internal static class RoutingNodeFactory
     private static RuntimeNode CreateWindowTyped<TInput>(
         RuntimeNodeFactoryContext context,
         WindowRoutingOptions options,
-        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
+        TimeProvider clock)
     {
         var node = new FlowWindowNode<TInput>(options, clock);
 
@@ -303,7 +303,7 @@ internal static class RoutingNodeFactory
         IRoutingContextFactory rightContextFactory,
         RoutingNodeContext leftNodeContext,
         RoutingNodeContext rightNodeContext,
-        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
+        TimeProvider clock)
     {
         // Compile each side's key expression once; the two sides have independent
         // context factories, node contexts, and input types.
@@ -349,7 +349,7 @@ internal static class RoutingNodeFactory
     private static RuntimeNode CreateMergeTyped<TInput>(
         RuntimeNodeFactoryContext context,
         MergeRoutingOptions options,
-        FluxFlow.Components.Routing.Timing.IRoutingClock clock)
+        TimeProvider clock)
     {
         var node = new FlowMergeNode<TInput>(options, clock);
         var builder = context.CreateNode(node)

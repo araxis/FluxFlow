@@ -1,5 +1,4 @@
 using FluxFlow.Components.Validation.Contracts;
-using FluxFlow.Components.Validation.Timing;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Validation.Options;
@@ -31,11 +30,11 @@ public sealed class ValidationComponentOptions
 
     private readonly object _typesLock = new();
     private readonly Dictionary<SelectorKey, IValidationValueSelector> _selectors = [];
-    private IValidationClock _clock = SystemValidationClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IValidationClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public ValidationComponentOptions UseClock(IValidationClock clock)
+    public ValidationComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

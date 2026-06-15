@@ -1,6 +1,5 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Options;
-using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Engine.Runtime;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
@@ -10,7 +9,7 @@ internal static class MqttNodeFactory
     public static RuntimeNode CreateSubscribe(
         RuntimeNodeFactoryContext context,
         IMqttClientFactory clientFactory,
-        IMqttClock clock)
+        TimeProvider clock)
     {
         var options = MqttOptionsReader.ReadSubscriptionOptions(context.Definition);
         var node = new MqttSubscribeNode(
@@ -27,7 +26,7 @@ internal static class MqttNodeFactory
     public static RuntimeNode CreatePublish(
         RuntimeNodeFactoryContext context,
         IMqttClientFactory clientFactory,
-        IMqttClock clock)
+        TimeProvider clock)
     {
         var options = MqttOptionsReader.ReadPublishOptions(context.Definition);
         var node = new MqttPublishNode(

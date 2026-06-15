@@ -4,6 +4,7 @@ using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
@@ -54,7 +55,7 @@ public sealed class FileReadNodeTests
         var readAt = DateTimeOffset.Parse("2026-06-02T12:10:00Z");
         var runtimeNode = CreateNode(
             new { baseDirectory = directory.Path },
-            options => options.UseClock(new RecordingFileSystemClock(readAt)));
+            options => options.UseClock(new FakeTimeProvider(readAt)));
         var input = runtimeNode.FindInput(new PortName(FileSystemComponentPorts.Input))
             .ShouldBeOfType<InputPort<FileReadRequest>>();
         var results = new BufferBlock<FileReadResult>();

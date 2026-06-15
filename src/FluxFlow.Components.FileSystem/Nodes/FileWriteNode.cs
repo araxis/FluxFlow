@@ -1,7 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
@@ -11,13 +10,13 @@ namespace FluxFlow.Components.FileSystem.Nodes;
 public sealed class FileWriteNode : FlowNodeBase
 {
     private readonly FileWriteOptions _options;
-    private readonly IFileSystemClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<FileWriteRequest> _input;
     private readonly BufferBlock<FileWriteResult> _result;
 
     internal FileWriteNode(
         FileWriteOptions options,
-        IFileSystemClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -146,7 +145,7 @@ public sealed class FileWriteNode : FlowNodeBase
                 Path = resolved.Path,
                 BytesWritten = resolved.Bytes.Length,
                 Mode = request.Mode,
-                WrittenAt = _clock.UtcNow
+                WrittenAt = _clock.GetUtcNow()
             };
 
             await _result.SendAsync(result).ConfigureAwait(false);

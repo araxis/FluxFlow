@@ -1,7 +1,6 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
-using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
@@ -12,7 +11,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 {
     private readonly IMqttClientFactory _clientFactory;
     private readonly MqttClientFactoryContext _factoryContext;
-    private readonly IMqttClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<MqttPublishRequest> _input;
     private readonly BufferBlock<MqttPublishResult> _result;
     private readonly MqttPublishOptions _options;
@@ -25,7 +24,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         MqttPublishOptions options,
         MqttClientFactoryContext factoryContext,
         IMqttClientFactory clientFactory,
-        IMqttClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _factoryContext = factoryContext ?? throw new ArgumentNullException(nameof(factoryContext));
@@ -218,7 +217,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 
             var result = new MqttPublishResult
             {
-                Timestamp = _clock.UtcNow,
+                Timestamp = _clock.GetUtcNow(),
                 Topic = request.Topic!,
                 PayloadBytes = request.Payload.Length,
                 PayloadPreview = request.PayloadPreview,
@@ -300,7 +299,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         IReadOnlyDictionary<string, string>? attributes = null)
         => EmitEvent(new FlowEvent
         {
-            Timestamp = _clock.UtcNow,
+            Timestamp = _clock.GetUtcNow(),
             Type = type,
             Source = Id.ToString(),
             SourceNodeId = Id,

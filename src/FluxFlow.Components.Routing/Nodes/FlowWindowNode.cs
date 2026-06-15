@@ -1,7 +1,6 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Components.Routing.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -10,7 +9,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 {
     private readonly WindowRoutingOptions _options;
-    private readonly IRoutingClock _clock;
+    private readonly TimeProvider _clock;
     private readonly TimeSpan _timeLimit;
     private readonly ActionBlock<TInput> _input;
     private readonly ActionBlock<WindowCommand> _commands;
@@ -24,13 +23,13 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
     private bool _disposed;
 
     public FlowWindowNode(WindowRoutingOptions options)
-        : this(options, SystemRoutingClock.Instance)
+        : this(options, TimeProvider.System)
     {
     }
 
     public FlowWindowNode(
         WindowRoutingOptions options,
-        IRoutingClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -180,7 +179,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private async Task AddInputAsync(TInput input)
     {
-        var now = _clock.UtcNow;
+        var now = _clock.GetUtcNow();
         if (_items.Count == 0)
         {
             StartWindow(now);
@@ -189,7 +188,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         _items.Add(input);
         if (_options.MaxItems > 0 && _items.Count >= _options.MaxItems)
         {
-            await EmitWindowAsync(FlowWindowEmitReason.Count, _clock.UtcNow)
+            await EmitWindowAsync(FlowWindowEmitReason.Count, _clock.GetUtcNow())
                 .ConfigureAwait(false);
         }
     }
@@ -201,7 +200,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        await EmitWindowAsync(FlowWindowEmitReason.Time, _clock.UtcNow)
+        await EmitWindowAsync(FlowWindowEmitReason.Time, _clock.GetUtcNow())
             .ConfigureAwait(false);
     }
 
@@ -210,7 +209,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         TryCancelTimer();
         if (_items.Count > 0 && _options.EmitPartialOnCompletion)
         {
-            await EmitWindowAsync(FlowWindowEmitReason.Completion, _clock.UtcNow)
+            await EmitWindowAsync(FlowWindowEmitReason.Completion, _clock.GetUtcNow())
                 .ConfigureAwait(false);
             return;
         }
@@ -288,7 +287,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
     {
         try
         {
-            await _clock.DelayAsync(_timeLimit, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(_timeLimit, _clock, cancellationToken).ConfigureAwait(false);
             await _commands.SendAsync(
                 WindowCommand.Timer(version),
                 _lifecycleCancellation.Token).ConfigureAwait(false);

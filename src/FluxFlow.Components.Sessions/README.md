@@ -21,12 +21,13 @@ registry.RegisterSessionsComponents(options =>
     options.UseStore(context => new MySessionStore(context.StoreName)));
 ```
 
-Hosts that need deterministic recording or replay timing can provide a clock:
+Hosts that need deterministic recording or replay timing can provide a
+`TimeProvider`:
 
 ```csharp
 registry.RegisterSessionsComponents(options => options
     .UseStore(context => new MySessionStore(context.StoreName))
-    .UseClock(sessionClock));
+    .UseClock(timeProvider));
 ```
 
 ## Recorder
@@ -74,7 +75,7 @@ Replay modes:
 `startSequence` and `maxMessages` can limit the replay range.
 
 `UseClock(...)` controls replay delays for fixed interval, real-time, and
-multiplier modes. Without it, sessions use the system clock.
+multiplier modes. Without it, sessions use `TimeProvider.System`.
 
 ## Query
 
@@ -108,7 +109,6 @@ The package includes:
 - `SessionQueryResult`
 - `ISessionStore`
 - `ISessionStoreFactory`
-- `ISessionClock`
 
 Records carry neutral fields: session id, sequence, timestamp, type, name,
 payload, content type, and string attributes. Hosts can map their own envelope

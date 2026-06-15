@@ -3,6 +3,7 @@ using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -15,7 +16,7 @@ public sealed class EventProjectionNodeTests
     [Fact]
     public async Task Projection_CountsLatestPreviewAndRateForMatchingEvents()
     {
-        var clock = new RecordingProjectionClock(
+        var timeProvider = new FakeTimeProvider(
             new DateTimeOffset(2026, 6, 3, 8, 0, 0, TimeSpan.Zero));
         var runtimeNode = CreateProjection(
             new
@@ -34,7 +35,7 @@ public sealed class EventProjectionNodeTests
                     }
                 }
             },
-            clock);
+            timeProvider);
         var input = GetInput(runtimeNode);
         var output = LinkOutput(runtimeNode);
         var start = new DateTimeOffset(2026, 6, 3, 7, 59, 50, TimeSpan.Zero);
@@ -68,7 +69,7 @@ public sealed class EventProjectionNodeTests
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
         first.Name.ShouldBe("errors");
-        first.Timestamp.ShouldBe(clock.UtcNow);
+        first.Timestamp.ShouldBe(timeProvider.GetUtcNow());
         first.ObservedCount.ShouldBe(1);
         first.MatchedCount.ShouldBe(1);
         first.CurrentRate.ShouldBe(0.1);
@@ -162,7 +163,7 @@ public sealed class EventProjectionNodeTests
     public async Task Projection_EmitsFinalSnapshotWhenConfigured()
     {
         var timestamp = new DateTimeOffset(2026, 6, 3, 11, 0, 0, TimeSpan.Zero);
-        var clock = new RecordingProjectionClock(timestamp);
+        var timeProvider = new FakeTimeProvider(timestamp);
         var runtimeNode = CreateProjection(new
         {
             rateWindowSeconds = 10,
@@ -173,19 +174,19 @@ public sealed class EventProjectionNodeTests
                 typePrefix = "task."
             }
         },
-        clock);
+        timeProvider);
         var input = GetInput(runtimeNode);
         var output = LinkOutput(runtimeNode);
 
         await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(CreateEvent(timestamp, "task.started"));
         await input.Target.SendAsync(CreateEvent(timestamp.AddSeconds(1), "task.completed"));
-        clock.UtcNow = timestamp.AddSeconds(20);
+        timeProvider.SetUtcNow(timestamp.AddSeconds(20));
         input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.Timestamp.ShouldBe(clock.UtcNow);
+        snapshot.Timestamp.ShouldBe(timeProvider.GetUtcNow());
         snapshot.MatchedCount.ShouldBe(2);
         snapshot.CurrentRate.ShouldBe(0.2);
         snapshot.Latest.ShouldNotBeNull();
@@ -196,14 +197,14 @@ public sealed class EventProjectionNodeTests
     public async Task Projection_FinalSnapshotKeepsRateForReplayedEventTimestamps()
     {
         var eventTime = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
-        var clock = new RecordingProjectionClock(eventTime.AddDays(30));
+        var timeProvider = new FakeTimeProvider(eventTime.AddDays(30));
         var runtimeNode = CreateProjection(new
         {
             rateWindowSeconds = 10,
             emitEveryMatch = false,
             emitFinalSnapshot = true
         },
-        clock);
+        timeProvider);
         var input = GetInput(runtimeNode);
         var output = LinkOutput(runtimeNode);
 
@@ -216,7 +217,7 @@ public sealed class EventProjectionNodeTests
         // The rate window is trimmed against the last event timestamp, so replayed
         // streams with old event timestamps keep a meaningful final rate.
         var snapshot = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.Timestamp.ShouldBe(clock.UtcNow);
+        snapshot.Timestamp.ShouldBe(timeProvider.GetUtcNow());
         snapshot.MatchedCount.ShouldBe(2);
         snapshot.CurrentRate.ShouldBe(0.2);
     }
@@ -315,14 +316,14 @@ public sealed class EventProjectionNodeTests
 
     private static RuntimeNode CreateProjection(
         object configuration,
-        RecordingProjectionClock? clock = null)
+        FakeTimeProvider? timeProvider = null)
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterProjectionsComponents(options =>
             {
-                if (clock is not null)
+                if (timeProvider is not null)
                 {
-                    options.UseClock(clock);
+                    options.UseClock(timeProvider);
                 }
             });
         registry.TryGetFactory(ProjectionsComponentTypes.EventProjection, out var factory)

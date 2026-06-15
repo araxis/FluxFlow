@@ -1,10 +1,10 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Diagnostics;
 using FluxFlow.Components.Http.Options;
-using FluxFlow.Components.Http.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Diagnostics;
 using System.Net;
@@ -72,9 +72,10 @@ public sealed class HttpRequestNodeTests
     public async Task Request_UsesConfiguredClockForResponseTiming()
     {
         var startedAt = DateTimeOffset.Parse("2026-06-02T10:00:00Z");
-        var completedAt = DateTimeOffset.Parse("2026-06-02T10:00:02.500Z");
-        var clock = new RecordingHttpClock(startedAt, completedAt);
-        IHttpClock? capturedClock = null;
+        var elapsed = TimeSpan.FromMilliseconds(2500);
+        var completedAt = startedAt + elapsed;
+        var clock = new FakeTimeProvider(startedAt);
+        TimeProvider? capturedClock = null;
         var runtimeNode = CreateNode(
             options => options
                 .UseClock(clock)
@@ -82,11 +83,16 @@ public sealed class HttpRequestNodeTests
                 {
                     capturedClock = context.Clock;
                     return new DelegateSender((sendContext, _) =>
-                        Task.FromResult(CreateResponse(sendContext, 200, "ok") with
+                    {
+                        // Advance between the node's start and completion reads so
+                        // the captured timing reflects a non-zero elapsed delta.
+                        clock.Advance(elapsed);
+                        return Task.FromResult(CreateResponse(sendContext, 200, "ok") with
                         {
                             Timestamp = DateTimeOffset.UnixEpoch,
                             ElapsedMilliseconds = 42
-                        }));
+                        });
+                    });
                 }),
             new { });
         var input = GetInput(runtimeNode);
@@ -223,8 +229,12 @@ public sealed class HttpRequestNodeTests
     public async Task Request_UsesConfiguredClockForRequestErrors()
     {
         var startedAt = DateTimeOffset.Parse("2026-06-02T11:00:00Z");
-        var failedAt = DateTimeOffset.Parse("2026-06-02T11:00:01.250Z");
-        var clock = new RecordingHttpClock(startedAt, failedAt);
+        var elapsed = TimeSpan.FromMilliseconds(1250);
+        var failedAt = startedAt + elapsed;
+        // The invalid-URL failure happens before the sender runs, so there is no
+        // hook to interleave Advance between the node's two clock reads. Auto-advance
+        // makes the second read (completion) land exactly one step after the first.
+        var clock = new FakeTimeProvider(startedAt) { AutoAdvanceAmount = elapsed };
         var runtimeNode = CreateNode(
             options => options
                 .UseClock(clock)

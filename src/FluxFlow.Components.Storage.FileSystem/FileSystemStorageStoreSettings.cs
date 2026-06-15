@@ -1,5 +1,3 @@
-using FluxFlow.Components.Storage.Timing;
-
 namespace FluxFlow.Components.Storage.FileSystem;
 
 internal sealed record FileSystemStorageStoreSettings(
@@ -8,4 +6,4 @@ internal sealed record FileSystemStorageStoreSettings(
     string? DefaultCollection,
     long MaxValueBytes,
     bool FlushOnWrite,
-    IStorageClock Clock);
+    TimeProvider Clock);

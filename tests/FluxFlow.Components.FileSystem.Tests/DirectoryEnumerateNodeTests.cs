@@ -4,6 +4,7 @@ using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -55,7 +56,7 @@ public sealed class DirectoryEnumerateNodeTests
                 directory = ".",
                 baseDirectory = directory.Path
             },
-            options => options.UseClock(new RecordingFileSystemClock(enumeratedAt)));
+            options => options.UseClock(new FakeTimeProvider(enumeratedAt)));
         var output = new BufferBlock<DirectoryEnumerateEntry>();
         LinkOutput(runtimeNode, output);
 

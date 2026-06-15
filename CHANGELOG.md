@@ -1,5 +1,32 @@
 # Changelog
 
+## FluxFlow.Components.Sources 2.0.0-preview.1
+
+2.0 preview: TimeProvider clock migration.
+
+- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+  the clock is now configured via `UseClock(TimeProvider)`/the
+  `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
+  public types are removed (breaking). Runtime behavior is unchanged.
+
+## FluxFlow.Components.Storage.FileSystem 2.0.0-preview.1
+
+2.0 preview: TimeProvider clock migration.
+
+- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+  the clock is now configured via `UseClock(TimeProvider)`/the
+  `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
+  public types are removed (breaking). Runtime behavior is unchanged.
+
+## FluxFlow.Components.Storage.SqlFile 2.0.0-preview.1
+
+2.0 preview: TimeProvider clock migration.
+
+- Replaces the package's bespoke clock abstraction with System.TimeProvider —
+  the clock is now configured via `UseClock(TimeProvider)`/the
+  `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
+  public types are removed (breaking). Runtime behavior is unchanged.
+
 ## FluxFlow.Engine 1.3.0
 
 Additive resource accessor (Wave 3 groundwork).
@@ -32,6 +59,9 @@ Additive resource accessor (Wave 3 groundwork).
   factory. The configured clock is still injected.
 - Public node constructors change (breaking); registration, options, ports, and
   behavior unchanged.
+- Replaces the bespoke `IAssertionClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Mapping 2.0.0-preview.1
 
@@ -62,6 +92,9 @@ Additive resource accessor (Wave 3 groundwork).
   the expression engine or per-message context factories.
 - Public node constructors change (breaking); registration, options, ports, JSON
   shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IRoutingClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Validation 2.0.0-preview.1
 
@@ -73,6 +106,9 @@ Additive resource accessor (Wave 3 groundwork).
 - `JsonSchemaValidatorContext` no longer exposes the raw options to value
   selectors (public contract break). Node type, options, ports, and validation
   behavior are unchanged.
+- Replaces the bespoke `IValidationClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Observability 2.0.0-preview.1
 
@@ -83,6 +119,9 @@ Additive resource accessor (Wave 3 groundwork).
   predicate expression string on every message. The node no longer holds the
   expression engine or the per-message context factory. Internal refactor;
   node registration, options, ports, and runtime behavior are unchanged.
+- Replaces the bespoke `IObservabilityClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Http 2.0.0-preview.1
 
@@ -93,6 +132,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IHttpClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Metrics 2.0.0-preview.1
 
@@ -103,6 +145,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IMetricsClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Storage 2.0.0-preview.1
 
@@ -113,6 +158,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IStorageClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Sessions 2.0.0-preview.1
 
@@ -123,6 +171,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `ISessionClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.FileSystem 2.0.0-preview.1
 
@@ -133,6 +184,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IFileSystemClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Timers 2.0.0-preview.1
 
@@ -143,6 +197,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `ITimerClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Mqtt 2.0.0-preview.1
 
@@ -153,6 +210,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IMqttClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Payloads 2.0.0-preview.1
 
@@ -173,6 +233,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IProjectionClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Expectations 2.0.0-preview.1
 
@@ -183,6 +246,9 @@ Additive resource accessor (Wave 3 groundwork).
   the runtime node no longer references definition/registration types. This
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
+- Replaces the bespoke `IExpectationClock` abstraction with System.TimeProvider
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Mapping 1.3.0
 

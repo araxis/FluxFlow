@@ -428,6 +428,23 @@ Date: 2026-05-31
   at 695 tests across 30 assemblies. Wave 2 implementation complete; the whole
   2.0 set stays unpublished (preview) until release is approved.
 
+- Wave 3 step A: added the additive `RuntimeNodeFactoryContext.GetResource<T>`
+  engine accessor (engine `1.3.0`, merged) — the build-time resolution
+  primitive for connection-resource components.
+- Wave 3 TimeProvider consolidation: replaced all 15 bespoke `IXxxClock`
+  interfaces (+ their `System*`/`Recording*` doubles) with `System.TimeProvider`
+  across every clock-bearing component package; standardized the option API on
+  `UseClock(TimeProvider)`/`Clock`; replaced test doubles with
+  `Microsoft.Extensions.TimeProvider.Testing` `FakeTimeProvider` (10.7.0) plus
+  bespoke throwing `TimeProvider`s for fault-injection tests. Hardened the
+  FakeTimeProvider timeout tests to gate `Advance` on timer registration and
+  removed real-time/synchronous-assertion races (Routing, Validation) — full
+  Release suite verified stable across 19 consecutive solution-wide runs.
+  Sources/Storage.FileSystem/Storage.SqlFile bumped to `2.0.0-preview.1`; the
+  other clock packages already on the 2.0 track gained a clock changelog
+  bullet. Engine has no clock and is unaffected. Connection-resource components
+  (mqtt.connection/http.client/storage.store) remain the last Wave 3 step.
+
 ## Remaining
 
 - No remaining work for the component `1.0.0` release track.

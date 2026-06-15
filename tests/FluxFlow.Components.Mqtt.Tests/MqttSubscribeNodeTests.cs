@@ -2,6 +2,7 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -24,7 +25,7 @@ public sealed class MqttSubscribeNodeTests
         };
         var adapter = new RecordingMqttClientAdapter(message);
         var clientFactory = new RecordingMqttClientFactory(adapter);
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 10, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 10, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterMqttComponents(options => options
                 .UseClientFactory(clientFactory)
@@ -317,7 +318,7 @@ public sealed class MqttSubscribeNodeTests
             Topic = "devices/temperature",
             Payload = [1]
         });
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 11, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 11, 1, 2, TimeSpan.Zero));
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterMqttComponents(options => options
                 .UseClientFactory(new RecordingMqttClientFactory(adapter))
@@ -352,7 +353,7 @@ public sealed class MqttSubscribeNodeTests
         names.ShouldContain(MqttDiagnosticNames.SubscribeStopped);
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.SubscribeReceived);
-        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
+        flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
         flowEvent.GetAttribute("retain").ShouldBe("False");
     }
 
@@ -360,7 +361,7 @@ public sealed class MqttSubscribeNodeTests
     public async Task SubscribeNode_ForwardsAdapterHealthEvents()
     {
         var adapter = new RecordingMqttClientAdapter(waitForCancellation: true);
-        var clock = new RecordingMqttClock(new DateTimeOffset(2026, 2, 3, 12, 1, 2, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 12, 1, 2, TimeSpan.Zero));
         adapter.HealthEvents.Add(new MqttClientHealthEvent
         {
             State = MqttClientHealthState.Reconnecting,
@@ -405,7 +406,7 @@ public sealed class MqttSubscribeNodeTests
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
-        flowEvent.Timestamp.ShouldBe(clock.UtcNow);
+        flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
         flowEvent.Status.ShouldBe("Reconnecting");
         flowEvent.Subject.ShouldBe("main-broker");
 

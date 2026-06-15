@@ -1,7 +1,6 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Components.FileSystem.Timing;
 using FluxFlow.Engine.Components;
 using System.Threading.Tasks.Dataflow;
 
@@ -11,7 +10,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 {
     private readonly object _stateLock = new();
     private readonly DirectoryEnumerateOptions _options;
-    private readonly IFileSystemClock _clock;
+    private readonly TimeProvider _clock;
     private CancellationTokenSource? _enumerationCancellation;
     private Task? _enumerationTask;
     private string? _resolvedDirectory;
@@ -20,7 +19,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 
     internal DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
-        IFileSystemClock clock)
+        TimeProvider clock)
         : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -271,7 +270,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         string resolvedDirectory)
         => new()
         {
-            EnumeratedAt = _clock.UtcNow,
+            EnumeratedAt = _clock.GetUtcNow(),
             Path = directory.FullName,
             Directory = resolvedDirectory,
             Name = directory.Name,
@@ -290,7 +289,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         string resolvedDirectory)
         => new()
         {
-            EnumeratedAt = _clock.UtcNow,
+            EnumeratedAt = _clock.GetUtcNow(),
             Path = file.FullName,
             Directory = resolvedDirectory,
             Name = file.Name,

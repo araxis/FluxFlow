@@ -1,14 +1,12 @@
-using FluxFlow.Components.Metrics.Timing;
-
 namespace FluxFlow.Components.Metrics.Options;
 
 public sealed class MetricsComponentOptions
 {
-    private IMetricsClock _clock = SystemMetricsClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IMetricsClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
-    public MetricsComponentOptions UseClock(IMetricsClock clock)
+    public MetricsComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

@@ -34,7 +34,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
 
     private sealed class HttpClientRequestSender(
         HttpClient client,
-        IHttpClock clock) : IHttpRequestSender
+        TimeProvider clock) : IHttpRequestSender
     {
         public async Task<HttpResponseOutput> SendAsync(
             HttpRequestSendContext context,
@@ -43,7 +43,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
             ArgumentNullException.ThrowIfNull(context);
 
             using var request = CreateRequest(context);
-            var startedAt = clock.UtcNow;
+            var startedAt = clock.GetUtcNow();
             using var response = await client.SendAsync(
                     request,
                     HttpCompletionOption.ResponseHeadersRead,
@@ -57,7 +57,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
                 .ConfigureAwait(false);
             var contentType = response.Content.Headers.ContentType?.ToString();
 
-            var completedAt = clock.UtcNow;
+            var completedAt = clock.GetUtcNow();
             return new HttpResponseOutput
             {
                 Timestamp = completedAt,
