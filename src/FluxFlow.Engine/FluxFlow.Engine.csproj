@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Engine</PackageId>
     <AssemblyName>FluxFlow.Engine</AssemblyName>
     <RootNamespace>FluxFlow.Engine</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, host-provided expression routing, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds a build-time expression compile seam: IFlowExpressionEngine.Compile&lt;T&gt; (default-implemented, non-breaking) returns an IFlowCompiledExpression&lt;T&gt; so expressions parse once at build time instead of per message. ExpressionFlowPredicate now compiles once, a new ExpressionFlowMapper mirrors it for mapping, and the engine's own conditional links compile once. Event channels now use the non-lossy fanout source instead of a lossy broadcast block.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds an additive RuntimeNodeFactoryContext.GetResource&lt;T&gt;(NodeName) typed accessor that resolves a resource node's component-defined handle (e.g. a shared connection client) at build time. Enables operation nodes to reference connection/resource components by name. No existing API changes.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

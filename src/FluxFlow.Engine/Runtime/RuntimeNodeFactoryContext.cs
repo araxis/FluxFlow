@@ -27,4 +27,15 @@ public sealed record RuntimeNodeFactoryContext(
         }
         return node;
     }
+
+    /// <summary>
+    /// Resolves a resource node and returns its <see cref="RuntimeNode.Node"/>
+    /// as <typeparamref name="T"/> — the resource's component-defined handle
+    /// (e.g. a connection handle exposing a shared client). Throws if the
+    /// resource is missing or does not provide <typeparamref name="T"/>.
+    /// </summary>
+    public T GetResource<T>(NodeName resourceName) where T : class
+        => GetResource(resourceName).Node as T
+           ?? throw new InvalidOperationException(
+               $"Resource '{resourceName}' does not provide '{typeof(T).Name}'.");
 }
