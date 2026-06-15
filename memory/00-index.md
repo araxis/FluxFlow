@@ -177,6 +177,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `136-wave2-2.0-plan.md`: review-ready Wave 2 (2.0) plan — per-node
   compile-once transformation, factory relocation, breaking-surface summary,
   and sequencing.
+- `137-wave3-2.0-plan.md`: review-ready Wave 3 (2.0) plan — connection
+  resource components, lazy-connect handle, TimeProvider clock consolidation,
+  breaking surface, and sequencing.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
