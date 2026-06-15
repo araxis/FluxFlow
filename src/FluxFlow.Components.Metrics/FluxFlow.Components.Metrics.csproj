@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable metrics aggregation components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Correctness fix: aggregate snapshots are now emitted with back-pressure (awaited SendAsync) instead of being dropped when the output is full, so a slow consumer no longer loses snapshots.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

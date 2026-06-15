@@ -3,7 +3,6 @@ using FluxFlow.Components.Http.Diagnostics;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Components.Http.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 
@@ -19,7 +18,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     private readonly BufferBlock<HttpErrorOutput> _errors;
     private bool _disposed;
 
-    private HttpRequestNode(
+    internal HttpRequestNode(
         HttpRequestNodeOptions options,
         IHttpRequestSender sender,
         IHttpClock clock)
@@ -61,30 +60,6 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     public ISourceBlock<HttpResponseOutput> Output => _output;
 
     public ISourceBlock<HttpErrorOutput> RequestErrors => _errors;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        HttpComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = HttpOptionsReader.ReadRequestOptions(context.Definition);
-        var sender = componentOptions.RequestSenderFactory.Create(new HttpRequestSenderContext
-        {
-            Address = context.Address,
-            Options = options,
-            Clock = componentOptions.Clock
-        }) ?? throw new InvalidOperationException(
-            "http.request sender factory returned null.");
-        var node = new HttpRequestNode(options, sender, componentOptions.Clock);
-
-        return context.CreateNode(node)
-            .Input(HttpComponentPorts.Input, node.Input)
-            .Output(HttpComponentPorts.Output, node.Output)
-            .Output(HttpComponentPorts.Errors, node.RequestErrors)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();

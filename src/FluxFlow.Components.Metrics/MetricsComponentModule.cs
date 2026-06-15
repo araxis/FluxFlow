@@ -19,7 +19,7 @@ public sealed class MetricsComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 MetricsComponentTypes.Aggregate,
-                context => MetricsAggregateNode.Create(context, options))
+                context => MetricsAggregateNodeFactory.Create(context, options))
         ];
     }
 

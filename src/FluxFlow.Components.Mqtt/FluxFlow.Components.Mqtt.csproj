@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Correctness fix: the subscribe node no longer opens a client lease, subscription, or health monitor when Complete() races StartAsync — the completed state is checked under the state lock before any resource is acquired.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

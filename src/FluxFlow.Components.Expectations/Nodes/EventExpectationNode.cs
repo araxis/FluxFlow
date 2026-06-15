@@ -4,7 +4,6 @@ using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Expectations.Timing;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Expectations.Nodes;
@@ -24,7 +23,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
     private bool _resolved;
     private bool _disposed;
 
-    private EventExpectationNode(
+    internal EventExpectationNode(
         EventExpectationSettings settings,
         IExpectationClock clock,
         EventExpectationNodeKind kind)
@@ -65,24 +64,6 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                 return _observedEvents.Count;
             }
         }
-    }
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        ExpectationsComponentOptions componentOptions,
-        EventExpectationNodeKind kind)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var settings = ExpectationsOptionsReader.ReadEventExpectationSettings(context.Definition);
-        var node = new EventExpectationNode(settings, componentOptions.Clock, kind);
-
-        return context.CreateNode(node)
-            .Input(ExpectationsComponentPorts.Input, node.Input)
-            .Output(ExpectationsComponentPorts.Result, node.Result)
-            .Output(ExpectationsComponentPorts.Errors, node.Errors)
-            .Build();
     }
 
     public override Task StartAsync(CancellationToken cancellationToken = default)

@@ -2,7 +2,6 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Storage.Nodes;
@@ -20,7 +19,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
     private bool _startRequested;
     private bool _disposed;
 
-    private StorageDeleteNode(
+    internal StorageDeleteNode(
         StorageDeleteOptions options,
         StorageComponentOptions componentOptions,
         StorageStoreContext storeContext)
@@ -50,31 +49,6 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
     public ITargetBlock<StorageDeleteRequest> Input => _input;
 
     public ISourceBlock<StorageResult> Result => _result;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        StorageComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = StorageOptionsReader.ReadDeleteOptions(context.Definition);
-        var node = new StorageDeleteNode(
-            options,
-            componentOptions,
-            StorageNodeSupport.CreateStoreContext(
-                context.Address,
-                StorageComponentTypes.Delete,
-                options.Store,
-                options.Collection,
-                componentOptions.Clock));
-
-        return context.CreateNode(node)
-            .Input(StorageComponentPorts.Input, node.Input)
-            .Output(StorageComponentPorts.Result, node.Result)
-            .Output(StorageComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
     {

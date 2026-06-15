@@ -3,7 +3,6 @@ using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
@@ -25,7 +24,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     private bool _completed;
     private bool _disposed;
 
-    private MqttSubscribeNode(
+    internal MqttSubscribeNode(
         MqttSubscriptionOptions options,
         MqttClientFactoryContext factoryContext,
         IMqttClientFactory clientFactory,
@@ -39,23 +38,6 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     }
 
     public ISourceBlock<FlowEvent> Events => _events;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        IMqttClientFactory clientFactory,
-        IMqttClock clock)
-    {
-        var options = MqttOptionsReader.ReadSubscriptionOptions(context.Definition);
-        var node = new MqttSubscribeNode(
-            options,
-            MqttClientFactoryContexts.Create(context, options, clock),
-            clientFactory,
-            clock);
-
-        return context.CreateNode(node)
-            .Output(MqttComponentPorts.Output, node.Output)
-            .Build();
-    }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
     {

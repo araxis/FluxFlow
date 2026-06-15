@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Projections</PackageId>
     <AssemblyName>FluxFlow.Components.Projections</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>2.0.0-preview.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event projection components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds a package-owned IComponentDesignMetadataProvider with a new dependency on FluxFlow.Components.Designer, and final snapshots compute the rate window against the last matched event timestamp so replayed streams report correct rates.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

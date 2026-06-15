@@ -14,16 +14,16 @@ public sealed class FileSystemComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 FileSystemComponentTypes.DirectoryEnumerate,
-                context => DirectoryEnumerateNode.Create(context, options)),
+                context => FileSystemNodeFactory.CreateEnumerate(context, options)),
             new FlowNodeRegistration(
                 FileSystemComponentTypes.FileRead,
-                context => FileReadNode.Create(context, options)),
+                context => FileSystemNodeFactory.CreateRead(context, options)),
             new FlowNodeRegistration(
                 FileSystemComponentTypes.FileWatch,
-                context => FileWatchNode.Create(context, options)),
+                context => FileSystemNodeFactory.CreateWatch(context, options)),
             new FlowNodeRegistration(
                 FileSystemComponentTypes.FileWrite,
-                context => FileWriteNode.Create(context, options))
+                context => FileSystemNodeFactory.CreateWrite(context, options))
         ];
     }
 

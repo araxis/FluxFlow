@@ -406,6 +406,14 @@ Date: 2026-05-31
   Control/Assertions/Timers/Observability `1.2.1`). All 12 publish runs
   succeeded first try (flat-container pre-check absorbed indexing lag); all 12
   versions verified live on the public feed.
+- Started Wave 2 (2.0 track, held unpublished): step 1 relocated the co-located
+  `static Create(RuntimeNodeFactoryContext …)` out of node types into dedicated
+  `*NodeFactory` classes for Http, Metrics, Storage, Sessions, FileSystem,
+  Timers (Interval/Schedule), Mqtt, Payloads, Projections, Expectations — pure
+  refactor, zero behavior change, full suite green at 695 tests. Those 10
+  packages bumped to `2.0.0-preview.1` (removing the public `static Create` is
+  breaking). Engine and the expression/State/Validation packages untouched in
+  this step.
 
 ## Remaining
 

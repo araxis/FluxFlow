@@ -2,7 +2,6 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Storage.Nodes;
@@ -21,7 +20,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
     private bool _startRequested;
     private bool _disposed;
 
-    private StorageQueryNode(
+    internal StorageQueryNode(
         StorageQueryOptions options,
         StorageComponentOptions componentOptions,
         StorageStoreContext storeContext)
@@ -54,32 +53,6 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
     public ISourceBlock<StorageQueryResult> Result => _result;
 
     public ISourceBlock<StorageRecord> Records => _records;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        StorageComponentOptions componentOptions)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
-
-        var options = StorageOptionsReader.ReadQueryOptions(context.Definition);
-        var node = new StorageQueryNode(
-            options,
-            componentOptions,
-            StorageNodeSupport.CreateStoreContext(
-                context.Address,
-                StorageComponentTypes.Query,
-                options.Store,
-                options.Collection,
-                componentOptions.Clock));
-
-        return context.CreateNode(node)
-            .Input(StorageComponentPorts.Input, node.Input)
-            .Output(StorageComponentPorts.Result, node.Result)
-            .Output(StorageComponentPorts.Records, node.Records)
-            .Output(StorageComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
     {

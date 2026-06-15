@@ -1,5 +1,105 @@
 # Changelog
 
+## FluxFlow.Components.Http 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Metrics 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Storage 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Sessions 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.FileSystem 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Timers 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Mqtt 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Payloads 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Projections 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
+## FluxFlow.Components.Expectations 2.0.0-preview.1
+
+2.0 preview: node factory relocation (no runtime behavior change).
+
+- The node's `static Create(RuntimeNodeFactoryContext …)` factory method is
+  moved out of the node type into a dedicated internal `*NodeFactory` class so
+  the runtime node no longer references definition/registration types. This
+  removes the public `static Create` from the node type (breaking); node
+  registration, options, ports, JSON shape, and runtime behavior are unchanged.
+
 ## FluxFlow.Components.Mapping 1.3.0
 
 Failed-output observability release.

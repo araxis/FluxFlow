@@ -2,7 +2,6 @@ using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -21,7 +20,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
     private readonly ActionBlock<PayloadInspectionRequest> _input;
     private readonly BufferBlock<PayloadInspectionResult> _output;
 
-    private PayloadInspectNode(PayloadInspectOptions options)
+    internal PayloadInspectNode(PayloadInspectOptions options)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         if (options.BoundedCapacity <= 0)
@@ -47,20 +46,6 @@ public sealed class PayloadInspectNode : FlowNodeBase
     public ITargetBlock<PayloadInspectionRequest> Input => _input;
 
     public ISourceBlock<PayloadInspectionResult> Output => _output;
-
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-
-        var options = PayloadOptionsReader.ReadInspectOptions(context.Definition);
-        var node = new PayloadInspectNode(options);
-
-        return context.CreateNode(node)
-            .Input(PayloadComponentPorts.Input, node.Input)
-            .Output(PayloadComponentPorts.Output, node.Output)
-            .Output(PayloadComponentPorts.Errors, node.Errors)
-            .Build();
-    }
 
     public override void Complete()
         => _input.Complete();

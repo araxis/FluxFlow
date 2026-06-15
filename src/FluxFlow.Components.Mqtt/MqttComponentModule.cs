@@ -17,10 +17,10 @@ public sealed class MqttComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 MqttComponentTypes.Publish,
-                context => MqttPublishNode.Create(context, clientFactory, clock)),
+                context => MqttNodeFactory.CreatePublish(context, clientFactory, clock)),
             new FlowNodeRegistration(
                 MqttComponentTypes.Subscribe,
-                context => MqttSubscribeNode.Create(context, clientFactory, clock))
+                context => MqttNodeFactory.CreateSubscribe(context, clientFactory, clock))
         ];
     }
 

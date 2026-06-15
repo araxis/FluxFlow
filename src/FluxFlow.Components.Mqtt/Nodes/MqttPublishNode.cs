@@ -4,7 +4,6 @@ using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Timing;
 using FluxFlow.Components.Mqtt.Validation;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
@@ -22,7 +21,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     private MqttClientLease? _clientLease;
     private bool _disposed;
 
-    private MqttPublishNode(
+    internal MqttPublishNode(
         MqttPublishOptions options,
         MqttClientFactoryContext factoryContext,
         IMqttClientFactory clientFactory,
@@ -44,24 +43,6 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
     public ITargetBlock<MqttPublishRequest> Input => _input;
 
     public ISourceBlock<MqttPublishResult> Result => _result;
-
-    public static RuntimeNode Create(
-        RuntimeNodeFactoryContext context,
-        IMqttClientFactory clientFactory,
-        IMqttClock clock)
-    {
-        var options = MqttOptionsReader.ReadPublishOptions(context.Definition);
-        var node = new MqttPublishNode(
-            options,
-            MqttClientFactoryContexts.Create(context, options, clock),
-            clientFactory,
-            clock);
-
-        return context.CreateNode(node)
-            .Input(MqttComponentPorts.Input, node.Input)
-            .Output(MqttComponentPorts.Result, node.Result)
-            .Build();
-    }
 
     public override async Task StartAsync(CancellationToken cancellationToken = default)
     {

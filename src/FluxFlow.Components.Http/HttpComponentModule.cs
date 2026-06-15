@@ -14,7 +14,7 @@ public sealed class HttpComponentModule : IFlowNodeModule
         [
             new FlowNodeRegistration(
                 HttpComponentTypes.Request,
-                context => HttpRequestNode.Create(context, options))
+                context => HttpRequestNodeFactory.Create(context, options))
         ];
     }
 
