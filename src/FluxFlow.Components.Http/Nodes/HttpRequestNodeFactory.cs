@@ -1,5 +1,6 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
+using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 
 namespace FluxFlow.Components.Http.Nodes;
@@ -8,20 +9,15 @@ internal static class HttpRequestNodeFactory
 {
     public static RuntimeNode Create(
         RuntimeNodeFactoryContext context,
-        HttpComponentOptions componentOptions)
+        TimeProvider clock)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(componentOptions);
+        ArgumentNullException.ThrowIfNull(clock);
 
         var options = HttpOptionsReader.ReadRequestOptions(context.Definition);
-        var sender = componentOptions.RequestSenderFactory.Create(new HttpRequestSenderContext
-        {
-            Address = context.Address,
-            Options = options,
-            Clock = componentOptions.Clock
-        }) ?? throw new InvalidOperationException(
-            "http.request sender factory returned null.");
-        var node = new HttpRequestNode(options, sender, componentOptions.Clock);
+        var client = context.GetResource<IHttpClientHandle>(
+            new NodeName(options.Client!));
+        var node = new HttpRequestNode(options, client, clock);
 
         return context.CreateNode(node)
             .Input(HttpComponentPorts.Input, node.Input)

@@ -10,5 +10,6 @@ public enum HttpErrorKind
     ResponseTooLarge = 5,
     SendFailed = 6,
     NonSuccessStatus = 7,
-    UrlNotAllowed = 8
+    UrlNotAllowed = 8,
+    NotConnected = 9
 }

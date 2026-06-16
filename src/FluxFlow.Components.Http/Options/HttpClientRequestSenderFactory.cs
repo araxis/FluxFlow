@@ -14,7 +14,7 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
 
         var handler = new SocketsHttpHandler
         {
-            AllowAutoRedirect = context.Options.FollowRedirects && !HasAllowListGuard(context.Options),
+            AllowAutoRedirect = context.Client.FollowRedirects && !HasAllowListGuard(context.Client),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5)
         };
         var client = new HttpClient(handler, disposeHandler: true)
@@ -29,8 +29,8 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
     // RestrictToBaseUrlOrigin), auto-redirect is disabled so a server cannot
     // 3xx-redirect past the per-request host validation in HttpRequestNode.
     // The redirect response is surfaced as-is instead of being followed.
-    private static bool HasAllowListGuard(HttpRequestNodeOptions options)
-        => options.RestrictToBaseUrlOrigin || options.AllowedHosts.Count > 0;
+    private static bool HasAllowListGuard(IHttpClientHandle client)
+        => client.RestrictToBaseUrlOrigin || client.AllowedHosts.Count > 0;
 
     private sealed class HttpClientRequestSender(
         HttpClient client,

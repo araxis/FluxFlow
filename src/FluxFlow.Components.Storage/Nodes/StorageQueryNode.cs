@@ -8,26 +8,26 @@ namespace FluxFlow.Components.Storage.Nodes;
 
 public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
 {
-    private readonly object _stateLock = new();
+    private const string NotAvailableMessage =
+        "storage.query is not available; the storage.store component does not open a store yet.";
+
     private readonly StorageQueryOptions _options;
-    private readonly StorageComponentOptions _componentOptions;
-    private readonly StorageStoreContext _storeContext;
+    private readonly IStorageStoreHandle _store;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<StorageQueryRequest> _input;
     private readonly BufferBlock<StorageQueryResult> _result;
     private readonly BufferBlock<StorageRecord> _records;
     private readonly CancellationTokenSource _processingCancellation = new();
-    private StorageStoreLease? _lease;
-    private bool _startRequested;
     private bool _disposed;
 
     internal StorageQueryNode(
         StorageQueryOptions options,
-        StorageComponentOptions componentOptions,
-        StorageStoreContext storeContext)
+        IStorageStoreHandle store,
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _componentOptions = componentOptions ?? throw new ArgumentNullException(nameof(componentOptions));
-        _storeContext = storeContext ?? throw new ArgumentNullException(nameof(storeContext));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
         var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
         _input = new ActionBlock<StorageQueryRequest>(
@@ -53,52 +53,6 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
     public ISourceBlock<StorageQueryResult> Result => _result;
 
     public ISourceBlock<StorageRecord> Records => _records;
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("storage.query node has already started.");
-            }
-
-            _startRequested = true;
-        }
-
-        try
-        {
-            _lease = await StorageNodeSupport.OpenStoreAsync(
-                _componentOptions.StoreFactory,
-                _storeContext,
-                cancellationToken).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpened,
-                message: "Opened storage store.",
-                attributes: StorageNodeSupport.CreateStoreAttributes(_storeContext));
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                StorageErrorCodes.StoreUnavailable,
-                $"Storage store failed to open: {exception.Message}",
-                exception,
-                StorageNodeSupport.CreateStoreContextText(_storeContext));
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpenFailed,
-                FlowDiagnosticLevel.Error,
-                "Storage store failed to open.",
-                exception,
-                StorageNodeSupport.CreateStoreAttributes(_storeContext));
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw;
-        }
-    }
 
     public override void Complete()
         => _input.Complete();
@@ -134,29 +88,13 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
         }
         finally
         {
-            if (_lease is not null)
-            {
-                await _lease.DisposeAsync().ConfigureAwait(false);
-            }
-
             _processingCancellation.Dispose();
         }
     }
 
-    private async Task QueryAsync(StorageQueryRequest input)
+    private Task QueryAsync(StorageQueryRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
-
-        var store = _lease?.Store;
-        if (store is null)
-        {
-            ReportError(
-                StorageErrorCodes.NotStarted,
-                "storage.query has not started.",
-                input,
-                exception: null);
-            return;
-        }
 
         StorageQueryRequest request;
         try
@@ -170,56 +108,17 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
                 $"storage.query request is invalid: {exception.Message}",
                 input,
                 exception);
-            return;
+            return Task.CompletedTask;
         }
 
-        try
-        {
-            var records = await store.QueryAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
-            var copiedRecords = records
-                .Select(record => ValidateAndCopyRecord(record, request))
-                .Take(request.Limit!.Value)
-                .ToArray();
-
-            await _result.SendAsync(
-                CreateResult(request, copiedRecords),
-                _processingCancellation.Token).ConfigureAwait(false);
-
-            if (_options.EmitRecordOutputs)
-            {
-                foreach (var record in copiedRecords)
-                {
-                    await _records.SendAsync(
-                        record,
-                        _processingCancellation.Token).ConfigureAwait(false);
-                }
-            }
-
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.QueryCompleted,
-                message: "storage.query completed.",
-                attributes: StorageNodeSupport.CreateCollectionAttributes(
-                    "query",
-                    _options.Store,
-                    request.Collection!,
-                    request.CorrelationId,
-                    copiedRecords.Length,
-                    request.Limit));
-        }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.QueryFailed,
-                $"storage.query failed: {exception.Message}",
-                request,
-                exception);
-        }
+        // The storage.store component holds configuration only; no store is
+        // opened yet, so every otherwise-valid request reports not available.
+        ReportError(
+            StorageErrorCodes.StoreNotAvailable,
+            NotAvailableMessage,
+            request,
+            exception: null);
+        return Task.CompletedTask;
     }
 
     private StorageQueryRequest NormalizeRequest(StorageQueryRequest input)
@@ -241,33 +140,6 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
         return request;
     }
 
-    private StorageQueryResult CreateResult(
-        StorageQueryRequest request,
-        IReadOnlyList<StorageRecord> records)
-        => new()
-        {
-            Timestamp = _componentOptions.Clock.GetUtcNow(),
-            Operation = "query",
-            Collection = request.Collection!,
-            Succeeded = true,
-            Count = records.Count,
-            Records = _options.EmitRecordsInResult ? records.ToArray() : [],
-            CorrelationId = request.CorrelationId
-        };
-
-    private static StorageRecord ValidateAndCopyRecord(
-        StorageRecord record,
-        StorageQueryRequest request)
-    {
-        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
-        {
-            throw new InvalidOperationException(
-                "storage.query store returned a record for a different collection.");
-        }
-
-        return StorageNodeSupport.CopyRecord(record);
-    }
-
     private void ReportError(
         int code,
         string message,
@@ -284,7 +156,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateCollectionContext(
                 "query",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 correlationId));
         TryEmitDiagnostic(
@@ -294,7 +166,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateCollectionAttributes(
                 "query",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 correlationId));
     }

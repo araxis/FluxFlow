@@ -135,6 +135,13 @@ Additive resource accessor (Wave 3 groundwork).
 - Replaces the bespoke `IHttpClock` abstraction with System.TimeProvider
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
+- Introduces a separate `http.client` resource component that owns the client
+  configuration (base URL, allowed hosts, redirect policy, timeout, pooling).
+  `http.request` now references it by a required `client` name and no longer
+  carries client-level config; it resolves the client at build time via the
+  engine's `$resources` mechanism. For now the client holds configuration only
+  — no `HttpClient` is established — so `http.request` reports a not-connected
+  result until a later connect step.
 
 ## FluxFlow.Components.Metrics 2.0.0-preview.1
 
@@ -161,6 +168,13 @@ Additive resource accessor (Wave 3 groundwork).
 - Replaces the bespoke `IStorageClock` abstraction with System.TimeProvider
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
+- Introduces a separate `storage.store` resource component that owns the store
+  configuration. `storage.put`/`storage.get`/`storage.query`/`storage.delete`
+  now reference it by a required `store` name and no longer open a store
+  directly; they resolve it at build time via the engine's `$resources`
+  mechanism. For now the store component holds configuration only — no store is
+  opened — so the operations report a not-available result until a later open
+  step.
 
 ## FluxFlow.Components.Sessions 2.0.0-preview.1
 

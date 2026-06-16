@@ -455,6 +455,19 @@ Date: 2026-05-31
   connect step (deliberate intermediate state; round-trip/health/lease tests were
   removed/rewritten). Mqtt stays `2.0.0-preview.1`. Full suite green at 692 tests.
   HTTP/Storage connection components still pending.
+- Wave 3 connection components (HTTP + Storage, mirroring MQTT, config-only):
+  added `http.client` (owns base URL/allowed hosts/redirects/timeout/pooling;
+  http.request references it by required `client`, reports RequestNotConnected,
+  holds no HttpClient) and `storage.store` (owns store config; storage.put/get/
+  query/delete reference it by required `store`, report StoreNotAvailable, open
+  no store). Both resolve via `GetResource<T>` at build. Removed the now-obsolete
+  through-node round-trip integration tests from the FileSystem/SqlFile adapter
+  test projects (direct-adapter coverage retained); added the two new types to
+  the Designer coverage test. Http/Storage stay `2.0.0-preview.1`. Full suite
+  green at 679 tests. Wave 3 connection-component separation is complete for all
+  three protocols (all config-only; the shared-client/open "connect step" is the
+  remaining future work, deferred by owner choice). The full 2.0 set (Waves 2+3)
+  is implemented and unpublished on the preview track.
 
 ## Remaining
 

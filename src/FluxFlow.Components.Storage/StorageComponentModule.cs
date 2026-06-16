@@ -10,20 +10,24 @@ public sealed class StorageComponentModule : IFlowNodeModule
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        var clock = options.Clock;
         Registrations =
         [
             new FlowNodeRegistration(
+                StorageComponentTypes.Store,
+                StorageStoreNodeFactory.Create),
+            new FlowNodeRegistration(
                 StorageComponentTypes.Put,
-                context => StorageNodeFactory.CreatePut(context, options)),
+                context => StorageNodeFactory.CreatePut(context, clock)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Get,
-                context => StorageNodeFactory.CreateGet(context, options)),
+                context => StorageNodeFactory.CreateGet(context, clock)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Query,
-                context => StorageNodeFactory.CreateQuery(context, options)),
+                context => StorageNodeFactory.CreateQuery(context, clock)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Delete,
-                context => StorageNodeFactory.CreateDelete(context, options))
+                context => StorageNodeFactory.CreateDelete(context, clock))
         ];
     }
 

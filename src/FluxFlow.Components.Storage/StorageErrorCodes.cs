@@ -9,4 +9,5 @@ public static class StorageErrorCodes
     public const int DeleteFailed = 14004;
     public const int NotStarted = 14005;
     public const int QueryFailed = 14006;
+    public const int StoreNotAvailable = 14007;
 }

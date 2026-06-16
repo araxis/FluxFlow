@@ -8,27 +8,27 @@ namespace FluxFlow.Components.Storage.Nodes;
 
 public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
 {
-    private readonly object _stateLock = new();
+    private const string NotAvailableMessage =
+        "storage.get is not available; the storage.store component does not open a store yet.";
+
     private readonly StorageGetOptions _options;
-    private readonly StorageComponentOptions _componentOptions;
-    private readonly StorageStoreContext _storeContext;
+    private readonly IStorageStoreHandle _store;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<StorageGetRequest> _input;
     private readonly BufferBlock<StorageResult> _result;
     private readonly BufferBlock<StorageResult> _found;
     private readonly BufferBlock<StorageResult> _notFound;
     private readonly CancellationTokenSource _processingCancellation = new();
-    private StorageStoreLease? _lease;
-    private bool _startRequested;
     private bool _disposed;
 
     internal StorageGetNode(
         StorageGetOptions options,
-        StorageComponentOptions componentOptions,
-        StorageStoreContext storeContext)
+        IStorageStoreHandle store,
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _componentOptions = componentOptions ?? throw new ArgumentNullException(nameof(componentOptions));
-        _storeContext = storeContext ?? throw new ArgumentNullException(nameof(storeContext));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
         var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
         _input = new ActionBlock<StorageGetRequest>(
@@ -57,52 +57,6 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
     public ISourceBlock<StorageResult> Found => _found;
 
     public ISourceBlock<StorageResult> NotFound => _notFound;
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("storage.get node has already started.");
-            }
-
-            _startRequested = true;
-        }
-
-        try
-        {
-            _lease = await StorageNodeSupport.OpenStoreAsync(
-                _componentOptions.StoreFactory,
-                _storeContext,
-                cancellationToken).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpened,
-                message: "Opened storage store.",
-                attributes: StorageNodeSupport.CreateStoreAttributes(_storeContext));
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                StorageErrorCodes.StoreUnavailable,
-                $"Storage store failed to open: {exception.Message}",
-                exception,
-                StorageNodeSupport.CreateStoreContextText(_storeContext));
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpenFailed,
-                FlowDiagnosticLevel.Error,
-                "Storage store failed to open.",
-                exception,
-                StorageNodeSupport.CreateStoreAttributes(_storeContext));
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw;
-        }
-    }
 
     public override void Complete()
         => _input.Complete();
@@ -139,29 +93,13 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
         }
         finally
         {
-            if (_lease is not null)
-            {
-                await _lease.DisposeAsync().ConfigureAwait(false);
-            }
-
             _processingCancellation.Dispose();
         }
     }
 
-    private async Task GetAsync(StorageGetRequest input)
+    private Task GetAsync(StorageGetRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
-
-        var store = _lease?.Store;
-        if (store is null)
-        {
-            ReportError(
-                StorageErrorCodes.NotStarted,
-                "storage.get has not started.",
-                input,
-                exception: null);
-            return;
-        }
 
         StorageGetRequest request;
         try
@@ -175,54 +113,17 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
                 $"storage.get request is invalid: {exception.Message}",
                 input,
                 exception);
-            return;
+            return Task.CompletedTask;
         }
 
-        try
-        {
-            var record = await store.GetAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
-            var result = record is null
-                ? CreateMissingResult(request)
-                : StorageNodeSupport.CreateRecordResult(
-                    "get",
-                    record,
-                    includeRecord: true,
-                    request.CorrelationId,
-                    _componentOptions.Clock);
-
-            await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
-            await (record is null ? _notFound : _found)
-                .SendAsync(result, _processingCancellation.Token)
-                .ConfigureAwait(false);
-            TryEmitDiagnostic(
-                record is null
-                    ? StorageDiagnosticNames.GetNotFound
-                    : StorageDiagnosticNames.GetFound,
-                message: record is null
-                    ? "storage.get did not find record."
-                    : "storage.get found record.",
-                attributes: StorageNodeSupport.CreateOperationAttributes(
-                    "get",
-                    _options.Store,
-                    request.Collection!,
-                    request.Key,
-                    request.CorrelationId,
-                    record?.Version));
-        }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.GetFailed,
-                $"storage.get failed: {exception.Message}",
-                request,
-                exception);
-        }
+        // The storage.store component holds configuration only; no store is
+        // opened yet, so every otherwise-valid request reports not available.
+        ReportError(
+            StorageErrorCodes.StoreNotAvailable,
+            NotAvailableMessage,
+            request,
+            exception: null);
+        return Task.CompletedTask;
     }
 
     private StorageGetRequest NormalizeRequest(StorageGetRequest input)
@@ -235,20 +136,6 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
             Key = StorageNodeSupport.ResolveKey("storage.get", input.Key),
             IncludeExpired = input.IncludeExpired ?? _options.IncludeExpired,
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
-        };
-
-    private StorageResult CreateMissingResult(StorageGetRequest request)
-        => new()
-        {
-            Timestamp = _componentOptions.Clock.GetUtcNow(),
-            Operation = "get",
-            Collection = request.Collection!,
-            Key = request.Key,
-            Succeeded = true,
-            Found = false,
-            Version = null,
-            CorrelationId = request.CorrelationId,
-            Message = "Record was not found."
         };
 
     private void ReportError(
@@ -268,7 +155,7 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationContext(
                 "get",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));
@@ -279,7 +166,7 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationAttributes(
                 "get",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));
