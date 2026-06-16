@@ -8,25 +8,25 @@ namespace FluxFlow.Components.Storage.Nodes;
 
 public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
 {
-    private readonly object _stateLock = new();
+    private const string NotAvailableMessage =
+        "storage.put is not available; the storage.store component does not open a store yet.";
+
     private readonly StoragePutOptions _options;
-    private readonly StorageComponentOptions _componentOptions;
-    private readonly StorageStoreContext _storeContext;
+    private readonly IStorageStoreHandle _store;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<StoragePutRequest> _input;
     private readonly BufferBlock<StorageResult> _result;
     private readonly CancellationTokenSource _processingCancellation = new();
-    private StorageStoreLease? _lease;
-    private bool _startRequested;
     private bool _disposed;
 
     internal StoragePutNode(
         StoragePutOptions options,
-        StorageComponentOptions componentOptions,
-        StorageStoreContext storeContext)
+        IStorageStoreHandle store,
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _componentOptions = componentOptions ?? throw new ArgumentNullException(nameof(componentOptions));
-        _storeContext = storeContext ?? throw new ArgumentNullException(nameof(storeContext));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
         var executionOptions = new ExecutionDataflowBlockOptions
         {
@@ -48,52 +48,6 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
     public ITargetBlock<StoragePutRequest> Input => _input;
 
     public ISourceBlock<StorageResult> Result => _result;
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("storage.put node has already started.");
-            }
-
-            _startRequested = true;
-        }
-
-        try
-        {
-            _lease = await StorageNodeSupport.OpenStoreAsync(
-                _componentOptions.StoreFactory,
-                _storeContext,
-                cancellationToken).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpened,
-                message: "Opened storage store.",
-                attributes: StorageNodeSupport.CreateStoreAttributes(_storeContext));
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                StorageErrorCodes.StoreUnavailable,
-                $"Storage store failed to open: {exception.Message}",
-                exception,
-                StorageNodeSupport.CreateStoreContextText(_storeContext));
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpenFailed,
-                FlowDiagnosticLevel.Error,
-                "Storage store failed to open.",
-                exception,
-                StorageNodeSupport.CreateStoreAttributes(_storeContext));
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw;
-        }
-    }
 
     public override void Complete()
         => _input.Complete();
@@ -128,29 +82,13 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
         }
         finally
         {
-            if (_lease is not null)
-            {
-                await _lease.DisposeAsync().ConfigureAwait(false);
-            }
-
             _processingCancellation.Dispose();
         }
     }
 
-    private async Task PutAsync(StoragePutRequest input)
+    private Task PutAsync(StoragePutRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
-
-        var store = _lease?.Store;
-        if (store is null)
-        {
-            ReportError(
-                StorageErrorCodes.NotStarted,
-                "storage.put has not started.",
-                input,
-                exception: null);
-            return;
-        }
 
         StoragePutRequest request;
         try
@@ -164,46 +102,17 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
                 $"storage.put request is invalid: {exception.Message}",
                 input,
                 exception);
-            return;
+            return Task.CompletedTask;
         }
 
-        try
-        {
-            var record = await store.PutAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
-            ValidateRecord(record, request);
-            var result = StorageNodeSupport.CreateRecordResult(
-                "put",
-                record,
-                _options.EmitStoredRecord,
-                request.CorrelationId,
-                _componentOptions.Clock);
-
-            await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.PutStored,
-                message: "storage.put stored record.",
-                attributes: StorageNodeSupport.CreateOperationAttributes(
-                    "put",
-                    _options.Store,
-                    request.Collection!,
-                    request.Key,
-                    request.CorrelationId,
-                    record.Version));
-        }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.PutFailed,
-                $"storage.put failed: {exception.Message}",
-                request,
-                exception);
-        }
+        // The storage.store component holds configuration only; no store is
+        // opened yet, so every otherwise-valid request reports not available.
+        ReportError(
+            StorageErrorCodes.StoreNotAvailable,
+            NotAvailableMessage,
+            request,
+            exception: null);
+        return Task.CompletedTask;
     }
 
     private StoragePutRequest NormalizeRequest(StoragePutRequest input)
@@ -237,7 +146,7 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationContext(
                 "put",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));
@@ -248,25 +157,10 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationAttributes(
                 "put",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));
-    }
-
-    private static void ValidateRecord(StorageRecord record, StoragePutRequest request)
-    {
-        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
-        {
-            throw new InvalidOperationException(
-                "storage.put store returned a record for a different collection.");
-        }
-
-        if (!StringComparer.Ordinal.Equals(record.Key, request.Key))
-        {
-            throw new InvalidOperationException(
-                "storage.put store returned a record for a different key.");
-        }
     }
 
     private void CompleteOutput(Task completion)

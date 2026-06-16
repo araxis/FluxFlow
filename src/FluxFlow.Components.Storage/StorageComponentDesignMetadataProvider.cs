@@ -8,6 +8,24 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 {
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() =>
     [
+        new()
+        {
+            Type = StorageComponentTypes.Store,
+            DisplayName = "Storage Store",
+            Category = "Storage",
+            Summary = "Holds shared storage store configuration referenced by storage operation nodes.",
+            IconKey = "storage",
+            PreferredNodeName = "storageStore",
+            SuggestedEditorWidth = 460,
+            Options =
+            [
+                TextHelper("storeName", "Store name", "Logical store name; defaults to the resource node name when omitted.")
+            ],
+            Ports =
+            [
+                Port(StorageComponentPorts.Errors, PortDirection.Output, "FlowError", false)
+            ]
+        },
         Metadata(StorageComponentTypes.Put, "Storage Put", "storagePut", "Writes records into a host-provided storage store.",
             "StoragePutRequest", StorageComponentPorts.Result, "StoragePutResult"),
         Metadata(StorageComponentTypes.Get, "Storage Get", "storageGet", "Reads a record from a host-provided storage store.",
@@ -36,6 +54,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             SuggestedEditorWidth = 480,
             Options =
             [
+                TextRequired("store", "Store name", "Name of the storage.store resource to use."),
                 Text("collection", "Collection", "default"),
                 Number("boundedCapacity", "Capacity", 128, 1)
             ],
@@ -53,6 +72,23 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         Kind = OptionValueKind.Text,
         DisplayName = displayName,
         DefaultValue = defaultValue
+    };
+
+    private static OptionDesignMetadata TextHelper(string name, string displayName, string helperText) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Text,
+        DisplayName = displayName,
+        HelperText = helperText
+    };
+
+    private static OptionDesignMetadata TextRequired(string name, string displayName, string helperText) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Text,
+        DisplayName = displayName,
+        HelperText = helperText,
+        IsRequired = true
     };
 
     private static OptionDesignMetadata Number(string name, string displayName, object defaultValue, double min) => new()

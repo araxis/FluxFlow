@@ -8,25 +8,25 @@ namespace FluxFlow.Components.Storage.Nodes;
 
 public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
 {
-    private readonly object _stateLock = new();
+    private const string NotAvailableMessage =
+        "storage.delete is not available; the storage.store component does not open a store yet.";
+
     private readonly StorageDeleteOptions _options;
-    private readonly StorageComponentOptions _componentOptions;
-    private readonly StorageStoreContext _storeContext;
+    private readonly IStorageStoreHandle _store;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<StorageDeleteRequest> _input;
     private readonly BufferBlock<StorageResult> _result;
     private readonly CancellationTokenSource _processingCancellation = new();
-    private StorageStoreLease? _lease;
-    private bool _startRequested;
     private bool _disposed;
 
     internal StorageDeleteNode(
         StorageDeleteOptions options,
-        StorageComponentOptions componentOptions,
-        StorageStoreContext storeContext)
+        IStorageStoreHandle store,
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _componentOptions = componentOptions ?? throw new ArgumentNullException(nameof(componentOptions));
-        _storeContext = storeContext ?? throw new ArgumentNullException(nameof(storeContext));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
         _input = new ActionBlock<StorageDeleteRequest>(
             DeleteAsync,
@@ -49,52 +49,6 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
     public ITargetBlock<StorageDeleteRequest> Input => _input;
 
     public ISourceBlock<StorageResult> Result => _result;
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("storage.delete node has already started.");
-            }
-
-            _startRequested = true;
-        }
-
-        try
-        {
-            _lease = await StorageNodeSupport.OpenStoreAsync(
-                _componentOptions.StoreFactory,
-                _storeContext,
-                cancellationToken).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpened,
-                message: "Opened storage store.",
-                attributes: StorageNodeSupport.CreateStoreAttributes(_storeContext));
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                StorageErrorCodes.StoreUnavailable,
-                $"Storage store failed to open: {exception.Message}",
-                exception,
-                StorageNodeSupport.CreateStoreContextText(_storeContext));
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.StoreOpenFailed,
-                FlowDiagnosticLevel.Error,
-                "Storage store failed to open.",
-                exception,
-                StorageNodeSupport.CreateStoreAttributes(_storeContext));
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw;
-        }
-    }
 
     public override void Complete()
         => _input.Complete();
@@ -129,29 +83,13 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
         }
         finally
         {
-            if (_lease is not null)
-            {
-                await _lease.DisposeAsync().ConfigureAwait(false);
-            }
-
             _processingCancellation.Dispose();
         }
     }
 
-    private async Task DeleteAsync(StorageDeleteRequest input)
+    private Task DeleteAsync(StorageDeleteRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
-
-        var store = _lease?.Store;
-        if (store is null)
-        {
-            ReportError(
-                StorageErrorCodes.NotStarted,
-                "storage.delete has not started.",
-                input,
-                exception: null);
-            return;
-        }
 
         StorageDeleteRequest request;
         try
@@ -165,50 +103,17 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
                 $"storage.delete request is invalid: {exception.Message}",
                 input,
                 exception);
-            return;
+            return Task.CompletedTask;
         }
 
-        try
-        {
-            var result = await store.DeleteAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
-            ValidateResult(result, request);
-
-            if (result.Found || _options.EmitMissingAsResult)
-            {
-                await _result.SendAsync(
-                    CopyResult(result),
-                    _processingCancellation.Token).ConfigureAwait(false);
-            }
-
-            TryEmitDiagnostic(
-                result.Found
-                    ? StorageDiagnosticNames.DeleteDeleted
-                    : StorageDiagnosticNames.DeleteMissing,
-                message: result.Found
-                    ? "storage.delete deleted record."
-                    : "storage.delete did not find record.",
-                attributes: StorageNodeSupport.CreateOperationAttributes(
-                    "delete",
-                    _options.Store,
-                    request.Collection!,
-                    request.Key,
-                    request.CorrelationId,
-                    result.Version));
-        }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            ReportError(
-                StorageErrorCodes.DeleteFailed,
-                $"storage.delete failed: {exception.Message}",
-                request,
-                exception);
-        }
+        // The storage.store component holds configuration only; no store is
+        // opened yet, so every otherwise-valid request reports not available.
+        ReportError(
+            StorageErrorCodes.StoreNotAvailable,
+            NotAvailableMessage,
+            request,
+            exception: null);
+        return Task.CompletedTask;
     }
 
     private StorageDeleteRequest NormalizeRequest(StorageDeleteRequest input)
@@ -220,30 +125,6 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
                 _options.Collection),
             Key = StorageNodeSupport.ResolveKey("storage.delete", input.Key),
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
-        };
-
-    private static void ValidateResult(StorageResult result, StorageDeleteRequest request)
-    {
-        if (!StringComparer.Ordinal.Equals(result.Collection, request.Collection))
-        {
-            throw new InvalidOperationException(
-                "storage.delete store returned a result for a different collection.");
-        }
-
-        if (!StringComparer.Ordinal.Equals(result.Key, request.Key))
-        {
-            throw new InvalidOperationException(
-                "storage.delete store returned a result for a different key.");
-        }
-    }
-
-    private static StorageResult CopyResult(StorageResult result)
-        => result with
-        {
-            Record = result.Record is null
-                ? null
-                : StorageNodeSupport.CopyRecord(result.Record),
-            Attributes = StorageNodeSupport.CopyAttributes(result.Attributes)
         };
 
     private void ReportError(
@@ -263,7 +144,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationContext(
                 "delete",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));
@@ -274,7 +155,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
             exception,
             StorageNodeSupport.CreateOperationAttributes(
                 "delete",
-                _options.Store,
+                _store.StoreName,
                 collection,
                 key,
                 correlationId));

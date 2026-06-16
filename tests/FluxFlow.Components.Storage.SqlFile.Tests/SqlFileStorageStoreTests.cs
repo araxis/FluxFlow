@@ -1,14 +1,18 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Storage.SqlFile.Tests;
 
+// NOTE: The through-the-node round-trip integration tests
+// (Registration_StoresThroughStorageNode, Registration_QueriesThroughStorageNode,
+// Registration_PropagatesConfiguredClockToStoreContext) were removed pending the
+// Wave 3 store-open step. The logical storage operation nodes are now config-only
+// and report StoreNotAvailable at runtime (no store is opened yet), so driving a
+// real put/get/query through the registered node no longer round-trips. The
+// direct SqlFileStorageStore / factory coverage below remains valid.
 public sealed class SqlFileStorageStoreTests
 {
     [Fact]
@@ -502,116 +506,6 @@ public sealed class SqlFileStorageStoreTests
             }));
     }
 
-    [Fact]
-    public async Task Registration_StoresThroughStorageNode()
-    {
-        using var temp = TempDirectory.Create();
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSqlFileStorage(
-                Path.Combine(temp.Path, "records.db")));
-        registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
-        var runtimeNode = factory(CreateContext(StorageComponentTypes.Put, new
-        {
-            collection = "items",
-            boundedCapacity = 4
-        }));
-        var input = runtimeNode.FindInput(new PortName(StorageComponentPorts.Input))
-            .ShouldBeOfType<InputPort<StoragePutRequest>>();
-        var output = LinkOutput<StorageResult>(runtimeNode);
-
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await input.Target.SendAsync(new StoragePutRequest
-        {
-            Key = "alpha",
-            Value = "first"
-        });
-        input.Target.Complete();
-
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeNodeAsync(runtimeNode);
-
-        result.Collection.ShouldBe("items");
-        result.Key.ShouldBe("alpha");
-        result.Version.ShouldBe(1);
-        File.Exists(Path.Combine(temp.Path, "records.db")).ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task Registration_PropagatesConfiguredClockToStoreContext()
-    {
-        var now = new DateTimeOffset(2026, 2, 3, 6, 4, 5, TimeSpan.Zero);
-        var clock = new FakeTimeProvider(now);
-        using var temp = TempDirectory.Create();
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options =>
-            {
-                options.UseClock(clock);
-                options.UseSqlFileStorage(Path.Combine(temp.Path, "records.db"));
-            });
-        registry.TryGetFactory(StorageComponentTypes.Put, out var factory).ShouldBeTrue();
-        var runtimeNode = factory(CreateContext(StorageComponentTypes.Put, new
-        {
-            collection = "items",
-            boundedCapacity = 4
-        }));
-        var input = runtimeNode.FindInput(new PortName(StorageComponentPorts.Input))
-            .ShouldBeOfType<InputPort<StoragePutRequest>>();
-        var output = LinkOutput<StorageResult>(runtimeNode);
-
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await input.Target.SendAsync(new StoragePutRequest
-        {
-            Key = "alpha",
-            Value = "first"
-        });
-        input.Target.Complete();
-
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeNodeAsync(runtimeNode);
-
-        result.Timestamp.ShouldBe(now);
-        result.Record.ShouldNotBeNull();
-        result.Record!.StoredAt.ShouldBe(now);
-    }
-
-    [Fact]
-    public async Task Registration_QueriesThroughStorageNode()
-    {
-        using var temp = TempDirectory.Create();
-        var path = Path.Combine(temp.Path, "records.db");
-        await using var store = CreateStore(path);
-        await store.PutAsync(new StoragePutRequest
-        {
-            Collection = "items",
-            Key = "alpha",
-            Value = "first"
-        });
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStorageComponents(options => options.UseSqlFileStorage(path));
-        registry.TryGetFactory(StorageComponentTypes.Query, out var factory).ShouldBeTrue();
-        var runtimeNode = factory(CreateContext(StorageComponentTypes.Query, new
-        {
-            collection = "items",
-            boundedCapacity = 4
-        }));
-        var input = runtimeNode.FindInput(new PortName(StorageComponentPorts.Input))
-            .ShouldBeOfType<InputPort<StorageQueryRequest>>();
-        var output = LinkOutput<StorageQueryResult>(runtimeNode);
-
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await input.Target.SendAsync(new StorageQueryRequest());
-        input.Target.Complete();
-
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeNodeAsync(runtimeNode);
-
-        result.Count.ShouldBe(1);
-        result.Records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
-    }
-
     private static SqlFileStorageStore CreateStore(
         string databasePath,
         FakeTimeProvider? clock = null)
@@ -621,48 +515,6 @@ public sealed class SqlFileStorageStoreTests
             Clock = clock
         });
 
-    private static RuntimeNodeFactoryContext CreateContext(
-        NodeType nodeType,
-        object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        var values = root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-
-        return new RuntimeNodeFactoryContext(
-            new NodeName("storage"),
-            new NodeDefinition
-            {
-                Type = nodeType,
-                Configuration = values
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
-    }
-
-    private static async Task DisposeNodeAsync(RuntimeNode runtimeNode)
-    {
-        if (runtimeNode.Node is IAsyncDisposable disposable)
-        {
-            await disposable.DisposeAsync();
-        }
-    }
-
-    private static BufferBlock<T> LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string portName = StorageComponentPorts.Result)
-    {
-        var target = new BufferBlock<T>();
-        runtimeNode.FindOutput(new PortName(portName))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-        return target;
-    }
 }
 
 internal sealed class TempDirectory : IDisposable

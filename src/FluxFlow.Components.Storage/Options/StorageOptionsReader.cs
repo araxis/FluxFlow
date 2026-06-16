@@ -12,11 +12,18 @@ internal static class StorageOptionsReader
         Converters = { new JsonStringEnumConverter() }
     };
 
+    public static StorageStoreOptions ReadStoreOptions(NodeDefinition definition)
+    {
+        var options = Read<StorageStoreOptions>(definition);
+        ValidateOptionalText("storage.store", "storeName", options.StoreName);
+        return options;
+    }
+
     public static StoragePutOptions ReadPutOptions(NodeDefinition definition)
     {
         var options = Read<StoragePutOptions>(definition);
         ValidateBoundedCapacity("storage.put", options.BoundedCapacity);
-        ValidateOptionalText("storage.put", "store", options.Store);
+        ValidateRequiredStore("storage.put", options.Store);
         ValidateOptionalText("storage.put", "collection", options.Collection);
         return options;
     }
@@ -25,7 +32,7 @@ internal static class StorageOptionsReader
     {
         var options = Read<StorageGetOptions>(definition);
         ValidateBoundedCapacity("storage.get", options.BoundedCapacity);
-        ValidateOptionalText("storage.get", "store", options.Store);
+        ValidateRequiredStore("storage.get", options.Store);
         ValidateOptionalText("storage.get", "collection", options.Collection);
         return options;
     }
@@ -34,7 +41,7 @@ internal static class StorageOptionsReader
     {
         var options = Read<StorageDeleteOptions>(definition);
         ValidateBoundedCapacity("storage.delete", options.BoundedCapacity);
-        ValidateOptionalText("storage.delete", "store", options.Store);
+        ValidateRequiredStore("storage.delete", options.Store);
         ValidateOptionalText("storage.delete", "collection", options.Collection);
         return options;
     }
@@ -43,7 +50,7 @@ internal static class StorageOptionsReader
     {
         var options = Read<StorageQueryOptions>(definition);
         ValidateBoundedCapacity("storage.query", options.BoundedCapacity);
-        ValidateOptionalText("storage.query", "store", options.Store);
+        ValidateRequiredStore("storage.query", options.Store);
         ValidateOptionalText("storage.query", "collection", options.Collection);
         ValidateOffset("storage.query", options.Offset);
         ValidateLimit("storage.query", options.Limit);
@@ -65,6 +72,15 @@ internal static class StorageOptionsReader
         {
             throw new InvalidOperationException(
                 $"{nodeType} option 'boundedCapacity' must be greater than zero.");
+        }
+    }
+
+    private static void ValidateRequiredStore(string nodeType, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} option 'store' is required and must name a storage.store resource.");
         }
     }
 

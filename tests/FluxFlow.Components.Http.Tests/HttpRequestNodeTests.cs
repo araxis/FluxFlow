@@ -1,16 +1,9 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Diagnostics;
-using FluxFlow.Components.Http.Options;
-using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
@@ -19,233 +12,225 @@ namespace FluxFlow.Components.Http.Tests;
 public sealed class HttpRequestNodeTests
 {
     [Fact]
-    public async Task Request_SendsViaConfiguredSenderAndEmitsResponse()
+    public void ClientNode_ExposesConfiguredHandle()
     {
-        HttpRequestSendContext? captured = null;
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-            {
-                captured = context;
-                return Task.FromResult(CreateResponse(context, 200, "ok"));
-            })),
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(
+            registry,
             new
             {
                 baseUrl = "https://example.test/api/",
+                allowedHosts = new[] { "example.test", ".internal.example" },
+                restrictToBaseUrlOrigin = true,
+                followRedirects = false,
+                defaultTimeoutMilliseconds = 5000,
+                pooledConnectionLifetimeSeconds = 120,
+                maxConnectionsPerServer = 8,
                 defaultHeaders = new Dictionary<string, string>
                 {
                     ["Accept"] = "application/json"
                 }
-            });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
+            },
+            clientName: "api-client");
 
-        await input.Target.SendAsync(new HttpRequestInput
-        {
-            Method = "post",
-            Url = "items",
-            Body = """{"name":"flux"}""",
-            ContentType = "application/json",
-            Headers = new Dictionary<string, string>
-            {
-                ["X-Request"] = "one"
-            }
-        });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var node = resources[new NodeName("api-client")].Node;
+        var handle = node.ShouldBeAssignableTo<IHttpClientHandle>()!;
 
-        response.Success.ShouldBeTrue();
-        response.StatusCode.ShouldBe(200);
-        response.Body.ShouldBe("ok");
-        captured.ShouldNotBeNull();
-        captured.Method.ShouldBe("POST");
-        captured.Url.ToString().ShouldBe("https://example.test/api/items");
-        captured.Headers["Accept"].ShouldBe("application/json");
-        captured.Headers["X-Request"].ShouldBe("one");
-        captured.ContentType.ShouldBe("application/json");
-        Encoding.UTF8.GetString(captured.BodyBytes!).ShouldBe("""{"name":"flux"}""");
+        handle.ClientName.ShouldBe("api-client");
+        handle.BaseUrl.ShouldBe("https://example.test/api/");
+        handle.AllowedHosts.ShouldBe(["example.test", ".internal.example"]);
+        handle.RestrictToBaseUrlOrigin.ShouldBeTrue();
+        handle.FollowRedirects.ShouldBeFalse();
+        handle.DefaultTimeoutMilliseconds.ShouldBe(5000);
+        handle.PooledConnectionLifetimeSeconds.ShouldBe(120);
+        handle.MaxConnectionsPerServer.ShouldBe(8);
+        handle.DefaultHeaders["Accept"].ShouldBe("application/json");
     }
 
     [Fact]
-    public async Task Request_UsesConfiguredClockForResponseTiming()
+    public void ClientNode_AppliesDefaultsWhenOmitted()
     {
-        var startedAt = DateTimeOffset.Parse("2026-06-02T10:00:00Z");
-        var elapsed = TimeSpan.FromMilliseconds(2500);
-        var completedAt = startedAt + elapsed;
-        var clock = new FakeTimeProvider(startedAt);
-        TimeProvider? capturedClock = null;
-        var runtimeNode = CreateNode(
-            options => options
-                .UseClock(clock)
-                .UseRequestSender((context) =>
-                {
-                    capturedClock = context.Clock;
-                    return new DelegateSender((sendContext, _) =>
-                    {
-                        // Advance between the node's start and completion reads so
-                        // the captured timing reflects a non-zero elapsed delta.
-                        clock.Advance(elapsed);
-                        return Task.FromResult(CreateResponse(sendContext, 200, "ok") with
-                        {
-                            Timestamp = DateTimeOffset.UnixEpoch,
-                            ElapsedMilliseconds = 42
-                        });
-                    });
-                }),
-            new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(registry);
 
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/ok" });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var handle = resources[new NodeName(HttpResourceTestContext.ClientName)].Node
+            .ShouldBeAssignableTo<IHttpClientHandle>()!;
 
-        capturedClock.ShouldBeSameAs(clock);
-        response.Timestamp.ShouldBe(completedAt);
-        response.ElapsedMilliseconds.ShouldBe(2500);
+        handle.ClientName.ShouldBe(HttpResourceTestContext.ClientName);
+        handle.BaseUrl.ShouldBeNull();
+        handle.AllowedHosts.ShouldBeEmpty();
+        handle.RestrictToBaseUrlOrigin.ShouldBeFalse();
+        handle.FollowRedirects.ShouldBeTrue();
+        handle.DefaultTimeoutMilliseconds.ShouldBe(100_000);
+        handle.PooledConnectionLifetimeSeconds.ShouldBeNull();
+        handle.MaxConnectionsPerServer.ShouldBeNull();
+        handle.DefaultHeaders.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Request_UsesCaseInsensitiveContentTypeHeader()
+    public void ClientNode_RejectsRelativeBaseUrl()
     {
-        HttpRequestSendContext? captured = null;
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-            {
-                captured = context;
-                return Task.FromResult(CreateResponse(context, 200, "ok"));
-            })),
-            new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
+        var registry = HttpResourceTestContext.CreateRegistry();
 
-        await input.Target.SendAsync(new HttpRequestInput
-        {
-            Url = "https://example.test/items",
-            Body = "{}",
-            Headers = new Dictionary<string, string>
-            {
-                ["content-type"] = "application/json"
-            }
-        });
-        input.Target.Complete();
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var exception = Should.Throw<InvalidOperationException>(
+            () => HttpResourceTestContext.CreateResources(
+                registry,
+                new { baseUrl = "relative/path" }));
 
-        captured.ShouldNotBeNull();
-        captured.ContentType.ShouldBe("application/json");
+        exception.Message.ShouldContain("baseUrl");
     }
 
     [Fact]
-    public async Task Request_EmitsNonSuccessResponseWithoutErrorByDefault()
+    public void ClientNode_RejectsRestrictToOriginWithoutBaseUrl()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-                Task.FromResult(CreateResponse(context, 404, "missing")))),
-            new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var registry = HttpResourceTestContext.CreateRegistry();
 
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/items/1" });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var exception = Should.Throw<InvalidOperationException>(
+            () => HttpResourceTestContext.CreateResources(
+                registry,
+                new { restrictToBaseUrlOrigin = true }));
 
-        response.StatusCode.ShouldBe(404);
-        response.Success.ShouldBeFalse();
-        errors.TryReceive(out _).ShouldBeFalse();
+        exception.Message.ShouldContain("restrictToBaseUrlOrigin");
     }
 
     [Fact]
-    public async Task Request_EmitsErrorForNonSuccessWhenConfigured()
+    public void ClientNode_RejectsEmptyAllowedHostEntry()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-                Task.FromResult(CreateResponse(context, 500, "failed")))),
-            new
-            {
-                treatNonSuccessStatusAsError = true
-            });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var registry = HttpResourceTestContext.CreateRegistry();
 
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/items/1" });
+        var exception = Should.Throw<InvalidOperationException>(
+            () => HttpResourceTestContext.CreateResources(
+                registry,
+                new { allowedHosts = new[] { "example.test", "" } }));
+
+        exception.Message.ShouldContain("allowedHosts");
+    }
+
+    [Fact]
+    public void ClientNode_RejectsInvalidPooledConnectionLifetime()
+    {
+        var registry = HttpResourceTestContext.CreateRegistry();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => HttpResourceTestContext.CreateResources(
+                registry,
+                new { pooledConnectionLifetimeSeconds = 0 }));
+
+        exception.Message.ShouldContain("pooledConnectionLifetimeSeconds");
+    }
+
+    [Fact]
+    public async Task Request_ReportsNotConnectedForResolvableClient()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
+        var registry = HttpResourceTestContext.CreateRegistry(options => options.UseClock(clock));
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
+        var input = GetInput(runtimeNode);
+        var output = LinkOutput<HttpResponseOutput>(runtimeNode, HttpComponentPorts.Output);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.HttpRequestNode>();
+        var diagnostics = new BufferBlock<FluxFlow.Engine.Components.FlowDiagnostic>();
+        node.Diagnostics.LinkTo(diagnostics);
+        var flowErrors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
+        node.Errors.LinkTo(flowErrors);
+
+        await node.StartAsync();
+        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/items" });
         input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // No client => no response is produced; the node reports not connected.
+        output.TryReceive(out _).ShouldBeFalse();
+
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Kind.ShouldBe(HttpErrorKind.NotConnected);
+        error.Message.ShouldContain("does not establish a client");
+        error.Url.ShouldBe("https://example.test/items");
+        error.Timestamp.ShouldBe(clock.GetUtcNow());
+
+        var flowError = await flowErrors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        flowError.Code.ShouldBe(HttpErrorCodes.RequestNotConnected);
+        flowError.Context.ShouldNotBeNull();
+        flowError.Context.ShouldContain($"clientName={HttpResourceTestContext.ClientName}");
+
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        diagnostic.Name.ShouldBe(HttpDiagnosticNames.RequestFailed);
+        diagnostic.Level.ShouldBe(FluxFlow.Engine.Components.FlowDiagnosticLevel.Error);
+        diagnostic.Attributes["clientName"].ShouldBe(HttpResourceTestContext.ClientName);
+
+        await node.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Request_ResolvesRelativeUrlAgainstClientBaseUrlBeforeReportingNotConnected()
+    {
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(
+            registry,
+            new { baseUrl = "https://example.test/api/" });
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
+        var input = GetInput(runtimeNode);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
+
+        await runtimeNode.Node.StartAsync();
+        await input.Target.SendAsync(new HttpRequestInput { Method = "post", Url = "items" });
+        input.Target.Complete();
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        response.StatusCode.ShouldBe(500);
-        response.Success.ShouldBeFalse();
-        error.Kind.ShouldBe(HttpErrorKind.NonSuccessStatus);
-        error.StatusCode.ShouldBe(500);
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Kind.ShouldBe(HttpErrorKind.NotConnected);
+        error.Method.ShouldBe("POST");
+        error.Url.ShouldBe("https://example.test/api/items");
     }
 
     [Fact]
     public async Task Request_EmitsInvalidUrlErrorAndContinues()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-                Task.FromResult(CreateResponse(context, 200, "ok")))),
-            new { });
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
         var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
 
+        await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(new HttpRequestInput { Url = "relative" });
         await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/ok" });
         input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        error.Kind.ShouldBe(HttpErrorKind.InvalidUrl);
-        response.Success.ShouldBeTrue();
-        response.Body.ShouldBe("ok");
+        first.Kind.ShouldBe(HttpErrorKind.InvalidUrl);
+        second.Kind.ShouldBe(HttpErrorKind.NotConnected);
     }
 
     [Fact]
-    public async Task Request_UsesConfiguredClockForRequestErrors()
+    public async Task Request_UsesClientClockForRequestErrors()
     {
         var startedAt = DateTimeOffset.Parse("2026-06-02T11:00:00Z");
         var elapsed = TimeSpan.FromMilliseconds(1250);
         var failedAt = startedAt + elapsed;
-        // The invalid-URL failure happens before the sender runs, so there is no
-        // hook to interleave Advance between the node's two clock reads. Auto-advance
-        // makes the second read (completion) land exactly one step after the first.
         var clock = new FakeTimeProvider(startedAt) { AutoAdvanceAmount = elapsed };
-        var runtimeNode = CreateNode(
-            options => options
-                .UseClock(clock)
-                .UseRequestSender((_) => new DelegateSender((context, _) =>
-                    Task.FromResult(CreateResponse(context, 200, "ok")))),
-            new { });
+        var registry = HttpResourceTestContext.CreateRegistry(options => options.UseClock(clock));
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
         var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
 
+        await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(new HttpRequestInput { Url = "relative" });
         input.Target.Complete();
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
@@ -257,111 +242,72 @@ public sealed class HttpRequestNodeTests
     }
 
     [Fact]
-    public async Task Request_AllowsHostMatchingAllowedHosts()
+    public async Task Request_RejectsHostOutsideClientAllowedHosts()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-                Task.FromResult(CreateResponse(context, 200, "ok")))),
-            new
-            {
-                allowedHosts = new[] { "api.example.test", ".internal.example" }
-            });
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(
+            registry,
+            new { allowedHosts = new[] { "api.example.test" } });
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
         var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
 
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://api.example.test/items" });
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://service.internal.example/items" });
-        input.Target.Complete();
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        first.Success.ShouldBeTrue();
-        second.Success.ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task Request_RejectsHostOutsideAllowedHostsWithoutSending()
-    {
-        var sent = false;
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-            {
-                sent = true;
-                return Task.FromResult(CreateResponse(context, 200, "ok"));
-            })),
-            new
-            {
-                allowedHosts = new[] { "api.example.test" }
-            });
-        var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
-
+        await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(new HttpRequestInput { Url = "https://evil.example.test/items" });
         input.Target.Complete();
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         error.Kind.ShouldBe(HttpErrorKind.UrlNotAllowed);
-        sent.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Request_RestrictToBaseUrlOriginBlocksCrossOriginAbsoluteUrl()
     {
-        HttpRequestSendContext? captured = null;
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-            {
-                captured = context;
-                return Task.FromResult(CreateResponse(context, 200, "ok"));
-            })),
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(
+            registry,
             new
             {
                 baseUrl = "https://example.test/api/",
                 restrictToBaseUrlOrigin = true
             });
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
         var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
 
+        await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(new HttpRequestInput { Url = "https://attacker.test/steal" });
         await input.Target.SendAsync(new HttpRequestInput { Url = "items" });
         input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var blocked = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var allowed = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        error.Kind.ShouldBe(HttpErrorKind.UrlNotAllowed);
-        response.Success.ShouldBeTrue();
-        captured.ShouldNotBeNull();
-        captured.Url.ToString().ShouldBe("https://example.test/api/items");
+        blocked.Kind.ShouldBe(HttpErrorKind.UrlNotAllowed);
+        allowed.Kind.ShouldBe(HttpErrorKind.NotConnected);
+        allowed.Url.ShouldBe("https://example.test/api/items");
     }
 
     [Fact]
     public async Task Request_RejectsHeadersWithForbiddenCharacters()
     {
-        var sent = false;
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-            {
-                sent = true;
-                return Task.FromResult(CreateResponse(context, 200, "ok"));
-            })),
-            new { });
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        var runtimeNode = CreateRequestNode(
+            registry,
+            new { client = HttpResourceTestContext.ClientName },
+            resources);
         var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var errors = LinkOutput<HttpErrorOutput>(runtimeNode, HttpComponentPorts.Errors);
 
+        await runtimeNode.Node.StartAsync();
         await input.Target.SendAsync(new HttpRequestInput
         {
             Url = "https://example.test/items",
@@ -375,224 +321,75 @@ public sealed class HttpRequestNodeTests
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         error.Kind.ShouldBe(HttpErrorKind.InvalidRequest);
-        sent.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Request_EmitsTimeoutError()
+    public void Request_RejectsMissingClientOption()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender(async (_, cancellationToken) =>
-            {
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                throw new UnreachableException();
-            })),
-            new { });
-        var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        registry.TryGetFactory(HttpComponentTypes.Request, out var factory).ShouldBeTrue();
 
-        await input.Target.SendAsync(new HttpRequestInput
-        {
-            Url = "https://example.test/slow",
-            TimeoutMilliseconds = 1
-        });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        error.Kind.ShouldBe(HttpErrorKind.Timeout);
-    }
-
-    [Fact]
-    public async Task Request_EmitsCanceledError()
-    {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((_, _) =>
-                throw new OperationCanceledException("stopped"))),
-            new { });
-        var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
-
-        await input.Target.SendAsync(new HttpRequestInput
-        {
-            Url = "https://example.test/canceled"
-        });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        error.Kind.ShouldBe(HttpErrorKind.Canceled);
-    }
-
-    [Fact]
-    public async Task Request_DefaultSenderReadsResponse()
-    {
-        await using var server = await TestHttpServer.StartAsync(
-            "application/json; charset=utf-8",
-            """{"ok":true}""");
-        var runtimeNode = CreateNode(_ => { }, new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-
-        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        response.Success.ShouldBeTrue();
-        response.StatusCode.ShouldBe(200);
-        response.ContentType.ShouldBe("application/json; charset=utf-8");
-        response.Body.ShouldBe("""{"ok":true}""");
-        response.BodyBytes.ShouldBe(Encoding.UTF8.GetBytes("""{"ok":true}"""));
-    }
-
-    [Fact]
-    public async Task Request_DoesNotFollowRedirectToDisallowedHostUnderAllowList()
-    {
-        await using var server = await RedirectingTestServer.StartAsync(
-            "https://attacker.test/steal");
-        var runtimeNode = CreateNode(_ => { }, new
-        {
-            allowedHosts = new[] { "127.0.0.1" }
-        });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-
-        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        response.StatusCode.ShouldBe(302);
-        response.Headers["Location"].ShouldBe(["https://attacker.test/steal"]);
-        server.RequestCount.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Request_FollowsRedirectWhenNoAllowListGuardConfigured()
-    {
-        await using var target = await TestHttpServer.StartAsync(
-            "text/plain",
-            "redirected");
-        await using var server = await RedirectingTestServer.StartAsync(target.Url);
-        var runtimeNode = CreateNode(_ => { }, new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-
-        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
-        input.Target.Complete();
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        response.StatusCode.ShouldBe(200);
-        response.Body.ShouldBe("redirected");
-        server.RequestCount.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Request_EnforcesMaxResponseBodySize()
-    {
-        await using var server = await TestHttpServer.StartAsync(
-            "text/plain",
-            "too-large");
-        var runtimeNode = CreateNode(_ => { }, new
-        {
-            maxResponseBodyBytes = 3
-        });
-        var input = GetInput(runtimeNode);
-        var errors = LinkOutput<HttpErrorOutput>(
-            runtimeNode,
-            HttpComponentPorts.Errors);
-
-        await input.Target.SendAsync(new HttpRequestInput { Url = server.Url });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        error.Kind.ShouldBe(HttpErrorKind.ResponseTooLarge);
-    }
-
-    [Fact]
-    public async Task Request_EmitsDiagnostics()
-    {
-        var runtimeNode = CreateNode(
-            options => options.UseRequestSender((_) => new DelegateSender((context, _) =>
-                Task.FromResult(CreateResponse(context, 200, "ok")))),
-            new { });
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<HttpResponseOutput>(
-            runtimeNode,
-            HttpComponentPorts.Output);
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
-
-        await input.Target.SendAsync(new HttpRequestInput { Url = "https://example.test/ok" });
-        input.Target.Complete();
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(HttpDiagnosticNames.RequestSucceeded);
-        diagnostic.Attributes["statusCode"].ShouldBe(200);
-        diagnostic.Attributes["success"].ShouldBe(true);
-    }
-
-    [Fact]
-    public void Request_RejectsInvalidOptions()
-    {
         var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(_ => { }, new { boundedCapacity = 0 }));
+            () => factory(HttpResourceTestContext.CreateContext(
+                HttpComponentTypes.Request,
+                new { maxResponseBodyBytes = 1024 },
+                resources)));
+
+        exception.Message.ShouldContain("client");
+    }
+
+    [Fact]
+    public void Request_FailsWhenClientResourceMissing()
+    {
+        var registry = HttpResourceTestContext.CreateRegistry();
+        registry.TryGetFactory(HttpComponentTypes.Request, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(HttpResourceTestContext.CreateContext(
+                HttpComponentTypes.Request,
+                new { client = "missing-client" },
+                new Dictionary<NodeName, RuntimeNode>())));
+
+        exception.Message.ShouldContain("missing-client");
+    }
+
+    [Fact]
+    public void Request_RejectsInvalidBoundedCapacity()
+    {
+        var registry = HttpResourceTestContext.CreateRegistry();
+        var resources = HttpResourceTestContext.CreateResources(registry);
+        registry.TryGetFactory(HttpComponentTypes.Request, out var factory).ShouldBeTrue();
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => factory(HttpResourceTestContext.CreateContext(
+                HttpComponentTypes.Request,
+                new { client = HttpResourceTestContext.ClientName, boundedCapacity = 0 },
+                resources)));
 
         exception.Message.ShouldContain("boundedCapacity");
     }
 
     [Fact]
-    public void RegisterHttpComponents_RegistersRequestNode()
+    public void RegisterHttpComponents_RegistersClientAndRequestNodes()
     {
         var registry = new RuntimeNodeFactoryRegistry()
             .RegisterHttpComponents();
 
+        registry.TryGetFactory(HttpComponentTypes.Client, out _).ShouldBeTrue();
         registry.TryGetFactory(HttpComponentTypes.Request, out _).ShouldBeTrue();
     }
 
-    private static RuntimeNode CreateNode(
-        Action<HttpComponentOptions> configure,
-        object configuration)
+    private static RuntimeNode CreateRequestNode(
+        RuntimeNodeFactoryRegistry registry,
+        object configuration,
+        IReadOnlyDictionary<NodeName, RuntimeNode> resources)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterHttpComponents(configure);
         registry.TryGetFactory(HttpComponentTypes.Request, out var factory).ShouldBeTrue();
-        return factory(CreateContext(configuration));
-    }
-
-    private static RuntimeNodeFactoryContext CreateContext(object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        var values = root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-
-        return new RuntimeNodeFactoryContext(
-            new NodeName("request"),
-            new NodeDefinition
-            {
-                Type = HttpComponentTypes.Request,
-                Configuration = values
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
+        return factory(HttpResourceTestContext.CreateContext(
+            HttpComponentTypes.Request,
+            configuration,
+            resources));
     }
 
     private static InputPort<HttpRequestInput> GetInput(RuntimeNode runtimeNode)
@@ -613,219 +410,5 @@ public sealed class HttpRequestNodeTests
                 out var error);
         error.ShouldBeNull();
         return target;
-    }
-
-    private static HttpResponseOutput CreateResponse(
-        HttpRequestSendContext context,
-        int statusCode,
-        string body)
-        => new()
-        {
-            Method = context.Method,
-            Url = context.Url.ToString(),
-            StatusCode = statusCode,
-            ReasonPhrase = statusCode is >= 200 and <= 299 ? "OK" : "Error",
-            Headers = new Dictionary<string, string[]>
-            {
-                ["Content-Type"] = ["text/plain"]
-            },
-            BodyBytes = Encoding.UTF8.GetBytes(body),
-            Body = body,
-            ContentType = "text/plain",
-            ElapsedMilliseconds = 1,
-            Success = statusCode is >= 200 and <= 299
-        };
-
-    private sealed class DelegateSender(
-        Func<HttpRequestSendContext, CancellationToken, Task<HttpResponseOutput>> send)
-        : IHttpRequestSender
-    {
-        public Task<HttpResponseOutput> SendAsync(
-            HttpRequestSendContext context,
-            CancellationToken cancellationToken = default)
-            => send(context, cancellationToken);
-
-        public ValueTask DisposeAsync()
-            => ValueTask.CompletedTask;
-    }
-
-    private sealed class TestHttpServer : IAsyncDisposable
-    {
-        private readonly TcpListener _listener;
-        private readonly Task _serverTask;
-
-        private TestHttpServer(
-            TcpListener listener,
-            Task serverTask,
-            string url)
-        {
-            _listener = listener;
-            _serverTask = serverTask;
-            Url = url;
-        }
-
-        public string Url { get; }
-
-        public static Task<TestHttpServer> StartAsync(
-            string contentType,
-            string body)
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var endpoint = (IPEndPoint)listener.LocalEndpoint;
-            var server = new TestHttpServer(
-                listener,
-                HandleAsync(listener, contentType, body),
-                $"http://127.0.0.1:{endpoint.Port}/");
-            return Task.FromResult(server);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _listener.Stop();
-            try
-            {
-                await _serverTask.ConfigureAwait(false);
-            }
-            catch (SocketException)
-            {
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-        }
-
-        private static async Task HandleAsync(
-            TcpListener listener,
-            string contentType,
-            string body)
-        {
-            using var client = await listener.AcceptTcpClientAsync()
-                .ConfigureAwait(false);
-            await using var stream = client.GetStream();
-            await ReadHeadersAsync(stream).ConfigureAwait(false);
-
-            var bodyBytes = Encoding.UTF8.GetBytes(body);
-            var header =
-                "HTTP/1.1 200 OK\r\n" +
-                $"Content-Type: {contentType}\r\n" +
-                $"Content-Length: {bodyBytes.Length}\r\n" +
-                "Connection: close\r\n" +
-                "\r\n";
-            var headerBytes = Encoding.ASCII.GetBytes(header);
-            await stream.WriteAsync(headerBytes).ConfigureAwait(false);
-            await stream.WriteAsync(bodyBytes).ConfigureAwait(false);
-        }
-
-        private static async Task ReadHeadersAsync(NetworkStream stream)
-        {
-            var buffer = new byte[1];
-            var previous = new Queue<byte>(4);
-            while (await stream.ReadAsync(buffer).ConfigureAwait(false) == 1)
-            {
-                previous.Enqueue(buffer[0]);
-                if (previous.Count > 4)
-                {
-                    previous.Dequeue();
-                }
-
-                if (previous.Count == 4 &&
-                    previous.SequenceEqual("\r\n\r\n"u8.ToArray()))
-                {
-                    return;
-                }
-            }
-        }
-    }
-
-    private sealed class RedirectingTestServer : IAsyncDisposable
-    {
-        private readonly TcpListener _listener;
-        private readonly string _location;
-        private readonly Task _serverTask;
-        private int _requestCount;
-
-        private RedirectingTestServer(
-            TcpListener listener,
-            string url,
-            string location)
-        {
-            _listener = listener;
-            Url = url;
-            _location = location;
-            _serverTask = AcceptAsync();
-        }
-
-        public string Url { get; }
-
-        public int RequestCount => Volatile.Read(ref _requestCount);
-
-        public static Task<RedirectingTestServer> StartAsync(string location)
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var endpoint = (IPEndPoint)listener.LocalEndpoint;
-            var server = new RedirectingTestServer(
-                listener,
-                $"http://127.0.0.1:{endpoint.Port}/",
-                location);
-            return Task.FromResult(server);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _listener.Stop();
-            try
-            {
-                await _serverTask.ConfigureAwait(false);
-            }
-            catch (SocketException)
-            {
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-        }
-
-        private async Task AcceptAsync()
-        {
-            while (true)
-            {
-                using var client = await _listener.AcceptTcpClientAsync()
-                    .ConfigureAwait(false);
-                Interlocked.Increment(ref _requestCount);
-                await using var stream = client.GetStream();
-                await ReadHeadersAsync(stream).ConfigureAwait(false);
-
-                var header =
-                    "HTTP/1.1 302 Found\r\n" +
-                    $"Location: {_location}\r\n" +
-                    "Content-Length: 0\r\n" +
-                    "Connection: close\r\n" +
-                    "\r\n";
-                var headerBytes = Encoding.ASCII.GetBytes(header);
-                await stream.WriteAsync(headerBytes).ConfigureAwait(false);
-            }
-        }
-
-        private static async Task ReadHeadersAsync(NetworkStream stream)
-        {
-            var buffer = new byte[1];
-            var previous = new Queue<byte>(4);
-            while (await stream.ReadAsync(buffer).ConfigureAwait(false) == 1)
-            {
-                previous.Enqueue(buffer[0]);
-                if (previous.Count > 4)
-                {
-                    previous.Dequeue();
-                }
-
-                if (previous.Count == 4 &&
-                    previous.SequenceEqual("\r\n\r\n"u8.ToArray()))
-                {
-                    return;
-                }
-            }
-        }
     }
 }

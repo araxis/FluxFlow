@@ -11,4 +11,5 @@ public static class HttpErrorCodes
     public const int SendFailed = 9006;
     public const int NonSuccessStatus = 9007;
     public const int UrlNotAllowed = 9008;
+    public const int RequestNotConnected = 9009;
 }

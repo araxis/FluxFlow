@@ -10,6 +10,30 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
     [
         new()
         {
+            Type = HttpComponentTypes.Client,
+            DisplayName = "HTTP Client",
+            Category = "HTTP",
+            Summary = "Holds shared HTTP client configuration referenced by request nodes.",
+            IconKey = "http-client",
+            PreferredNodeName = "httpClient",
+            SuggestedEditorWidth = 460,
+            Options =
+            [
+                Text("baseUrl", "Base URL", "Absolute base URL used to resolve relative request URLs."),
+                AllowedHosts(),
+                Boolean("restrictToBaseUrlOrigin", "Restrict to baseUrl origin", false),
+                Boolean("followRedirects", "Follow redirects", true),
+                Number("defaultTimeoutMilliseconds", "Default timeout ms", 100000, 1),
+                NumberOptional("pooledConnectionLifetimeSeconds", "Pooled connection lifetime s", 1),
+                NumberOptional("maxConnectionsPerServer", "Max connections per server", 1)
+            ],
+            Ports =
+            [
+                Port("Errors", PortDirection.Output, "FlowError", false)
+            ]
+        },
+        new()
+        {
             Type = HttpComponentTypes.Request,
             DisplayName = "HTTP Request",
             Category = "HTTP",
@@ -19,12 +43,9 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
             SuggestedEditorWidth = 520,
             Options =
             [
-                Number("defaultTimeoutMilliseconds", "Default timeout ms", 30000, 1),
+                Text("client", "Client name", "Name of the http.client resource to use.", true),
                 Number("maxResponseBodyBytes", "Max response body bytes", 1048576, 1),
-                Boolean("followRedirects", "Follow redirects", true),
                 Boolean("treatNonSuccessStatusAsError", "Treat non-success status as error", false),
-                Boolean("restrictToBaseUrlOrigin", "Restrict to baseUrl origin", false),
-                AllowedHosts(),
                 Number("boundedCapacity", "Capacity", 128, 1)
             ],
             Ports =
@@ -36,12 +57,33 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
         }
     ];
 
+    private static OptionDesignMetadata Text(
+        string name,
+        string displayName,
+        string? helperText = null,
+        bool required = false) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Text,
+        DisplayName = displayName,
+        HelperText = helperText,
+        IsRequired = required
+    };
+
     private static OptionDesignMetadata Number(string name, string displayName, object defaultValue, double min) => new()
     {
         Name = name,
         Kind = OptionValueKind.Number,
         DisplayName = displayName,
         DefaultValue = defaultValue,
+        Min = min
+    };
+
+    private static OptionDesignMetadata NumberOptional(string name, string displayName, double min) => new()
+    {
+        Name = name,
+        Kind = OptionValueKind.Number,
+        DisplayName = displayName,
         Min = min
     };
 
