@@ -60,7 +60,12 @@ if (!start.IsSuccess)
     return 1;
 }
 
-await host.Runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+// The mqtt.connection component holds configuration only; the publish and
+// subscribe nodes resolve it by connectionName but do not establish a client
+// yet, so the subscribe source never self-completes. Drive completion through
+// the host so the run terminates instead of waiting for messages that the
+// not-connected nodes never produce.
+await host.StopAsync(new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
 var observedDiagnostics = await ReceiveUntilCompletedAsync(diagnostics, TimeSpan.FromSeconds(5));
 var published = adapter.Published
     .OrderBy(request => request.Topic, StringComparer.Ordinal)
@@ -70,7 +75,7 @@ var results = store.GetResults()
     .ToArray();
 
 Console.WriteLine("Sample: mqtt-composition");
-Console.WriteLine($"Factory contexts: {clientFactory.Contexts.Count}");
+Console.WriteLine("Connection: sample-bus (config only; no client established yet)");
 Console.WriteLine($"Published messages: {published.Length}");
 foreach (var request in published)
 {

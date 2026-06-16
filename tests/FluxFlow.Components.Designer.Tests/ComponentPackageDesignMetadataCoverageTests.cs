@@ -94,6 +94,7 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         HttpComponentTypes.Request,
         MappingComponentTypes.Mapper,
         MetricsComponentTypes.Aggregate,
+        MqttComponentTypes.Connection,
         MqttComponentTypes.Publish,
         MqttComponentTypes.Subscribe,
         ObservabilityComponentTypes.Counter,

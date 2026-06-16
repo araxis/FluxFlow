@@ -12,6 +12,27 @@ internal static class SampleApplicationDefinition
     public static ApplicationDefinition Create()
         => new()
         {
+            Resources =
+            {
+                ["sample-bus"] = new NodeDefinition
+                {
+                    Type = MqttComponentTypes.Connection,
+                    Configuration =
+                    {
+                        ["profile"] = JsonValue(new
+                        {
+                            name = "sample-bus",
+                            host = "localhost",
+                            port = 1883
+                        }),
+                        ["reconnect"] = JsonValue(new
+                        {
+                            enabled = true,
+                            maxAttempts = 5
+                        })
+                    }
+                }
+            },
             Workflows =
             {
                 ["main"] = new WorkflowDefinition

@@ -213,6 +213,13 @@ Additive resource accessor (Wave 3 groundwork).
 - Replaces the bespoke `IMqttClock` abstraction with System.TimeProvider
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
+- Introduces a separate `mqtt.connection` resource component that owns the
+  connection profile and reconnect policy. `mqtt.publish`/`mqtt.subscribe` now
+  reference it by a required `connectionName` and no longer carry
+  `connection`/`reconnect` config; they resolve the connection at build time via
+  the engine's `$resources` mechanism. For now the connection holds
+  configuration only — no MQTT client is established — so publish/subscribe
+  report a not-connected result until a later connect step.
 
 ## FluxFlow.Components.Payloads 2.0.0-preview.1
 

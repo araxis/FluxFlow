@@ -444,6 +444,17 @@ Date: 2026-05-31
   other clock packages already on the 2.0 track gained a clock changelog
   bullet. Engine has no clock and is unaffected. Connection-resource components
   (mqtt.connection/http.client/storage.store) remain the last Wave 3 step.
+- Wave 3 connection components (MQTT template): added a separate `mqtt.connection`
+  resource component (`IMqttConnectionHandle`, `MqttConnectionNode`/options/
+  factory, `mqtt.connection` type) that owns the connection profile + reconnect
+  policy. `mqtt.publish`/`mqtt.subscribe` now reference it by required
+  `connectionName`, resolve it at build via `GetResource<IMqttConnectionHandle>`,
+  and no longer carry connection/reconnect config or create/connect/dispose any
+  client. Per the owner's explicit choice, this step is CONFIG-ONLY: no client is
+  established, so publish/subscribe report a not-connected result until a later
+  connect step (deliberate intermediate state; round-trip/health/lease tests were
+  removed/rewritten). Mqtt stays `2.0.0-preview.1`. Full suite green at 692 tests.
+  HTTP/Storage connection components still pending.
 
 ## Remaining
 

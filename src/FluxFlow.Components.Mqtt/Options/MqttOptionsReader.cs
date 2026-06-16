@@ -10,25 +10,32 @@ internal static class MqttOptionsReader
 {
     private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
+    public static MqttConnectionOptions ReadConnectionOptions(NodeDefinition definition)
+    {
+        var options = Read<MqttConnectionOptions>(definition);
+        EnsureValidReconnectPolicy(options.Reconnect);
+        return options;
+    }
+
     public static MqttPublishOptions ReadPublishOptions(NodeDefinition definition)
     {
         var options = Read<MqttPublishOptions>(definition);
+        EnsureConnectionName(options.ConnectionName, nameof(options.ConnectionName));
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
         EnsurePositive(options.PublishTimeoutMilliseconds, nameof(options.PublishTimeoutMilliseconds));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
         EnsureValidPublishTopic(options.DefaultTopic, nameof(options.DefaultTopic), required: false);
-        EnsureValidReconnectPolicy(options.Reconnect);
         return options;
     }
 
     public static MqttSubscriptionOptions ReadSubscriptionOptions(NodeDefinition definition)
     {
         var options = Read<MqttSubscriptionOptions>(definition);
+        EnsureConnectionName(options.ConnectionName, nameof(options.ConnectionName));
         EnsurePositive(options.BoundedCapacity, nameof(options.BoundedCapacity));
         EnsureDefined(options.QualityOfService, nameof(options.QualityOfService));
 
         EnsureValidSubscriptionFilter(options.TopicFilter, nameof(options.TopicFilter));
-        EnsureValidReconnectPolicy(options.Reconnect);
 
         return options;
     }
@@ -45,6 +52,15 @@ internal static class MqttOptionsReader
 
         var json = JsonSerializer.Serialize(definition.Configuration, SerializerOptions);
         return JsonSerializer.Deserialize<T>(json, SerializerOptions) ?? new T();
+    }
+
+    private static void EnsureConnectionName(string? value, string name)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(
+                $"MQTT option '{name}' is required and must name an mqtt.connection resource.");
+        }
     }
 
     private static void EnsurePositive(int value, string name)

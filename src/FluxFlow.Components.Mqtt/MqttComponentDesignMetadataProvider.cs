@@ -10,6 +10,32 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     [
         new()
         {
+            Type = MqttComponentTypes.Connection,
+            DisplayName = "MQTT Connection",
+            Category = "MQTT",
+            Summary = "Holds shared MQTT connection configuration referenced by publish and subscribe nodes.",
+            IconKey = "mqtt-connection",
+            PreferredNodeName = "mqttConnection",
+            SuggestedEditorWidth = 460,
+            Options =
+            [
+                Option("profile.host", OptionValueKind.Text, "Host", "Broker host name or address."),
+                Option("profile.port", OptionValueKind.Number, "Port", "Broker TCP port.", defaultValue: 1883),
+                Option("profile.clientId", OptionValueKind.Text, "Client id"),
+                Option("profile.useTls", OptionValueKind.Boolean, "Use TLS", defaultValue: false),
+                Option("reconnect.enabled", OptionValueKind.Boolean, "Reconnect enabled", defaultValue: true),
+                Option("reconnect.maxAttempts", OptionValueKind.Number, "Max attempts", "Maximum reconnect attempts.", false, null),
+                Option("reconnect.initialDelayMilliseconds", OptionValueKind.Number, "Initial delay ms"),
+                Option("reconnect.maxDelayMilliseconds", OptionValueKind.Number, "Max delay ms"),
+                Option("reconnect.backoffMultiplier", OptionValueKind.Number, "Backoff multiplier")
+            ],
+            Ports =
+            [
+                Port("Errors", PortDirection.Output, "FlowError", false)
+            ]
+        },
+        new()
+        {
             Type = MqttComponentTypes.Subscribe,
             DisplayName = "MQTT Subscribe",
             Category = "MQTT",
@@ -19,7 +45,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             SuggestedEditorWidth = 460,
             Options =
             [
-                Option("connectionName", OptionValueKind.Text, "Connection name"),
+                Option("connectionName", OptionValueKind.Text, "Connection name", "Name of the mqtt.connection resource to use.", true),
                 Option("topicFilter", OptionValueKind.Text, "Topic filter", "MQTT topic filter to subscribe to.", true, "#"),
                 QualityOfServiceOption(),
                 Option("receiveRetainedMessages", OptionValueKind.Boolean, "Receive retained", defaultValue: true),
@@ -42,7 +68,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             SuggestedEditorWidth = 460,
             Options =
             [
-                Option("connectionName", OptionValueKind.Text, "Connection name"),
+                Option("connectionName", OptionValueKind.Text, "Connection name", "Name of the mqtt.connection resource to use.", true),
                 Option("defaultTopic", OptionValueKind.Text, "Default topic"),
                 QualityOfServiceOption(),
                 Option("retain", OptionValueKind.Boolean, "Retain", defaultValue: false),
