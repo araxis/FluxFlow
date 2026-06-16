@@ -1,4 +1,3 @@
-using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using Xunit;
@@ -11,49 +10,22 @@ public sealed class MqttComponentModuleTests
     public void RegisterMqttComponents_AddsPackageNodeFactories()
     {
         var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(options => options.UseClientFactory(new TestMqttClientFactory()));
+            .RegisterMqttComponents(_ => { });
 
+        registry.TryGetFactory(MqttComponentTypes.Connection, out _).ShouldBeTrue();
         registry.TryGetFactory(MqttComponentTypes.Publish, out _).ShouldBeTrue();
         registry.TryGetFactory(MqttComponentTypes.Subscribe, out _).ShouldBeTrue();
     }
 
     [Fact]
-    public void RegisterMqttComponents_AcceptsClientFactoryDirectly()
+    public void RegisterMqttComponents_DoesNotRequireClientFactory()
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents(new TestMqttClientFactory());
-
-        registry.TryGetFactory(MqttComponentTypes.Publish, out _).ShouldBeTrue();
-        registry.TryGetFactory(MqttComponentTypes.Subscribe, out _).ShouldBeTrue();
-    }
-
-    [Fact]
-    public void RegisterMqttComponents_AcceptsContextFactoryDirectly()
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMqttComponents((context, _) =>
-                ValueTask.FromResult(MqttClientLease.Shared(new RecordingMqttClientAdapter())));
-
-        registry.TryGetFactory(MqttComponentTypes.Publish, out _).ShouldBeTrue();
-        registry.TryGetFactory(MqttComponentTypes.Subscribe, out _).ShouldBeTrue();
-    }
-
-    [Fact]
-    public void RegisterMqttComponents_RequiresClientFactory()
-    {
+        // The connection component holds configuration only and no node creates a
+        // client this step, so registration no longer requires a client factory.
         var registry = new RuntimeNodeFactoryRegistry();
 
-        var exception = Should.Throw<InvalidOperationException>(
-            () => registry.RegisterMqttComponents(_ => { }));
+        Should.NotThrow(() => registry.RegisterMqttComponents(_ => { }));
 
-        exception.Message.ShouldContain("client factory");
-    }
-
-    private sealed class TestMqttClientFactory : IMqttClientFactory
-    {
-        public ValueTask<MqttClientLease> CreateAsync(
-            MqttClientFactoryContext context,
-            CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        registry.TryGetFactory(MqttComponentTypes.Connection, out _).ShouldBeTrue();
     }
 }
