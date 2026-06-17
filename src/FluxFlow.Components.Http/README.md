@@ -6,18 +6,46 @@ Reusable HTTP request components for FluxFlow.
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
-| `http.request` | `Input` -> `Output`, `Errors` | Sends HTTP requests and emits typed responses or request errors. |
+| `http.client` | resource | Owns the HTTP sender lifecycle (base URL, host allow-list, redirects, timeout, pooling). Request nodes reference it by name. |
+| `http.request` | `Input` -> `Output`, `Errors` | Sends HTTP requests through a borrowed client and emits typed responses or request errors. |
 
-## HTTP Request
+Register both node types once:
+
+```csharp
+registry.RegisterHttpComponents();
+```
+
+## Client resource
+
+The `http.client` node owns the sender. It is a resource: `http.request` does
+not build its own client, it borrows the established sender from an
+`http.client` by name. Transport and security settings live on the client.
+
+```json
+{
+  "type": "http.client",
+  "name": "internal-api",
+  "baseUrl": "https://api.internal.example",
+  "defaultTimeoutMilliseconds": 100000,
+  "followRedirects": true,
+  "restrictToBaseUrlOrigin": true,
+  "allowedHosts": [ "api.internal.example", ".internal.example" ],
+  "pooledConnectionLifetimeSeconds": 300,
+  "maxConnectionsPerServer": 20,
+  "defaultHeaders": { "x-api-key": "..." }
+}
+```
+
+`http.request` requires a `client` that names an `http.client` resource. The
+reference is mandatory; there is no inline transport configuration on the
+request node.
 
 ```json
 {
   "type": "http.request",
   "name": "call-api",
-  "baseUrl": "https://example.test",
-  "defaultTimeoutMilliseconds": 30000,
+  "client": "internal-api",
   "maxResponseBodyBytes": 1048576,
-  "followRedirects": true,
   "treatNonSuccessStatusAsError": false,
   "boundedCapacity": 128
 }
@@ -32,21 +60,27 @@ Non-success status codes do not fault the node. Responses are emitted with
 `Success = false`. When `treatNonSuccessStatusAsError` is enabled, the response
 is still emitted and a matching error item is also emitted.
 
+## Connecting (host-driven)
+
+Connecting is an explicit host decision: there is no auto-connect or lazy
+connect. `StartAsync` on the client is a no-op. The host establishes and tears
+down the sender through `IHttpClientHandle`:
+
+```csharp
+await client.ConnectAsync(cancellationToken);
+// ... run the graph ...
+await client.DisconnectAsync(cancellationToken);
+```
+
+`http.request` borrows the established sender at call-time and never builds or
+disposes it. A request sent before the client is connected is reported per
+message on the `Errors` port rather than faulting the node.
+
 ## Security
 
-By default the node accepts any absolute per-message URL, which preserves 1.x
-behavior. Hosts that process untrusted message URLs should restrict where
-requests can go, because `defaultHeaders` (often credentials) are attached to
-every request:
-
-```json
-{
-  "type": "http.request",
-  "baseUrl": "https://api.internal.example",
-  "restrictToBaseUrlOrigin": true,
-  "allowedHosts": [ "api.internal.example", ".internal.example" ]
-}
-```
+A host that processes untrusted message URLs should restrict where requests can
+go on the `http.client`, because `defaultHeaders` (often credentials) are
+attached to every request:
 
 - `allowedHosts` (default empty = allow all): when non-empty, the resolved
   absolute URL host must match one entry. Entries match case-insensitively,
@@ -62,8 +96,9 @@ sent.
 ## Runtime Timing
 
 Responses and request errors use the package clock for timestamps and elapsed
-milliseconds. Existing callers use the default system clock. Hosts and tests can
-provide a deterministic clock through registration:
+milliseconds. The package uses `System.TimeProvider` (default
+`TimeProvider.System`); there is no bespoke HTTP clock interface. Hosts and
+tests can provide a deterministic `TimeProvider` through registration:
 
 ```csharp
 registry.RegisterHttpComponents(options => options
@@ -72,10 +107,9 @@ registry.RegisterHttpComponents(options => options
 
 ## Sender Ownership
 
-The package includes a default per-node sender. Hosts that need named clients,
-shared clients, custom authentication, tracing, proxy settings, deterministic
-time, or test doubles can provide `IHttpRequestSenderFactory` through
-registration:
+The `http.client` resource builds a default pooled sender from its options.
+Hosts that need custom authentication, tracing, proxy settings, or test doubles
+can provide `IHttpRequestSenderFactory` through registration:
 
 ```csharp
 registry.RegisterHttpComponents(options => options
@@ -83,8 +117,9 @@ registry.RegisterHttpComponents(options => options
     .UseRequestSenderFactory(myFactory));
 ```
 
-The sender factory receives the resolved node options and configured clock. The
-package disposes senders it creates through the configured factory.
+The sender factory receives the resolved client handle and configured clock.
+The `http.client` resource disposes senders it creates through the configured
+factory.
 
 ## Design Metadata
 

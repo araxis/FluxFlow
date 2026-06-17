@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Engine.Components;
@@ -168,12 +169,28 @@ public sealed class HttpClientNode : FlowNodeBase, IHttpClientHandle, IAsyncDisp
             sender = _senderFactory.CreateClient(context);
             ArgumentNullException.ThrowIfNull(sender);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // Re-acquire the gate to publish. A concurrent DisposeAsync may have
+            // disposed the gate while the factory was building, so a re-acquire can
+            // throw ObjectDisposedException: catch it and STILL dispose the fresh
+            // sender so a torn-down gate never strands an HttpClient.
             try
             {
-                // If a disconnect or dispose won the race while we were building,
-                // honor it: drop the freshly built sender and stay not-connected.
-                if (_userDisconnected || _disposed || ct.IsCancellationRequested)
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                await sender.DisposeAsync().ConfigureAwait(false);
+                return sender;
+            }
+
+            try
+            {
+                // If a disconnect or dispose won the race while we were building, or
+                // a superseding establish already published a live sender, honor it:
+                // drop the freshly built sender and stay as-is. Never overwrite a
+                // non-null _sender.
+                if (_userDisconnected || _disposed || ct.IsCancellationRequested ||
+                    _sender is not null)
                 {
                     await sender.DisposeAsync().ConfigureAwait(false);
                     return sender;
@@ -199,20 +216,36 @@ public sealed class HttpClientNode : FlowNodeBase, IHttpClientHandle, IAsyncDisp
             var cancelled = exception is OperationCanceledException &&
                 (ct.IsCancellationRequested || _lifecycleCancellation.IsCancellationRequested);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // A concurrent DisposeAsync may have disposed the gate; tolerate that on
+            // re-acquire but STILL dispose any half-built sender so the fault path
+            // never strands an HttpClient.
             try
             {
-                _inFlightConnect = null;
-
-                // Never leave a half-built sender behind.
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
                 if (sender is not null)
                 {
                     await sender.DisposeAsync().ConfigureAwait(false);
                 }
 
-                if (!cancelled && !_userDisconnected && !_disposed)
+                ExceptionDispatchInfo.Throw(exception);
+            }
+
+            try
+            {
+                _inFlightConnect = null;
+
+                // Never leave a half-built sender behind. Never overwrite a non-null
+                // _sender published by a superseding establish.
+                if (sender is not null)
                 {
-                    _sender = null;
+                    await sender.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (!cancelled && !_userDisconnected && !_disposed && _sender is null)
+                {
                     _state = HttpClientConnectionState.Faulted;
                 }
             }

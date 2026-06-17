@@ -88,14 +88,20 @@ internal sealed class RecordingHttpRequestSenderFactory : IHttpRequestSenderFact
     private readonly List<InMemoryHttpRequestSender> _senders = [];
     private readonly Func<HttpRequestSendContext, HttpResponseOutput>? _respond;
     private readonly Task? _buildGate;
+    private readonly TaskCompletionSource? _entered;
+    private readonly int _throwOnCallNumber;
     private int _createClientCalls;
 
     public RecordingHttpRequestSenderFactory(
         Func<HttpRequestSendContext, HttpResponseOutput>? respond = null,
-        Task? buildGate = null)
+        Task? buildGate = null,
+        TaskCompletionSource? entered = null,
+        int throwOnCallNumber = 0)
     {
         _respond = respond;
         _buildGate = buildGate;
+        _entered = entered;
+        _throwOnCallNumber = throwOnCallNumber;
     }
 
     public int CreateClientCalls => Volatile.Read(ref _createClientCalls);
@@ -142,11 +148,23 @@ internal sealed class RecordingHttpRequestSenderFactory : IHttpRequestSenderFact
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(context.Client);
 
-        Interlocked.Increment(ref _createClientCalls);
+        var callNumber = Interlocked.Increment(ref _createClientCalls);
 
-        // Honor an optional build gate so the single-flight test can hold two
-        // concurrent ConnectAsync calls inside one in-flight build deterministically.
+        // Signal that the build is in-flight so a test can deterministically race a
+        // disconnect/dispose against an establish that is parked on the build gate.
+        _entered?.TrySetResult();
+
+        // Honor an optional build gate so single-flight and teardown-race tests can
+        // hold the in-flight build open until the test releases it. The gate ignores
+        // cancellation: the establish path must dispose the fresh sender on its own.
         _buildGate?.GetAwaiter().GetResult();
+
+        // Surface a connect-time fault on the configured call so the establish path's
+        // fault handling (state == Faulted, completion not completed) is exercised.
+        if (_throwOnCallNumber == callNumber)
+        {
+            throw new InvalidOperationException("CreateClient failed.");
+        }
 
         // Mirror the production guard decision so the connected sender's redirect
         // policy reflects the handle's allow-list/origin configuration.

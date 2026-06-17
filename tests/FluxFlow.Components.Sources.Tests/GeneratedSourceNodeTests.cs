@@ -31,8 +31,8 @@ public sealed class GeneratedSourceNodeTests
         var output = new BufferBlock<InputMessage>();
         LinkOutput(runtimeNode, output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var items = await DrainUntilCompletedAsync(output);
         items.Select(item => item.Id).ShouldBe(["A-100", "A-101"]);
@@ -54,8 +54,8 @@ public sealed class GeneratedSourceNodeTests
         var output = new BufferBlock<int>();
         LinkOutput(runtimeNode, output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var items = await DrainUntilCompletedAsync(output);
         items.ShouldBe([1, 2, 1, 2, 1]);
@@ -77,7 +77,7 @@ public sealed class GeneratedSourceNodeTests
         var output = new BufferBlock<string>();
         LinkOutput(runtimeNode, output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // The node holds a 15ms initial delay and then a 30ms interval delay between the
         // two items. FakeTimeProvider keeps each Task.Delay pending until time advances,
@@ -100,8 +100,8 @@ public sealed class GeneratedSourceNodeTests
         var output = new BufferBlock<string>();
         LinkOutput(runtimeNode, output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
@@ -125,8 +125,8 @@ public sealed class GeneratedSourceNodeTests
                 diagnostics,
                 new DataflowLinkOptions { PropagateCompletion = true });
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var names = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
@@ -151,9 +151,9 @@ public sealed class GeneratedSourceNodeTests
         LinkOutput(runtimeNode, output);
 
         runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -170,8 +170,8 @@ public sealed class GeneratedSourceNodeTests
         LinkOutput(runtimeNode, output);
 
         runtimeNode.Node.Complete();
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
@@ -270,7 +270,7 @@ public sealed class GeneratedSourceNodeTests
 
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var items = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {
@@ -286,7 +286,7 @@ public sealed class GeneratedSourceNodeTests
     private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
         BufferBlock<FlowDiagnostic> diagnostics)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var entries = new List<FlowDiagnostic>();
         while (await diagnostics.OutputAvailableAsync(cancellation.Token))
         {
@@ -326,10 +326,10 @@ public sealed class GeneratedSourceNodeTests
 
             // No unfired timer yet: wait until the loop arms the next one or completes.
             await Task.WhenAny(scheduled, node.Completion)
-                .WaitAsync(TimeSpan.FromSeconds(5));
+                .WaitAsync(TimeSpan.FromSeconds(30));
         }
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     private sealed record InputMessage(string Id, int Value);

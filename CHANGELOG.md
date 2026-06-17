@@ -82,6 +82,9 @@ Additive resource accessor (Wave 3 groundwork).
   types.
 - The node's static `Create` is removed (relocated to the factory). Registration,
   options, ports, and behavior unchanged.
+- Replaces the bespoke `IStateClock` abstraction with `System.TimeProvider`
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
 ## FluxFlow.Components.Routing 2.0.0-preview.1
 

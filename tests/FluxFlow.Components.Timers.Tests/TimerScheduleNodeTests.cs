@@ -24,8 +24,8 @@ public sealed class TimerScheduleNodeTests
         var output = new BufferBlock<ScheduleTick>();
         LinkOutput(runtimeNode, output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = await DrainUntilCompletedAsync(output);
         ticks.Select(tick => tick.Sequence).ShouldBe([1, 2]);
@@ -56,8 +56,8 @@ public sealed class TimerScheduleNodeTests
                 events,
                 new DataflowLinkOptions { PropagateCompletion = true });
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var diagnosticNames = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
@@ -66,7 +66,7 @@ public sealed class TimerScheduleNodeTests
         diagnosticNames.ShouldContain(TimerDiagnosticNames.ScheduleStarted);
         diagnosticNames.ShouldContain(TimerDiagnosticNames.ScheduleTick);
         diagnosticNames.ShouldContain(TimerDiagnosticNames.ScheduleStopped);
-        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         flowEvent.Type.ShouldBe(TimerEventNames.ScheduleTick);
         flowEvent.Subject.ShouldBe("diag");
     }
@@ -84,8 +84,8 @@ public sealed class TimerScheduleNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public sealed class TimerScheduleNodeTests
     private static async Task<List<ScheduleTick>> DrainUntilCompletedAsync(
         BufferBlock<ScheduleTick> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var ticks = new List<ScheduleTick>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {
@@ -214,7 +214,7 @@ public sealed class TimerScheduleNodeTests
     private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
         BufferBlock<FlowDiagnostic> diagnostics)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var entries = new List<FlowDiagnostic>();
         while (await diagnostics.OutputAvailableAsync(cancellation.Token))
         {

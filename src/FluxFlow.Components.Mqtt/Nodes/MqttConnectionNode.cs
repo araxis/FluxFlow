@@ -128,7 +128,7 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
                     _lifecycleCancellation.Token);
 
                 _state = MqttClientHealthState.Connecting;
-                connect = EstablishAsync(_connectCts.Token);
+                connect = EstablishAsync(_connectCts, _connectCts.Token);
                 _inFlightConnect = connect;
             }
         }
@@ -140,7 +140,9 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
         await connect.ConfigureAwait(false);
     }
 
-    private async Task<MqttClientLease> EstablishAsync(CancellationToken ct)
+    private async Task<MqttClientLease> EstablishAsync(
+        CancellationTokenSource ownCts,
+        CancellationToken ct)
     {
         // Yield off the gate-holding caller so the in-flight Task is observable to a
         // concurrent ConnectAsync before CreateAsync runs.
@@ -161,32 +163,58 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
             lease = await _clientFactory.CreateAsync(context, ct).ConfigureAwait(false);
             ArgumentNullException.ThrowIfNull(lease);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // Re-acquire the gate to decide-and-publish. DisposeAsync may have disposed
+            // the gate while CreateAsync was running, in which case WaitAsync throws
+            // ObjectDisposedException; treat that as "cannot publish" and fall through
+            // to robust disposal of the freshly built lease so it never leaks.
+            var published = false;
             try
             {
-                // If a disconnect or dispose won the race while we were creating,
-                // honor it: drop the freshly created lease and stay not-connected.
-                if (_userDisconnected || _disposed)
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                try
                 {
-                    await lease.DisposeAsync().ConfigureAwait(false);
-                    return lease;
+                    // Honor any teardown that won the race while we were creating, drop
+                    // a superseded connect, and never overwrite a live lease: a
+                    // disconnect/dispose, this establish no longer being the current
+                    // in-flight one (a superseding connect replaced ownCts), or an
+                    // already-published lease all mean this fresh lease must be dropped,
+                    // not published.
+                    if (!_disposed &&
+                        !_userDisconnected &&
+                        ReferenceEquals(_connectCts, ownCts) &&
+                        _lease is null)
+                    {
+                        // Publish order: lease FIRST, epoch next, health monitor, then
+                        // flip state to Connected LAST so a borrow that observes
+                        // Connected always sees a non-null lease.
+                        _lease = lease;
+                        _epoch++;
+                        _healthMonitor = MqttHealthMonitor.Start(lease.Adapter, _clock, EmitHealth, EmitHealthFailure);
+                        _state = MqttClientHealthState.Connected;
+                        _inFlightConnect = null;
+                        published = true;
+                    }
                 }
-
-                // Publish order: lease FIRST, epoch next, health monitor, then flip
-                // state to Connected LAST so a borrow that observes Connected always
-                // sees a non-null lease.
-                _lease = lease;
-                _epoch++;
-                _healthMonitor = MqttHealthMonitor.Start(lease.Adapter, _clock, EmitHealth, EmitHealthFailure);
-                _state = MqttClientHealthState.Connected;
-                _inFlightConnect = null;
-                SignalChange();
+                finally
+                {
+                    _gate.Release();
+                }
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                _gate.Release();
+                // Gate disposed by a concurrent DisposeAsync; cannot publish.
             }
 
+            if (!published)
+            {
+                // Could not publish (teardown/supersede/already-live lease, or a
+                // disposed gate): dispose the fresh lease and return WITHOUT publishing
+                // so the live client never leaks.
+                await lease.DisposeAsync().ConfigureAwait(false);
+                return lease;
+            }
+
+            SignalChange();
             return lease;
         }
         catch (Exception exception)
@@ -196,27 +224,51 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
             var cancelled = exception is OperationCanceledException &&
                 (ct.IsCancellationRequested || _lifecycleCancellation.IsCancellationRequested);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // Mutating shared state needs the gate, but a concurrent DisposeAsync may
+            // have disposed it (ObjectDisposedException). Tolerate that and STILL
+            // dispose any freshly built lease afterwards so it never leaks.
+            var faulted = false;
             try
             {
-                _inFlightConnect = null;
-
-                // Never leave a half-open lease behind.
-                if (lease is not null)
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                try
                 {
-                    await lease.DisposeAsync().ConfigureAwait(false);
+                    // Only retract our own in-flight marker; a superseding establish
+                    // may already own it. Never clobber a live lease: only fault when
+                    // this is still the current connect and nothing was published.
+                    if (ReferenceEquals(_connectCts, ownCts))
+                    {
+                        _inFlightConnect = null;
+                    }
+
+                    if (!cancelled && !_userDisconnected && !_disposed &&
+                        ReferenceEquals(_connectCts, ownCts) && _lease is null)
+                    {
+                        _lease = null;
+                        _state = MqttClientHealthState.Faulted;
+                        faulted = true;
+                    }
                 }
-
-                if (!cancelled && !_userDisconnected && !_disposed)
+                finally
                 {
-                    _lease = null;
-                    _state = MqttClientHealthState.Faulted;
-                    SignalChange();
+                    _gate.Release();
                 }
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                _gate.Release();
+                // Gate disposed by a concurrent DisposeAsync; state is already torn
+                // down. Fall through to dispose the half-open lease below.
+            }
+
+            // Never leave a half-open lease behind, even if the gate was disposed.
+            if (lease is not null)
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (faulted)
+            {
+                SignalChange();
             }
 
             if (!cancelled && !_userDisconnected && !_disposed)

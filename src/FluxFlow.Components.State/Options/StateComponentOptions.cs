@@ -1,5 +1,4 @@
 using FluxFlow.Components.Expressions;
-using FluxFlow.Components.State.Timing;
 using FluxFlow.Engine.Mapping;
 
 namespace FluxFlow.Components.State.Options;
@@ -7,9 +6,9 @@ namespace FluxFlow.Components.State.Options;
 public sealed class StateComponentOptions
 {
     private readonly FlowExpressionEngineRegistry _expressionEngines = new("State");
-    private IStateClock _clock = SystemStateClock.Instance;
+    private TimeProvider _clock = TimeProvider.System;
 
-    public IStateClock Clock => _clock;
+    public TimeProvider Clock => _clock;
 
     public StateComponentOptions UseExpressionEngine(
         IFlowExpressionEngine expressionEngine,
@@ -29,7 +28,7 @@ public sealed class StateComponentOptions
         return this;
     }
 
-    public StateComponentOptions UseClock(IStateClock clock)
+    public StateComponentOptions UseClock(TimeProvider clock)
     {
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         return this;

@@ -5,6 +5,7 @@ using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Mapping;
 using FluxFlow.Engine.Runtime;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
@@ -155,10 +156,8 @@ public sealed class StateReducerNodeTests
     [Fact]
     public async Task Reducer_UsesConfiguredClockForResults()
     {
-        var reduceAt = new DateTimeOffset(2026, 6, 2, 18, 45, 0, TimeSpan.Zero);
-        var resetAt = reduceAt.AddSeconds(1);
-        var clearAt = resetAt.AddSeconds(1);
-        var clock = new RecordingStateClock(reduceAt, resetAt, clearAt);
+        var fixedInstant = new DateTimeOffset(2026, 6, 2, 18, 45, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(fixedInstant);
         var runtimeNode = CreateNode(
             new
             {
@@ -166,7 +165,7 @@ public sealed class StateReducerNodeTests
                 initialState = 5
             },
             new SampleExpressionEngine(),
-            options => options.UseClock(clock));
+            options => options.UseClock(timeProvider));
         var input = GetInput(runtimeNode);
         var output = LinkOutput<StateReducerResult>(runtimeNode);
 
@@ -189,9 +188,9 @@ public sealed class StateReducerNodeTests
         var clear = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        reduce.UpdatedAt.ShouldBe(reduceAt);
-        reset.UpdatedAt.ShouldBe(resetAt);
-        clear.UpdatedAt.ShouldBe(clearAt);
+        reduce.UpdatedAt.ShouldBe(fixedInstant);
+        reset.UpdatedAt.ShouldBe(fixedInstant);
+        clear.UpdatedAt.ShouldBe(fixedInstant);
     }
 
     [Fact]

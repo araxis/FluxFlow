@@ -11,7 +11,7 @@
     <Description>Reusable state reducer components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once reducer + factory relocation for state.reducer.</PackageReleaseNotes>
+    <PackageReleaseNotes>2.0 preview: compile-once reducer + factory relocation for state.reducer. Replaces the bespoke IStateClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

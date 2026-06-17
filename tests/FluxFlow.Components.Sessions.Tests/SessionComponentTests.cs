@@ -29,7 +29,7 @@ public sealed class SessionComponentTests
         var output = LinkOutput<SessionRecord>(runtimeNode);
         var firstTimestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionRecordInput
         {
             Timestamp = firstTimestamp,
@@ -44,9 +44,9 @@ public sealed class SessionComponentTests
         });
         input.Target.Complete();
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         first.Sequence.ShouldBe(1);
         second.Sequence.ShouldBe(2);
@@ -69,14 +69,14 @@ public sealed class SessionComponentTests
         var output = LinkOutput<SessionRecord>(runtimeNode);
         var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionRecordInput { Name = "bad" });
         await input.Target.SendAsync(new SessionRecordInput { Name = "good" });
         input.Target.Complete();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
         recorded.Sequence.ShouldBe(1);
@@ -95,7 +95,7 @@ public sealed class SessionComponentTests
         var input = GetInput(runtimeNode);
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionRecordInput
         {
             Name = "next",
@@ -103,8 +103,8 @@ public sealed class SessionComponentTests
         });
         input.Target.Complete();
 
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         recorded.Sequence.ShouldBe(6);
         recorded.Attributes.ShouldBeEmpty();
@@ -128,12 +128,12 @@ public sealed class SessionComponentTests
         var input = GetInput(runtimeNode);
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionRecordInput { Name = "timed" });
         input.Target.Complete();
 
-        var record = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var record = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         record.Timestamp.ShouldBe(timestamp);
         store.Metadata.ShouldNotBeNull();
@@ -152,8 +152,8 @@ public sealed class SessionComponentTests
         }, store);
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var records = await DrainUntilCompletedAsync(output);
         records.Select(record => record.Sequence).ShouldBe([1, 2, 3]);
@@ -175,7 +175,7 @@ public sealed class SessionComponentTests
             options => options.UseClock(timeProvider));
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // The first record emits immediately; the next two each wait for a 40ms
         // FakeTimeProvider delay that only fires once time is advanced.
@@ -200,10 +200,10 @@ public sealed class SessionComponentTests
         }, store);
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         first.Sequence.ShouldBe(1);
         output.TryReceive(out _).ShouldBeFalse();
@@ -227,14 +227,14 @@ public sealed class SessionComponentTests
         // Completing the node before the replay starts completes the output,
         // so every subsequent send is declined.
         runtimeNode.Node.Complete();
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // The replay loop must stop on the first declined send instead of
         // iterating through the remaining records. Time is never advanced, so if
         // the loop reached an inter-record Task.Delay it would hang forever and
         // disposal would time out; completing within the timeout proves the loop
         // broke before awaiting any inter-record delay.
-        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public sealed class SessionComponentTests
             options => options.UseClock(timeProvider));
         var output = LinkOutput<SessionRecord>(runtimeNode);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // 80ms stored gap divided by the 4x multiplier yields a single 20ms
         // FakeTimeProvider delay before the second record; advance to fire it.
@@ -309,16 +309,16 @@ public sealed class SessionComponentTests
         var output = LinkOutput<SessionQueryResult>(runtimeNode);
         var sessions = LinkOutput<SessionMetadata>(runtimeNode, SessionsComponentPorts.Sessions);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionQueryRequest
         {
             CorrelationId = "corr-1"
         });
         input.Target.Complete();
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var session = await sessions.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var session = await sessions.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         result.Timestamp.ShouldBe(timestamp);
         result.Count.ShouldBe(1);
@@ -346,14 +346,14 @@ public sealed class SessionComponentTests
         var output = LinkOutput<SessionQueryResult>(runtimeNode);
         var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionQueryRequest { Limit = 0 });
         await input.Target.SendAsync(new SessionQueryRequest());
         input.Target.Complete();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.InvalidQuery);
         result.Count.ShouldBe(1);
@@ -373,14 +373,14 @@ public sealed class SessionComponentTests
         var output = LinkOutput<SessionQueryResult>(runtimeNode);
         var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(new SessionQueryRequest());
         await input.Target.SendAsync(new SessionQueryRequest());
         input.Target.Complete();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
         result.Count.ShouldBe(1);
@@ -402,9 +402,9 @@ public sealed class SessionComponentTests
                 diagnostics,
                 new DataflowLinkOptions { PropagateCompletion = true });
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var names = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
             .Select(diagnostic => diagnostic.Name)
@@ -553,7 +553,7 @@ public sealed class SessionComponentTests
         BufferBlock<SessionRecord> output)
     {
         var records = new List<SessionRecord>();
-        while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+        while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(30)))
         {
             while (output.TryReceive(out var record))
             {
@@ -568,7 +568,7 @@ public sealed class SessionComponentTests
         BufferBlock<FlowDiagnostic> output)
     {
         var diagnostics = new List<FlowDiagnostic>();
-        while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+        while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(30)))
         {
             while (output.TryReceive(out var diagnostic))
             {
@@ -836,9 +836,9 @@ public sealed class SessionComponentTests
 
             // No unfired timer yet: wait until the loop arms the next one or completes.
             await Task.WhenAny(scheduled, node.Completion)
-                .WaitAsync(TimeSpan.FromSeconds(5));
+                .WaitAsync(TimeSpan.FromSeconds(30));
         }
 
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 }

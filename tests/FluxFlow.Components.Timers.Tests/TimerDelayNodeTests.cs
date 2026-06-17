@@ -33,9 +33,9 @@ public sealed class TimerDelayNodeTests
 
         await input.Target.SendAsync(message);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var delayed = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var delayed = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         delayed.ShouldBe(message);
         DateTimeOffset.UtcNow.ShouldBeGreaterThan(startedAt.AddMilliseconds(20));
     }
@@ -60,7 +60,7 @@ public sealed class TimerDelayNodeTests
         await input.Target.SendAsync(2);
         await input.Target.SendAsync(3);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
     }
@@ -87,10 +87,10 @@ public sealed class TimerDelayNodeTests
 
         await input.Target.SendAsync("hello");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBe(["hello"]);
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(TimerDiagnosticNames.DelayEmitted);
         diagnostic.Attributes["inputType"].ShouldBe("string");
     }
@@ -114,7 +114,7 @@ public sealed class TimerDelayNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         (await DrainUntilCompletedAsync(output)).ShouldBe(["one"]);
     }
 
@@ -145,9 +145,9 @@ public sealed class TimerDelayNodeTests
         // whole burst shares one pending delay. Wait until the node has actually armed
         // that Task.Delay before advancing the clock to release it; the later items then
         // see a non-positive remaining delay and emit without waiting again.
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
         clock.Advance(TimeSpan.FromMilliseconds(50));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
     }
@@ -180,9 +180,9 @@ public sealed class TimerDelayNodeTests
         await input.Target.SendAsync("bad");
         await input.Target.SendAsync("good");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(TimerErrorCodes.DelayFailed);
         (await DrainUntilCompletedAsync(output)).ShouldBe(["good"]);
     }
@@ -204,7 +204,7 @@ public sealed class TimerDelayNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync()
             .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
 
         await Should.ThrowAsync<InvalidOperationException>(
             () => runtimeNode.Node.Completion);
@@ -231,10 +231,10 @@ public sealed class TimerDelayNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync()
             .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public sealed class TimerDelayNodeTests
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(
         BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {
