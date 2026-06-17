@@ -24,7 +24,15 @@ public sealed class HttpComponentOptions
         Func<HttpRequestSenderContext, IHttpRequestSender> create)
     {
         ArgumentNullException.ThrowIfNull(create);
-        _requestSenderFactory = new DelegateHttpRequestSenderFactory(create);
+        _requestSenderFactory = new DelegateHttpRequestSenderFactory(create, null);
+        return this;
+    }
+
+    public HttpComponentOptions UseRequestSender(
+        Func<HttpClientSenderContext, IHttpRequestSender> createClient)
+    {
+        ArgumentNullException.ThrowIfNull(createClient);
+        _requestSenderFactory = new DelegateHttpRequestSenderFactory(null, createClient);
         return this;
     }
 
@@ -35,10 +43,20 @@ public sealed class HttpComponentOptions
     }
 
     private sealed class DelegateHttpRequestSenderFactory(
-        Func<HttpRequestSenderContext, IHttpRequestSender> create)
+        Func<HttpRequestSenderContext, IHttpRequestSender>? create,
+        Func<HttpClientSenderContext, IHttpRequestSender>? createClient)
         : IHttpRequestSenderFactory
     {
         public IHttpRequestSender Create(HttpRequestSenderContext context)
-            => create(context);
+            => create is not null
+                ? create(context)
+                : throw new InvalidOperationException(
+                    "This sender factory is configured for client-scoped senders only.");
+
+        public IHttpRequestSender CreateClient(HttpClientSenderContext context)
+            => createClient is not null
+                ? createClient(context)
+                : throw new InvalidOperationException(
+                    "This sender factory is configured for request-scoped senders only.");
     }
 }

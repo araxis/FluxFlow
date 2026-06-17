@@ -142,6 +142,13 @@ Additive resource accessor (Wave 3 groundwork).
   engine's `$resources` mechanism. For now the client holds configuration only
   — no `HttpClient` is established — so `http.request` reports a not-connected
   result until a later connect step.
+- Adds an explicit, host-driven connect lifecycle: `http.client` now exposes
+  `ConnectAsync`/`DisconnectAsync` (plus a `State` and a lock-free
+  `TryGetSender`), owning the pooled `HttpClient`/sender built via a new
+  client-scoped sender context. `http.request` borrows the sender when connected
+  and reports not-connected otherwise; it never connects or disposes. The
+  allowed-hosts/redirect SSRF guard is preserved (per-request validation plus
+  `AllowAutoRedirect` disabled under a guard). No auto-connect.
 
 ## FluxFlow.Components.Metrics 2.0.0-preview.1
 
@@ -175,6 +182,12 @@ Additive resource accessor (Wave 3 groundwork).
   mechanism. For now the store component holds configuration only — no store is
   opened — so the operations report a not-available result until a later open
   step.
+- Adds an explicit, host-driven connect lifecycle: `storage.store` now exposes
+  `ConnectAsync`/`DisconnectAsync` (plus a `State` and a lock-free
+  `TryGetStore`), opening/owning the `IStorageStore` via the configured factory
+  (a missing factory reports `StoreOpenFailed` without faulting the runtime).
+  `storage.put`/`get`/`query`/`delete` borrow the opened store when connected and
+  report not-available otherwise; they never open or dispose it. No auto-connect.
 
 ## FluxFlow.Components.Sessions 2.0.0-preview.1
 
@@ -234,6 +247,12 @@ Additive resource accessor (Wave 3 groundwork).
   the engine's `$resources` mechanism. For now the connection holds
   configuration only — no MQTT client is established — so publish/subscribe
   report a not-connected result until a later connect step.
+- Adds an explicit, host-driven connect lifecycle: `mqtt.connection` now exposes
+  `ConnectAsync`/`DisconnectAsync` (plus a connection `State` and a lock-free
+  `TryGetAdapter`), owning the single client lease and health monitor.
+  `mqtt.publish`/`mqtt.subscribe` borrow the established adapter when connected
+  (subscribe (re)subscribes on connect, deduped per connection epoch) and report
+  not-connected otherwise; they never connect or dispose. No auto-connect.
 
 ## FluxFlow.Components.Payloads 2.0.0-preview.1
 

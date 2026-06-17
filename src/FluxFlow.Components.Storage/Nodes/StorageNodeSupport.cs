@@ -1,3 +1,5 @@
+using FluxFlow.Components.Storage.Contracts;
+
 namespace FluxFlow.Components.Storage.Nodes;
 
 internal static class StorageNodeSupport
@@ -34,6 +36,32 @@ internal static class StorageNodeSupport
 
         return key.Trim();
     }
+
+    public static StorageResult CreateRecordResult(
+        string operation,
+        StorageRecord record,
+        bool includeRecord,
+        string? correlationId,
+        TimeProvider clock)
+        => new()
+        {
+            Timestamp = clock.GetUtcNow(),
+            Operation = operation,
+            Collection = record.Collection,
+            Key = record.Key,
+            Succeeded = true,
+            Found = true,
+            Record = includeRecord ? CopyRecord(record) : null,
+            Version = record.Version,
+            CorrelationId = Normalize(correlationId) ?? Normalize(record.CorrelationId),
+            Attributes = CopyAttributes(record.Attributes)
+        };
+
+    public static StorageRecord CopyRecord(StorageRecord record)
+        => record with
+        {
+            Attributes = CopyAttributes(record.Attributes)
+        };
 
     public static Dictionary<string, object?> CreateOperationAttributes(
         string operation,

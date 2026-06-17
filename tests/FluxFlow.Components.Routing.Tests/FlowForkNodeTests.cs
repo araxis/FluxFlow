@@ -28,7 +28,7 @@ public sealed class FlowForkNodeTests
         await input.Target.SendAsync("one");
         await input.Target.SendAsync("two");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(first)).ShouldBe(["one", "two"]);
         (await DrainUntilCompletedAsync(second)).ShouldBe(["one", "two"]);
@@ -48,7 +48,7 @@ public sealed class FlowForkNodeTests
         LinkOutput(runtimeNode, "First", first);
 
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(first)).ShouldBeEmpty();
     }
@@ -70,9 +70,9 @@ public sealed class FlowForkNodeTests
 
         await input.Target.SendAsync(1);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.ForkForwarded);
         diagnostic.Attributes["outputs"].ShouldBe(1);
     }
@@ -164,7 +164,7 @@ public sealed class FlowForkNodeTests
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(
         BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {

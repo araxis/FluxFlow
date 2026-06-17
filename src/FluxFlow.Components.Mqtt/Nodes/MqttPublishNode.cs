@@ -10,7 +10,7 @@ namespace FluxFlow.Components.Mqtt.Nodes;
 public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
 {
     private const string NotConnectedMessage =
-        "MQTT publish node is not connected; the mqtt.connection component does not establish a client yet.";
+        "MQTT publish node is not connected; establish the mqtt.connection client (host ConnectAsync) before publishing.";
 
     private readonly IMqttConnectionHandle _connection;
     private readonly TimeProvider _clock;
@@ -92,7 +92,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
         base.OnNodeFaulted(exception);
     }
 
-    private Task HandleAsync(MqttPublishRequest input)
+    private async Task HandleAsync(MqttPublishRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -104,7 +104,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 MqttErrorCodes.PublishInvalidTopic,
                 topicValidation.Message ?? "MQTT publish request uses an invalid topic.",
                 request);
-            return Task.CompletedTask;
+            return;
         }
 
         if (request.Payload is null)
@@ -113,7 +113,7 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 MqttErrorCodes.PublishInvalidPayload,
                 "MQTT publish request requires a payload.",
                 request);
-            return Task.CompletedTask;
+            return;
         }
 
         if (request.QualityOfService.HasValue &&
@@ -123,30 +123,112 @@ public sealed class MqttPublishNode : EventFlowNodeBase, IAsyncDisposable
                 MqttErrorCodes.PublishInvalidQualityOfService,
                 "MQTT publish request uses an unsupported quality setting.",
                 request);
-            return Task.CompletedTask;
+            return;
         }
 
-        // The mqtt.connection component holds configuration only; no client is
-        // established yet, so every otherwise-valid request reports not connected.
+        // Borrow the adapter the connection node established. The publish node
+        // never creates or disposes a client; if no client is established the
+        // request reports not connected.
+        if (!_connection.TryGetAdapter(out var adapter))
+        {
+            ReportNotConnected(request);
+            return;
+        }
+
+        var publishTimeout = TimeSpan.FromMilliseconds(_options.PublishTimeoutMilliseconds);
+        using var publishCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifecycleCancellation.Token);
+        publishCancellation.CancelAfter(publishTimeout);
+        try
+        {
+            await adapter.PublishAsync(request, publishCancellation.Token)
+                .AsTask()
+                .WaitAsync(publishTimeout, _lifecycleCancellation.Token)
+                .ConfigureAwait(false);
+
+            var result = new MqttPublishResult
+            {
+                Timestamp = _clock.GetUtcNow(),
+                Topic = request.Topic!,
+                PayloadBytes = request.Payload.Length,
+                PayloadPreview = request.PayloadPreview,
+                QualityOfService = request.QualityOfService ?? _options.QualityOfService,
+                Retain = request.Retain ?? _options.Retain,
+                CorrelationId = request.CorrelationId
+            };
+
+            await _result.SendAsync(result).ConfigureAwait(false);
+            EmitMqttEvent(
+                type: MqttEventNames.PublishSucceeded,
+                subject: request.Topic,
+                channel: MqttEventNames.PublishSucceeded,
+                payloadBytes: result.PayloadBytes,
+                payloadPreview: result.PayloadPreview,
+                attributes: CreateEventAttributes(request, result.PayloadBytes));
+            TryEmitDiagnostic(
+                MqttDiagnosticNames.PublishSucceeded,
+                message: $"Published MQTT message to '{request.Topic}'.",
+                attributes: CreateDiagnosticAttributes(request, result.PayloadBytes));
+        }
+        catch (Exception exception) when (
+            exception is TimeoutException ||
+            (exception is OperationCanceledException &&
+             publishCancellation.IsCancellationRequested &&
+             !_lifecycleCancellation.IsCancellationRequested))
+        {
+            ReportPublishError(
+                MqttErrorCodes.PublishTimedOut,
+                $"MQTT publish timed out after {_options.PublishTimeoutMilliseconds} ms.",
+                request,
+                exception);
+            EmitPublishFailedEvent(request);
+            TryEmitDiagnostic(
+                MqttDiagnosticNames.PublishFailed,
+                FlowDiagnosticLevel.Error,
+                $"MQTT publish timed out for '{request.Topic}'.",
+                exception,
+                CreateDiagnosticAttributes(request, request.Payload.Length));
+        }
+        catch (Exception exception)
+        {
+            ReportPublishError(
+                MqttErrorCodes.PublishFailed,
+                $"MQTT publish failed: {exception.Message}",
+                request,
+                exception);
+            EmitPublishFailedEvent(request);
+            TryEmitDiagnostic(
+                MqttDiagnosticNames.PublishFailed,
+                FlowDiagnosticLevel.Error,
+                $"MQTT publish failed for '{request.Topic}'.",
+                exception,
+                CreateDiagnosticAttributes(request, request.Payload.Length));
+        }
+    }
+
+    private void ReportNotConnected(MqttPublishRequest request)
+    {
         ReportPublishError(
             MqttErrorCodes.PublishNotConnected,
             NotConnectedMessage,
             request);
-        EmitMqttEvent(
-            type: MqttEventNames.PublishFailed,
-            subject: request.Topic,
-            status: "failed",
-            channel: MqttEventNames.PublishFailed,
-            payloadBytes: request.Payload.Length,
-            payloadPreview: request.PayloadPreview,
-            attributes: CreateEventAttributes(request, request.Payload.Length));
+        EmitPublishFailedEvent(request);
         TryEmitDiagnostic(
             MqttDiagnosticNames.PublishFailed,
             FlowDiagnosticLevel.Error,
             NotConnectedMessage,
-            attributes: CreateDiagnosticAttributes(request, request.Payload.Length));
-        return Task.CompletedTask;
+            attributes: CreateDiagnosticAttributes(request, request.Payload!.Length));
     }
+
+    private bool EmitPublishFailedEvent(MqttPublishRequest request)
+        => EmitMqttEvent(
+            type: MqttEventNames.PublishFailed,
+            subject: request.Topic,
+            status: "failed",
+            channel: MqttEventNames.PublishFailed,
+            payloadBytes: request.Payload!.Length,
+            payloadPreview: request.PayloadPreview,
+            attributes: CreateEventAttributes(request, request.Payload.Length));
 
     private bool EmitMqttEvent(
         string type,

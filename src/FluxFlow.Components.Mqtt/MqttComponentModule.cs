@@ -12,11 +12,12 @@ public sealed class MqttComponentModule : IFlowNodeModule
         ArgumentNullException.ThrowIfNull(options);
 
         var clock = options.Clock;
+        var clientFactory = options.RequireClientFactory();
         Registrations =
         [
             new FlowNodeRegistration(
                 MqttComponentTypes.Connection,
-                MqttConnectionNodeFactory.Create),
+                context => MqttConnectionNodeFactory.Create(context, clientFactory, clock)),
             new FlowNodeRegistration(
                 MqttComponentTypes.Publish,
                 context => MqttNodeFactory.CreatePublish(context, clock)),

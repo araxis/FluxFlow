@@ -820,6 +820,12 @@ public sealed class SessionComponentTests
         var fired = 0;
         while (!node.Completion.IsCompleted)
         {
+            // Capture the next-timer registration signal BEFORE reading the count, so a
+            // timer armed in the gap between the count check and the await is not a
+            // lost-wakeup: either the count check below sees it, or this captured signal
+            // completes when it is armed.
+            var scheduled = timeProvider.TimerScheduled;
+
             if (timeProvider.CreatedTimerCount > fired)
             {
                 // An inter-record delay is armed (or already was) but not yet released.
@@ -829,7 +835,6 @@ public sealed class SessionComponentTests
             }
 
             // No unfired timer yet: wait until the loop arms the next one or completes.
-            var scheduled = timeProvider.TimerScheduled;
             await Task.WhenAny(scheduled, node.Completion)
                 .WaitAsync(TimeSpan.FromSeconds(5));
         }

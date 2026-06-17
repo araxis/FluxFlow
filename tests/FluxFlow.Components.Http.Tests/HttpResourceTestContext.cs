@@ -1,3 +1,4 @@
+using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
@@ -19,6 +20,16 @@ internal static class HttpResourceTestContext
         Action<HttpComponentOptions>? configure = null)
         => new RuntimeNodeFactoryRegistry()
             .RegisterHttpComponents(options => configure?.Invoke(options));
+
+    /// <summary>
+    /// Resolves the http.client resource handle from a resources view so tests
+    /// can drive the host-API connect/disconnect lifecycle.
+    /// </summary>
+    public static IHttpClientHandle ResolveHandle(
+        IReadOnlyDictionary<NodeName, RuntimeNode> resources,
+        string clientName = ClientName)
+        => resources[new NodeName(clientName)].Node
+            .ShouldBeAssignableTo<IHttpClientHandle>()!;
 
     /// <summary>
     /// Builds an http.client resource node through the registry-registered

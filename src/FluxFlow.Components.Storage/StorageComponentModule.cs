@@ -11,11 +11,12 @@ public sealed class StorageComponentModule : IFlowNodeModule
         ArgumentNullException.ThrowIfNull(options);
 
         var clock = options.Clock;
+        var storeFactory = options.StoreFactory;
         Registrations =
         [
             new FlowNodeRegistration(
                 StorageComponentTypes.Store,
-                StorageStoreNodeFactory.Create),
+                context => StorageStoreNodeFactory.Create(context, storeFactory, clock)),
             new FlowNodeRegistration(
                 StorageComponentTypes.Put,
                 context => StorageNodeFactory.CreatePut(context, clock)),

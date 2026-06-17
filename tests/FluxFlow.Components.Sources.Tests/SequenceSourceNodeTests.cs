@@ -227,6 +227,10 @@ public sealed class SequenceSourceNodeTests
         var fired = 0;
         while (!node.Completion.IsCompleted)
         {
+            // Capture the next-timer registration signal BEFORE reading the count so a
+            // timer armed in the gap is not a lost-wakeup.
+            var scheduled = clock.TimerScheduled;
+
             if (clock.CreatedTimerCount > fired)
             {
                 // A delay is armed (or already was) but not yet released: fire it.
@@ -236,7 +240,6 @@ public sealed class SequenceSourceNodeTests
             }
 
             // No unfired timer yet: wait until the loop arms the next one or completes.
-            var scheduled = clock.TimerScheduled;
             await Task.WhenAny(scheduled, node.Completion)
                 .WaitAsync(TimeSpan.FromSeconds(5));
         }

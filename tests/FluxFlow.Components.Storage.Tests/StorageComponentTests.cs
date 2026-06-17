@@ -81,7 +81,7 @@ public sealed class StorageComponentTests
         // No store => no result is produced; the node reports not available.
         output.TryReceive(out _).ShouldBeFalse();
         error.Code.ShouldBe(StorageErrorCodes.StoreNotAvailable);
-        error.Message.ShouldContain("does not open a store yet");
+        error.Message.ShouldContain("host ConnectAsync");
         error.Context.ShouldNotBeNull();
         error.Context.ShouldContain("operation=put");
         error.Context.ShouldContain("collection=items");

@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage;
+using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
@@ -9,23 +10,43 @@ namespace FluxFlow.Components.Storage.Tests;
 /// <summary>
 /// Builds storage operation runtime nodes through the registry/factory while
 /// exposing a `$resources` view that contains a storage.store resource node,
-/// so the factory's GetResource&lt;IStorageStoreHandle&gt; lookup resolves.
+/// so the factory's GetResource&lt;IStorageStoreHandle&gt; lookup resolves. The
+/// store factory the storage.store node opens on host ConnectAsync can be supplied
+/// per test; when omitted the default MissingStorageStoreFactory is used (its
+/// OpenAsync throws, so a connect attempt faults the resource without opening).
 /// </summary>
 internal static class StorageResourceTestContext
 {
     public const string StoreName = "main-store";
 
-    public static RuntimeNodeFactoryRegistry CreateRegistry(TimeProvider? clock = null)
+    public static RuntimeNodeFactoryRegistry CreateRegistry(
+        TimeProvider? clock = null,
+        IStorageStoreFactory? storeFactory = null)
         => new RuntimeNodeFactoryRegistry()
             .RegisterStorageComponents(options =>
             {
-                // The store factory is unused this step but RegisterStorageComponents
-                // still accepts one; the storage.store component holds config only.
+                // The storage.store node owns the store; it opens the factory on the
+                // host-driven ConnectAsync. Tests that never connect can omit it.
+                if (storeFactory is not null)
+                {
+                    options.UseStoreFactory(storeFactory);
+                }
+
                 if (clock is not null)
                 {
                     options.UseClock(clock);
                 }
             });
+
+    /// <summary>
+    /// Resolves the storage.store resource handle from a resources view so tests
+    /// can drive the host-API connect/disconnect lifecycle.
+    /// </summary>
+    public static IStorageStoreHandle ResolveHandle(
+        IReadOnlyDictionary<NodeName, RuntimeNode> resources,
+        string storeName = StoreName)
+        => resources[new NodeName(storeName)].Node
+            .ShouldBeAssignableTo<IStorageStoreHandle>()!;
 
     /// <summary>
     /// Builds a storage.store resource node through the registry-registered
@@ -56,6 +77,21 @@ internal static class StorageResourceTestContext
         var node = factory(context);
         resourceNodes[new NodeName(storeName)] = node;
         return resourceNodes;
+    }
+
+    /// <summary>
+    /// Builds a storage operation runtime node from the same registry/resources view
+    /// that owns the storage.store handle, so the op node borrows the very store the
+    /// host opens through that handle's ConnectAsync.
+    /// </summary>
+    public static RuntimeNode CreateOperationNode(
+        RuntimeNodeFactoryRegistry registry,
+        IReadOnlyDictionary<NodeName, RuntimeNode> resources,
+        NodeType type,
+        object configuration)
+    {
+        registry.TryGetFactory(type, out var factory).ShouldBeTrue();
+        return factory(CreateContext(type, configuration, resources));
     }
 
     public static RuntimeNodeFactoryContext CreateContext(

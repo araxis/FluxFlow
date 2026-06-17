@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
 {
     private const string NotAvailableMessage =
-        "storage.delete is not available; the storage.store component does not open a store yet.";
+        "storage.delete is not available; open the storage.store store (host ConnectAsync) before deleting.";
 
     private readonly StorageDeleteOptions _options;
     private readonly IStorageStoreHandle _store;
@@ -87,7 +87,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    private Task DeleteAsync(StorageDeleteRequest input)
+    private async Task DeleteAsync(StorageDeleteRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -103,17 +103,62 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
                 $"storage.delete request is invalid: {exception.Message}",
                 input,
                 exception);
-            return Task.CompletedTask;
+            return;
         }
 
-        // The storage.store component holds configuration only; no store is
-        // opened yet, so every otherwise-valid request reports not available.
-        ReportError(
-            StorageErrorCodes.StoreNotAvailable,
-            NotAvailableMessage,
-            request,
-            exception: null);
-        return Task.CompletedTask;
+        // Borrow the store the storage.store node opened. The delete node never opens
+        // or disposes a store; if none is open the request reports not available.
+        if (!_store.TryGetStore(out var store))
+        {
+            ReportError(
+                StorageErrorCodes.StoreNotAvailable,
+                NotAvailableMessage,
+                request,
+                exception: null);
+            return;
+        }
+
+        try
+        {
+            var result = await store.DeleteAsync(
+                request,
+                _processingCancellation.Token).ConfigureAwait(false);
+            ValidateResult(result, request);
+
+            if (result.Found || _options.EmitMissingAsResult)
+            {
+                await _result.SendAsync(
+                    CopyResult(result),
+                    _processingCancellation.Token).ConfigureAwait(false);
+            }
+
+            TryEmitDiagnostic(
+                result.Found
+                    ? StorageDiagnosticNames.DeleteDeleted
+                    : StorageDiagnosticNames.DeleteMissing,
+                message: result.Found
+                    ? "storage.delete deleted record."
+                    : "storage.delete did not find record.",
+                attributes: StorageNodeSupport.CreateOperationAttributes(
+                    "delete",
+                    _store.StoreName,
+                    request.Collection!,
+                    request.Key,
+                    request.CorrelationId,
+                    result.Version));
+        }
+        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ReportError(
+                StorageErrorCodes.DeleteFailed,
+                $"storage.delete failed: {exception.Message}",
+                request,
+                exception);
+        }
     }
 
     private StorageDeleteRequest NormalizeRequest(StorageDeleteRequest input)
@@ -125,6 +170,30 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
                 _options.Collection),
             Key = StorageNodeSupport.ResolveKey("storage.delete", input.Key),
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
+        };
+
+    private static void ValidateResult(StorageResult result, StorageDeleteRequest request)
+    {
+        if (!StringComparer.Ordinal.Equals(result.Collection, request.Collection))
+        {
+            throw new InvalidOperationException(
+                "storage.delete store returned a result for a different collection.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(result.Key, request.Key))
+        {
+            throw new InvalidOperationException(
+                "storage.delete store returned a result for a different key.");
+        }
+    }
+
+    private static StorageResult CopyResult(StorageResult result)
+        => result with
+        {
+            Record = result.Record is null
+                ? null
+                : StorageNodeSupport.CopyRecord(result.Record),
+            Attributes = StorageNodeSupport.CopyAttributes(result.Attributes)
         };
 
     private void ReportError(

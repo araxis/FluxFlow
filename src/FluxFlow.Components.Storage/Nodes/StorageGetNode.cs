@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
 {
     private const string NotAvailableMessage =
-        "storage.get is not available; the storage.store component does not open a store yet.";
+        "storage.get is not available; open the storage.store store (host ConnectAsync) before reading.";
 
     private readonly StorageGetOptions _options;
     private readonly IStorageStoreHandle _store;
@@ -97,7 +97,7 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    private Task GetAsync(StorageGetRequest input)
+    private async Task GetAsync(StorageGetRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -113,17 +113,66 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
                 $"storage.get request is invalid: {exception.Message}",
                 input,
                 exception);
-            return Task.CompletedTask;
+            return;
         }
 
-        // The storage.store component holds configuration only; no store is
-        // opened yet, so every otherwise-valid request reports not available.
-        ReportError(
-            StorageErrorCodes.StoreNotAvailable,
-            NotAvailableMessage,
-            request,
-            exception: null);
-        return Task.CompletedTask;
+        // Borrow the store the storage.store node opened. The get node never opens
+        // or disposes a store; if none is open the request reports not available.
+        if (!_store.TryGetStore(out var store))
+        {
+            ReportError(
+                StorageErrorCodes.StoreNotAvailable,
+                NotAvailableMessage,
+                request,
+                exception: null);
+            return;
+        }
+
+        try
+        {
+            var record = await store.GetAsync(
+                request,
+                _processingCancellation.Token).ConfigureAwait(false);
+            var result = record is null
+                ? CreateMissingResult(request)
+                : StorageNodeSupport.CreateRecordResult(
+                    "get",
+                    record,
+                    includeRecord: true,
+                    request.CorrelationId,
+                    _clock);
+
+            await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
+            await (record is null ? _notFound : _found)
+                .SendAsync(result, _processingCancellation.Token)
+                .ConfigureAwait(false);
+            TryEmitDiagnostic(
+                record is null
+                    ? StorageDiagnosticNames.GetNotFound
+                    : StorageDiagnosticNames.GetFound,
+                message: record is null
+                    ? "storage.get did not find record."
+                    : "storage.get found record.",
+                attributes: StorageNodeSupport.CreateOperationAttributes(
+                    "get",
+                    _store.StoreName,
+                    request.Collection!,
+                    request.Key,
+                    request.CorrelationId,
+                    record?.Version));
+        }
+        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ReportError(
+                StorageErrorCodes.GetFailed,
+                $"storage.get failed: {exception.Message}",
+                request,
+                exception);
+        }
     }
 
     private StorageGetRequest NormalizeRequest(StorageGetRequest input)
@@ -136,6 +185,20 @@ public sealed class StorageGetNode : FlowNodeBase, IAsyncDisposable
             Key = StorageNodeSupport.ResolveKey("storage.get", input.Key),
             IncludeExpired = input.IncludeExpired ?? _options.IncludeExpired,
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId)
+        };
+
+    private StorageResult CreateMissingResult(StorageGetRequest request)
+        => new()
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Operation = "get",
+            Collection = request.Collection!,
+            Key = request.Key,
+            Succeeded = true,
+            Found = false,
+            Version = null,
+            CorrelationId = request.CorrelationId,
+            Message = "Record was not found."
         };
 
     private void ReportError(

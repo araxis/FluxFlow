@@ -1,3 +1,4 @@
+using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
@@ -14,17 +15,30 @@ internal static class MqttResourceTestContext
 {
     public const string ConnectionName = "main-broker";
 
-    public static RuntimeNodeFactoryRegistry CreateRegistry(TimeProvider? clock = null)
+    public static RuntimeNodeFactoryRegistry CreateRegistry(
+        TimeProvider? clock = null,
+        IMqttClientFactory? clientFactory = null)
         => new RuntimeNodeFactoryRegistry()
             .RegisterMqttComponents(options =>
             {
-                // The client factory is unused this step but RegisterMqttComponents
-                // still accepts one; the connection component holds config only.
+                // The connection node owns the client; the module now requires a
+                // factory. Tests that never connect can pass a stub that throws.
+                options.UseClientFactory(clientFactory ?? new ThrowingMqttClientFactory());
                 if (clock is not null)
                 {
                     options.UseClock(clock);
                 }
             });
+
+    /// <summary>
+    /// Resolves the mqtt.connection resource handle from a resources view so tests
+    /// can drive the host-API connect/disconnect lifecycle.
+    /// </summary>
+    public static IMqttConnectionHandle ResolveHandle(
+        IReadOnlyDictionary<NodeName, RuntimeNode> resources,
+        string connectionName = ConnectionName)
+        => resources[new NodeName(connectionName)].Node
+            .ShouldBeAssignableTo<IMqttConnectionHandle>()!;
 
     /// <summary>
     /// Builds an mqtt.connection resource node through the registry-registered
