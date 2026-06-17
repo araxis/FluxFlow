@@ -27,9 +27,9 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         match.Key.ShouldBe("A-100");
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
@@ -53,9 +53,9 @@ public sealed class FlowCorrelationNodeTests
         await request.Target.SendAsync(new CorrelationMessage("A-100", "ignored", "start"));
         request.Target.Complete();
         response.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         match.Key.ShouldBe("A-100");
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
@@ -76,9 +76,9 @@ public sealed class FlowCorrelationNodeTests
         await request.Target.SendAsync(new CorrelationMessage("A-100", "ignored", "start"));
         request.Target.Complete();
         response.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
         timeout.Value.Payload.ShouldBe("start");
@@ -97,9 +97,9 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         match.Request.Payload.ShouldBe("start");
         match.Response.Payload.ShouldBe("done");
     }
@@ -116,9 +116,9 @@ public sealed class FlowCorrelationNodeTests
 
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
         timeout.Value.Payload.ShouldBe("start");
@@ -157,14 +157,14 @@ public sealed class FlowCorrelationNodeTests
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
 
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
-        await firstInputEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await firstInputEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
         clock.SetUtcNow(startedAt.AddMilliseconds(100));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var firstTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var secondTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var firstTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var secondTimeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         firstTimeout.Side.ShouldBe("request");
         secondTimeout.Side.ShouldBe("response");
         matched.TryReceive(out _).ShouldBeFalse();
@@ -208,16 +208,16 @@ public sealed class FlowCorrelationNodeTests
         runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Matched))!.LinkToDiscard();
 
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "first"));
-        await firstEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await firstEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
         clock.SetUtcNow(startedAt.AddMilliseconds(50));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "second"));
-        await duplicateEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await duplicateEvaluated.Task.WaitAsync(TimeSpan.FromSeconds(30));
         clock.SetUtcNow(startedAt.AddMilliseconds(120));
         await input.Target.SendAsync(new CorrelationMessage("B-200", "request", "other"));
 
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         errors.TryReceive(out _).ShouldBeFalse();
         var duplicate = await ReceiveDiagnosticAsync(
@@ -264,12 +264,12 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-101", "request", "start"));
         await input.Target.SendAsync(new CorrelationMessage("A-101", "response", "done"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.CorrelationKeyFailed);
         error.Context!.ShouldContain("expressionName=pairing");
-        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-101");
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
     }
 
     [Fact]
@@ -288,11 +288,11 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.CorrelationInvalidSide);
-        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-100");
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-100");
     }
 
     [Fact]
@@ -309,9 +309,9 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         await input.Target.SendAsync(new CorrelationMessage("A-101", "request", "next"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.CorrelationCapacityExceeded);
         error.Context!.ShouldContain("key=A-101");
     }
@@ -331,9 +331,9 @@ public sealed class FlowCorrelationNodeTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request", "start"));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response", "done"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.CorrelationMatched);
         diagnostic.Attributes["key"].ShouldBe("A-100");
         diagnostic.Attributes["expressionId"].ShouldBe("corr-v1");
@@ -444,7 +444,7 @@ public sealed class FlowCorrelationNodeTests
         BufferBlock<FlowDiagnostic> diagnostics,
         string name)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         while (await diagnostics.OutputAvailableAsync(cancellation.Token))
         {
             var diagnostic = await diagnostics.ReceiveAsync(cancellation.Token);

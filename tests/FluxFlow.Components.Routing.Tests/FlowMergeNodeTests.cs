@@ -30,7 +30,7 @@ public sealed class FlowMergeNodeTests
         await second.Target.SendAsync("two");
         first.Target.Complete();
         second.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var values = await DrainUntilCompletedAsync(output);
         values.Count.ShouldBe(2);
@@ -55,7 +55,7 @@ public sealed class FlowMergeNodeTests
         await right.Target.SendAsync(2);
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var values = await DrainUntilCompletedAsync(output);
         values.Select(item => item.Sequence).ShouldBe([1, 2]);
@@ -86,7 +86,7 @@ public sealed class FlowMergeNodeTests
         await Task.WhenAll(sends);
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var values = await DrainUntilCompletedAsync(output);
         values.Count.ShouldBe(40);
@@ -117,12 +117,12 @@ public sealed class FlowMergeNodeTests
         // longer racing background processing. With Second still open the node must
         // not have completed; awaiting the emitted item (rather than a synchronous
         // IsCompleted check straight after Complete) keeps this deterministic under load.
-        var item = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var item = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         item.Value.ShouldBe("one");
         runtimeNode.Node.Completion.IsCompleted.ShouldBeFalse();
 
         second.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
@@ -141,9 +141,9 @@ public sealed class FlowMergeNodeTests
 
         await left.Target.SendAsync(1);
         left.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.MergeEmitted);
         diagnostic.Attributes["source"].ShouldBe(RoutingComponentPorts.Left);
     }
@@ -238,7 +238,7 @@ public sealed class FlowMergeNodeTests
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(
         BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {

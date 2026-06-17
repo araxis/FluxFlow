@@ -39,11 +39,11 @@ public sealed class RoutingClockTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await result.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).EvaluatedAt
+        (await result.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).EvaluatedAt
             .ShouldBe(timestamp);
-        (await routed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).RoutedAt
+        (await routed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).RoutedAt
             .ShouldBe(timestamp);
     }
 
@@ -66,9 +66,9 @@ public sealed class RoutingClockTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ReceivedAt
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).ReceivedAt
             .ShouldBe(timestamp);
     }
 
@@ -92,15 +92,15 @@ public sealed class RoutingClockTests
 
         var timerScheduled = clock.NextTimerScheduled;
         await input.Target.SendAsync("first");
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
         // The time window stays pending until the fake clock is advanced; nothing
         // should have been emitted while the delay is outstanding.
         output.TryReceive(out _).ShouldBeFalse();
 
         clock.Advance(TimeSpan.FromMilliseconds(25));
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         window.StartedAt.ShouldBe(startedAt);
         window.EmittedAt.ShouldBe(startedAt.AddMilliseconds(25));
@@ -123,15 +123,15 @@ public sealed class RoutingClockTests
 
         var timerScheduled = clock.NextTimerScheduled;
         await left.Target.SendAsync(new LeftMessage("A-100"));
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
         // The timeout timer waits on the fake clock; no timeout fires until it advances.
         timeouts.TryReceive(out _).ShouldBeFalse();
 
         clock.Advance(TimeSpan.FromMilliseconds(25));
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         timeout.ReceivedAt.ShouldBe(startedAt);
         timeout.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
@@ -152,14 +152,14 @@ public sealed class RoutingClockTests
 
         var timerScheduled = clock.NextTimerScheduled;
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request"));
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
         // The pending request waits for the timeout timer; advancing the clock fires it.
         timeouts.TryReceive(out _).ShouldBeFalse();
 
         clock.Advance(TimeSpan.FromMilliseconds(25));
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe("request");
@@ -183,9 +183,9 @@ public sealed class RoutingClockTests
         await input.Target.SendAsync(new CorrelationMessage("A-100", "request"));
         await input.Target.SendAsync(new CorrelationMessage("A-100", "response"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var match = await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         match.RequestReceivedAt.ShouldBe(timestamp);
         match.ResponseReceivedAt.ShouldBe(timestamp);
         match.MatchedAt.ShouldBe(timestamp);

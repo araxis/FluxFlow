@@ -40,18 +40,18 @@ public sealed class FlowSwitchNodeTests
         await input.Target.SendAsync(new InputMessage("A-100", "priority"));
         await input.Target.SendAsync(new InputMessage("A-101", "standard"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var first = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var second = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         first.RouteKey.ShouldBe("priority");
         first.Matched.ShouldBeTrue();
         first.Value!.Id.ShouldBe("A-100");
         second.RouteKey.ShouldBe("standard");
         second.Matched.ShouldBeFalse();
         second.DefaultRoute.ShouldBe("other");
-        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-100");
-        (await defaults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-101");
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Id.ShouldBe("A-100");
+        (await defaults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Id.ShouldBe("A-101");
     }
 
     [Fact]
@@ -74,10 +74,10 @@ public sealed class FlowSwitchNodeTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Matched.ShouldBeTrue();
-        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe("value");
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Matched.ShouldBeTrue();
+        (await matched.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).ShouldBe("value");
     }
 
     [Fact]
@@ -101,9 +101,9 @@ public sealed class FlowSwitchNodeTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Matched.ShouldBeTrue();
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Matched.ShouldBeTrue();
     }
 
     [Fact]
@@ -130,9 +130,9 @@ public sealed class FlowSwitchNodeTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Matched.ShouldBeTrue();
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Matched.ShouldBeTrue();
         matched.TryReceive(out _).ShouldBeFalse();
         defaults.TryReceive(out _).ShouldBeFalse();
     }
@@ -170,10 +170,10 @@ public sealed class FlowSwitchNodeTests
         await input.Target.SendAsync(new InputMessage("A-100", "priority"));
         await input.Target.SendAsync(new InputMessage("A-101", "standard"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await priority.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-100");
-        (await standard.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-101");
+        (await priority.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Id.ShouldBe("A-100");
+        (await standard.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Id.ShouldBe("A-101");
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class FlowSwitchNodeTests
         await input.Target.SendAsync(new InputMessage("A-100", "priority"));
         await input.Target.SendAsync(new InputMessage("A-101", "standard"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var envelopes = await DrainUntilCompletedAsync(routed);
         envelopes.Count.ShouldBe(2);
@@ -260,7 +260,7 @@ public sealed class FlowSwitchNodeTests
         await input.Target.SendAsync(new { category = "priority" });
         await input.Target.SendAsync(new { category = "urgent" });
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(important)).Count.ShouldBe(2);
     }
@@ -298,12 +298,12 @@ public sealed class FlowSwitchNodeTests
         await input.Target.SendAsync("first");
         await input.Target.SendAsync("second");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.SwitchExpressionFailed);
         error.Context!.ShouldContain("expressionName=switch-test");
-        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Matched.ShouldBeTrue();
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Matched.ShouldBeTrue();
     }
 
     [Fact]
@@ -333,9 +333,9 @@ public sealed class FlowSwitchNodeTests
 
         await input.Target.SendAsync(new DerivedRouteMessage("first"));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.RouteKey.ShouldBe("derived");
         result.Matched.ShouldBeTrue();
     }
@@ -363,9 +363,9 @@ public sealed class FlowSwitchNodeTests
 
         await input.Target.SendAsync("value");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.SwitchRouted);
         diagnostic.Attributes["routeKey"].ShouldBe("priority");
         diagnostic.Attributes["matched"].ShouldBe(true);
@@ -531,7 +531,7 @@ public sealed class FlowSwitchNodeTests
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(
         BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {

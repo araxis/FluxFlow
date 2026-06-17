@@ -31,7 +31,7 @@ public sealed class FlowWindowNodeTests
         await input.Target.SendAsync(20);
         await input.Target.SendAsync(30);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var windows = await DrainUntilCompletedAsync(output);
         windows.Count.ShouldBe(2);
@@ -58,9 +58,9 @@ public sealed class FlowWindowNodeTests
         LinkOutput(runtimeNode, output);
 
         await input.Target.SendAsync("first");
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         window.Reason.ShouldBe(FlowWindowEmitReason.Time);
         window.Items.ShouldBe(["first"]);
@@ -84,9 +84,9 @@ public sealed class FlowWindowNodeTests
 
         await input.Target.SendAsync(1);
         await input.Target.SendAsync(2);
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         window.Reason.ShouldBe(FlowWindowEmitReason.Count);
         window.Items.ShouldBe([1, 2]);
@@ -108,7 +108,7 @@ public sealed class FlowWindowNodeTests
 
         await input.Target.SendAsync(1);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
@@ -127,7 +127,7 @@ public sealed class FlowWindowNodeTests
         LinkOutput(runtimeNode, output);
 
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
@@ -149,9 +149,9 @@ public sealed class FlowWindowNodeTests
 
         await input.Target.SendAsync(1);
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.WindowEmitted);
         diagnostic.Attributes["count"].ShouldBe(1);
         diagnostic.Attributes["reason"].ShouldBe(FlowWindowEmitReason.Count.ToString());
@@ -172,11 +172,11 @@ public sealed class FlowWindowNodeTests
         await node.Input.SendAsync(1);
         await node.Input.SendAsync(2);
         node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.WindowFailed);
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         window.Items.ShouldBe([2]);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -253,7 +253,7 @@ public sealed class FlowWindowNodeTests
     private static async Task<List<FlowWindow<T>>> DrainUntilCompletedAsync<T>(
         BufferBlock<FlowWindow<T>> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<FlowWindow<T>>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {

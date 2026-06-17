@@ -10,19 +10,76 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
     public IHttpRequestSender Create(HttpRequestSenderContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(context.Client);
         ArgumentNullException.ThrowIfNull(context.Clock);
 
+        return Build(context.Client, context.Clock);
+    }
+
+    public IHttpRequestSender CreateClient(HttpClientSenderContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(context.Client);
+        ArgumentNullException.ThrowIfNull(context.Clock);
+
+        return Build(context.Client, context.Clock);
+    }
+
+    private static IHttpRequestSender Build(IHttpClientHandle client, TimeProvider clock)
+    {
+        // Security: when an allow-list guard is configured, auto-redirect is
+        // disabled so a server cannot 3xx-redirect past the per-request host
+        // validation in HttpRequestNode. The redirect response is surfaced
+        // as-is instead of being followed.
+        var allowAutoRedirect = client.FollowRedirects && !HasAllowListGuard(client);
         var handler = new SocketsHttpHandler
         {
-            AllowAutoRedirect = context.Client.FollowRedirects && !HasAllowListGuard(context.Client),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            AllowAutoRedirect = allowAutoRedirect
         };
-        var client = new HttpClient(handler, disposeHandler: true)
+
+        // Honor the client-scoped pooling configuration that was previously
+        // hardcoded. Unset values keep the SocketsHttpHandler defaults.
+        if (client.PooledConnectionLifetimeSeconds is { } lifetimeSeconds)
+        {
+            handler.PooledConnectionLifetime = TimeSpan.FromSeconds(lifetimeSeconds);
+        }
+
+        if (client.MaxConnectionsPerServer is { } maxConnections)
+        {
+            handler.MaxConnectionsPerServer = maxConnections;
+        }
+
+        var httpClient = new HttpClient(handler, disposeHandler: true)
         {
             Timeout = Timeout.InfiniteTimeSpan
         };
 
-        return new HttpClientRequestSender(client, context.Clock);
+        if (!string.IsNullOrWhiteSpace(client.BaseUrl) &&
+            Uri.TryCreate(client.BaseUrl, UriKind.Absolute, out var baseAddress))
+        {
+            httpClient.BaseAddress = baseAddress;
+        }
+
+        ApplyDefaultHeaders(httpClient, client.DefaultHeaders);
+
+        return new HttpClientRequestSender(httpClient, clock, allowAutoRedirect);
+    }
+
+    private static void ApplyDefaultHeaders(
+        HttpClient httpClient,
+        IReadOnlyDictionary<string, string> defaultHeaders)
+    {
+        foreach (var header in defaultHeaders)
+        {
+            if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                // Content-Type is a content header, not a default request header;
+                // it is set per request from the resolved body.
+                continue;
+            }
+
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+        }
     }
 
     // When an allow-list guard is configured (AllowedHosts non-empty OR
@@ -34,8 +91,11 @@ public sealed class HttpClientRequestSenderFactory : IHttpRequestSenderFactory
 
     private sealed class HttpClientRequestSender(
         HttpClient client,
-        TimeProvider clock) : IHttpRequestSender
+        TimeProvider clock,
+        bool allowAutoRedirect) : IHttpRequestSender, IHttpRedirectPolicy
     {
+        public bool AllowAutoRedirect => allowAutoRedirect;
+
         public async Task<HttpResponseOutput> SendAsync(
             HttpRequestSendContext context,
             CancellationToken cancellationToken = default)

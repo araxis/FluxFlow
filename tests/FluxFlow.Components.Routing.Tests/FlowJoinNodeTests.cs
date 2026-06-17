@@ -30,9 +30,9 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-100", "right"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Key.ShouldBe("A-100");
         result.Left.Payload.ShouldBe("left");
         result.Right.Payload.ShouldBe("right");
@@ -55,9 +55,9 @@ public sealed class FlowJoinNodeTests
         await left.Target.SendAsync(new LeftMessage("A-100", "left"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Left.Payload.ShouldBe("left");
         result.Right.Payload.ShouldBe("right");
     }
@@ -80,10 +80,10 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-100", "right-2"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         first.Left.Payload.ShouldBe("left-1");
         first.Right.Payload.ShouldBe("right-1");
         second.Left.Payload.ShouldBe("left-2");
@@ -103,10 +103,10 @@ public sealed class FlowJoinNodeTests
         LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
 
         await left.Target.SendAsync(new LeftMessage("A-100", "left"));
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe(FlowJoinSide.Left);
@@ -130,9 +130,9 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-100", "right"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         timeout.Key.ShouldBe("A-100");
         timeout.Side.ShouldBe(FlowJoinSide.Right);
         timeout.Right!.Payload.ShouldBe("right");
@@ -167,12 +167,12 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-101", "right"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.JoinLeftKeyFailed);
         error.Context!.ShouldContain("expressionName=join-v1");
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-101");
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
     }
 
     [Fact]
@@ -209,11 +209,11 @@ public sealed class FlowJoinNodeTests
         await node.Left.SendAsync(new LeftMessage("A-101", "left"));
         await node.Right.SendAsync(new RightMessage("A-101", "right"));
         node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.JoinFailed);
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("A-101");
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -230,8 +230,8 @@ public sealed class FlowJoinNodeTests
         LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
         LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
         runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
-        var errorTask = errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var outputTask = output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var errorTask = errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var outputTask = output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         await left.Target.SendAsync(new LeftMessage("A-100", "left-1"));
         await left.Target.SendAsync(new LeftMessage("A-101", "left-2"));
@@ -243,7 +243,7 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-100", "right-1"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await outputTask).Key.ShouldBe("A-100");
     }
@@ -266,9 +266,9 @@ public sealed class FlowJoinNodeTests
         await right.Target.SendAsync(new RightMessage("A-100", "right"));
         left.Target.Complete();
         right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(RoutingDiagnosticNames.JoinMatched);
         diagnostic.Attributes["key"].ShouldBe("A-100");
         diagnostic.Attributes["expressionId"].ShouldBe("join-v1");

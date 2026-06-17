@@ -13,7 +13,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
             Type = HttpComponentTypes.Client,
             DisplayName = "HTTP Client",
             Category = "HTTP",
-            Summary = "Holds shared HTTP client configuration referenced by request nodes.",
+            Summary = "Owns the shared HTTP client referenced by request nodes. The client is established and torn down via the host connect/disconnect API; there is no auto-connect.",
             IconKey = "http-client",
             PreferredNodeName = "httpClient",
             SuggestedEditorWidth = 460,

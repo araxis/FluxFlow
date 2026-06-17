@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
 {
     private const string NotAvailableMessage =
-        "storage.put is not available; the storage.store component does not open a store yet.";
+        "storage.put is not available; open the storage.store store (host ConnectAsync) before writing.";
 
     private readonly StoragePutOptions _options;
     private readonly IStorageStoreHandle _store;
@@ -86,7 +86,7 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    private Task PutAsync(StoragePutRequest input)
+    private async Task PutAsync(StoragePutRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -102,17 +102,58 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
                 $"storage.put request is invalid: {exception.Message}",
                 input,
                 exception);
-            return Task.CompletedTask;
+            return;
         }
 
-        // The storage.store component holds configuration only; no store is
-        // opened yet, so every otherwise-valid request reports not available.
-        ReportError(
-            StorageErrorCodes.StoreNotAvailable,
-            NotAvailableMessage,
-            request,
-            exception: null);
-        return Task.CompletedTask;
+        // Borrow the store the storage.store node opened. The put node never opens
+        // or disposes a store; if none is open the request reports not available.
+        if (!_store.TryGetStore(out var store))
+        {
+            ReportError(
+                StorageErrorCodes.StoreNotAvailable,
+                NotAvailableMessage,
+                request,
+                exception: null);
+            return;
+        }
+
+        try
+        {
+            var record = await store.PutAsync(
+                request,
+                _processingCancellation.Token).ConfigureAwait(false);
+            ValidateRecord(record, request);
+            var result = StorageNodeSupport.CreateRecordResult(
+                "put",
+                record,
+                _options.EmitStoredRecord,
+                request.CorrelationId,
+                _clock);
+
+            await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
+            TryEmitDiagnostic(
+                StorageDiagnosticNames.PutStored,
+                message: "storage.put stored record.",
+                attributes: StorageNodeSupport.CreateOperationAttributes(
+                    "put",
+                    _store.StoreName,
+                    request.Collection!,
+                    request.Key,
+                    request.CorrelationId,
+                    record.Version));
+        }
+        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ReportError(
+                StorageErrorCodes.PutFailed,
+                $"storage.put failed: {exception.Message}",
+                request,
+                exception);
+        }
     }
 
     private StoragePutRequest NormalizeRequest(StoragePutRequest input)
@@ -128,6 +169,21 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId),
             ContentType = StorageNodeSupport.Normalize(input.ContentType)
         };
+
+    private static void ValidateRecord(StorageRecord record, StoragePutRequest request)
+    {
+        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
+        {
+            throw new InvalidOperationException(
+                "storage.put store returned a record for a different collection.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(record.Key, request.Key))
+        {
+            throw new InvalidOperationException(
+                "storage.put store returned a record for a different key.");
+        }
+    }
 
     private void ReportError(
         int code,

@@ -66,7 +66,7 @@ public sealed class MqttPublishNodeTests
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
-        error.Message.ShouldContain("does not establish a client");
+        error.Message.ShouldContain("not connected");
         error.Context.ShouldNotBeNull();
         error.Context.ShouldContain("correlationId=abc");
         error.Context.ShouldContain($"connectionName={MqttResourceTestContext.ConnectionName}");
@@ -84,6 +84,74 @@ public sealed class MqttPublishNodeTests
         diagnostic.Attributes["connectionName"].ShouldBe(MqttResourceTestContext.ConnectionName);
 
         await node.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task PublishNode_RoundTripsThroughBorrowedAdapterAcrossConnectLifecycle()
+    {
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
+        var adapter = new RecordingMqttClientAdapter();
+        var factory = new RecordingMqttClientFactory(adapter, ownLease: false);
+        var registry = MqttResourceTestContext.CreateRegistry(clock, factory);
+        var resources = MqttResourceTestContext.CreateResources(registry);
+        var handle = MqttResourceTestContext.ResolveHandle(resources);
+        registry.TryGetFactory(MqttComponentTypes.Publish, out var publishFactory).ShouldBeTrue();
+
+        var runtimeNode = publishFactory(MqttResourceTestContext.CreateContext(
+            MqttComponentTypes.Publish,
+            new
+            {
+                connectionName = MqttResourceTestContext.ConnectionName,
+                defaultTopic = "devices/temperature",
+                qualityOfService = "AtLeastOnce",
+                boundedCapacity = 8
+            },
+            resources));
+
+        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
+            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
+        var results = new BufferBlock<MqttPublishResult>();
+        using var link = runtimeNode.FindOutput(new PortName(MqttComponentPorts.Result))!
+            .TryLinkTo(
+                new InputPort<MqttPublishResult>(
+                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
+                    results),
+                propagateCompletion: false,
+                out var linkError);
+        linkError.ShouldBeNull();
+
+        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttPublishNode>();
+        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
+        node.Errors.LinkTo(errors);
+        await node.StartAsync();
+
+        // Before connect: not connected.
+        await input.Target.SendAsync(new MqttPublishRequest { Payload = [1], CorrelationId = "before" });
+        var beforeError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        beforeError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
+
+        // After host ConnectAsync: round-trips through the borrowed adapter.
+        await handle.ConnectAsync();
+        await input.Target.SendAsync(new MqttPublishRequest
+        {
+            Payload = [1, 2, 3],
+            CorrelationId = "after"
+        });
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.Topic.ShouldBe("devices/temperature");
+        result.PayloadBytes.ShouldBe(3);
+        result.CorrelationId.ShouldBe("after");
+        adapter.Published.ShouldContain(request => request.CorrelationId == "after");
+
+        // After DisconnectAsync: not connected again.
+        await handle.DisconnectAsync();
+        await input.Target.SendAsync(new MqttPublishRequest { Payload = [9], CorrelationId = "afterDisconnect" });
+        var afterError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        afterError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
+
+        await node.DisposeAsync();
+        await ((IAsyncDisposable)handle).DisposeAsync();
     }
 
     [Fact]

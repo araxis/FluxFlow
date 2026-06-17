@@ -13,7 +13,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             Type = StorageComponentTypes.Store,
             DisplayName = "Storage Store",
             Category = "Storage",
-            Summary = "Holds shared storage store configuration referenced by storage operation nodes.",
+            Summary = "Owns a shared storage store referenced by storage operation nodes. The host opens and closes the store via the explicit ConnectAsync/DisconnectAsync API; there is no auto-open.",
             IconKey = "storage",
             PreferredNodeName = "storageStore",
             SuggestedEditorWidth = 460,

@@ -9,7 +9,7 @@ namespace FluxFlow.Components.Storage.Nodes;
 public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
 {
     private const string NotAvailableMessage =
-        "storage.query is not available; the storage.store component does not open a store yet.";
+        "storage.query is not available; open the storage.store store (host ConnectAsync) before querying.";
 
     private readonly StorageQueryOptions _options;
     private readonly IStorageStoreHandle _store;
@@ -92,7 +92,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    private Task QueryAsync(StorageQueryRequest input)
+    private async Task QueryAsync(StorageQueryRequest input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -108,17 +108,95 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
                 $"storage.query request is invalid: {exception.Message}",
                 input,
                 exception);
-            return Task.CompletedTask;
+            return;
         }
 
-        // The storage.store component holds configuration only; no store is
-        // opened yet, so every otherwise-valid request reports not available.
-        ReportError(
-            StorageErrorCodes.StoreNotAvailable,
-            NotAvailableMessage,
-            request,
-            exception: null);
-        return Task.CompletedTask;
+        // Borrow the store the storage.store node opened. The query node never opens
+        // or disposes a store; if none is open the request reports not available.
+        if (!_store.TryGetStore(out var store))
+        {
+            ReportError(
+                StorageErrorCodes.StoreNotAvailable,
+                NotAvailableMessage,
+                request,
+                exception: null);
+            return;
+        }
+
+        try
+        {
+            var records = await store.QueryAsync(
+                request,
+                _processingCancellation.Token).ConfigureAwait(false);
+            var copiedRecords = records
+                .Select(record => ValidateAndCopyRecord(record, request))
+                .Take(request.Limit!.Value)
+                .ToArray();
+
+            await _result.SendAsync(
+                CreateResult(request, copiedRecords),
+                _processingCancellation.Token).ConfigureAwait(false);
+
+            if (_options.EmitRecordOutputs)
+            {
+                foreach (var record in copiedRecords)
+                {
+                    await _records.SendAsync(
+                        record,
+                        _processingCancellation.Token).ConfigureAwait(false);
+                }
+            }
+
+            TryEmitDiagnostic(
+                StorageDiagnosticNames.QueryCompleted,
+                message: "storage.query completed.",
+                attributes: StorageNodeSupport.CreateCollectionAttributes(
+                    "query",
+                    _store.StoreName,
+                    request.Collection!,
+                    request.CorrelationId,
+                    copiedRecords.Length,
+                    request.Limit));
+        }
+        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ReportError(
+                StorageErrorCodes.QueryFailed,
+                $"storage.query failed: {exception.Message}",
+                request,
+                exception);
+        }
+    }
+
+    private StorageQueryResult CreateResult(
+        StorageQueryRequest request,
+        IReadOnlyList<StorageRecord> records)
+        => new()
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Operation = "query",
+            Collection = request.Collection!,
+            Succeeded = true,
+            Count = records.Count,
+            Records = _options.EmitRecordsInResult ? records.ToArray() : [],
+            CorrelationId = request.CorrelationId
+        };
+
+    private static StorageRecord ValidateAndCopyRecord(
+        StorageRecord record,
+        StorageQueryRequest request)
+    {
+        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
+        {
+            throw new InvalidOperationException(
+                "storage.query store returned a record for a different collection.");
+        }
+
+        return StorageNodeSupport.CopyRecord(record);
     }
 
     private StorageQueryRequest NormalizeRequest(StorageQueryRequest input)

@@ -13,7 +13,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             Type = MqttComponentTypes.Connection,
             DisplayName = "MQTT Connection",
             Category = "MQTT",
-            Summary = "Holds shared MQTT connection configuration referenced by publish and subscribe nodes.",
+            Summary = "Owns the shared MQTT client referenced by publish and subscribe nodes. Connecting and disconnecting are host-driven (ConnectAsync/DisconnectAsync on the resolved handle); there is no in-graph command port.",
             IconKey = "mqtt-connection",
             PreferredNodeName = "mqttConnection",
             SuggestedEditorWidth = 460,

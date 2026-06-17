@@ -469,6 +469,29 @@ Date: 2026-05-31
   remaining future work, deferred by owner choice). The full 2.0 set (Waves 2+3)
   is implemented and unpublished on the preview track.
 
+- Wave 3 connect step (host-API only, explicit, no auto-connect — owner choice):
+  made the three connection components functional. Each handle gained
+  `ConnectAsync`/`DisconnectAsync` + a connection `State` + a lock-free
+  `TryGet*` borrow accessor over a single-flight gated core (set client first /
+  state Connected last; clear/null first on disconnect; resources dispose last
+  = authoritative teardown). mqtt.connection owns the single lease + health
+  monitor; publish/subscribe borrow the adapter (subscribe (re)subscribes on
+  connect, deduped per connection epoch). http.client owns the pooled sender
+  (built via a new client-scoped sender context; SSRF allow-list/redirect guard
+  preserved). storage.store opens/owns the store via the factory (missing
+  factory → StoreOpenFailed, never faults the runtime). Operations borrow when
+  connected, report not-connected/not-available otherwise, and never connect or
+  dispose. An in-graph command-port trigger was ruled out (resource nodes can't
+  be link targets without an engine change). Fixed FakeTimeProvider test
+  flakiness uncovered under heavy parallel load: a capture-after-count
+  lost-wakeup in the Sessions/Sources advance helpers (capture the registration
+  signal before the count check) and over-aggressive 5s positive-wait timeouts
+  in the Routing tests (raised to 30s); full Release suite stable across 12
+  consecutive solution-wide runs, 705 tests. Mqtt/Http/Storage stay
+  `2.0.0-preview.1`. This makes the full 2.0 set (Waves 2+3) functional and
+  publishable; it remains unpublished on the preview track pending the publish
+  decision.
+
 ## Remaining
 
 - No remaining work for the component `1.0.0` release track.

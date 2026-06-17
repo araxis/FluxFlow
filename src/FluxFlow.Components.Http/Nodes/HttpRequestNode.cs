@@ -3,6 +3,7 @@ using FluxFlow.Components.Http.Diagnostics;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Components.Http.Timing;
 using FluxFlow.Engine.Components;
+using System.Text;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Http.Nodes;
@@ -10,7 +11,7 @@ namespace FluxFlow.Components.Http.Nodes;
 public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 {
     private const string NotConnectedMessage =
-        "http.request is not connected; the http.client component does not establish a client yet.";
+        "http.request is not connected; establish the http.client (host ConnectAsync) before sending.";
 
     private readonly HttpRequestNodeOptions _options;
     private readonly IHttpClientHandle _client;
@@ -18,6 +19,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     private readonly ActionBlock<HttpRequestInput> _input;
     private readonly BufferBlock<HttpResponseOutput> _output;
     private readonly BufferBlock<HttpErrorOutput> _errors;
+    private readonly CancellationTokenSource _lifecycleCancellation = new();
     private bool _disposed;
 
     internal HttpRequestNode(
@@ -69,6 +71,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
     public override void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
+        _lifecycleCancellation.Cancel();
         try
         {
             FaultNode(exception);
@@ -90,7 +93,17 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
 
         _disposed = true;
         Complete();
-        await Completion.ConfigureAwait(false);
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Completion may surface a fault; teardown must still run.
+        }
+
+        _lifecycleCancellation.Cancel();
+        _lifecycleCancellation.Dispose();
     }
 
     private async Task HandleAsync(HttpRequestInput input)
@@ -101,6 +114,9 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         ResolvedRequest request;
         try
         {
+            // All security validation runs first: method/url shape, the baseUrl
+            // origin guard and the allowedHosts allow-list (EnsureUrlAllowed), the
+            // timeout, and header injection checks — BEFORE any sender is touched.
             request = ResolveRequest(input);
         }
         catch (HttpRequestNodeException exception)
@@ -116,17 +132,182 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        // The http.client component holds configuration only; no client is
-        // established yet, so every otherwise-valid request reports not connected.
-        await ReportRequestErrorAsync(
-                HttpErrorCodes.RequestNotConnected,
-                HttpErrorKind.NotConnected,
-                NotConnectedMessage,
-                input,
-                CaptureTiming(startedAt),
-                resolvedUrl: request.Url.ToString(),
-                method: request.Method)
-            .ConfigureAwait(false);
+        // Borrow the sender the http.client node established. The request node
+        // never creates or disposes a sender; if none is established the request
+        // reports not connected.
+        if (!_client.TryGetSender(out var sender))
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.RequestNotConnected,
+                    HttpErrorKind.NotConnected,
+                    NotConnectedMessage,
+                    input,
+                    CaptureTiming(startedAt),
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        await SendAsync(input, request, sender, startedAt).ConfigureAwait(false);
+    }
+
+    private async Task SendAsync(
+        HttpRequestInput input,
+        ResolvedRequest request,
+        IHttpRequestSender sender,
+        DateTimeOffset startedAt)
+    {
+        var sendContext = BuildSendContext(input, request);
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifecycleCancellation.Token);
+        requestCancellation.CancelAfter(request.Timeout);
+
+        HttpResponseOutput response;
+        try
+        {
+            response = await sender.SendAsync(sendContext, requestCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (HttpClientRequestSenderFactory.HttpResponseBodyTooLargeException exception)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.ResponseTooLarge,
+                    HttpErrorKind.ResponseTooLarge,
+                    $"http.request response body exceeded {exception.MaxBytes} bytes.",
+                    input,
+                    CaptureTiming(startedAt),
+                    exception,
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+        catch (OperationCanceledException exception) when (
+            requestCancellation.IsCancellationRequested &&
+            !_lifecycleCancellation.IsCancellationRequested)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.Timeout,
+                    HttpErrorKind.Timeout,
+                    $"http.request timed out after {request.Timeout.TotalMilliseconds:0} ms.",
+                    input,
+                    CaptureTiming(startedAt),
+                    exception,
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+        catch (OperationCanceledException exception)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.Canceled,
+                    HttpErrorKind.Canceled,
+                    "http.request was canceled.",
+                    input,
+                    CaptureTiming(startedAt),
+                    exception,
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+        catch (HttpRequestException exception)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.Network,
+                    HttpErrorKind.Network,
+                    $"http.request failed to reach the server: {exception.Message}",
+                    input,
+                    CaptureTiming(startedAt),
+                    exception,
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+        catch (Exception exception)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.SendFailed,
+                    HttpErrorKind.SendFailed,
+                    $"http.request failed: {exception.Message}",
+                    input,
+                    CaptureTiming(startedAt),
+                    exception,
+                    resolvedUrl: request.Url.ToString(),
+                    method: request.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (_options.TreatNonSuccessStatusAsError && !response.Success)
+        {
+            await ReportRequestErrorAsync(
+                    HttpErrorCodes.NonSuccessStatus,
+                    HttpErrorKind.NonSuccessStatus,
+                    $"http.request received non-success status {response.StatusCode}.",
+                    input,
+                    CaptureTiming(startedAt),
+                    statusCode: response.StatusCode,
+                    reasonPhrase: response.ReasonPhrase,
+                    resolvedUrl: response.Url,
+                    method: response.Method)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        await _output.SendAsync(response).ConfigureAwait(false);
+        TryEmitDiagnostic(
+            HttpDiagnosticNames.RequestSucceeded,
+            FlowDiagnosticLevel.Information,
+            $"http.request {response.Method} {response.Url} -> {response.StatusCode}.",
+            attributes: CreateResponseAttributes(response));
+    }
+
+    private HttpRequestSendContext BuildSendContext(
+        HttpRequestInput input,
+        ResolvedRequest request)
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in input.Headers)
+        {
+            headers[header.Key] = header.Value;
+        }
+
+        var contentType = !string.IsNullOrWhiteSpace(input.ContentType)
+            ? input.ContentType
+            : (headers.TryGetValue("Content-Type", out var headerContentType)
+                ? headerContentType
+                : null);
+
+        var bodyBytes = ResolveBodyBytes(input);
+
+        return new HttpRequestSendContext
+        {
+            Input = input,
+            Method = request.Method,
+            Url = request.Url,
+            Headers = headers,
+            BodyBytes = bodyBytes,
+            BodyText = input.Body,
+            ContentType = contentType,
+            Timeout = request.Timeout,
+            MaxResponseBodyBytes = _options.MaxResponseBodyBytes
+        };
+    }
+
+    private static byte[]? ResolveBodyBytes(HttpRequestInput input)
+    {
+        if (input.Bytes is not null)
+        {
+            return input.Bytes;
+        }
+
+        return input.Body is not null
+            ? Encoding.UTF8.GetBytes(input.Body)
+            : null;
     }
 
     private ResolvedRequest ResolveRequest(HttpRequestInput input)
@@ -143,9 +324,9 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         }
 
         var url = ResolveUrl(input.Url);
-        ResolveTimeout(input.TimeoutMilliseconds);
+        var timeout = ResolveTimeout(input.TimeoutMilliseconds);
         ValidateHeaders(input);
-        return new ResolvedRequest(method, url);
+        return new ResolvedRequest(method, url, timeout);
     }
 
     private Uri ResolveUrl(string? url)
@@ -218,7 +399,7 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         return host.Equals(allowed, StringComparison.OrdinalIgnoreCase);
     }
 
-    private void ResolveTimeout(int? timeoutMilliseconds)
+    private TimeSpan ResolveTimeout(int? timeoutMilliseconds)
     {
         var value = timeoutMilliseconds ?? _client.DefaultTimeoutMilliseconds;
         if (value <= 0)
@@ -228,6 +409,8 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
                 HttpErrorKind.InvalidRequest,
                 "http.request timeout must be greater than zero.");
         }
+
+        return TimeSpan.FromMilliseconds(value);
     }
 
     private void ValidateHeaders(HttpRequestInput input)
@@ -374,7 +557,18 @@ public sealed class HttpRequestNode : FlowNodeBase, IAsyncDisposable
         public HttpErrorKind Kind { get; } = kind;
     }
 
-    private readonly record struct ResolvedRequest(string Method, Uri Url);
+    private Dictionary<string, object?> CreateResponseAttributes(HttpResponseOutput response)
+        => new(StringComparer.Ordinal)
+        {
+            ["clientName"] = _client.ClientName,
+            ["method"] = response.Method,
+            ["url"] = response.Url,
+            ["statusCode"] = response.StatusCode,
+            ["success"] = response.Success,
+            ["elapsedMilliseconds"] = response.ElapsedMilliseconds
+        };
+
+    private readonly record struct ResolvedRequest(string Method, Uri Url, TimeSpan Timeout);
 
     private HttpRequestTiming CaptureTiming(DateTimeOffset startedAt)
     {

@@ -148,7 +148,7 @@ public sealed class HttpRequestNodeTests
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Kind.ShouldBe(HttpErrorKind.NotConnected);
-        error.Message.ShouldContain("does not establish a client");
+        error.Message.ShouldContain("not connected");
         error.Url.ShouldBe("https://example.test/items");
         error.Timestamp.ShouldBe(clock.GetUtcNow());
 
