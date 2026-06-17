@@ -1,6 +1,6 @@
 # Changelog
 
-## FluxFlow.Components.Sources 2.0.0-preview.1
+## FluxFlow.Components.Sources 2.0.0
 
 2.0 preview: TimeProvider clock migration.
 
@@ -9,7 +9,7 @@
   `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
   public types are removed (breaking). Runtime behavior is unchanged.
 
-## FluxFlow.Components.Storage.FileSystem 2.0.0-preview.1
+## FluxFlow.Components.Storage.FileSystem 2.0.0
 
 2.0 preview: TimeProvider clock migration.
 
@@ -18,7 +18,7 @@
   `TimeProvider`-typed `Clock` option, and the old `IXxxClock`/`System*Clock`
   public types are removed (breaking). Runtime behavior is unchanged.
 
-## FluxFlow.Components.Storage.SqlFile 2.0.0-preview.1
+## FluxFlow.Components.Storage.SqlFile 2.0.0
 
 2.0 preview: TimeProvider clock migration.
 
@@ -38,7 +38,7 @@ Additive resource accessor (Wave 3 groundwork).
   reference connection/resource components by name. No existing engine APIs
   change.
 
-## FluxFlow.Components.Control 2.0.0-preview.1
+## FluxFlow.Components.Control 2.0.0
 
 2.0 preview: compile-once predicates for flow.filter and flow.when.
 
@@ -49,7 +49,7 @@ Additive resource accessor (Wave 3 groundwork).
   path); registration, options, ports, JSON shape, and runtime behavior are
   unchanged.
 
-## FluxFlow.Components.Assertions 2.0.0-preview.1
+## FluxFlow.Components.Assertions 2.0.0
 
 2.0 preview: compile-once predicate for flow.assert.
 
@@ -63,7 +63,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Mapping 2.0.0-preview.1
+## FluxFlow.Components.Mapping 2.0.0
 
 2.0 preview: compile-once mapper for flow.mapper.
 
@@ -72,7 +72,7 @@ Additive resource accessor (Wave 3 groundwork).
   context. The public node constructor changes (breaking); registration,
   options, ports, the Failed port, and behavior unchanged.
 
-## FluxFlow.Components.State 2.0.0-preview.1
+## FluxFlow.Components.State 2.0.0
 
 2.0 preview: compile-once reducer + factory relocation for state.reducer.
 
@@ -82,8 +82,11 @@ Additive resource accessor (Wave 3 groundwork).
   types.
 - The node's static `Create` is removed (relocated to the factory). Registration,
   options, ports, and behavior unchanged.
+- Replaces the bespoke `IStateClock` abstraction with `System.TimeProvider`
+  (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
+  are removed).
 
-## FluxFlow.Components.Routing 2.0.0-preview.1
+## FluxFlow.Components.Routing 2.0.0
 
 2.0 preview: compile-once selectors for switch, correlation, and join.
 
@@ -96,7 +99,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Validation 2.0.0-preview.1
+## FluxFlow.Components.Validation 2.0.0
 
 2.0 preview: schema compiled at build time for the JSON schema validator.
 
@@ -110,7 +113,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Observability 2.0.0-preview.1
+## FluxFlow.Components.Observability 2.0.0
 
 2.0 preview: compile-once predicate for flow.counter (no runtime behavior change).
 
@@ -123,7 +126,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Http 2.0.0-preview.1
+## FluxFlow.Components.Http 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -150,7 +153,7 @@ Additive resource accessor (Wave 3 groundwork).
   allowed-hosts/redirect SSRF guard is preserved (per-request validation plus
   `AllowAutoRedirect` disabled under a guard). No auto-connect.
 
-## FluxFlow.Components.Metrics 2.0.0-preview.1
+## FluxFlow.Components.Metrics 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -163,7 +166,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Storage 2.0.0-preview.1
+## FluxFlow.Components.Storage 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -189,7 +192,7 @@ Additive resource accessor (Wave 3 groundwork).
   `storage.put`/`get`/`query`/`delete` borrow the opened store when connected and
   report not-available otherwise; they never open or dispose it. No auto-connect.
 
-## FluxFlow.Components.Sessions 2.0.0-preview.1
+## FluxFlow.Components.Sessions 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -202,7 +205,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.FileSystem 2.0.0-preview.1
+## FluxFlow.Components.FileSystem 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -215,7 +218,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Timers 2.0.0-preview.1
+## FluxFlow.Components.Timers 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -228,7 +231,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Mqtt 2.0.0-preview.1
+## FluxFlow.Components.Mqtt 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -254,7 +257,7 @@ Additive resource accessor (Wave 3 groundwork).
   (subscribe (re)subscribes on connect, deduped per connection epoch) and report
   not-connected otherwise; they never connect or dispose. No auto-connect.
 
-## FluxFlow.Components.Payloads 2.0.0-preview.1
+## FluxFlow.Components.Payloads 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -264,7 +267,7 @@ Additive resource accessor (Wave 3 groundwork).
   removes the public `static Create` from the node type (breaking); node
   registration, options, ports, JSON shape, and runtime behavior are unchanged.
 
-## FluxFlow.Components.Projections 2.0.0-preview.1
+## FluxFlow.Components.Projections 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 
@@ -277,7 +280,7 @@ Additive resource accessor (Wave 3 groundwork).
   (`UseClock` now takes a `TimeProvider`; the old clock interface/implementation
   are removed).
 
-## FluxFlow.Components.Expectations 2.0.0-preview.1
+## FluxFlow.Components.Expectations 2.0.0
 
 2.0 preview: node factory relocation (no runtime behavior change).
 

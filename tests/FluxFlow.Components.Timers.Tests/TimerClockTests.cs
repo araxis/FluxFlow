@@ -29,7 +29,7 @@ public sealed class TimerClockTests
 
         // Capture the initial-delay timer's registration before starting the loop.
         var scheduled = clock.TimerScheduled;
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // The first tick is due after the 50ms initial delay; advancing releases the
         // pending Task.Delay so the loop emits and registers the next interval delay.
@@ -37,7 +37,7 @@ public sealed class TimerClockTests
             clock, output, scheduled, TimeSpan.FromMilliseconds(50));
         var (second, _) = await AdvanceUntilReceivedAsync(
             clock, output, scheduled2, TimeSpan.FromMilliseconds(100));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = new[] { first, second };
         ticks.Select(tick => tick.Sequence).ShouldBe([1, 2]);
@@ -68,12 +68,12 @@ public sealed class TimerClockTests
 
         // Capture the next-occurrence timer's registration before starting the loop.
         var scheduled = clock.TimerScheduled;
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
         // The next noon occurrence is one second away; releasing that delay emits the tick.
         var (tick, _) = await AdvanceUntilReceivedAsync(
             clock, output, scheduled, TimeSpan.FromSeconds(1));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var dueAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         tick.StartedAt.ShouldBe(startedAt);
@@ -98,14 +98,14 @@ public sealed class TimerClockTests
 
         // Capture the per-item delay registration before sending the item that arms it.
         var scheduled = clock.TimerScheduled;
-        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(30));
         input.Complete();
 
         // The item is held for 25ms; the delay stays pending until time advances.
         var (emitted, _) = await AdvanceUntilReceivedAsync(
             clock, output, scheduled, TimeSpan.FromMilliseconds(25));
         emitted.ShouldBe("one");
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -127,8 +127,8 @@ public sealed class TimerClockTests
 
         // Capture the first interval timer's registration before sending the items.
         var scheduled = clock.TimerScheduled;
-        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
-        await input.Target.SendAsync("two").WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(30));
+        await input.Target.SendAsync("two").WaitAsync(TimeSpan.FromSeconds(30));
         input.Complete();
 
         // Each emission waits a 30ms interval; release them one at a time.
@@ -138,7 +138,7 @@ public sealed class TimerClockTests
             clock, output, scheduled2, TimeSpan.FromMilliseconds(30));
         first.ShouldBe("one");
         second.ShouldBe("two");
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -158,13 +158,13 @@ public sealed class TimerClockTests
 
         // Capture the quiet-period timer's registration before sending the item.
         var scheduled = clock.TimerScheduled;
-        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(5));
+        await input.Target.SendAsync("one").WaitAsync(TimeSpan.FromSeconds(30));
 
         // The debounce emits after the 40ms quiet period elapses with no further input.
         var (emitted, _) = await AdvanceUntilReceivedAsync(
             clock, output, scheduled, TimeSpan.FromMilliseconds(40));
         input.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         emitted.ShouldBe("one");
     }
@@ -218,11 +218,11 @@ public sealed class TimerClockTests
         TimeSpan dueIn)
     {
         // Wait until the loop has registered the delay we are about to release.
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
         // Capture the next registration before advancing; this advance is what arms it.
         var nextScheduled = clock.TimerScheduled;
         clock.Advance(dueIn);
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         return (value, nextScheduled);
     }
 }

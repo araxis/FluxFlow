@@ -492,6 +492,30 @@ Date: 2026-05-31
   publishable; it remains unpublished on the preview track pending the publish
   decision.
 
+- 2.0 GA remediation + cut (owner decision "Blocker + all confirmed fixes, then
+  cut GA"). Pre-release review returned NO-GO on one blocker + confirmed fixes.
+  Blocker: `FluxFlow.Components.State` still shipped a bespoke `IStateClock`
+  (missed by the TimeProvider sweep; an earlier commit falsely claimed it
+  migrated) — migrated to `System.TimeProvider`. Confirmed fixes: connection-node
+  dispose-race lease leak in all three nodes (decide-and-publish guard + gate-
+  disposed tolerance, plus connect-fault/disconnect-wins/dispose-races tests); a
+  `BespokeClockInterfaceTests` release guard asserting no `src` package re-adds an
+  `IXxxClock` (would have caught the State miss); restored the descriptive
+  `MapperFailed` diagnostic in Mapping; refreshed the Mqtt/Http/Storage/Timers
+  packaged READMEs to the 2.0 shapes. Fixed three load-only flakes at root cause:
+  FlowWindow real-clock duration coupled to the ~15.6ms Windows tick (assert
+  positive elapsed; exact value pinned with a fake clock in RoutingClockTests),
+  FlowJoin one-shot clock-fault landing on a non-deterministic message (send the
+  failing message alone and await its error first), and StorageStore reading
+  secondary fanout ports (Found/Records/Diagnostics) before the pump delivered
+  (await the item); standardized positive waits to 30s in Sessions/Sources/
+  Timers/Expectations. Stability: Routing 50/50, Storage 40/40, full solution
+  15/15 green at 717 tests. Cut GA: flipped the 20 component packages
+  `2.0.0-preview.1` -> `2.0.0` (csproj + CHANGELOG headings; preflight/get-release-
+  notes key off the heading). Engine ships `1.3.0` (additive); publish engine
+  first (ProjectReference bakes a `>= 1.3.0` floor), then the 20 `2.0.0`
+  components, then verify the feed.
+
 ## Remaining
 
 - No remaining work for the component `1.0.0` release track.

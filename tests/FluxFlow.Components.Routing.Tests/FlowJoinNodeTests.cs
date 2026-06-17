@@ -205,14 +205,22 @@ public sealed class FlowJoinNodeTests
         node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
         node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowJoinTimeout<LeftMessage, RightMessage>>());
 
+        // The clock faults on its first read, so the first message the join
+        // processes fails and is reported as JoinFailed. Send it alone and await the
+        // error so the one-shot fault is consumed deterministically: the join drains
+        // its Left and Right inputs concurrently, so a later message could otherwise
+        // absorb the throw and break the pair that should match.
         await node.Left.SendAsync(new LeftMessage("A-100", "boom"));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RoutingErrorCodes.JoinFailed);
+
+        // The clock now returns a fixed time; a subsequent pair matches and is
+        // emitted, proving the node kept processing after the failure.
         await node.Left.SendAsync(new LeftMessage("A-101", "left"));
         await node.Right.SendAsync(new RightMessage("A-101", "right"));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(RoutingErrorCodes.JoinFailed);
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
         node.Completion.IsFaulted.ShouldBeFalse();
     }

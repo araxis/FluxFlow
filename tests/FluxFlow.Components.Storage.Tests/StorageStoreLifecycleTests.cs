@@ -69,8 +69,11 @@ public sealed class StorageStoreLifecycleTests
             new StorageGetRequest { Key = "a" });
         getResult.Found.ShouldBeTrue();
         getResult.Record!.Value.ShouldBe("one");
-        found.TryReceive(out var foundResult).ShouldBeTrue();
-        foundResult!.Record!.Value.ShouldBe("one");
+        // Found is a separate fanout port pumped on its own task, so await its item
+        // rather than TryReceive: Node.Completion does not guarantee the secondary
+        // port's buffer has been delivered to yet.
+        var foundResult = await found.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        foundResult.Record!.Value.ShouldBe("one");
 
         // QUERY
         var query = StorageResourceTestContext.CreateOperationNode(
@@ -82,8 +85,10 @@ public sealed class StorageStoreLifecycleTests
             new StorageQueryRequest { CorrelationId = "q-1" });
         queryResult.Count.ShouldBe(1);
         queryResult.Records.ShouldHaveSingleItem().Key.ShouldBe("a");
-        records.TryReceive(out var queriedRecord).ShouldBeTrue();
-        queriedRecord!.Key.ShouldBe("a");
+        // Records is a separate fanout port; await its item for the same reason as
+        // the Found port above.
+        var queriedRecord = await records.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        queriedRecord.Key.ShouldBe("a");
 
         // DELETE
         var delete = StorageResourceTestContext.CreateOperationNode(
@@ -209,8 +214,11 @@ public sealed class StorageStoreLifecycleTests
         // The resource node itself is never faulted / the runtime is never torn down.
         node.Completion.IsCompleted.ShouldBeFalse();
 
-        diagnostics.TryReceive(out var diagnostic).ShouldBeTrue();
-        diagnostic!.Name.ShouldBe(StorageDiagnosticNames.StoreOpenFailed);
+        // Diagnostics is a fanout port pumped on its own task; await the item rather
+        // than TryReceive, since the failed connect task returning does not guarantee
+        // the diagnostic has been delivered to the linked buffer yet.
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        diagnostic.Name.ShouldBe(StorageDiagnosticNames.StoreOpenFailed);
         diagnostic.Level.ShouldBe(FlowDiagnosticLevel.Error);
 
         await ((IAsyncDisposable)node).DisposeAsync();
@@ -231,6 +239,97 @@ public sealed class StorageStoreLifecycleTests
         // Idempotent dispose.
         await ((IAsyncDisposable)handle).DisposeAsync();
         store.DisposeCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_WhenOpenFaults_EntersFaultedThenSucceedsOnRetry()
+    {
+        // First OpenAsync throws (a transient fault, distinct from the missing-factory
+        // case); the second connect with the now-succeeding factory opens the store.
+        var store = new InMemoryStorageStore();
+        var factory = new FaultThenSucceedStorageStoreFactory(store, faults: 1);
+        var (_, _, handle) = CreateHarness(factory);
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            handle.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+
+        handle.State.ShouldBe(StorageStoreConnectionState.Faulted);
+        handle.TryGetStore(out _).ShouldBeFalse();
+        factory.OpenCalls.ShouldBe(1);
+
+        // The resource node is never faulted by a connect fault: it stays runnable so
+        // a retry can succeed.
+        var node = (StorageStoreNode)handle;
+        node.Completion.IsCompleted.ShouldBeFalse();
+
+        // Retry: the factory now succeeds, so the store becomes borrowable.
+        await handle.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        handle.State.ShouldBe(StorageStoreConnectionState.Connected);
+        factory.OpenCalls.ShouldBe(2);
+        handle.TryGetStore(out var borrowed).ShouldBeTrue();
+        borrowed.ShouldBeSameAs(store);
+
+        await ((IAsyncDisposable)handle).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisconnectAsync_WinningDuringEstablish_DisposesFreshLeaseOnce()
+    {
+        // Gate OpenAsync so the disconnect lands while the open is still in flight.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var store = new InMemoryStorageStore();
+        var factory = new GatedStorageStoreFactory(store, gate.Task);
+        var (_, _, handle) = CreateHarness(factory);
+
+        var connect = handle.ConnectAsync();
+        await factory.Opened.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Disconnect wins the race, then the parked open is released.
+        await handle.DisconnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        gate.SetResult();
+        await connect.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The freshly opened (Owned) lease must be dropped, not published, and disposed
+        // exactly once; the store is never observable.
+        handle.State.ShouldBe(StorageStoreConnectionState.Disconnected);
+        handle.TryGetStore(out _).ShouldBeFalse();
+        store.DisposeCalls.ShouldBe(1);
+
+        await ((IAsyncDisposable)handle).DisposeAsync();
+
+        // Dispose after a dropped establish must not double-dispose the store.
+        store.DisposeCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_RacingInFlightConnect_DisposesFreshStoreWithoutLeak()
+    {
+        // Gate OpenAsync so DisposeAsync disposes the gate while the open is still in
+        // flight; on resume the publish guard must drop and dispose the fresh lease
+        // even though re-acquiring the disposed gate throws ObjectDisposedException.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var store = new InMemoryStorageStore();
+        var factory = new GatedStorageStoreFactory(store, gate.Task);
+        var (_, _, handle) = CreateHarness(factory);
+
+        var connect = handle.ConnectAsync();
+        await factory.Opened.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await ((IAsyncDisposable)handle).DisposeAsync();
+        gate.SetResult();
+
+        // The in-flight connect completes without surfacing an unobserved exception,
+        // and the freshly opened store is disposed (no leak) rather than published.
+        await connect.WaitAsync(TimeSpan.FromSeconds(5));
+
+        handle.TryGetStore(out _).ShouldBeFalse();
+        store.DisposeCalls.ShouldBe(1);
+
+        // Force any unobserved-task finalizers to surface a missed exception.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     private static (

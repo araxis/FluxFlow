@@ -9,10 +9,37 @@ provide the concrete store through an adapter.
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
+| `storage.store` | resource | Owns the store lifecycle. Operation nodes reference it by name and borrow the opened store. |
 | `storage.put` | `Input` -> `Result`, `Errors` | Stores or updates a logical record. |
 | `storage.get` | `Input` -> `Result`, `Found`, `NotFound`, `Errors` | Reads a logical record and routes found/missing results. |
 | `storage.query` | `Input` -> `Result`, `Records`, `Errors` | Queries records by collection, key prefix, attributes, time bounds, and limit. |
 | `storage.delete` | `Input` -> `Result`, `Errors` | Deletes a logical record and reports whether it existed. |
+
+## Store resource
+
+The `storage.store` node owns the store. It is a resource: the operation nodes
+do not open their own store, they borrow the opened store from a `storage.store`
+by name.
+
+```json
+{
+  "type": "storage.store",
+  "name": "default",
+  "storeName": "items-db"
+}
+```
+
+Each operation node requires a `store` that names a `storage.store` resource.
+The reference is mandatory.
+
+```json
+{
+  "type": "storage.put",
+  "name": "save",
+  "store": "default",
+  "collection": "items"
+}
+```
 
 ## Store Ownership
 
@@ -25,16 +52,36 @@ var registry = new RuntimeNodeFactoryRegistry()
         .UseSharedStore(context => new AppStorageStore(context.StoreName)));
 ```
 
-Use `StorageStoreLease.Owned(store)` when the node should dispose the store.
-Use `StorageStoreLease.Shared(store)` when the host owns the store lifetime.
+Use `StorageStoreLease.Owned(store)` when the `storage.store` resource should
+dispose the store. Use `StorageStoreLease.Shared(store)` when the host owns the
+store lifetime.
 
 The factory receives the node address, node type, store name, and default
 collection through `StorageStoreContext`.
 
+## Opening (host-driven)
+
+Opening the store is an explicit host decision: there is no auto-open or lazy
+open. `StartAsync` on the `storage.store` resource is a no-op. The host opens and
+closes the store through `IStorageStoreHandle.ConnectAsync` /
+`DisconnectAsync` (named for cross-protocol consistency even though storage
+"opens" a store):
+
+```csharp
+await store.ConnectAsync(cancellationToken);
+// ... run the graph ...
+await store.DisconnectAsync(cancellationToken);
+```
+
+Operation nodes borrow the opened store at call-time and never open or dispose
+it. An operation sent before the store is opened is reported per message on the
+`Errors` port rather than faulting the node.
+
 ## Runtime Timing
 
-Storage nodes use `SystemStorageClock` by default. Hosts can provide an
-`IStorageClock` when tests, replay, or deterministic dashboards need stable
+The package uses `System.TimeProvider` (default `TimeProvider.System`); there is
+no bespoke storage clock interface. Hosts can provide a deterministic
+`TimeProvider` when tests, replay, or deterministic dashboards need stable
 timestamps:
 
 ```csharp
@@ -44,8 +91,9 @@ var registry = new RuntimeNodeFactoryRegistry()
         .UseSharedStore(context => new AppStorageStore(context.StoreName)));
 ```
 
-The configured clock is also available on `StorageStoreContext`, so backend
-stores can use the same time source for stored records and expiration checks.
+The configured `TimeProvider` is also available on `StorageStoreContext.Clock`,
+so backend stores can use the same time source for stored records and expiration
+checks.
 
 ## Put
 
@@ -134,8 +182,7 @@ Core contracts:
 - `StorageWriteMode`
 - `IStorageStore`
 - `IStorageStoreFactory`
-- `IStorageClock`
-- `SystemStorageClock`
+- `IStorageStoreHandle`
 - `StorageStoreContext`
 - `StorageStoreLease`
 
@@ -144,7 +191,7 @@ serialization and can compose this package with serialization or payload
 components before storage.
 
 Per-message store failures emit `FlowError` and later messages continue.
-Startup fails clearly when the store cannot be opened.
+Opening the store fails clearly when the store cannot be opened.
 
 ## Design Metadata
 

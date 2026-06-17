@@ -178,6 +178,74 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
+    public async Task MapperNode_ReportsExpectedTypeWhenResultIsIncompatible()
+    {
+        // The compiled-mapper path casts the engine result to the output type, so a
+        // wrong-typed return surfaces as a raw InvalidCastException. The node must
+        // still report MapperFailed but with a message naming the expected type.
+        var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => "not-an-output-message");
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(engine)
+                .RegisterType<OutputMessage>("app.output"),
+            new
+            {
+                expression = "map",
+                outputType = "app.output",
+                expressionName = "test-map"
+            });
+        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var errors = new BufferBlock<FlowError>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+
+        await input.Target.SendAsync("value");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
+        error.Message.ShouldContain("incompatible or null value");
+        error.Message.ShouldContain(typeof(OutputMessage).ToString());
+        error.Message.ShouldContain("app.output");
+        error.Exception.ShouldBeOfType<InvalidCastException>();
+    }
+
+    [Fact]
+    public async Task MapperNode_ReportsExpectedTypeWhenResultIsNull()
+    {
+        // A null return for a non-nullable value-type output surfaces as a raw
+        // NullReferenceException; the node must report the expected type instead.
+        var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => null);
+        var runtimeNode = CreateNode(
+            options => options
+                .UseExpressionEngine(engine)
+                .RegisterType<int>("app.count"),
+            new
+            {
+                expression = "map",
+                outputType = "app.count",
+                expressionName = "test-map"
+            });
+        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
+            .ShouldBeOfType<InputPort<object>>();
+        var errors = new BufferBlock<FlowError>();
+        runtimeNode.Node.Errors.LinkTo(errors);
+
+        await input.Target.SendAsync("value");
+        input.Target.Complete();
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
+        error.Message.ShouldContain("incompatible or null value");
+        error.Message.ShouldContain(typeof(int).ToString());
+        // A null result for a value-type output surfaces as InvalidCastException or
+        // NullReferenceException depending on the cast; both route to the clearer message.
+        (error.Exception is InvalidCastException or NullReferenceException).ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task MapperNode_ErrorsPortReceivesPerMessageFailures()
     {
         var calls = 0;

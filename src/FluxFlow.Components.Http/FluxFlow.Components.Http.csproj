@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>2.0.0-preview.1</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable HTTP request components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>

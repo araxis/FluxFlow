@@ -180,6 +180,11 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `137-wave3-2.0-plan.md`: review-ready Wave 3 (2.0) plan — connection
   resource components, lazy-connect handle, TimeProvider clock consolidation,
   breaking surface, and sequencing.
+- `138-2.0-ga-remediation-and-cut.md`: 2.0 pre-release review remediation
+  (State clock blocker, connection dispose-race leaks, clock release guard,
+  mapper diagnostic, README refresh, three flake root-cause fixes) and the GA
+  cut flipping the 20 component packages from `2.0.0-preview.1` to `2.0.0`
+  (engine stays `1.3.0`).
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

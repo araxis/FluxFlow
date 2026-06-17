@@ -108,7 +108,7 @@ public sealed class StorageStoreNode : FlowNodeBase, IStorageStoreHandle, IAsync
                     _lifecycleCancellation.Token);
 
                 _state = StorageStoreConnectionState.Connecting;
-                connect = EstablishAsync(_connectCts.Token);
+                connect = EstablishAsync(_connectCts, _connectCts.Token);
                 _inFlightConnect = connect;
             }
         }
@@ -120,7 +120,9 @@ public sealed class StorageStoreNode : FlowNodeBase, IStorageStoreHandle, IAsync
         await connect.ConfigureAwait(false);
     }
 
-    private async Task<StorageStoreLease> EstablishAsync(CancellationToken ct)
+    private async Task<StorageStoreLease> EstablishAsync(
+        CancellationTokenSource ownCts,
+        CancellationToken ct)
     {
         // Yield off the gate-holding caller so the in-flight Task is observable to a
         // concurrent ConnectAsync before OpenAsync runs.
@@ -129,6 +131,8 @@ public sealed class StorageStoreNode : FlowNodeBase, IStorageStoreHandle, IAsync
         StorageStoreLease? lease = null;
         try
         {
+            ct.ThrowIfCancellationRequested();
+
             var context = new StorageStoreContext
             {
                 Address = _address,
@@ -141,27 +145,53 @@ public sealed class StorageStoreNode : FlowNodeBase, IStorageStoreHandle, IAsync
             lease = await _storeFactory.OpenAsync(context, ct).ConfigureAwait(false);
             ArgumentNullException.ThrowIfNull(lease);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // Re-acquire the gate to publish. DisposeAsync may have disposed the gate
+            // while OpenAsync was running, in which case WaitAsync throws
+            // ObjectDisposedException; treat that as "cannot publish" and fall through
+            // to robust disposal of the freshly opened lease so it never leaks.
+            var published = false;
             try
             {
-                // If a disconnect or dispose won the race while we were opening,
-                // honor it: drop the freshly opened lease and stay not-connected.
-                if (_userDisconnected || _disposed)
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                try
                 {
-                    await lease.DisposeAsync().ConfigureAwait(false);
-                    return lease;
+                    // Honor any teardown that won the race while we were opening, drop
+                    // a cancelled connect, and never overwrite a live store: a
+                    // disconnect/dispose, a cancelled token, a superseding establish
+                    // (no longer the current in-flight Task), or an already-published
+                    // store all mean this fresh lease must be dropped, not published.
+                    if (!_userDisconnected &&
+                        !_disposed &&
+                        !ct.IsCancellationRequested &&
+                        ReferenceEquals(_connectCts, ownCts) &&
+                        _store is null)
+                    {
+                        // Publish order: store FIRST, then flip state to Connected LAST
+                        // so a borrow that observes Connected always sees a non-null
+                        // store.
+                        _lease = lease;
+                        _store = lease.Store;
+                        _state = StorageStoreConnectionState.Connected;
+                        _inFlightConnect = null;
+                        published = true;
+                    }
                 }
-
-                // Publish order: store FIRST, then flip state to Connected LAST so a
-                // borrow that observes Connected always sees a non-null store.
-                _lease = lease;
-                _store = lease.Store;
-                _state = StorageStoreConnectionState.Connected;
-                _inFlightConnect = null;
+                finally
+                {
+                    _gate.Release();
+                }
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                _gate.Release();
+                // Gate disposed by a concurrent DisposeAsync; cannot publish.
+            }
+
+            if (!published)
+            {
+                // Could not publish (teardown/cancel/supersede/already-live store):
+                // dispose the fresh lease and return WITHOUT publishing.
+                await lease.DisposeAsync().ConfigureAwait(false);
+                return lease;
             }
 
             TryEmitDiagnostic(
@@ -177,27 +207,44 @@ public sealed class StorageStoreNode : FlowNodeBase, IStorageStoreHandle, IAsync
             var cancelled = exception is OperationCanceledException &&
                 (ct.IsCancellationRequested || _lifecycleCancellation.IsCancellationRequested);
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            // Mutating shared state needs the gate, but a concurrent DisposeAsync may
+            // have disposed it (ObjectDisposedException). Tolerate that and STILL
+            // dispose the freshly opened lease afterwards so it never leaks.
             try
             {
-                _inFlightConnect = null;
-
-                // Never leave a half-open lease behind.
-                if (lease is not null)
+                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                try
                 {
-                    await lease.DisposeAsync().ConfigureAwait(false);
+                    // Only retract our own in-flight marker; a superseding establish
+                    // may already own it. Never clobber a live store: only fault when
+                    // this is still the current connect and nothing was published.
+                    if (ReferenceEquals(_connectCts, ownCts))
+                    {
+                        _inFlightConnect = null;
+                    }
+
+                    if (!cancelled && !_userDisconnected && !_disposed &&
+                        ReferenceEquals(_connectCts, ownCts) && _store is null)
+                    {
+                        _lease = null;
+                        _state = StorageStoreConnectionState.Faulted;
+                    }
                 }
-
-                if (!cancelled && !_userDisconnected && !_disposed)
+                finally
                 {
-                    _store = null;
-                    _lease = null;
-                    _state = StorageStoreConnectionState.Faulted;
+                    _gate.Release();
                 }
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                _gate.Release();
+                // Gate disposed by a concurrent DisposeAsync; state is already torn
+                // down. Fall through to dispose the half-open lease below.
+            }
+
+            // Never leave a half-open lease behind, even if the gate was disposed.
+            if (lease is not null)
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
             }
 
             // The default MissingStorageStoreFactory throws here. Surface it as a

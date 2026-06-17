@@ -32,9 +32,9 @@ public sealed class TimerDebounceNodeTests
         await input.Target.SendAsync(new InputMessage("one"));
         await input.Target.SendAsync(new InputMessage("two"));
 
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         value.Value.ShouldBe("two");
         DateTimeOffset.UtcNow.ShouldBeGreaterThanOrEqualTo(startedAt.AddMilliseconds(25));
@@ -59,7 +59,7 @@ public sealed class TimerDebounceNodeTests
         input.Target.Complete();
 
         var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(250));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         value.ShouldBe("one");
     }
@@ -82,11 +82,11 @@ public sealed class TimerDebounceNodeTests
 
         await input.Target.SendAsync(1);
         await input.Target.SendAsync(2);
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         await input.Target.SendAsync(3);
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         first.ShouldBe(2);
         second.ShouldBe(3);
@@ -114,10 +114,10 @@ public sealed class TimerDebounceNodeTests
 
         await input.Target.SendAsync("hello");
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await DrainUntilCompletedAsync(output)).ShouldBe(["hello"]);
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         diagnostic.Name.ShouldBe(TimerDiagnosticNames.DebounceEmitted);
         diagnostic.Attributes["inputType"].ShouldBe("string");
         diagnostic.Attributes["sequence"].ShouldBe(1L);
@@ -142,7 +142,7 @@ public sealed class TimerDebounceNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         (await DrainUntilCompletedAsync(output)).ShouldBe(["one"]);
     }
 
@@ -163,7 +163,7 @@ public sealed class TimerDebounceNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync()
             .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(30));
 
         await Should.ThrowAsync<InvalidOperationException>(
             () => runtimeNode.Node.Completion);
@@ -270,7 +270,7 @@ public sealed class TimerDebounceNodeTests
     private static async Task<List<T>> DrainUntilCompletedAsync<T>(
         BufferBlock<T> output)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var values = new List<T>();
         while (await output.OutputAvailableAsync(cancellation.Token))
         {

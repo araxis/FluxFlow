@@ -1,7 +1,6 @@
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Components.State.Options;
-using FluxFlow.Components.State.Timing;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Mapping;
 using System.Threading.Tasks.Dataflow;
@@ -15,7 +14,7 @@ public sealed class StateReducerNode : FlowNodeBase
     private readonly StateReducerOptions _options;
     private readonly IFlowReducer _reducer;
     private readonly string _engineName;
-    private readonly IStateClock _clock;
+    private readonly TimeProvider _clock;
     private readonly ActionBlock<StateReducerInput> _input;
     private readonly BufferBlock<StateReducerResult> _output;
     private readonly Dictionary<string, StoredState> _states = new(StringComparer.Ordinal);
@@ -26,7 +25,7 @@ public sealed class StateReducerNode : FlowNodeBase
         StateReducerOptions options,
         IFlowReducer reducer,
         string engineName,
-        IStateClock clock)
+        TimeProvider clock)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _reducer = reducer ?? throw new ArgumentNullException(nameof(reducer));
@@ -190,7 +189,7 @@ public sealed class StateReducerNode : FlowNodeBase
             Input = input.Input,
             NewState = null,
             Version = current is null ? 0 : current.Version + 1,
-            UpdatedAt = _clock.UtcNow
+            UpdatedAt = _clock.GetUtcNow()
         };
     }
 
@@ -317,7 +316,7 @@ public sealed class StateReducerNode : FlowNodeBase
             Input = input.Input,
             NewState = next.State,
             Version = next.Version,
-            UpdatedAt = _clock.UtcNow
+            UpdatedAt = _clock.GetUtcNow()
         };
 
     private void ReportReducerError(

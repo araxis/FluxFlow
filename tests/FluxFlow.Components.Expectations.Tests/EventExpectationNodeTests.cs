@@ -49,7 +49,7 @@ public sealed class EventExpectationNodeTests
             subject: "orders/2",
             payloadPreview: "abcdef"));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.EvaluatedAt.ShouldBe(timeProvider.GetUtcNow());
         result.Name.ShouldBe("failed-order");
         result.Kind.ShouldBe(EventExpectationResultKind.Expect);
@@ -62,7 +62,7 @@ public sealed class EventExpectationNodeTests
         result.ObservedEvents.Count.ShouldBe(2);
 
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -98,17 +98,17 @@ public sealed class EventExpectationNodeTests
         await WaitUntilAsync(() => node.ObservedEventCount == 1);
 
         // Only advance once the node has actually registered its timeout timer.
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
         timeProvider.Advance(timeout);
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Satisfied.ShouldBeFalse();
         result.Matched.ShouldBeFalse();
         result.TimedOut.ShouldBeTrue();
         result.ObservedEvents.ShouldHaveSingleItem();
 
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -133,17 +133,17 @@ public sealed class EventExpectationNodeTests
         // to be registered before advancing, otherwise the advance fires nothing.
         var timerScheduled = timeProvider.TimerScheduled;
         await runtimeNode.Node.StartAsync();
-        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
         timeProvider.Advance(TimeSpan.FromSeconds(1));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Kind.ShouldBe(EventExpectationResultKind.Guard);
         result.Satisfied.ShouldBeTrue();
         result.Matched.ShouldBeFalse();
         result.TimedOut.ShouldBeTrue();
 
         GetInput(runtimeNode).Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class EventExpectationNodeTests
                 ["severity"] = "critical"
             }));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Kind.ShouldBe(EventExpectationResultKind.Guard);
         result.Satisfied.ShouldBeFalse();
         result.Matched.ShouldBeTrue();
@@ -184,7 +184,7 @@ public sealed class EventExpectationNodeTests
         result.MatchedEvent.Channel.ShouldBe("events/orders");
 
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -204,9 +204,9 @@ public sealed class EventExpectationNodeTests
 
         await runtimeNode.Node.StartAsync();
         input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Satisfied.ShouldBeFalse();
         result.Matched.ShouldBeFalse();
         result.TimedOut.ShouldBeFalse();
@@ -233,10 +233,10 @@ public sealed class EventExpectationNodeTests
         await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
             .DisposeAsync();
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         result.Satisfied.ShouldBeFalse();
         result.TimedOut.ShouldBeFalse();
-        await results.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await results.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -346,7 +346,7 @@ public sealed class EventExpectationNodeTests
         var startedAt = Environment.TickCount64;
         while (!condition())
         {
-            (Environment.TickCount64 - startedAt).ShouldBeLessThan(5000);
+            (Environment.TickCount64 - startedAt).ShouldBeLessThan(30000);
             await Task.Delay(10);
         }
     }

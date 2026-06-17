@@ -96,7 +96,7 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         {
             TryReportError(
                 MappingErrorCodes.MapperFailed,
-                $"flow.mapper failed to map input: {exception.Message}",
+                $"flow.mapper failed to map input: {DescribeFailure(exception)}",
                 exception,
                 CreateErrorContext());
             TryEmitDiagnostic(
@@ -111,6 +111,22 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
             return [];
         }
     }
+
+    private string DescribeFailure(Exception exception)
+        => exception switch
+        {
+            // The compiled-mapper path surfaces a wrong-type or null result as a raw
+            // InvalidCastException/NullReferenceException. Restore the descriptive
+            // "expected type" message that the interpreted path used to produce.
+            InvalidCastException => DescribeIncompatibleResult(exception),
+            NullReferenceException => DescribeIncompatibleResult(exception),
+            _ => exception.Message
+        };
+
+    private string DescribeIncompatibleResult(Exception exception)
+        => $"the mapping expression returned an incompatible or null value; " +
+            $"expected output type '{_nodeContext.OutputType}' (configured as '{_options.EffectiveOutputType}'). " +
+            $"{exception.Message}";
 
     private void CompleteOutputs(Task completion)
     {

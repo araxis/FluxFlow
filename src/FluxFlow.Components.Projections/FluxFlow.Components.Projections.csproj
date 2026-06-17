@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Projections</PackageId>
     <AssemblyName>FluxFlow.Components.Projections</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections</RootNamespace>
-    <Version>2.0.0-preview.1</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event projection components for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;monitoring</PackageTags>

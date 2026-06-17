@@ -1,5 +1,6 @@
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
+using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
@@ -74,6 +75,91 @@ public sealed class HttpClientLifecycleTests
         handle.State.ShouldBe(HttpClientConnectionState.Connected);
 
         await ((IAsyncDisposable)handle).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ConnectAsync_SurfacesConnectFault_ThenRetrySucceeds()
+    {
+        // First CreateClient throws; the second succeeds. One factory, gated by call
+        // number, so the retry path runs against a now-succeeding build.
+        var factory = new RecordingHttpRequestSenderFactory(throwOnCallNumber: 1);
+        var (handle, _) = CreateClient(factory);
+        var node = (IFlowNode)handle;
+
+        var fault = await Should.ThrowAsync<InvalidOperationException>(handle.ConnectAsync());
+        fault.Message.ShouldBe("CreateClient failed.");
+
+        handle.State.ShouldBe(HttpClientConnectionState.Faulted);
+        handle.TryGetSender(out _).ShouldBeFalse();
+        node.Completion.IsCompleted.ShouldBeFalse();
+        factory.CreateClientCalls.ShouldBe(1);
+
+        // A second connect builds a fresh sender and connects.
+        await handle.ConnectAsync();
+
+        handle.State.ShouldBe(HttpClientConnectionState.Connected);
+        factory.CreateClientCalls.ShouldBe(2);
+        handle.TryGetSender(out var borrowed).ShouldBeTrue();
+        borrowed.ShouldBeSameAs(factory.LastSender);
+
+        await ((IAsyncDisposable)handle).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisconnectAsync_WinsDuringEstablish_DisposesFreshSenderAndStaysDisconnected()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var factory = new RecordingHttpRequestSenderFactory(
+            buildGate: release.Task,
+            entered: entered);
+        var (handle, _) = CreateClient(factory);
+
+        // Park the establish inside the gated factory build.
+        var connect = handle.ConnectAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Disconnect wins the race while the build is in-flight, then release the
+        // factory so the establish resumes and observes the requested disconnect.
+        await handle.DisconnectAsync();
+        release.SetResult();
+        await connect.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The freshly built sender is dropped (disposed once) and never published.
+        factory.LastSender.DisposeCalls.ShouldBe(1);
+        handle.State.ShouldBe(HttpClientConnectionState.Disconnected);
+        handle.TryGetSender(out _).ShouldBeFalse();
+
+        await ((IAsyncDisposable)handle).DisposeAsync();
+        factory.LastSender.DisposeCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_RacingInFlightConnect_DisposesFreshSenderWithoutLeak()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var factory = new RecordingHttpRequestSenderFactory(
+            buildGate: release.Task,
+            entered: entered);
+        var (handle, _) = CreateClient(factory);
+
+        // Park the establish inside the gated factory build.
+        var connect = handle.ConnectAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Dispose (which disposes the gate) wins while the build is in-flight, then
+        // release the factory so the establish resumes onto a disposed gate.
+        await ((IAsyncDisposable)handle).DisposeAsync();
+        release.SetResult();
+
+        // The establish must not leak the fresh sender or surface an exception even
+        // though the gate it re-acquires to publish has been disposed.
+        await connect.WaitAsync(TimeSpan.FromSeconds(5));
+
+        factory.LastSender.DisposeCalls.ShouldBe(1);
+        handle.State.ShouldBe(HttpClientConnectionState.Disconnected);
+        handle.TryGetSender(out _).ShouldBeFalse();
     }
 
     [Fact]

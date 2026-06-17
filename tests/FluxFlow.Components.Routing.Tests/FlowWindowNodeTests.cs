@@ -64,7 +64,11 @@ public sealed class FlowWindowNodeTests
 
         window.Reason.ShouldBe(FlowWindowEmitReason.Time);
         window.Items.ShouldBe(["first"]);
-        window.Duration.ShouldBeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(20));
+        // Real clock: only assert a positive elapsed span. GetUtcNow() snaps to the
+        // ~15.6ms Windows system tick, so a 25ms window can measure a single-tick
+        // duration below 20ms under load. The exact (25ms) duration is pinned
+        // deterministically with a fake clock in RoutingClockTests.
+        window.Duration.ShouldBeGreaterThan(TimeSpan.Zero);
     }
 
     [Fact]

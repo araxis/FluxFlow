@@ -9,33 +9,102 @@ preserving the same runtime registration model.
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
-| `mqtt.publish` | `Input` -> `Result` | Publishes `MqttPublishRequest` values through an adapter. |
-| `mqtt.subscribe` | source -> `Output` | Emits `MqttReceivedMessage` values from an adapter subscription. |
+| `mqtt.connection` | resource | Owns the MQTT client lifecycle (profile + reconnect policy). Publish and subscribe nodes reference it by name. |
+| `mqtt.publish` | `Input` -> `Result` | Publishes `MqttPublishRequest` values through a borrowed connection. |
+| `mqtt.subscribe` | source -> `Output` | Emits `MqttReceivedMessage` values from a borrowed connection subscription. |
 
 The package does not include a concrete network client. Applications provide an
 adapter through `RegisterMqttComponents`.
 
 ```csharp
 var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterMqttComponents((context, cancellationToken) =>
-        ValueTask.FromResult(MqttClientLease.Owned(
-            new AppMqttClientAdapter(context.Profile))));
+    .RegisterMqttComponents((profile, cancellationToken) =>
+        ValueTask.FromResult<IMqttClientAdapter>(
+            new AppMqttClientAdapter(profile)));
 ```
 
 Options are static node settings. Requests and messages are per-item data.
+
+## Connection resource
+
+The `mqtt.connection` node owns the client. It is a resource: `mqtt.publish`
+and `mqtt.subscribe` do not open their own clients, they borrow the established
+adapter from a connection by name. The connection carries the broker `profile`
+and an optional `reconnect` policy.
+
+```json
+{
+  "type": "mqtt.connection",
+  "name": "broker",
+  "profile": {
+    "host": "broker.internal.example",
+    "port": 1883,
+    "clientId": "fluxflow",
+    "useTls": false
+  },
+  "reconnect": {
+    "enabled": true,
+    "maxAttempts": 5,
+    "initialDelayMilliseconds": 100,
+    "maxDelayMilliseconds": 5000,
+    "backoffMultiplier": 2,
+    "useJitter": true
+  }
+}
+```
+
+`reconnect` values are advisory. The package validates them and passes them to
+the adapter factory through `MqttClientFactoryContext.Reconnect`. The adapter
+still owns connection state, retry loops, shared client behavior, and
+broker-specific recovery.
+
+`mqtt.publish` and `mqtt.subscribe` require a `connectionName` that names an
+`mqtt.connection` resource. The reference is mandatory; there is no inline
+broker configuration on publish or subscribe.
+
+```json
+{
+  "type": "mqtt.publish",
+  "name": "publisher",
+  "connectionName": "broker",
+  "defaultTopic": "devices/state"
+}
+```
+
+```json
+{
+  "type": "mqtt.subscribe",
+  "name": "subscriber",
+  "connectionName": "broker",
+  "topicFilter": "devices/+/state"
+}
+```
+
+## Connecting (host-driven)
+
+Connecting is an explicit host decision: there is no auto-connect or lazy
+connect. `StartAsync` on the connection is a no-op. The host establishes and
+tears down the client through `IMqttConnectionHandle`:
+
+```csharp
+await connection.ConnectAsync(cancellationToken);
+// ... run the graph ...
+await connection.DisconnectAsync(cancellationToken);
+```
+
+`ConnectAsync` is idempotent (a no-op when already connected) and single-flight
+(a concurrent call awaits the in-flight connect). Publish and subscribe borrow
+the established adapter and never connect or dispose it; a borrow only succeeds
+while the connection is `Connected`.
 
 `mqtt.publish` bounds each adapter publish with `publishTimeoutMilliseconds`
 (default `30000`). A publish that exceeds the timeout is reported as a
 per-message error and the node continues with later requests, so a hung
 adapter cannot wedge the node.
 
-`MqttClientFactoryContext` includes the runtime node address, connection name,
-and connection profile. Hosts can use `ConnectionName` to resolve app-owned
-resources instead of placing all broker settings inline.
-
-Return `MqttClientLease.Owned(adapter)` when the node should dispose the
-adapter. Return `MqttClientLease.Shared(adapter)` when the host owns a shared
-client lifetime.
+Return `MqttClientLease.Owned(adapter)` from the factory when the connection
+should dispose the adapter. Return `MqttClientLease.Shared(adapter)` when the
+host owns a shared client lifetime.
 
 Subscriptions return `IMqttSubscription`; once `SubscribeAsync` returns,
 startup is considered successful. Each subscription should expose an independent
@@ -43,14 +112,15 @@ message stream so shared clients can safely serve multiple nodes.
 
 ## Runtime Timing
 
-Use `MqttComponentOptions.UseClock(...)` when tests or hosts need deterministic
-package-owned timestamps.
+Use `MqttComponentOptions.UseClock(TimeProvider)` when tests or hosts need
+deterministic package-owned timestamps. The package uses `System.TimeProvider`;
+there is no bespoke MQTT clock interface.
 
 ```csharp
 var registry = new RuntimeNodeFactoryRegistry()
     .RegisterMqttComponents(options => options
         .UseClientFactory(factory)
-        .UseClock(testClock));
+        .UseClock(TimeProvider.System));
 ```
 
 `mqtt.publish` uses the configured clock for `MqttPublishResult.Timestamp`.
@@ -70,31 +140,6 @@ diagnostics and events named `mqtt.connection.healthChanged`.
 
 The package does not own reconnect policy. Adapters decide how to connect,
 reconnect, and report state.
-
-## Reconnect Policy Hints
-
-Nodes can optionally set `reconnect` to pass policy hints to the host adapter
-through `MqttClientFactoryContext.Reconnect`.
-
-```json
-{
-  "type": "mqtt.publish",
-  "name": "publisher",
-  "defaultTopic": "devices/state",
-  "reconnect": {
-    "enabled": true,
-    "maxAttempts": 5,
-    "initialDelayMilliseconds": 100,
-    "maxDelayMilliseconds": 5000,
-    "backoffMultiplier": 2,
-    "useJitter": true
-  }
-}
-```
-
-These values are advisory. The package validates them and passes them to the
-adapter factory. The adapter still owns connection state, retry loops, shared
-client behavior, and broker-specific recovery.
 
 ## Topic validation
 
