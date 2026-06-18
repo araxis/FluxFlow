@@ -1,36 +1,53 @@
 # FluxFlow.Components.Expectations
 
-Reusable event expectation components for FluxFlow.
+A standalone event-expectation node for FluxFlow.
 
-## Nodes
+## What it is
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `event.expect` | `Input` -> `Result`, `Errors` | Waits for a matching runtime event and emits one expectation result. |
-| `event.guard` | `Input` -> `Result`, `Errors` | Guards against a matching runtime event and emits one guard result. |
+`EventExpectationNode` is a self-contained TPL Dataflow processor built on the
+`FluxFlow.Nodes` kit. You give it options, post `ProjectionEvent`s to its input,
+and it resolves **exactly once** into a single `EventExpectationResult` broadcast
+on its output (failures on the error port, diagnostics on the event port). It
+needs **nothing else** — no engine, registry, or runtime:
 
-Both nodes consume `FlowEvent` values from `FluxFlow.Engine` and emit
-`EventExpectationResult` values.
-
-## Example
-
-```json
+```csharp
+await using var node = new EventExpectationNode(new EventExpectationOptions
 {
-  "type": "event.expect",
-  "name": "order-completed",
-  "timeoutMilliseconds": 5000,
-  "maxObservedEvents": 10,
-  "maxPreviewChars": 256,
-  "filter": {
-    "type": "operation.completed",
-    "status": "ok",
-    "subjectPrefix": "orders/"
-  }
-}
+    Kind = EventExpectationNodeKind.Expect,
+    Name = "order-completed",
+    TimeoutMilliseconds = 5000,
+    Filter = new EventFilter
+    {
+        Type = "operation.completed",
+        Status = "ok",
+        SubjectPrefix = "orders/"
+    }
+});
+
+node.Output.LinkTo(asserter.Input);  // broadcast: link to as many consumers as you like
+
+await node.Input.SendAsync(FlowMessage.Create(@event));
 ```
 
-`event.guard` uses the same options, but a matching event means the guard is not
-satisfied.
+An `Expect` node is satisfied when a matching event arrives; a `Guard` node is
+satisfied when none arrives. The node resolves on the first of three triggers:
+
+- a matching event,
+- a configured timeout (armed over the injected `TimeProvider`),
+- input completion via `CompleteWithResultAsync()`.
+
+## Ports
+
+| Port | Block | Purpose |
+|------|-------|---------|
+| `Input` | `BufferBlock<FlowMessage<ProjectionEvent>>` | bounded intake — `SendAsync` applies backpressure |
+| `Output` | `BroadcastBlock<FlowMessage<EventExpectationResult>>` | the single result, fanned out to every linked consumer |
+| `Errors` | `BroadcastBlock<FlowError>` | evaluation failures |
+| `Events` | `BroadcastBlock<FlowEvent>` | `event.expectation.matched` / `.timed-out` / `.completed` diagnostics |
+
+The result carries the correlation id of the matching event (or, on timeout and
+completion, the last observed event's id) so correlation flows event → result via
+the `FlowMessage<T>` envelope.
 
 ## Result
 
@@ -50,7 +67,8 @@ satisfied.
 ## Filters
 
 Expectations use the same neutral `EventFilter` contract as the Projections
-package. Filters support:
+package (the shared `ProjectionEvent` / `EventFilter` / `EventFilterMatcher`
+contracts come from `FluxFlow.Components.Projections`). Filters support:
 
 - event type or type prefix
 - subject prefix
@@ -68,16 +86,16 @@ Filters use ordinal string comparison.
 
 ## Timing
 
-Use `ExpectationsComponentOptions.UseClock(...)` for deterministic timeout
-and result timestamps in tests or hosts.
+Pass a `TimeProvider` to the constructor for deterministic timeout and result
+timestamps in tests or hosts. The timeout is armed via `TimeProvider.CreateTimer`,
+so a `FakeTimeProvider` drives it by advancing the clock — no real-time wait.
 
 ```csharp
-registry.RegisterExpectationsComponents(options =>
-    options.UseClock(timeProvider));
+var node = new EventExpectationNode(options, timeProvider);
 ```
 
-## Boundaries
+## Composition
 
-This package has no UI dependency, no concrete transport dependency, and no
-host-specific scenario runner dependency. Hosts decide how to feed events into
-the nodes and how to display, store, or assert the emitted results.
+Building a workflow — reading config, creating nodes, linking them — is a
+separate concern from the node. This package is just the node; wire it from
+whatever composition/host layer you use.

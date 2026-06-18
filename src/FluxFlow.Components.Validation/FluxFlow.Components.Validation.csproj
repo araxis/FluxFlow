@@ -8,18 +8,17 @@
     <RootNamespace>FluxFlow.Components.Validation</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable validation components for FluxFlow.</Description>
+    <Description>A standalone JSON schema validator node for FluxFlow: a value in, a validation result broadcast out, with the original input fanned to Valid/Invalid ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: schema compiled at build time for the JSON schema validator. Replaces the bespoke IValidationClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as a single standalone json.schema-validator node over a pre-compiled JSON schema: input in, validation result broadcast out, original input fanned to the Valid/Invalid ports, failures on the error port — all carrying the message correlation id. The engine factory, module, registration extensions, design-metadata provider, definition-options reader, and the type/selector resolution layer are removed; the node takes its schema, value selector, and TimeProvider directly and depends only on FluxFlow.Nodes (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" Version="9.2.1" />

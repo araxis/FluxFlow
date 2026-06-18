@@ -1,12 +1,22 @@
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Metrics.Nodes;
 
-public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone metrics-aggregation node. Post a
+/// <c>FlowMessage&lt;MetricSampleInput&gt;</c> to <c>Input</c>; the node folds each
+/// sample into a rolling aggregate and broadcasts a
+/// <c>FlowMessage&lt;MetricSnapshotOutput&gt;</c> on <c>Output</c> carrying the same
+/// correlation id (rejected-group / invalid-sample failures on <c>Errors</c>,
+/// diagnostics on <c>Events</c>). Works with nothing but
+/// <c>new MetricsAggregateNode(options, clock)</c> — no engine. Snapshots are
+/// broadcast (latest-wins per consumer); when <see cref="MetricsAggregateOptions.EmitEverySample"/>
+/// is disabled the node coalesces to a single final snapshot emitted as the input drains.
+/// </summary>
+public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSnapshotOutput>
 {
     private const string DefaultGroup = "default";
     private const int MaxTrackedRejectedGroups = 1024;
@@ -14,12 +24,10 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     private readonly MetricsAggregateOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _rateWindow;
-    private readonly ActionBlock<MetricSampleInput> _input;
-    private readonly BufferBlock<MetricSnapshotOutput> _output;
-    private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
+    private CorrelationId? _lastCorrelationId;
     private DateTimeOffset? _firstTimestamp;
     private DateTimeOffset? _latestTimestamp;
     private bool _rejectedGroupTrackingCapped;
@@ -32,88 +40,108 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     private double? _minValue;
     private double? _maxValue;
     private long _totalSize;
-    private bool _disposed;
+    private int _finalSnapshotEmitted;
 
-    internal MetricsAggregateNode(
-        MetricsAggregateOptions options,
-        TimeProvider timeProvider)
-    {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "metrics.aggregate bounded capacity must be greater than zero.");
-        }
+    // Coalesce-mode handshake (EmitEverySample = false). The final ProcessAsync
+    // opens _finalSampleApplied once it has folded in the last sample, then parks on
+    // _finalSnapshotFlushed. FlushOnInputCompletionAsync — the one component that
+    // knows the input has truly ended — waits for the last sample, emits the single
+    // snapshot while the parked delegate is still holding the processor (so Output is
+    // open), then releases the delegate.
+    private readonly TaskCompletionSource _finalSampleApplied =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _finalSnapshotFlushed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _rateWindow = TimeSpan.FromSeconds(options.RateWindowSeconds);
-        var inputOptions = new ExecutionDataflowBlockOptions
+    public MetricsAggregateNode(
+        MetricsAggregateOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
         {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
+            InputCapacity = (options ?? new MetricsAggregateOptions()).BoundedCapacity,
             MaxDegreeOfParallelism = 1
-        };
-        _input = new ActionBlock<MetricSampleInput>(AggregateAsync, inputOptions);
-        _output = new BufferBlock<MetricSnapshotOutput>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            completion => _ = CompleteOutputAsync(completion),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_output.Completion);
-    }
-
-    public ITargetBlock<MetricSampleInput> Input => _input;
-
-    public ISourceBlock<MetricSnapshotOutput> Output => _output;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+        })
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
+        // BoundedCapacity flows to the kit's input-buffer capacity, which the base
+        // constructor validates (> 0) before this body runs.
+        _options = options ?? new MetricsAggregateOptions();
+        _timeProvider = clock ?? TimeProvider.System;
+        _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+
+        if (!_options.EmitEverySample)
         {
-            _lifecycleCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
+            _ = FlushOnInputCompletionAsync();
         }
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async Task ProcessAsync(FlowMessage<MetricSampleInput> message)
     {
-        if (_disposed)
+        ArgumentNullException.ThrowIfNull(message);
+        await AggregateAsync(message).ConfigureAwait(false);
+
+        if (!_options.EmitEverySample && await IsFinalSampleAsync().ConfigureAwait(false))
         {
-            return;
+            // This is the final sample: hand its just-applied state to the flush task
+            // and park — asynchronously, without holding the worker thread — until the
+            // snapshot has been posted. Parking keeps the processor, and so the
+            // broadcast Output, open until the flush completes.
+            _finalSampleApplied.TrySetResult();
+            await _finalSnapshotFlushed.Task.ConfigureAwait(false);
+        }
+    }
+
+    // The single-DOP, single-slot processor can only have pulled THIS sample (rather
+    // than a later one) once no later sample remains buffered, so when the intake
+    // buffer has completed this is the final sample. Completion is signalled the
+    // instant the processor pulls the sample — before this delegate runs — but the
+    // completion task can take a few scheduling beats to transition; a bounded run of
+    // async yields lets it land. A non-final sample's buffer never completes (its
+    // successors stay queued behind the single-slot processor while this delegate
+    // runs), so it yields out cheaply and returns. Yields free the worker thread
+    // between turns and never block it, and a non-final sample's yields cost only a
+    // handful of scheduler turns — no timers, no spinning.
+    private async Task<bool> IsFinalSampleAsync()
+    {
+        for (var i = 0; i < 64 && !Input.Completion.IsCompleted; i++)
+        {
+            await Task.Yield();
         }
 
-        _disposed = true;
-        Complete();
+        return Input.Completion.IsCompleted;
+    }
+
+    private async Task FlushOnInputCompletionAsync()
+    {
         try
         {
-            await Completion.ConfigureAwait(false);
+            await Input.Completion.ConfigureAwait(false);
+
+            // Wait for the final sample to be folded in (skip on empty input, where
+            // the processor completes without ever invoking ProcessAsync).
+            var finalSample = await Task
+                .WhenAny(_finalSampleApplied.Task, Completion)
+                .ConfigureAwait(false);
+            if (finalSample == _finalSampleApplied.Task)
+            {
+                TryEmitFinalSnapshot();
+            }
         }
         catch
         {
-            // Dispose must not throw when the node faulted.
+            // A faulted/cancelled input still means no further samples arrive.
         }
         finally
         {
-            _lifecycleCancellation.Dispose();
+            _finalSnapshotFlushed.TrySetResult();
         }
     }
 
-    private async Task AggregateAsync(MetricSampleInput sample)
+    private Task AggregateAsync(FlowMessage<MetricSampleInput> message)
     {
+        var sample = message.Payload;
         try
         {
+            _lastCorrelationId = message.CorrelationId;
             var timestamp = sample.Timestamp ?? _timeProvider.GetUtcNow();
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
@@ -155,25 +183,23 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
             UpdateGroup(groupKey, timestamp, value, size);
             if (_options.EmitEverySample)
             {
-                await EmitSnapshotAsync(CreateSnapshot(timestamp)).ConfigureAwait(false);
+                // Carry the correlation id of the sample that produced this snapshot.
+                Emit(message.With(CreateSnapshot(timestamp)));
             }
 
             TryEmitDiagnostic(
+                message.CorrelationId,
                 MetricsDiagnosticNames.AggregateUpdated,
-                message: "metrics.aggregate updated snapshot.",
+                level: FlowEventLevel.Information,
+                eventMessage: "metrics.aggregate updated snapshot.",
                 attributes: CreateUpdateAttributes(timestamp));
-        }
-        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
-        {
-            // The node is tearing down (dispose/fault); stop emitting rather than
-            // blocking forever on a dead consumer.
         }
         catch (MetricsAggregateException exception)
         {
             ReportAggregateError(
                 exception.Code,
                 exception.Message,
-                sample,
+                message,
                 exception.InnerException);
         }
         catch (Exception exception)
@@ -181,9 +207,28 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
             ReportAggregateError(
                 MetricsErrorCodes.AggregateFailed,
                 $"metrics.aggregate failed: {exception.Message}",
-                sample,
+                message,
                 exception);
         }
+
+        return Task.CompletedTask;
+    }
+
+    private void TryEmitFinalSnapshot()
+    {
+        if (_options.EmitEverySample || !_latestTimestamp.HasValue)
+        {
+            return;
+        }
+
+        if (Interlocked.Exchange(ref _finalSnapshotEmitted, 1) != 0)
+        {
+            return;
+        }
+
+        var snapshot = CreateSnapshot(_latestTimestamp.Value);
+        var correlationId = _lastCorrelationId ?? CorrelationId.New();
+        Emit(new FlowMessage<MetricSnapshotOutput>(correlationId, snapshot));
     }
 
     private double? ResolveValue(MetricSampleInput sample)
@@ -288,13 +333,18 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
             var summary =
                 $"metrics.aggregate rejected group tracking limit of {MaxTrackedRejectedGroups} reached; " +
                 "further rejected groups are not itemized.";
-            TryReportError(
-                MetricsErrorCodes.GroupLimitReached,
-                summary,
-                context: $"maxGroups={_options.MaxGroups}; maxTrackedRejectedGroups={MaxTrackedRejectedGroups}");
-            TryEmitDiagnostic(
+            EmitError(new FlowError
+            {
+                Timestamp = _timeProvider.GetUtcNow(),
+                CorrelationId = _lastCorrelationId,
+                Code = MetricsErrorCodes.GroupLimitReached,
+                Message = summary,
+                Context = $"maxGroups={_options.MaxGroups}; maxTrackedRejectedGroups={MaxTrackedRejectedGroups}"
+            });
+            EmitDiagnostic(
+                _lastCorrelationId,
                 MetricsDiagnosticNames.AggregateGroupLimitReached,
-                FlowDiagnosticLevel.Warning,
+                FlowEventLevel.Warning,
                 summary,
                 attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
@@ -310,56 +360,24 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
         }
 
         var message = $"metrics.aggregate maxGroups limit reached; group '{groupKey}' was not tracked.";
-        TryReportError(
-            MetricsErrorCodes.GroupLimitReached,
-            message,
-            context: $"group={groupKey}; maxGroups={_options.MaxGroups}");
-        TryEmitDiagnostic(
+        EmitError(new FlowError
+        {
+            Timestamp = _timeProvider.GetUtcNow(),
+            CorrelationId = _lastCorrelationId,
+            Code = MetricsErrorCodes.GroupLimitReached,
+            Message = message,
+            Context = $"group={groupKey}; maxGroups={_options.MaxGroups}"
+        });
+        EmitDiagnostic(
+            _lastCorrelationId,
             MetricsDiagnosticNames.AggregateGroupLimitReached,
-            FlowDiagnosticLevel.Warning,
+            FlowEventLevel.Warning,
             message,
             attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["group"] = groupKey,
                 ["maxGroups"] = _options.MaxGroups
             });
-    }
-
-    // Awaited, back-pressured emit: a slow consumer slows the single-DOP input
-    // pump instead of silently dropping snapshots. The lifecycle token lets
-    // dispose/fault release a send that is blocked on a dead consumer.
-    private Task EmitSnapshotAsync(MetricSnapshotOutput snapshot)
-        => _output.SendAsync(snapshot, _lifecycleCancellation.Token);
-
-    private async Task CompleteOutputAsync(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } completionException)
-        {
-            ((IDataflowBlock)_output).Fault(completionException);
-            return;
-        }
-
-        try
-        {
-            if (!_options.EmitEverySample && _latestTimestamp.HasValue)
-            {
-                // Final snapshot on completion shares the hot-path back-pressure so
-                // it is not dropped; the lifecycle token still unblocks teardown if
-                // the consumer is gone.
-                await EmitSnapshotAsync(CreateSnapshot(_latestTimestamp.Value))
-                    .ConfigureAwait(false);
-            }
-
-            _output.Complete();
-        }
-        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
-        {
-            _output.Complete();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-        }
     }
 
     private MetricSnapshotOutput CreateSnapshot(DateTimeOffset timestamp)
@@ -424,17 +442,52 @@ public sealed class MetricsAggregateNode : FlowNodeBase, IAsyncDisposable
     private void ReportAggregateError(
         int code,
         string message,
-        MetricSampleInput sample,
+        FlowMessage<MetricSampleInput> source,
         Exception? exception)
     {
-        TryReportError(code, message, exception, CreateErrorContext(sample));
-        TryEmitDiagnostic(
+        var sample = source.Payload;
+        EmitError(new FlowError
+        {
+            Timestamp = _timeProvider.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = CreateErrorContext(sample),
+            Exception = exception
+        });
+        EmitDiagnostic(
+            source.CorrelationId,
             MetricsDiagnosticNames.AggregateFailed,
-            FlowDiagnosticLevel.Error,
+            FlowEventLevel.Error,
             message,
             exception,
             CreateSampleAttributes(sample));
     }
+
+    private void TryEmitDiagnostic(
+        CorrelationId correlationId,
+        string name,
+        FlowEventLevel level,
+        string eventMessage,
+        IReadOnlyDictionary<string, object?> attributes)
+        => EmitDiagnostic(correlationId, name, level, eventMessage, attributes: attributes);
+
+    private void EmitDiagnostic(
+        CorrelationId? correlationId,
+        string name,
+        FlowEventLevel level,
+        string? message,
+        Exception? exception = null,
+        IReadOnlyDictionary<string, object?>? attributes = null)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = _timeProvider.GetUtcNow(),
+            CorrelationId = correlationId,
+            Name = name,
+            Level = level,
+            Message = message,
+            Attributes = attributes ?? new Dictionary<string, object?>(StringComparer.Ordinal)
+        });
 
     private static MetricSampleInput CopySample(MetricSampleInput sample, DateTimeOffset timestamp)
         => sample with

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -8,22 +8,18 @@
     <RootNamespace>FluxFlow.Components.Expectations</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable event expectation components for FluxFlow.</Description>
+    <Description>A standalone event-expectation node for FluxFlow: post ProjectionEvent values, watch for a matching event (expect) or its absence (guard), and broadcast one EventExpectationResult with error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke IExpectationClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as a single standalone event-expectation node over the FluxFlow.Nodes kit: post FlowMessage&lt;ProjectionEvent&gt; in, one FlowMessage&lt;EventExpectationResult&gt; broadcast out, failures on the error port, diagnostics on the event port. The node resolves on the first of a matching event, a timeout armed over the injected TimeProvider, or input completion via CompleteWithResultAsync. The engine glue (node factory, module, registration extensions, component-type/port constants, JSON options reader, component-options/clock holder, and design-metadata provider) is removed; the node depends only on FluxFlow.Nodes and the shared FluxFlow.Components.Projections contracts (ProjectionEvent, EventFilter), and runs without the engine. ProjectionEvent replaces the engine FlowEvent as the standalone input contract; correlation flows event -&gt; result via the envelope.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

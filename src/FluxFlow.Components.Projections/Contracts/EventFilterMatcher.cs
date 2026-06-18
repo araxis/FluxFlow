@@ -1,10 +1,8 @@
-using FluxFlow.Engine.Components;
-
 namespace FluxFlow.Components.Projections.Contracts;
 
 public static class EventFilterMatcher
 {
-    public static bool IsMatch(FlowEvent flowEvent, EventFilter? filter)
+    public static bool IsMatch(ProjectionEvent flowEvent, EventFilter? filter)
     {
         ArgumentNullException.ThrowIfNull(flowEvent);
 
@@ -49,7 +47,7 @@ public static class EventFilterMatcher
             return false;
         }
 
-        if (!MatchesExact(flowEvent.SourceNodeId?.ToString(), filter.SourceNodeId))
+        if (!MatchesExact(flowEvent.SourceNodeId, filter.SourceNodeId))
         {
             return false;
         }
@@ -99,7 +97,7 @@ public static class EventFilterMatcher
         => !string.IsNullOrWhiteSpace(expectedPrefix) &&
            actual?.StartsWith(expectedPrefix, StringComparison.Ordinal) == true;
 
-    private static string? GetAttribute(FlowEvent flowEvent, string name)
+    private static string? GetAttribute(ProjectionEvent flowEvent, string name)
         => flowEvent.Attributes is not null &&
            flowEvent.Attributes.TryGetValue(name, out var value)
             ? value

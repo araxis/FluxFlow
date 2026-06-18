@@ -1,33 +1,49 @@
 # FluxFlow.Components.Projections
 
-Reusable event projection components for FluxFlow.
+A standalone event-projection node for FluxFlow, built on the `FluxFlow.Nodes` kit.
+No engine required: `new` the node, post events, link the output.
 
-## Nodes
+## Node
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `event.projection` | `Input` -> `Output`, `Errors` | Projects matching runtime events into count, latest-event, and rolling-rate snapshots. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `EventProjectionNode` | `Input` -> `Output`, `Errors`, `Events` | Folds matching events into count, latest-event, and rolling-rate snapshots. |
 
-`event.projection` consumes `FlowEvent` values from `FluxFlow.Engine` and emits
-`EventProjectionSnapshot` values.
+`EventProjectionNode` is a `FlowNode<ProjectionEvent, EventProjectionSnapshot>`. Post a
+`FlowMessage<ProjectionEvent>` to `Input`; the node broadcasts a
+`FlowMessage<EventProjectionSnapshot>` on `Output` carrying the triggering event's
+correlation id. Errors surface on `Errors` (`FlowError`) and diagnostics on `Events`
+(`FlowEvent`).
 
 ## Example
 
-```json
+```csharp
+var node = new EventProjectionNode(new EventProjectionOptions
 {
-  "type": "event.projection",
-  "name": "failed-operations",
-  "rateWindowSeconds": 60,
-  "maxPreviewChars": 256,
-  "filter": {
-    "typePrefix": "operation.",
-    "status": "failed",
-    "subjectPrefix": "orders/",
-    "attributes": {
-      "tenant": "north"
+    Name = "failed-operations",
+    RateWindowSeconds = 60,
+    MaxPreviewChars = 256,
+    Filter = new EventFilter
+    {
+        TypePrefix = "operation.",
+        Status = "failed",
+        SubjectPrefix = "orders/",
+        Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
     }
-  }
-}
+});
+
+var snapshots = new BufferBlock<FlowMessage<EventProjectionSnapshot>>();
+node.Output.LinkTo(snapshots, new DataflowLinkOptions { PropagateCompletion = true });
+
+await node.Input.SendAsync(FlowMessage.Create(new ProjectionEvent
+{
+    Timestamp = DateTimeOffset.UtcNow,
+    Type = "operation.completed",
+    Source = "orders",
+    Subject = "orders/42",
+    Status = "failed",
+    Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
+}));
 ```
 
 The snapshot includes:
@@ -59,18 +75,25 @@ Filters use ordinal string comparison.
 
 ## Timing
 
-Use `ProjectionsComponentOptions.UseClock(...)` for deterministic snapshot
-timestamps in tests or hosts.
+Pass a `TimeProvider` to the constructor for deterministic snapshot timestamps in
+tests or hosts:
 
 ```csharp
-registry.RegisterProjectionsComponents(options =>
-    options.UseClock(timeProvider));
+var node = new EventProjectionNode(options, timeProvider);
 ```
 
-Event rate uses matching event timestamps. Snapshot timestamps use the
-configured projection clock.
+Event rate uses matching event timestamps. Snapshot timestamps use the supplied
+`TimeProvider` (defaults to `TimeProvider.System`).
+
+## Final snapshot
+
+With `EmitFinalSnapshot = true` (and typically `EmitEveryMatch = false`) the node
+emits a single closing snapshot when the stream ends. Drain and close it via
+`await node.CompleteWithFinalSnapshotAsync()` instead of `Complete()`; the flush rides
+the ordered input pump so it lands after every event already posted.
 
 ## Boundaries
 
-This package has no UI dependency and no host-specific resource assumptions.
-Hosts decide how snapshots are displayed, stored, tested, or forwarded.
+This package has no UI dependency and no host-specific resource assumptions. It
+depends only on `FluxFlow.Nodes`. Hosts decide how snapshots are displayed, stored,
+tested, or forwarded.

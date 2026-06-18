@@ -1,8 +1,10 @@
+using FluxFlow.Components.Serialization;
 using FluxFlow.Components.Serialization.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Serialization.Nodes;
+using FluxFlow.Components.Serialization.Options;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text;
 using System.Text.Json;
@@ -12,25 +14,25 @@ using Xunit;
 
 namespace FluxFlow.Components.Serialization.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows request -> result for free.
 public sealed class SerializationNodeTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+
     [Fact]
-    public async Task JsonParse_ParsesTextAndEmitsResult()
+    public async Task JsonParse_ParsesTextAndPreservesCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.JsonParse,
-            new { allowTrailingCommas = true });
-        var input = GetInput<JsonParseRequest>(runtimeNode);
-        var output = LinkOutput<JsonParseResult>(runtimeNode);
+        await using var node = new JsonParseNode(
+            new SerializationNodeOptions { AllowTrailingCommas = true });
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new JsonParseRequest
-        {
-            Text = """{"name":"flux",}"""
-        });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var request = FlowMessage.Create(new JsonParseRequest { Text = """{"name":"flux",}""" });
+        await node.Input.SendAsync(request);
 
+        var received = await output.ReceiveAsync().WaitAsync(Timeout);
+        received.CorrelationId.ShouldBe(request.CorrelationId);   // the whole point of the envelope
+        var result = received.Payload;
         result.Kind.ShouldBe(JsonValueKind.Object);
         result.Value.ShouldBeOfType<JsonObject>()["name"]!.GetValue<string>().ShouldBe("flux");
         result.ByteCount.ShouldBeGreaterThan(0);
@@ -40,46 +42,35 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task JsonParse_EmitsErrorAndContinues()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.JsonParse,
-            new { });
-        var input = GetInput<JsonParseRequest>(runtimeNode);
-        var output = LinkOutput<JsonParseResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(
-            runtimeNode,
-            SerializationComponentPorts.Errors);
+        await using var node = new JsonParseNode();
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new JsonParseRequest { Text = "{" });
-        await input.Target.SendAsync(new JsonParseRequest { Text = """{"ok":true}""" });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create(new JsonParseRequest { Text = "{" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new JsonParseRequest { Text = """{"ok":true}""" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
 
         error.Code.ShouldBe(SerializationErrorCodes.JsonParseFailed);
-        result.Kind.ShouldBe(JsonValueKind.Object);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        result.Payload.Kind.ShouldBe(JsonValueKind.Object);   // later message still flows
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task JsonStringify_StringifiesValue()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.JsonStringify,
-            new { });
-        var input = GetInput<JsonStringifyRequest>(runtimeNode);
-        var output = LinkOutput<JsonStringifyResult>(runtimeNode);
+        await using var node = new JsonStringifyNode();
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new JsonStringifyRequest
+        await node.Input.SendAsync(FlowMessage.Create(new JsonStringifyRequest
         {
-            Value = new Dictionary<string, object?>
-            {
-                ["ok"] = true
-            }
-        });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            Value = new Dictionary<string, object?> { ["ok"] = true }
+        }));
 
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
         result.Text.ShouldBe("""{"ok":true}""");
         result.Bytes.ShouldBe(Encoding.UTF8.GetBytes(result.Text));
         result.ByteCount.ShouldBe(result.Bytes.Length);
@@ -88,17 +79,15 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task TextEncode_EmitsBytes()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.TextEncode,
-            new { });
-        var input = GetInput<TextEncodeRequest>(runtimeNode);
-        var output = LinkOutput<TextEncodeResult>(runtimeNode);
+        await using var node = new TextEncodeNode();
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new TextEncodeRequest { Text = "hello" });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var request = FlowMessage.Create(new TextEncodeRequest { Text = "hello" });
+        await node.Input.SendAsync(request);
 
+        var received = await output.ReceiveAsync().WaitAsync(Timeout);
+        received.CorrelationId.ShouldBe(request.CorrelationId);
+        var result = received.Payload;
         result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
         result.ByteCount.ShouldBe(5);
         result.Encoding.ShouldBe("utf-8");
@@ -107,21 +96,17 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task TextDecode_SkipsByteOrderMark()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.TextDecode,
-            new { defaultEncoding = "utf-16" });
-        var input = GetInput<TextDecodeRequest>(runtimeNode);
-        var output = LinkOutput<TextDecodeResult>(runtimeNode);
+        await using var node = new TextDecodeNode(
+            new SerializationNodeOptions { DefaultEncoding = "utf-16" });
+        var output = Sink(node.Output);
         var encoding = Encoding.Unicode;
         var bytes = encoding.GetPreamble()
             .Concat(encoding.GetBytes("hello"))
             .ToArray();
 
-        await input.Target.SendAsync(new TextDecodeRequest { Bytes = bytes });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new TextDecodeRequest { Bytes = bytes }));
 
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
         result.Text.ShouldBe("hello");
         result.Encoding.ShouldBe("utf-16");
         result.ByteCount.ShouldBe(bytes.Length);
@@ -130,17 +115,12 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task Base64Encode_EncodesText()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.Base64Encode,
-            new { });
-        var input = GetInput<Base64EncodeRequest>(runtimeNode);
-        var output = LinkOutput<Base64EncodeResult>(runtimeNode);
+        await using var node = new Base64EncodeNode();
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new Base64EncodeRequest { Text = "hello" });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "hello" }));
 
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
         result.Text.ShouldBe("aGVsbG8=");
         result.ByteCount.ShouldBe(5);
         result.EncodedLength.ShouldBe(8);
@@ -149,21 +129,16 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task Base64Decode_DecodesText()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.Base64Decode,
-            new { });
-        var input = GetInput<Base64DecodeRequest>(runtimeNode);
-        var output = LinkOutput<Base64DecodeResult>(runtimeNode);
+        await using var node = new Base64DecodeNode();
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new Base64DecodeRequest
+        await node.Input.SendAsync(FlowMessage.Create(new Base64DecodeRequest
         {
             Text = "aGVsbG8=",
             DecodeText = true
-        });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        }));
 
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
         result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
         result.ByteCount.ShouldBe(5);
         result.Text.ShouldBe("hello");
@@ -173,67 +148,48 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task TextEncode_EmitsOutputTooLargeErrorAndContinues()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.TextEncode,
-            new { maxOutputBytes = 2 });
-        var input = GetInput<TextEncodeRequest>(runtimeNode);
-        var output = LinkOutput<TextEncodeResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(
-            runtimeNode,
-            SerializationComponentPorts.Errors);
+        await using var node = new TextEncodeNode(
+            new SerializationNodeOptions { MaxOutputBytes = 2 });
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new TextEncodeRequest { Text = "hello" });
-        await input.Target.SendAsync(new TextEncodeRequest { Text = "ok" });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "hello" }));
+        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "ok" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
 
         error.Code.ShouldBe(SerializationErrorCodes.OutputTooLarge);
-        result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
+        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
     }
 
     [Fact]
     public async Task TextEncode_EmitsInputTooLargeErrorAndContinues()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.TextEncode,
-            new
-            {
-                maxInputBytes = 2,
-                maxOutputBytes = 10
-            });
-        var input = GetInput<TextEncodeRequest>(runtimeNode);
-        var output = LinkOutput<TextEncodeResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(
-            runtimeNode,
-            SerializationComponentPorts.Errors);
+        await using var node = new TextEncodeNode(
+            new SerializationNodeOptions { MaxInputBytes = 2, MaxOutputBytes = 10 });
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new TextEncodeRequest { Text = "hello" });
-        await input.Target.SendAsync(new TextEncodeRequest { Text = "ok" });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "hello" }));
+        await node.Input.SendAsync(FlowMessage.Create(new TextEncodeRequest { Text = "ok" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+        var result = await output.ReceiveAsync().WaitAsync(Timeout);
 
         error.Code.ShouldBe(SerializationErrorCodes.InputTooLarge);
-        result.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
+        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("ok"));
     }
 
     [Fact]
     public async Task Base64Decode_AllowsEmptyText()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.Base64Decode,
-            new { });
-        var input = GetInput<Base64DecodeRequest>(runtimeNode);
-        var output = LinkOutput<Base64DecodeResult>(runtimeNode);
+        await using var node = new Base64DecodeNode();
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new Base64DecodeRequest { Text = "" });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new Base64DecodeRequest { Text = "" }));
 
+        var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
         result.Bytes.ShouldBeEmpty();
         result.ByteCount.ShouldBe(0);
     }
@@ -241,117 +197,86 @@ public sealed class SerializationNodeTests
     [Fact]
     public async Task TextDecode_EmitsUnsupportedEncodingError()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.TextDecode,
-            new { });
-        var input = GetInput<TextDecodeRequest>(runtimeNode);
-        var errors = LinkOutput<FlowError>(
-            runtimeNode,
-            SerializationComponentPorts.Errors);
+        await using var node = new TextDecodeNode();
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new TextDecodeRequest
+        var request = FlowMessage.Create(new TextDecodeRequest
         {
             Bytes = [1, 2, 3],
             Encoding = "missing-encoding"
         });
-        input.Target.Complete();
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(request);
 
+        var error = await errors.ReceiveAsync().WaitAsync(Timeout);
         error.Code.ShouldBe(SerializationErrorCodes.UnsupportedEncoding);
+        error.CorrelationId.ShouldBe(request.CorrelationId);
     }
 
     [Fact]
-    public async Task JsonParse_EmitsDiagnostics()
+    public async Task Success_EmitsEventCarryingCorrelationIdStampedByClock()
     {
-        var runtimeNode = CreateNode(
-            SerializationComponentTypes.JsonParse,
-            new { });
-        var input = GetInput<JsonParseRequest>(runtimeNode);
-        var output = LinkOutput<JsonParseResult>(runtimeNode);
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-18T12:00:00Z"));
+        await using var node = new JsonParseNode(clock: clock);
+        Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync(new JsonParseRequest { Text = """{"ok":true}""" });
-        input.Target.Complete();
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var request = FlowMessage.Create(new JsonParseRequest { Text = """{"ok":true}""" });
+        await node.Input.SendAsync(request);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
-        diagnostic.Attributes["kind"].ShouldBe(JsonValueKind.Object.ToString());
+        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+        @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
+        @event.Level.ShouldBe(FlowEventLevel.Information);
+        @event.CorrelationId.ShouldBe(request.CorrelationId);
+        @event.Timestamp.ShouldBe(clock.GetUtcNow());
+        @event.Attributes["kind"].ShouldBe(JsonValueKind.Object.ToString());
+    }
+
+    [Fact]
+    public async Task Failure_EmitsErrorEventCarryingCorrelationId()
+    {
+        await using var node = new JsonParseNode();
+        var events = Sink(node.Events);
+
+        var request = FlowMessage.Create(new JsonParseRequest { Text = "{" });
+        await node.Input.SendAsync(request);
+
+        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+        @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParseFailed);
+        @event.Level.ShouldBe(FlowEventLevel.Error);
+        @event.CorrelationId.ShouldBe(request.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Output_FansOutEveryResultToEveryConsumer()
+    {
+        // The usual workflow case, with NO engine: one node's output linked to two
+        // downstream consumers (a "logger" and a "mapper"). Both see every result.
+        await using var node = new Base64EncodeNode();
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "a" }));
+        await node.Input.SendAsync(FlowMessage.Create(new Base64EncodeRequest { Text = "b" }));
+
+        (await logger.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("YQ==");
+        (await logger.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("Yg==");
+        (await mapper.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("YQ==");
+        (await mapper.ReceiveAsync().WaitAsync(Timeout)).Payload.Text.ShouldBe("Yg==");
     }
 
     [Fact]
     public void Node_RejectsInvalidOptions()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(SerializationComponentTypes.JsonParse, new { boundedCapacity = 0 }));
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new JsonParseNode(new SerializationNodeOptions { BoundedCapacity = 0 }));
 
         exception.Message.ShouldContain("boundedCapacity");
     }
 
-    [Fact]
-    public void RegisterSerializationComponents_RegistersAllNodes()
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSerializationComponents();
-
-        registry.TryGetFactory(SerializationComponentTypes.JsonParse, out _).ShouldBeTrue();
-        registry.TryGetFactory(SerializationComponentTypes.JsonStringify, out _).ShouldBeTrue();
-        registry.TryGetFactory(SerializationComponentTypes.TextEncode, out _).ShouldBeTrue();
-        registry.TryGetFactory(SerializationComponentTypes.TextDecode, out _).ShouldBeTrue();
-        registry.TryGetFactory(SerializationComponentTypes.Base64Encode, out _).ShouldBeTrue();
-        registry.TryGetFactory(SerializationComponentTypes.Base64Decode, out _).ShouldBeTrue();
-    }
-
-    private static RuntimeNode CreateNode(NodeType type, object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSerializationComponents();
-        registry.TryGetFactory(type, out var factory).ShouldBeTrue();
-        return factory(CreateContext(type, configuration));
-    }
-
-    private static RuntimeNodeFactoryContext CreateContext(
-        NodeType type,
-        object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        var values = root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-
-        return new RuntimeNodeFactoryContext(
-            new NodeName("serialization"),
-            new NodeDefinition
-            {
-                Type = type,
-                Configuration = values
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
-    }
-
-    private static InputPort<T> GetInput<T>(RuntimeNode runtimeNode)
-        => runtimeNode.FindInput(new PortName(SerializationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<T>>();
-
-    private static BufferBlock<T> LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string portName = SerializationComponentPorts.Output)
-    {
-        var target = new BufferBlock<T>();
-        runtimeNode.FindOutput(new PortName(portName))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-        return target;
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 }

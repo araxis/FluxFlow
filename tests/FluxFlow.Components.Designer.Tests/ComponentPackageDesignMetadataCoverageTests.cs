@@ -2,22 +2,16 @@ using FluxFlow.Components.Assertions;
 using FluxFlow.Components.Control;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Expectations;
 using FluxFlow.Components.FileSystem;
 using FluxFlow.Components.Mapping;
-using FluxFlow.Components.Metrics;
 using FluxFlow.Components.Mqtt;
 using FluxFlow.Components.Observability;
-using FluxFlow.Components.Payloads;
-using FluxFlow.Components.Projections;
 using FluxFlow.Components.Routing;
-using FluxFlow.Components.Serialization;
 using FluxFlow.Components.Sessions;
 using FluxFlow.Components.Sources;
 using FluxFlow.Components.State;
 using FluxFlow.Components.Storage;
 using FluxFlow.Components.Timers;
-using FluxFlow.Components.Validation;
 using FluxFlow.Engine.Definitions;
 using Shouldly;
 using Xunit;
@@ -60,22 +54,16 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
     [
         new AssertionsComponentDesignMetadataProvider(),
         new ControlComponentDesignMetadataProvider(),
-        new ExpectationsComponentDesignMetadataProvider(),
         new FileSystemComponentDesignMetadataProvider(),
         new MappingComponentDesignMetadataProvider(),
-        new MetricsComponentDesignMetadataProvider(),
         new MqttComponentDesignMetadataProvider(),
         new ObservabilityComponentDesignMetadataProvider(),
-        new PayloadComponentDesignMetadataProvider(),
-        new ProjectionsComponentDesignMetadataProvider(),
         new RoutingComponentDesignMetadataProvider(),
-        new SerializationComponentDesignMetadataProvider(),
         new SessionsComponentDesignMetadataProvider(),
         new SourcesComponentDesignMetadataProvider(),
         new StateComponentDesignMetadataProvider(),
         new StorageComponentDesignMetadataProvider(),
         new TimerComponentDesignMetadataProvider(),
-        new ValidationComponentDesignMetadataProvider()
     ];
 
     private static readonly IReadOnlyList<NodeType> ExpectedTypes =
@@ -83,34 +71,23 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         AssertionsComponentTypes.Assert,
         ControlComponentTypes.Filter,
         ControlComponentTypes.When,
-        ExpectationsComponentTypes.Expect,
-        ExpectationsComponentTypes.Guard,
         FileSystemComponentTypes.DirectoryEnumerate,
         FileSystemComponentTypes.FileRead,
         FileSystemComponentTypes.FileWatch,
         FileSystemComponentTypes.FileWrite,
         MappingComponentTypes.Mapper,
-        MetricsComponentTypes.Aggregate,
         MqttComponentTypes.Connection,
         MqttComponentTypes.Publish,
         MqttComponentTypes.Subscribe,
         ObservabilityComponentTypes.Counter,
         ObservabilityComponentTypes.Logger,
         ObservabilityComponentTypes.Metrics,
-        PayloadComponentTypes.Inspect,
-        ProjectionsComponentTypes.EventProjection,
         RoutingComponentTypes.Correlation,
         RoutingComponentTypes.Fork,
         RoutingComponentTypes.Join,
         RoutingComponentTypes.Merge,
         RoutingComponentTypes.Switch,
         RoutingComponentTypes.Window,
-        SerializationComponentTypes.Base64Decode,
-        SerializationComponentTypes.Base64Encode,
-        SerializationComponentTypes.JsonParse,
-        SerializationComponentTypes.JsonStringify,
-        SerializationComponentTypes.TextDecode,
-        SerializationComponentTypes.TextEncode,
         SessionsComponentTypes.Query,
         SessionsComponentTypes.Recorder,
         SessionsComponentTypes.Replay,
@@ -127,6 +104,5 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         TimerComponentTypes.Interval,
         TimerComponentTypes.Schedule,
         TimerComponentTypes.Throttle,
-        ValidationComponentTypes.JsonSchemaValidator
     ];
 }

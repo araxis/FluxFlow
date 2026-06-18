@@ -1,95 +1,99 @@
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Projections.Nodes;
 
-public sealed class EventProjectionNode : FlowNodeBase
+/// <summary>
+/// A standalone event-projection node. Post a <c>FlowMessage&lt;ProjectionEvent&gt;</c>
+/// to <c>Input</c>; the node folds every event that matches its configured
+/// <see cref="EventFilter"/> into a running projection (observed/matched counts, a
+/// rolling rate over a time window, first/last matched timestamps, and the latest
+/// matching event summary) and broadcasts a
+/// <c>FlowMessage&lt;EventProjectionSnapshot&gt;</c> on <c>Output</c> carrying the
+/// triggering event's correlation id (failures on <c>Errors</c>, diagnostics on
+/// <c>Events</c>). Works with nothing but <c>new EventProjectionNode(options)</c> — no
+/// engine. Events are processed strictly in order on a single worker so the rolling
+/// state stays consistent.
+/// </summary>
+public sealed class EventProjectionNode : FlowNode<ProjectionEvent, EventProjectionSnapshot>
 {
+    // Reference-identity sentinel posted through the ordered input pump to emit a
+    // final snapshot once all real events have been folded in. Carrying the flush
+    // in-band keeps it ordered behind every observed event without a kit hook.
+    private static readonly ProjectionEvent FlushSentinel = new()
+    {
+        Timestamp = default,
+        Type = "__flush__",
+        Source = "__flush__"
+    };
+
     private readonly EventProjectionOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _rateWindow;
-    private readonly ActionBlock<FlowEvent> _input;
-    private readonly BufferBlock<EventProjectionSnapshot> _output;
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private long _observedCount;
     private long _matchedCount;
     private DateTimeOffset? _firstMatchedAt;
     private DateTimeOffset? _lastMatchedAt;
     private EventSummary? _latest;
+    private CorrelationId? _lastMatchedCorrelationId;
 
-    internal EventProjectionNode(
-        EventProjectionOptions options,
-        TimeProvider timeProvider)
+    public EventProjectionNode(
+        EventProjectionOptions? options = null,
+        TimeProvider? timeProvider = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? new EventProjectionOptions()).BoundedCapacity,
+            MaxDegreeOfParallelism = 1
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-        if (options.BoundedCapacity <= 0)
+        _options = options ?? new EventProjectionOptions();
+        // A null filter means match-all (matcher and snapshot copy both expect a value).
+        _options = _options with { Filter = _options.Filter ?? new EventFilter() };
+        _timeProvider = timeProvider ?? TimeProvider.System;
+
+        // BoundedCapacity > 0 is enforced by the base FlowNode (InputCapacity).
+        if (_options.RateWindowSeconds <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "event.projection bounded capacity must be greater than zero.");
+                "event.projection option 'rateWindowSeconds' must be greater than zero.");
         }
 
-        _rateWindow = TimeSpan.FromSeconds(options.RateWindowSeconds);
-        var inputOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        _input = new ActionBlock<FlowEvent>(ProjectAsync, inputOptions);
-        _output = new BufferBlock<EventProjectionSnapshot>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        CompleteWhen(_input.Completion);
+        _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
     }
 
-    public ITargetBlock<FlowEvent> Input => _input;
-
-    public ISourceBlock<EventProjectionSnapshot> Output => _output;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-    }
-
-    protected override void OnNodeCompleted()
+    /// <summary>
+    /// Completes the node, emitting one final snapshot first when
+    /// <see cref="EventProjectionOptions.EmitFinalSnapshot"/> is set. The flush is sent
+    /// through the ordered input pump, so it lands behind every event already posted.
+    /// </summary>
+    public async Task CompleteWithFinalSnapshotAsync()
     {
         if (_options.EmitFinalSnapshot)
         {
-            var timestamp = _timeProvider.GetUtcNow();
-            EmitSnapshot(CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp));
+            await Input.SendAsync(FlowMessage.Create(FlushSentinel)).ConfigureAwait(false);
         }
 
-        _output.Complete();
-        base.OnNodeCompleted();
+        Complete();
     }
 
-    protected override void OnNodeFaulted(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<ProjectionEvent> message)
     {
-        ((IDataflowBlock)_output).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
+        ArgumentNullException.ThrowIfNull(message);
 
-    private Task ProjectAsync(FlowEvent flowEvent)
-    {
+        if (ReferenceEquals(message.Payload, FlushSentinel))
+        {
+            EmitFinalSnapshot();
+            return Task.CompletedTask;
+        }
+
+        var flowEvent = message.Payload;
         try
         {
-            ArgumentNullException.ThrowIfNull(flowEvent);
             _observedCount++;
 
             if (!EventFilterMatcher.IsMatch(flowEvent, _options.Filter))
@@ -101,35 +105,61 @@ public sealed class EventProjectionNode : FlowNodeBase
             _firstMatchedAt ??= flowEvent.Timestamp;
             _lastMatchedAt = flowEvent.Timestamp;
             _latest = CreateSummary(flowEvent);
+            _lastMatchedCorrelationId = message.CorrelationId;
             AddRateSample(flowEvent.Timestamp);
 
             var snapshot = CreateSnapshot(_timeProvider.GetUtcNow(), flowEvent.Timestamp);
             if (_options.EmitEveryMatch)
             {
-                EmitSnapshot(snapshot);
+                Emit(message.With(snapshot));
             }
 
-            TryEmitDiagnostic(
-                ProjectionDiagnosticNames.ProjectionUpdated,
-                message: "event.projection updated snapshot.",
-                attributes: CreateSnapshotAttributes(snapshot));
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _timeProvider.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = ProjectionDiagnosticNames.ProjectionUpdated,
+                Level = FlowEventLevel.Information,
+                Message = "event.projection updated snapshot.",
+                Attributes = CreateSnapshotAttributes(snapshot)
+            });
         }
         catch (Exception exception)
         {
-            TryReportError(
-                ProjectionsErrorCodes.ProjectionFailed,
-                $"event.projection failed: {exception.Message}",
-                exception,
-                CreateEventContext(flowEvent));
-            TryEmitDiagnostic(
-                ProjectionDiagnosticNames.ProjectionFailed,
-                FlowDiagnosticLevel.Error,
-                "event.projection failed.",
-                exception,
-                CreateEventAttributes(flowEvent));
+            EmitError(new FlowError
+            {
+                Timestamp = _timeProvider.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Code = ProjectionsErrorCodes.ProjectionFailed,
+                Message = $"event.projection failed: {exception.Message}",
+                Context = CreateEventContext(flowEvent),
+                Exception = exception
+            });
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _timeProvider.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = ProjectionDiagnosticNames.ProjectionFailed,
+                Level = FlowEventLevel.Error,
+                Message = "event.projection failed.",
+                Attributes = CreateEventAttributes(flowEvent)
+            });
         }
 
         return Task.CompletedTask;
+    }
+
+    private void EmitFinalSnapshot()
+    {
+        var timestamp = _timeProvider.GetUtcNow();
+        var snapshot = CreateSnapshot(timestamp, _lastMatchedAt ?? timestamp);
+
+        // The final snapshot rides the last matched event's correlation id when there
+        // was a match; otherwise it is a fresh exchange (no event drove it).
+        var message = _lastMatchedCorrelationId is { } correlationId
+            ? new FlowMessage<EventProjectionSnapshot>(correlationId, snapshot)
+            : FlowMessage.Create(snapshot);
+        Emit(message);
     }
 
     private EventProjectionSnapshot CreateSnapshot(
@@ -148,13 +178,13 @@ public sealed class EventProjectionNode : FlowNodeBase
             Filter = CopyFilter(_options.Filter)
         };
 
-    private EventSummary CreateSummary(FlowEvent flowEvent)
+    private EventSummary CreateSummary(ProjectionEvent flowEvent)
         => new()
         {
             Timestamp = flowEvent.Timestamp,
             Type = flowEvent.Type,
             Source = flowEvent.Source,
-            SourceNodeId = flowEvent.SourceNodeId?.ToString(),
+            SourceNodeId = flowEvent.SourceNodeId,
             Subject = flowEvent.Subject,
             Status = flowEvent.Status,
             Channel = flowEvent.Channel,
@@ -182,29 +212,6 @@ public sealed class EventProjectionNode : FlowNodeBase
     {
         TrimRateSamples(referenceTime);
         return _rateSamples.Count / _rateWindow.TotalSeconds;
-    }
-
-    private void EmitSnapshot(EventProjectionSnapshot snapshot)
-    {
-        if (_output.Post(snapshot))
-        {
-            return;
-        }
-
-        var message = "event.projection snapshot output was full; snapshot was dropped.";
-        TryReportError(
-            ProjectionsErrorCodes.SnapshotDropped,
-            message,
-            context: $"matchedCount={snapshot.MatchedCount}; boundedCapacity={_options.BoundedCapacity}");
-        TryEmitDiagnostic(
-            ProjectionDiagnosticNames.SnapshotDropped,
-            FlowDiagnosticLevel.Warning,
-            message,
-            attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["matchedCount"] = snapshot.MatchedCount,
-                ["boundedCapacity"] = _options.BoundedCapacity
-            });
     }
 
     private string? Truncate(string? value)
@@ -242,7 +249,7 @@ public sealed class EventProjectionNode : FlowNodeBase
             ["latestChannel"] = snapshot.Latest?.Channel
         };
 
-    private static Dictionary<string, object?> CreateEventAttributes(FlowEvent? flowEvent)
+    private static Dictionary<string, object?> CreateEventAttributes(ProjectionEvent? flowEvent)
         => new(StringComparer.Ordinal)
         {
             ["type"] = flowEvent?.Type,
@@ -252,7 +259,7 @@ public sealed class EventProjectionNode : FlowNodeBase
             ["status"] = flowEvent?.Status
         };
 
-    private static string CreateEventContext(FlowEvent? flowEvent)
+    private static string CreateEventContext(ProjectionEvent? flowEvent)
     {
         if (flowEvent is null)
         {
