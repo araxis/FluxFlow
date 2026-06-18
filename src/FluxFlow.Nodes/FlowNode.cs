@@ -14,13 +14,14 @@ namespace FluxFlow.Nodes;
 /// <c>LinkTo</c> the next one. Transform a message with
 /// <see cref="FlowMessage{T}.With{TOut}"/> to carry the correlation id forward.
 /// </summary>
-public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
+public abstract class FlowNode<TInput, TOutput> : IFlowNode
 {
     private readonly BufferBlock<FlowMessage<TInput>> _input;
     private readonly ActionBlock<FlowMessage<TInput>> _processor;
     private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
     private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
+    private readonly List<IDataflowBlock> _extraOutputs = new();
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -84,6 +85,19 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
 
     protected bool Emit(FlowMessage<TOutput> message) => _output.Post(message);
 
+    /// <summary>
+    /// Creates an additional broadcast output port beyond <see cref="Output"/>, for nodes
+    /// that fan a message to more than one typed domain output (e.g. Passed/Failed,
+    /// Found/Records, WhenTrue/WhenFalse). The block is completed/faulted with the node;
+    /// expose it as an <see cref="ISourceBlock{T}"/> and <c>Post</c> to it from ProcessAsync.
+    /// </summary>
+    protected BroadcastBlock<T> AddOutput<T>()
+    {
+        var port = new BroadcastBlock<T>(static message => message);
+        _extraOutputs.Add(port);
+        return port;
+    }
+
     protected bool EmitError(FlowError error) => _errors.Post(error);
 
     protected bool EmitEvent(FlowEvent @event) => _events.Post(@event);
@@ -99,6 +113,11 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
         ((IDataflowBlock)_output).Fault(exception);
         ((IDataflowBlock)_errors).Fault(exception);
         ((IDataflowBlock)_events).Fault(exception);
+        foreach (var extra in _extraOutputs)
+        {
+            extra.Fault(exception);
+        }
+
         _completion.TrySetException(exception);
     }
 
@@ -165,8 +184,14 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
             _output.Complete();
             _errors.Complete();
             _events.Complete();
-            await Task.WhenAll(_output.Completion, _errors.Completion, _events.Completion)
-                .ConfigureAwait(false);
+            foreach (var extra in _extraOutputs)
+            {
+                extra.Complete();
+            }
+
+            var completions = new List<Task> { _output.Completion, _errors.Completion, _events.Completion };
+            completions.AddRange(_extraOutputs.Select(extra => extra.Completion));
+            await Task.WhenAll(completions).ConfigureAwait(false);
             _completion.TrySetResult();
         }
         catch (Exception exception)
@@ -174,6 +199,11 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
             ((IDataflowBlock)_output).Fault(exception);
             ((IDataflowBlock)_errors).Fault(exception);
             ((IDataflowBlock)_events).Fault(exception);
+            foreach (var extra in _extraOutputs)
+            {
+                extra.Fault(exception);
+            }
+
             _completion.TrySetException(exception);
         }
     }
