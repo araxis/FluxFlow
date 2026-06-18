@@ -1,38 +1,33 @@
-using FluxFlow.Components.Http.Contracts;
-
 namespace FluxFlow.Components.Http.Options;
 
 public sealed class HttpComponentOptions
 {
-    private IHttpRequestSenderFactory _requestSenderFactory =
-        new HttpClientRequestSenderFactory();
+    private Func<string?, HttpClient>? _httpClientResolver;
     private TimeProvider _clock = TimeProvider.System;
-
-    public IHttpRequestSenderFactory RequestSenderFactory => _requestSenderFactory;
 
     public TimeProvider Clock => _clock;
 
-    public HttpComponentOptions UseRequestSenderFactory(
-        IHttpRequestSenderFactory requestSenderFactory)
+    /// <summary>
+    /// Supplies the single <see cref="HttpClient"/> every http.client node uses.
+    /// The host owns the client (and all of its transport policy: base address,
+    /// pooling, redirects, default headers, TLS, any allow-list/SSRF delegating
+    /// handler). The node never disposes it.
+    /// </summary>
+    public HttpComponentOptions UseHttpClient(HttpClient client)
     {
-        _requestSenderFactory = requestSenderFactory
-            ?? throw new ArgumentNullException(nameof(requestSenderFactory));
+        ArgumentNullException.ThrowIfNull(client);
+        _httpClientResolver = _ => client;
         return this;
     }
 
-    public HttpComponentOptions UseRequestSender(
-        Func<HttpRequestSenderContext, IHttpRequestSender> create)
+    /// <summary>
+    /// Supplies a resolver invoked per node with the node's optional <c>client</c>
+    /// name, so different nodes can use different clients (for example bridging to
+    /// <c>IHttpClientFactory.CreateClient(name)</c>).
+    /// </summary>
+    public HttpComponentOptions UseHttpClient(Func<string?, HttpClient> resolver)
     {
-        ArgumentNullException.ThrowIfNull(create);
-        _requestSenderFactory = new DelegateHttpRequestSenderFactory(create, null);
-        return this;
-    }
-
-    public HttpComponentOptions UseRequestSender(
-        Func<HttpClientSenderContext, IHttpRequestSender> createClient)
-    {
-        ArgumentNullException.ThrowIfNull(createClient);
-        _requestSenderFactory = new DelegateHttpRequestSenderFactory(null, createClient);
+        _httpClientResolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         return this;
     }
 
@@ -42,21 +37,16 @@ public sealed class HttpComponentOptions
         return this;
     }
 
-    private sealed class DelegateHttpRequestSenderFactory(
-        Func<HttpRequestSenderContext, IHttpRequestSender>? create,
-        Func<HttpClientSenderContext, IHttpRequestSender>? createClient)
-        : IHttpRequestSenderFactory
+    internal HttpClient ResolveHttpClient(string? name)
     {
-        public IHttpRequestSender Create(HttpRequestSenderContext context)
-            => create is not null
-                ? create(context)
-                : throw new InvalidOperationException(
-                    "This sender factory is configured for client-scoped senders only.");
+        if (_httpClientResolver is null)
+        {
+            throw new InvalidOperationException(
+                "No HttpClient is configured. Call UseHttpClient(...) when registering the HTTP components.");
+        }
 
-        public IHttpRequestSender CreateClient(HttpClientSenderContext context)
-            => createClient is not null
-                ? createClient(context)
-                : throw new InvalidOperationException(
-                    "This sender factory is configured for request-scoped senders only.");
+        return _httpClientResolver(name)
+            ?? throw new InvalidOperationException(
+                $"The configured HttpClient resolver returned null for client '{name ?? "(default)"}'.");
     }
 }

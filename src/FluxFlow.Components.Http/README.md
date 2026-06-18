@@ -1,130 +1,87 @@
 # FluxFlow.Components.Http
 
-Reusable HTTP request components for FluxFlow.
+A reusable HTTP request component for FluxFlow.
 
-## Nodes
+## Node
 
 | Node type | Shape | Purpose |
 |-----------|-------|---------|
-| `http.client` | resource | Owns the HTTP sender lifecycle (base URL, host allow-list, redirects, timeout, pooling). Request nodes reference it by name. |
-| `http.request` | `Input` -> `Output`, `Errors` | Sends HTTP requests through a borrowed client and emits typed responses or request errors. |
+| `http.client` | `Input` -> `Output`, `Errors` | A "blockified" `HttpClient`: a request arrives on `Input`, is sent through the host-injected `HttpClient`, and the response is broadcast on `Output` (failures on `Errors`). |
 
-Register both node types once:
+The node owns no transport policy. Base address, connection pooling, redirects,
+default headers, TLS, proxy, and any allow-list / SSRF guard all live on the
+`HttpClient` you inject — exactly as you would configure a regular .NET
+`HttpClient` (typically through `IHttpClientFactory` and a `DelegatingHandler`).
+The node never disposes the client; the host owns its lifetime.
+
+## Registration
+
+The host supplies the `HttpClient`. A single shared client:
 
 ```csharp
-registry.RegisterHttpComponents();
+registry.RegisterHttpComponents(options => options
+    .UseHttpClient(httpClient));
 ```
 
-## Client resource
+Or a resolver, so different nodes can use different clients via the node's
+optional `client` name (for example bridging to `IHttpClientFactory`):
 
-The `http.client` node owns the sender. It is a resource: `http.request` does
-not build its own client, it borrows the established sender from an
-`http.client` by name. Transport and security settings live on the client.
+```csharp
+registry.RegisterHttpComponents(options => options
+    .UseHttpClient(name => httpClientFactory.CreateClient(name ?? "default")));
+```
+
+A deterministic clock for timestamps/elapsed can be provided through
+`UseClock(TimeProvider)` (default `TimeProvider.System`).
+
+## Node options
 
 ```json
 {
   "type": "http.client",
-  "name": "internal-api",
-  "baseUrl": "https://api.internal.example",
-  "defaultTimeoutMilliseconds": 100000,
-  "followRedirects": true,
-  "restrictToBaseUrlOrigin": true,
-  "allowedHosts": [ "api.internal.example", ".internal.example" ],
-  "pooledConnectionLifetimeSeconds": 300,
-  "maxConnectionsPerServer": 20,
-  "defaultHeaders": { "x-api-key": "..." }
-}
-```
-
-`http.request` requires a `client` that names an `http.client` resource. The
-reference is mandatory; there is no inline transport configuration on the
-request node.
-
-```json
-{
-  "type": "http.request",
   "name": "call-api",
   "client": "internal-api",
   "maxResponseBodyBytes": 1048576,
   "treatNonSuccessStatusAsError": false,
-  "boundedCapacity": 128
+  "boundedCapacity": 128,
+  "maxDegreeOfParallelism": 1,
+  "defaultTimeoutMilliseconds": null
 }
 ```
 
-`http.request` consumes `HttpRequestInput` values and emits
-`HttpResponseOutput` values. Network, timeout, cancellation, invalid URL, and
-body size failures are emitted through `HttpErrorOutput` on the `Errors` port.
-The node continues processing later messages after a per-message failure.
+- `client` (optional): name passed to the host's `HttpClient` resolver.
+- `maxResponseBodyBytes`: response bodies larger than this are read up to the cap
+  and the response is flagged `BodyTruncated = true`.
+- `treatNonSuccessStatusAsError`: when `true`, a non-success status is reported on
+  the `Errors` port instead of `Output`.
+- `defaultTimeoutMilliseconds` (optional): per-request timeout used when the
+  request input does not specify one. Null defers to the `HttpClient`'s own
+  timeout.
 
-Non-success status codes do not fault the node. Responses are emitted with
-`Success = false`. When `treatNonSuccessStatusAsError` is enabled, the response
-is still emitted and a matching error item is also emitted.
+## Behaviour
 
-## Connecting (host-driven)
+The node consumes `HttpRequestInput` and emits `HttpResponseOutput`. A relative
+`Url` resolves against the injected client's `BaseAddress`; an absolute `Url` is
+used as-is. Network, timeout, cancellation, and invalid-URL failures are emitted
+as `HttpErrorOutput` on the `Errors` port and the node keeps processing later
+messages. Non-success status codes do not fault the node.
 
-Connecting is an explicit host decision: there is no auto-connect or lazy
-connect. `StartAsync` on the client is a no-op. The host establishes and tears
-down the sender through `IHttpClientHandle`:
-
-```csharp
-await client.ConnectAsync(cancellationToken);
-// ... run the graph ...
-await client.DisconnectAsync(cancellationToken);
-```
-
-`http.request` borrows the established sender at call-time and never builds or
-disposes it. A request sent before the client is connected is reported per
-message on the `Errors` port rather than faulting the node.
+`Output` and `Errors` are broadcast ports: every linked consumer receives every
+item.
 
 ## Security
 
-A host that processes untrusted message URLs should restrict where requests can
-go on the `http.client`, because `defaultHeaders` (often credentials) are
-attached to every request:
-
-- `allowedHosts` (default empty = allow all): when non-empty, the resolved
-  absolute URL host must match one entry. Entries match case-insensitively,
-  either exactly or as a leading-dot suffix such as `.internal.example`.
-- `restrictToBaseUrlOrigin` (default `false`): when `true`, absolute message
-  URLs must match the `baseUrl` scheme, host, and port.
-
-Violations are reported per message through the `Errors` port with kind
-`UrlNotAllowed` and the message is dropped. Header names and values containing
-CR, LF, or NUL characters are also rejected per message before the request is
-sent.
-
-## Runtime Timing
-
-Responses and request errors use the package clock for timestamps and elapsed
-milliseconds. The package uses `System.TimeProvider` (default
-`TimeProvider.System`); there is no bespoke HTTP clock interface. Hosts and
-tests can provide a deterministic `TimeProvider` through registration:
-
-```csharp
-registry.RegisterHttpComponents(options => options
-    .UseClock(httpClock));
-```
-
-## Sender Ownership
-
-The `http.client` resource builds a default pooled sender from its options.
-Hosts that need custom authentication, tracing, proxy settings, or test doubles
-can provide `IHttpRequestSenderFactory` through registration:
-
-```csharp
-registry.RegisterHttpComponents(options => options
-    .UseClock(httpClock)
-    .UseRequestSenderFactory(myFactory));
-```
-
-The sender factory receives the resolved client handle and configured clock.
-The `http.client` resource disposes senders it creates through the configured
-factory.
+This node is a thin wrapper over the `HttpClient` you give it. Any policy for
+untrusted URLs — host allow-lists, blocking redirects, pinning to an origin,
+stripping credentials — belongs on that `HttpClient`, idiomatically as a
+`DelegatingHandler` in its handler chain. Keeping it there means the policy
+applies no matter who sends to the node, and the node stays a pure transport
+pump.
 
 ## Design Metadata
 
 This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
+node type. Hosts can compose it through `ComponentDesignMetadataCatalog` to
 populate palettes, editors, validation views, and documentation without
 duplicating package descriptors.
 

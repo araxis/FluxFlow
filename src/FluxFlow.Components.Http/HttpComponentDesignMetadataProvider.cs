@@ -13,40 +13,18 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
             Type = HttpComponentTypes.Client,
             DisplayName = "HTTP Client",
             Category = "HTTP",
-            Summary = "Owns the shared HTTP client referenced by request nodes. The client is established and torn down via the host connect/disconnect API; there is no auto-connect.",
-            IconKey = "http-client",
-            PreferredNodeName = "httpClient",
-            SuggestedEditorWidth = 460,
-            Options =
-            [
-                Text("baseUrl", "Base URL", "Absolute base URL used to resolve relative request URLs."),
-                AllowedHosts(),
-                Boolean("restrictToBaseUrlOrigin", "Restrict to baseUrl origin", false),
-                Boolean("followRedirects", "Follow redirects", true),
-                Number("defaultTimeoutMilliseconds", "Default timeout ms", 100000, 1),
-                NumberOptional("pooledConnectionLifetimeSeconds", "Pooled connection lifetime s", 1),
-                NumberOptional("maxConnectionsPerServer", "Max connections per server", 1)
-            ],
-            Ports =
-            [
-                Port("Errors", PortDirection.Output, "FlowError", false)
-            ]
-        },
-        new()
-        {
-            Type = HttpComponentTypes.Request,
-            DisplayName = "HTTP Request",
-            Category = "HTTP",
-            Summary = "Sends HTTP requests from explicit request inputs.",
+            Summary = "Sends an HTTP request through the host-injected HttpClient: request in, response out (broadcast), failures on the error port. All transport policy (base URL, pooling, redirects, default headers, TLS, any allow-list/SSRF handler) lives on the injected HttpClient.",
             IconKey = "http",
-            PreferredNodeName = "httpRequest",
+            PreferredNodeName = "httpClient",
             SuggestedEditorWidth = 520,
             Options =
             [
-                Text("client", "Client name", "Name of the http.client resource to use.", true),
+                Text("client", "Client name", "Optional name passed to the host's HttpClient resolver (for example an IHttpClientFactory client name)."),
                 Number("maxResponseBodyBytes", "Max response body bytes", 1048576, 1),
                 Boolean("treatNonSuccessStatusAsError", "Treat non-success status as error", false),
-                Number("boundedCapacity", "Capacity", 128, 1)
+                Number("boundedCapacity", "Capacity", 128, 1),
+                Number("maxDegreeOfParallelism", "Max parallelism", 1, 1),
+                NumberOptional("defaultTimeoutMilliseconds", "Default timeout ms", 1)
             ],
             Ports =
             [
@@ -85,14 +63,6 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
         Kind = OptionValueKind.Number,
         DisplayName = displayName,
         Min = min
-    };
-
-    private static OptionDesignMetadata AllowedHosts() => new()
-    {
-        Name = "allowedHosts",
-        Kind = OptionValueKind.Json,
-        DisplayName = "Allowed hosts",
-        HelperText = "JSON array of host names. Exact match or leading-dot suffix match like \".internal.example\"."
     };
 
     private static OptionDesignMetadata Boolean(string name, string displayName, bool defaultValue) => new()

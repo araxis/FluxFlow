@@ -92,7 +92,6 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         FileSystemComponentTypes.FileWatch,
         FileSystemComponentTypes.FileWrite,
         HttpComponentTypes.Client,
-        HttpComponentTypes.Request,
         MappingComponentTypes.Mapper,
         MetricsComponentTypes.Aggregate,
         MqttComponentTypes.Connection,

@@ -11,15 +11,11 @@ public sealed class HttpComponentModule : IFlowNodeModule
         ArgumentNullException.ThrowIfNull(options);
 
         var clock = options.Clock;
-        var senderFactory = options.RequestSenderFactory;
         Registrations =
         [
             new FlowNodeRegistration(
                 HttpComponentTypes.Client,
-                context => HttpClientNodeFactory.Create(context, senderFactory, clock)),
-            new FlowNodeRegistration(
-                HttpComponentTypes.Request,
-                context => HttpRequestNodeFactory.Create(context, clock))
+                context => HttpClientNodeFactory.Create(context, options, clock))
         ];
     }
 
