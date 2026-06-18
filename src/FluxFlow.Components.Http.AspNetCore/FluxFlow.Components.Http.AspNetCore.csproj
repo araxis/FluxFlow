@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;http;trigger;aspnetcore</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial ASP.NET Core HTTP trigger adapter: MapFluxFlowTrigger maps an endpoint to a RequestReplyBridge&lt;HttpTriggerRequest, HttpTriggerReply&gt;, and HttpRequestContext bridges HttpContext to the bridge's reply contract (writing the correlated response, or 504/500 on failure).</PackageReleaseNotes>
+    <PackageReleaseNotes>Initial ASP.NET Core HTTP trigger adapter: HttpTriggerNode is the trigger as a component (given a keyed request source, using a RequestReplyCoordinator internally). AddFluxFlowHttpTrigger(name, configure) registers it and MapFluxFlowTrigger(pattern, name) feeds it (plus a MapFluxFlowTrigger(pattern, coordinator) overload). HttpRequestContext writes the correlated response, or 504/500/503 on timeout/failure/shutdown.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

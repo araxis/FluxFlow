@@ -189,7 +189,7 @@ This folder records the extraction work for `FluxFlow.Engine`.
   `work/http-simplify`, unmerged) — the `FluxFlow.Nodes` kit (`FlowNode<,>`,
   `FlowMessage<T>` envelope, guarded `CorrelationId`), engine-free standalone
   nodes (HTTP rebuilt as the template), and the transport-neutral
-  `RequestReplyBridge` reused by HTTP (ASP.NET) and MQTT triggers.
+  `RequestReplyCoordinator` reused by HTTP (ASP.NET) and MQTT triggers.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

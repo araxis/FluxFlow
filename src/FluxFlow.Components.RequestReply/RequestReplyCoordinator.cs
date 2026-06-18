@@ -15,7 +15,7 @@ namespace FluxFlow.Components.RequestReply;
 /// response within the timeout are failed and evicted. The bridge knows nothing about
 /// the transport — that lives entirely in the context's <c>ReplyAsync</c>/<c>FailAsync</c>.
 /// </summary>
-public sealed class RequestReplyBridge<TRequest, TResponse> : IAsyncDisposable
+public sealed class RequestReplyCoordinator<TRequest, TResponse> : IAsyncDisposable
 {
     private readonly RequestReplyOptions _options;
     private readonly TimeProvider _clock;
@@ -29,7 +29,7 @@ public sealed class RequestReplyBridge<TRequest, TResponse> : IAsyncDisposable
     private readonly CancellationTokenSource _stopping = new();
     private int _disposed;
 
-    public RequestReplyBridge(RequestReplyOptions? options = null, TimeProvider? clock = null)
+    public RequestReplyCoordinator(RequestReplyOptions? options = null, TimeProvider? clock = null)
     {
         _options = options ?? new RequestReplyOptions();
         if (_options.Capacity <= 0)

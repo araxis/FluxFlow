@@ -11,7 +11,7 @@ public static class MqttTriggerExtensions
     /// when the graph answers. Returns false if the bridge is not accepting (shutting down).
     /// </summary>
     public static Task<bool> SubmitAsync(
-        this RequestReplyBridge<MqttRequest, MqttReply> bridge,
+        this RequestReplyCoordinator<MqttRequest, MqttReply> bridge,
         MqttRequest request,
         IMqttResponsePublisher publisher,
         CancellationToken cancellationToken = default)

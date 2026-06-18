@@ -59,7 +59,7 @@ public sealed class MqttRequestReplyTests
     public async Task EndToEnd_SameBridge_DrivesMqtt()
     {
         // The exact bridge the HTTP trigger uses — here driving MQTT, proving neutrality.
-        await using var bridge = new RequestReplyBridge<MqttRequest, MqttReply>();
+        await using var bridge = new RequestReplyCoordinator<MqttRequest, MqttReply>();
         var handler = new ActionBlock<FlowMessage<MqttRequest>>(request =>
             bridge.Responses.Post(request.With(new MqttReply
             {

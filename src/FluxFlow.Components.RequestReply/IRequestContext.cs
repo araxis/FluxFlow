@@ -5,7 +5,7 @@ namespace FluxFlow.Components.RequestReply;
 /// <summary>
 /// One inbound request plus how to answer it. The host/transport adapter creates
 /// these (e.g. from an <c>HttpContext</c> or an MQTT request message): the
-/// <see cref="RequestReplyBridge{TRequest,TResponse}"/> forwards <see cref="Request"/>
+/// <see cref="RequestReplyCoordinator{TRequest,TResponse}"/> forwards <see cref="Request"/>
 /// into the graph and calls <see cref="ReplyAsync"/> (or <see cref="FailAsync"/> on
 /// timeout) when the correlated response comes back. The bridge never sees the
 /// transport — only this contract.

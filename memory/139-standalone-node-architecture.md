@@ -56,16 +56,23 @@ engine's `OutputPort` — so a node could not run without the engine.
   machine, the sender-factory layer, the in-node SSRF guard (now a `DelegatingHandler`
   concern on the injected client), and the engine glue (factory/module/types/registration/
   design-metadata). All transport policy lives on the injected `HttpClient`.
-- **`FluxFlow.Components.RequestReply`** (new): `RequestReplyBridge<TRequest, TResponse>`
+- **`FluxFlow.Components.RequestReply`** (new): `RequestReplyCoordinator<TRequest, TResponse>`
   bridges request/reply onto a one-way graph. Host feeds `IRequestContext` (request +
   `ReplyAsync`/`FailAsync` to the real transport) into `Incoming`; the bridge mints/honours
   a `CorrelationId`, holds the context in-flight, emits `FlowMessage<TRequest>` on a
   **reliable bounded** `Output`; the graph returns `FlowMessage<TResponse>` (same id, via
   `With`) to `Responses`; the bridge matches and replies. A `TimeProvider` sweep fails +
   evicts timed-out requests (no leak, no hung caller). Transport-agnostic.
-- **`FluxFlow.Components.Http.AspNetCore`** (new): the ONLY ASP.NET-aware package.
-  `MapFluxFlowTrigger` maps an endpoint to the bridge; `HttpRequestContext` writes the
-  correlated reply (or 504/500/503) back. Held open until the graph answers.
+- **`FluxFlow.Components.Http.AspNetCore`** (new): the ONLY ASP.NET-aware package. The
+  trigger is a component (`HttpTriggerNode`) that is *given* its inbound request source
+  (injected, keyed) and uses a `RequestReplyCoordinator` internally — the host does not
+  hand-wire a coordinator. `AddFluxFlowHttpTrigger(name, configure)` registers a keyed
+  request source + the trigger + a hosted service (wires the graph in `configure`);
+  `MapFluxFlowTrigger(pattern, name)` feeds the keyed source (a `MapFluxFlowTrigger(
+  pattern, coordinator)` overload remains for DI-less/tests). `HttpRequestContext` writes
+  the correlated reply (or 504/500/503) back, holding the response open until the graph
+  answers. (Trade noted: resolving the keyed source in the endpoint is a mild
+  service-locator seam — accepted for DI-first host ergonomics.)
 - **`FluxFlow.Components.Mqtt.RequestReply`** (new): the SAME bridge driving MQTT, with
   no MQTT-library dependency — `MqttRequestContext` publishes the reply to the MQTT5
   response topic (echoing correlation data) via a host-supplied `IMqttResponsePublisher`.

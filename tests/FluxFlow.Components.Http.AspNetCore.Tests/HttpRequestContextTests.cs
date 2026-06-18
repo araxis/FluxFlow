@@ -68,7 +68,7 @@ public sealed class HttpRequestContextTests
     [Fact]
     public async Task EndToEnd_BridgePlusHandler_WritesResponseToHttpContext()
     {
-        await using var bridge = new RequestReplyBridge<HttpTriggerRequest, HttpTriggerReply>();
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
         // The "graph": echo the request body back, preserving the correlation id.
         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
             bridge.Responses.Post(request.With(

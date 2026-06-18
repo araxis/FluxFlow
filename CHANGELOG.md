@@ -4,7 +4,7 @@
 
 Initial MQTT request/reply trigger.
 
-- Reuses `RequestReplyBridge` for MQTT: `MqttRequestContext` surfaces an inbound
+- Reuses `RequestReplyCoordinator` for MQTT: `MqttRequestContext` surfaces an inbound
   `MqttRequest`, seeds the correlation id from MQTT5 correlation data, and publishes
   the reply to the request's response topic (echoing the correlation data) via a
   host-supplied `IMqttResponsePublisher`. No MQTT-library dependency — proof the bridge
@@ -14,16 +14,20 @@ Initial MQTT request/reply trigger.
 
 Initial ASP.NET Core HTTP trigger adapter.
 
-- `MapFluxFlowTrigger` maps an endpoint to a `RequestReplyBridge<HttpTriggerRequest,
-  HttpTriggerReply>`; `HttpRequestContext` bridges `HttpContext` to the reply contract,
-  writing the correlated response (or `504`/`500`/`503` on timeout/failure/shutdown).
+- `HttpTriggerNode` is the trigger as a component: given a keyed request source and using
+  a `RequestReplyCoordinator` internally, it exposes graph-facing `Output`/`Responses`.
+- `AddFluxFlowHttpTrigger(name, configure)` registers the keyed source + trigger + a
+  hosted service; `MapFluxFlowTrigger(pattern, name)` feeds it. A
+  `MapFluxFlowTrigger(pattern, coordinator)` overload supports DI-less/manual composition.
+- `HttpRequestContext` bridges `HttpContext` to the reply contract, writing the correlated
+  response (or `504`/`500`/`503` on timeout/failure/shutdown).
 - The only FluxFlow package that references ASP.NET Core.
 
 ## FluxFlow.Components.RequestReply 0.1.0
 
 Initial request/reply bridge.
 
-- `RequestReplyBridge<TRequest, TResponse>` correlates a host-supplied
+- `RequestReplyCoordinator<TRequest, TResponse>` correlates a host-supplied
   `IRequestContext` stream to a one-way graph (`Output` requests, `Responses` input)
   by `CorrelationId`, replies through the context, evicts timed-out requests, and
   reports on broadcast error/event ports. Transport-agnostic — reused by HTTP and

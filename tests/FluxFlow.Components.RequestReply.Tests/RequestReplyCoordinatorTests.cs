@@ -7,12 +7,12 @@ using Xunit;
 
 namespace FluxFlow.Components.RequestReply.Tests;
 
-public sealed class RequestReplyBridgeTests
+public sealed class RequestReplyCoordinatorTests
 {
     [Fact]
     public async Task Request_FlowsToOutput_WithMintedCorrelationId()
     {
-        await using var bridge = new RequestReplyBridge<string, string>();
+        await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("ping");
 
         await bridge.Incoming.SendAsync(context);
@@ -26,7 +26,7 @@ public sealed class RequestReplyBridgeTests
     [Fact]
     public async Task HostSuppliedCorrelationId_IsHonoured()
     {
-        await using var bridge = new RequestReplyBridge<string, string>();
+        await using var bridge = new RequestReplyCoordinator<string, string>();
         var id = new CorrelationId("trace-7");
         await bridge.Incoming.SendAsync(new FakeContext("ping", id));
 
@@ -36,7 +36,7 @@ public sealed class RequestReplyBridgeTests
     [Fact]
     public async Task Response_RepliesToContext_AndEvicts()
     {
-        await using var bridge = new RequestReplyBridge<string, string>();
+        await using var bridge = new RequestReplyCoordinator<string, string>();
         var context = new FakeContext("hello");
         await bridge.Incoming.SendAsync(context);
 
@@ -52,7 +52,7 @@ public sealed class RequestReplyBridgeTests
     [Fact]
     public async Task EndToEnd_GraphHandler_RepliesThroughBridge()
     {
-        await using var bridge = new RequestReplyBridge<string, string>();
+        await using var bridge = new RequestReplyCoordinator<string, string>();
         // The "graph": echo handler that preserves the correlation id via With().
         var handler = new ActionBlock<FlowMessage<string>>(
             request => bridge.Responses.Post(request.With($"echo:{request.Payload}")));
@@ -69,7 +69,7 @@ public sealed class RequestReplyBridgeTests
     public async Task Timeout_FailsContext_AndEvicts()
     {
         var clock = new FakeTimeProvider();
-        await using var bridge = new RequestReplyBridge<string, string>(
+        await using var bridge = new RequestReplyCoordinator<string, string>(
             new RequestReplyOptions
             {
                 Timeout = TimeSpan.FromMilliseconds(200),
@@ -91,7 +91,7 @@ public sealed class RequestReplyBridgeTests
     [Fact]
     public async Task UnmatchedResponse_ReportsError()
     {
-        await using var bridge = new RequestReplyBridge<string, string>();
+        await using var bridge = new RequestReplyCoordinator<string, string>();
         var errors = Sink(bridge.Errors);
 
         await bridge.Responses.SendAsync(FlowMessage.Create("orphan", new CorrelationId("unknown")));

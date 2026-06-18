@@ -1,6 +1,6 @@
 # FluxFlow.Components.Mqtt.RequestReply
 
-MQTT request/reply **trigger** for FluxFlow — the same `RequestReplyBridge` the HTTP
+MQTT request/reply **trigger** for FluxFlow — the same `RequestReplyCoordinator` the HTTP
 trigger uses, wired to MQTT. Proof that the bridge is transport-neutral: pub/sub here,
 HTTP there, identical correlation machinery.
 
@@ -10,7 +10,7 @@ inbound messages onto `MqttRequest`, feeds them to the bridge, and implements
 `HttpClient` and the ASP.NET adapter owns Kestrel.
 
 ```csharp
-var bridge = new RequestReplyBridge<MqttRequest, MqttReply>();
+var bridge = new RequestReplyCoordinator<MqttRequest, MqttReply>();
 bridge.Output.LinkTo(handler.Input);     // your graph: FlowMessage<MqttRequest> -> FlowMessage<MqttReply>
 handler.Output.LinkTo(bridge.Responses);
 

@@ -22,7 +22,7 @@ public sealed class HttpTriggerEndpointTests
     [Fact]
     public async Task Post_RoutesThroughBridgeAndGraph_ReturnsResponse()
     {
-        await using var bridge = new RequestReplyBridge<HttpTriggerRequest, HttpTriggerReply>();
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
         // The "graph": echo "METHOD:body", preserving the correlation id via With().
         var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
             bridge.Responses.Post(request.With(HttpTriggerReply.Text(
@@ -42,7 +42,7 @@ public sealed class HttpTriggerEndpointTests
     public async Task NoResponseFromGraph_TimesOut_Returns504()
     {
         // Requests are accepted but never answered, so the bridge times them out.
-        await using var bridge = new RequestReplyBridge<HttpTriggerRequest, HttpTriggerReply>(
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
             new RequestReplyOptions
             {
                 Timeout = TimeSpan.FromMilliseconds(300),
@@ -58,8 +58,40 @@ public sealed class HttpTriggerEndpointTests
         response.StatusCode.ShouldBe(HttpStatusCode.GatewayTimeout);
     }
 
+    [Fact]
+    public async Task DiComposition_RoutesThroughKeyedTrigger()
+    {
+        // The DI-first composition: register the trigger by name, map the endpoint by name.
+        using var host = await new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddRouting();
+                    services.AddFluxFlowHttpTrigger("echo", trigger =>
+                    {
+                        var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
+                            trigger.Responses.Post(request.With(HttpTriggerReply.Text(
+                                $"di:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                        trigger.Output.LinkTo(handler);
+                    });
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapFluxFlowTrigger("/echo", "echo"));
+                }))
+            .StartAsync();
+        var client = host.GetTestClient();
+
+        var response = await client.PostAsync("/echo", new StringContent("hi"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("di:hi");
+    }
+
     private static Task<IHost> StartServerAsync(
-        RequestReplyBridge<HttpTriggerRequest, HttpTriggerReply> bridge)
+        RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply> bridge)
         => new HostBuilder()
             .ConfigureWebHost(web => web
                 .UseTestServer()

@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial request/reply bridge: RequestReplyBridge&lt;TRequest, TResponse&gt; correlates a host-supplied IRequestContext stream to a one-way graph (Output requests, Responses input) by CorrelationId, replies via the context, evicts timed-out requests, and reports on broadcast error/event ports.</PackageReleaseNotes>
+    <PackageReleaseNotes>Initial request/reply bridge: RequestReplyCoordinator&lt;TRequest, TResponse&gt; correlates a host-supplied IRequestContext stream to a one-way graph (Output requests, Responses input) by CorrelationId, replies via the context, evicts timed-out requests, and reports on broadcast error/event ports.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;components;mqtt;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial MQTT request/reply trigger: MqttRequestContext reuses the RequestReplyBridge — it surfaces an inbound MqttRequest, seeds the correlation id from MQTT5 correlation data, and publishes the reply to the response topic (echoing the original correlation data) via a host-supplied IMqttResponsePublisher. No MQTT library dependency.</PackageReleaseNotes>
+    <PackageReleaseNotes>Initial MQTT request/reply trigger: MqttRequestContext reuses the RequestReplyCoordinator — it surfaces an inbound MqttRequest, seeds the correlation id from MQTT5 correlation data, and publishes the reply to the response topic (echoing the original correlation data) via a host-supplied IMqttResponsePublisher. No MQTT library dependency.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

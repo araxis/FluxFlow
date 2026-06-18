@@ -17,7 +17,7 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - The host creates an `IRequestContext<TRequest, TResponse>` per inbound request —
   it carries the request and a `ReplyAsync`/`FailAsync` that write back to the real
   transport (`HttpContext`, an MQTT reply topic, …). The bridge never sees the transport.
-- `RequestReplyBridge<TRequest, TResponse>` assigns a `CorrelationId` (or honours one
+- `RequestReplyCoordinator<TRequest, TResponse>` assigns a `CorrelationId` (or honours one
   the context supplies), holds the context in-flight, and emits `FlowMessage<TRequest>`
   on `Output`.
 - The graph maps request → response with `message.With(response)`, which preserves the

@@ -534,7 +534,7 @@ Date: 2026-05-31
   nodes -> optional composition/host. Reworked so far: `FluxFlow.Components.Http`
   collapsed to one engine-free `HttpClientNode` over an injected HttpClient (SSRF
   guard, pooling, redirects all move to the injected client / a DelegatingHandler);
-  new `FluxFlow.Components.RequestReply` (`RequestReplyBridge<TReq,TResp>` brings
+  new `FluxFlow.Components.RequestReply` (`RequestReplyCoordinator<TReq,TResp>` brings
   request/reply to the one-way graph, correlating on CorrelationId, with timeout
   eviction and reliable bounded request delivery); new
   `FluxFlow.Components.Http.AspNetCore` (the only ASP.NET-aware package;
