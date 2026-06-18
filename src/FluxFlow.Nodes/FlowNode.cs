@@ -4,20 +4,21 @@ namespace FluxFlow.Nodes;
 
 /// <summary>
 /// Base for a single-input / single-output node. A node is a self-contained TPL
-/// Dataflow processor: post a <typeparamref name="TInput"/> to <see cref="Input"/>
-/// (a bounded buffer — backpressure on intake), and the node broadcasts a
-/// <typeparamref name="TOutput"/> on <see cref="Output"/>, errors on
-/// <see cref="Errors"/>, and events on <see cref="Events"/>. Every source port is
-/// a <see cref="BroadcastBlock{T}"/>, so one output can be linked to many
-/// downstream nodes (e.g. a logger and a mapper) and each keeps-up consumer sees
-/// every message. No engine, registry, or runtime is needed — just <c>new</c> the
-/// node and <c>LinkTo</c> the next one.
+/// Dataflow processor: every message travels as a <see cref="FlowMessage{T}"/>
+/// envelope (payload + correlation id). Post a <c>FlowMessage&lt;TInput&gt;</c> to
+/// <see cref="Input"/> (a bounded buffer — backpressure on intake); the node
+/// broadcasts a <c>FlowMessage&lt;TOutput&gt;</c> on <see cref="Output"/>, errors on
+/// <see cref="Errors"/>, events on <see cref="Events"/>. Every source port is a
+/// <see cref="BroadcastBlock{T}"/>, so one output can fan out to many downstream
+/// nodes. No engine, registry, or runtime — just <c>new</c> the node and
+/// <c>LinkTo</c> the next one. Transform a message with
+/// <see cref="FlowMessage{T}.With{TOut}"/> to carry the correlation id forward.
 /// </summary>
 public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
 {
-    private readonly BufferBlock<TInput> _input;
-    private readonly ActionBlock<TInput> _processor;
-    private readonly BroadcastBlock<TOutput> _output;
+    private readonly BufferBlock<FlowMessage<TInput>> _input;
+    private readonly ActionBlock<FlowMessage<TInput>> _processor;
+    private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
     private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly CancellationTokenSource _stopping = new();
@@ -40,18 +41,15 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
                 nameof(options), "MaxDegreeOfParallelism must be greater than zero.");
         }
 
-        // Broadcast outputs: default (unbounded) — fan-out to every linked consumer,
-        // latest-wins (a consumer that falls behind may miss messages; no backpressure).
-        _output = new BroadcastBlock<TOutput>(static value => value);
+        _output = new BroadcastBlock<FlowMessage<TOutput>>(static message => message);
         _errors = new BroadcastBlock<FlowError>(static value => value);
         _events = new BroadcastBlock<FlowEvent>(static value => value);
 
-        // Buffered input: SendAsync applies backpressure once InputCapacity is reached.
-        _input = new BufferBlock<TInput>(new DataflowBlockOptions
+        _input = new BufferBlock<FlowMessage<TInput>>(new DataflowBlockOptions
         {
             BoundedCapacity = options.InputCapacity
         });
-        _processor = new ActionBlock<TInput>(
+        _processor = new ActionBlock<FlowMessage<TInput>>(
             RunAsync,
             new ExecutionDataflowBlockOptions
             {
@@ -64,10 +62,10 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
     }
 
     /// <summary>Input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
-    public ITargetBlock<TInput> Input => _input;
+    public ITargetBlock<FlowMessage<TInput>> Input => _input;
 
     /// <summary>Output port — broadcast; link it to as many downstream inputs as you like.</summary>
-    public ISourceBlock<TOutput> Output => _output;
+    public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
     /// <summary>Error port — broadcast; uniform <see cref="FlowError"/> stream.</summary>
     public ISourceBlock<FlowError> Errors => _errors;
@@ -81,10 +79,10 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
     /// <summary>Canceled when the node is faulted or disposed.</summary>
     protected CancellationToken Stopping => _stopping.Token;
 
-    /// <summary>Handle one input. Throwing is caught and surfaced on <see cref="Errors"/>.</summary>
-    protected abstract Task ProcessAsync(TInput input);
+    /// <summary>Handle one message. Throwing is caught and surfaced on <see cref="Errors"/>.</summary>
+    protected abstract Task ProcessAsync(FlowMessage<TInput> message);
 
-    protected bool Emit(TOutput output) => _output.Post(output);
+    protected bool Emit(FlowMessage<TOutput> message) => _output.Post(message);
 
     protected bool EmitError(FlowError error) => _errors.Post(error);
 
@@ -135,11 +133,11 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
     /// <summary>Override to release node-owned resources after the pump has stopped.</summary>
     protected virtual ValueTask OnDisposeAsync() => ValueTask.CompletedTask;
 
-    private async Task RunAsync(TInput input)
+    private async Task RunAsync(FlowMessage<TInput> message)
     {
         try
         {
-            await ProcessAsync(input).ConfigureAwait(false);
+            await ProcessAsync(message).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
         {
@@ -147,10 +145,12 @@ public abstract class FlowNode<TInput, TOutput> : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            // Node-level safety net: a handler throw becomes an error item, never a dead pump.
+            // Node-level safety net: a handler throw becomes an error item (stamped
+            // with the in-flight correlation id), never a dead pump.
             EmitError(new FlowError
             {
                 Timestamp = DateTimeOffset.UtcNow,
+                CorrelationId = message.CorrelationId,
                 Message = exception.Message,
                 Exception = exception
             });

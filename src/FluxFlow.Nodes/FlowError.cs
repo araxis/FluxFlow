@@ -9,6 +9,9 @@ public sealed record FlowError
 {
     public DateTimeOffset Timestamp { get; init; }
 
+    /// <summary>The correlation id of the message that caused this error, if any.</summary>
+    public CorrelationId? CorrelationId { get; init; }
+
     public int Code { get; init; }
 
     public required string Message { get; init; }

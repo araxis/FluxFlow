@@ -7,14 +7,15 @@ using System.Text;
 namespace FluxFlow.Components.Http.Nodes;
 
 /// <summary>
-/// A standalone HTTP node — a "blockified" <see cref="HttpClient"/>. Post an
-/// <see cref="HttpRequestInput"/> to <c>Input</c>; the node sends it through the
-/// injected client and broadcasts an <see cref="HttpResponseOutput"/> on
-/// <c>Output</c> (failures on <c>Errors</c>, a success/failure note on
-/// <c>Events</c>). Works with nothing but <c>new HttpClientNode(httpClient)</c> —
-/// no engine, registry, or runtime. All transport policy (base address, pooling,
-/// redirects, default headers, TLS, any allow-list/SSRF handler) lives on the
-/// injected client; the node never connects or disposes it.
+/// A standalone HTTP node — a "blockified" <see cref="HttpClient"/>. Post a
+/// <c>FlowMessage&lt;HttpRequestInput&gt;</c> to <c>Input</c>; the node sends it
+/// through the injected client and broadcasts a
+/// <c>FlowMessage&lt;HttpResponseOutput&gt;</c> on <c>Output</c> carrying the same
+/// correlation id (failures on <c>Errors</c>, a note on <c>Events</c>). Works with
+/// nothing but <c>new HttpClientNode(httpClient)</c> — no engine. All transport
+/// policy (base address, pooling, redirects, default headers, TLS, any
+/// allow-list/SSRF handler) lives on the injected client; the node never connects
+/// or disposes it.
 /// </summary>
 public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutput>
 {
@@ -40,9 +41,10 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         _clock = clock ?? TimeProvider.System;
     }
 
-    protected override async Task ProcessAsync(HttpRequestInput input)
+    protected override async Task ProcessAsync(FlowMessage<HttpRequestInput> message)
     {
-        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
         var startedAt = _clock.GetUtcNow();
 
         HttpRequestMessage request;
@@ -52,7 +54,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         }
         catch (InvalidUrlException exception)
         {
-            EmitFailure(HttpErrorCodes.InvalidUrl, exception.Message, input, startedAt);
+            EmitFailure(HttpErrorCodes.InvalidUrl, exception.Message, message, startedAt);
             return;
         }
 
@@ -78,22 +80,22 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
             catch (OperationCanceledException exception) when (
                 requestCancellation.IsCancellationRequested && !Stopping.IsCancellationRequested)
             {
-                EmitFailure(HttpErrorCodes.Timeout, "http.client request timed out.", input, startedAt, exception, method: method, url: url);
+                EmitFailure(HttpErrorCodes.Timeout, "http.client request timed out.", message, startedAt, exception, method: method, url: url);
                 return;
             }
             catch (OperationCanceledException exception)
             {
-                EmitFailure(HttpErrorCodes.Canceled, "http.client request was canceled.", input, startedAt, exception, method: method, url: url);
+                EmitFailure(HttpErrorCodes.Canceled, "http.client request was canceled.", message, startedAt, exception, method: method, url: url);
                 return;
             }
             catch (HttpRequestException exception)
             {
-                EmitFailure(HttpErrorCodes.Network, $"http.client request failed to reach the server: {exception.Message}", input, startedAt, exception, method: method, url: url);
+                EmitFailure(HttpErrorCodes.Network, $"http.client request failed to reach the server: {exception.Message}", message, startedAt, exception, method: method, url: url);
                 return;
             }
             catch (Exception exception)
             {
-                EmitFailure(HttpErrorCodes.SendFailed, $"http.client request failed: {exception.Message}", input, startedAt, exception, method: method, url: url);
+                EmitFailure(HttpErrorCodes.SendFailed, $"http.client request failed: {exception.Message}", message, startedAt, exception, method: method, url: url);
                 return;
             }
 
@@ -108,7 +110,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
                     EmitFailure(
                         HttpErrorCodes.NonSuccessStatus,
                         $"http.client received non-success status {output.StatusCode}.",
-                        input,
+                        message,
                         startedAt,
                         statusCode: output.StatusCode,
                         method: output.Method,
@@ -116,10 +118,12 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
                     return;
                 }
 
-                Emit(output);
+                // Carry the correlation id forward onto the response.
+                Emit(message.With(output));
                 EmitEvent(new FlowEvent
                 {
                     Timestamp = _clock.GetUtcNow(),
+                    CorrelationId = message.CorrelationId,
                     Name = RequestSucceeded,
                     Level = FlowEventLevel.Information,
                     Message = $"{output.Method} {output.Url} -> {output.StatusCode}",
@@ -288,7 +292,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
     private void EmitFailure(
         int code,
         string message,
-        HttpRequestInput input,
+        FlowMessage<HttpRequestInput> source,
         DateTimeOffset startedAt,
         Exception? exception = null,
         int? statusCode = null,
@@ -296,6 +300,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         string? url = null)
     {
         var elapsed = Elapsed(startedAt);
+        var input = source.Payload;
         var context = new List<string>
         {
             $"method={method ?? input.Method}",
@@ -311,6 +316,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         EmitError(new FlowError
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
             Code = code,
             Message = message,
             Context = string.Join("; ", context),
@@ -319,6 +325,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
             Name = RequestFailed,
             Level = FlowEventLevel.Error,
             Message = message,

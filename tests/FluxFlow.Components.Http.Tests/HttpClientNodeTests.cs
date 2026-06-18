@@ -11,24 +11,25 @@ using Xunit;
 
 namespace FluxFlow.Components.Http.Tests;
 
-// Every test news the node directly — no engine, no registry, no runtime. That is
-// the whole point: a node is a self-contained Dataflow processor you link by hand.
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows request -> response for free.
 public sealed class HttpClientNodeTests
 {
     [Fact]
-    public async Task Request_RoundTripsThroughInjectedClient()
+    public async Task Request_RoundTripsAndPreservesCorrelationId()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "pong", "text/plain"));
         await using var node = new HttpClientNode(new HttpClient(handler));
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput { Method = "GET", Url = "https://example.test/ping" });
+        var request = FlowMessage.Create(new HttpRequestInput { Method = "GET", Url = "https://example.test/ping" });
+        await node.Input.SendAsync(request);
 
         var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        response.StatusCode.ShouldBe(200);
-        response.Success.ShouldBeTrue();
-        response.Body.ShouldBe("pong");
-        response.Method.ShouldBe("GET");
+        response.CorrelationId.ShouldBe(request.CorrelationId);   // the whole point of the envelope
+        response.Payload.StatusCode.ShouldBe(200);
+        response.Payload.Success.ShouldBeTrue();
+        response.Payload.Body.ShouldBe("pong");
         handler.LastRequest!.RequestUri!.ToString().ShouldBe("https://example.test/ping");
     }
 
@@ -44,13 +45,13 @@ public sealed class HttpClientNodeTests
         var logger = Sink(node.Output);
         var mapper = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/1" });
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/2" });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/1" }));
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/2" }));
 
-        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
-        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r2");
-        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
-        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r2");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.Body.ShouldBe("r1");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.Body.ShouldBe("r2");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.Body.ShouldBe("r1");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.Body.ShouldBe("r2");
     }
 
     [Fact]
@@ -60,15 +61,15 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(new HttpClient(handler));
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput
         {
             Method = "POST",
             Url = "https://example.test/items",
             Body = "{\"id\":1}",
             ContentType = "application/json"
-        });
+        }));
 
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).StatusCode.ShouldBe(201);
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.StatusCode.ShouldBe(201);
         handler.LastRequest!.Method.Method.ShouldBe("POST");
         handler.LastBody.ShouldBe("{\"id\":1}");
         handler.LastRequest.Content!.Headers.ContentType!.MediaType.ShouldBe("application/json");
@@ -82,9 +83,9 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(client);
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "v1/status" });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "v1/status" }));
 
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).StatusCode.ShouldBe(200);
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.StatusCode.ShouldBe(200);
         handler.LastRequest!.RequestUri!.ToString().ShouldBe("https://api.example.test/v1/status");
     }
 
@@ -95,11 +96,11 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(new HttpClient(handler));
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" }));
 
         var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        response.StatusCode.ShouldBe(500);
-        response.Success.ShouldBeFalse();
+        response.Payload.StatusCode.ShouldBe(500);
+        response.Payload.Success.ShouldBeFalse();
     }
 
     [Fact]
@@ -111,10 +112,12 @@ public sealed class HttpClientNodeTests
             new HttpClientNodeOptions { TreatNonSuccessStatusAsError = true });
         var errors = Sink(node.Errors);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        var request = FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(request);
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(HttpErrorCodes.NonSuccessStatus);
+        error.CorrelationId.ShouldBe(request.CorrelationId);
         error.Context.ShouldContain("statusCode=404");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
@@ -126,9 +129,12 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(new HttpClient(handler));
         var errors = Sink(node.Errors);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        var request = FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(request);
 
-        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.Network);
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(HttpErrorCodes.Network);
+        error.CorrelationId.ShouldBe(request.CorrelationId);
 
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
@@ -138,7 +144,6 @@ public sealed class HttpClientNodeTests
     [Fact]
     public async Task RequestTimeout_ReportsTimeout()
     {
-        // Handler blocks until the request token cancels, so the per-request timeout fires.
         var handler = new StubHandler(async (_, ct) =>
         {
             await Task.Delay(Timeout.Infinite, ct);
@@ -149,7 +154,7 @@ public sealed class HttpClientNodeTests
             new HttpClientNodeOptions { DefaultTimeoutMilliseconds = 100 });
         var errors = Sink(node.Errors);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" }));
 
         (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.Timeout);
     }
@@ -161,7 +166,7 @@ public sealed class HttpClientNodeTests
         await using var node = new HttpClientNode(new HttpClient(handler));
         var errors = Sink(node.Errors);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = null });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = null }));
 
         (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.InvalidUrl);
     }
@@ -176,26 +181,28 @@ public sealed class HttpClientNodeTests
             new HttpClientNodeOptions { MaxResponseBodyBytes = 1000 });
         var output = Sink(node.Output);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" }));
 
-        var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var response = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
         response.BodyTruncated.ShouldBeTrue();
         response.BodyBytes.Length.ShouldBe(1000);
     }
 
     [Fact]
-    public async Task Success_EmitsEventOnEventPort()
+    public async Task Success_EmitsEventCarryingCorrelationId()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"));
         await using var node = new HttpClientNode(new HttpClient(handler));
         Sink(node.Output);
         var events = Sink(node.Events);
 
-        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+        var request = FlowMessage.Create(new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(request);
 
         var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         @event.Name.ShouldBe(HttpClientNode.RequestSucceeded);
         @event.Level.ShouldBe(FlowEventLevel.Information);
+        @event.CorrelationId.ShouldBe(request.CorrelationId);
     }
 
     [Fact]

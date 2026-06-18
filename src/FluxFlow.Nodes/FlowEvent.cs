@@ -15,6 +15,9 @@ public sealed record FlowEvent
 {
     public DateTimeOffset Timestamp { get; init; }
 
+    /// <summary>The correlation id of the message this event relates to, if any.</summary>
+    public CorrelationId? CorrelationId { get; init; }
+
     public required string Name { get; init; }
 
     public FlowEventLevel Level { get; init; } = FlowEventLevel.Information;

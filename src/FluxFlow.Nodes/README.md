@@ -3,30 +3,46 @@
 The minimal base every FluxFlow node is built on. A node is a self-contained TPL
 Dataflow processor — you `new` it and link it; no engine, registry, or runtime.
 
+## Messages
+
+Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
+`CorrelationId` + the `Payload` (plus a per-hop `MessageId`, `Timestamp`, and a
+`Headers` bag). It's immutable, so a broadcast can hand the same instance to many
+consumers. Transform the payload with `With`, which keeps the correlation id and
+headers — so correlation flows through a graph with no node copying it by hand.
+
+```csharp
+var message = FlowMessage.Create("hello");        // mints a CorrelationId
+var next    = message.With(message.Payload.Length); // same id, new payload
+```
+
+`CorrelationId` is a guarded value type (non-empty) and serializes as a bare JSON
+string, so envelopes persist cleanly.
+
 ## `FlowNode<TInput, TOutput>`
 
 Derive from it and implement `ProcessAsync`. The base gives you four ports:
 
 | Port | Block | Notes |
 |------|-------|-------|
-| `Input` | `BufferBlock<TInput>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<TOutput>` | fan-out: link to as many downstream inputs as you like |
-| `Errors` | `BroadcastBlock<FlowError>` | uniform error stream |
+| `Input` | `BufferBlock<FlowMessage<TInput>>` | bounded intake — `SendAsync` applies backpressure |
+| `Output` | `BroadcastBlock<FlowMessage<TOutput>>` | fan-out: link to as many downstream inputs as you like |
+| `Errors` | `BroadcastBlock<FlowError>` | uniform error stream (carries the message's correlation id) |
 | `Events` | `BroadcastBlock<FlowEvent>` | uniform observability stream |
 
 ```csharp
 public sealed class UppercaseNode : FlowNode<string, string>
 {
-    protected override Task ProcessAsync(string input)
+    protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        Emit(input.ToUpperInvariant());
+        Emit(message.With(message.Payload.ToUpperInvariant()));
         return Task.CompletedTask;
     }
 }
 
 await using var node = new UppercaseNode();
 node.Output.LinkTo(next.Input);
-await node.Input.SendAsync("hello");
+await node.Input.SendAsync(FlowMessage.Create("hello"));
 ```
 
 A throw inside `ProcessAsync` is caught and surfaced on `Errors` rather than
