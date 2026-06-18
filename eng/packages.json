@@ -7,6 +7,20 @@
     "notesName": "FluxFlow.Nodes"
   },
   {
+    "alias": "components-requestreply",
+    "tagPrefix": "components-requestreply",
+    "packageId": "FluxFlow.Components.RequestReply",
+    "project": "src/FluxFlow.Components.RequestReply/FluxFlow.Components.RequestReply.csproj",
+    "notesName": "FluxFlow.Components.RequestReply"
+  },
+  {
+    "alias": "components-http-aspnetcore",
+    "tagPrefix": "components-http-aspnetcore",
+    "packageId": "FluxFlow.Components.Http.AspNetCore",
+    "project": "src/FluxFlow.Components.Http.AspNetCore/FluxFlow.Components.Http.AspNetCore.csproj",
+    "notesName": "FluxFlow.Components.Http.AspNetCore"
+  },
+  {
     "alias": "engine",
     "tagPrefix": "engine",
     "packageId": "FluxFlow.Engine",

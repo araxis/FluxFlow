@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Http.AspNetCore</PackageId>
+    <AssemblyName>FluxFlow.Components.Http.AspNetCore</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Http.AspNetCore</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>ASP.NET Core HTTP trigger adapter for FluxFlow: maps an endpoint's HttpContext onto the request/reply bridge so an inbound request flows into a graph and the correlated response is written back. The only FluxFlow package that references ASP.NET Core.</Description>
+    <PackageTags>workflow;dataflow;components;http;trigger;aspnetcore</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial ASP.NET Core HTTP trigger adapter: MapFluxFlowTrigger maps an endpoint to a RequestReplyBridge&lt;HttpTriggerRequest, HttpTriggerReply&gt;, and HttpRequestContext bridges HttpContext to the bridge's reply contract (writing the correlated response, or 504/500 on failure).</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

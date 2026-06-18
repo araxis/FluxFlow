@@ -118,7 +118,7 @@ public sealed class HttpClientNodeTests
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(HttpErrorCodes.NonSuccessStatus);
         error.CorrelationId.ShouldBe(request.CorrelationId);
-        error.Context.ShouldContain("statusCode=404");
+        error.Context!.ShouldContain("statusCode=404");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 

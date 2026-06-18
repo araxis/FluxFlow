@@ -1,5 +1,24 @@
 # Changelog
 
+## FluxFlow.Components.Http.AspNetCore 0.1.0
+
+Initial ASP.NET Core HTTP trigger adapter.
+
+- `MapFluxFlowTrigger` maps an endpoint to a `RequestReplyBridge<HttpTriggerRequest,
+  HttpTriggerReply>`; `HttpRequestContext` bridges `HttpContext` to the reply contract,
+  writing the correlated response (or `504`/`500`/`503` on timeout/failure/shutdown).
+- The only FluxFlow package that references ASP.NET Core.
+
+## FluxFlow.Components.RequestReply 0.1.0
+
+Initial request/reply bridge.
+
+- `RequestReplyBridge<TRequest, TResponse>` correlates a host-supplied
+  `IRequestContext` stream to a one-way graph (`Output` requests, `Responses` input)
+  by `CorrelationId`, replies through the context, evicts timed-out requests, and
+  reports on broadcast error/event ports. Transport-agnostic — reused by HTTP and
+  MQTT triggers.
+
 ## FluxFlow.Nodes 0.1.0
 
 Initial shared node kit.
