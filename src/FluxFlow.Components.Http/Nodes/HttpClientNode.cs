@@ -24,6 +24,10 @@ public sealed class HttpClientNode : FlowNodeBase, IAsyncDisposable
     private readonly HttpClientNodeOptions _options;
     private readonly TimeProvider _clock;
     private readonly ActionBlock<HttpRequestInput> _input;
+    // _output/_errors are the node's private outboxes (single consumer = the port).
+    // Consumers do NOT link to these; they link to the Output/Errors ports, which
+    // the engine wraps in OutputPort<T> — a lossless fan-out that delivers every
+    // message to every linked node (e.g. the same response to a logger AND a mapper).
     private readonly BufferBlock<HttpResponseOutput> _output;
     private readonly BufferBlock<HttpErrorOutput> _errors;
     private readonly CancellationTokenSource _lifecycleCancellation = new();

@@ -33,17 +33,26 @@ public sealed class HttpClientNodeTests
     }
 
     [Fact]
-    public async Task Output_FansOutToEveryLinkedConsumer()
+    public async Task Output_FansOutEveryResponseToEveryConsumer()
     {
-        var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"));
+        // The usual workflow case: one output linked to two downstream nodes
+        // (here a "logger" and a "mapper"). Both must receive EVERY response,
+        // in order — i.e. a lossless fan-out, not latest-only.
+        var responses = 0;
+        var handler = new StubHandler((_, _) =>
+            Respond(HttpStatusCode.OK, $"r{Interlocked.Increment(ref responses)}", "text/plain"));
         var node = CreateNode(new HttpClient(handler), new { });
-        var first = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
-        var second = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        var logger = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        var mapper = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/1" });
+        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/2" });
 
-        (await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).StatusCode.ShouldBe(200);
-        (await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).StatusCode.ShouldBe(200);
+        // Every consumer sees both responses (not just the most recent one).
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r2");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r2");
     }
 
     [Fact]
