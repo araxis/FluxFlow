@@ -514,8 +514,15 @@ Date: 2026-05-31
   `2.0.0-preview.1` -> `2.0.0` (csproj + CHANGELOG headings; preflight/get-release-
   notes key off the heading). Engine ships `1.3.0` (additive); publish engine
   first (ProjectReference bakes a `>= 1.3.0` floor), then the 20 `2.0.0`
-  components, then verify the feed.
+  components, then verify the feed. PUBLISHED + verified: all 21 GA packages
+  (engine `1.3.0` + 20 components `2.0.0`) are live and indexed on nuget.org;
+  21 git tags + 21 GitHub releases exist. Note: a single `git push` of all 17
+  tier-1 tags triggered no workflow runs (GitHub suppresses push events for
+  >3 tags pushed at once); re-triggered via `workflow_dispatch` per package
+  (resolves version from csproj, reuses the existing tag). For future
+  multi-package releases, push tags in batches of <=3 or dispatch.
 
 ## Remaining
 
-- No remaining work for the component `1.0.0` release track.
+- No remaining work: the 2.0 GA line is fully published. (The `1.0.0` component
+  release track is also complete.)
