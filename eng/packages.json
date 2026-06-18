@@ -21,6 +21,13 @@
     "notesName": "FluxFlow.Components.Http.AspNetCore"
   },
   {
+    "alias": "components-mqtt-requestreply",
+    "tagPrefix": "components-mqtt-requestreply",
+    "packageId": "FluxFlow.Components.Mqtt.RequestReply",
+    "project": "src/FluxFlow.Components.Mqtt.RequestReply/FluxFlow.Components.Mqtt.RequestReply.csproj",
+    "notesName": "FluxFlow.Components.Mqtt.RequestReply"
+  },
+  {
     "alias": "engine",
     "tagPrefix": "engine",
     "packageId": "FluxFlow.Engine",

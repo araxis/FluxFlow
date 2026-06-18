@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Mqtt.RequestReply</PackageId>
+    <AssemblyName>FluxFlow.Components.Mqtt.RequestReply</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mqtt.RequestReply</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>MQTT request/reply trigger for FluxFlow: feeds inbound MQTT request messages into the request/reply bridge and publishes the correlated reply to the MQTT5 response topic. Library-agnostic — the host owns the MQTT client and supplies a publisher.</Description>
+    <PackageTags>workflow;dataflow;components;mqtt;request-reply;trigger</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial MQTT request/reply trigger: MqttRequestContext reuses the RequestReplyBridge — it surfaces an inbound MqttRequest, seeds the correlation id from MQTT5 correlation data, and publishes the reply to the response topic (echoing the original correlation data) via a host-supplied IMqttResponsePublisher. No MQTT library dependency.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Components.Mqtt.RequestReply 0.1.0
+
+Initial MQTT request/reply trigger.
+
+- Reuses `RequestReplyBridge` for MQTT: `MqttRequestContext` surfaces an inbound
+  `MqttRequest`, seeds the correlation id from MQTT5 correlation data, and publishes
+  the reply to the request's response topic (echoing the correlation data) via a
+  host-supplied `IMqttResponsePublisher`. No MQTT-library dependency — proof the bridge
+  is transport-neutral.
+
 ## FluxFlow.Components.Http.AspNetCore 0.1.0
 
 Initial ASP.NET Core HTTP trigger adapter.
