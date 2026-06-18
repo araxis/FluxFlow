@@ -522,7 +522,33 @@ Date: 2026-05-31
   (resolves version from csproj, reuses the existing tag). For future
   multi-package releases, push tags in batches of <=3 or dispatch.
 
+- Standalone-node re-architecture (branch `work/http-simplify`, in progress,
+  unmerged, unpublished — full detail in [[139-standalone-node-architecture]]).
+  Owner principle: build nodes that connect, not a framework; a node must run
+  with no engine (`new` it, post input, `LinkTo` output), delegating complexity
+  to TPL Dataflow and the real library (HttpClient, the host's server, an MQTT
+  client). Three layers: the `FluxFlow.Nodes` kit (`FlowNode<TIn,TOut>` with a
+  bounded BufferBlock input + BroadcastBlock output/error/event ports; the
+  `FlowMessage<T>` envelope carrying a guarded strong `CorrelationId` that flows
+  via `With`; FlowError/FlowEvent stamped with it) -> self-contained component
+  nodes -> optional composition/host. Reworked so far: `FluxFlow.Components.Http`
+  collapsed to one engine-free `HttpClientNode` over an injected HttpClient (SSRF
+  guard, pooling, redirects all move to the injected client / a DelegatingHandler);
+  new `FluxFlow.Components.RequestReply` (`RequestReplyBridge<TReq,TResp>` brings
+  request/reply to the one-way graph, correlating on CorrelationId, with timeout
+  eviction and reliable bounded request delivery); new
+  `FluxFlow.Components.Http.AspNetCore` (the only ASP.NET-aware package;
+  `MapFluxFlowTrigger`); new `FluxFlow.Components.Mqtt.RequestReply` (same bridge,
+  no MQTT-library dep — transport-neutrality proof). Full solution green at 731
+  tests, 0 warnings; real-server end-to-end via ASP.NET Core TestServer. The other
+  ~27 components remain engine-coupled; rolling the kit/envelope across them is the
+  large migration gated on an explicit go-ahead.
+
 ## Remaining
 
-- No remaining work: the 2.0 GA line is fully published. (The `1.0.0` component
-  release track is also complete.)
+- 2.0 GA line is fully published. (The `1.0.0` component release track is also
+  complete.)
+- Standalone-node re-architecture: HTTP + request/reply + HTTP/MQTT triggers done
+  on `work/http-simplify`; pending decisions — roll the kit/envelope across the
+  remaining ~27 components, then version/publish the reworked packages (new major
+  line). See [[139-standalone-node-architecture]].

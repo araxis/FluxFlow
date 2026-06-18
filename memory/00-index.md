@@ -185,6 +185,11 @@ This folder records the extraction work for `FluxFlow.Engine`.
   mapper diagnostic, README refresh, three flake root-cause fixes) and the GA
   cut flipping the 20 component packages from `2.0.0-preview.1` to `2.0.0`
   (engine stays `1.3.0`).
+- `139-standalone-node-architecture.md`: in-progress re-architecture (branch
+  `work/http-simplify`, unmerged) — the `FluxFlow.Nodes` kit (`FlowNode<,>`,
+  `FlowMessage<T>` envelope, guarded `CorrelationId`), engine-free standalone
+  nodes (HTTP rebuilt as the template), and the transport-neutral
+  `RequestReplyBridge` reused by HTTP (ASP.NET) and MQTT triggers.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
