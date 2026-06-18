@@ -2,11 +2,7 @@ namespace FluxFlow.Components.Http.Options;
 
 public sealed record HttpClientNodeOptions
 {
-    /// <summary>
-    /// Optional name passed to the host's HttpClient resolver (for example an
-    /// <c>IHttpClientFactory</c> client name). Null/empty selects the default.
-    /// </summary>
-    public string? Client { get; init; }
+    public static readonly HttpClientNodeOptions Default = new();
 
     public int BoundedCapacity { get; init; } = 128;
 
@@ -17,8 +13,8 @@ public sealed record HttpClientNodeOptions
     public int MaxDegreeOfParallelism { get; init; } = 1;
 
     /// <summary>
-    /// Per-request timeout applied when the request input does not specify one.
-    /// Null defers entirely to the injected HttpClient's own timeout.
+    /// Per-request timeout used when the request input does not specify one. Null
+    /// defers entirely to the injected HttpClient's own timeout.
     /// </summary>
     public int? DefaultTimeoutMilliseconds { get; init; }
 }

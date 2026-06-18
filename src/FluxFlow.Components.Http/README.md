@@ -1,92 +1,66 @@
 # FluxFlow.Components.Http
 
-A reusable HTTP request component for FluxFlow.
+A standalone HTTP node for FluxFlow — a "blockified" `HttpClient`.
 
-## Node
+## What it is
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `http.client` | `Input` -> `Output`, `Errors` | A "blockified" `HttpClient`: a request arrives on `Input`, is sent through the host-injected `HttpClient`, and the response is broadcast on `Output` (failures on `Errors`). |
+`HttpClientNode` is a self-contained TPL Dataflow processor. You give it an
+`HttpClient`, post `HttpRequestInput`s to its input, and it broadcasts
+`HttpResponseOutput`s on its output (failures on the error port, notes on the
+event port). It needs **nothing else** — no engine, registry, or runtime:
+
+```csharp
+await using var node = new HttpClientNode(httpClient);
+
+node.Output.LinkTo(logger.Input);   // broadcast: link the output to as many
+node.Output.LinkTo(mapper.Input);   // downstream nodes as you like
+
+await node.Input.SendAsync(new HttpRequestInput
+{
+    Method = "GET",
+    Url = "https://api.example.com/things/42"
+});
+```
+
+## Ports
+
+| Port | Block | Purpose |
+|------|-------|---------|
+| `Input` | `BufferBlock<HttpRequestInput>` | bounded intake — `SendAsync` applies backpressure |
+| `Output` | `BroadcastBlock<HttpResponseOutput>` | the response, fanned out to every linked consumer |
+| `Errors` | `BroadcastBlock<FlowError>` | request failures (invalid URL, timeout, network, send, non-success) |
+| `Events` | `BroadcastBlock<FlowEvent>` | `http.request.succeeded` / `http.request.failed` notes |
+
+Outputs are broadcast (latest-wins, no backpressure): a consumer that keeps up
+sees every message; one that falls badly behind may miss some. That is the
+deliberate trade for simplicity. If a graph genuinely must not drop, bridge that
+edge through its own bounded buffer.
+
+## Transport policy lives on the HttpClient
 
 The node owns no transport policy. Base address, connection pooling, redirects,
-default headers, TLS, proxy, and any allow-list / SSRF guard all live on the
-`HttpClient` you inject — exactly as you would configure a regular .NET
-`HttpClient` (typically through `IHttpClientFactory` and a `DelegatingHandler`).
-The node never disposes the client; the host owns its lifetime.
+default headers, TLS, proxy, and any allow-list / SSRF guard all belong on the
+`HttpClient` you inject — exactly as you configure a regular .NET client
+(typically via `IHttpClientFactory` and a `DelegatingHandler`). The node never
+disposes the client; the host owns its lifetime. A relative `Url` resolves
+against the client's `BaseAddress`.
 
-## Registration
-
-The host supplies the `HttpClient`. A single shared client:
-
-```csharp
-registry.RegisterHttpComponents(options => options
-    .UseHttpClient(httpClient));
-```
-
-Or a resolver, so different nodes can use different clients via the node's
-optional `client` name (for example bridging to `IHttpClientFactory`):
+## Options
 
 ```csharp
-registry.RegisterHttpComponents(options => options
-    .UseHttpClient(name => httpClientFactory.CreateClient(name ?? "default")));
-```
-
-A deterministic clock for timestamps/elapsed can be provided through
-`UseClock(TimeProvider)` (default `TimeProvider.System`).
-
-## Node options
-
-```json
+new HttpClientNodeOptions
 {
-  "type": "http.client",
-  "name": "call-api",
-  "client": "internal-api",
-  "maxResponseBodyBytes": 1048576,
-  "treatNonSuccessStatusAsError": false,
-  "boundedCapacity": 128,
-  "maxDegreeOfParallelism": 1,
-  "defaultTimeoutMilliseconds": null
-}
+    BoundedCapacity = 128,            // input buffer size
+    MaxResponseBodyBytes = 1_048_576, // bodies past this are read to the cap, BodyTruncated = true
+    TreatNonSuccessStatusAsError = false,
+    MaxDegreeOfParallelism = 1,       // >1 to send concurrently (output order not guaranteed)
+    DefaultTimeoutMilliseconds = null // per-request timeout when the input omits one
+};
 ```
 
-- `client` (optional): name passed to the host's `HttpClient` resolver.
-- `maxResponseBodyBytes`: response bodies larger than this are read up to the cap
-  and the response is flagged `BodyTruncated = true`.
-- `treatNonSuccessStatusAsError`: when `true`, a non-success status is reported on
-  the `Errors` port instead of `Output`.
-- `defaultTimeoutMilliseconds` (optional): per-request timeout used when the
-  request input does not specify one. Null defers to the `HttpClient`'s own
-  timeout.
+## Composition
 
-## Behaviour
-
-The node consumes `HttpRequestInput` and emits `HttpResponseOutput`. A relative
-`Url` resolves against the injected client's `BaseAddress`; an absolute `Url` is
-used as-is. Network, timeout, cancellation, and invalid-URL failures are emitted
-as `HttpErrorOutput` on the `Errors` port and the node keeps processing later
-messages. Non-success status codes do not fault the node.
-
-`Output` and `Errors` are broadcast ports: every linked consumer receives every
-item.
-
-## Security
-
-This node is a thin wrapper over the `HttpClient` you give it. Any policy for
-untrusted URLs — host allow-lists, blocking redirects, pinning to an origin,
-stripping credentials — belongs on that `HttpClient`, idiomatically as a
-`DelegatingHandler` in its handler chain. Keeping it there means the policy
-applies no matter who sends to the node, and the node stays a pure transport
-pump.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node type. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
-
-## Composition Guidance
-
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Building a workflow — reading config, creating nodes, linking them — is a
+separate concern from the node. This package is just the node; wire it from
+whatever composition/host layer you use (`appsettings.json` → construct nodes →
+`LinkTo`).

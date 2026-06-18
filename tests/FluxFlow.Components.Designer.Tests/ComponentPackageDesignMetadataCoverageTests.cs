@@ -4,7 +4,6 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Expectations;
 using FluxFlow.Components.FileSystem;
-using FluxFlow.Components.Http;
 using FluxFlow.Components.Mapping;
 using FluxFlow.Components.Metrics;
 using FluxFlow.Components.Mqtt;
@@ -63,7 +62,6 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         new ControlComponentDesignMetadataProvider(),
         new ExpectationsComponentDesignMetadataProvider(),
         new FileSystemComponentDesignMetadataProvider(),
-        new HttpComponentDesignMetadataProvider(),
         new MappingComponentDesignMetadataProvider(),
         new MetricsComponentDesignMetadataProvider(),
         new MqttComponentDesignMetadataProvider(),
@@ -91,7 +89,6 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         FileSystemComponentTypes.FileRead,
         FileSystemComponentTypes.FileWatch,
         FileSystemComponentTypes.FileWrite,
-        HttpComponentTypes.Client,
         MappingComponentTypes.Mapper,
         MetricsComponentTypes.Aggregate,
         MqttComponentTypes.Connection,

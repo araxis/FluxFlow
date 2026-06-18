@@ -1,5 +1,15 @@
 # Changelog
 
+## FluxFlow.Nodes 0.1.0
+
+Initial shared node kit.
+
+- `FlowNode<TInput, TOutput>` base: a self-contained TPL Dataflow processor with a
+  bounded buffered input and broadcast output/error/event ports. Nodes built on it
+  run standalone — no engine, registry, or runtime.
+- `FlowError` and `FlowEvent` records: the uniform error/event items every node
+  emits.
+
 ## FluxFlow.Components.Sources 2.0.0
 
 2.0 preview: TimeProvider clock migration.

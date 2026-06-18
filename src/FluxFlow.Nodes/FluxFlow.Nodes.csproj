@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Nodes</PackageId>
+    <AssemblyName>FluxFlow.Nodes</AssemblyName>
+    <RootNamespace>FluxFlow.Nodes</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Minimal base for FluxFlow nodes: a self-contained TPL Dataflow processor with a buffered input and broadcast output/error/event ports. Nodes built on it run standalone — no engine required.</Description>
+    <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial shared node kit: FlowNode&lt;TInput, TOutput&gt; base (buffered input, broadcast output/error/event ports) plus the FlowError and FlowEvent records. Nodes built on it run standalone, with no engine.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,28 +1,28 @@
 using FluxFlow.Components.Http;
 using FluxFlow.Components.Http.Contracts;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Http.Nodes;
+using FluxFlow.Components.Http.Options;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Http.Tests;
 
+// Every test news the node directly — no engine, no registry, no runtime. That is
+// the whole point: a node is a self-contained Dataflow processor you link by hand.
 public sealed class HttpClientNodeTests
 {
     [Fact]
     public async Task Request_RoundTripsThroughInjectedClient()
     {
-        var handler = new StubHandler((_, _) =>
-            Respond(HttpStatusCode.OK, "pong", "text/plain"));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var output = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "pong", "text/plain"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput { Method = "GET", Url = "https://example.test/ping" });
+        await node.Input.SendAsync(new HttpRequestInput { Method = "GET", Url = "https://example.test/ping" });
 
         var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         response.StatusCode.ShouldBe(200);
@@ -35,20 +35,18 @@ public sealed class HttpClientNodeTests
     [Fact]
     public async Task Output_FansOutEveryResponseToEveryConsumer()
     {
-        // The usual workflow case: one output linked to two downstream nodes
-        // (here a "logger" and a "mapper"). Both must receive EVERY response,
-        // in order — i.e. a lossless fan-out, not latest-only.
+        // The usual workflow case, with NO engine: one node's output linked to two
+        // downstream consumers (a "logger" and a "mapper"). Both see every response.
         var responses = 0;
         var handler = new StubHandler((_, _) =>
             Respond(HttpStatusCode.OK, $"r{Interlocked.Increment(ref responses)}", "text/plain"));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var logger = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
-        var mapper = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/1" });
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/2" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/1" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/2" });
 
-        // Every consumer sees both responses (not just the most recent one).
         (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
         (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r2");
         (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Body.ShouldBe("r1");
@@ -59,10 +57,10 @@ public sealed class HttpClientNodeTests
     public async Task PostBody_SendsContentAndContentType()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.Created, "", null));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var output = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput
+        await node.Input.SendAsync(new HttpRequestInput
         {
             Method = "POST",
             Url = "https://example.test/items",
@@ -81,10 +79,10 @@ public sealed class HttpClientNodeTests
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"));
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.example.test/") };
-        var node = CreateNode(client, new { });
-        var output = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        await using var node = new HttpClientNode(client);
+        var output = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput { Url = "v1/status" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "v1/status" });
 
         (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).StatusCode.ShouldBe(200);
         handler.LastRequest!.RequestUri!.ToString().ShouldBe("https://api.example.test/v1/status");
@@ -94,10 +92,10 @@ public sealed class HttpClientNodeTests
     public async Task NonSuccessStatus_GoesToOutputByDefault()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.InternalServerError, "boom", "text/plain"));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var output = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
 
         var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         response.StatusCode.ShouldBe(500);
@@ -108,62 +106,64 @@ public sealed class HttpClientNodeTests
     public async Task NonSuccessStatus_GoesToErrorPortWhenConfigured()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.NotFound, "nope", "text/plain"));
-        var node = CreateNode(new HttpClient(handler), new { treatNonSuccessStatusAsError = true });
-        var errors = LinkOutput<HttpErrorOutput>(node, HttpComponentPorts.Errors);
+        await using var node = new HttpClientNode(
+            new HttpClient(handler),
+            new HttpClientNodeOptions { TreatNonSuccessStatusAsError = true });
+        var errors = Sink(node.Errors);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Kind.ShouldBe(HttpErrorKind.NonSuccessStatus);
-        error.StatusCode.ShouldBe(404);
-        node.Node.Completion.IsFaulted.ShouldBeFalse();
+        error.Code.ShouldBe(HttpErrorCodes.NonSuccessStatus);
+        error.Context.ShouldContain("statusCode=404");
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task NetworkFailure_ReportsNetworkErrorAndDoesNotFault()
     {
-        var handler = new StubHandler((_, _) =>
-            throw new HttpRequestException("connection refused"));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var errors = LinkOutput<HttpErrorOutput>(node, HttpComponentPorts.Errors);
+        var handler = new StubHandler((_, _) => throw new HttpRequestException("connection refused"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var errors = Sink(node.Errors);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Kind.ShouldBe(HttpErrorKind.Network);
-        node.Node.Completion.IsFaulted.ShouldBeFalse();
+        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.Network);
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task RequestTimeout_ReportsTimeout()
     {
-        // The handler blocks until the request token is canceled, so the per-request
-        // timeout fires deterministically.
+        // Handler blocks until the request token cancels, so the per-request timeout fires.
         var handler = new StubHandler(async (_, ct) =>
         {
             await Task.Delay(Timeout.Infinite, ct);
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
-        var node = CreateNode(new HttpClient(handler), new { defaultTimeoutMilliseconds = 100 });
-        var errors = LinkOutput<HttpErrorOutput>(node, HttpComponentPorts.Errors);
+        await using var node = new HttpClientNode(
+            new HttpClient(handler),
+            new HttpClientNodeOptions { DefaultTimeoutMilliseconds = 100 });
+        var errors = Sink(node.Errors);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Kind.ShouldBe(HttpErrorKind.Timeout);
-        node.Node.Completion.IsFaulted.ShouldBeFalse();
+        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.Timeout);
     }
 
     [Fact]
     public async Task MissingUrlWithoutBaseAddress_ReportsInvalidUrl()
     {
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "", null));
-        var node = CreateNode(new HttpClient(handler), new { });
-        var errors = LinkOutput<HttpErrorOutput>(node, HttpComponentPorts.Errors);
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var errors = Sink(node.Errors);
 
-        await SendAsync(node, new HttpRequestInput { Url = null });
+        await node.Input.SendAsync(new HttpRequestInput { Url = null });
 
-        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Kind.ShouldBe(HttpErrorKind.InvalidUrl);
+        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Code.ShouldBe(HttpErrorCodes.InvalidUrl);
     }
 
     [Fact]
@@ -171,10 +171,12 @@ public sealed class HttpClientNodeTests
     {
         var payload = new string('x', 5000);
         var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, payload, "text/plain"));
-        var node = CreateNode(new HttpClient(handler), new { maxResponseBodyBytes = 1000 });
-        var output = LinkOutput<HttpResponseOutput>(node, HttpComponentPorts.Output);
+        await using var node = new HttpClientNode(
+            new HttpClient(handler),
+            new HttpClientNodeOptions { MaxResponseBodyBytes = 1000 });
+        var output = Sink(node.Output);
 
-        await SendAsync(node, new HttpRequestInput { Url = "https://example.test/" });
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
 
         var response = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         response.BodyTruncated.ShouldBeTrue();
@@ -182,70 +184,29 @@ public sealed class HttpClientNodeTests
     }
 
     [Fact]
-    public void Registration_ExposesOnlyHttpClientType()
+    public async Task Success_EmitsEventOnEventPort()
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterHttpComponents(options => options.UseHttpClient(new HttpClient()));
+        var handler = new StubHandler((_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        Sink(node.Output);
+        var events = Sink(node.Events);
 
-        registry.TryGetFactory(HttpComponentTypes.Client, out _).ShouldBeTrue();
+        await node.Input.SendAsync(new HttpRequestInput { Url = "https://example.test/" });
+
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        @event.Name.ShouldBe(HttpClientNode.RequestSucceeded);
+        @event.Level.ShouldBe(FlowEventLevel.Information);
     }
 
     [Fact]
-    public void Factory_WithoutConfiguredHttpClient_Throws()
+    public void Constructor_RequiresHttpClient()
+        => Should.Throw<ArgumentNullException>(() => new HttpClientNode(null!));
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry().RegisterHttpComponents();
-        registry.TryGetFactory(HttpComponentTypes.Client, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(CreateContext(new { })));
-        exception.Message.ShouldContain("UseHttpClient");
-    }
-
-    private static RuntimeNode CreateNode(HttpClient client, object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterHttpComponents(options => options.UseHttpClient(client));
-        registry.TryGetFactory(HttpComponentTypes.Client, out var factory).ShouldBeTrue();
-        return factory(CreateContext(configuration));
-    }
-
-    private static RuntimeNodeFactoryContext CreateContext(object configuration)
-        => new(
-            new NodeName("http"),
-            new NodeDefinition
-            {
-                Type = HttpComponentTypes.Client,
-                Configuration = ToConfiguration(configuration)
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
-
-    private static Dictionary<string, JsonElement> ToConfiguration(object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        return root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-    }
-
-    private static async Task SendAsync(RuntimeNode node, HttpRequestInput input)
-    {
-        var target = node.FindInput(new PortName(HttpComponentPorts.Input))
-            .ShouldBeOfType<InputPort<HttpRequestInput>>();
-        await target.Target.SendAsync(input).WaitAsync(TimeSpan.FromSeconds(30));
-    }
-
-    private static BufferBlock<T> LinkOutput<T>(RuntimeNode node, string portName)
-    {
-        var target = new BufferBlock<T>();
-        node.FindOutput(new PortName(portName))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("sink"), new PortName("Input")),
-                    target),
-                propagateCompletion: false,
-                out var error);
-        error.ShouldBeNull();
-        return target;
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+        return sink;
     }
 
     private static Task<HttpResponseMessage> Respond(HttpStatusCode status, string body, string? contentType)

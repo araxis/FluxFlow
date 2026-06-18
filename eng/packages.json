@@ -1,5 +1,12 @@
 [
   {
+    "alias": "nodes",
+    "tagPrefix": "nodes",
+    "packageId": "FluxFlow.Nodes",
+    "project": "src/FluxFlow.Nodes/FluxFlow.Nodes.csproj",
+    "notesName": "FluxFlow.Nodes"
+  },
+  {
     "alias": "engine",
     "tagPrefix": "engine",
     "packageId": "FluxFlow.Engine",
