@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Http.AspNetCore\FluxFlow.Components.Http.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+</Project>
