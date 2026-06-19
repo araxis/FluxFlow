@@ -18,7 +18,7 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

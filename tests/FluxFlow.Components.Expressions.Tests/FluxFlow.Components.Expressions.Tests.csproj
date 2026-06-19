@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 
   <ItemGroup>
