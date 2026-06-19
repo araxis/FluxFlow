@@ -1,100 +1,51 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Storage.Nodes;
 
-public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone storage query node over an injected <see cref="IStorageStore"/>. Post a
+/// <c>FlowMessage&lt;StorageQueryRequest&gt;</c> to <c>Input</c>; the node queries the
+/// store and broadcasts a single <c>FlowMessage&lt;StorageQueryResult&gt;</c> on
+/// <c>Output</c>. When <see cref="StorageQueryOptions.EmitRecordOutputs"/> is set it also
+/// fans each matched record to the <c>Records</c> port as a
+/// <c>FlowMessage&lt;StorageRecord&gt;</c>, each carrying the same correlation id. Store
+/// failures surface on <c>Errors</c> (with the original correlation id) and the node
+/// keeps processing. Works with nothing but <c>new StorageQueryNode(store)</c> — no engine.
+/// </summary>
+public sealed class StorageQueryNode : FlowNode<StorageQueryRequest, StorageQueryResult>
 {
-    private const string NotAvailableMessage =
-        "storage.query is not available; open the storage.store store (host ConnectAsync) before querying.";
-
+    private readonly IStorageStore _store;
     private readonly StorageQueryOptions _options;
-    private readonly IStorageStoreHandle _store;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<StorageQueryRequest> _input;
-    private readonly BufferBlock<StorageQueryResult> _result;
-    private readonly BufferBlock<StorageRecord> _records;
-    private readonly CancellationTokenSource _processingCancellation = new();
-    private bool _disposed;
+    private readonly BroadcastBlock<FlowMessage<StorageRecord>> _records;
 
-    internal StorageQueryNode(
-        StorageQueryOptions options,
-        IStorageStoreHandle store,
-        TimeProvider clock)
+    public StorageQueryNode(
+        IStorageStore store,
+        StorageQueryOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? StorageQueryOptions.Default).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _options = options ?? StorageQueryOptions.Default;
+        _clock = clock ?? TimeProvider.System;
 
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
-        _input = new ActionBlock<StorageQueryRequest>(
-            QueryAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _result = new BufferBlock<StorageQueryResult>(blockOptions);
-        _records = new BufferBlock<StorageRecord>(blockOptions);
-        _input.Completion.ContinueWith(
-            CompleteOutputs,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_result.Completion, _records.Completion));
+        _records = AddOutput<FlowMessage<StorageRecord>>();
     }
 
-    public ITargetBlock<StorageQueryRequest> Input => _input;
+    /// <summary>Each matched record; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<StorageRecord>> Records => _records;
 
-    public ISourceBlock<StorageQueryResult> Result => _result;
-
-    public ISourceBlock<StorageRecord> Records => _records;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override async Task ProcessAsync(FlowMessage<StorageQueryRequest> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _processingCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-            ((IDataflowBlock)_records).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        try
-        {
-            Complete();
-            await Completion.ConfigureAwait(false);
-        }
-        finally
-        {
-            _processingCancellation.Dispose();
-        }
-    }
-
-    private async Task QueryAsync(StorageQueryRequest input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
         StorageQueryRequest request;
         try
@@ -106,59 +57,47 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.InvalidRequest,
                 $"storage.query request is invalid: {exception.Message}",
+                message,
                 input,
                 exception);
             return;
         }
 
-        // Borrow the store the storage.store node opened. The query node never opens
-        // or disposes a store; if none is open the request reports not available.
-        if (!_store.TryGetStore(out var store))
-        {
-            ReportError(
-                StorageErrorCodes.StoreNotAvailable,
-                NotAvailableMessage,
-                request,
-                exception: null);
-            return;
-        }
-
         try
         {
-            var records = await store.QueryAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
+            var records = await _store.QueryAsync(request, Stopping).ConfigureAwait(false);
             var copiedRecords = records
                 .Select(record => ValidateAndCopyRecord(record, request))
                 .Take(request.Limit!.Value)
                 .ToArray();
 
-            await _result.SendAsync(
-                CreateResult(request, copiedRecords),
-                _processingCancellation.Token).ConfigureAwait(false);
+            // Carry the correlation id forward onto the result and each record.
+            Emit(message.With(CreateResult(request, copiedRecords)));
 
             if (_options.EmitRecordOutputs)
             {
                 foreach (var record in copiedRecords)
                 {
-                    await _records.SendAsync(
-                        record,
-                        _processingCancellation.Token).ConfigureAwait(false);
+                    _records.Post(message.With(record));
                 }
             }
 
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.QueryCompleted,
-                message: "storage.query completed.",
-                attributes: StorageNodeSupport.CreateCollectionAttributes(
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = StorageDiagnosticNames.QueryCompleted,
+                Level = FlowEventLevel.Information,
+                Message = "storage.query completed.",
+                Attributes = StorageNodeSupport.CreateCollectionAttributes(
                     "query",
-                    _store.StoreName,
                     request.Collection!,
                     request.CorrelationId,
                     copiedRecords.Length,
-                    request.Limit));
+                    request.Limit)
+            });
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -167,6 +106,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.QueryFailed,
                 $"storage.query failed: {exception.Message}",
+                message,
                 request,
                 exception);
         }
@@ -221,6 +161,7 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
     private void ReportError(
         int code,
         string message,
+        FlowMessage<StorageQueryRequest> source,
         StorageQueryRequest input,
         Exception? exception)
     {
@@ -228,37 +169,29 @@ public sealed class StorageQueryNode : FlowNodeBase, IAsyncDisposable
             ?? StorageNodeSupport.Normalize(_options.Collection)
             ?? "(missing)";
         var correlationId = StorageNodeSupport.Normalize(input.CorrelationId);
-        TryReportError(
-            code,
-            message,
-            exception,
-            StorageNodeSupport.CreateCollectionContext(
-                "query",
-                _store.StoreName,
-                collection,
-                correlationId));
-        TryEmitDiagnostic(
-            StorageDiagnosticNames.QueryFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            StorageNodeSupport.CreateCollectionAttributes(
-                "query",
-                _store.StoreName,
-                collection,
-                correlationId));
-    }
-
-    private void CompleteOutputs(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
+        EmitError(new FlowError
         {
-            ((IDataflowBlock)_result).Fault(exception);
-            ((IDataflowBlock)_records).Fault(exception);
-            return;
-        }
-
-        _result.Complete();
-        _records.Complete();
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = StorageNodeSupport.CreateCollectionContext(
+                "query",
+                collection,
+                correlationId),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = StorageDiagnosticNames.QueryFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = StorageNodeSupport.CreateCollectionAttributes(
+                "query",
+                collection,
+                correlationId)
+        });
     }
 }

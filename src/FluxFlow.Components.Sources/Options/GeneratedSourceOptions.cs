@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace FluxFlow.Components.Sources.Options;
 
 public sealed record GeneratedSourceOptions
@@ -9,7 +7,6 @@ public sealed record GeneratedSourceOptions
 
     public string Name { get; init; } = DefaultName;
     public string OutputType { get; init; } = ObjectTypeName;
-    public JsonElement[] Items { get; init; } = [];
     public bool Loop { get; init; }
     public int? MaxItems { get; init; }
     public int InitialDelayMilliseconds { get; init; }

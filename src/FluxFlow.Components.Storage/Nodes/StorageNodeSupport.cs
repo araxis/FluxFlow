@@ -65,7 +65,6 @@ internal static class StorageNodeSupport
 
     public static Dictionary<string, object?> CreateOperationAttributes(
         string operation,
-        string? store,
         string collection,
         string key,
         string? correlationId,
@@ -77,11 +76,6 @@ internal static class StorageNodeSupport
             ["collection"] = collection,
             ["key"] = key
         };
-
-        if (!string.IsNullOrWhiteSpace(store))
-        {
-            attributes["store"] = store;
-        }
 
         if (!string.IsNullOrWhiteSpace(correlationId))
         {
@@ -98,7 +92,6 @@ internal static class StorageNodeSupport
 
     public static Dictionary<string, object?> CreateCollectionAttributes(
         string operation,
-        string? store,
         string collection,
         string? correlationId,
         int? count = null,
@@ -109,11 +102,6 @@ internal static class StorageNodeSupport
             ["operation"] = operation,
             ["collection"] = collection
         };
-
-        if (!string.IsNullOrWhiteSpace(store))
-        {
-            attributes["store"] = store;
-        }
 
         if (!string.IsNullOrWhiteSpace(correlationId))
         {
@@ -135,7 +123,6 @@ internal static class StorageNodeSupport
 
     public static string CreateOperationContext(
         string operation,
-        string? store,
         string collection,
         string key,
         string? correlationId)
@@ -147,11 +134,6 @@ internal static class StorageNodeSupport
             $"key={key}"
         };
 
-        if (!string.IsNullOrWhiteSpace(store))
-        {
-            values.Add($"store={store}");
-        }
-
         if (!string.IsNullOrWhiteSpace(correlationId))
         {
             values.Add($"correlationId={correlationId}");
@@ -162,7 +144,6 @@ internal static class StorageNodeSupport
 
     public static string CreateCollectionContext(
         string operation,
-        string? store,
         string collection,
         string? correlationId)
     {
@@ -171,11 +152,6 @@ internal static class StorageNodeSupport
             $"operation={operation}",
             $"collection={collection}"
         };
-
-        if (!string.IsNullOrWhiteSpace(store))
-        {
-            values.Add($"store={store}");
-        }
 
         if (!string.IsNullOrWhiteSpace(correlationId))
         {

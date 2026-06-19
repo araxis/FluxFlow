@@ -1,95 +1,44 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Storage.Nodes;
 
-public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone storage delete node over an injected <see cref="IStorageStore"/>. Post a
+/// <c>FlowMessage&lt;StorageDeleteRequest&gt;</c> to <c>Input</c>; the node deletes the
+/// record and broadcasts a <c>FlowMessage&lt;StorageResult&gt;</c> on <c>Output</c>
+/// carrying the same correlation id, reporting whether the record existed. When
+/// <see cref="StorageDeleteOptions.EmitMissingAsResult"/> is false a missing delete is
+/// suppressed. Store failures surface on <c>Errors</c> (with the original correlation id)
+/// and the node keeps processing. Works with nothing but
+/// <c>new StorageDeleteNode(store)</c> — no engine.
+/// </summary>
+public sealed class StorageDeleteNode : FlowNode<StorageDeleteRequest, StorageResult>
 {
-    private const string NotAvailableMessage =
-        "storage.delete is not available; open the storage.store store (host ConnectAsync) before deleting.";
-
+    private readonly IStorageStore _store;
     private readonly StorageDeleteOptions _options;
-    private readonly IStorageStoreHandle _store;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<StorageDeleteRequest> _input;
-    private readonly BufferBlock<StorageResult> _result;
-    private readonly CancellationTokenSource _processingCancellation = new();
-    private bool _disposed;
 
-    internal StorageDeleteNode(
-        StorageDeleteOptions options,
-        IStorageStoreHandle store,
-        TimeProvider clock)
+    public StorageDeleteNode(
+        IStorageStore store,
+        StorageDeleteOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? StorageDeleteOptions.Default).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-
-        _input = new ActionBlock<StorageDeleteRequest>(
-            DeleteAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _result = new BufferBlock<StorageResult>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_result.Completion);
+        _options = options ?? StorageDeleteOptions.Default;
+        _clock = clock ?? TimeProvider.System;
     }
 
-    public ITargetBlock<StorageDeleteRequest> Input => _input;
-
-    public ISourceBlock<StorageResult> Result => _result;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override async Task ProcessAsync(FlowMessage<StorageDeleteRequest> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _processingCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        try
-        {
-            Complete();
-            await Completion.ConfigureAwait(false);
-        }
-        finally
-        {
-            _processingCancellation.Dispose();
-        }
-    }
-
-    private async Task DeleteAsync(StorageDeleteRequest input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
         StorageDeleteRequest request;
         try
@@ -101,53 +50,43 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.InvalidRequest,
                 $"storage.delete request is invalid: {exception.Message}",
+                message,
                 input,
                 exception);
             return;
         }
 
-        // Borrow the store the storage.store node opened. The delete node never opens
-        // or disposes a store; if none is open the request reports not available.
-        if (!_store.TryGetStore(out var store))
-        {
-            ReportError(
-                StorageErrorCodes.StoreNotAvailable,
-                NotAvailableMessage,
-                request,
-                exception: null);
-            return;
-        }
-
         try
         {
-            var result = await store.DeleteAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
+            var result = await _store.DeleteAsync(request, Stopping).ConfigureAwait(false);
             ValidateResult(result, request);
 
             if (result.Found || _options.EmitMissingAsResult)
             {
-                await _result.SendAsync(
-                    CopyResult(result),
-                    _processingCancellation.Token).ConfigureAwait(false);
+                // Carry the correlation id forward onto the result.
+                Emit(message.With(CopyResult(result)));
             }
 
-            TryEmitDiagnostic(
-                result.Found
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = result.Found
                     ? StorageDiagnosticNames.DeleteDeleted
                     : StorageDiagnosticNames.DeleteMissing,
-                message: result.Found
+                Level = FlowEventLevel.Information,
+                Message = result.Found
                     ? "storage.delete deleted record."
                     : "storage.delete did not find record.",
-                attributes: StorageNodeSupport.CreateOperationAttributes(
+                Attributes = StorageNodeSupport.CreateOperationAttributes(
                     "delete",
-                    _store.StoreName,
                     request.Collection!,
                     request.Key,
                     request.CorrelationId,
-                    result.Version));
+                    result.Version)
+            });
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -156,6 +95,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.DeleteFailed,
                 $"storage.delete failed: {exception.Message}",
+                message,
                 request,
                 exception);
         }
@@ -199,6 +139,7 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
     private void ReportError(
         int code,
         string message,
+        FlowMessage<StorageDeleteRequest> source,
         StorageDeleteRequest input,
         Exception? exception)
     {
@@ -207,37 +148,31 @@ public sealed class StorageDeleteNode : FlowNodeBase, IAsyncDisposable
             ?? "(missing)";
         var key = StorageNodeSupport.Normalize(input.Key) ?? "(missing)";
         var correlationId = StorageNodeSupport.Normalize(input.CorrelationId);
-        TryReportError(
-            code,
-            message,
-            exception,
-            StorageNodeSupport.CreateOperationContext(
-                "delete",
-                _store.StoreName,
-                collection,
-                key,
-                correlationId));
-        TryEmitDiagnostic(
-            StorageDiagnosticNames.DeleteFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            StorageNodeSupport.CreateOperationAttributes(
-                "delete",
-                _store.StoreName,
-                collection,
-                key,
-                correlationId));
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
+        EmitError(new FlowError
         {
-            ((IDataflowBlock)_result).Fault(exception);
-            return;
-        }
-
-        _result.Complete();
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = StorageNodeSupport.CreateOperationContext(
+                "delete",
+                collection,
+                key,
+                correlationId),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = StorageDiagnosticNames.DeleteFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = StorageNodeSupport.CreateOperationAttributes(
+                "delete",
+                collection,
+                key,
+                correlationId)
+        });
     }
 }

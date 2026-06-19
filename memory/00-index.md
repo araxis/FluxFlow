@@ -63,7 +63,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `61-package-readme-composition-links.md`: component package README links to composition guidance.
 - `62-storage-component-package-plan.md`: planned generic storage component package boundary and v0.1 scope.
 - `63-storage-component-package.md`: first generic logical storage component package.
-- `64-storage-composition-sample.md`: runnable logical storage composition sample.
 - `65-storage-adapter-and-migration-plan.md`: persisted storage adapter and host migration plan.
 - `66-storage-filesystem-adapter-package.md`: first file-system-backed storage adapter package.
 - `67-assertions-component-package.md`: assertion package split from control and release notes.

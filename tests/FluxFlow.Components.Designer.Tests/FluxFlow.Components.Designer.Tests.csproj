@@ -8,26 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Assertions\FluxFlow.Components.Assertions.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Control\FluxFlow.Components.Control.csproj" />
+    <!-- The per-component design-metadata providers were removed when the components
+         became engine-free standalone nodes, so the package-coverage test is gone. The
+         remaining catalog test exercises the Designer package's own contracts, which need
+         only the Designer package and the engine's NodeType/PortName definitions. -->
     <ProjectReference Include="..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Expectations\FluxFlow.Components.Expectations.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.FileSystem\FluxFlow.Components.FileSystem.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Http\FluxFlow.Components.Http.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Metrics\FluxFlow.Components.Metrics.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Payloads\FluxFlow.Components.Payloads.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Routing\FluxFlow.Components.Routing.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Serialization\FluxFlow.Components.Serialization.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Sessions\FluxFlow.Components.Sessions.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Sources\FluxFlow.Components.Sources.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.State\FluxFlow.Components.State.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Timers\FluxFlow.Components.Timers.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Validation\FluxFlow.Components.Validation.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 

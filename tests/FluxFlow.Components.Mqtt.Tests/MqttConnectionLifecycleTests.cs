@@ -1,7 +1,7 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
+using FluxFlow.Components.Mqtt.Nodes;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -15,24 +15,22 @@ public sealed class MqttConnectionLifecycleTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var factory = new RecordingMqttClientFactory(adapter, ownLease: false);
-        var handle = CreateHandle(factory);
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        handle.State.ShouldBe(MqttClientHealthState.Disconnected);
-        handle.TryGetAdapter(out _).ShouldBeFalse();
+        node.State.ShouldBe(MqttClientHealthState.Disconnected);
+        node.TryGetAdapter(out _).ShouldBeFalse();
 
-        await handle.ConnectAsync();
+        await node.ConnectAsync();
 
-        handle.State.ShouldBe(MqttClientHealthState.Connected);
+        node.State.ShouldBe(MqttClientHealthState.Connected);
         factory.CreateCalls.ShouldBe(1);
-        handle.TryGetAdapter(out var borrowed).ShouldBeTrue();
+        node.TryGetAdapter(out var borrowed).ShouldBeTrue();
         borrowed.ShouldBeSameAs(adapter);
-        handle.ConnectionEpoch.ShouldBe(1);
+        node.ConnectionEpoch.ShouldBe(1);
 
         // Idempotent: a second connect does not create a second client.
-        await handle.ConnectAsync();
+        await node.ConnectAsync();
         factory.CreateCalls.ShouldBe(1);
-
-        await ((IAsyncDisposable)handle).DisposeAsync();
     }
 
     [Fact]
@@ -40,22 +38,20 @@ public sealed class MqttConnectionLifecycleTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var factory = new RecordingMqttClientFactory(adapter, ownLease: true);
-        var handle = CreateHandle(factory);
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        await handle.ConnectAsync();
-        handle.TryGetAdapter(out _).ShouldBeTrue();
+        await node.ConnectAsync();
+        node.TryGetAdapter(out _).ShouldBeTrue();
 
-        await handle.DisconnectAsync();
+        await node.DisconnectAsync();
 
-        handle.State.ShouldBe(MqttClientHealthState.Disconnected);
-        handle.TryGetAdapter(out _).ShouldBeFalse();
+        node.State.ShouldBe(MqttClientHealthState.Disconnected);
+        node.TryGetAdapter(out _).ShouldBeFalse();
         adapter.DisposeCalls.ShouldBe(1);
 
         // Idempotent disconnect does not double-dispose.
-        await handle.DisconnectAsync();
+        await node.DisconnectAsync();
         adapter.DisposeCalls.ShouldBe(1);
-
-        await ((IAsyncDisposable)handle).DisposeAsync();
     }
 
     [Fact]
@@ -64,20 +60,18 @@ public sealed class MqttConnectionLifecycleTests
         var gate = new TaskCompletionSource();
         var adapter = new RecordingMqttClientAdapter();
         var factory = new GatedMqttClientFactory(adapter, gate.Task);
-        var handle = CreateHandle(factory);
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        var first = handle.ConnectAsync();
-        var second = handle.ConnectAsync();
+        var first = node.ConnectAsync();
+        var second = node.ConnectAsync();
 
         // Both calls observe the same in-flight establish; release the factory.
         gate.SetResult();
         await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
 
         factory.CreateCalls.ShouldBe(1);
-        handle.State.ShouldBe(MqttClientHealthState.Connected);
-        handle.ConnectionEpoch.ShouldBe(1);
-
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        node.State.ShouldBe(MqttClientHealthState.Connected);
+        node.ConnectionEpoch.ShouldBe(1);
     }
 
     [Fact]
@@ -86,12 +80,12 @@ public sealed class MqttConnectionLifecycleTests
         var gate = new TaskCompletionSource();
         var adapter = new RecordingMqttClientAdapter();
         var factory = new GatedMqttClientFactory(adapter, gate.Task);
-        var handle = CreateHandle(factory);
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        var connect = handle.ConnectAsync();
+        var connect = node.ConnectAsync();
 
         // Disconnect while the connect is parked inside the factory, then release it.
-        await handle.DisconnectAsync();
+        await node.DisconnectAsync();
         gate.SetResult();
 
         try
@@ -103,10 +97,8 @@ public sealed class MqttConnectionLifecycleTests
             // The in-flight connect was cancelled by disconnect.
         }
 
-        handle.State.ShouldBe(MqttClientHealthState.Disconnected);
-        handle.TryGetAdapter(out _).ShouldBeFalse();
-
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        node.State.ShouldBe(MqttClientHealthState.Disconnected);
+        node.TryGetAdapter(out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -114,15 +106,15 @@ public sealed class MqttConnectionLifecycleTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var factory = new RecordingMqttClientFactory(adapter, ownLease: true);
-        var handle = CreateHandle(factory);
+        var node = MqttTestContext.CreateConnection(factory);
 
-        await handle.ConnectAsync();
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        await node.ConnectAsync();
+        await node.DisposeAsync();
 
         adapter.DisposeCalls.ShouldBe(1);
 
         // Idempotent dispose.
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        await node.DisposeAsync();
         adapter.DisposeCalls.ShouldBe(1);
     }
 
@@ -130,19 +122,13 @@ public sealed class MqttConnectionLifecycleTests
     public async Task ConnectAsync_WhenCreateFaults_EntersFaultedThenSucceedsOnRetry()
     {
         // First CreateAsync throws a transient fault; ConnectAsync surfaces it and the
-        // node enters Faulted, emits a faulted health event + error diagnostic, but the
-        // resource node is NOT faulted (it stays runnable so a retry can succeed).
+        // node enters Faulted, emitting a faulted health event, but the node is not
+        // disposed (it stays runnable so a retry can succeed).
         var adapter = new RecordingMqttClientAdapter();
         var factory = new FaultThenSucceedMqttClientFactory(adapter, faults: 1);
-        var registry = MqttResourceTestContext.CreateRegistry(clientFactory: factory);
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        var node = (Nodes.MqttConnectionNode)resources[
-            new NodeName(MqttResourceTestContext.ConnectionName)].Node;
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        var events = new BufferBlock<FlowEvent>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        node.Events.LinkTo(events);
-        node.Diagnostics.LinkTo(diagnostics);
+        var events = MqttTestContext.Sink(node.Events);
 
         await Should.ThrowAsync<InvalidOperationException>(
             node.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5)));
@@ -151,16 +137,10 @@ public sealed class MqttConnectionLifecycleTests
         node.TryGetAdapter(out _).ShouldBeFalse();
         factory.CreateCalls.ShouldBe(1);
 
-        // A connect fault must not fault the resource node.
-        node.Completion.IsCompleted.ShouldBeFalse();
-
         var faultedEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        faultedEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
-        faultedEvent.Status.ShouldBe(MqttClientHealthState.Faulted.ToString());
-
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(MqttDiagnosticNames.ConnectionHealthChanged);
-        diagnostic.Level.ShouldBe(FlowDiagnosticLevel.Error);
+        faultedEvent.Name.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        faultedEvent.Level.ShouldBe(FlowEventLevel.Error);
+        faultedEvent.Attributes["state"].ShouldBe(MqttClientHealthState.Faulted.ToString());
 
         // Retry: the factory now succeeds, so the adapter becomes borrowable.
         await node.ConnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
@@ -169,8 +149,6 @@ public sealed class MqttConnectionLifecycleTests
         factory.CreateCalls.ShouldBe(2);
         node.TryGetAdapter(out var borrowed).ShouldBeTrue();
         borrowed.ShouldBeSameAs(adapter);
-
-        await ((IAsyncDisposable)node).DisposeAsync();
     }
 
     [Fact]
@@ -180,24 +158,24 @@ public sealed class MqttConnectionLifecycleTests
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var adapter = new RecordingMqttClientAdapter();
         var factory = new GatedSignalingMqttClientFactory(adapter, gate.Task, ownLease: true);
-        var handle = CreateHandle(factory);
+        var node = MqttTestContext.CreateConnection(factory);
 
-        var connect = handle.ConnectAsync();
+        var connect = node.ConnectAsync();
         await factory.Created.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Disconnect wins the race (sets userDisconnected), then the parked create is
         // released and returns a real, Owned lease.
-        await handle.DisconnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await node.DisconnectAsync().WaitAsync(TimeSpan.FromSeconds(5));
         gate.SetResult();
         await connect.WaitAsync(TimeSpan.FromSeconds(5));
 
         // The freshly built (Owned) lease must be dropped, not published, and disposed
         // exactly once; the adapter is never observable.
-        handle.State.ShouldBe(MqttClientHealthState.Disconnected);
-        handle.TryGetAdapter(out _).ShouldBeFalse();
+        node.State.ShouldBe(MqttClientHealthState.Disconnected);
+        node.TryGetAdapter(out _).ShouldBeFalse();
         adapter.DisposeCalls.ShouldBe(1);
 
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        await node.DisposeAsync();
 
         // Dispose after a dropped establish must not double-dispose the adapter.
         adapter.DisposeCalls.ShouldBe(1);
@@ -212,19 +190,19 @@ public sealed class MqttConnectionLifecycleTests
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var adapter = new RecordingMqttClientAdapter();
         var factory = new GatedSignalingMqttClientFactory(adapter, gate.Task, ownLease: true);
-        var handle = CreateHandle(factory);
+        var node = MqttTestContext.CreateConnection(factory);
 
-        var connect = handle.ConnectAsync();
+        var connect = node.ConnectAsync();
         await factory.Created.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await ((IAsyncDisposable)handle).DisposeAsync();
+        await node.DisposeAsync();
         gate.SetResult();
 
         // The in-flight connect completes without surfacing an unobserved exception, and
         // the freshly built adapter is disposed (no leak) rather than published.
         await connect.WaitAsync(TimeSpan.FromSeconds(5));
 
-        handle.TryGetAdapter(out _).ShouldBeFalse();
+        node.TryGetAdapter(out _).ShouldBeFalse();
         adapter.DisposeCalls.ShouldBe(1);
 
         // Force any unobserved-task finalizers to surface a missed exception.
@@ -238,32 +216,21 @@ public sealed class MqttConnectionLifecycleTests
     {
         var adapter = new RecordingMqttClientAdapter();
         var factory = new RecordingMqttClientFactory(adapter, ownLease: false);
-        var registry = MqttResourceTestContext.CreateRegistry(clientFactory: factory);
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        var node = (Nodes.MqttConnectionNode)resources[new NodeName(MqttResourceTestContext.ConnectionName)].Node;
+        await using var node = MqttTestContext.CreateConnection(factory);
 
-        var events = new BufferBlock<FlowEvent>();
-        node.Events.LinkTo(events);
+        var events = MqttTestContext.Sink(node.Events);
 
         await node.ConnectAsync();
         adapter.PushHealth(new MqttClientHealthEvent
         {
             State = MqttClientHealthState.Connected,
-            ConnectionName = MqttResourceTestContext.ConnectionName
+            ConnectionName = MqttTestContext.ConnectionName
         });
 
         var healthEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        healthEvent.Type.ShouldBe(MqttEventNames.ConnectionHealthChanged);
-        healthEvent.Status.ShouldBe(MqttClientHealthState.Connected.ToString());
-
-        await ((IAsyncDisposable)node).DisposeAsync();
-    }
-
-    private static IMqttConnectionHandle CreateHandle(IMqttClientFactory factory)
-    {
-        var registry = MqttResourceTestContext.CreateRegistry(clientFactory: factory);
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        return MqttResourceTestContext.ResolveHandle(resources);
+        healthEvent.Name.ShouldBe(MqttEventNames.ConnectionHealthChanged);
+        healthEvent.Attributes["state"].ShouldBe(MqttClientHealthState.Connected.ToString());
+        healthEvent.Attributes["connectionName"].ShouldBe(MqttTestContext.ConnectionName);
     }
 
     private sealed class GatedMqttClientFactory(RecordingMqttClientAdapter adapter, Task gate)

@@ -1,215 +1,124 @@
 # FluxFlow.Components.Routing
 
-Reusable expression-driven routing components for FluxFlow.
+Standalone routing nodes for FluxFlow, built on the **FluxFlow.Nodes** kit. Every node is
+a self-contained TPL Dataflow processor: `new` it with its options and the selectors it
+needs, post `FlowMessage<T>` envelopes to its input(s), and link its broadcast output/error/
+event ports to the next stage. No engine, registry, or runtime is required. Key and side
+extraction is supplied by the caller as plain delegates (compile them once from a
+`FluxFlow.Mapping` `IFlowExpressionEngine` / `IFlowPredicate` if you use expressions).
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `flow.switch` | `Input` -> `Result`, optional `Routed`, `Matched`, optional route outputs, `Default`, `Errors` | Evaluates a route key expression and routes the original input by match status. |
-| `flow.correlation` | `Input` or `Request`/`Response` -> `Matched`, `Timeouts`, `Errors` | Pairs request and response style messages by key. |
-| `flow.window` | `Input` -> `Output`, `Errors` | Groups input items into count or time based windows. |
-| `flow.join` | `Left`, `Right` -> `Output`, `Timeouts`, `Errors` | Joins two typed streams by per-side key expressions. |
-| `flow.fork` | `Input` -> configured named outputs, `Errors` | Copies every input to every configured output. |
-| `flow.merge` | configured named inputs -> `Output`, `Errors` | Combines several same-type streams into one source-tagged stream. |
+| Node | Base | Shape |
+|------|------|-------|
+| `FlowSwitchNode<TInput>` | `FlowNode<TInput, TInput>` | `Input` -> `Matched` (primary `Output`), `Default`, optional `Routed`, configured route-output ports, `Errors`/`Events` |
+| `FlowForkNode<TInput>` | `FlowNode<TInput, TInput>` | `Input` -> each configured output (first is the primary `Output`), `Errors`/`Events` |
+| `FlowMergeNode<TInput>` | `FlowNode<TInput, TInput>` | one fan-in `Input` (link many upstreams) -> `Output`, `Errors`/`Events` |
+| `FlowWindowNode<TInput>` | `FlowNode<TInput, FlowWindow<TInput>>` | `Input` -> `Output` (windows), `Errors`/`Events` |
+| `FlowCorrelationNode<TInput>` | `FlowNode<TInput, FlowCorrelationMatch<TInput>>` | `Input` -> `Matched` (primary `Output`), `Timeouts`, `Errors`/`Events` |
+| `FlowJoinNode<TLeft, TRight>` | kit primitives (two inputs) | `Left`, `Right` -> `Output` (results), `Timeouts`, `Errors`/`Events` |
 
-The package does not choose an expression language. Applications provide one or
-more `IFlowExpressionEngine` implementations during registration.
+Every emitted message carries the source correlation id forward (`FlowMessage<T>.With`):
+the matched branch keeps the input's id, a join result keeps the left message's id, a
+correlation match keeps the request's id, and each timeout keeps its own message's id.
 
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterRoutingComponents(options => options
-        .UseExpressionEngine(appExpressionEngine)
-        .UseClock(routingClock)
-        .RegisterType<AppMessage>("app.message")
-        .UseContextFactory(new AppMessageContextFactory()));
-```
-
-`UseClock(...)` is optional. Without it, routing nodes use the default system
-clock. Supplying a clock lets hosts and tests make route timestamps, window
-timers, join timeouts, and correlation timestamps deterministic.
+All nodes time off an injected `System.TimeProvider` (defaulting to `TimeProvider.System`),
+so windows, join timeouts, and correlation timeouts are deterministic under a
+`FakeTimeProvider` in tests.
 
 ## Switch
 
-Basic configuration:
-
-```json
-{
-  "type": "flow.switch",
-  "inputType": "app.message",
-  "engine": "my-engine",
-  "expression": "category",
-  "routes": [ "priority", "standard" ],
-  "routeOutputs": {
-    "priority": "Priority",
-    "standard": "Standard"
-  },
-  "defaultRoute": "unknown"
-}
+```csharp
+var node = new FlowSwitchNode<AppMessage>(
+    new SwitchRoutingOptions
+    {
+        Routes = ["priority", "standard"],
+        RouteOutputs = new Dictionary<string, string> { ["priority"] = "Priority" },
+        DefaultRoute = "unknown"
+    },
+    routeKeySelector: message => message.Category);
 ```
 
-`Result` emits `FlowSwitchResult<TInput>` so downstream links can inspect
-`RouteKey`, `Matched`, and the original `Value`. `Matched` emits the original
-input when the key is in `routes`. `Default` emits the original input when the
-key is empty or not configured.
-
-`routeOutputs` is optional. When configured, the runtime adds those output
-ports and emits the original input to the matching route port. Several route
-keys can map to the same output port. Route output port names must be valid
-engine port names and cannot collide with built-in switch ports.
-
-If `routes` is empty, every non-empty route key is treated as matched. This lets
-hosts use the result envelope and link conditions without predeclaring every
-route key.
-
-Set `emitRouteEnvelope` to `true` when downstream nodes need one neutral route
-object instead of, or in addition to, direct route ports. `Routed` emits
-`FlowRoute<TInput>` with route key, selected route, match status, default route,
-matched output port, expression metadata, input type, and original value.
-
-Expression evaluation failures emit `FlowError` and the node continues
-processing later messages.
-
-## Correlation
-
-Use `flow.correlation` when a workflow receives related messages and needs to
-pair them by key.
-
-Single-stream mode uses `Input` and a `sideExpression`:
-
-```json
-{
-  "type": "flow.correlation",
-  "inputType": "app.message",
-  "engine": "my-engine",
-  "keyExpression": "correlationId",
-  "sideExpression": "kind",
-  "requestSide": "request",
-  "responseSide": "response",
-  "timeoutMilliseconds": 30000,
-  "maxPending": 1024
-}
-```
-
-Split-stream mode omits `sideExpression` and exposes separate `Request` and
-`Response` inputs:
-
-```json
-{
-  "type": "flow.correlation",
-  "inputType": "app.message",
-  "engine": "my-engine",
-  "keyExpression": "correlationId",
-  "timeoutMilliseconds": 30000,
-  "maxPending": 1024
-}
-```
-
-`Matched` emits `FlowCorrelationMatch<TInput>` with the request, response, key,
-timestamps, and elapsed time. `Timeouts` emits
-`FlowCorrelationTimeout<TInput>` for unmatched pending inputs when the timeout
-is observed before the next input, and for any remaining pending inputs when
-the node completes.
-
-Invalid keys, unsupported sides, duplicate same-side messages, expression
-failures, and pending-capacity failures emit `FlowError` and the node continues
-processing later messages.
-
-## Window
-
-Use `flow.window` when a workflow needs batches of items before a downstream
-node runs.
-
-```json
-{
-  "type": "flow.window",
-  "inputType": "app.message",
-  "maxItems": 100,
-  "timeMilliseconds": 5000,
-  "emitPartialOnCompletion": true
-}
-```
-
-`Output` emits `FlowWindow<TInput>` with a sequence number, item list, start and
-emit timestamps, duration, count, and emit reason. `maxItems` emits when the
-window reaches the configured count. `timeMilliseconds` emits when the current
-window has been open for that duration, even if no later input arrives. When
-both are configured, whichever condition happens first emits the window.
-
-At least one boundary must be configured. On completion, a partial window is
-emitted by default. Set `emitPartialOnCompletion` to `false` to discard partial
-windows.
-
-## Join
-
-Use `flow.join` when a workflow needs to pair values from two streams by key.
-
-```json
-{
-  "type": "flow.join",
-  "leftInputType": "app.request",
-  "rightInputType": "app.response",
-  "engine": "my-engine",
-  "leftKeyExpression": "correlationId",
-  "rightKeyExpression": "correlationId",
-  "timeoutMilliseconds": 30000,
-  "maxPending": 1024
-}
-```
-
-`Output` emits `FlowJoinResult<TLeft, TRight>` with the joined left and right
-values, key, timestamps, and elapsed time. `Timeouts` emits
-`FlowJoinTimeout<TLeft, TRight>` for unmatched pending values when the timeout
-expires or when the node completes.
-
-Repeated keys are paired in FIFO order. Key evaluation failures, empty keys,
-and pending-capacity failures emit `FlowError` and the node continues
-processing later values.
+`Matched` (the primary `Output`) re-emits the input when its route key is in `Routes`;
+`Default` re-emits it otherwise. If `Routes` is empty every non-empty key is treated as
+matched. `RouteOutputs` adds extra ports keyed by name and re-emits the input to the
+matching route port; several route keys may map to the same port. Set `EmitRouteEnvelope`
+to expose a neutral `Routed` port. `EmitMatchedInput` / `EmitDefaultInput` suppress those
+branches. Route-key selector failures surface on `Errors` and the node keeps processing.
 
 ## Fork
 
-Use `flow.fork` when every downstream branch must receive every item.
-
-```json
-{
-  "type": "flow.fork",
-  "inputType": "app.message",
-  "outputs": [ "Audit", "Transform", "Dashboard" ]
-}
+```csharp
+var node = new FlowForkNode<AppMessage>(
+    new ForkRoutingOptions { Outputs = ["Audit", "Transform", "Dashboard"] });
 ```
 
-Each configured output port emits the original input type. The node sends each
-item to every output in configured order, then completes all outputs after the
-input completes. Output names must be valid engine port names and cannot collide
-with built-in fork ports.
+Each configured output receives every input. The first output is the primary `Output`;
+the rest are reached through `node.Outputs[name]`. Output names must be valid identifiers
+and cannot collide with the built-in `Input`/`Errors` ports.
 
 ## Merge
 
-Use `flow.merge` when several same-type streams should converge while retaining
-the source port name.
-
-```json
-{
-  "type": "flow.merge",
-  "inputType": "app.message",
-  "inputs": [ "Primary", "Retry", "Replay" ]
-}
+```csharp
+var node = new FlowMergeNode<AppMessage>(new MergeRoutingOptions());
+// link several upstreams into the one input:
+sourceA.LinkTo(node.Input);
+sourceB.LinkTo(node.Input);
 ```
 
-`Output` emits `FlowMergeItem<TInput>` with sequence number, source input port,
-received timestamp, and original value. The node completes only after every
-configured input completes. Input names must be valid engine port names and
-cannot collide with built-in merge ports.
+A fan-in node: the single bounded `Input` already merges concurrent producers, and the
+node re-broadcasts each message on `Output` in arrival order, preserving correlation.
 
-## Design Metadata
+## Window
 
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+```csharp
+var node = new FlowWindowNode<AppMessage>(
+    new WindowRoutingOptions { MaxItems = 100, TimeMilliseconds = 5000 });
+```
 
-## Composition Guidance
+`Output` emits `FlowWindow<TInput>` (sequence, items, start/emit timestamps, duration,
+count, reason). `MaxItems` emits when the window fills; `TimeMilliseconds` emits when the
+open window ages out (timed off the injected clock); when both are set, whichever fires
+first wins. At least one boundary is required. On completion a partial window is emitted by
+default — set `EmitPartialOnCompletion = false` to discard it.
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+## Correlation
+
+```csharp
+var node = new FlowCorrelationNode<AppMessage>(
+    new CorrelationRoutingOptions
+    {
+        RequestSide = "request",
+        ResponseSide = "response",
+        TimeoutMilliseconds = 30000
+    },
+    keySelector: message => message.CorrelationId,
+    sideSelector: message => message.Kind);
+```
+
+Pairs a request with its matching response by key. `Matched` emits
+`FlowCorrelationMatch<TInput>`; `Timeouts` emits `FlowCorrelationTimeout<TInput>` for
+pending inputs that age past the timeout (observed before the next input or on completion).
+Invalid keys/sides, duplicate sides, selector failures, and pending-capacity overflow
+surface on `Errors` and the node keeps processing.
+
+## Join
+
+```csharp
+var node = new FlowJoinNode<RequestMessage, ResponseMessage>(
+    new JoinRoutingOptions { TimeoutMilliseconds = 30000 },
+    leftKeySelector: request => request.CorrelationId,
+    rightKeySelector: response => response.CorrelationId);
+```
+
+The one two-input routing node, built directly on kit primitives. Post to `Left` and
+`Right`; `Output` emits `FlowJoinResult<TLeft, TRight>` for matched pairs (FIFO for repeated
+keys) and `Timeouts` emits `FlowJoinTimeout<TLeft, TRight>` for values that age past the
+timeout or remain when the node completes. Key-evaluation failures, empty keys, and
+pending-capacity overflow surface on `Errors` and the node keeps processing.
+
+## Lifecycle
+
+Each node implements `IFlowNode`: `Complete()` drains and completes the outputs, `Fault`
+faults the data outputs while flushing (completing) `Errors`/`Events` so buffered
+diagnostics survive, and `await DisposeAsync()` completes, drains, and releases timers.

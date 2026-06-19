@@ -8,18 +8,17 @@
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable logical storage components for FluxFlow.</Description>
+    <Description>Standalone storage nodes for FluxFlow: blockified put/get/query/delete over an injected IStorageStore, with broadcast result/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke IStorageClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed). Introduces a separate storage.store resource component that owns the store configuration; storage.put/get/query/delete now reference it by a required store name and no longer open a store directly. For now the store component holds configuration only — no store is opened — so the operations report a not-available result until a later open step. Adds an explicit, host-driven connect lifecycle: storage.store now exposes ConnectAsync/DisconnectAsync (plus a State and a lock-free TryGetStore), opening/owning the IStorageStore via the configured factory (a missing factory reports StoreOpenFailed without faulting the runtime); storage.put/get/query/delete borrow the opened store when connected and report not-available otherwise, never opening or disposing it. No auto-connect.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as standalone storage.put/get/query/delete nodes over an injected IStorageStore: request in, result broadcast out, failures on the error port, diagnostics on the event port. Every message travels as a FlowMessage&lt;T&gt; envelope so the correlation id flows request -&gt; result (and onto the Found/NotFound and Records branches). The storage.store resource node and its connect/disconnect lifecycle are removed — the host owns the IStorageStore lifetime and injects the opened store into each node, exactly like the HTTP node over an HttpClient. The engine factory/module/registration/designer-metadata glue is removed; the nodes depend only on FluxFlow.Nodes and run without the engine. The IStorageStore contract, all request/result/record DTOs, options, error codes, and the store factory/lease/context types are unchanged, so the FileSystem and SqlFile adapters keep working.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

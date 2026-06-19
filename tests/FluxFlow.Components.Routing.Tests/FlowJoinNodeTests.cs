@@ -2,308 +2,251 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Mapping;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
+// Join is the one two-input routing node, built directly on kit primitives. Every test
+// news the node and sends FlowMessage envelopes to Left/Right; the left correlation id
+// flows onto a matched result, the timed-out message's id onto its timeout.
 public sealed class FlowJoinNodeTests
 {
+    private sealed record LeftMessage(string Key, string Payload);
+
+    private sealed record RightMessage(string Key, string Payload);
+
     [Fact]
-    public async Task Join_MatchesLeftAndRightByKey()
+    public async Task Join_MatchesLeftAndRightByKey_CarryingLeftCorrelation()
     {
-        var runtimeNode = CreateNode(new { });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await using var node = CreateNode();
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "left"));
-        await right.Target.SendAsync(new RightMessage("A-100", "right"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var left = FlowMessage.Create(new LeftMessage("A-100", "left"));
+        await node.Left.SendAsync(left);
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Key.ShouldBe("A-100");
-        result.Left.Payload.ShouldBe("left");
-        result.Right.Payload.ShouldBe("right");
-        result.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+        var result = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        result.Payload.Key.ShouldBe("A-100");
+        result.Payload.Left.Payload.ShouldBe("left");
+        result.Payload.Right.Payload.ShouldBe("right");
+        result.Payload.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+        result.CorrelationId.ShouldBe(left.CorrelationId);
     }
 
     [Fact]
     public async Task Join_MatchesOutOfOrderRightAndLeft()
     {
-        var runtimeNode = CreateNode(new { });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await using var node = CreateNode();
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-        await right.Target.SendAsync(new RightMessage("A-100", "right"));
-        await left.Target.SendAsync(new LeftMessage("A-100", "left"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right")));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        result.Left.Payload.ShouldBe("left");
-        result.Right.Payload.ShouldBe("right");
+        var result = (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        result.Payload.Left.Payload.ShouldBe("left");
+        result.Payload.Right.Payload.ShouldBe("right");
     }
 
     [Fact]
     public async Task Join_PairsDuplicateKeysInOrder()
     {
-        var runtimeNode = CreateNode(new { });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await using var node = CreateNode();
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "left-1"));
-        await left.Target.SendAsync(new LeftMessage("A-100", "left-2"));
-        await right.Target.SendAsync(new RightMessage("A-100", "right-1"));
-        await right.Target.SendAsync(new RightMessage("A-100", "right-2"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left-1")));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left-2")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right-1")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right-2")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        first.Left.Payload.ShouldBe("left-1");
-        first.Right.Payload.ShouldBe("right-1");
-        second.Left.Payload.ShouldBe("left-2");
-        second.Right.Payload.ShouldBe("right-2");
+        var results = await RoutingTestSink.DrainUntilCompletedAsync(output);
+        results.Count.ShouldBe(2);
+        results[0].Payload.Left.Payload.ShouldBe("left-1");
+        results[0].Payload.Right.Payload.ShouldBe("right-1");
+        results[1].Payload.Left.Payload.ShouldBe("left-2");
+        results[1].Payload.Right.Payload.ShouldBe("right-2");
     }
 
     [Fact]
-    public async Task Join_EmitsTimeoutWhenTimerExpires()
+    public async Task Join_EmitsTimeoutWhenTimerExpires_CarryingCorrelation()
     {
-        var runtimeNode = CreateNode(new { timeoutMilliseconds = 25 });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!.LinkToDiscard();
-        var timeouts = new BufferBlock<FlowJoinTimeout<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:03Z");
+        var clock = new TrackingFakeTimeProvider(startedAt);
+        await using var node = CreateNode(o => o with { TimeoutMilliseconds = 25 }, clock);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinResult<LeftMessage, RightMessage>>>());
+        var timeouts = RoutingTestSink.Link(node.Timeouts);
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "left"));
+        var timerScheduled = clock.NextTimerScheduled;
+        var left = FlowMessage.Create(new LeftMessage("A-100", "left"));
+        await node.Left.SendAsync(left);
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        timeouts.TryReceive(out _).ShouldBeFalse();
+
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        timeout.Key.ShouldBe("A-100");
-        timeout.Side.ShouldBe(FlowJoinSide.Left);
-        timeout.Left!.Payload.ShouldBe("left");
-        timeout.Right.ShouldBeNull();
-        timeout.Timeout.ShouldBe(TimeSpan.FromMilliseconds(25));
+        timeout.Payload.Key.ShouldBe("A-100");
+        timeout.Payload.Side.ShouldBe(FlowJoinSide.Left);
+        timeout.Payload.Left!.Payload.ShouldBe("left");
+        timeout.Payload.Right.ShouldBeNull();
+        timeout.Payload.Timeout.ShouldBe(TimeSpan.FromMilliseconds(25));
+        timeout.Payload.ReceivedAt.ShouldBe(startedAt);
+        timeout.Payload.TimedOutAt.ShouldBe(startedAt.AddMilliseconds(25));
+        timeout.CorrelationId.ShouldBe(left.CorrelationId);
     }
 
     [Fact]
     public async Task Join_EmitsTimeoutsForRemainingInputsOnCompletion()
     {
-        var runtimeNode = CreateNode(new { timeoutMilliseconds = 5_000 });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!.LinkToDiscard();
-        var timeouts = new BufferBlock<FlowJoinTimeout<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Timeouts, timeouts);
+        await using var node = CreateNode(o => o with { TimeoutMilliseconds = 5_000 });
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinResult<LeftMessage, RightMessage>>>());
+        var timeouts = RoutingTestSink.Link(node.Timeouts);
 
-        await right.Target.SendAsync(new RightMessage("A-100", "right"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var timeout = await timeouts.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        timeout.Key.ShouldBe("A-100");
-        timeout.Side.ShouldBe(FlowJoinSide.Right);
-        timeout.Right!.Payload.ShouldBe("right");
+        var timeout = (await RoutingTestSink.DrainUntilCompletedAsync(timeouts)).ShouldHaveSingleItem();
+        timeout.Payload.Key.ShouldBe("A-100");
+        timeout.Payload.Side.ShouldBe(FlowJoinSide.Right);
+        timeout.Payload.Right!.Payload.ShouldBe("right");
     }
 
     [Fact]
-    public async Task Join_ReportsExpressionFailureAndContinues()
+    public async Task Join_ReportsKeyFailureAndContinues()
     {
-        var runtimeNode = CreateNode(
-            new { expressionName = "join-v1" },
-            (expression, context, _) =>
-            {
-                if (context.Variables["payload"]?.Equals("throw") == true)
-                {
-                    throw new InvalidOperationException("key failed");
-                }
+        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+            new JoinRoutingOptions { ExpressionName = "join-v1" },
+            left => left.Payload == "throw"
+                ? throw new InvalidOperationException("key failed")
+                : left.Key,
+            right => right.Key);
+        var errors = RoutingTestSink.Link(node.Errors);
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-                return context.Variables["key"];
-            });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        var errors = new BufferBlock<FlowError>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
-        LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "throw")));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-101", "left")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-101", "right")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "throw"));
-        await left.Target.SendAsync(new LeftMessage("A-101", "left"));
-        await right.Target.SendAsync(new RightMessage("A-101", "right"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var error = (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First();
         error.Code.ShouldBe(RoutingErrorCodes.JoinLeftKeyFailed);
         error.Context!.ShouldContain("expressionName=join-v1");
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
+            .Payload.Key.ShouldBe("A-101");
     }
 
     [Fact]
     public async Task Join_ReportsProcessingFailureAndContinues()
     {
+        // The clock faults on its first read, so the first message the join processes fails
+        // (JoinFailed). Send it alone and await the error so the one-shot fault is consumed
+        // deterministically; a later pair then matches, proving the node kept processing.
         var clock = new ThrowingTimeProvider();
-        var leftNodeContext = new RoutingNodeContext
-        {
-            Address = new NodeAddress("main", new NodeName("join")),
-            NodeType = RoutingComponentTypes.Join,
-            InputType = typeof(LeftMessage)
-        };
-        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["key"]);
-        var leftFactory = new MessageContextFactory();
-        var rightFactory = new MessageContextFactory();
-        var rightNodeContext = leftNodeContext with { InputType = typeof(RightMessage) };
-        var node = new FlowJoinNode<LeftMessage, RightMessage>(
-            new JoinRoutingOptions
-            {
-                LeftKeyExpression = "key",
-                RightKeyExpression = "key"
-            },
-            left => SelectKey(engine, "key", leftFactory, leftNodeContext, left),
-            right => SelectKey(engine, "key", rightFactory, rightNodeContext, right),
-            clock,
-            engine.Name);
-        var errors = new BufferBlock<FlowError>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
-        node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
-        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowJoinTimeout<LeftMessage, RightMessage>>());
+        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+            new JoinRoutingOptions(),
+            left => left.Key,
+            right => right.Key,
+            clock: clock);
+        var errors = RoutingTestSink.Link(node.Errors);
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-        // The clock faults on its first read, so the first message the join
-        // processes fails and is reported as JoinFailed. Send it alone and await the
-        // error so the one-shot fault is consumed deterministically: the join drains
-        // its Left and Right inputs concurrently, so a later message could otherwise
-        // absorb the throw and break the pair that should match.
-        await node.Left.SendAsync(new LeftMessage("A-100", "boom"));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "boom")));
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(RoutingErrorCodes.JoinFailed);
 
-        // The clock now returns a fixed time; a subsequent pair matches and is
-        // emitted, proving the node kept processing after the failure.
-        await node.Left.SendAsync(new LeftMessage("A-101", "left"));
-        await node.Right.SendAsync(new RightMessage("A-101", "right"));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-101", "left")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-101", "right")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Key.ShouldBe("A-101");
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).First().Payload.Key.ShouldBe("A-101");
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Join_ReportsCapacityLimitAndContinues()
     {
-        var runtimeNode = CreateNode(new { maxPending = 1 });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        var errors = new BufferBlock<FlowError>();
-        var output = new BufferBlock<FlowJoinResult<LeftMessage, RightMessage>>();
-        LinkOutput(runtimeNode, RoutingComponentPorts.Errors, errors);
-        LinkOutput(runtimeNode, RoutingComponentPorts.Output, output);
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await using var node = CreateNode(o => o with { MaxPending = 1 });
+        var errors = RoutingTestSink.Link(node.Errors);
+        var output = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
         var errorTask = errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var outputTask = output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "left-1"));
-        await left.Target.SendAsync(new LeftMessage("A-101", "left-2"));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left-1")));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-101", "left-2")));
 
         var error = await errorTask;
         error.Code.ShouldBe(RoutingErrorCodes.JoinCapacityExceeded);
         error.Context!.ShouldContain("key=A-101");
 
-        await right.Target.SendAsync(new RightMessage("A-100", "right-1"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right-1")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await outputTask).Key.ShouldBe("A-100");
+        (await outputTask).Payload.Key.ShouldBe("A-100");
     }
 
     [Fact]
-    public async Task Join_EmitsDiagnostics()
+    public async Task Join_EmitsMatchedEvent()
     {
-        var runtimeNode = CreateNode(new { expressionId = "join-v1" });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<LeftMessage>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<RightMessage>>();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Timeouts))!.LinkToDiscard();
+        await using var node = CreateNode(o => o with { ExpressionId = "join-v1" });
+        var events = RoutingTestSink.Link(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinResult<LeftMessage, RightMessage>>>());
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
 
-        await left.Target.SendAsync(new LeftMessage("A-100", "left"));
-        await right.Target.SendAsync(new RightMessage("A-100", "right"));
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(RoutingDiagnosticNames.JoinMatched);
-        diagnostic.Attributes["key"].ShouldBe("A-100");
-        diagnostic.Attributes["expressionId"].ShouldBe("join-v1");
+        var matchedEvent = (await RoutingTestSink.DrainUntilCompletedAsync(events))
+            .First(e => e.Name == RoutingDiagnosticNames.JoinMatched);
+        matchedEvent.Attributes["key"].ShouldBe("A-100");
+        matchedEvent.Attributes["expressionId"].ShouldBe("join-v1");
+    }
+
+    [Fact]
+    public async Task Join_OutputFansOutToManyConsumers()
+    {
+        await using var node = CreateNode();
+        var logger = RoutingTestSink.Link(node.Output);
+        var mapper = RoutingTestSink.Link(node.Output);
+        node.Timeouts.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>());
+
+        await node.Left.SendAsync(FlowMessage.Create(new LeftMessage("A-100", "left")));
+        await node.Right.SendAsync(FlowMessage.Create(new RightMessage("A-100", "right")));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        (await RoutingTestSink.DrainUntilCompletedAsync(logger)).ShouldHaveSingleItem()
+            .Payload.Key.ShouldBe("A-100");
+        (await RoutingTestSink.DrainUntilCompletedAsync(mapper)).ShouldHaveSingleItem()
+            .Payload.Key.ShouldBe("A-100");
     }
 
     [Fact]
     public async Task Join_DisposeAfterFaultDoesNotThrow()
     {
-        var leftNodeContext = new RoutingNodeContext
-        {
-            Address = new NodeAddress("main", new NodeName("join")),
-            NodeType = RoutingComponentTypes.Join,
-            InputType = typeof(LeftMessage)
-        };
-        var engine = new RecordingExpressionEngine();
-        var leftFactory = new TestRoutingContextFactory();
-        var rightFactory = new TestRoutingContextFactory();
-        var rightNodeContext = leftNodeContext with { InputType = typeof(RightMessage) };
-        var node = new FlowJoinNode<LeftMessage, RightMessage>(
-            new JoinRoutingOptions
-            {
-                LeftKeyExpression = "key",
-                RightKeyExpression = "key"
-            },
-            left => SelectKey(engine, "key", leftFactory, leftNodeContext, left),
-            right => SelectKey(engine, "key", rightFactory, rightNodeContext, right),
-            engine.Name);
+        var node = CreateNode();
 
         node.Fault(new InvalidOperationException("boom"));
         await node.DisposeAsync();
@@ -312,166 +255,58 @@ public sealed class FlowJoinNodeTests
     }
 
     [Fact]
-    public void Join_RejectsMissingLeftKeyExpression()
+    public async Task Join_FaultCompletesErrorsAndFaultsOutput()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { leftKeyExpression = "" }));
+        // The kit fault rule: data outputs (Output + Timeouts) fault, but Errors/Events are
+        // completed (flushed) rather than faulted so buffered diagnostics survive.
+        await using var node = new FlowJoinNode<LeftMessage, RightMessage>(
+            new JoinRoutingOptions(),
+            left => left.Key,
+            right => right.Key);
 
-        exception.Message.ShouldContain("leftKeyExpression");
+        node.Fault(new InvalidOperationException("boom"));
+
+        node.Completion.IsFaulted.ShouldBeTrue();
+        // Errors/Events are completed (flushed), not faulted.
+        await node.Errors.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Events.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Errors.Completion.IsCompletedSuccessfully.ShouldBeTrue();
+        node.Events.Completion.IsCompletedSuccessfully.ShouldBeTrue();
+        // Data outputs are faulted.
+        node.Output.Completion.IsFaulted.ShouldBeTrue();
+        node.Timeouts.Completion.IsFaulted.ShouldBeTrue();
     }
 
     [Fact]
     public void Join_RejectsInvalidCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { boundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => CreateNode(o => o with { BoundedCapacity = 0 }));
 
     [Fact]
-    public void Join_RejectsUnknownRightInputType()
+    public void Join_RejectsInvalidTimeout()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => CreateNode(o => o with { TimeoutMilliseconds = 0 }));
+
+    [Fact]
+    public void Join_RejectsNullOptions()
+        => Should.Throw<ArgumentNullException>(
+            () => new FlowJoinNode<LeftMessage, RightMessage>(null!, l => l.Key, r => r.Key));
+
+    [Fact]
+    public void Join_RejectsNullLeftSelector()
+        => Should.Throw<ArgumentNullException>(
+            () => new FlowJoinNode<LeftMessage, RightMessage>(
+                new JoinRoutingOptions(), null!, r => r.Key));
+
+    private static FlowJoinNode<LeftMessage, RightMessage> CreateNode(
+        Func<JoinRoutingOptions, JoinRoutingOptions>? configure = null,
+        TimeProvider? clock = null)
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { rightInputType = "missing.type" }));
-
-        exception.Message.ShouldContain("not registered");
-    }
-
-    private static RuntimeNode CreateNode(
-        object overrides,
-        Func<string, FlowMapContext, Type, object?>? evaluate = null)
-    {
-        var configuration = RoutingTestHost.MergeConfiguration(
-            new
-            {
-                leftKeyExpression = "leftKey",
-                rightKeyExpression = "rightKey",
-                leftInputType = "app.left",
-                rightInputType = "app.right"
-            },
-            overrides);
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterRoutingComponents(options => options
-                .UseExpressionEngine(new RecordingExpressionEngine(
-                    evaluate: evaluate ?? EvaluateJoinExpression))
-                .RegisterType<LeftMessage>("app.left")
-                .RegisterType<RightMessage>("app.right")
-                .UseContextFactory(new LeftMessageContextFactory())
-                .UseContextFactory(new RightMessageContextFactory()));
-        registry.TryGetFactory(RoutingComponentTypes.Join, out var factory).ShouldBeTrue();
-        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Join, configuration));
-    }
-
-    private static object? EvaluateJoinExpression(
-        string expression,
-        FlowMapContext context,
-        Type resultType)
-        => context.Variables["key"];
-
-    // Reproduces the selector the factory compiles once at build time: evaluate
-    // the expression through the engine (RecordingExpressionEngine's default
-    // Compile defers to Evaluate, preserving interception) over the context the
-    // factory creates for the input, then normalize the result to a string.
-    private static string? SelectKey<TInput>(
-        IFlowExpressionEngine engine,
-        string expression,
-        IRoutingContextFactory factory,
-        RoutingNodeContext nodeContext,
-        TInput input)
-    {
-        var value = engine.Compile<object?>(expression).Evaluate(factory.Create(input, nodeContext));
-        return value switch
-        {
-            null => null,
-            string text => string.IsNullOrWhiteSpace(text) ? null : text.Trim(),
-            _ => string.IsNullOrWhiteSpace(value.ToString()) ? null : value.ToString()!.Trim()
-        };
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string port,
-        BufferBlock<T> target)
-    {
-        runtimeNode.FindOutput(new PortName(port))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName(port), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private sealed record LeftMessage(string Key, string Payload);
-
-    private sealed record RightMessage(string Key, string Payload);
-
-    private sealed class TestRoutingContextFactory : IRoutingContextFactory
-    {
-        public FlowMapContext Create(object? input, RoutingNodeContext context)
-            => new()
-            {
-                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["input"] = input,
-                    ["value"] = input
-                }
-            };
-    }
-
-    private sealed class MessageContextFactory : IRoutingContextFactory
-    {
-        public FlowMapContext Create(object? input, RoutingNodeContext context)
-        {
-            var (key, payload) = input switch
-            {
-                LeftMessage left => (left.Key, left.Payload),
-                RightMessage right => (right.Key, right.Payload),
-                _ => (null, null)
-            };
-
-            return new FlowMapContext
-            {
-                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["input"] = input,
-                    ["value"] = input,
-                    ["key"] = key,
-                    ["payload"] = payload
-                }
-            };
-        }
-    }
-
-    private sealed class LeftMessageContextFactory : IFlowMapContextFactory<LeftMessage>
-    {
-        public FlowMapContext Create(LeftMessage input)
-            => new()
-            {
-                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["input"] = input,
-                    ["value"] = input,
-                    ["key"] = input.Key,
-                    ["payload"] = input.Payload
-                }
-            };
-    }
-
-    private sealed class RightMessageContextFactory : IFlowMapContextFactory<RightMessage>
-    {
-        public FlowMapContext Create(RightMessage input)
-            => new()
-            {
-                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["input"] = input,
-                    ["value"] = input,
-                    ["key"] = input.Key,
-                    ["payload"] = input.Payload
-                }
-            };
+        var options = configure?.Invoke(new JoinRoutingOptions()) ?? new JoinRoutingOptions();
+        return new FlowJoinNode<LeftMessage, RightMessage>(
+            options,
+            left => left.Key,
+            right => right.Key,
+            clock: clock);
     }
 }

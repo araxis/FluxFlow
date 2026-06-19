@@ -1,179 +1,64 @@
-using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
-public sealed class FlowMergeNode<TInput> : FlowNodeBase
+/// <summary>
+/// A standalone merge (fan-in) node. Several upstreams of the same type all link into the
+/// single bounded <c>Input</c> — a <see cref="System.Threading.Tasks.Dataflow.BufferBlock{T}"/>
+/// already merges concurrent producers — and the node re-broadcasts each message on
+/// <c>Output</c> in arrival order, carrying the correlation id forward and stamping a
+/// monotonic sequence number into the merge diagnostic. Output completes once every linked
+/// upstream completes the input. Works with nothing but <c>new FlowMergeNode&lt;T&gt;(options)</c>
+/// — no engine.
+/// </summary>
+public sealed class FlowMergeNode<TInput> : FlowNode<TInput, TInput>
 {
     private readonly MergeRoutingOptions _options;
     private readonly TimeProvider _clock;
-    private readonly Dictionary<string, ActionBlock<TInput>> _inputBlocks;
-    private readonly IReadOnlyDictionary<string, ITargetBlock<TInput>> _inputs;
-    private readonly ActionBlock<MergeCommand> _merge;
-    private readonly BufferBlock<FlowMergeItem<TInput>> _output;
     private long _nextSequence;
-
-    public FlowMergeNode(MergeRoutingOptions options)
-        : this(options, TimeProvider.System)
-    {
-    }
 
     public FlowMergeNode(
         MergeRoutingOptions options,
-        TimeProvider clock)
-    {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.Inputs.Length == 0)
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
         {
-            throw new ArgumentException(
-                "flow.merge requires at least one input.",
-                nameof(options));
-        }
-
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
+    {
+        _options = options;
+        _clock = clock ?? TimeProvider.System;
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "flow.merge bounded capacity must be greater than zero.");
         }
-
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
-        var inputOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        var mergeOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        _output = new BufferBlock<FlowMergeItem<TInput>>(blockOptions);
-        _merge = new ActionBlock<MergeCommand>(
-            EmitAsync,
-            mergeOptions);
-        _inputBlocks = options.Inputs
-            .ToDictionary(
-                input => input.Trim(),
-                input =>
-                {
-                    var source = input.Trim();
-                    return new ActionBlock<TInput>(
-                        value => QueueAsync(source, value),
-                        inputOptions);
-                },
-                StringComparer.Ordinal);
-        _inputs = _inputBlocks.ToDictionary(
-            input => input.Key,
-            input => (ITargetBlock<TInput>)input.Value,
-            StringComparer.Ordinal);
-        Task.WhenAll(_inputBlocks.Values.Select(input => input.Completion))
-            .ContinueWith(
-                CompleteMerge,
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
-        _merge.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_output.Completion);
     }
 
-    public IReadOnlyDictionary<string, ITargetBlock<TInput>> Inputs => _inputs;
-
-    public ISourceBlock<FlowMergeItem<TInput>> Output => _output;
-
-    public override void Complete()
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        foreach (var input in _inputBlocks.Values)
-        {
-            input.Complete();
-        }
-    }
+        ArgumentNullException.ThrowIfNull(message);
 
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            foreach (var input in _inputBlocks.Values)
-            {
-                ((IDataflowBlock)input).Fault(exception);
-            }
+        var sequence = Interlocked.Increment(ref _nextSequence);
 
-            ((IDataflowBlock)_merge).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-    }
-
-    private async Task QueueAsync(
-        string source,
-        TInput input)
-    {
-        var accepted = await _merge.SendAsync(
-            new MergeCommand(source, input)).ConfigureAwait(false);
-        if (!accepted)
+        // Re-broadcast the same envelope; the correlation id flows forward unchanged.
+        Emit(message);
+        EmitEvent(new FlowEvent
         {
-            throw new InvalidOperationException("flow.merge rejected queued input.");
-        }
-    }
-
-    private async Task EmitAsync(MergeCommand command)
-    {
-        var item = new FlowMergeItem<TInput>
-        {
-            Sequence = Interlocked.Increment(ref _nextSequence),
-            Source = command.Source,
-            Value = command.Value,
-            ReceivedAt = _clock.GetUtcNow()
-        };
-        await _output.SendAsync(item).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            RoutingDiagnosticNames.MergeEmitted,
-            message: "flow.merge emitted value.",
-            attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = RoutingDiagnosticNames.MergeEmitted,
+            Level = FlowEventLevel.Information,
+            Message = "flow.merge emitted value.",
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["inputType"] = _options.InputType,
-                ["source"] = command.Source,
-                ["sequence"] = item.Sequence
-            });
+                ["sequence"] = sequence
+            }
+        });
+
+        return Task.CompletedTask;
     }
-
-    private void CompleteMerge(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_merge).Fault(exception);
-            return;
-        }
-
-        _merge.Complete();
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            return;
-        }
-
-        _output.Complete();
-    }
-
-    private sealed record MergeCommand(
-        string Source,
-        TInput Value);
 }

@@ -1,38 +1,43 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
-public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone windowing node. Post <c>FlowMessage&lt;TInput&gt;</c> values to <c>Input</c>;
+/// the node groups their payloads into count- or time-bounded windows and broadcasts each
+/// completed window as a <c>FlowMessage&lt;FlowWindow&lt;TInput&gt;&gt;</c> on <c>Output</c>.
+/// A window emits when <see cref="WindowRoutingOptions.MaxItems"/> items are buffered, when
+/// the configured time elapses with no further input (timed off the injected
+/// <see cref="TimeProvider"/>), or — by default — as a partial window when the input drains.
+/// The window carries the correlation id of the message that opened it. Works with nothing
+/// but <c>new FlowWindowNode&lt;T&gt;(options)</c> — no engine.
+/// </summary>
+public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>>
 {
     private readonly WindowRoutingOptions _options;
     private readonly TimeProvider _clock;
     private readonly TimeSpan _timeLimit;
-    private readonly ActionBlock<TInput> _input;
-    private readonly ActionBlock<WindowCommand> _commands;
-    private readonly BufferBlock<FlowWindow<TInput>> _output;
-    private readonly CancellationTokenSource _lifecycleCancellation = new();
+    private readonly object _gate = new();
     private readonly List<TInput> _items = [];
-    private volatile CancellationTokenSource? _timerCancellation;
+    private CorrelationId _windowCorrelationId;
     private DateTimeOffset? _startedAt;
     private long _nextSequence;
     private long _windowVersion;
-    private bool _disposed;
-
-    public FlowWindowNode(WindowRoutingOptions options)
-        : this(options, TimeProvider.System)
-    {
-    }
+    private ITimer? _timer;
 
     public FlowWindowNode(
         WindowRoutingOptions options,
-        TimeProvider clock)
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _options = options;
+        _clock = clock ?? TimeProvider.System;
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -62,178 +67,124 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         }
 
         _timeLimit = TimeSpan.FromMilliseconds(options.TimeMilliseconds);
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
-        var executionOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        _output = new BufferBlock<FlowWindow<TInput>>(blockOptions);
-        _commands = new ActionBlock<WindowCommand>(ProcessCommandAsync, executionOptions);
-        _input = new ActionBlock<TInput>(
-            async input => await _commands.SendAsync(
-                WindowCommand.FromInput(input),
-                _lifecycleCancellation.Token).ConfigureAwait(false),
-            executionOptions);
-        _input.Completion.ContinueWith(
-            completion => _ = CompleteCommandsAsync(completion),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        _commands.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_output.Completion);
     }
 
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<FlowWindow<TInput>> Output => _output;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(message);
+
         try
         {
-            _lifecycleCancellation.Cancel();
-            TryCancelTimer();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_commands).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        try
-        {
-            await Completion.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Dispose must not throw when the node faulted.
-        }
-        finally
-        {
-            _timerCancellation?.Dispose();
-            _lifecycleCancellation.Dispose();
-        }
-    }
-
-    private async Task ProcessCommandAsync(WindowCommand command)
-    {
-        try
-        {
-            switch (command.Kind)
+            FlowWindow<TInput>? window = null;
+            CorrelationId correlation = default;
+            lock (_gate)
             {
-                case WindowCommandKind.Input:
-                    await AddInputAsync(command.Input!).ConfigureAwait(false);
-                    break;
-                case WindowCommandKind.Timer:
-                    await EmitByTimeAsync(command.WindowVersion).ConfigureAwait(false);
-                    break;
-                case WindowCommandKind.Complete:
-                    await CompleteWindowAsync().ConfigureAwait(false);
-                    break;
-                default:
-                    throw new InvalidOperationException(
-                        $"flow.window command '{command.Kind}' is not supported.");
+                if (_items.Count == 0)
+                {
+                    StartWindow(message.CorrelationId, _clock.GetUtcNow());
+                }
+
+                _items.Add(message.Payload);
+                if (_options.MaxItems > 0 && _items.Count >= _options.MaxItems)
+                {
+                    correlation = _windowCorrelationId;
+                    window = BuildAndClearWindow(FlowWindowEmitReason.Count, _clock.GetUtcNow());
+                }
             }
-        }
-        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
-        {
-            throw;
+
+            if (window is not null)
+            {
+                EmitWindow(window, correlation);
+            }
         }
         catch (Exception exception)
         {
-            TryReportError(
-                RoutingErrorCodes.WindowFailed,
-                $"flow.window failed: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                RoutingDiagnosticNames.WindowFailed,
-                FlowDiagnosticLevel.Error,
-                "flow.window failed.",
-                exception,
-                CreateAttributes());
+            ReportFailure(message.CorrelationId, exception);
         }
+
+        return Task.CompletedTask;
     }
 
-    private async Task AddInputAsync(TInput input)
+    /// <summary>
+    /// Flushes a partial window when the input drains (unless suppressed). Runs after the
+    /// pump stops and before the outputs complete, so the emitted window reaches consumers.
+    /// </summary>
+    protected override ValueTask OnInputCompletedAsync()
     {
-        var now = _clock.GetUtcNow();
-        if (_items.Count == 0)
+        FlowWindow<TInput>? window = null;
+        CorrelationId correlation = default;
+        lock (_gate)
         {
-            StartWindow(now);
+            CancelTimer();
+            if (_items.Count > 0 && _options.EmitPartialOnCompletion)
+            {
+                correlation = _windowCorrelationId;
+                window = BuildAndClearWindow(FlowWindowEmitReason.Completion, _clock.GetUtcNow());
+            }
+            else
+            {
+                ClearWindow();
+            }
         }
 
-        _items.Add(input);
-        if (_options.MaxItems > 0 && _items.Count >= _options.MaxItems)
+        if (window is not null)
         {
-            await EmitWindowAsync(FlowWindowEmitReason.Count, _clock.GetUtcNow())
-                .ConfigureAwait(false);
+            EmitWindow(window, correlation);
         }
+
+        return ValueTask.CompletedTask;
     }
 
-    private async Task EmitByTimeAsync(long version)
+    protected override ValueTask OnDisposeAsync()
     {
-        if (version != _windowVersion || _items.Count == 0)
+        lock (_gate)
         {
-            return;
+            CancelTimer();
         }
 
-        await EmitWindowAsync(FlowWindowEmitReason.Time, _clock.GetUtcNow())
-            .ConfigureAwait(false);
+        return ValueTask.CompletedTask;
     }
 
-    private async Task CompleteWindowAsync()
+    // Fired once the time window elapses for the window identified by <paramref name="state"/>.
+    private void OnTimeElapsed(object? state)
     {
-        TryCancelTimer();
-        if (_items.Count > 0 && _options.EmitPartialOnCompletion)
+        var version = (long)state!;
+        FlowWindow<TInput>? window = null;
+        CorrelationId correlation = default;
+        lock (_gate)
         {
-            await EmitWindowAsync(FlowWindowEmitReason.Completion, _clock.GetUtcNow())
-                .ConfigureAwait(false);
-            return;
+            if (version == _windowVersion && _items.Count > 0)
+            {
+                correlation = _windowCorrelationId;
+                window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
+            }
         }
 
-        ClearWindow();
+        if (window is not null)
+        {
+            EmitWindow(window, correlation);
+        }
     }
 
-    private void StartWindow(DateTimeOffset startedAt)
+    private void StartWindow(CorrelationId correlationId, DateTimeOffset startedAt)
     {
         _startedAt = startedAt;
+        _windowCorrelationId = correlationId;
         _windowVersion++;
         ScheduleTimer(_windowVersion);
     }
 
-    private async Task EmitWindowAsync(
+    // Builds the window snapshot and resets state. Must be called under _gate.
+    private FlowWindow<TInput>? BuildAndClearWindow(
         FlowWindowEmitReason reason,
         DateTimeOffset emittedAt)
     {
         if (_items.Count == 0 || _startedAt is null)
         {
-            return;
+            return null;
         }
 
-        TryCancelTimer();
+        CancelTimer();
         var window = new FlowWindow<TInput>
         {
             Sequence = ++_nextSequence,
@@ -242,15 +193,11 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
             EmittedAt = emittedAt,
             Reason = reason
         };
-
         ClearWindow();
-        await _output.SendAsync(window, _lifecycleCancellation.Token).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            RoutingDiagnosticNames.WindowEmitted,
-            message: "flow.window emitted window.",
-            attributes: CreateAttributes(window));
+        return window;
     }
 
+    // Must be called under _gate.
     private void ClearWindow()
     {
         _items.Clear();
@@ -258,6 +205,7 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
         _windowVersion++;
     }
 
+    // Must be called under _gate.
     private void ScheduleTimer(long version)
     {
         if (_timeLimit <= TimeSpan.Zero)
@@ -265,73 +213,54 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        var previous = Interlocked.Exchange(ref _timerCancellation, null);
-        previous?.Cancel();
-        previous?.Dispose();
-        var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            _lifecycleCancellation.Token);
-        _timerCancellation = timerCancellation;
-        _ = RunTimerAsync(version, timerCancellation.Token);
+        _timer?.Dispose();
+        _timer = _clock.CreateTimer(OnTimeElapsed, version, _timeLimit, Timeout.InfiniteTimeSpan);
     }
 
-    private void TryCancelTimer()
+    // Must be called under _gate.
+    private void CancelTimer()
     {
-        var timerCancellation = Interlocked.Exchange(ref _timerCancellation, null);
-        timerCancellation?.Cancel();
-        timerCancellation?.Dispose();
+        _timer?.Dispose();
+        _timer = null;
     }
 
-    private async Task RunTimerAsync(
-        long version,
-        CancellationToken cancellationToken)
+    private void EmitWindow(FlowWindow<TInput> window, CorrelationId correlationId)
     {
-        try
+        Emit(new FlowMessage<FlowWindow<TInput>>(correlationId, window));
+        EmitEvent(new FlowEvent
         {
-            await Task.Delay(_timeLimit, _clock, cancellationToken).ConfigureAwait(false);
-            await _commands.SendAsync(
-                WindowCommand.Timer(version),
-                _lifecycleCancellation.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
+            Name = RoutingDiagnosticNames.WindowEmitted,
+            Level = FlowEventLevel.Information,
+            Message = "flow.window emitted window.",
+            Attributes = CreateAttributes(window)
+        });
     }
 
-    private async Task CompleteCommandsAsync(Task completion)
+    private void ReportFailure(CorrelationId correlationId, Exception exception)
     {
-        if (completion.IsFaulted && completion.Exception is { } completionException)
+        EmitError(new FlowError
         {
-            ((IDataflowBlock)_commands).Fault(completionException);
-            return;
-        }
-
-        try
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
+            Code = RoutingErrorCodes.WindowFailed,
+            Message = $"flow.window failed: {exception.Message}",
+            Context = CreateErrorContext(),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
         {
-            await _commands.SendAsync(
-                WindowCommand.Complete(),
-                CancellationToken.None).ConfigureAwait(false);
-            _commands.Complete();
-        }
-        catch (Exception exception)
-        {
-            ((IDataflowBlock)_commands).Fault(exception);
-        }
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
+            Name = RoutingDiagnosticNames.WindowFailed,
+            Level = FlowEventLevel.Error,
+            Message = "flow.window failed.",
+            Attributes = CreateAttributes()
+        });
     }
 
-    private void CompleteOutput(Task completion)
-    {
-        TryCancelTimer();
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            return;
-        }
-
-        _output.Complete();
-    }
-
-    private Dictionary<string, object?> CreateAttributes(
-        FlowWindow<TInput>? window = null)
+    private Dictionary<string, object?> CreateAttributes(FlowWindow<TInput>? window = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -354,26 +283,4 @@ public sealed class FlowWindowNode<TInput> : FlowNodeBase, IAsyncDisposable
 
     private string CreateErrorContext()
         => $"inputType={_options.InputType}; maxItems={_options.MaxItems}; timeMilliseconds={_options.TimeMilliseconds}";
-
-    private sealed record WindowCommand(
-        WindowCommandKind Kind,
-        TInput? Input = default,
-        long WindowVersion = 0)
-    {
-        public static WindowCommand FromInput(TInput input)
-            => new(WindowCommandKind.Input, input);
-
-        public static WindowCommand Timer(long version)
-            => new(WindowCommandKind.Timer, WindowVersion: version);
-
-        public static WindowCommand Complete()
-            => new(WindowCommandKind.Complete);
-    }
-
-    private enum WindowCommandKind
-    {
-        Input,
-        Timer,
-        Complete
-    }
 }

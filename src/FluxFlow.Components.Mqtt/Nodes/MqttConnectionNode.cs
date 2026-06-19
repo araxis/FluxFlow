@@ -1,23 +1,29 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
 /// <summary>
-/// Owns the MQTT client lifecycle. Establishing and tearing down the client is an
-/// explicit, host-API-only decision: there is no auto-connect, no lazy connect, and
-/// no in-graph command port. Publish and subscribe nodes borrow the established
-/// adapter via <see cref="TryGetAdapter"/> and never connect or dispose it.
+/// Owns the MQTT client lifecycle. A connection is a resource, not a dataflow node:
+/// it has no input/output data ports, only a self-owned <see cref="Events"/> stream
+/// that broadcasts connection-health <see cref="FlowEvent"/>s. Establishing and
+/// tearing down the client is an explicit, host-API-only decision: there is no
+/// auto-connect, no lazy connect, and no in-graph command port. Publish and subscribe
+/// nodes borrow the established adapter via <see cref="TryGetAdapter"/> and never
+/// connect or dispose it. Works with nothing but a client factory — no engine.
 /// </summary>
-public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandle, IAsyncDisposable
+public sealed class MqttConnectionNode : IMqttConnectionHandle, IAsyncDisposable
 {
-    private readonly NodeAddress _address;
     private readonly IMqttClientFactory _clientFactory;
     private readonly TimeProvider _clock;
+
+    // Self-owned event port. Broadcast so connection health can fan out to many
+    // observers; a connection handle has no data/error ports.
+    private readonly BroadcastBlock<FlowEvent> _events = new(static e => e);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
@@ -36,26 +42,22 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
     private TaskCompletionSource _change =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    internal MqttConnectionNode(
-        NodeAddress address,
+    public MqttConnectionNode(
         string connectionName,
         MqttConnectionProfile profile,
         MqttReconnectPolicy? reconnect,
         IMqttClientFactory clientFactory,
-        TimeProvider clock)
+        TimeProvider? clock = null)
     {
-        ArgumentNullException.ThrowIfNull(address);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionName);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(clientFactory);
-        ArgumentNullException.ThrowIfNull(clock);
 
-        _address = address;
         ConnectionName = connectionName;
         Profile = profile;
         Reconnect = reconnect;
         _clientFactory = clientFactory;
-        _clock = clock;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public string ConnectionName { get; }
@@ -67,6 +69,9 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
     public MqttClientHealthState State => _state;
 
     public int ConnectionEpoch => _epoch;
+
+    /// <summary>Event port — broadcast; connection-health <see cref="FlowEvent"/> stream.</summary>
+    public ISourceBlock<FlowEvent> Events => _events;
 
     // StartAsync stays a no-op: connecting is an explicit host decision.
 
@@ -153,7 +158,6 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
         {
             var context = new MqttClientFactoryContext
             {
-                Address = _address,
                 ConnectionName = ConnectionName,
                 Profile = Profile,
                 Reconnect = Reconnect,
@@ -355,14 +359,9 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
         {
         }
 
-        CompleteNode();
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _lifecycleCancellation.Cancel();
-        FaultNode(exception);
+        // Complete (flush) the event port rather than fault it, so observers'
+        // Completion settles and any buffered health event is still delivered.
+        _events.Complete();
     }
 
     private void SignalChange()
@@ -383,46 +382,22 @@ public sealed class MqttConnectionNode : EventFlowNodeBase, IMqttConnectionHandl
             ConnectionName = ConnectionName
         };
 
-        TryEmitDiagnostic(
-            MqttDiagnosticNames.ConnectionHealthChanged,
-            FlowDiagnosticLevel.Error,
-            $"MQTT connection '{ConnectionName}' failed to establish a client.",
-            exception,
-            MqttHealthSignal.CreateDiagnosticAttributes(health, ConnectionName));
-        EmitHealthEvent(health);
+        EmitHealthEvent(health, FlowEventLevel.Error);
     }
 
     private void EmitHealthFailure(MqttClientHealthEvent health, Exception exception)
-    {
-        TryEmitDiagnostic(
-            MqttDiagnosticNames.ConnectionHealthChanged,
-            FlowDiagnosticLevel.Error,
-            "MQTT connection health stream failed.",
-            exception,
-            MqttHealthSignal.CreateDiagnosticAttributes(health, ConnectionName));
-        EmitHealthEvent(health);
-    }
+        => EmitHealthEvent(health, FlowEventLevel.Error);
 
     private void EmitHealth(MqttClientHealthEvent health)
-    {
-        TryEmitDiagnostic(
-            MqttDiagnosticNames.ConnectionHealthChanged,
-            MqttHealthSignal.GetLevel(health),
-            MqttHealthSignal.CreateMessage(health),
-            attributes: MqttHealthSignal.CreateDiagnosticAttributes(health, ConnectionName));
-        EmitHealthEvent(health);
-    }
+        => EmitHealthEvent(health, MqttHealthSignal.GetLevel(health));
 
-    private bool EmitHealthEvent(MqttClientHealthEvent health)
-        => EmitEvent(new FlowEvent
+    private bool EmitHealthEvent(MqttClientHealthEvent health, FlowEventLevel level)
+        => _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
-            Type = MqttEventNames.ConnectionHealthChanged,
-            Source = Id.ToString(),
-            SourceNodeId = Id,
-            Subject = MqttHealthSignal.CreateSubject(health, ConnectionName),
-            Status = health.State.ToString(),
-            Channel = MqttEventNames.ConnectionHealthChanged,
-            Attributes = MqttHealthSignal.CreateEventAttributes(health, ConnectionName)
+            Name = MqttEventNames.ConnectionHealthChanged,
+            Level = level,
+            Message = MqttHealthSignal.CreateMessage(health),
+            Attributes = MqttHealthSignal.CreateAttributes(health, ConnectionName)
         });
 }

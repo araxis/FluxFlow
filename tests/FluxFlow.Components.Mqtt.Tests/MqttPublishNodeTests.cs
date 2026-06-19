@@ -1,7 +1,8 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Mqtt.Nodes;
+using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -15,75 +16,51 @@ public sealed class MqttPublishNodeTests
     public async Task PublishNode_ReportsNotConnectedForValidRequest()
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
-        var registry = MqttResourceTestContext.CreateRegistry(clock);
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
-
-        var runtimeNode = factory(MqttResourceTestContext.CreateContext(
-            MqttComponentTypes.Publish,
-            new
+        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory(), clock);
+        await using var node = new MqttPublishNode(
+            connection,
+            new MqttPublishOptions
             {
-                connectionName = MqttResourceTestContext.ConnectionName,
-                defaultTopic = "devices/temperature",
-                retain = true,
-                qualityOfService = "AtLeastOnce",
-                boundedCapacity = 4
+                DefaultTopic = "devices/temperature",
+                Retain = true,
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                BoundedCapacity = 4
             },
-            resources));
+            clock);
 
-        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
-            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
-        var results = new BufferBlock<MqttPublishResult>();
-        using var link = runtimeNode.FindOutput(new PortName(MqttComponentPorts.Result))!
-            .TryLinkTo(
-                new InputPort<MqttPublishResult>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out var linkError);
-        linkError.ShouldBeNull();
+        var results = MqttTestContext.Sink(node.Output);
+        var errors = MqttTestContext.Sink(node.Errors);
+        var events = MqttTestContext.Sink(node.Events);
 
-        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
-        var events = new BufferBlock<FluxFlow.Engine.Components.FlowEvent>();
-        var diagnostics = new BufferBlock<FluxFlow.Engine.Components.FlowDiagnostic>();
-        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttPublishNode>();
-        node.Errors.LinkTo(errors);
-        node.Events.LinkTo(events);
-        node.Diagnostics.LinkTo(diagnostics);
-
-        await node.StartAsync();
-        await input.Target.SendAsync(new MqttPublishRequest
-        {
-            Payload = [1, 2, 3],
-            PayloadPreview = "010203",
-            CorrelationId = "abc"
-        });
-        input.Target.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        // No client => no result is produced; the node reports not connected.
-        results.TryReceive(out _).ShouldBeFalse();
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MqttPublishRequest
+            {
+                Payload = [1, 2, 3],
+                PayloadPreview = "010203",
+                CorrelationId = "abc"
+            },
+            new CorrelationId("corr-1")));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
         error.Message.ShouldContain("not connected");
+        error.CorrelationId.ShouldBe(new CorrelationId("corr-1"));
         error.Context.ShouldNotBeNull();
         error.Context.ShouldContain("correlationId=abc");
-        error.Context.ShouldContain($"connectionName={MqttResourceTestContext.ConnectionName}");
+        error.Context.ShouldContain($"connectionName={MqttTestContext.ConnectionName}");
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        flowEvent.Type.ShouldBe(MqttEventNames.PublishFailed);
-        flowEvent.Status.ShouldBe("failed");
-        flowEvent.Subject.ShouldBe("devices/temperature");
+        flowEvent.Name.ShouldBe(MqttEventNames.PublishFailed);
+        flowEvent.Level.ShouldBe(FlowEventLevel.Error);
+        flowEvent.CorrelationId.ShouldBe(new CorrelationId("corr-1"));
         flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
-        flowEvent.GetAttribute("correlationId").ShouldBe("abc");
+        flowEvent.Attributes["topic"].ShouldBe("devices/temperature");
+        flowEvent.Attributes["correlationId"].ShouldBe("abc");
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(MqttDiagnosticNames.PublishFailed);
-        diagnostic.Level.ShouldBe(FluxFlow.Engine.Components.FlowDiagnosticLevel.Error);
-        diagnostic.Attributes["connectionName"].ShouldBe(MqttResourceTestContext.ConnectionName);
-
-        await node.DisposeAsync();
+        // No client => no result is produced.
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -92,88 +69,56 @@ public sealed class MqttPublishNodeTests
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
         var adapter = new RecordingMqttClientAdapter();
         var factory = new RecordingMqttClientFactory(adapter, ownLease: false);
-        var registry = MqttResourceTestContext.CreateRegistry(clock, factory);
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        var handle = MqttResourceTestContext.ResolveHandle(resources);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var publishFactory).ShouldBeTrue();
-
-        var runtimeNode = publishFactory(MqttResourceTestContext.CreateContext(
-            MqttComponentTypes.Publish,
-            new
+        await using var connection = MqttTestContext.CreateConnection(factory, clock);
+        await using var node = new MqttPublishNode(
+            connection,
+            new MqttPublishOptions
             {
-                connectionName = MqttResourceTestContext.ConnectionName,
-                defaultTopic = "devices/temperature",
-                qualityOfService = "AtLeastOnce",
-                boundedCapacity = 8
+                DefaultTopic = "devices/temperature",
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                BoundedCapacity = 8
             },
-            resources));
+            clock);
 
-        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
-            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
-        var results = new BufferBlock<MqttPublishResult>();
-        using var link = runtimeNode.FindOutput(new PortName(MqttComponentPorts.Result))!
-            .TryLinkTo(
-                new InputPort<MqttPublishResult>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: false,
-                out var linkError);
-        linkError.ShouldBeNull();
-
-        var node = runtimeNode.Node.ShouldBeOfType<Nodes.MqttPublishNode>();
-        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
-        node.Errors.LinkTo(errors);
-        await node.StartAsync();
+        var results = MqttTestContext.Sink(node.Output);
+        var errors = MqttTestContext.Sink(node.Errors);
 
         // Before connect: not connected.
-        await input.Target.SendAsync(new MqttPublishRequest { Payload = [1], CorrelationId = "before" });
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MqttPublishRequest { Payload = [1], CorrelationId = "before" }));
         var beforeError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         beforeError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
 
-        // After host ConnectAsync: round-trips through the borrowed adapter.
-        await handle.ConnectAsync();
-        await input.Target.SendAsync(new MqttPublishRequest
-        {
-            Payload = [1, 2, 3],
-            CorrelationId = "after"
-        });
+        // After host ConnectAsync: round-trips through the borrowed adapter, carrying the
+        // envelope correlation id forward onto the result.
+        await connection.ConnectAsync();
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MqttPublishRequest { Payload = [1, 2, 3], CorrelationId = "after" },
+            new CorrelationId("envelope-after")));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Topic.ShouldBe("devices/temperature");
-        result.PayloadBytes.ShouldBe(3);
-        result.CorrelationId.ShouldBe("after");
+        result.CorrelationId.ShouldBe(new CorrelationId("envelope-after"));
+        result.Payload.Topic.ShouldBe("devices/temperature");
+        result.Payload.PayloadBytes.ShouldBe(3);
+        result.Payload.CorrelationId.ShouldBe("after");
         adapter.Published.ShouldContain(request => request.CorrelationId == "after");
 
         // After DisconnectAsync: not connected again.
-        await handle.DisconnectAsync();
-        await input.Target.SendAsync(new MqttPublishRequest { Payload = [9], CorrelationId = "afterDisconnect" });
+        await connection.DisconnectAsync();
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MqttPublishRequest { Payload = [9], CorrelationId = "afterDisconnect" }));
         var afterError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         afterError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
-
-        await node.DisposeAsync();
-        await ((IAsyncDisposable)handle).DisposeAsync();
     }
 
     [Fact]
     public async Task PublishNode_ReportsErrorWhenTopicIsMissing()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
+        await using var node = new MqttPublishNode(connection);
+        var errors = MqttTestContext.Sink(node.Errors);
 
-        var runtimeNode = factory(MqttResourceTestContext.CreateContext(
-            MqttComponentTypes.Publish,
-            new { connectionName = MqttResourceTestContext.ConnectionName },
-            resources));
-        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
-            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
-        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-
-        await runtimeNode.Node.StartAsync();
-        await input.Target.SendAsync(new MqttPublishRequest { Payload = [1] });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest { Payload = [1] }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishInvalidTopic);
@@ -183,27 +128,12 @@ public sealed class MqttPublishNodeTests
     [Fact]
     public async Task PublishNode_ReportsErrorWhenTopicContainsWildcard()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
+        await using var node = new MqttPublishNode(connection);
+        var errors = MqttTestContext.Sink(node.Errors);
 
-        var runtimeNode = factory(MqttResourceTestContext.CreateContext(
-            MqttComponentTypes.Publish,
-            new { connectionName = MqttResourceTestContext.ConnectionName },
-            resources));
-        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
-            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
-        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-
-        await runtimeNode.Node.StartAsync();
-        await input.Target.SendAsync(new MqttPublishRequest
-        {
-            Topic = "devices/+",
-            Payload = [1]
-        });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(
+            new MqttPublishRequest { Topic = "devices/+", Payload = [1] }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishInvalidTopic);
@@ -211,91 +141,22 @@ public sealed class MqttPublishNodeTests
     }
 
     [Fact]
-    public void PublishNode_RejectsMissingConnectionName()
-    {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(MqttResourceTestContext.CreateContext(
-                MqttComponentTypes.Publish,
-                new { defaultTopic = "devices/state" },
-                resources)));
-
-        exception.Message.ShouldContain("ConnectionName");
-    }
-
-    [Fact]
-    public void PublishNode_FailsWhenConnectionResourceMissing()
-    {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(MqttResourceTestContext.CreateContext(
-                MqttComponentTypes.Publish,
-                new { connectionName = "missing-broker", defaultTopic = "devices/state" },
-                new Dictionary<NodeName, RuntimeNode>())));
-
-        exception.Message.ShouldContain("missing-broker");
-    }
-
-    [Fact]
-    public void PublishNode_RejectsInvalidDefaultTopic()
-    {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(MqttResourceTestContext.CreateContext(
-                MqttComponentTypes.Publish,
-                new { connectionName = MqttResourceTestContext.ConnectionName, defaultTopic = "devices/#" },
-                resources)));
-
-        exception.Message.ShouldContain("defaultTopic");
-    }
-
-    [Fact]
-    public void PublishNode_RejectsInvalidPublishTimeout()
-    {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(MqttResourceTestContext.CreateContext(
-                MqttComponentTypes.Publish,
-                new { connectionName = MqttResourceTestContext.ConnectionName, publishTimeoutMilliseconds = 0 },
-                resources)));
-
-        exception.Message.ShouldContain("PublishTimeoutMilliseconds");
-    }
-
-    [Fact]
     public async Task PublishNode_ReportsErrorWhenPayloadIsMissing()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
-        registry.TryGetFactory(MqttComponentTypes.Publish, out var factory).ShouldBeTrue();
+        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
+        await using var node = new MqttPublishNode(
+            connection,
+            new MqttPublishOptions { DefaultTopic = "devices/state" });
+        var errors = MqttTestContext.Sink(node.Errors);
 
-        var runtimeNode = factory(MqttResourceTestContext.CreateContext(
-            MqttComponentTypes.Publish,
-            new { connectionName = MqttResourceTestContext.ConnectionName, defaultTopic = "devices/state" },
-            resources));
-        var input = runtimeNode.FindInput(new PortName(MqttComponentPorts.Input))
-            .ShouldBeOfType<InputPort<MqttPublishRequest>>();
-        var errors = new BufferBlock<FluxFlow.Engine.Components.FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-
-        await runtimeNode.Node.StartAsync();
-        await input.Target.SendAsync(new MqttPublishRequest { Payload = null! });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest { Payload = null! }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishInvalidPayload);
         error.Message.ShouldContain("payload");
     }
+
+    [Fact]
+    public void PublishNode_RejectsNullConnection()
+        => Should.Throw<ArgumentNullException>(() => new MqttPublishNode(connection: null!));
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -8,21 +8,17 @@
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable deterministic source components for FluxFlow.</Description>
+    <Description>Standalone deterministic source nodes for FluxFlow: generated and sequence emitters built as FlowSource&lt;T&gt; over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: TimeProvider clock migration. Replaces the package's bespoke clock abstraction with System.TimeProvider — the clock is now configured via UseClock(TimeProvider)/the TimeProvider-typed Clock option, and the old IXxxClock/System*Clock public types are removed (breaking). Runtime behavior is unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt on the FluxFlow.Nodes kit: source.generated and source.sequence are FlowSource&lt;T&gt; sources (started via StartAsync, items minted as FlowMessage envelopes carrying a fresh correlation id) that time off the injected TimeProvider. The engine factories, module, registration extensions, ports, type constants, design-metadata provider, the definition-options reader, and the JSON item/string-to-Type resolution layer (SourcesComponentOptions) are removed; GeneratedSourceNode takes its options plus the already-materialized items, SequenceSourceNode takes its options, and both take a TimeProvider directly and depend only on FluxFlow.Nodes (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

@@ -1,134 +1,77 @@
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sources.Nodes;
 
-public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAsyncDisposable
+/// <summary>
+/// A standalone deterministic sequence source. Call <c>StartAsync</c> and the node
+/// broadcasts <see cref="SequenceSourceOptions.Count"/> <c>FlowMessage&lt;SourceSequenceItem&gt;</c>
+/// values on <c>Output</c> (each minting a fresh correlation id), then completes — honoring
+/// the configured initial delay and inter-item interval off the injected
+/// <see cref="TimeProvider"/>, so tests can advance a FakeTimeProvider instead of sleeping.
+/// Lifecycle notes are emitted on <c>Events</c> using <see cref="SourceDiagnosticNames"/>;
+/// failures surface a <see cref="FlowError"/> on <c>Errors</c>. Works with nothing but
+/// <c>new SequenceSourceNode(options)</c> — no engine.
+/// </summary>
+public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
 {
-    private readonly object _stateLock = new();
+    public const string Started = SourceDiagnosticNames.SequenceStarted;
+    public const string Emitted = SourceDiagnosticNames.SequenceEmitted;
+    public const string Completed = SourceDiagnosticNames.SequenceCompleted;
+    public const string Failed = SourceDiagnosticNames.SequenceFailed;
+
     private readonly SequenceSourceOptions _options;
     private readonly TimeProvider _clock;
-    private CancellationTokenSource? _runCancellation;
-    private Task? _runTask;
-    private bool _startRequested;
-    private bool _completedBeforeStart;
-    private bool _disposed;
 
-    public SequenceSourceNode(SequenceSourceOptions options)
-        : this(options, TimeProvider.System)
-    {
-    }
-
-    internal SequenceSourceNode(
-        SequenceSourceOptions options,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
+    public SequenceSourceNode(SequenceSourceOptions options, TimeProvider? clock = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.BoundedCapacity <= 0)
+        _clock = clock ?? TimeProvider.System;
+
+        if (_options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "source.sequence bounded capacity must be greater than zero.");
+                "source.sequence option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (_options.InitialDelayMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'initialDelayMilliseconds' cannot be negative.");
+        }
+
+        if (_options.IntervalMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'intervalMilliseconds' cannot be negative.");
+        }
+
+        if (_options.Count <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'count' must be greater than zero.");
+        }
+
+        if (_options.Step == 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'step' cannot be zero.");
         }
     }
 
-    public override Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_completedBeforeStart)
-            {
-                return Task.CompletedTask;
-            }
-
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("source.sequence node has already started.");
-            }
-
-            _startRequested = true;
-            _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _runTask = RunAsync(_runCancellation.Token);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-    {
-        CancellationTokenSource? cancellation;
-        lock (_stateLock)
-        {
-            cancellation = _runCancellation;
-            if (cancellation is null)
-            {
-                _completedBeforeStart = true;
-            }
-        }
-
-        if (cancellation is null)
-        {
-            CompleteOutput();
-            return;
-        }
-
-        try
-        {
-            cancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the run loop has stopped.
-        }
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _runCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the run loop has stopped.
-        }
-
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        if (_runTask is not null)
-        {
-            await _runTask.ConfigureAwait(false);
-        }
-
-        _runCancellation?.Dispose();
-    }
-
-    private async Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var emitted = 0;
         try
         {
-            TryEmitDiagnostic(
-                SourceDiagnosticNames.SequenceStarted,
-                message: "source.sequence started.",
-                attributes: CreateAttributes(emitted));
+            EmitDiagnostic(Started, "source.sequence started.", CreateAttributes(emitted));
             await SourceNodeTiming.DelayInitialAsync(
                 _options.InitialDelayMilliseconds,
                 _clock,
@@ -146,17 +89,12 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
                     Step = _options.Step,
                     Timestamp = _clock.GetUtcNow()
                 };
-                if (!await SendOutputAsync(item, cancellationToken).ConfigureAwait(false))
-                {
-                    CompleteSequence(emitted, "source.sequence stopped.");
-                    return;
-                }
-
+                Emit(FlowMessage.Create(item));
                 emitted++;
-                TryEmitDiagnostic(
-                    SourceDiagnosticNames.SequenceEmitted,
-                    message: "source.sequence emitted item.",
-                    attributes: CreateAttributes(emitted, item));
+                EmitDiagnostic(
+                    Emitted,
+                    "source.sequence emitted item.",
+                    CreateAttributes(emitted, item));
                 if (index < _options.Count - 1)
                 {
                     await SourceNodeTiming.DelayIntervalAsync(
@@ -174,29 +112,46 @@ public sealed class SequenceSourceNode : SourceFlowNode<SourceSequenceItem>, IAs
         }
         catch (Exception exception)
         {
-            TryReportError(
-                SourceErrorCodes.SequenceFailed,
-                $"source.sequence failed: {exception.Message}",
-                exception,
-                CreateErrorContext(emitted));
-            TryEmitDiagnostic(
-                SourceDiagnosticNames.SequenceFailed,
-                FlowDiagnosticLevel.Error,
-                "source.sequence failed.",
-                exception,
-                CreateAttributes(emitted));
-            base.Fault(exception);
+            ReportFailure(exception, emitted);
+            throw;
         }
     }
 
     private void CompleteSequence(int emitted, string message)
+        => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
+
+    private void ReportFailure(Exception exception, int emitted)
     {
-        TryEmitDiagnostic(
-            SourceDiagnosticNames.SequenceCompleted,
-            message: message,
-            attributes: CreateAttributes(emitted));
-        CompleteOutput();
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = SourceErrorCodes.SequenceFailed,
+            Message = $"source.sequence failed: {exception.Message}",
+            Context = CreateErrorContext(emitted),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = Failed,
+            Level = FlowEventLevel.Error,
+            Message = "source.sequence failed.",
+            Attributes = CreateAttributes(emitted)
+        });
     }
+
+    private void EmitDiagnostic(
+        string name,
+        string message,
+        IReadOnlyDictionary<string, object?> attributes)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = name,
+            Level = FlowEventLevel.Information,
+            Message = message,
+            Attributes = attributes
+        });
 
     private Dictionary<string, object?> CreateAttributes(
         int emitted,
