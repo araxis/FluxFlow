@@ -14,6 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- See FluxFlow.Components.Storage.SqlFile.csproj: scoped risk-acceptance of CVE-2025-6965
+         until a patched SQLitePCLRaw (SQLite >= 3.50.2) ships. The audit runs per project, so
+         the suppression is repeated here for the test project's closure. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.7.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="Shouldly" Version="4.2.1" />
