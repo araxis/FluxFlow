@@ -180,11 +180,14 @@ This folder records the extraction work for `FluxFlow.Engine`.
   mapper diagnostic, README refresh, three flake root-cause fixes) and the GA
   cut flipping the 20 component packages from `2.0.0-preview.1` to `2.0.0`
   (engine stays `1.3.0`).
-- `139-standalone-node-architecture.md`: in-progress re-architecture (branch
-  `work/http-simplify`, unmerged) — the `FluxFlow.Nodes` kit (`FlowNode<,>`,
-  `FlowMessage<T>` envelope, guarded `CorrelationId`), engine-free standalone
-  nodes (HTTP rebuilt as the template), and the transport-neutral
-  `RequestReplyCoordinator` reused by HTTP (ASP.NET) and MQTT triggers.
+- `139-standalone-node-architecture.md`: COMPLETE re-architecture (branch
+  `work/http-simplify`, unmerged/unpublished) — the `FluxFlow.Nodes` kit
+  (`FlowNode<,>`/`FlowSource<>`, `AddOutput`, `OnInputCompletedAsync` drain hook,
+  fault-flush rule, `FlowMessage<T>` envelope, guarded `CorrelationId`), the extracted
+  `FluxFlow.Mapping` leaf, all 18 dataflow-node packages migrated engine-free (engine
+  now optional), the transport-neutral `RequestReplyCoordinator` (HTTP/MQTT triggers),
+  5 composition samples retired, and an adversarial verify pass that caught + fixed 3
+  migration regressions. 738 tests green.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

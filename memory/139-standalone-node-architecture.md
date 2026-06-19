@@ -2,10 +2,13 @@
 
 Date: 2026-06-18
 
-Status: in progress on branch `work/http-simplify`. NOT merged to main, NOT
-published. This is a deliberate re-architecture explored after the 2.0 GA cut
-([[138-2.0-ga-remediation-and-cut]]); it supersedes the engine-coupled component
-model for the packages reworked so far (HTTP first as the template).
+Status: migration COMPLETE on branch `work/http-simplify` (as of 2026-06-19). NOT
+merged to main, NOT published — versioning/publishing of this new major line is a
+pending owner decision. A deliberate re-architecture after the 2.0 GA cut
+([[138-2.0-ga-remediation-and-cut]]) that supersedes the engine-coupled component
+model. HTTP was the template; all 18 dataflow-node component packages are now
+engine-free on the kit, and the engine is an optional runtime (only the infra
+packages `Designer` and `Journal` still reference it).
 
 ## The owner's principle (why this exists)
 
@@ -87,21 +90,68 @@ The bridge implements request/reply over the dataflow realm by correlating on
 `CorrelationId`. The reply travels back as a normal `FlowMessage` (the id is echoed by the
 handler via `With`), never as a delegate threaded through the graph.
 
+## Kit extensions added during the full migration
+
+The kit grew (still tiny) to cover every node shape the migration needed:
+- `AddOutput<T>()` — extra **domain** output ports beyond the primary `Output` (e.g.
+  Mapping `Output`+`Failed`, Control `When`→`WhenTrue`/`WhenFalse`, Assertions
+  `Result`/`Passed`/`Failed`, Validation `Valid`/`Invalid`). Errors/Events were always
+  there; this is for *data* fan-out.
+- `FlowSource<TOutput>` — zero-input producers (`StartAsync`→`RunAsync(ct)`, `Emit`,
+  `OnDisposeAsync`, stop on `Stopping`): Timers interval/schedule, FileSystem
+  enumerate/watch, Sessions replay, Sources generated/sequence, MQTT subscribe.
+- `OnInputCompletedAsync()` drain hook — flush work a node held back, after the input
+  drains and before outputs complete (debounce's pending item, Metrics' coalesced final
+  snapshot, the Timers delay line). Removed the fragile `new`-hiding of `Complete`/`Dispose`.
+- **Fault rule**: on fault the DATA outputs Fault, but Errors/Events are **Completed
+  (flushed)** — faulting a `BroadcastBlock` discards its buffered message, which would drop
+  the very `FlowError` a consumer needs. (Bug found + fixed mid-migration.)
+
+`IFlowNode`/`IFlowSource` interfaces unify lifecycle. The 2-input `FlowJoin` is hand-rolled
+on these primitives (no speculative 2-input base).
+
+## FluxFlow.Mapping (extracted)
+
+The expression/mapping abstraction (`IFlowExpressionEngine`, `IFlowMapper`,
+`IFlowPredicate`, `FlowMapContext`, the Expression/Delegate adapters, …) was moved out of
+`FluxFlow.Engine` into a leaf package **`FluxFlow.Mapping`** (`0.1.0`) so the
+expression-using components (Mapping/Control/Assertions/Observability/State/Routing) and
+`FluxFlow.Components.Expressions` go engine-free; the engine references it instead.
+
+## Migration outcome
+
+All 18 dataflow-node packages migrated engine-free across waves: Wave 1 (Metrics, Payloads,
+Projections, Validation, Serialization, Expectations), Wave 2 (Mapping, Control, Assertions,
+Observability, State), Wave 3a (Timers, FileSystem, Sessions), Wave 3b (Routing, Storage,
+Sources), Wave 3c (Mqtt — connection-node dispose-race hardening ported verbatim). The 5
+engine-based composition samples (MappingControl, Mqtt, State, Sessions, Storage) were
+retired (the standalone model is shown by `HttpTriggerSample`); their memory records too.
+The Designer per-component coverage test went away with the providers (Designer package +
+its catalog test remain). Inter-component coupling was only Expectations→Projections.
+
+An **adversarial review+verify pass** (per-package reviewers → skeptical verification) found
+3 real regressions the agent migration introduced, all fixed + regression-tested: Metrics
+final-snapshot drop under load (→ drain hook), Timers delay accumulating per item instead of
+constant-offset-from-arrival (→ restored 2-stage stamp+delay-line), Sessions replay dropping
+the `ReplayFailed` error on mid-stream store failure (→ wrapped the read loop).
+
 ## Verification + state
 
-Full solution green at 731 tests, 0 warnings. New packages registered in
-`eng/packages.json` + CHANGELOG (kit/RequestReply/Http.AspNetCore/Mqtt.RequestReply at
-`0.1.0`; Http rebuilt, version unflipped). Real-server end-to-end proven via ASP.NET
-Core TestServer.
+Full solution green at **738 tests, 0 warnings**; flake-prone suites survive heavy
+oversubscription stress. Real-server end-to-end proven via ASP.NET Core TestServer. New
+packages in `eng/packages.json` + CHANGELOG at `0.1.0` (Nodes, Mapping, RequestReply,
+Http.AspNetCore, Mqtt.RequestReply); migrated components keep their current versions
+(unflipped, unpublished).
 
-## Open / next
+## Open / next (owner decisions)
 
-- The other ~27 components are still engine-coupled (old model). Rolling the kit +
-  envelope across them is the large mechanical migration that makes the repo consistent;
-  it is the point-of-no-return on this architecture and is gated on an explicit decision.
-- Versioning/publishing deferred: this is a new major line for the reworked packages.
-- The engine becomes an optional Layer-3 runtime; a generic "register a FlowNode into the
-  engine" adapter (instead of per-component glue) is the future composition piece.
+- **Versioning/publishing** of this new major line — still deferred; the whole branch is
+  unpublished. Needs an explicit call on version numbers + what to publish.
+- **PR/merge** `work/http-simplify` → `main`.
+- The engine is now an optional Layer-3 runtime. A generic "register a `FlowNode` into the
+  engine" adapter (instead of the deleted per-component glue) is the future composition
+  piece; `Designer` (visual-designer `NodeType`/`PortName`) and `Journal` (engine
+  `FlowEvent`→record mapper) are the only infra packages still engine-coupled.
 
 Builds on [[135-architecture-review-and-roadmap]] and the 2.0 line in
 [[138-2.0-ga-remediation-and-cut]].
