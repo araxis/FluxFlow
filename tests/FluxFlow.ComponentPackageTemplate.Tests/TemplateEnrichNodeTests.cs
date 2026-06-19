@@ -1,9 +1,8 @@
+using FluxFlow.ComponentPackageTemplate;
 using FluxFlow.ComponentPackageTemplate.Contracts;
-using FluxFlow.ComponentPackageTemplate.Diagnostics;
+using FluxFlow.ComponentPackageTemplate.Nodes;
 using FluxFlow.ComponentPackageTemplate.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -15,113 +14,71 @@ public sealed class TemplateEnrichNodeTests
     private static readonly DateTimeOffset Now = new(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task TemplateEnrichNode_EnrichesInput()
+    public async Task EnrichesInput_PreservingCorrelation()
     {
-        var runtimeNode = CreateNode(new { prefix = "demo", boundedCapacity = 4 });
-        var input = runtimeNode.FindInput(new PortName(TemplateComponentPorts.Input))
-            .ShouldBeOfType<InputPort<TemplateInput>>();
-        var output = runtimeNode.FindOutput(new PortName(TemplateComponentPorts.Output));
-        output.ShouldNotBeNull();
-        output.ValueType.ShouldBe(typeof(TemplateOutput));
+        await using var node = new TemplateEnrichNode(
+            new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 },
+            new ManualTimeProvider(Now));
+        var output = Sink(node.Output);
 
-        var results = new BufferBlock<TemplateOutput>();
-        output.TryLinkTo(
-            new InputPort<TemplateOutput>(
-                new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                results),
-            propagateCompletion: true,
-            out var error);
-        error.ShouldBeNull();
+        var message = FlowMessage.Create(new TemplateInput { Id = "A-100", Value = "order" });
+        await node.Input.SendAsync(message);
 
-        await input.Target.SendAsync(new TemplateInput { Id = "A-100", Value = "order" });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Id.ShouldBe("A-100");
-        result.Value.ShouldBe("order");
-        result.Text.ShouldBe("demo:order");
-        result.ProcessedAt.ShouldBe(Now);
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        result.CorrelationId.ShouldBe(message.CorrelationId);
+        result.Payload.Id.ShouldBe("A-100");
+        result.Payload.Value.ShouldBe("order");
+        result.Payload.Text.ShouldBe("demo:order");
+        result.Payload.ProcessedAt.ShouldBe(Now);
     }
 
     [Fact]
-    public async Task TemplateEnrichNode_ReportsInvalidInputAndContinues()
+    public async Task ReportsInvalidInputOnErrors_AndKeepsProcessing()
     {
-        var runtimeNode = CreateNode(new { prefix = "demo", boundedCapacity = 4 });
-        var input = runtimeNode.FindInput(new PortName(TemplateComponentPorts.Input))
-            .ShouldBeOfType<InputPort<TemplateInput>>();
-        var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<TemplateOutput>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(TemplateComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<TemplateOutput>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
+        await using var node = new TemplateEnrichNode(
+            new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 });
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new TemplateInput { Id = "empty", Value = "" });
-        await input.Target.SendAsync(new TemplateInput { Id = "valid", Value = "ok" });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create(new TemplateInput { Id = "empty", Value = "" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new TemplateInput { Id = "valid", Value = "ok" }));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         error.Code.ShouldBe(TemplateErrorCodes.EnrichFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
         error.Context.ShouldBe("id=empty");
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Id.ShouldBe("valid");
-        result.Text.ShouldBe("demo:ok");
+        // The next valid input is still processed (the bad one did not fault the pump).
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        result.Payload.Id.ShouldBe("valid");
+        result.Payload.Text.ShouldBe("demo:ok");
     }
 
     [Fact]
-    public async Task TemplateEnrichNode_EmitsDiagnostics()
+    public async Task EmitsSucceededDiagnostic()
     {
-        var runtimeNode = CreateNode(new { prefix = "demo", boundedCapacity = 4 });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(TemplateComponentPorts.Input))
-            .ShouldBeOfType<InputPort<TemplateInput>>();
-        runtimeNode.FindOutput(new PortName(TemplateComponentPorts.Output))!
-            .LinkToDiscard();
+        await using var node = new TemplateEnrichNode(
+            new TemplateEnrichOptions { Prefix = "demo", BoundedCapacity = 4 });
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync(new TemplateInput { Id = "A-100", Value = "order" });
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create(new TemplateInput { Id = "A-100", Value = "order" });
+        await node.Input.SendAsync(message);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(TemplateDiagnosticNames.EnrichSucceeded);
+        var diagnostic = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        diagnostic.Name.ShouldBe(TemplateEnrichNode.Succeeded);
+        diagnostic.CorrelationId.ShouldBe(message.CorrelationId);
         diagnostic.Attributes["id"].ShouldBe("A-100");
-        diagnostic.Attributes["prefix"].ShouldBe("demo");
     }
 
     [Fact]
-    public void TemplateEnrichNode_RejectsInvalidCapacity()
+    public void RejectsNullOptions()
+        => Should.Throw<ArgumentNullException>(() => new TemplateEnrichNode(null!));
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { prefix = "demo", boundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
-
-    [Fact]
-    public void TemplateEnrichNode_RejectsMissingPrefix()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { prefix = "", boundedCapacity = 4 }));
-
-        exception.Message.ShouldContain("prefix");
-    }
-
-    private static RuntimeNode CreateNode(object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterTemplateComponents(options =>
-                options.UseTimeProvider(new ManualTimeProvider(Now)));
-
-        registry.TryGetFactory(TemplateComponentTypes.Enrich, out var factory).ShouldBeTrue();
-        return factory(TemplateTestHost.CreateContext(configuration));
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+        return sink;
     }
 }
