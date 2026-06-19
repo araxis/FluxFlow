@@ -1,192 +1,86 @@
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Globalization;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEventSource, IAsyncDisposable
+/// <summary>
+/// A standalone cron-schedule source. Call <c>StartAsync</c> and the node broadcasts a
+/// <c>FlowMessage&lt;ScheduleTick&gt;</c> on <c>Output</c> at each occurrence of the
+/// configured cron expression (plus diagnostic notes on <c>Events</c>), minting a fresh
+/// correlation id per tick. It runs until <see cref="TimerScheduleSettings.MaxTicks"/>
+/// is reached (source complete) or it is stopped via <c>Complete</c>/dispose. Timing is
+/// driven by the injected <see cref="TimeProvider"/>, so tests can advance a
+/// FakeTimeProvider to fire ticks deterministically. Works with nothing but
+/// <c>new TimerScheduleNode(settings)</c> — no engine.
+/// </summary>
+public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
 {
-    private readonly object _stateLock = new();
+    public const string Started = TimerDiagnosticNames.ScheduleStarted;
+    public const string Tick = TimerDiagnosticNames.ScheduleTick;
+    public const string Stopped = TimerDiagnosticNames.ScheduleStopped;
+    public const string Failed = TimerDiagnosticNames.ScheduleFailed;
+
     private readonly TimerScheduleSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
-    private CancellationTokenSource? _scheduleCancellation;
-    private Task? _scheduleTask;
-    private bool _started;
-    private bool _completedBeforeStart;
-    private bool _disposed;
+    private readonly CronSchedule _schedule;
 
-    internal TimerScheduleNode(
+    public TimerScheduleNode(
         TimerScheduleSettings settings,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity })
+        TimeProvider? clock = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (settings.BoundedCapacity <= 0)
+        _clock = clock ?? TimeProvider.System;
+
+        if (string.IsNullOrWhiteSpace(_settings.Cron))
+        {
+            throw new ArgumentException(
+                "timer.schedule 'Cron' must be a non-empty cron expression.", nameof(settings));
+        }
+
+        if (_settings.MaxTicks is <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(settings),
-                "Timer schedule bounded capacity must be greater than zero.");
+                nameof(settings), "timer.schedule 'MaxTicks' must be greater than zero when set.");
         }
+
+        if (_settings.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.schedule 'BoundedCapacity' must be greater than zero.");
+        }
+
+        // Compiling the cron up front validates the expression in the constructor.
+        _schedule = CronSchedule.Parse(_settings.Cron);
     }
 
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public override Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_stateLock)
-        {
-            if (_completedBeforeStart)
-            {
-                return Task.CompletedTask;
-            }
-
-            if (_started)
-            {
-                throw new InvalidOperationException("timer.schedule node has already started.");
-            }
-
-            _started = true;
-            _scheduleCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.ScheduleStarted,
-                message: $"Started timer schedule '{_settings.Name}'.",
-                attributes: CreateAttributes());
-            _scheduleTask = RunScheduleAsync(_scheduleCancellation.Token);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-    {
-        CancellationTokenSource? cancellation;
-        lock (_stateLock)
-        {
-            cancellation = _scheduleCancellation;
-            if (cancellation is null)
-            {
-                _completedBeforeStart = true;
-            }
-        }
-
-        if (cancellation is null)
-        {
-            CompleteOutput();
-            return;
-        }
-
-        try
-        {
-            cancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the schedule loop has stopped.
-        }
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _scheduleCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the schedule loop has stopped.
-        }
-
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-
-        if (_scheduleTask is not null)
-        {
-            await _scheduleTask.ConfigureAwait(false);
-        }
-
-        _scheduleCancellation?.Dispose();
-    }
-
-    protected override void OnNodeCompleted()
-    {
-        _events.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_events).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private async Task RunScheduleAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var startedAt = _clock.GetUtcNow();
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = startedAt,
+            Name = Started,
+            Level = FlowEventLevel.Information,
+            Message = $"Started timer schedule '{_settings.Name}'.",
+            Attributes = CreateAttributes()
+        });
+
         var sequence = 0L;
-
-        try
+        while (true)
         {
-            while (true)
+            var dueAt = _schedule.GetNextOccurrence(_clock.GetUtcNow(), _settings.TimeZone)
+                ?? throw new InvalidOperationException(
+                    $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
+            await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
+            sequence = EmitTick(sequence, startedAt, dueAt);
+            if (_settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value)
             {
-                var dueAt = _settings.Schedule.GetNextOccurrence(_clock.GetUtcNow(), _settings.TimeZone)
-                    ?? throw new InvalidOperationException(
-                        $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
-                await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
-                var emitted = await EmitTickAsync(
-                    sequence,
-                    startedAt,
-                    dueAt,
-                    cancellationToken).ConfigureAwait(false);
-                if (emitted is null)
-                {
-                    CompleteSchedule(startedAt, sequence);
-                    return;
-                }
-
-                sequence = emitted.Value;
-                if (_settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value)
-                {
-                    CompleteSchedule(startedAt, sequence);
-                    return;
-                }
+                CompleteSchedule(startedAt, sequence);
+                return;
             }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            CompleteSchedule(startedAt, sequence);
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                TimerErrorCodes.ScheduleFailed,
-                $"timer.schedule failed: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.ScheduleFailed,
-                FlowDiagnosticLevel.Error,
-                "timer.schedule failed.",
-                exception,
-                CreateAttributes(sequence));
-            base.Fault(exception);
         }
     }
 
@@ -201,14 +95,11 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         }
     }
 
-    private async Task<long?> EmitTickAsync(
+    private long EmitTick(
         long currentSequence,
         DateTimeOffset startedAt,
-        DateTimeOffset dueAt,
-        CancellationToken cancellationToken)
+        DateTimeOffset dueAt)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         var sequence = currentSequence + 1;
         var timestamp = _clock.GetUtcNow();
         var tick = new ScheduleTick
@@ -223,54 +114,29 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
             Drift = timestamp - dueAt
         };
 
-        if (!await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false))
+        Emit(FlowMessage.Create(tick));
+        EmitEvent(new FlowEvent
         {
-            // The output declined the tick because it has completed; stop the loop.
-            return null;
-        }
-
-        TryEmitDiagnostic(
-            TimerDiagnosticNames.ScheduleTick,
-            message: $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
-            attributes: CreateAttributes(tick));
-        EmitTickEvent(tick);
+            Timestamp = timestamp,
+            Name = Tick,
+            Level = FlowEventLevel.Information,
+            Message = $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
+            Attributes = CreateAttributes(tick)
+        });
         return sequence;
     }
 
     private void CompleteSchedule(DateTimeOffset startedAt, long sequence)
-    {
-        TryEmitDiagnostic(
-            TimerDiagnosticNames.ScheduleStopped,
-            message: $"Stopped timer schedule '{_settings.Name}'.",
-            attributes: CreateAttributes(sequence, _clock.GetUtcNow() - startedAt));
-        CompleteOutput();
-    }
-
-    private bool EmitTickEvent(ScheduleTick tick)
-    {
-        var attributes = new Dictionary<string, string>
+        => EmitEvent(new FlowEvent
         {
-            ["name"] = tick.Name,
-            ["sequence"] = tick.Sequence.ToString(CultureInfo.InvariantCulture),
-            ["cron"] = tick.Cron,
-            ["timeZoneId"] = tick.TimeZoneId,
-            ["driftMilliseconds"] = tick.Drift.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)
-        };
-
-        return _events.Post(new FlowEvent
-        {
-            Timestamp = tick.Timestamp,
-            Type = TimerEventNames.ScheduleTick,
-            Source = Id.ToString(),
-            SourceNodeId = Id,
-            Subject = tick.Name,
-            Channel = TimerEventNames.ScheduleTick,
-            Attributes = attributes
+            Timestamp = _clock.GetUtcNow(),
+            Name = Stopped,
+            Level = FlowEventLevel.Information,
+            Message = $"Stopped timer schedule '{_settings.Name}'.",
+            Attributes = CreateAttributes(sequence, _clock.GetUtcNow() - startedAt)
         });
-    }
 
-    private Dictionary<string, object?> CreateAttributes(
-        ScheduleTick? tick = null)
+    private Dictionary<string, object?> CreateAttributes(ScheduleTick? tick = null)
     {
         var attributes = CreateAttributes(tick?.Sequence);
         if (tick is null)
@@ -310,22 +176,5 @@ public sealed class TimerScheduleNode : SourceFlowNode<ScheduleTick>, IFlowEvent
         }
 
         return attributes;
-    }
-
-    private string CreateErrorContext()
-    {
-        var values = new List<string>
-        {
-            $"name={_settings.Name}",
-            $"cron={_settings.Cron}",
-            $"timeZoneId={_settings.TimeZone.Id}"
-        };
-
-        if (_settings.MaxTicks.HasValue)
-        {
-            values.Add($"maxTicks={_settings.MaxTicks.Value}");
-        }
-
-        return string.Join("; ", values);
     }
 }

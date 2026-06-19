@@ -1,11 +1,15 @@
 namespace FluxFlow.Components.Timers.Options;
 
-internal sealed record TimerIntervalSettings
+/// <summary>
+/// Configuration for <see cref="Nodes.TimerIntervalNode"/>. <see cref="Interval"/> is
+/// required and must be greater than zero; the node validates these in its constructor.
+/// </summary>
+public sealed record TimerIntervalSettings
 {
-    public required string Name { get; init; }
+    public string Name { get; init; } = "interval";
     public required TimeSpan Interval { get; init; }
-    public required TimeSpan InitialDelay { get; init; }
-    public required bool EmitImmediately { get; init; }
-    public required long? MaxTicks { get; init; }
-    public required int BoundedCapacity { get; init; }
+    public TimeSpan InitialDelay { get; init; } = TimeSpan.Zero;
+    public bool EmitImmediately { get; init; }
+    public long? MaxTicks { get; init; }
+    public int BoundedCapacity { get; init; } = 128;
 }

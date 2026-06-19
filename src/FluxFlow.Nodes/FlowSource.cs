@@ -149,11 +149,16 @@ public abstract class FlowSource<TOutput> : IFlowSource
     private void FaultOutputs(Exception exception)
     {
         ((IDataflowBlock)_output).Fault(exception);
-        ((IDataflowBlock)_errors).Fault(exception);
-        ((IDataflowBlock)_events).Fault(exception);
         foreach (var extra in _extraOutputs)
         {
             extra.Fault(exception);
         }
+
+        // Errors/Events carry the diagnostics that explain the fault. Complete (flush)
+        // them rather than Fault them: faulting a BroadcastBlock discards its buffered
+        // message, which would drop the very FlowError a consumer needs to see. The
+        // authoritative fault is surfaced on Completion by the caller.
+        _errors.Complete();
+        _events.Complete();
     }
 }

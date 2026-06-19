@@ -111,12 +111,17 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         ((IDataflowBlock)_input).Fault(exception);
         ((IDataflowBlock)_processor).Fault(exception);
         ((IDataflowBlock)_output).Fault(exception);
-        ((IDataflowBlock)_errors).Fault(exception);
-        ((IDataflowBlock)_events).Fault(exception);
         foreach (var extra in _extraOutputs)
         {
             extra.Fault(exception);
         }
+
+        // Errors/Events carry the diagnostics that explain the fault. Complete (flush)
+        // them rather than Fault them: faulting a BroadcastBlock discards its buffered
+        // message, which would drop the very FlowError a consumer needs to see. The
+        // authoritative fault is surfaced on Completion below.
+        _errors.Complete();
+        _events.Complete();
 
         _completion.TrySetException(exception);
     }
@@ -152,6 +157,15 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
     /// <summary>Override to release node-owned resources after the pump has stopped.</summary>
     protected virtual ValueTask OnDisposeAsync() => ValueTask.CompletedTask;
 
+    /// <summary>
+    /// Override to flush work the node has deliberately held back — for example a debounce's
+    /// pending latest item — once the input has drained and every <see cref="ProcessAsync"/>
+    /// has completed, but before the outputs are completed. <see cref="Emit"/>/<see
+    /// cref="EmitEvent"/> calls here still reach linked consumers. Not invoked on the fault
+    /// path, where held-back work is dropped.
+    /// </summary>
+    protected virtual ValueTask OnInputCompletedAsync() => ValueTask.CompletedTask;
+
     private async Task RunAsync(FlowMessage<TInput> message)
     {
         try
@@ -181,6 +195,11 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         try
         {
             await _processor.Completion.ConfigureAwait(false);
+            // After the input has drained and every ProcessAsync has finished, give the node
+            // a chance to flush work it deliberately held back (e.g. a debounce's pending
+            // item). Emit/EmitEvent here still reach linked consumers because the outputs are
+            // completed only below.
+            await OnInputCompletedAsync().ConfigureAwait(false);
             _output.Complete();
             _errors.Complete();
             _events.Complete();
@@ -197,12 +216,14 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
         catch (Exception exception)
         {
             ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_errors).Fault(exception);
-            ((IDataflowBlock)_events).Fault(exception);
             foreach (var extra in _extraOutputs)
             {
                 extra.Fault(exception);
             }
+
+            // Flush diagnostics rather than discard them — see Fault for the rationale.
+            _errors.Complete();
+            _events.Complete();
 
             _completion.TrySetException(exception);
         }

@@ -1,199 +1,119 @@
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-public sealed class TimerDelayNode<TInput> : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone delay node: post a <c>FlowMessage&lt;TInput&gt;</c> to <c>Input</c> and the
+/// node re-broadcasts the same payload on <c>Output</c> after the configured delay,
+/// carrying the original correlation id forward. Order is preserved (the node processes
+/// one item at a time). Timing uses the injected <see cref="TimeProvider"/>, so a
+/// FakeTimeProvider drives it deterministically. Works with nothing but
+/// <c>new TimerDelayNode&lt;T&gt;(settings)</c> — no engine.
+/// </summary>
+public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
 {
+    public const string Emitted = TimerDiagnosticNames.DelayEmitted;
+    public const string Failed = TimerDiagnosticNames.DelayFailed;
+
     private readonly TimerDelaySettings _settings;
     private readonly TimeProvider _clock;
-    private readonly TransformBlock<TInput, DelayedInput> _input;
-    private readonly ActionBlock<DelayedInput> _emitter;
-    private readonly BufferBlock<TInput> _output;
-    private readonly CancellationTokenSource _processingCancellation = new();
-    private readonly CancellationTokenSource _disposeCancellation = new();
-    private readonly CancellationTokenSource _delayCancellation;
-    private bool _disposed;
+    private readonly string _inputType = typeof(TInput).Name;
 
-    internal TimerDelayNode(
+    public TimerDelayNode(
         TimerDelaySettings settings,
-        TimeProvider clock)
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (settings ?? throw new ArgumentNullException(nameof(settings))).BoundedCapacity
+        })
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (settings.BoundedCapacity <= 0)
+        _settings = settings;
+        _clock = clock ?? TimeProvider.System;
+
+        if (_settings.Delay < TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(settings),
-                "Timer delay bounded capacity must be greater than zero.");
+                nameof(settings), "timer.delay 'Delay' cannot be negative.");
         }
 
-        _delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            _processingCancellation.Token,
-            _disposeCancellation.Token);
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity };
-        var inputOptions = new ExecutionDataflowBlockOptions
+        if (_settings.BoundedCapacity <= 0)
         {
-            BoundedCapacity = settings.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        var emitterOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = settings.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        // Stamp the due time when an item arrives so a burst of inputs is emitted a
-        // constant offset after arrival instead of accumulating one delay per item.
-        _input = new TransformBlock<TInput, DelayedInput>(Stamp, inputOptions);
-        _emitter = new ActionBlock<DelayedInput>(DelayAsync, emitterOptions);
-        _input.LinkTo(
-            _emitter,
-            new DataflowLinkOptions { PropagateCompletion = true });
-        _output = new BufferBlock<TInput>(blockOptions);
-        _emitter.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_output.Completion);
-    }
-
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<TInput> Output => _output;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            TryCancel(_processingCancellation);
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_emitter).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.delay 'BoundedCapacity' must be greater than zero.");
         }
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async Task ProcessAsync(FlowMessage<TInput> message)
     {
-        if (_disposed)
-        {
-            return;
-        }
+        ArgumentNullException.ThrowIfNull(message);
 
-        _disposed = true;
-        Complete();
-        TryCancel(_disposeCancellation);
         try
         {
-            await Completion.ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            // Dispose tolerates nodes that completed in a faulted or canceled state.
-        }
-
-        _delayCancellation.Dispose();
-        _disposeCancellation.Dispose();
-        _processingCancellation.Dispose();
-    }
-
-    private DelayedInput Stamp(TInput input)
-        => new(input, _clock.GetUtcNow() + _settings.Delay);
-
-    private async Task DelayAsync(DelayedInput delayed)
-    {
-        try
-        {
-            var remaining = delayed.DueAt - _clock.GetUtcNow();
-            if (remaining > TimeSpan.Zero)
+            if (_settings.Delay > TimeSpan.Zero)
             {
-                await Task.Delay(remaining, _clock, _delayCancellation.Token).ConfigureAwait(false);
+                await Task.Delay(_settings.Delay, _clock, Stopping).ConfigureAwait(false);
             }
-
-            await _output.SendAsync(delayed.Input, _processingCancellation.Token).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.DelayEmitted,
-                message: "timer.delay emitted input.",
-                attributes: CreateAttributes());
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
-        catch (OperationCanceledException) when (_disposeCancellation.IsCancellationRequested)
-        {
-            // Dispose cancels in-flight delays so disposal drains promptly.
-        }
         catch (Exception exception)
         {
-            TryReportError(
-                TimerErrorCodes.DelayFailed,
-                $"timer.delay failed: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.DelayFailed,
-                FlowDiagnosticLevel.Error,
-                "timer.delay failed.",
-                exception,
-                CreateAttributes());
+            // A per-message timing failure surfaces as a domain error; the node keeps
+            // processing later messages instead of faulting the whole pump.
+            ReportFailure(message, exception);
+            return;
         }
+
+        // Carry the correlation id forward onto the (unchanged) payload.
+        Emit(message.With(message.Payload));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = Emitted,
+            Level = FlowEventLevel.Information,
+            Message = "timer.delay emitted input.",
+            Attributes = CreateAttributes()
+        });
     }
 
-    private static void TryCancel(CancellationTokenSource cancellation)
+    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
     {
-        try
+        EmitError(new FlowError
         {
-            cancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = TimerErrorCodes.DelayFailed,
+            Message = $"timer.delay failed: {exception.Message}",
+            Context = CreateErrorContext(),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
         {
-            // The node was already disposed; cancellation is no longer required.
-        }
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = Failed,
+            Level = FlowEventLevel.Error,
+            Message = "timer.delay failed.",
+            Attributes = CreateAttributes()
+        });
     }
+
+    private string CreateErrorContext()
+        => string.Join("; ",
+            $"name={_settings.Name}",
+            $"inputType={_inputType}",
+            $"delayMilliseconds={_settings.Delay.TotalMilliseconds}");
 
     private Dictionary<string, object?> CreateAttributes()
         => new(StringComparer.Ordinal)
         {
             ["name"] = _settings.Name,
-            ["inputType"] = _settings.InputType,
+            ["inputType"] = _inputType,
             ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
         };
-
-    private string CreateErrorContext()
-    {
-        var values = new List<string>
-        {
-            $"name={_settings.Name}",
-            $"inputType={_settings.InputType}",
-            $"delayMilliseconds={_settings.Delay.TotalMilliseconds}"
-        };
-
-        return string.Join("; ", values);
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            return;
-        }
-
-        _output.Complete();
-    }
-
-    private readonly record struct DelayedInput(TInput Input, DateTimeOffset DueAt);
 }

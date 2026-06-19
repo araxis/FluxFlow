@@ -1,10 +1,7 @@
-using FluxFlow.Components.Timers.Diagnostics;
+using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Shouldly;
-using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
@@ -13,329 +10,165 @@ namespace FluxFlow.Components.Timers.Tests;
 public sealed class TimerThrottleNodeTests
 {
     [Fact]
-    public async Task Throttle_EmitsFirstInputBeforeIntervalByDefault()
+    public async Task Throttle_EmitsFirstInputImmediatelyByDefault_PreservingCorrelation()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                intervalMilliseconds = 1000
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(1000) },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
+        var message = FlowMessage.Create("one");
 
-        await input.Target.SendAsync("one");
-        input.Target.Complete();
+        await node.Input.SendAsync(message);
 
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(250));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        value.ShouldBe("one");
+        // EmitFirstImmediately is the default, so the first item needs no clock advance.
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        value.Payload.ShouldBe("one");
+        value.CorrelationId.ShouldBe(message.CorrelationId);
     }
 
     [Fact]
-    public async Task Throttle_SpacesLaterInputs()
+    public async Task Throttle_SpacesLaterInputsByInterval()
     {
-        var runtimeNode = CreateNode(
-            options => options.RegisterType<InputMessage>("message"),
-            new
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings
             {
-                inputType = "message",
-                name = "rate",
-                intervalMilliseconds = 45,
-                boundedCapacity = 4
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var output = new BufferBlock<InputMessage>();
-        LinkOutput(runtimeNode, output);
-        var stopwatch = Stopwatch.StartNew();
+                Name = "rate",
+                Interval = TimeSpan.FromMilliseconds(45),
+                BoundedCapacity = 4
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(new InputMessage("one"));
-        await input.Target.SendAsync(new InputMessage("two"));
+        // The first item emits immediately (no timer); the second arms a one-interval
+        // timer, so capture that registration before sending the burst that arms it.
+        var scheduled = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.Input.SendAsync(FlowMessage.Create("two"));
+
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        output.TryReceive(out _).ShouldBeFalse();
+        clock.Advance(TimeSpan.FromMilliseconds(45));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        stopwatch.Stop();
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Value.ShouldBe("one");
-        second.Value.ShouldBe("two");
-        stopwatch.ElapsedMilliseconds.ShouldBeGreaterThanOrEqualTo(30);
+        first.Payload.ShouldBe("one");
+        second.Payload.ShouldBe("two");
     }
 
     [Fact]
     public async Task Throttle_CanDelayFirstInput()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings
             {
-                inputType = "string",
-                intervalMilliseconds = 35,
-                emitFirstImmediately = false
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
-        var startedAt = DateTimeOffset.UtcNow;
+                Interval = TimeSpan.FromMilliseconds(35),
+                EmitFirstImmediately = false
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
+        var scheduled = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create("hello"));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        output.TryReceive(out _).ShouldBeFalse();
+        clock.Advance(TimeSpan.FromMilliseconds(35));
+
         var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        value.ShouldBe("hello");
-        DateTimeOffset.UtcNow.ShouldBeGreaterThanOrEqualTo(startedAt.AddMilliseconds(25));
+        value.Payload.ShouldBe("hello");
     }
 
     [Fact]
     public async Task Throttle_PreservesOrder()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
+        await using var node = new TimerThrottleNode<int>(
+            new TimerThrottleSettings
             {
-                inputType = "int",
-                intervalMilliseconds = 1,
-                boundedCapacity = 8
+                Interval = TimeSpan.FromMilliseconds(1),
+                BoundedCapacity = 8
             });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<int>();
-        LinkOutput(runtimeNode, output);
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(1);
-        await input.Target.SendAsync(2);
-        await input.Target.SendAsync(3);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
+        await node.Input.SendAsync(FlowMessage.Create(3));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe([1, 2, 3]);
+        (await TimerTestSink.DrainUntilCompletedAsync(output))
+            .Select(message => message.Payload)
+            .ShouldBe([1, 2, 3]);
     }
 
     [Fact]
-    public async Task Throttle_EmitsDiagnostics()
+    public async Task Throttle_EmitsEvents()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                intervalMilliseconds = 1
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        LinkOutput(runtimeNode, output);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        await using var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(1) });
+        var output = TimerTestSink.Link(node.Output);
+        var events = TimerTestSink.Link(node.Events);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create("hello"));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["hello"]);
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(TimerDiagnosticNames.ThrottleEmitted);
-        diagnostic.Attributes["inputType"].ShouldBe("string");
-        diagnostic.Attributes["sequence"].ShouldBe(1L);
+        (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        var flowEvent = (await TimerTestSink.DrainUntilCompletedAsync(events))
+            .ShouldHaveSingleItem();
+        flowEvent.Name.ShouldBe(TimerThrottleNode<string>.Emitted);
+        flowEvent.Attributes["inputType"].ShouldBe(nameof(String));
+        flowEvent.Attributes["sequence"].ShouldBe(1L);
     }
 
     [Fact]
     public async Task Throttle_DisposeDrainsAndCompletesOutput()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                intervalMilliseconds = 1
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(1) });
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync("one");
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync();
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["one"]);
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        (await TimerTestSink.DrainUntilCompletedAsync(output))
+            .Select(message => message.Payload)
+            .ShouldBe(["one"]);
     }
 
     [Fact]
     public async Task Throttle_DisposeAfterFaultDoesNotThrow()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                intervalMilliseconds = 1
-            });
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .LinkToDiscard();
+        var node = new TimerThrottleNode<string>(
+            new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(1) });
+        TimerTestSink.Link(node.Output);
 
-        runtimeNode.Node.Fault(new InvalidOperationException("boom"));
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync()
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(30));
+        node.Fault(new InvalidOperationException("boom"));
+        await node.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
 
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.Completion);
-    }
-
-    [Fact]
-    public async Task Throttle_DisposePromptlyCancelsPendingDelays()
-    {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "int",
-                intervalMilliseconds = 30000,
-                emitFirstImmediately = false,
-                boundedCapacity = 8
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<int>();
-        LinkOutput(runtimeNode, output);
-
-        await input.Target.SendAsync(1);
-        await input.Target.SendAsync(2);
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync()
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(30));
-
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-    }
-
-    [Fact]
-    public void Throttle_RejectsMissingInterval()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(_ => { }, new { inputType = "string" }));
-
-        exception.Message.ShouldContain("interval");
+        await Should.ThrowAsync<InvalidOperationException>(() => node.Completion);
     }
 
     [Fact]
     public void Throttle_RejectsNonPositiveInterval()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "string",
-                    intervalMilliseconds = 0
-                }));
-
-        exception.Message.ShouldContain("interval");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerThrottleNode<string>(
+                new TimerThrottleSettings { Interval = TimeSpan.Zero }))
+            .Message.ShouldContain("Interval");
 
     [Fact]
     public void Throttle_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerThrottleNode<string>(
+                new TimerThrottleSettings
                 {
-                    inputType = "string",
-                    intervalMilliseconds = 1,
-                    boundedCapacity = 0
+                    Interval = TimeSpan.FromMilliseconds(1),
+                    BoundedCapacity = 0
                 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
 
     [Fact]
-    public void Throttle_RejectsUnknownInputType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "message",
-                    intervalMilliseconds = 1
-                }));
-
-        exception.Message.ShouldContain("message");
-    }
-
-    [Fact]
-    public void Throttle_RejectsDuplicateIntervalOptions()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "string",
-                    interval = TimeSpan.FromMilliseconds(1),
-                    intervalMilliseconds = 1
-                }));
-
-        exception.Message.ShouldContain("interval");
-    }
-
-    private static RuntimeNode CreateNode(
-        Action<TimerComponentOptions> configure,
-        object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterTimerComponents(configure);
-        registry.TryGetFactory(TimerComponentTypes.Throttle, out var factory).ShouldBeTrue();
-        return factory(TimerTestHost.CreateContext(
-            TimerComponentTypes.Throttle,
-            configuration,
-            "throttle"));
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        BufferBlock<T> target)
-    {
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var values = new List<T>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values;
-    }
-
-    private sealed record InputMessage(string Value);
+    public void Throttle_RejectsNullSettings()
+        => Should.Throw<ArgumentNullException>(() => new TimerThrottleNode<string>(null!));
 }

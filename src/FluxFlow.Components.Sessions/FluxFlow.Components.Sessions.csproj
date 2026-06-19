@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -8,18 +8,17 @@
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable session recording and replay components for FluxFlow.</Description>
+    <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke ISessionClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as three standalone nodes over an injected ISessionStore and TimeProvider: SessionRecorderNode (FlowNode, input -> record), SessionReplayNode (FlowSource, stored records out), and SessionQueryNode (FlowNode, request -> result with an extra Sessions output). Every message is a FlowMessage&lt;T&gt; envelope carrying the correlation id; failures surface on the broadcast Errors port and diagnostics on Events. The node factory, component module, registration extensions, port/type constants, NodeDefinition options reader, and design-metadata provider are removed — construct a node directly and LinkTo the next one. The nodes depend only on FluxFlow.Nodes and run without the engine.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

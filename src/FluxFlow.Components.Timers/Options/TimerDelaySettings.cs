@@ -1,9 +1,12 @@
 namespace FluxFlow.Components.Timers.Options;
 
-internal sealed record TimerDelaySettings
+/// <summary>
+/// Configuration for <see cref="Nodes.TimerDelayNode{TInput}"/>. <see cref="Delay"/> is
+/// required and cannot be negative; the node validates these in its constructor.
+/// </summary>
+public sealed record TimerDelaySettings
 {
-    public required string Name { get; init; }
-    public required string InputType { get; init; }
+    public string Name { get; init; } = "delay";
     public required TimeSpan Delay { get; init; }
-    public required int BoundedCapacity { get; init; }
+    public int BoundedCapacity { get; init; } = 128;
 }

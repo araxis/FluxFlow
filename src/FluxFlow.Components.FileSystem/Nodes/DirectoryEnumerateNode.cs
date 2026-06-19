@@ -1,167 +1,67 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
-public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEntry>, IAsyncDisposable
+/// <summary>
+/// A standalone directory-enumeration source. Once <c>StartAsync</c> is called the node
+/// resolves its configured directory, enumerates matching files and/or directories, and
+/// broadcasts each one as a <c>FlowMessage&lt;DirectoryEnumerateEntry&gt;</c> on
+/// <c>Output</c> (each minting a fresh correlation id), then completes. Diagnostics go on
+/// <c>Events</c>; resolution / access / IO failures go on <c>Errors</c>. Works with
+/// nothing but <c>new DirectoryEnumerateNode(options)</c> — no engine.
+/// </summary>
+public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
 {
-    private readonly object _stateLock = new();
+    public const string EnumerateStarted = FileSystemDiagnosticNames.DirectoryEnumerateStarted;
+    public const string EnumerateEntry = FileSystemDiagnosticNames.DirectoryEnumerateEntry;
+    public const string EnumerateCompleted = FileSystemDiagnosticNames.DirectoryEnumerateCompleted;
+    public const string EnumerateFailed = FileSystemDiagnosticNames.DirectoryEnumerateFailed;
+
     private readonly DirectoryEnumerateOptions _options;
     private readonly TimeProvider _clock;
-    private CancellationTokenSource? _enumerationCancellation;
-    private Task? _enumerationTask;
-    private string? _resolvedDirectory;
-    private bool _started;
-    private bool _disposed;
 
-    internal DirectoryEnumerateNode(
+    public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
+        TimeProvider? clock = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "Directory enumerate bounded capacity must be greater than zero.");
-        }
+        _clock = clock ?? TimeProvider.System;
+        ValidateOptions(_options);
     }
 
-    public override Task StartAsync(CancellationToken cancellationToken = default)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_stateLock)
-        {
-            if (_started)
-            {
-                throw new InvalidOperationException("directory.enumerate node has already started.");
-            }
-
-            _started = true;
-        }
-
+        string resolvedDirectory;
         try
         {
-            var resolvedDirectory = ResolveDirectory();
-            if (!System.IO.Directory.Exists(resolvedDirectory))
-            {
-                throw new DirectoryEnumerateNodeException(
-                    FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing,
-                    $"directory.enumerate directory '{_options.Directory}' was not found.");
-            }
-
-            var enumerationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-            lock (_stateLock)
-            {
-                _resolvedDirectory = resolvedDirectory;
-                _enumerationCancellation = enumerationCancellation;
-                TryEmitDiagnostic(
-                    FileSystemDiagnosticNames.DirectoryEnumerateStarted,
-                    message: $"Started directory enumeration '{resolvedDirectory}'.",
-                    attributes: CreateAttributes(resolvedDirectory));
-                _enumerationTask = Task.Run(
-                    () => RunEnumerationAsync(resolvedDirectory, enumerationCancellation.Token),
-                    CancellationToken.None);
-            }
-
-            return Task.CompletedTask;
+            resolvedDirectory = ResolveDirectory();
         }
         catch (FileSystemPathResolutionException exception)
         {
             ReportEnumerateError(exception.Code, exception.Message, exception);
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateFailed,
-                FlowDiagnosticLevel.Error,
-                exception.Message,
-                exception,
-                CreateAttributes());
-            throw new InvalidOperationException("directory.enumerate failed to start.", exception);
-        }
-        catch (DirectoryEnumerateNodeException exception)
-        {
-            ReportEnumerateError(exception.Code, exception.Message, exception);
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateFailed,
-                FlowDiagnosticLevel.Error,
-                exception.Message,
-                exception,
-                CreateAttributes());
-            throw new InvalidOperationException("directory.enumerate failed to start.", exception);
-        }
-        catch (Exception exception)
-        {
-            ReportEnumerateError(
-                FileSystemErrorCodes.DirectoryEnumerateFailed,
-                $"directory.enumerate startup failed: {exception.Message}",
-                exception);
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateFailed,
-                FlowDiagnosticLevel.Error,
-                "directory.enumerate startup failed.",
-                exception,
-                CreateAttributes());
-            throw new InvalidOperationException("directory.enumerate failed to start.", exception);
-        }
-    }
-
-    public override void Complete()
-    {
-        _enumerationCancellation?.Cancel();
-        CompleteOutput();
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _enumerationCancellation?.Cancel();
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
             return;
         }
 
-        _disposed = true;
-        Complete();
-
-        if (_enumerationTask is not null)
+        if (!Directory.Exists(resolvedDirectory))
         {
-            try
-            {
-                await _enumerationTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
+            ReportEnumerateError(
+                FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing,
+                $"directory.enumerate directory '{_options.Directory}' was not found.");
+            return;
         }
 
-        _enumerationCancellation?.Dispose();
-    }
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = EnumerateStarted,
+            Level = FlowEventLevel.Information,
+            Message = $"Started directory enumeration '{resolvedDirectory}'.",
+            Attributes = CreateAttributes(resolvedDirectory)
+        });
 
-    private string ResolveDirectory()
-        => FileSystemPathResolver.Resolve(
-            _options.Directory,
-            new FileSystemPathPolicy(
-                "directory.enumerate",
-                _options.BaseDirectory,
-                _options.AllowAbsolutePaths,
-                FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory,
-                FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied));
-
-    private async Task RunEnumerationAsync(
-        string resolvedDirectory,
-        CancellationToken cancellationToken)
-    {
         long emitted = 0;
         try
         {
@@ -174,32 +74,38 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
                     break;
                 }
 
-                if (!await SendOutputAsync(entry, cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
-
+                Emit(FlowMessage.Create(entry));
                 emitted++;
 
-                TryEmitDiagnostic(
-                    FileSystemDiagnosticNames.DirectoryEnumerateEntry,
-                    message: $"Enumerated '{entry.Path}'.",
-                    attributes: CreateAttributes(entry, emitted));
+                EmitEvent(new FlowEvent
+                {
+                    Timestamp = _clock.GetUtcNow(),
+                    Name = EnumerateEntry,
+                    Level = FlowEventLevel.Information,
+                    Message = $"Enumerated '{entry.Path}'.",
+                    Attributes = CreateAttributes(entry, emitted)
+                });
             }
 
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateCompleted,
-                message: $"Completed directory enumeration '{resolvedDirectory}'.",
-                attributes: CreateAttributes(resolvedDirectory, emitted));
-            CompleteOutput();
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                Name = EnumerateCompleted,
+                Level = FlowEventLevel.Information,
+                Message = $"Completed directory enumeration '{resolvedDirectory}'.",
+                Attributes = CreateAttributes(resolvedDirectory, emitted)
+            });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.DirectoryEnumerateCompleted,
-                message: $"Stopped directory enumeration '{resolvedDirectory}'.",
-                attributes: CreateAttributes(resolvedDirectory, emitted));
-            CompleteOutput();
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                Name = EnumerateCompleted,
+                Level = FlowEventLevel.Information,
+                Message = $"Stopped directory enumeration '{resolvedDirectory}'.",
+                Attributes = CreateAttributes(resolvedDirectory, emitted)
+            });
         }
         catch (UnauthorizedAccessException exception)
         {
@@ -219,16 +125,19 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
                 resolvedDirectory,
                 emitted);
         }
-        catch (Exception exception)
-        {
-            FailEnumeration(
-                FileSystemErrorCodes.DirectoryEnumerateFailed,
-                $"directory.enumerate failed: {exception.Message}",
-                exception,
-                resolvedDirectory,
-                emitted);
-        }
+
+        await Task.CompletedTask.ConfigureAwait(false);
     }
+
+    private string ResolveDirectory()
+        => FileSystemPathResolver.Resolve(
+            _options.Directory,
+            new FileSystemPathPolicy(
+                "directory.enumerate",
+                _options.BaseDirectory,
+                _options.AllowAbsolutePaths,
+                FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory,
+                FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied));
 
     private IEnumerable<DirectoryEnumerateEntry> Enumerate(string resolvedDirectory)
     {
@@ -244,7 +153,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 
         if (_options.IncludeDirectories)
         {
-            foreach (var directory in System.IO.Directory.EnumerateDirectories(
+            foreach (var directory in Directory.EnumerateDirectories(
                          resolvedDirectory,
                          _options.Filter,
                          enumerationOptions))
@@ -255,7 +164,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
 
         if (_options.IncludeFiles)
         {
-            foreach (var file in System.IO.Directory.EnumerateFiles(
+            foreach (var file in Directory.EnumerateFiles(
                          resolvedDirectory,
                          _options.Filter,
                          enumerationOptions))
@@ -311,21 +220,68 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         string resolvedDirectory,
         long emitted)
     {
-        ReportEnumerateError(code, message, exception);
-        TryEmitDiagnostic(
-            FileSystemDiagnosticNames.DirectoryEnumerateFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateAttributes(resolvedDirectory, emitted));
-        base.Fault(exception);
+        ReportEnumerateError(code, message, exception, resolvedDirectory);
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = EnumerateFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateAttributes(resolvedDirectory, emitted)
+        });
     }
 
     private void ReportEnumerateError(
         int code,
         string message,
-        Exception? exception = null)
-        => TryReportError(code, message, exception, CreateErrorContext());
+        Exception? exception = null,
+        string? resolvedDirectory = null)
+        => EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = code,
+            Message = message,
+            Context = CreateErrorContext(resolvedDirectory),
+            Exception = exception
+        });
+
+    private static void ValidateOptions(DirectoryEnumerateOptions options)
+    {
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Directory enumerate bounded capacity must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Directory))
+        {
+            throw new ArgumentException(
+                "directory.enumerate option 'directory' cannot be empty.",
+                nameof(options));
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Filter))
+        {
+            throw new ArgumentException(
+                "directory.enumerate option 'filter' cannot be empty.",
+                nameof(options));
+        }
+
+        if (!options.IncludeFiles && !options.IncludeDirectories)
+        {
+            throw new ArgumentException(
+                "directory.enumerate requires includeFiles or includeDirectories.",
+                nameof(options));
+        }
+
+        if (options.MaxEntries is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "directory.enumerate option 'maxEntries' must be greater than zero when set.");
+        }
+    }
 
     private Dictionary<string, object?> CreateAttributes(
         string? resolvedDirectory = null,
@@ -379,7 +335,7 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         return attributes;
     }
 
-    private string CreateErrorContext()
+    private string CreateErrorContext(string? resolvedDirectory = null)
     {
         var values = new List<string>
         {
@@ -390,9 +346,9 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
             $"includeDirectories={_options.IncludeDirectories}"
         };
 
-        if (!string.IsNullOrWhiteSpace(_resolvedDirectory))
+        if (!string.IsNullOrWhiteSpace(resolvedDirectory))
         {
-            values.Add($"resolvedDirectory={_resolvedDirectory}");
+            values.Add($"resolvedDirectory={resolvedDirectory}");
         }
 
         if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
@@ -406,16 +362,5 @@ public sealed class DirectoryEnumerateNode : SourceFlowNode<DirectoryEnumerateEn
         }
 
         return string.Join("; ", values);
-    }
-
-    private sealed class DirectoryEnumerateNodeException : Exception
-    {
-        public DirectoryEnumerateNodeException(int code, string message, Exception? innerException = null)
-            : base(message, innerException)
-        {
-            Code = code;
-        }
-
-        public int Code { get; }
     }
 }

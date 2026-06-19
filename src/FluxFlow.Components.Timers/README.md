@@ -1,122 +1,90 @@
 # FluxFlow.Components.Timers
 
-Reusable timer components for FluxFlow.
+Standalone timer nodes for FluxFlow, built on the [FluxFlow.Nodes](../FluxFlow.Nodes)
+kit. Every node is a self-contained TPL Dataflow processor: `new` it, `LinkTo`
+the next node, and run it — no engine, registry, or runtime required. All timing
+is driven by an injected `TimeProvider`, so tests stay deterministic with a
+`FakeTimeProvider`.
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `timer.interval` | `Output` | Emits `TimerTick` values on a fixed interval. |
-| `timer.schedule` | `Output` | Emits `ScheduleTick` values from a cron expression. |
-| `timer.delay` | `Input` -> `Output` | Delays typed inputs and emits them unchanged. |
-| `timer.throttle` | `Input` -> `Output` | Rate-limits typed inputs without changing them. |
-| `timer.debounce` | `Input` -> `Output` | Emits the latest typed input after a quiet period. |
+| Node | Kind | Shape | Purpose |
+|------|------|-------|---------|
+| `TimerIntervalNode` | source | `Output` | Emits `FlowMessage<TimerTick>` on a fixed interval. |
+| `TimerScheduleNode` | source | `Output` | Emits `FlowMessage<ScheduleTick>` from a cron expression. |
+| `TimerDelayNode<T>` | transform | `Input` → `Output` | Re-emits each input after a delay, unchanged. |
+| `TimerThrottleNode<T>` | transform | `Input` → `Output` | Rate-limits inputs to one per interval, unchanged. |
+| `TimerDebounceNode<T>` | transform | `Input` → `Output` | Emits the latest input after a quiet period. |
 
-The package emits neutral tick contracts only. Hosts decide whether ticks drive
-polling, periodic health checks, metrics, file work, message publishing, or
-other workflow activity.
+Sources start with `StartAsync()` and produce until they hit `MaxTicks` (source
+complete) or are stopped via `Complete()`/`DisposeAsync()`. Every emitted tick is
+a `FlowMessage<T>` envelope with a fresh `CorrelationId`. The transforms preserve
+the correlation id of each input message they re-emit. Errors surface on the
+`Errors` port and diagnostics on the `Events` port. The package emits neutral
+tick contracts only — hosts decide whether ticks drive polling, health checks,
+metrics, file work, message publishing, or other activity.
 
 ## Interval
 
-```json
+```csharp
+await using var node = new TimerIntervalNode(new TimerIntervalSettings
 {
-  "type": "timer.interval",
-  "name": "poll",
-  "intervalMilliseconds": 1000,
-  "initialDelayMilliseconds": 250,
-  "maxTicks": 10,
-  "boundedCapacity": 128
-}
+    Name = "poll",
+    Interval = TimeSpan.FromSeconds(1),
+    InitialDelay = TimeSpan.FromMilliseconds(250),
+    EmitImmediately = false,
+    MaxTicks = 10
+});
+node.Output.LinkTo(downstream);
+await node.StartAsync();
 ```
 
-`timer.interval` emits `TimerTick` values with a sequence number, timestamp,
-due time, elapsed time, interval, and drift. Use `emitImmediately: true` when
-the first tick should be emitted as soon as the node starts.
+`TimerIntervalNode` emits `TimerTick` values with a sequence number, timestamp,
+due time, elapsed time, interval, and drift. Set `EmitImmediately = true` to emit
+the first tick as soon as the node starts.
 
 ## Schedule
 
-```json
+```csharp
+await using var node = new TimerScheduleNode(new TimerScheduleSettings
 {
-  "type": "timer.schedule",
-  "name": "weekday-noon",
-  "cron": "0 12 ? * MON-FRI",
-  "timeZoneId": "UTC",
-  "maxTicks": 10,
-  "boundedCapacity": 128
-}
+    Name = "weekday-noon",
+    Cron = "0 12 ? * MON-FRI",
+    TimeZone = TimeZoneInfo.Utc,
+    MaxTicks = 10
+});
+node.Output.LinkTo(downstream);
+await node.StartAsync();
 ```
 
-`timer.schedule` emits `ScheduleTick` values. Cron expressions can use five
-fields or six fields when seconds are needed.
+`TimerScheduleNode` emits `ScheduleTick` values. Cron expressions use five fields,
+or six when seconds are needed. The expression is compiled and validated in the
+constructor.
 
-## Delay
-
-```json
-{
-  "type": "timer.delay",
-  "inputType": "message",
-  "delayMilliseconds": 250,
-  "boundedCapacity": 128
-}
-```
-
-`timer.delay` preserves input order and emits the original item after the
-configured delay. Register custom input aliases on the package options.
-
-## Throttle
-
-```json
-{
-  "type": "timer.throttle",
-  "inputType": "message",
-  "intervalMilliseconds": 100,
-  "emitFirstImmediately": true,
-  "boundedCapacity": 128
-}
-```
-
-`timer.throttle` preserves input order and emits the original item no more
-than once per configured interval. It queues items through normal bounded
-capacity instead of dropping them.
-
-## Debounce
-
-```json
-{
-  "type": "timer.debounce",
-  "inputType": "message",
-  "quietPeriodMilliseconds": 250,
-  "boundedCapacity": 128
-}
-```
-
-`timer.debounce` keeps the latest input and emits it after no new input arrives
-for the configured quiet period. When the input completes, the latest pending
-item is flushed before the output completes.
-
-## Registration
+## Delay / Throttle / Debounce
 
 ```csharp
-registry.RegisterTimerComponents(options => options
-    .UseClock(TimeProvider.System)
-    .RegisterType<MyMessage>("message"));
+await using var delay = new TimerDelayNode<MyMessage>(
+    new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(250) });
+await using var throttle = new TimerThrottleNode<MyMessage>(
+    new TimerThrottleSettings { Interval = TimeSpan.FromMilliseconds(100), EmitFirstImmediately = true });
+await using var debounce = new TimerDebounceNode<MyMessage>(
+    new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(250) });
+
+await delay.Input.SendAsync(FlowMessage.Create(message));
 ```
 
-`UseClock(TimeProvider)` is optional. The default uses `TimeProvider.System`.
-The package uses `System.TimeProvider`; there is no bespoke timer clock
-interface. Hosts and tests can provide a deterministic `TimeProvider` to control
-tick timestamps, schedule due-time delays, delay nodes, throttle windows, and
-debounce quiet periods.
+- `TimerDelayNode<T>` preserves input order and re-emits each item after the
+  configured delay.
+- `TimerThrottleNode<T>` preserves input order and re-emits no more than once per
+  interval, queuing items through bounded intake instead of dropping them.
+- `TimerDebounceNode<T>` keeps the latest input and emits it after no new input
+  arrives for the quiet period; a pending item is flushed when the input completes.
 
-## Design Metadata
+## Deterministic time
 
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
-
-## Composition Guidance
-
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Pass a `TimeProvider` to any node's constructor (it defaults to
+`TimeProvider.System`). Tests can supply a
+[`FakeTimeProvider`](https://www.nuget.org/packages/Microsoft.Extensions.TimeProvider.Testing)
+and advance it to fire interval ticks, schedule occurrences, delays, throttle
+windows, and debounce quiet periods without real-time waits.

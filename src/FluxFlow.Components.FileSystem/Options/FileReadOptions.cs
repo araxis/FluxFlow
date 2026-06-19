@@ -8,5 +8,10 @@ public sealed record FileReadOptions
     public string? BaseDirectory { get; init; }
     public bool AllowAbsolutePaths { get; init; }
     public string DefaultEncoding { get; init; } = "utf-8";
-    public long? MaxBytes { get; init; }
+
+    /// <summary>
+    /// Maximum file size the node will read, in bytes. Defaults to
+    /// <see cref="DefaultMaxBytes"/> (16 MiB); set to <c>null</c> for unlimited reads.
+    /// </summary>
+    public long? MaxBytes { get; init; } = DefaultMaxBytes;
 }

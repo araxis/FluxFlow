@@ -1,32 +1,32 @@
 using FluxFlow.Components.FileSystem.Contracts;
-using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
+using static FluxFlow.Components.FileSystem.Tests.FileSystemTestHelpers;
 
 namespace FluxFlow.Components.FileSystem.Tests;
 
+// file.watch is an event-driven FlowSource: StartAsync arms a FileSystemWatcher, then
+// real filesystem changes drive its output. The injected clock stamps the timestamps.
 public sealed class FileWatchNodeTests
 {
     [Fact]
-    public async Task FileWatch_EmitsFileEvents()
+    public async Task FileWatch_EmitsFileEvents_WithFreshCorrelation()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("watch");
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            boundedCapacity = 16
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            BoundedCapacity = 16
         });
-        var output = new BufferBlock<FileWatchEvent>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
         var filePath = Path.Combine(directory.Path, "created.txt");
         await File.WriteAllTextAsync(filePath, "hello");
 
@@ -35,252 +35,188 @@ public sealed class FileWatchNodeTests
             value => value.Name == "created.txt" &&
                      value.ChangeType is FileWatchChangeType.Created or FileWatchChangeType.Changed);
 
-        watchEvent.Path.ShouldBe(Path.GetFullPath(filePath));
-        watchEvent.Directory.ShouldBe(Path.GetFullPath(directory.Path));
+        watchEvent.Payload.Path.ShouldBe(Path.GetFullPath(filePath));
+        watchEvent.Payload.Directory.ShouldBe(Path.GetFullPath(directory.Path));
+        watchEvent.CorrelationId.IsEmpty.ShouldBeFalse();
 
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        node.Complete();
+        await node.Completion.WaitAsync(TestTimeout);
     }
 
     [Fact]
     public async Task FileWatch_EmitsRenamedEvents()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("watch");
         var originalPath = Path.Combine(directory.Path, "before.txt");
         var renamedPath = Path.Combine(directory.Path, "after.txt");
         await File.WriteAllTextAsync(originalPath, "hello");
-        var runtimeNode = CreateNode(new
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            boundedCapacity = 16
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            BoundedCapacity = 16
         });
-        var output = new BufferBlock<FileWatchEvent>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
         File.Move(originalPath, renamedPath);
 
-        var watchEvent = await ReceiveMatchingAsync(
+        var watchEvent = (await ReceiveMatchingAsync(
             output,
-            value => value.Name == "after.txt" &&
-                     value.ChangeType == FileWatchChangeType.Renamed);
+            value => value.Name == "after.txt" && value.ChangeType == FileWatchChangeType.Renamed)).Payload;
 
         watchEvent.Path.ShouldBe(Path.GetFullPath(renamedPath));
         watchEvent.OldPath.ShouldBe(Path.GetFullPath(originalPath));
         watchEvent.OldName.ShouldBe("before.txt");
 
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        node.Complete();
+        await node.Completion.WaitAsync(TestTimeout);
     }
 
     [Fact]
-    public async Task FileWatch_EmitsDiagnosticsAndFlowEvents()
+    public async Task FileWatch_StampsEventsWithInjectedClockAndEmitsLifecycleEvents()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("watch");
         var timestamp = DateTimeOffset.Parse("2026-06-02T12:30:00Z");
-        var runtimeNode = CreateNode(
-            new
+        await using var node = new FileWatchNode(
+            new FileWatchOptions
             {
-                directory = ".",
-                baseDirectory = directory.Path,
-                boundedCapacity = 16
+                Directory = ".",
+                BaseDirectory = directory.Path,
+                BoundedCapacity = 16
             },
-            options => options.UseClock(new FakeTimeProvider(timestamp)));
-        var output = new BufferBlock<FileWatchEvent>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        var events = new BufferBlock<FlowEvent>();
-        LinkOutput(runtimeNode, output);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowEventSource>()!
-            .Events.LinkTo(events);
+            new FakeTimeProvider(timestamp));
+        var output = Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "diag.txt"), "hello");
         var watchEvent = await ReceiveMatchingAsync(output, value => value.Name == "diag.txt");
-        watchEvent.Timestamp.ShouldBe(timestamp);
+        watchEvent.Payload.Timestamp.ShouldBe(timestamp);
 
-        await ReceiveDiagnosticAsync(
-            diagnostics,
-            FileSystemDiagnosticNames.FileWatchStarted);
-        await ReceiveDiagnosticAsync(
-            diagnostics,
-            FileSystemDiagnosticNames.FileWatchChanged);
-        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        flowEvent.Type.ShouldBe(FileSystemEventNames.FileWatchChanged);
-        flowEvent.Subject.ShouldEndWith("diag.txt");
-        flowEvent.Timestamp.ShouldBe(timestamp);
+        await ReceiveEventAsync(events, FileWatchNode.WatchStarted);
+        var changed = await ReceiveEventAsync(events, FileWatchNode.WatchChanged);
+        changed.Message.ShouldNotBeNull().ShouldContain("diag.txt");
+        changed.Timestamp.ShouldBe(timestamp);
 
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        node.Complete();
+        await node.Completion.WaitAsync(TestTimeout);
     }
 
     [Fact]
     public async Task FileWatch_CompleteStopsAndCompletesOutput()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("watch");
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path
+            Directory = ".",
+            BaseDirectory = directory.Path
         });
-        var output = new BufferBlock<FileWatchEvent>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        node.Complete();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        await output.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await output.Completion.WaitAsync(TestTimeout);
         output.Completion.IsCompletedSuccessfully.ShouldBeTrue();
-        await DisposeAsync(runtimeNode);
     }
 
     [Fact]
-    public async Task FileWatch_MissingDirectoryFailsStartup()
+    public async Task FileWatch_MissingDirectoryReportsErrorAndCompletes()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("watch");
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = "missing",
-            baseDirectory = directory.Path
+            Directory = "missing",
+            BaseDirectory = directory.Path
         });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        var errors = Sink(node.Errors);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        exception.Message.ShouldContain("failed to start");
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWatchDirectoryMissing);
-
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
+            .ShouldBe(FileSystemErrorCodes.FileWatchDirectoryMissing);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task FileWatch_RejectsAbsoluteDirectoryWhenDisabled()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("watch");
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = directory.Path,
-            baseDirectory = directory.Path
+            Directory = directory.Path,
+            BaseDirectory = directory.Path
         });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        var errors = Sink(node.Errors);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        exception.Message.ShouldContain("failed to start");
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.FileWatchAbsolutePathDenied);
-
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
+            .ShouldBe(FileSystemErrorCodes.FileWatchAbsolutePathDenied);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public void FileWatch_RejectsMissingDirectoryOption()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { }));
-
+        var exception = Should.Throw<ArgumentException>(
+            () => new FileWatchNode(new FileWatchOptions()));
         exception.Message.ShouldContain("directory");
     }
 
     [Fact]
     public void FileWatch_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { directory = ".", boundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FileWatchNode(new FileWatchOptions { Directory = ".", BoundedCapacity = 0 }));
 
     [Fact]
     public void FileWatch_RejectsInternalBufferSizeOutsideRange()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { directory = ".", internalBufferSize = 1024 }));
-
-        exception.Message.ShouldContain("internalBufferSize");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FileWatchNode(new FileWatchOptions { Directory = ".", InternalBufferSize = 1024 }));
 
     [Fact]
     public async Task FileWatch_StartsWithConfiguredInternalBufferSize()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("watch");
+        await using var node = new FileWatchNode(new FileWatchOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            internalBufferSize = 16384
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            InternalBufferSize = 16384
         });
-        var output = new BufferBlock<FileWatchEvent>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        await DisposeAsync(runtimeNode);
+        await node.StartAsync();
+        node.Complete();
+        await node.Completion.WaitAsync(TestTimeout);
+        output.Completion.IsCompletedSuccessfully.ShouldBeTrue();
     }
 
     [Fact]
     public void FileWatch_RejectsUnsupportedNotifyFilter()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
+        var exception = Should.Throw<ArgumentException>(
+            () => new FileWatchNode(new FileWatchOptions
             {
-                directory = ".",
-                notifyFilters = new[] { "DefinitelyNotAFilter" }
+                Directory = ".",
+                NotifyFilters = ["DefinitelyNotAFilter"]
             }));
-
         exception.Message.ShouldContain("notifyFilters");
     }
 
-    private static RuntimeNode CreateNode(
-        object configuration,
-        Action<FileSystemComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterFileSystemComponents(configure ?? (_ => { }));
-        registry.TryGetFactory(FileSystemComponentTypes.FileWatch, out var factory).ShouldBeTrue();
-        return factory(FileSystemTestHost.CreateContext(
-            FileSystemComponentTypes.FileWatch,
-            configuration,
-            "watcher"));
-    }
-
-    private static void LinkOutput(RuntimeNode runtimeNode, BufferBlock<FileWatchEvent> target)
-    {
-        runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<FileWatchEvent>(
-                    new PortAddress("test", new NodeName("events"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<FileWatchEvent> ReceiveMatchingAsync(
-        BufferBlock<FileWatchEvent> output,
+    private static async Task<FlowMessage<FileWatchEvent>> ReceiveMatchingAsync(
+        BufferBlock<FlowMessage<FileWatchEvent>> output,
         Func<FileWatchEvent, bool> predicate)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cancellation = new CancellationTokenSource(TestTimeout);
         while (!cancellation.IsCancellationRequested)
         {
             var value = await output.ReceiveAsync(cancellation.Token);
-            if (predicate(value))
+            if (predicate(value.Payload))
             {
                 return value;
             }
@@ -289,55 +225,18 @@ public sealed class FileWatchNodeTests
         throw new TimeoutException("Timed out waiting for file watch event.");
     }
 
-    private static async Task<FlowDiagnostic> ReceiveDiagnosticAsync(
-        BufferBlock<FlowDiagnostic> diagnostics,
-        string name)
+    private static async Task<FlowEvent> ReceiveEventAsync(BufferBlock<FlowEvent> events, string name)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cancellation = new CancellationTokenSource(TestTimeout);
         while (!cancellation.IsCancellationRequested)
         {
-            var value = await diagnostics.ReceiveAsync(cancellation.Token);
+            var value = await events.ReceiveAsync(cancellation.Token);
             if (value.Name == name)
             {
                 return value;
             }
         }
 
-        throw new TimeoutException($"Timed out waiting for diagnostic '{name}'.");
-    }
-
-    private static async ValueTask DisposeAsync(RuntimeNode runtimeNode)
-    {
-        if (runtimeNode.Node is IAsyncDisposable disposable)
-        {
-            await disposable.DisposeAsync();
-        }
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        private TempDirectory(string path)
-        {
-            Path = path;
-        }
-
-        public string Path { get; }
-
-        public static TempDirectory Create()
-        {
-            var path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                $"fluxflow-filesystem-watch-{Guid.NewGuid():N}");
-            System.IO.Directory.CreateDirectory(path);
-            return new TempDirectory(path);
-        }
-
-        public void Dispose()
-        {
-            if (System.IO.Directory.Exists(Path))
-            {
-                System.IO.Directory.Delete(Path, recursive: true);
-            }
-        }
+        throw new TimeoutException($"Timed out waiting for event '{name}'.");
     }
 }

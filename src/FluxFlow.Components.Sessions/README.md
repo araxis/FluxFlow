@@ -1,128 +1,124 @@
 # FluxFlow.Components.Sessions
 
-Reusable session recording and replay components for FluxFlow.
+Standalone session recording, replay, and query nodes for FluxFlow. Each node is a
+self-contained TPL Dataflow processor built on the `FluxFlow.Nodes` kit — `new` it,
+`LinkTo` the next node, and run it without the engine.
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `session.recorder` | `Input` -> `Output`, `Errors` | Records incoming messages into a host-provided session store. |
-| `session.replay` | `Output`, `Errors` | Replays stored session messages as a source stream. |
-| `session.query` | `Input` -> `Output`, `Sessions`, `Errors` | Queries session metadata from a host-provided session store. |
+| Node | Kit base | Shape |
+|------|----------|-------|
+| `SessionRecorderNode` | `FlowNode<SessionRecordInput, SessionRecord>` | `Input` -> `Output`, `Errors`, `Events` |
+| `SessionReplayNode` | `FlowSource<SessionRecord>` | `Output`, `Errors`, `Events` (started via `StartAsync`) |
+| `SessionQueryNode` | `FlowNode<SessionQueryRequest, SessionQueryResult>` | `Input` -> `Output`, `Sessions`, `Errors`, `Events` |
+
+Every message travels as a `FlowMessage<T>` envelope. The recorder and query node carry
+the incoming correlation id forward (`message.With(...)`); the replay source mints a
+fresh correlation id per record. Domain failures surface on the broadcast `Errors` port
+(`FlowError`, with the original correlation id where one exists) and the pump keeps
+processing later messages; diagnostics go to `Events` (`FlowEvent`).
 
 ## Storage
 
-The package owns the recording and replay contracts, but storage is injected by
-the host through `ISessionStoreFactory`. This keeps database paths, schemas,
-workspace ownership, and retention policy outside the component package.
+Storage is injected by the host through `ISessionStore`, passed directly to each node's
+constructor. This keeps database paths, schemas, workspace ownership, and retention
+policy outside the component package. Hosts that need deterministic recording or replay
+timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
 
 ```csharp
-registry.RegisterSessionsComponents(options =>
-    options.UseStore(context => new MySessionStore(context.StoreName)));
-```
-
-Hosts that need deterministic recording or replay timing can provide a
-`TimeProvider`:
-
-```csharp
-registry.RegisterSessionsComponents(options => options
-    .UseStore(context => new MySessionStore(context.StoreName))
-    .UseClock(timeProvider));
+ISessionStore store = new MySessionStore(...);
+TimeProvider clock = TimeProvider.System;
 ```
 
 ## Recorder
 
-```json
-{
-  "type": "session.recorder",
-  "name": "recorder",
-  "store": "default",
-  "sessionId": "sample-session",
-  "boundedCapacity": 128,
-  "tags": {
-    "source": "demo"
-  }
-}
+```csharp
+await using var recorder = new SessionRecorderNode(
+    new SessionRecorderOptions { SessionId = "sample-session", BoundedCapacity = 128 },
+    store,
+    clock);
+
+await recorder.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "event", Payload = "..." }));
+recorder.Complete();
+await recorder.Completion;
 ```
 
-`session.recorder` consumes `SessionRecordInput` and emits the stored
-`SessionRecord` returned by the store. Startup opens the session. Completion
-closes the session with the final message count.
-
-`UseClock(...)` controls session start/end timestamps and default message
-timestamps when `SessionRecordInput.Timestamp` is not set.
+`SessionRecorderNode` consumes `SessionRecordInput` and broadcasts the stored
+`SessionRecord` returned by the store, carrying the correlation id forward. The session
+is opened lazily on the first message. It is closed (with the final message count) when
+the node is disposed; the close completes the `SessionCompleted` task. The injected
+`TimeProvider` controls the session start/end timestamps and the default message
+timestamp when `SessionRecordInput.Timestamp` is not set.
 
 ## Replay
 
-```json
-{
-  "type": "session.replay",
-  "name": "replay",
-  "store": "default",
-  "sessionId": "sample-session",
-  "mode": "instant",
-  "boundedCapacity": 128
-}
+```csharp
+await using var replay = new SessionReplayNode(
+    new SessionReplayOptions
+    {
+        SessionId = "sample-session",
+        Mode = SessionReplayMode.Instant,
+        BoundedCapacity = 128
+    },
+    store,
+    clock);
+
+await replay.StartAsync();
+await replay.Completion;
 ```
 
 Replay modes:
 
-- `instant`: emit records without delay.
-- `fixedInterval`: wait `fixedIntervalMilliseconds` between records.
-- `realTime`: use timestamp deltas from the stored records.
-- `multiplier`: use timestamp deltas divided by `speedMultiplier`.
+- `Instant`: emit records without delay.
+- `FixedInterval`: wait `FixedIntervalMilliseconds` between records.
+- `RealTime`: use timestamp deltas from the stored records.
+- `Multiplier`: use timestamp deltas divided by `SpeedMultiplier`.
 
-`startSequence` and `maxMessages` can limit the replay range.
-
-`UseClock(...)` controls replay delays for fixed interval, real-time, and
-multiplier modes. Without it, sessions use `TimeProvider.System`.
+`StartSequence` and `MaxMessages` can limit the replay range. The injected
+`TimeProvider` times the inter-record delays, so a `FakeTimeProvider` drives replay
+deterministically. The loop stops when the session is exhausted, when the source is
+completed/disposed, or when the output declines delivery. A missing session or store
+failure surfaces a `FlowError` and faults the source.
 
 ## Query
 
-```json
-{
-  "type": "session.query",
-  "name": "query",
-  "store": "default",
-  "namePrefix": "sample",
-  "limit": 100,
-  "boundedCapacity": 128
-}
+```csharp
+await using var query = new SessionQueryNode(
+    new SessionQueryOptions { NamePrefix = "sample", Limit = 100, BoundedCapacity = 128 },
+    store,
+    clock);
+
+await query.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" }));
+query.Complete();
+await query.Completion;
 ```
 
-`session.query` consumes `SessionQueryRequest` and emits `SessionQueryResult`
-on `Output`. When `emitSessionOutputs` is enabled, each matching
-`SessionMetadata` is also emitted on `Sessions`.
-
-The request can filter by name, name prefix, tags, started/ended ranges, active
-or completed status, and limit. Query failures are emitted through `Errors` and
-later requests continue.
+`SessionQueryNode` consumes `SessionQueryRequest` and broadcasts a `SessionQueryResult`
+on `Output`. When `EmitSessionOutputs` is enabled, each matching `SessionMetadata` is
+also fanned out to the extra `Sessions` port (`FlowMessage<SessionMetadata>`). The
+request can filter by name, name prefix, tags, started/ended ranges, active or completed
+status, and limit; node options provide defaults that the request merges over. Invalid
+requests and query failures surface on `Errors` and later requests continue.
 
 ## Contracts
 
-The package includes:
+The package owns the recording and replay contracts:
 
 - `SessionRecordInput`
 - `SessionRecord`
 - `SessionMetadata`
 - `SessionQueryRequest`
 - `SessionQueryResult`
+- `SessionStartRequest`, `SessionAppendRequest`, `SessionCompleteRequest`, `SessionReadRequest`
 - `ISessionStore`
-- `ISessionStoreFactory`
 
-Records carry neutral fields: session id, sequence, timestamp, type, name,
-payload, content type, and string attributes. Hosts can map their own envelope
-or event types into these contracts.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+Records carry neutral fields: session id, sequence, timestamp, type, name, payload,
+content type, and string attributes. Hosts can map their own envelope or event types
+into these contracts.
 
 ## Composition Guidance
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Use these nodes as parts of a host-composed graph: construct them, link their ports with
+`LinkTo`, and drive them directly. See
+[Component Composition](../../docs/12-component-composition.md) for recommended host and
+package boundaries.

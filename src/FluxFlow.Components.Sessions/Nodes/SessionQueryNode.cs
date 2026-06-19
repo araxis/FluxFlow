@@ -1,32 +1,43 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Sessions.Nodes;
 
-public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone session query node. Post a <c>FlowMessage&lt;SessionQueryRequest&gt;</c>
+/// to <c>Input</c>; the node merges the request with its defaults, queries a
+/// host-provided <see cref="ISessionStore"/>, and broadcasts a
+/// <c>FlowMessage&lt;SessionQueryResult&gt;</c> on <c>Output</c> carrying the same
+/// correlation id. When <see cref="SessionQueryOptions.EmitSessionOutputs"/> is set it
+/// also fans each matching <c>FlowMessage&lt;SessionMetadata&gt;</c> out to the extra
+/// <c>Sessions</c> port. Invalid requests and store failures surface on <c>Errors</c>
+/// (with the original correlation id) and the pump keeps processing later requests;
+/// diagnostics go to <c>Events</c>. Works with nothing but
+/// <c>new SessionQueryNode(options, store)</c> — no engine.
+/// </summary>
+public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQueryResult>
 {
-    private readonly object _stateLock = new();
+    public const string QueryStarted = SessionsDiagnosticNames.QueryStarted;
+    public const string QueryCompleted = SessionsDiagnosticNames.QueryCompleted;
+    public const string QueryFailed = SessionsDiagnosticNames.QueryFailed;
+
     private readonly SessionQueryOptions _options;
     private readonly ISessionStore _store;
-    private readonly SessionsComponentOptions _componentOptions;
-    private readonly ActionBlock<SessionQueryRequest> _input;
-    private readonly BufferBlock<SessionQueryResult> _output;
-    private readonly BufferBlock<SessionMetadata> _sessions;
-    private readonly CancellationTokenSource _processingCancellation = new();
-    private bool _startRequested;
-    private bool _disposed;
+    private readonly TimeProvider _clock;
+    private readonly BroadcastBlock<FlowMessage<SessionMetadata>> _sessions;
 
-    internal SessionQueryNode(
+    public SessionQueryNode(
         SessionQueryOptions options,
         ISessionStore store,
-        SessionsComponentOptions componentOptions)
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
-        _componentOptions = componentOptions ?? throw new ArgumentNullException(nameof(componentOptions));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -34,99 +45,43 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
                 "session.query bounded capacity must be greater than zero.");
         }
 
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
-        _input = new ActionBlock<SessionQueryRequest>(
-            QueryAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _output = new BufferBlock<SessionQueryResult>(blockOptions);
-        _sessions = new BufferBlock<SessionMetadata>(blockOptions);
-        _input.Completion.ContinueWith(
-            CompleteOutputs,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_output.Completion, _sessions.Completion));
+        if (options.Limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.query limit must be greater than zero.");
+        }
+
+        if (!options.IncludeActive && !options.IncludeCompleted)
+        {
+            throw new ArgumentException(
+                "session.query must include active sessions, completed sessions, or both.",
+                nameof(options));
+        }
+
+        _options = options;
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? TimeProvider.System;
+        _sessions = AddOutput<FlowMessage<SessionMetadata>>();
+
+        // One-time "started" note, mirroring the old StartAsync diagnostic.
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = QueryStarted,
+            Level = FlowEventLevel.Information,
+            Message = "session.query started.",
+            Attributes = CreateQueryAttributes()
+        });
     }
 
-    public ITargetBlock<SessionQueryRequest> Input => _input;
+    /// <summary>Matching session metadata; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<SessionMetadata>> Sessions => _sessions;
 
-    public ISourceBlock<SessionQueryResult> Output => _output;
-
-    public ISourceBlock<SessionMetadata> Sessions => _sessions;
-
-    public override Task StartAsync(CancellationToken cancellationToken = default)
+    protected override async Task ProcessAsync(FlowMessage<SessionQueryRequest> message)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("session.query node has already started.");
-            }
-
-            _startRequested = true;
-        }
-
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.QueryStarted,
-            message: "session.query started.",
-            attributes: CreateQueryAttributes());
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _processingCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_sessions).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        await Completion.ConfigureAwait(false);
-        _processingCancellation.Dispose();
-    }
-
-    private async Task QueryAsync(SessionQueryRequest input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-
-        lock (_stateLock)
-        {
-            if (!_startRequested)
-            {
-                ReportQueryError(
-                    SessionsErrorCodes.NotStarted,
-                    "session.query has not started.",
-                    input,
-                    exception: null);
-                return;
-            }
-        }
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
         SessionQueryRequest request;
         try
@@ -138,41 +93,22 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
             ReportQueryError(
                 SessionsErrorCodes.InvalidQuery,
                 $"session.query request is invalid: {exception.Message}",
+                message,
                 input,
                 exception);
             return;
         }
 
+        IReadOnlyList<SessionMetadata> copiedSessions;
         try
         {
-            var sessions = await _store.QuerySessionsAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
-            var copiedSessions = sessions
+            var sessions = await _store.QuerySessionsAsync(request, Stopping).ConfigureAwait(false);
+            copiedSessions = sessions
                 .Select(ValidateAndCopySession)
                 .Take(request.Limit!.Value)
                 .ToArray();
-
-            await _output.SendAsync(
-                CreateResult(request, copiedSessions),
-                _processingCancellation.Token).ConfigureAwait(false);
-
-            if (_options.EmitSessionOutputs)
-            {
-                foreach (var session in copiedSessions)
-                {
-                    await _sessions.SendAsync(
-                        session,
-                        _processingCancellation.Token).ConfigureAwait(false);
-                }
-            }
-
-            TryEmitDiagnostic(
-                SessionsDiagnosticNames.QueryCompleted,
-                message: "session.query completed.",
-                attributes: CreateQueryAttributes(request, copiedSessions.Length));
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -181,9 +117,32 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
             ReportQueryError(
                 SessionsErrorCodes.QueryFailed,
                 $"session.query failed: {exception.Message}",
+                message,
                 request,
                 exception);
+            return;
         }
+
+        // Carry the correlation id forward onto the result and any branched session.
+        Emit(message.With(CreateResult(request, copiedSessions)));
+
+        if (_options.EmitSessionOutputs)
+        {
+            foreach (var session in copiedSessions)
+            {
+                _sessions.Post(message.With(session));
+            }
+        }
+
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = QueryCompleted,
+            Level = FlowEventLevel.Information,
+            Message = "session.query completed.",
+            Attributes = CreateQueryAttributes(request, copiedSessions.Count)
+        });
     }
 
     private SessionQueryRequest NormalizeRequest(SessionQueryRequest input)
@@ -222,7 +181,7 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
         IReadOnlyList<SessionMetadata> sessions)
         => new()
         {
-            Timestamp = _componentOptions.Clock.GetUtcNow(),
+            Timestamp = _clock.GetUtcNow(),
             Operation = "query",
             Succeeded = true,
             Count = sessions.Count,
@@ -247,21 +206,29 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
     private void ReportQueryError(
         int code,
         string message,
+        FlowMessage<SessionQueryRequest> source,
         SessionQueryRequest request,
         Exception? exception)
     {
         var correlationId = Normalize(request.CorrelationId);
-        TryReportError(
-            code,
-            message,
-            exception,
-            CreateQueryContext(request, correlationId));
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.QueryFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateQueryAttributes(request));
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = CreateQueryContext(request, correlationId),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = QueryFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateQueryAttributes(request)
+        });
     }
 
     private Dictionary<string, object?> CreateQueryAttributes(
@@ -360,19 +327,6 @@ public sealed class SessionQueryNode : FlowNodeBase, IAsyncDisposable
             throw new InvalidOperationException(
                 $"session.query request {fromName} cannot be later than {toName}.");
         }
-    }
-
-    private void CompleteOutputs(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_sessions).Fault(exception);
-            return;
-        }
-
-        _output.Complete();
-        _sessions.Complete();
     }
 
     private static string? Normalize(string? value)

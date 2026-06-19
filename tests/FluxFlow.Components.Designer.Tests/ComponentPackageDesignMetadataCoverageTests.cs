@@ -1,12 +1,9 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.FileSystem;
 using FluxFlow.Components.Mqtt;
 using FluxFlow.Components.Routing;
-using FluxFlow.Components.Sessions;
 using FluxFlow.Components.Sources;
 using FluxFlow.Components.Storage;
-using FluxFlow.Components.Timers;
 using FluxFlow.Engine.Definitions;
 using Shouldly;
 using Xunit;
@@ -47,21 +44,14 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
 
     private static IReadOnlyList<IComponentDesignMetadataProvider> CreateProviders() =>
     [
-        new FileSystemComponentDesignMetadataProvider(),
         new MqttComponentDesignMetadataProvider(),
         new RoutingComponentDesignMetadataProvider(),
-        new SessionsComponentDesignMetadataProvider(),
         new SourcesComponentDesignMetadataProvider(),
         new StorageComponentDesignMetadataProvider(),
-        new TimerComponentDesignMetadataProvider(),
     ];
 
     private static readonly IReadOnlyList<NodeType> ExpectedTypes =
     [
-        FileSystemComponentTypes.DirectoryEnumerate,
-        FileSystemComponentTypes.FileRead,
-        FileSystemComponentTypes.FileWatch,
-        FileSystemComponentTypes.FileWrite,
         MqttComponentTypes.Connection,
         MqttComponentTypes.Publish,
         MqttComponentTypes.Subscribe,
@@ -71,9 +61,6 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         RoutingComponentTypes.Merge,
         RoutingComponentTypes.Switch,
         RoutingComponentTypes.Window,
-        SessionsComponentTypes.Query,
-        SessionsComponentTypes.Recorder,
-        SessionsComponentTypes.Replay,
         SourcesComponentTypes.Generated,
         SourcesComponentTypes.Sequence,
         StorageComponentTypes.Delete,
@@ -81,10 +68,5 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         StorageComponentTypes.Put,
         StorageComponentTypes.Query,
         StorageComponentTypes.Store,
-        TimerComponentTypes.Debounce,
-        TimerComponentTypes.Delay,
-        TimerComponentTypes.Interval,
-        TimerComponentTypes.Schedule,
-        TimerComponentTypes.Throttle,
     ];
 }

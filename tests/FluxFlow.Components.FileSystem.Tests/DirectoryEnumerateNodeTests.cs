@@ -1,93 +1,85 @@
 using FluxFlow.Components.FileSystem.Contracts;
-using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
+using static FluxFlow.Components.FileSystem.Tests.FileSystemTestHelpers;
 
 namespace FluxFlow.Components.FileSystem.Tests;
 
+// directory.enumerate is a FlowSource: StartAsync, then drain Output until it completes.
+// Each entry is minted as a fresh FlowMessage<DirectoryEnumerateEntry>.
 public sealed class DirectoryEnumerateNodeTests
 {
     [Fact]
     public async Task DirectoryEnumerate_EmitsMatchingFilesInsideBaseDirectory()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("enumerate");
         Directory.CreateDirectory(Path.Combine(directory.Path, "nested"));
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "root.txt"), "root");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "nested", "child.txt"), "child");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "skip.bin"), "skip");
-        var runtimeNode = CreateNode(new
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            filter = "*.txt",
-            includeSubdirectories = true,
-            boundedCapacity = 8
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            Filter = "*.txt",
+            IncludeSubdirectories = true,
+            BoundedCapacity = 8
         });
-        var output = new BufferBlock<DirectoryEnumerateEntry>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        var entries = await DrainUntilCompletedAsync(output);
-        entries.Select(entry => entry.Name)
-            .Order()
-            .ShouldBe(["child.txt", "root.txt"]);
+        var entries = (await DrainAsync(output)).Select(message => message.Payload).ToList();
+        entries.Select(entry => entry.Name).Order().ShouldBe(["child.txt", "root.txt"]);
         entries.ShouldAllBe(entry => entry.EntryType == DirectoryEntryType.File);
         entries.ShouldAllBe(entry => entry.Directory == Path.GetFullPath(directory.Path));
         entries.Single(entry => entry.Name == "root.txt").Length.ShouldBe(4);
     }
 
     [Fact]
-    public async Task DirectoryEnumerate_UsesConfiguredClockForEntryTimestamp()
+    public async Task DirectoryEnumerate_UsesInjectedClockForEntryTimestamp()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("enumerate");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "one.txt"), "one");
         var enumeratedAt = DateTimeOffset.Parse("2026-06-02T12:20:00Z");
-        var runtimeNode = CreateNode(
-            new
-            {
-                directory = ".",
-                baseDirectory = directory.Path
-            },
-            options => options.UseClock(new FakeTimeProvider(enumeratedAt)));
-        var output = new BufferBlock<DirectoryEnumerateEntry>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new DirectoryEnumerateNode(
+            new DirectoryEnumerateOptions { Directory = ".", BaseDirectory = directory.Path },
+            new FakeTimeProvider(enumeratedAt));
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        var entry = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        entry.EnumeratedAt.ShouldBe(enumeratedAt);
+        var entry = (await DrainAsync(output)).ShouldHaveSingleItem();
+        entry.Payload.EnumeratedAt.ShouldBe(enumeratedAt);
     }
 
     [Fact]
     public async Task DirectoryEnumerate_CanEmitDirectories()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("enumerate");
         Directory.CreateDirectory(Path.Combine(directory.Path, "nested"));
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "root.txt"), "root");
-        var runtimeNode = CreateNode(new
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            includeFiles = false,
-            includeDirectories = true,
-            boundedCapacity = 4
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            IncludeFiles = false,
+            IncludeDirectories = true,
+            BoundedCapacity = 4
         });
-        var output = new BufferBlock<DirectoryEnumerateEntry>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        var entry = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        var entry = (await DrainAsync(output)).ShouldHaveSingleItem().Payload;
         entry.Name.ShouldBe("nested");
         entry.EntryType.ShouldBe(DirectoryEntryType.Directory);
         entry.Length.ShouldBeNull();
@@ -96,223 +88,135 @@ public sealed class DirectoryEnumerateNodeTests
     [Fact]
     public async Task DirectoryEnumerate_MaxEntriesLimitsOutput()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("enumerate");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "one.txt"), "one");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "two.txt"), "two");
-        var runtimeNode = CreateNode(new
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path,
-            maxEntries = 1
+            Directory = ".",
+            BaseDirectory = directory.Path,
+            MaxEntries = 1
         });
-        var output = new BufferBlock<DirectoryEnumerateEntry>();
-        LinkOutput(runtimeNode, output);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        var entries = await DrainUntilCompletedAsync(output);
-        entries.Count.ShouldBe(1);
+        (await DrainAsync(output)).Count.ShouldBe(1);
     }
 
     [Fact]
-    public async Task DirectoryEnumerate_EmitsDiagnostics()
+    public async Task DirectoryEnumerate_EmitsLifecycleEvents()
     {
-        using var directory = TempDirectory.Create();
+        using var directory = TempDirectory.Create("enumerate");
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "diag.txt"), "value");
-        var runtimeNode = CreateNode(new
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = ".",
-            baseDirectory = directory.Path
+            Directory = ".",
+            BaseDirectory = directory.Path
         });
-        var output = new BufferBlock<DirectoryEnumerateEntry>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        LinkOutput(runtimeNode, output);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        var output = Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        var diagnosticNames = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
-            .Select(diagnostic => diagnostic.Name)
-            .ToArray();
-        diagnosticNames.ShouldContain(FileSystemDiagnosticNames.DirectoryEnumerateStarted);
-        diagnosticNames.ShouldContain(FileSystemDiagnosticNames.DirectoryEnumerateEntry);
-        diagnosticNames.ShouldContain(FileSystemDiagnosticNames.DirectoryEnumerateCompleted);
+        (await DrainAsync(output)).ShouldHaveSingleItem();
+        var eventNames = (await DrainEventsAsync(events)).Select(value => value.Name).ToArray();
+        eventNames.ShouldContain(DirectoryEnumerateNode.EnumerateStarted);
+        eventNames.ShouldContain(DirectoryEnumerateNode.EnumerateEntry);
+        eventNames.ShouldContain(DirectoryEnumerateNode.EnumerateCompleted);
     }
 
     [Fact]
-    public async Task DirectoryEnumerate_MissingDirectoryFailsStartup()
+    public async Task DirectoryEnumerate_MissingDirectoryReportsErrorAndCompletes()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("enumerate");
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = "missing",
-            baseDirectory = directory.Path
+            Directory = "missing",
+            BaseDirectory = directory.Path
         });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        var errors = Sink(node.Errors);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        exception.Message.ShouldContain("failed to start");
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing);
-
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
+            .ShouldBe(FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task DirectoryEnumerate_RejectsAbsoluteDirectoryWhenDisabled()
     {
-        using var directory = TempDirectory.Create();
-        var runtimeNode = CreateNode(new
+        using var directory = TempDirectory.Create("enumerate");
+        await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
         {
-            directory = directory.Path,
-            baseDirectory = directory.Path
+            Directory = directory.Path,
+            BaseDirectory = directory.Path
         });
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        var errors = Sink(node.Errors);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TestTimeout);
 
-        exception.Message.ShouldContain("failed to start");
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied);
-
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
+            .ShouldBe(FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public void DirectoryEnumerate_RejectsMissingDirectoryOption()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { }));
-
+        var exception = Should.Throw<ArgumentException>(
+            () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions()));
         exception.Message.ShouldContain("directory");
     }
 
     [Fact]
     public void DirectoryEnumerate_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { directory = ".", boundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions
+            {
+                Directory = ".",
+                BoundedCapacity = 0
+            }));
 
     [Fact]
     public void DirectoryEnumerate_RejectsDisabledEntryTypes()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
+        var exception = Should.Throw<ArgumentException>(
+            () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions
             {
-                directory = ".",
-                includeFiles = false,
-                includeDirectories = false
+                Directory = ".",
+                IncludeFiles = false,
+                IncludeDirectories = false
             }));
-
         exception.Message.ShouldContain("includeFiles");
     }
 
     [Fact]
     public void DirectoryEnumerate_RejectsInvalidMaxEntries()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { directory = ".", maxEntries = 0 }));
-
-        exception.Message.ShouldContain("maxEntries");
-    }
-
-    private static RuntimeNode CreateNode(
-        object configuration,
-        Action<FileSystemComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterFileSystemComponents(configure ?? (_ => { }));
-        registry.TryGetFactory(FileSystemComponentTypes.DirectoryEnumerate, out var factory).ShouldBeTrue();
-        return factory(FileSystemTestHost.CreateContext(
-            FileSystemComponentTypes.DirectoryEnumerate,
-            configuration,
-            "enumerate"));
-    }
-
-    private static void LinkOutput(RuntimeNode runtimeNode, BufferBlock<DirectoryEnumerateEntry> target)
-    {
-        runtimeNode.FindOutput(new PortName(FileSystemComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<DirectoryEnumerateEntry>(
-                    new PortAddress("test", new NodeName("entries"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<DirectoryEnumerateEntry>> DrainUntilCompletedAsync(
-        BufferBlock<DirectoryEnumerateEntry> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var entries = new List<DirectoryEnumerateEntry>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var entry))
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions
             {
-                entries.Add(entry);
+                Directory = ".",
+                MaxEntries = 0
+            }));
+
+    private static async Task<List<FlowEvent>> DrainEventsAsync(BufferBlock<FlowEvent> events)
+    {
+        using var cancellation = new CancellationTokenSource(TestTimeout);
+        var collected = new List<FlowEvent>();
+        while (await events.OutputAvailableAsync(cancellation.Token))
+        {
+            while (events.TryReceive(out var value))
+            {
+                collected.Add(value);
             }
         }
 
-        return entries;
-    }
-
-    private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
-        BufferBlock<FlowDiagnostic> diagnostics)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var entries = new List<FlowDiagnostic>();
-        while (await diagnostics.OutputAvailableAsync(cancellation.Token))
-        {
-            while (diagnostics.TryReceive(out var entry))
-            {
-                entries.Add(entry);
-            }
-        }
-
-        return entries;
-    }
-
-    private sealed class TempDirectory : IDisposable
-    {
-        private TempDirectory(string path)
-        {
-            Path = path;
-        }
-
-        public string Path { get; }
-
-        public static TempDirectory Create()
-        {
-            var path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                $"fluxflow-directory-enumerate-{Guid.NewGuid():N}");
-            System.IO.Directory.CreateDirectory(path);
-            return new TempDirectory(path);
-        }
-
-        public void Dispose()
-        {
-            if (System.IO.Directory.Exists(Path))
-            {
-                System.IO.Directory.Delete(Path, recursive: true);
-            }
-        }
+        return collected;
     }
 }

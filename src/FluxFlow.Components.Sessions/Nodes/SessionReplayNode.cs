@@ -1,32 +1,43 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sessions.Nodes;
 
-public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDisposable
+/// <summary>
+/// A standalone session replay source. Once <see cref="FlowSource{T}.StartAsync"/> is
+/// called it reads the configured session's records from a host-provided
+/// <see cref="ISessionStore"/> and broadcasts each as a fresh
+/// <c>FlowMessage&lt;SessionRecord&gt;</c> on <c>Output</c> (each minted with a new
+/// correlation id). Inter-record pacing — fixed interval, real-time deltas, or a
+/// speed multiplier — is timed against the injected <see cref="TimeProvider"/>, so a
+/// <c>FakeTimeProvider</c> drives it deterministically. The loop stops when the
+/// session is exhausted, when <c>Stopping</c> fires (<c>Complete</c>/dispose), or when
+/// the output declines delivery. A missing session or store failure faults the source
+/// after surfacing a <see cref="FlowError"/>; diagnostics go to <c>Events</c>. Works
+/// with nothing but <c>new SessionReplayNode(options, store)</c> — no engine.
+/// </summary>
+public sealed class SessionReplayNode : FlowSource<SessionRecord>
 {
-    private readonly object _stateLock = new();
+    public const string ReplayStarted = SessionsDiagnosticNames.ReplayStarted;
+    public const string ReplayEmitted = SessionsDiagnosticNames.ReplayEmitted;
+    public const string ReplayCompleted = SessionsDiagnosticNames.ReplayCompleted;
+    public const string ReplayFailed = SessionsDiagnosticNames.ReplayFailed;
+
     private readonly SessionReplayOptions _options;
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
     private readonly string _sessionId;
-    private CancellationTokenSource? _replayCancellation;
-    private Task? _replayTask;
-    private bool _startRequested;
-    private bool _disposed;
 
-    internal SessionReplayNode(
+    public SessionReplayNode(
         SessionReplayOptions options,
         ISessionStore store,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
+        TimeProvider? clock = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _clock = clock ?? TimeProvider.System;
         _sessionId = Normalize(options.SessionId)
             ?? throw new ArgumentException("session.replay requires a session id.", nameof(options));
         if (options.BoundedCapacity <= 0)
@@ -35,164 +46,111 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
                 nameof(options),
                 "session.replay bounded capacity must be greater than zero.");
         }
-    }
 
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_stateLock)
+        if (options.StartSequence is <= 0)
         {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("session.replay node has already started.");
-            }
-
-            _startRequested = true;
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay start sequence must be greater than zero when set.");
         }
 
+        if (options.MaxMessages is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay max messages must be greater than zero when set.");
+        }
+
+        if (options.FixedIntervalMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay fixed interval must be zero or greater.");
+        }
+
+        if (options.SpeedMultiplier <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay speed multiplier must be greater than zero.");
+        }
+    }
+
+    protected override async Task RunAsync(CancellationToken cancellationToken)
+    {
         SessionMetadata? session;
         try
         {
-            session = await _store.GetSessionAsync(
-                _sessionId,
-                cancellationToken).ConfigureAwait(false);
+            session = await _store.GetSessionAsync(_sessionId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            TryReportReplayError(
+            ReportReplayError(
                 SessionsErrorCodes.StoreUnavailable,
                 $"session.replay failed to load session: {exception.Message}",
                 exception);
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
             throw;
         }
 
         if (session is null)
         {
-            var exception = new InvalidOperationException(
+            var missing = new InvalidOperationException(
                 $"session.replay session '{_sessionId}' was not found.");
-            TryReportReplayError(
-                SessionsErrorCodes.InvalidSession,
-                exception.Message,
-                exception);
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw exception;
+            ReportReplayError(SessionsErrorCodes.InvalidSession, missing.Message, missing);
+            throw missing;
         }
 
-        lock (_stateLock)
+        EmitEvent(new FlowEvent
         {
-            _replayCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _replayTask = RunReplayAsync(_replayCancellation.Token);
-        }
+            Timestamp = _clock.GetUtcNow(),
+            Name = ReplayStarted,
+            Level = FlowEventLevel.Information,
+            Message = "session.replay started session.",
+            Attributes = CreateReplayAttributes(session)
+        });
 
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.ReplayStarted,
-            message: "session.replay started session.",
-            attributes: CreateReplayAttributes(session));
-    }
-
-    public override void Complete()
-    {
-        CancellationTokenSource? cancellation;
-        lock (_stateLock)
-        {
-            cancellation = _replayCancellation;
-        }
-
-        if (cancellation is null)
-        {
-            CompleteOutput();
-            return;
-        }
-
-        cancellation.Cancel();
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _replayCancellation?.Cancel();
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        if (_replayTask is not null)
-        {
-            await _replayTask.ConfigureAwait(false);
-        }
-
-        _replayCancellation?.Dispose();
-    }
-
-    private async Task RunReplayAsync(CancellationToken cancellationToken)
-    {
         var emitted = 0L;
         SessionRecord? previous = null;
-        try
+        await foreach (var record in _store.ReadMessagesAsync(
+                           new SessionReadRequest
+                           {
+                               SessionId = _sessionId,
+                               StartSequence = _options.StartSequence,
+                               MaxMessages = _options.MaxMessages
+                           },
+                           cancellationToken).WithCancellation(cancellationToken)
+                           .ConfigureAwait(false))
         {
-            await foreach (var record in _store.ReadMessagesAsync(
-                               new SessionReadRequest
-                               {
-                                   SessionId = _sessionId,
-                                   StartSequence = _options.StartSequence,
-                                   MaxMessages = _options.MaxMessages
-                               },
-                               cancellationToken).WithCancellation(cancellationToken)
-                               .ConfigureAwait(false))
+            await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
+            if (!Emit(FlowMessage.Create(CopyRecord(record))))
             {
-                await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
-                if (!await SendOutputAsync(CopyRecord(record), cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
-
-                emitted++;
-                previous = record;
-                TryEmitDiagnostic(
-                    SessionsDiagnosticNames.ReplayEmitted,
-                    message: "session.replay emitted message.",
-                    attributes: CreateRecordAttributes(record, emitted));
+                break;
             }
 
-            TryEmitDiagnostic(
-                SessionsDiagnosticNames.ReplayCompleted,
-                message: "session.replay completed session.",
-                attributes: CreateReplayAttributes(emitted));
-            CompleteOutput();
+            emitted++;
+            previous = record;
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                Name = ReplayEmitted,
+                Level = FlowEventLevel.Information,
+                Message = "session.replay emitted message.",
+                Attributes = CreateRecordAttributes(record, emitted)
+            });
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+
+        EmitEvent(new FlowEvent
         {
-            TryEmitDiagnostic(
-                SessionsDiagnosticNames.ReplayCompleted,
-                message: "session.replay stopped session.",
-                attributes: CreateReplayAttributes(emitted));
-            CompleteOutput();
-        }
-        catch (Exception exception)
-        {
-            TryReportReplayError(
-                SessionsErrorCodes.ReplayFailed,
-                $"session.replay failed: {exception.Message}",
-                exception);
-            base.Fault(exception);
-        }
+            Timestamp = _clock.GetUtcNow(),
+            Name = ReplayCompleted,
+            Level = FlowEventLevel.Information,
+            Message = "session.replay completed session.",
+            Attributes = CreateReplayAttributes(emitted)
+        });
     }
 
     private async Task DelayForRecordAsync(
@@ -222,18 +180,24 @@ public sealed class SessionReplayNode : SourceFlowNode<SessionRecord>, IAsyncDis
         await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
     }
 
-    private void TryReportReplayError(
-        int code,
-        string message,
-        Exception? exception)
+    private void ReportReplayError(int code, string message, Exception? exception)
     {
-        TryReportError(code, message, exception, $"sessionId={_sessionId}");
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.ReplayFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateReplayAttributes());
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = code,
+            Message = message,
+            Context = $"sessionId={_sessionId}",
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = ReplayFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateReplayAttributes()
+        });
     }
 
     private static SessionRecord CopyRecord(SessionRecord record)

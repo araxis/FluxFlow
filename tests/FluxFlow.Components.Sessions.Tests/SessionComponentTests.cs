@@ -1,55 +1,61 @@
+using FluxFlow.Components.Sessions;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
+using FluxFlow.Components.Sessions.Nodes;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Sessions.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the recorder/query carry the correlation id forward, the
+// replay source mints a fresh one per record. Timing is driven by an injected
+// FakeTimeProvider so replay pacing tests never sleep on the wall clock.
 public sealed class SessionComponentTests
 {
+    // ---- Recorder ------------------------------------------------------------------
+
     [Fact]
-    public async Task Recorder_WritesMessagesInOrder()
+    public async Task Recorder_WritesMessagesInOrderAndPreservesCorrelation()
     {
         var store = new TestSessionStore();
-        var runtimeNode = CreateRecorder(new
-        {
-            sessionId = "session-1",
-            name = "sample",
-            boundedCapacity = 4
-        }, store);
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+        var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1", Name = "sample", BoundedCapacity = 4 },
+            store);
+        var output = Sink(node.Output);
         var firstTimestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionRecordInput
+        var first = FlowMessage.Create(new SessionRecordInput
         {
             Timestamp = firstTimestamp,
             Name = "first",
             Payload = "a"
         });
-        await input.Target.SendAsync(new SessionRecordInput
+        var second = FlowMessage.Create(new SessionRecordInput
         {
             Timestamp = firstTimestamp.AddSeconds(1),
             Name = "second",
             Payload = "b"
         });
-        input.Target.Complete();
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(second);
+        node.Complete();
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var firstRecord = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var secondRecord = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        // The session closes when the node is disposed (after the pump has drained).
+        await node.DisposeAsync();
 
-        first.Sequence.ShouldBe(1);
-        second.Sequence.ShouldBe(2);
+        firstRecord.Payload.Sequence.ShouldBe(1);
+        firstRecord.CorrelationId.ShouldBe(first.CorrelationId);
+        secondRecord.Payload.Sequence.ShouldBe(2);
+        secondRecord.CorrelationId.ShouldBe(second.CorrelationId);
         store.Records.Select(record => record.Name).ShouldBe(["first", "second"]);
         store.Metadata.ShouldNotBeNull();
         store.Metadata.SessionId.ShouldBe("session-1");
@@ -58,29 +64,28 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
-    public async Task Recorder_ReportsAppendFailureAndContinues()
+    public async Task Recorder_ReportsAppendFailureWithCorrelationAndContinues()
     {
         var store = new TestSessionStore { FailNextAppend = true };
-        var runtimeNode = CreateRecorder(new
-        {
-            sessionId = "session-1"
-        }, store);
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionRecordInput { Name = "bad" });
-        await input.Target.SendAsync(new SessionRecordInput { Name = "good" });
-        input.Target.Complete();
+        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
+        node.Complete();
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
-        recorded.Sequence.ShouldBe(1);
-        recorded.Name.ShouldBe("good");
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        recorded.Payload.Sequence.ShouldBe(1);
+        recorded.Payload.Name.ShouldBe("good");
         store.Records.ShouldHaveSingleItem();
     }
 
@@ -88,26 +93,24 @@ public sealed class SessionComponentTests
     public async Task Recorder_ContinuesFromExistingMessageCountAndCopiesNullAttributes()
     {
         var store = new TestSessionStore { InitialMessageCount = 5 };
-        var runtimeNode = CreateRecorder(new
-        {
-            sessionId = "session-1"
-        }, store);
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+        var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionRecordInput
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput
         {
             Name = "next",
             Attributes = null!
-        });
-        input.Target.Complete();
+        }));
+        node.Complete();
 
         var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.DisposeAsync();
 
-        recorded.Sequence.ShouldBe(6);
-        recorded.Attributes.ShouldBeEmpty();
+        recorded.Payload.Sequence.ShouldBe(6);
+        recorded.Payload.Attributes.ShouldBeEmpty();
         store.Metadata.ShouldNotBeNull();
         store.Metadata.MessageCount.ShouldBe(6);
     }
@@ -118,45 +121,83 @@ public sealed class SessionComponentTests
         var timestamp = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(timestamp);
         var store = new TestSessionStore();
-        var runtimeNode = CreateRecorder(
-            new
-            {
-                sessionId = "session-1"
-            },
+        var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
             store,
-            options => options.UseClock(timeProvider));
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+            timeProvider);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionRecordInput { Name = "timed" });
-        input.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "timed" }));
+        node.Complete();
 
         var record = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.DisposeAsync();
 
-        record.Timestamp.ShouldBe(timestamp);
+        record.Payload.Timestamp.ShouldBe(timestamp);
         store.Metadata.ShouldNotBeNull();
         store.Metadata.StartedAt.ShouldBe(timestamp);
         store.Metadata.EndedAt.ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task Replay_EmitsMessagesInOrder()
+    public async Task Recorder_EmitsStartedAndRecordedEventsAndSignalsSessionCompleted()
+    {
+        var store = new TestSessionStore();
+        var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var events = Sink(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<SessionRecord>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "only" }));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        // Started/Recorded surface on the Events stream while the ports are open;
+        // the session-close diagnostic surfaces on SessionCompleted at disposal because
+        // the broadcast ports are already completed by then.
+        var names = (await DrainUntilCompletedAsync(events)).Select(@event => @event.Name).ToArray();
+        names.ShouldContain(SessionsDiagnosticNames.RecorderStarted);
+        names.ShouldContain(SessionsDiagnosticNames.RecorderRecorded);
+
+        await node.DisposeAsync();
+        await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
+        store.Metadata.ShouldNotBeNull();
+        store.Metadata.EndedAt.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Recorder_RequiresStore()
+        => Should.Throw<ArgumentNullException>(
+            () => new SessionRecorderNode(new SessionRecorderOptions(), null!));
+
+    [Fact]
+    public void Recorder_RejectsInvalidCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new SessionRecorderNode(
+                new SessionRecorderOptions { BoundedCapacity = 0 },
+                new TestSessionStore()));
+
+    // ---- Replay --------------------------------------------------------------------
+
+    [Fact]
+    public async Task Replay_EmitsMessagesInOrderAndMintsCorrelation()
     {
         var store = CreateStoreWithRecords();
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "session-1",
-            mode = "instant"
-        }, store);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            store);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var records = await DrainUntilCompletedAsync(output);
-        records.Select(record => record.Sequence).ShouldBe([1, 2, 3]);
+        records.Select(record => record.Payload.Sequence).ShouldBe([1, 2, 3]);
+        // The source mints a non-empty correlation id for each emitted record.
+        records.ShouldAllBe(record => !record.CorrelationId.IsEmpty);
+        records.Select(record => record.CorrelationId).Distinct().Count().ShouldBe(3);
     }
 
     [Fact]
@@ -164,111 +205,166 @@ public sealed class SessionComponentTests
     {
         var timeProvider = new TrackingFakeTimeProvider();
         var store = CreateStoreWithRecords(count: 3);
-        var runtimeNode = CreateReplay(
-            new
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions
             {
-                sessionId = "session-1",
-                mode = "fixedInterval",
-                fixedIntervalMilliseconds = 40
+                SessionId = "session-1",
+                Mode = SessionReplayMode.FixedInterval,
+                FixedIntervalMilliseconds = 40
             },
             store,
-            options => options.UseClock(timeProvider));
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+            timeProvider);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
 
         // The first record emits immediately; the next two each wait for a 40ms
         // FakeTimeProvider delay that only fires once time is advanced.
-        await AdvanceUntilCompletedAsync(
-            timeProvider,
-            runtimeNode.Node,
-            TimeSpan.FromMilliseconds(40));
+        await AdvanceUntilCompletedAsync(timeProvider, node, TimeSpan.FromMilliseconds(40));
 
         var records = await DrainUntilCompletedAsync(output);
-        records.Select(record => record.Sequence).ShouldBe([1, 2, 3]);
+        records.Select(record => record.Payload.Sequence).ShouldBe([1, 2, 3]);
     }
 
     [Fact]
     public async Task Replay_SupportsCancellation()
     {
         var store = CreateStoreWithRecords(count: 3);
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "session-1",
-            mode = "fixedInterval",
-            fixedIntervalMilliseconds = 500
-        }, store);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions
+            {
+                SessionId = "session-1",
+                Mode = SessionReplayMode.FixedInterval,
+                FixedIntervalMilliseconds = 500
+            },
+            store);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Sequence.ShouldBe(1);
+        first.Payload.Sequence.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
         output.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Replay_StopsWhenOutputDeclinesDelivery()
+    public async Task Replay_StopsPromptlyWhenCompletedBeforeStart()
     {
         var timeProvider = new FakeTimeProvider();
         var store = CreateStoreWithRecords(count: 3);
-        var runtimeNode = CreateReplay(
-            new
+        var node = new SessionReplayNode(
+            new SessionReplayOptions
             {
-                sessionId = "session-1",
-                mode = "fixedInterval",
-                fixedIntervalMilliseconds = 10
+                SessionId = "session-1",
+                Mode = SessionReplayMode.FixedInterval,
+                FixedIntervalMilliseconds = 10
             },
             store,
-            options => options.UseClock(timeProvider));
+            timeProvider);
 
-        // Completing the node before the replay starts completes the output,
-        // so every subsequent send is declined.
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        // Completing the source before it starts cancels the run token, so the read
+        // loop stops at its first cancellation check instead of awaiting any
+        // inter-record delay. Time is never advanced, so if the loop reached a
+        // Task.Delay it would hang and disposal would time out; completing within the
+        // timeout proves the loop broke before awaiting an inter-record delay.
+        node.Complete();
+        await node.StartAsync();
 
-        // The replay loop must stop on the first declined send instead of
-        // iterating through the remaining records. Time is never advanced, so if
-        // the loop reached an inter-record Task.Delay it would hang forever and
-        // disposal would time out; completing within the timeout proves the loop
-        // broke before awaiting any inter-record delay.
-        await ((IAsyncDisposable)runtimeNode.Node).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Replay_UsesMultiplierTiming()
     {
         var timeProvider = new TrackingFakeTimeProvider();
-        var store = CreateStoreWithRecords(
-            count: 2,
-            step: TimeSpan.FromMilliseconds(80));
-        var runtimeNode = CreateReplay(
-            new
+        var store = CreateStoreWithRecords(count: 2, step: TimeSpan.FromMilliseconds(80));
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions
             {
-                sessionId = "session-1",
-                mode = "multiplier",
-                speedMultiplier = 4
+                SessionId = "session-1",
+                Mode = SessionReplayMode.Multiplier,
+                SpeedMultiplier = 4
             },
             store,
-            options => options.UseClock(timeProvider));
-        var output = LinkOutput<SessionRecord>(runtimeNode);
+            timeProvider);
+        var output = Sink(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
 
         // 80ms stored gap divided by the 4x multiplier yields a single 20ms
         // FakeTimeProvider delay before the second record; advance to fire it.
-        await AdvanceUntilCompletedAsync(
-            timeProvider,
-            runtimeNode.Node,
-            TimeSpan.FromMilliseconds(20));
+        await AdvanceUntilCompletedAsync(timeProvider, node, TimeSpan.FromMilliseconds(20));
 
         (await DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
     }
 
     [Fact]
-    public async Task Query_EmitsResultAndSessionOutputs()
+    public async Task Replay_EmitsEvents()
+    {
+        var store = CreateStoreWithRecords(count: 1);
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            store);
+        var output = Sink(node.Output);
+        var events = Sink(node.Events);
+
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        await DrainUntilCompletedAsync(output);
+        var names = (await DrainUntilCompletedAsync(events)).Select(@event => @event.Name).ToArray();
+        names.ShouldContain(SessionsDiagnosticNames.ReplayStarted);
+        names.ShouldContain(SessionsDiagnosticNames.ReplayEmitted);
+        names.ShouldContain(SessionsDiagnosticNames.ReplayCompleted);
+    }
+
+    [Fact]
+    public async Task Replay_FaultsAndReportsWhenSessionIsMissing()
+    {
+        var store = new TestSessionStore();
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "missing" },
+            store);
+        // Don't propagate completion: the source faults its error port right after
+        // posting the error, and the buffered error must still be observable.
+        var errors = new BufferBlock<FlowError>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+
+        await node.StartAsync();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(SessionsErrorCodes.InvalidSession);
+        error.Message.ShouldContain("missing");
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+        exception.Message.ShouldContain("missing");
+    }
+
+    [Fact]
+    public void Replay_RejectsMissingSessionId()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new SessionReplayNode(new SessionReplayOptions(), new TestSessionStore()));
+
+        exception.Message.ShouldContain("session id");
+    }
+
+    [Fact]
+    public void Replay_RequiresStore()
+        => Should.Throw<ArgumentNullException>(
+            () => new SessionReplayNode(
+                new SessionReplayOptions { SessionId = "session-1" },
+                null!));
+
+    // ---- Query ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Query_EmitsResultAndSessionOutputsPreservingCorrelation()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 13, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(timestamp);
@@ -278,10 +374,7 @@ public sealed class SessionComponentTests
             SessionId = "session-1",
             Name = "alpha-one",
             StartedAt = timestamp.AddMinutes(-5),
-            Tags = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["kind"] = "demo"
-            }
+            Tags = new Dictionary<string, string>(StringComparer.Ordinal) { ["kind"] = "demo" }
         });
         store.Sessions.Add(new SessionMetadata
         {
@@ -289,42 +382,34 @@ public sealed class SessionComponentTests
             Name = "beta-one",
             StartedAt = timestamp.AddMinutes(-3),
             EndedAt = timestamp.AddMinutes(-1),
-            Tags = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["kind"] = "demo"
-            }
+            Tags = new Dictionary<string, string>(StringComparer.Ordinal) { ["kind"] = "demo" }
         });
-        var runtimeNode = CreateQuery(
-            new
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions
             {
-                namePrefix = "alpha",
-                tags = new Dictionary<string, string>
-                {
-                    ["kind"] = "demo"
-                }
+                NamePrefix = "alpha",
+                Tags = new Dictionary<string, string> { ["kind"] = "demo" }
             },
             store,
-            options => options.UseClock(timeProvider));
-        var input = GetInput<SessionQueryRequest>(runtimeNode);
-        var output = LinkOutput<SessionQueryResult>(runtimeNode);
-        var sessions = LinkOutput<SessionMetadata>(runtimeNode, SessionsComponentPorts.Sessions);
+            timeProvider);
+        var output = Sink(node.Output);
+        var sessions = Sink(node.Sessions);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionQueryRequest
-        {
-            CorrelationId = "corr-1"
-        });
-        input.Target.Complete();
+        var message = FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" });
+        await node.Input.SendAsync(message);
+        node.Complete();
 
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var session = await sessions.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        result.Timestamp.ShouldBe(timestamp);
-        result.Count.ShouldBe(1);
-        result.CorrelationId.ShouldBe("corr-1");
-        result.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-1");
-        session.SessionId.ShouldBe("session-1");
+        result.CorrelationId.ShouldBe(message.CorrelationId);
+        result.Payload.Timestamp.ShouldBe(timestamp);
+        result.Payload.Count.ShouldBe(1);
+        result.Payload.CorrelationId.ShouldBe("corr-1");
+        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-1");
+        session.CorrelationId.ShouldBe(message.CorrelationId);
+        session.Payload.SessionId.ShouldBe("session-1");
         store.LastQuery.ShouldNotBeNull();
         store.LastQuery.NamePrefix.ShouldBe("alpha");
         store.LastQuery.Tags["kind"].ShouldBe("demo");
@@ -333,7 +418,7 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
-    public async Task Query_ReportsInvalidRequestAndContinues()
+    public async Task Query_ReportsInvalidRequestWithCorrelationAndContinues()
     {
         var store = new TestSessionStore();
         store.Sessions.Add(new SessionMetadata
@@ -341,22 +426,22 @@ public sealed class SessionComponentTests
             SessionId = "session-1",
             StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
         });
-        var runtimeNode = CreateQuery(new { }, store);
-        var input = GetInput<SessionQueryRequest>(runtimeNode);
-        var output = LinkOutput<SessionQueryResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionQueryRequest { Limit = 0 });
-        await input.Target.SendAsync(new SessionQueryRequest());
-        input.Target.Complete();
+        var bad = FlowMessage.Create(new SessionQueryRequest { Limit = 0 });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        node.Complete();
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.InvalidQuery);
-        result.Count.ShouldBe(1);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        result.Payload.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -368,220 +453,69 @@ public sealed class SessionComponentTests
             SessionId = "session-1",
             StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
         });
-        var runtimeNode = CreateQuery(new { }, store);
-        var input = GetInput<SessionQueryRequest>(runtimeNode);
-        var output = LinkOutput<SessionQueryResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, SessionsComponentPorts.Errors);
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(new SessionQueryRequest());
-        await input.Target.SendAsync(new SessionQueryRequest());
-        input.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        node.Complete();
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        result.Count.ShouldBe(1);
+        result.Payload.Count.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Replay_EmitsDiagnostics()
-    {
-        var store = CreateStoreWithRecords(count: 1);
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "session-1",
-            mode = "instant"
-        }, store);
-        var output = LinkOutput<SessionRecord>(runtimeNode);
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
-
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var names = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
-            .Select(diagnostic => diagnostic.Name)
-            .ToArray();
-        names.ShouldContain(SessionsDiagnosticNames.ReplayStarted);
-        names.ShouldContain(SessionsDiagnosticNames.ReplayEmitted);
-        names.ShouldContain(SessionsDiagnosticNames.ReplayCompleted);
-    }
-
-    [Fact]
-    public async Task Replay_FailsStartupWhenSessionIsMissing()
+    public async Task Query_EmitsStartedEventAtConstruction()
     {
         var store = new TestSessionStore();
-        var runtimeNode = CreateReplay(new
-        {
-            sessionId = "missing"
-        }, store);
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var events = Sink(node.Events);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
-
-        exception.Message.ShouldContain("missing");
+        var started = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        started.Name.ShouldBe(SessionsDiagnosticNames.QueryStarted);
     }
 
     [Fact]
-    public void Replay_RejectsInvalidOptions()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateReplay(new { }, new TestSessionStore()));
-
-        exception.Message.ShouldContain("sessionId");
-    }
+    public void Query_RejectsEmptyInclusion()
+        => Should.Throw<ArgumentException>(
+            () => new SessionQueryNode(
+                new SessionQueryOptions { IncludeActive = false, IncludeCompleted = false },
+                new TestSessionStore()));
 
     [Fact]
-    public void Recorder_RequiresStore()
+    public void Query_RequiresStore()
+        => Should.Throw<ArgumentNullException>(
+            () => new SessionQueryNode(new SessionQueryOptions(), null!));
+
+    // ---- Helpers -------------------------------------------------------------------
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents();
-        registry.TryGetFactory(SessionsComponentTypes.Recorder, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(CreateContext(SessionsComponentTypes.Recorder, new { })));
-
-        exception.Message.ShouldContain("session store");
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+        return sink;
     }
 
-    [Fact]
-    public void RegisterSessionsComponents_RegistersNodes()
+    private static async Task<IReadOnlyList<T>> DrainUntilCompletedAsync<T>(BufferBlock<T> output)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options => options.UseStore(_ => new TestSessionStore()));
-
-        registry.TryGetFactory(SessionsComponentTypes.Recorder, out _).ShouldBeTrue();
-        registry.TryGetFactory(SessionsComponentTypes.Replay, out _).ShouldBeTrue();
-        registry.TryGetFactory(SessionsComponentTypes.Query, out _).ShouldBeTrue();
-    }
-
-    private static RuntimeNode CreateRecorder(
-        object configuration,
-        TestSessionStore store,
-        Action<SessionsComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options =>
-            {
-                options.UseStore(_ => store);
-                configure?.Invoke(options);
-            });
-        registry.TryGetFactory(SessionsComponentTypes.Recorder, out var factory).ShouldBeTrue();
-        return factory(CreateContext(SessionsComponentTypes.Recorder, configuration));
-    }
-
-    private static RuntimeNode CreateReplay(
-        object configuration,
-        TestSessionStore store,
-        Action<SessionsComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options =>
-            {
-                options.UseStore(_ => store);
-                configure?.Invoke(options);
-            });
-        registry.TryGetFactory(SessionsComponentTypes.Replay, out var factory).ShouldBeTrue();
-        return factory(CreateContext(SessionsComponentTypes.Replay, configuration));
-    }
-
-    private static RuntimeNode CreateQuery(
-        object configuration,
-        TestSessionStore store,
-        Action<SessionsComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterSessionsComponents(options =>
-            {
-                options.UseStore(_ => store);
-                configure?.Invoke(options);
-            });
-        registry.TryGetFactory(SessionsComponentTypes.Query, out var factory).ShouldBeTrue();
-        return factory(CreateContext(SessionsComponentTypes.Query, configuration));
-    }
-
-    private static RuntimeNodeFactoryContext CreateContext(
-        NodeType nodeType,
-        object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        var values = root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-
-        return new RuntimeNodeFactoryContext(
-            new NodeName("session"),
-            new NodeDefinition
-            {
-                Type = nodeType,
-                Configuration = values
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
-    }
-
-    private static InputPort<SessionRecordInput> GetInput(RuntimeNode runtimeNode)
-        => GetInput<SessionRecordInput>(runtimeNode);
-
-    private static InputPort<T> GetInput<T>(RuntimeNode runtimeNode)
-        => runtimeNode.FindInput(new PortName(SessionsComponentPorts.Input))
-            .ShouldBeOfType<InputPort<T>>();
-
-    private static BufferBlock<T> LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string portName = SessionsComponentPorts.Output)
-    {
-        var target = new BufferBlock<T>();
-        runtimeNode.FindOutput(new PortName(portName))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-        return target;
-    }
-
-    private static async Task<IReadOnlyList<SessionRecord>> DrainUntilCompletedAsync(
-        BufferBlock<SessionRecord> output)
-    {
-        var records = new List<SessionRecord>();
+        var items = new List<T>();
         while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(30)))
         {
-            while (output.TryReceive(out var record))
+            while (output.TryReceive(out var item))
             {
-                records.Add(record);
+                items.Add(item);
             }
         }
 
-        return records;
+        return items;
     }
 
-    private static async Task<IReadOnlyList<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
-        BufferBlock<FlowDiagnostic> output)
-    {
-        var diagnostics = new List<FlowDiagnostic>();
-        while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-        {
-            while (output.TryReceive(out var diagnostic))
-            {
-                diagnostics.Add(diagnostic);
-            }
-        }
-
-        return diagnostics;
-    }
-
-    private static TestSessionStore CreateStoreWithRecords(
-        int count = 3,
-        TimeSpan? step = null)
+    private static TestSessionStore CreateStoreWithRecords(int count = 3, TimeSpan? step = null)
     {
         var store = new TestSessionStore();
         var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");

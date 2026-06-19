@@ -58,7 +58,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `54-serialization-component-package.md`: first generic serialization component package.
 - `55-metrics-component-package.md`: first generic metrics aggregation component package.
 - `56-sessions-component-package.md`: first generic session recording and replay component package.
-- `57-sessions-composition-sample.md`: runnable sessions recording/replay composition sample.
 - `58-state-reducer-component-package.md`: first generic state reducer component package.
 - `60-component-composition-docs.md`: package composition guidance and host/package boundary notes.
 - `61-package-readme-composition-links.md`: component package README links to composition guidance.

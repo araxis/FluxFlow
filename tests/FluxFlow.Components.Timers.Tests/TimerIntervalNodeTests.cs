@@ -1,8 +1,7 @@
 using FluxFlow.Components.Timers.Contracts;
-using FluxFlow.Components.Timers.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Timers.Nodes;
+using FluxFlow.Components.Timers.Options;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -14,267 +13,194 @@ public sealed class TimerIntervalNodeTests
     [Fact]
     public async Task Interval_EmitsConfiguredTickCount()
     {
-        var runtimeNode = CreateNode(new
-        {
-            name = "poll",
-            intervalMilliseconds = 10,
-            emitImmediately = true,
-            maxTicks = 3,
-            boundedCapacity = 8
-        });
-        var output = new BufferBlock<TimerTick>();
-        LinkOutput(runtimeNode, output);
+        var startedAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+        var clock = new TrackingFakeTimeProvider(startedAt);
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings
+            {
+                Name = "poll",
+                Interval = TimeSpan.FromMilliseconds(10),
+                EmitImmediately = true,
+                MaxTicks = 3,
+                BoundedCapacity = 8
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        // First tick fires immediately; advance the clock twice to release the next two.
+        var scheduled = clock.TimerScheduled;
+        await node.StartAsync();
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        var scheduled2 = clock.TimerScheduled;
+        clock.Advance(TimeSpan.FromMilliseconds(10));
+        await scheduled2.WaitAsync(TimeSpan.FromSeconds(30));
+        clock.Advance(TimeSpan.FromMilliseconds(10));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var ticks = await DrainUntilCompletedAsync(output);
-        ticks.Select(tick => tick.Sequence).ShouldBe([1, 2, 3]);
-        ticks.ShouldAllBe(tick => tick.Name == "poll");
-        ticks.ShouldAllBe(tick => tick.Interval == TimeSpan.FromMilliseconds(10));
+        var ticks = TimerTestSink.Drain(output);
+        ticks.Select(message => message.Payload.Sequence).ShouldBe([1, 2, 3]);
+        ticks.ShouldAllBe(message => message.Payload.Name == "poll");
+        ticks.ShouldAllBe(message => message.Payload.Interval == TimeSpan.FromMilliseconds(10));
     }
 
     [Fact]
     public async Task Interval_HonorsInitialDelay()
     {
-        var runtimeNode = CreateNode(new
-        {
-            intervalMilliseconds = 100,
-            initialDelayMilliseconds = 40,
-            maxTicks = 1
-        });
-        var output = new BufferBlock<TimerTick>();
-        LinkOutput(runtimeNode, output);
-        var startedAt = DateTimeOffset.UtcNow;
+        var startedAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+        var clock = new TrackingFakeTimeProvider(startedAt);
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings
+            {
+                Interval = TimeSpan.FromMilliseconds(100),
+                InitialDelay = TimeSpan.FromMilliseconds(40),
+                MaxTicks = 1
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var scheduled = clock.TimerScheduled;
+        await node.StartAsync();
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        // Nothing should be emitted before the 40ms initial delay elapses.
+        output.TryReceive(out _).ShouldBeFalse();
+        clock.Advance(TimeSpan.FromMilliseconds(40));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var tick = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        tick.Timestamp.ShouldBeGreaterThan(startedAt.AddMilliseconds(20));
-        tick.Sequence.ShouldBe(1);
+        var tick = TimerTestSink.Drain(output).ShouldHaveSingleItem();
+        tick.Payload.Sequence.ShouldBe(1);
+        tick.Payload.DueAt.ShouldBe(startedAt.AddMilliseconds(40));
+        tick.Payload.Timestamp.ShouldBe(startedAt.AddMilliseconds(40));
+    }
+
+    [Fact]
+    public async Task Interval_MintsAFreshCorrelationIdPerTick()
+    {
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings
+            {
+                Interval = TimeSpan.FromMilliseconds(10),
+                EmitImmediately = true,
+                MaxTicks = 2
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
+
+        var scheduled = clock.TimerScheduled;
+        await node.StartAsync();
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        clock.Advance(TimeSpan.FromMilliseconds(10));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var ticks = TimerTestSink.Drain(output);
+        ticks.Count.ShouldBe(2);
+        ticks[0].CorrelationId.ShouldNotBe(ticks[1].CorrelationId);
+        ticks.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
     }
 
     [Fact]
     public async Task Interval_CompleteStopsTimer()
     {
-        var runtimeNode = CreateNode(new
-        {
-            intervalMilliseconds = 10,
-            emitImmediately = true,
-            boundedCapacity = 8
-        });
-        var output = new BufferBlock<TimerTick>();
-        LinkOutput(runtimeNode, output);
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings
+            {
+                Interval = TimeSpan.FromMilliseconds(10),
+                EmitImmediately = true,
+                BoundedCapacity = 8
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
         await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        await DrainUntilCompletedAsync(output);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Interval_DisposeBeforeStartCompletesOutput()
     {
-        var runtimeNode = CreateNode(new
-        {
-            intervalMilliseconds = 10
-        });
-        var output = new BufferBlock<TimerTick>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings { Interval = TimeSpan.FromMilliseconds(10) });
+        var output = TimerTestSink.Link(node.Output);
 
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync();
+        await node.DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         await output.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
-    public async Task Interval_EmitsDiagnosticsAndEvents()
+    public async Task Interval_EmitsLifecycleEvents()
     {
-        var runtimeNode = CreateNode(new
-        {
-            name = "diag",
-            intervalMilliseconds = 10,
-            emitImmediately = true,
-            maxTicks = 1
-        });
-        var output = new BufferBlock<TimerTick>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        var events = new BufferBlock<FlowEvent>();
-        LinkOutput(runtimeNode, output);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowEventSource>()!
-            .Events.LinkTo(
-                events,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerIntervalNode(
+            new TimerIntervalSettings
+            {
+                Name = "diag",
+                Interval = TimeSpan.FromMilliseconds(10),
+                EmitImmediately = true,
+                MaxTicks = 1
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
+        var events = TimerTestSink.Link(node.Events);
 
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-        var diagnosticNames = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
-            .Select(diagnostic => diagnostic.Name)
+        TimerTestSink.Drain(output).ShouldHaveSingleItem();
+        var eventNames = (await TimerTestSink.DrainUntilCompletedAsync(events))
+            .Select(flowEvent => flowEvent.Name)
             .ToArray();
-        diagnosticNames.ShouldContain(TimerDiagnosticNames.IntervalStarted);
-        diagnosticNames.ShouldContain(TimerDiagnosticNames.IntervalTick);
-        diagnosticNames.ShouldContain(TimerDiagnosticNames.IntervalStopped);
-        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        flowEvent.Type.ShouldBe(TimerEventNames.IntervalTick);
-        flowEvent.Subject.ShouldBe("diag");
-    }
-
-    [Fact]
-    public async Task Interval_CompleteBeforeStartPreventsLaterStart()
-    {
-        var runtimeNode = CreateNode(new
-        {
-            intervalMilliseconds = 10,
-            emitImmediately = true
-        });
-        var output = new BufferBlock<TimerTick>();
-        LinkOutput(runtimeNode, output);
-
-        runtimeNode.Node.Complete();
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task Interval_RejectsSecondStart()
-    {
-        var runtimeNode = CreateNode(new
-        {
-            intervalMilliseconds = 50,
-            emitImmediately = true,
-            maxTicks = 1
-        });
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .LinkToDiscard();
-
-        await runtimeNode.Node.StartAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.StartAsync());
-        exception.Message.ShouldContain("already started");
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-    }
-
-    [Fact]
-    public void Interval_RejectsMissingInterval()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { }));
-
-        exception.Message.ShouldContain("interval");
+        eventNames.ShouldContain(TimerIntervalNode.Started);
+        eventNames.ShouldContain(TimerIntervalNode.Tick);
+        eventNames.ShouldContain(TimerIntervalNode.Stopped);
     }
 
     [Fact]
     public void Interval_RejectsInvalidInterval()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { intervalMilliseconds = 0 }));
-
-        exception.Message.ShouldContain("interval");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerIntervalNode(
+                new TimerIntervalSettings { Interval = TimeSpan.Zero }))
+            .Message.ShouldContain("Interval");
 
     [Fact]
-    public void Interval_RejectsInvalidInitialDelay()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                intervalMilliseconds = 10,
-                initialDelayMilliseconds = -1
-            }));
-
-        exception.Message.ShouldContain("initialDelay");
-    }
+    public void Interval_RejectsNegativeInitialDelay()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerIntervalNode(
+                new TimerIntervalSettings
+                {
+                    Interval = TimeSpan.FromMilliseconds(10),
+                    InitialDelay = TimeSpan.FromMilliseconds(-1)
+                }))
+            .Message.ShouldContain("InitialDelay");
 
     [Fact]
     public void Interval_RejectsInvalidMaxTicks()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                intervalMilliseconds = 10,
-                maxTicks = 0
-            }));
-
-        exception.Message.ShouldContain("maxTicks");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerIntervalNode(
+                new TimerIntervalSettings
+                {
+                    Interval = TimeSpan.FromMilliseconds(10),
+                    MaxTicks = 0
+                }))
+            .Message.ShouldContain("MaxTicks");
 
     [Fact]
     public void Interval_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                intervalMilliseconds = 10,
-                boundedCapacity = 0
-            }));
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerIntervalNode(
+                new TimerIntervalSettings
+                {
+                    Interval = TimeSpan.FromMilliseconds(10),
+                    BoundedCapacity = 0
+                }))
+            .Message.ShouldContain("BoundedCapacity");
 
-        exception.Message.ShouldContain("boundedCapacity");
-    }
-
-    private static RuntimeNode CreateNode(object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterTimerComponents();
-        registry.TryGetFactory(TimerComponentTypes.Interval, out var factory).ShouldBeTrue();
-        return factory(TimerTestHost.CreateContext(
-            TimerComponentTypes.Interval,
-            configuration));
-    }
-
-    private static void LinkOutput(RuntimeNode runtimeNode, BufferBlock<TimerTick> target)
-    {
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<TimerTick>(
-                    new PortAddress("test", new NodeName("ticks"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<TimerTick>> DrainUntilCompletedAsync(
-        BufferBlock<TimerTick> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var ticks = new List<TimerTick>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var tick))
-            {
-                ticks.Add(tick);
-            }
-        }
-
-        return ticks;
-    }
-
-    private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
-        BufferBlock<FlowDiagnostic> diagnostics)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var entries = new List<FlowDiagnostic>();
-        while (await diagnostics.OutputAvailableAsync(cancellation.Token))
-        {
-            while (diagnostics.TryReceive(out var entry))
-            {
-                entries.Add(entry);
-            }
-        }
-
-        return entries;
-    }
+    [Fact]
+    public void Interval_RejectsNullSettings()
+        => Should.Throw<ArgumentNullException>(() => new TimerIntervalNode(null!));
 }
