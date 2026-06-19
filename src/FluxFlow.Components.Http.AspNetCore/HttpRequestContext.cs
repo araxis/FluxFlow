@@ -102,6 +102,28 @@ public sealed class HttpRequestContext : IRequestContext<HttpTriggerRequest, Htt
         }
     }
 
+    public Task AcknowledgeAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!_http.Response.HasStarted)
+            {
+                // Accepted into the graph; no graph result is awaited.
+                _http.Response.StatusCode = StatusCodes.Status202Accepted;
+            }
+        }
+        catch
+        {
+            // The response may already be gone (client aborted); nothing more to do.
+        }
+        finally
+        {
+            _completed.TrySetResult();
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task FailAsync(Exception error, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(error);

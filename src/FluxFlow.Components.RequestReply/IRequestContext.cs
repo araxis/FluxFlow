@@ -23,6 +23,13 @@ public interface IRequestContext<out TRequest, in TResponse>
     /// <summary>Answer the caller. Called once when the correlated response arrives.</summary>
     Task ReplyAsync(TResponse response, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Acknowledge that the request was accepted into the graph, with no graph result — the
+    /// bridge calls this once in fire-and-forget mode. Transport-specific: HTTP writes an
+    /// accepted status; MQTT has nothing to send back.
+    /// </summary>
+    Task AcknowledgeAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Answer with a failure — the bridge calls this on timeout or shutdown.</summary>
     Task FailAsync(Exception error, CancellationToken cancellationToken = default);
 }

@@ -44,6 +44,11 @@ public sealed class MqttRequestContext : IRequestContext<MqttRequest, MqttReply>
             cancellationToken).ConfigureAwait(false);
     }
 
+    public Task AcknowledgeAsync(CancellationToken cancellationToken = default)
+        // Fire-and-forget over MQTT: the message is published into the graph and there is
+        // nothing to send back to the requester.
+        => Task.CompletedTask;
+
     public Task FailAsync(Exception error, CancellationToken cancellationToken = default)
         // MQTT has no standard error reply; the requester relies on its own timeout.
         => Task.CompletedTask;

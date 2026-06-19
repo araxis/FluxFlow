@@ -25,7 +25,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
     private readonly ConcurrentDictionary<CorrelationId, InFlight> _inFlight = new();
-    private readonly ITimer _sweep;
+    private readonly ITimer? _sweep;
     private readonly CancellationTokenSource _stopping = new();
     private int _disposed;
 
@@ -75,7 +75,10 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
-        _sweep = _clock.CreateTimer(_ => Sweep(), null, _options.SweepInterval, _options.SweepInterval);
+        // Fire-and-forget never holds a request in flight, so there is nothing to time out.
+        _sweep = _options.Mode == RequestReplyMode.RequestReply
+            ? _clock.CreateTimer(_ => Sweep(), null, _options.SweepInterval, _options.SweepInterval)
+            : null;
     }
 
     /// <summary>Inbound request contexts — the host posts here (bounded; backpressure).</summary>
@@ -131,6 +134,36 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     private async Task OnIncomingAsync(IRequestContext<TRequest, TResponse> context)
     {
         var id = context.CorrelationId ?? CorrelationId.New();
+
+        if (_options.Mode == RequestReplyMode.FireAndForget)
+        {
+            // Correlate + publish, then acknowledge the caller immediately — no in-flight
+            // tracking, no waiting for a graph response.
+            EmitEvent(RequestReplyEvents.Received, id);
+
+            bool published;
+            try
+            {
+                published = await _output.SendAsync(FlowMessage.Create(context.Request, id), _stopping.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                published = false;
+            }
+
+            if (!published)
+            {
+                await SafeFailAsync(context, new InvalidOperationException(
+                    "The request/reply bridge is shutting down.")).ConfigureAwait(false);
+                return;
+            }
+
+            await SafeAcknowledgeAsync(context).ConfigureAwait(false);
+            EmitEvent(RequestReplyEvents.Published, id);
+            return;
+        }
+
         var entry = new InFlight(context, _clock.GetUtcNow() + _options.Timeout);
         if (!_inFlight.TryAdd(id, entry))
         {
@@ -220,6 +253,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         }
     }
 
+    private static async Task SafeAcknowledgeAsync(IRequestContext<TRequest, TResponse> context)
+    {
+        try
+        {
+            await context.AcknowledgeAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // The caller may already be gone (aborted); failing to acknowledge is not fatal.
+        }
+    }
+
     private void EmitEvent(string name, CorrelationId id, FlowEventLevel level = FlowEventLevel.Information)
         => _events.Post(new FlowEvent
         {
@@ -246,7 +291,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             return;
         }
 
-        _sweep.Dispose();
+        _sweep?.Dispose();
         _incoming.Complete();
         _stopping.Cancel();
 

@@ -104,6 +104,26 @@ public sealed class HttpTriggerEndpointTests
         (await response.Content.ReadAsStringAsync()).ShouldBe("di:hi");
     }
 
+    [Fact]
+    public async Task FireAndForget_Returns202Accepted_AndPublishesToGraphWithoutWaiting()
+    {
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
+            new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        // The "graph" only observes published requests; it never replies.
+        var published = new BufferBlock<FlowMessage<HttpTriggerRequest>>();
+        bridge.Output.LinkTo(published);
+
+        using var host = await StartServerAsync(bridge);
+        var client = host.GetTestClient();
+
+        var response = await client.PostAsync("/echo", new StringContent("payload"));
+
+        // Acked immediately with 202, and the request still reached the graph.
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var request = await published.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        Encoding.UTF8.GetString(request.Payload.Body ?? []).ShouldBe("payload");
+    }
+
     private static Task<IHost> StartServerAsync(
         RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply> bridge)
         => new HostBuilder()

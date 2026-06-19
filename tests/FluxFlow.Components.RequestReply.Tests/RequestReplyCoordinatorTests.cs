@@ -128,6 +128,47 @@ public sealed class RequestReplyCoordinatorTests
         bridge.ShouldBeAssignableTo<IFlowNode>();
     }
 
+    [Fact]
+    public async Task FireAndForget_PublishesThenAcknowledges_WithoutHoldingInFlight()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>(
+            new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        var context = new FakeContext("ingest");
+
+        await bridge.Incoming.SendAsync(context);
+
+        // The request is published into the graph...
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        request.Payload.ShouldBe("ingest");
+        request.CorrelationId.IsEmpty.ShouldBeFalse();
+
+        // ...and the caller is acknowledged immediately, never held in flight or replied to.
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Acknowledged.ShouldBeTrue();
+        context.Replied.ShouldBeNull();
+        context.Failed.ShouldBeNull();
+        bridge.InFlightCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task FireAndForget_IgnoresLateResponses()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>(
+            new RequestReplyOptions { Mode = RequestReplyMode.FireAndForget });
+        var errors = Sink(bridge.Errors);
+        var context = new FakeContext("ingest");
+        await bridge.Incoming.SendAsync(context);
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        // A response for a fire-and-forget request has nothing to match; it is reported
+        // unmatched like any orphan rather than replying to the (already-acked) caller.
+        await bridge.Responses.SendAsync(request.With("late"));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RequestReplyErrorCodes.Unmatched);
+        context.Replied.ShouldBeNull();
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
@@ -143,12 +184,20 @@ public sealed class RequestReplyCoordinatorTests
         public string Request { get; } = request;
         public CorrelationId? CorrelationId { get; } = correlationId;
         public string? Replied { get; private set; }
+        public bool Acknowledged { get; private set; }
         public Exception? Failed { get; private set; }
         public Task Settled => _settled.Task;
 
         public Task ReplyAsync(string response, CancellationToken cancellationToken = default)
         {
             Replied = response;
+            _settled.TrySetResult();
+            return Task.CompletedTask;
+        }
+
+        public Task AcknowledgeAsync(CancellationToken cancellationToken = default)
+        {
+            Acknowledged = true;
             _settled.TrySetResult();
             return Task.CompletedTask;
         }
