@@ -1,6 +1,6 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
 using System.Runtime.ExceptionServices;

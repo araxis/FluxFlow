@@ -1,6 +1,6 @@
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.Timers.Contracts;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Text.Json;
 
 namespace FluxFlow.StateCompositionSample;

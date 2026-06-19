@@ -1,5 +1,5 @@
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Text;
 using System.Text.Json;
 

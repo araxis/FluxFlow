@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 public sealed class ExpressionFlowPredicate<TInput> : IFlowPredicate<TInput>
 {

@@ -1,6 +1,6 @@
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using FluxFlow.Engine.Runtime;
 using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks.Dataflow;

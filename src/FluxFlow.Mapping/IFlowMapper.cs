@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 public interface IFlowMapper<in TInput, out TOutput>
 {

@@ -4,7 +4,7 @@ using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Engine.Components;
 using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;

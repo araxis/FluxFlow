@@ -1,7 +1,7 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Assertions.Nodes;

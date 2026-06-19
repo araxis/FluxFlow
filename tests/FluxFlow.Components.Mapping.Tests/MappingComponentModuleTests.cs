@@ -1,4 +1,4 @@
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using FluxFlow.Engine.Runtime;
 using Shouldly;
 using Xunit;

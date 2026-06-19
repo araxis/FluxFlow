@@ -1,6 +1,6 @@
 using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Routing.Contracts;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Collections.Concurrent;
 using System.Text.Json;
 

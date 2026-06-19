@@ -1,6 +1,6 @@
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Options;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using FluxFlow.Engine.Runtime;
 using System.Reflection;
 using System.Runtime.ExceptionServices;

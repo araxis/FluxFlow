@@ -7,6 +7,13 @@
     "notesName": "FluxFlow.Nodes"
   },
   {
+    "alias": "mapping",
+    "tagPrefix": "mapping",
+    "packageId": "FluxFlow.Mapping",
+    "project": "src/FluxFlow.Mapping/FluxFlow.Mapping.csproj",
+    "notesName": "FluxFlow.Mapping"
+  },
+  {
     "alias": "components-requestreply",
     "tagPrefix": "components-requestreply",
     "packageId": "FluxFlow.Components.RequestReply",

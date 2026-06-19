@@ -1,6 +1,6 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Expressions;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Assertions.Options;

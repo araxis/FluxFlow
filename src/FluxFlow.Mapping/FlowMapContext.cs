@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 /// <summary>
 /// Per-message mapping context passed to mapper functions and expression engines.

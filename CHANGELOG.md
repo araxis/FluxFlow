@@ -1,5 +1,16 @@
 # Changelog
 
+## FluxFlow.Mapping 0.1.0
+
+Initial extraction of the expression/mapping abstraction out of `FluxFlow.Engine` into a
+standalone leaf package, so nodes can map/filter with host-provided expressions without
+referencing the engine.
+
+- Moves `IFlowExpressionEngine`, `IFlowCompiledExpression`, `IFlowMapper`, `IFlowPredicate`,
+  `FlowMapContext`, `IFlowMapContextFactory`, the Expression/Delegate mapper+predicate
+  adapters, and `EvaluatingCompiledExpression` from `FluxFlow.Engine.Mapping` to the
+  `FluxFlow.Mapping` namespace/package. The engine now references this package.
+
 ## FluxFlow.Components.Mqtt.RequestReply 0.1.0
 
 Initial MQTT request/reply trigger.

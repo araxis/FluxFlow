@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 /// <summary>
 /// Default <see cref="IFlowExpressionEngine.Compile{T}"/> result: defers to

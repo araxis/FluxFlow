@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 /// <summary>
 /// A build-time mapper that compiles an expression once via

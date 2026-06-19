@@ -1,4 +1,4 @@
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Contracts;
 

@@ -2,7 +2,7 @@ using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Diagnostics;
 using FluxFlow.Components.Mapping.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mapping.Nodes;

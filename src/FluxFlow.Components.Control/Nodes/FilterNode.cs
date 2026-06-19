@@ -1,7 +1,7 @@
 using FluxFlow.Components.Control.Diagnostics;
 using FluxFlow.Components.Control.Options;
 using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Control.Nodes;

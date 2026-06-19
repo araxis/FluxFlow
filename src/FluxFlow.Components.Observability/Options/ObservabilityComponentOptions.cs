@@ -1,6 +1,6 @@
 using FluxFlow.Components.Expressions;
 using FluxFlow.Components.Observability.Contracts;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 using System.Text.Json;
 
 namespace FluxFlow.Components.Observability.Options;

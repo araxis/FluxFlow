@@ -1,4 +1,4 @@
-namespace FluxFlow.Engine.Mapping;
+namespace FluxFlow.Mapping;
 
 /// <summary>
 /// An expression compiled once by an <see cref="IFlowExpressionEngine"/> for
