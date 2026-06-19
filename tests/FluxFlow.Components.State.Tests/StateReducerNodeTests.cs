@@ -1,10 +1,10 @@
+using FluxFlow.Components.State;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
+using FluxFlow.Components.State.Nodes;
 using FluxFlow.Components.State.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
 using FluxFlow.Mapping;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text.Json;
@@ -13,65 +13,77 @@ using Xunit;
 
 namespace FluxFlow.Components.State.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows input -> result and onto any
+// error for free.
 public sealed class StateReducerNodeTests
 {
     [Fact]
-    public async Task Reducer_UpdatesStatePerKeyInOrder()
+    public async Task Reducer_UpdatesStatePerKeyInOrderAndPreservesCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count"
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count" },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a", Input = "first" });
-        await input.Target.SendAsync(new StateReducerInput { Key = "a", Input = "second" });
-        await input.Target.SendAsync(new StateReducerInput { Key = "b", Input = "other" });
-        input.Target.Complete();
+        var first = FlowMessage.Create(new StateReducerInput { Key = "a", Input = "first" });
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a", Input = "second" }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "b", Input = "other" }));
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var firstResult = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var third = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        first.Key.ShouldBe("a");
-        first.PreviousState.ShouldBeNull();
-        first.NewState.ShouldBe(1);
-        first.Version.ShouldBe(1);
-        second.Key.ShouldBe("a");
-        second.PreviousState.ShouldBe(1);
-        second.NewState.ShouldBe(2);
-        second.Version.ShouldBe(2);
-        third.Key.ShouldBe("b");
-        third.NewState.ShouldBe(1);
-        third.Version.ShouldBe(1);
+        firstResult.CorrelationId.ShouldBe(first.CorrelationId);   // the whole point of the envelope
+        firstResult.Payload.Key.ShouldBe("a");
+        firstResult.Payload.PreviousState.ShouldBeNull();
+        firstResult.Payload.NewState.ShouldBe(1);
+        firstResult.Payload.Version.ShouldBe(1);
+        second.Payload.Key.ShouldBe("a");
+        second.Payload.PreviousState.ShouldBe(1);
+        second.Payload.NewState.ShouldBe(2);
+        second.Payload.Version.ShouldBe(2);
+        third.Payload.Key.ShouldBe("b");
+        third.Payload.NewState.ShouldBe(1);
+        third.Payload.Version.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Output_FansOutEveryResultToEveryConsumer()
+    {
+        // One node's output linked to two downstream consumers, no engine. Both see
+        // every result.
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count" },
+            new SampleExpressionEngine());
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Version.ShouldBe(1);
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Version.ShouldBe(2);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Version.ShouldBe(1);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Version.ShouldBe(2);
     }
 
     [Fact]
     public async Task Reducer_UsesInitialStateFromRequestOrOptions()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                initialState = 10
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", InitialState = 10 },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a", Input = "first" });
-        await input.Target.SendAsync(new StateReducerInput { Key = "b", InitialState = 20 });
-        input.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a", Input = "first" }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "b", InitialState = 20 }));
 
-        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var second = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
 
-        ReadNumber(first.PreviousState).ShouldBe(10);
+        first.PreviousState.ShouldBe(10);
         first.NewState.ShouldBe(11);
         second.PreviousState.ShouldBe(20);
         second.NewState.ShouldBe(21);
@@ -80,17 +92,12 @@ public sealed class StateReducerNodeTests
     [Fact]
     public async Task Reducer_CanResolveKeyWithExpression()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                keyExpression = "topic-key",
-                reducer = "last-input"
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { KeyExpression = "topic-key", Reducer = "last-input" },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new StateReducerInput
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput
         {
             Key = "ignored",
             Input = "payload",
@@ -98,12 +105,9 @@ public sealed class StateReducerNodeTests
             {
                 ["topic"] = "orders/created"
             }
-        });
-        input.Target.Complete();
+        }));
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
+        var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
         result.Key.ShouldBe("orders/created");
         result.NewState.ShouldBe("payload");
     }
@@ -111,36 +115,29 @@ public sealed class StateReducerNodeTests
     [Fact]
     public async Task Reducer_ResetAndClearUseSameInput()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                initialState = 5
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", InitialState = 5 },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        await input.Target.SendAsync(new StateReducerInput
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput
         {
             Key = "a",
             InitialState = 100,
             Operation = StateReducerOperation.Reset
-        });
-        await input.Target.SendAsync(new StateReducerInput
+        }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput
         {
             Key = "a",
             Operation = StateReducerOperation.Clear
-        });
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        input.Target.Complete();
+        }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
 
         await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var reset = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var clear = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var afterClear = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var reset = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var clear = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var afterClear = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
 
         reset.PreviousState.ShouldBe(6);
         reset.NewState.ShouldBe(100);
@@ -148,7 +145,7 @@ public sealed class StateReducerNodeTests
         clear.PreviousState.ShouldBe(100);
         clear.NewState.ShouldBeNull();
         clear.Version.ShouldBe(3);
-        ReadNumber(afterClear.PreviousState).ShouldBe(5);
+        afterClear.PreviousState.ShouldBe(5);
         afterClear.NewState.ShouldBe(6);
         afterClear.Version.ShouldBe(1);
     }
@@ -157,36 +154,28 @@ public sealed class StateReducerNodeTests
     public async Task Reducer_UsesConfiguredClockForResults()
     {
         var fixedInstant = new DateTimeOffset(2026, 6, 2, 18, 45, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(fixedInstant);
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                initialState = 5
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", InitialState = 5 },
             new SampleExpressionEngine(),
-            options => options.UseClock(timeProvider));
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
+            new FakeTimeProvider(fixedInstant));
+        var output = Sink(node.Output);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        await input.Target.SendAsync(new StateReducerInput
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput
         {
             Key = "a",
             InitialState = 100,
             Operation = StateReducerOperation.Reset
-        });
-        await input.Target.SendAsync(new StateReducerInput
+        }));
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput
         {
             Key = "a",
             Operation = StateReducerOperation.Clear
-        });
-        input.Target.Complete();
+        }));
 
-        var reduce = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var reset = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var clear = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var reduce = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var reset = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var clear = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
 
         reduce.UpdatedAt.ShouldBe(fixedInstant);
         reset.UpdatedAt.ShouldBe(fixedInstant);
@@ -194,242 +183,136 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
-    public async Task Reducer_ReportsReducerFailuresAndContinues()
+    public async Task Reducer_ReportsReducerFailuresWithCorrelationIdAndContinues()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "fail-on-bad"
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "fail-on-bad" },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, StateComponentPorts.Errors);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a", Input = "bad" });
-        await input.Target.SendAsync(new StateReducerInput { Key = "a", Input = "good" });
-        input.Target.Complete();
+        var bad = FlowMessage.Create(new StateReducerInput { Key = "a", Input = "bad" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a", Input = "good" }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
         error.Code.ShouldBe(StateErrorCodes.ReducerFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+
+        // The pump keeps going: the second (well-formed) message still reduces.
+        var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
         result.NewState.ShouldBe("good");
         result.Version.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Reducer_RespectsMaxKeyLimit()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                maxKeys = 1
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", MaxKeys = 1 },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, StateComponentPorts.Errors);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        await input.Target.SendAsync(new StateReducerInput { Key = "b" });
-        input.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+        var rejected = FlowMessage.Create(new StateReducerInput { Key = "b" });
+        await node.Input.SendAsync(rejected);
 
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         result.Key.ShouldBe("a");
         error.Code.ShouldBe(StateErrorCodes.KeyLimitReached);
+        error.CorrelationId.ShouldBe(rejected.CorrelationId);
     }
 
     [Fact]
-    public async Task Reducer_CapsItemizedRejectedKeyDiagnostics()
+    public async Task Reducer_CapsItemizedRejectedKeyWarnings()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                maxKeys = 1
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", MaxKeys = 1 },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
-        var errors = LinkOutput<FlowError>(runtimeNode, StateComponentPorts.Errors);
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        var output = Sink(node.Output);
+        var errors = new BufferBlock<FlowError>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
+        var events = new BufferBlock<FlowEvent>();
+        node.Events.LinkTo(events, new DataflowLinkOptions { PropagateCompletion = true });
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "tracked" });
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "tracked" }));
         for (var index = 0; index < 1100; index++)
         {
-            await input.Target.SendAsync(new StateReducerInput { Key = $"rejected-{index}" });
+            await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = $"rejected-{index}" }));
         }
 
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Key.ShouldBe("tracked");
-        var keyLimitDiagnostics = (await DrainDiagnosticsUntilCompletedAsync(diagnostics))
-            .Where(diagnostic => diagnostic.Name == StateDiagnosticNames.KeyLimitReached)
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Key.ShouldBe("tracked");
+        var keyLimitEvents = (await DrainUntilCompletedAsync(events))
+            .Where(@event => @event.Name == StateDiagnosticNames.KeyLimitReached)
             .ToList();
-        keyLimitDiagnostics.Count.ShouldBe(1025);
-        keyLimitDiagnostics
-            .Count(diagnostic => diagnostic.Message!.Contains("will not be itemized"))
+        keyLimitEvents.Count.ShouldBe(1025);
+        keyLimitEvents
+            .Count(@event => @event.Message!.Contains("will not be itemized"))
             .ShouldBe(1);
-        (await DrainErrorsUntilCompletedAsync(errors)).Count.ShouldBe(1100);
+        keyLimitEvents.ShouldAllBe(@event => @event.Level == FlowEventLevel.Warning);
+        (await DrainUntilCompletedAsync(errors)).Count.ShouldBe(1100);
     }
 
     [Fact]
-    public async Task Reducer_EmitsDiagnostics()
+    public async Task Reducer_EmitsEventsCarryingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            new
-            {
-                reducer = "count",
-                expressionName = "counter"
-            },
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count", ExpressionName = "counter" },
             new SampleExpressionEngine());
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        var output = Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        input.Target.Complete();
+        var message = FlowMessage.Create(new StateReducerInput { Key = "a" });
+        await node.Input.SendAsync(message);
         await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
-        diagnostic.Attributes["key"].ShouldBe("a");
-        diagnostic.Attributes["version"].ShouldBe(1L);
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
+        @event.Level.ShouldBe(FlowEventLevel.Information);
+        @event.CorrelationId.ShouldBe(message.CorrelationId);
+        @event.Attributes["key"].ShouldBe("a");
+        @event.Attributes["version"].ShouldBe(1L);
+        @event.Attributes["engine"].ShouldBe("sample");
+        @event.Attributes["expressionName"].ShouldBe("counter");
     }
 
     [Fact]
     public void Reducer_RejectsInvalidOptions()
     {
         var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { reducer = "", boundedCapacity = 1 }, new SampleExpressionEngine()));
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "", BoundedCapacity = 1 },
+                new SampleExpressionEngine()));
 
         exception.Message.ShouldContain("reducer");
     }
 
     [Fact]
-    public void Reducer_RequiresExpressionEngine()
+    public void Constructor_RequiresExpressionEngine()
+        => Should.Throw<ArgumentNullException>(
+            () => new StateReducerNode(new StateReducerOptions { Reducer = "count" }, null!));
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStateComponents();
-        registry.TryGetFactory(StateComponentTypes.Reducer, out var factory).ShouldBeTrue();
-
-        var exception = Should.Throw<InvalidOperationException>(
-            () => factory(CreateContext(new { reducer = "count" })));
-
-        exception.Message.ShouldContain("expression engine");
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 
-    [Fact]
-    public async Task Reducer_UsesExpressionEngineResolver()
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStateComponents(options => options.UseExpressionEngineResolver(name =>
-            {
-                name.ShouldBe("custom");
-                return new SampleExpressionEngine();
-            }));
-        registry.TryGetFactory(StateComponentTypes.Reducer, out var factory).ShouldBeTrue();
-        var runtimeNode = factory(CreateContext(new
-        {
-            reducer = "count",
-            engine = "custom"
-        }));
-        var input = GetInput(runtimeNode);
-        var output = LinkOutput<StateReducerResult>(runtimeNode);
-
-        await input.Target.SendAsync(new StateReducerInput { Key = "a" });
-        input.Target.Complete();
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        result.NewState.ShouldBe(1);
-    }
-
-    [Fact]
-    public void RegisterStateComponents_RegistersReducer()
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStateComponents(options => options.UseExpressionEngine(new SampleExpressionEngine()));
-
-        registry.TryGetFactory(StateComponentTypes.Reducer, out _).ShouldBeTrue();
-    }
-
-    private static RuntimeNode CreateNode(
-        object configuration,
-        IFlowExpressionEngine expressionEngine,
-        Action<StateComponentOptions>? configure = null)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterStateComponents(options =>
-            {
-                options.UseExpressionEngine(expressionEngine);
-                configure?.Invoke(options);
-            });
-        registry.TryGetFactory(StateComponentTypes.Reducer, out var factory).ShouldBeTrue();
-        return factory(CreateContext(configuration));
-    }
-
-    private static RuntimeNodeFactoryContext CreateContext(object configuration)
-    {
-        var root = JsonSerializer.SerializeToElement(configuration);
-        var values = root.EnumerateObject()
-            .ToDictionary(property => property.Name, property => property.Value.Clone());
-
-        return new RuntimeNodeFactoryContext(
-            new NodeName("state"),
-            new NodeDefinition
-            {
-                Type = StateComponentTypes.Reducer,
-                Configuration = values
-            },
-            "main",
-            new Dictionary<NodeName, RuntimeNode>());
-    }
-
-    private static InputPort<StateReducerInput> GetInput(RuntimeNode runtimeNode)
-        => runtimeNode.FindInput(new PortName(StateComponentPorts.Input))
-            .ShouldBeOfType<InputPort<StateReducerInput>>();
-
-    private static BufferBlock<T> LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string portName = StateComponentPorts.Output)
-    {
-        var target = new BufferBlock<T>();
-        runtimeNode.FindOutput(new PortName(portName))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-        return target;
-    }
-
-    private static async Task<List<FlowDiagnostic>> DrainDiagnosticsUntilCompletedAsync(
-        BufferBlock<FlowDiagnostic> diagnostics)
+    private static async Task<List<T>> DrainUntilCompletedAsync<T>(BufferBlock<T> source)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var entries = new List<FlowDiagnostic>();
-        while (await diagnostics.OutputAvailableAsync(cancellation.Token))
+        var entries = new List<T>();
+        while (await source.OutputAvailableAsync(cancellation.Token))
         {
-            while (diagnostics.TryReceive(out var entry))
+            while (source.TryReceive(out var entry))
             {
                 entries.Add(entry);
             }
@@ -437,33 +320,6 @@ public sealed class StateReducerNodeTests
 
         return entries;
     }
-
-    private static async Task<List<FlowError>> DrainErrorsUntilCompletedAsync(
-        BufferBlock<FlowError> errors)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var entries = new List<FlowError>();
-        while (await errors.OutputAvailableAsync(cancellation.Token))
-        {
-            while (errors.TryReceive(out var entry))
-            {
-                entries.Add(entry);
-            }
-        }
-
-        return entries;
-    }
-
-    private static long ReadNumber(object? value)
-        => value switch
-        {
-            long number => number,
-            int number => number,
-            JsonElement json when json.ValueKind == JsonValueKind.Number &&
-                                  json.TryGetInt64(out var number) => number,
-            _ => throw new InvalidOperationException(
-                $"Cannot read '{value?.GetType().Name ?? "null"}' as a number.")
-        };
 
     private sealed class SampleExpressionEngine : IFlowExpressionEngine
     {

@@ -1,34 +1,45 @@
 # FluxFlow.Components.State
 
-Reusable state components for FluxFlow.
+A standalone keyed state-reducer node for FluxFlow. It depends only on
+`FluxFlow.Nodes` and `FluxFlow.Mapping` — no engine, registry, or runtime. You
+`new` the node and `LinkTo` the next one.
 
-## Nodes
+## Node
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `state.reducer` | `Input` -> `Output`, `Errors` | Keeps per-key state and updates it with a reducer expression. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `StateReducerNode` | `Input` -> `Output`, `Errors`, `Events` | Keeps per-key state and updates it with a reducer expression. |
 
-## Reducer
+Every message travels as a `FlowMessage<T>` envelope. The updated state snapshot
+is broadcast on `Output` as `FlowMessage<StateReducerResult>` carrying the same
+correlation id as the input. State updates are serial, so each key observes
+deterministic, ordered changes.
 
-```json
-{
-  "type": "state.reducer",
-  "name": "topicState",
-  "keyExpression": "topic",
-  "initialState": { "count": 0 },
-  "reducer": "update-topic-state",
-  "engine": "sample",
-  "boundedCapacity": 128,
-  "maxKeys": 1024
-}
+```csharp
+await using var node = new StateReducerNode(
+    new StateReducerOptions
+    {
+        KeyExpression = "topic",
+        InitialState = new { count = 0 },
+        Reducer = "update-topic-state",
+        BoundedCapacity = 128,
+        MaxKeys = 1024
+    },
+    myExpressionEngine);
+
+node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
+
+await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a", Input = payload }));
 ```
 
-`state.reducer` consumes `StateReducerInput` and emits
+The reducer (and optional key) expression is compiled once at construction via
+`IFlowExpressionEngine.Compile<T>(...)`, so parsing happens there rather than per
+message. `StateReducerNode` consumes `StateReducerInput` and emits
 `StateReducerResult`. The reducer expression receives variables for `key`,
 `input`, `value`, `state`, `previousState`, `initialState`, `version`,
 `operation`, and any per-message `Variables`.
 
-If `keyExpression` is set, it resolves the state key from the same expression
+If `KeyExpression` is set, it resolves the state key from the same expression
 context. Otherwise the node uses `StateReducerInput.Key`.
 
 ## Operations
@@ -36,31 +47,26 @@ context. Otherwise the node uses `StateReducerInput.Key`.
 `StateReducerInput.Operation` defaults to `Reduce`.
 
 - `Reduce`: evaluate the reducer and store the new state.
-- `Reset`: store the request `InitialState` or node `initialState`.
+- `Reset`: store the request `InitialState` or node `InitialState`.
 - `Clear`: remove the state for the key and emit a result with `NewState` null.
 
-Reducer failures are emitted through `Errors` and later messages continue.
-State updates are serial, so each key observes deterministic ordered changes.
+## Behavior
 
-## Registration
+Reducer, key-evaluation, and key-limit failures emit a `FlowError` on `Errors`
+(carrying the input's correlation id and a `Code` from `StateErrorCodes`) and the
+node keeps processing later messages. Per-operation notes
+(`state.reducer.updated`/`reset`/`cleared`), reducer failures, and key-limit
+warnings flow on the `Events` port (also carrying the correlation id where one is
+available).
+
+## Runtime timing
+
+`StateReducerResult.UpdatedAt` uses the node's clock (default
+`TimeProvider.System`). Provide a deterministic clock for tests:
 
 ```csharp
-registry.RegisterStateComponents(options =>
-    options
-        .UseExpressionEngine(myExpressionEngine)
-        .UseClock(stateClock));
+new StateReducerNode(options, myExpressionEngine, clock: new FakeTimeProvider(timestamp));
 ```
-
-`UseClock(...)` is optional. Without it, `state.reducer` uses the default
-system clock. Supplying a clock lets hosts and tests make `StateReducerResult`
-timestamps deterministic.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
 
 ## Composition Guidance
 

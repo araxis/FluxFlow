@@ -1,9 +1,7 @@
 using FluxFlow.Components.Observability.Contracts;
-using FluxFlow.Components.Observability.Diagnostics;
+using FluxFlow.Components.Observability.Nodes;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -11,228 +9,176 @@ using Xunit;
 
 namespace FluxFlow.Components.Observability.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows input -> entry and onto any
+// error/event for free.
 public sealed class FlowLoggerNodeTests
 {
     [Fact]
-    public async Task Logger_EmitsStructuredEntry()
+    public async Task Logger_EmitsStructuredEntryPreservingCorrelationId()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 18, 30, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(timestamp);
-        var runtimeNode = CreateNode(
-            options => options
-                .UseClock(timeProvider)
-                .RegisterType<InputMessage>("message")
-                .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind)
-                .UseValueSelector<InputMessage>("size", (message, _) => message.Payload.Length),
-            new
+        await using var node = new FlowLoggerNode<InputMessage>(
+            new FlowLoggerOptions
             {
-                inputType = "message",
-                level = "Warning",
-                category = "workflow.test",
-                messageTemplate = "Observed {kind}:{size} #{sequence}",
-                attributeSelectors = new[] { "kind", "size" }
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var entries = new BufferBlock<FlowLogEntry>();
-        LinkEntries(runtimeNode, entries);
+                InputType = "message",
+                Level = "Warning",
+                Category = "workflow.test",
+                MessageTemplate = "Observed {kind}:{size} #{sequence}"
+            },
+            Selectors(
+                ("kind", (InputMessage message) => message.Kind),
+                ("size", message => message.Payload.Length)),
+            new FakeTimeProvider(timestamp));
+        var entries = Sink(node.Output);
 
-        await input.Target.SendAsync(new InputMessage("alpha", [1, 2, 3], true));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = FlowMessage.Create(new InputMessage("alpha", [1, 2, 3], true));
+        await node.Input.SendAsync(sent);
 
         var entry = await entries.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        entry.Level.ShouldBe(FlowLogLevel.Warning);
-        entry.Category.ShouldBe("workflow.test");
-        entry.Message.ShouldBe("Observed alpha:3 #1");
-        entry.InputType.ShouldBe("message");
-        entry.Sequence.ShouldBe(1);
-        entry.Timestamp.ShouldBe(timestamp);
-        entry.Attributes["kind"].ShouldBe("alpha");
-        entry.Attributes["size"].ShouldBe(3);
+        entry.CorrelationId.ShouldBe(sent.CorrelationId);   // the whole point of the envelope
+        entry.Payload.Level.ShouldBe(FlowLogLevel.Warning);
+        entry.Payload.Category.ShouldBe("workflow.test");
+        entry.Payload.Message.ShouldBe("Observed alpha:3 #1");
+        entry.Payload.InputType.ShouldBe("message");
+        entry.Payload.Sequence.ShouldBe(1);
+        entry.Payload.Timestamp.ShouldBe(timestamp);
+        entry.Payload.Attributes["kind"].ShouldBe("alpha");
+        entry.Payload.Attributes["size"].ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Output_FansOutEveryEntryToEveryConsumer()
+    {
+        // One node's output linked to two downstream consumers, no engine. Both see
+        // every entry.
+        await using var node = new FlowLoggerNode<string>(
+            new FlowLoggerOptions { InputType = "string", MessageTemplate = "{input}" });
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.Input.SendAsync(FlowMessage.Create("two"));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Message.ShouldBe("one");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Message.ShouldBe("two");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Message.ShouldBe("one");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Message.ShouldBe("two");
     }
 
     [Fact]
     public async Task Logger_ReportsAttributeSelectorFailureAndStillEmitsEntry()
     {
-        var runtimeNode = CreateNode(
-            options => options
-                .RegisterType<InputMessage>("message")
-                .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind)
-                .UseValueSelector<InputMessage>("broken", (_, _) => throw new InvalidOperationException("select failed")),
-            new
+        await using var node = new FlowLoggerNode<InputMessage>(
+            new FlowLoggerOptions
             {
-                inputType = "message",
-                attributeSelectors = new[] { "kind", "broken" }
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var errors = new BufferBlock<FlowError>();
-        var entries = new BufferBlock<FlowLogEntry>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        LinkEntries(runtimeNode, entries);
+                InputType = "message",
+                AttributeSelectors = ["kind", "broken"]
+            },
+            Selectors(
+                ("kind", (InputMessage message) => message.Kind),
+                ("broken", _ => throw new InvalidOperationException("select failed"))));
+        var entries = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(new InputMessage("alpha", [1], true));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = FlowMessage.Create(new InputMessage("alpha", [1], true));
+        await node.Input.SendAsync(sent);
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(ObservabilityErrorCodes.LoggerAttributeSelectorFailed);
+        error.CorrelationId.ShouldBe(sent.CorrelationId);
         error.Context!.ShouldContain("selector=broken");
+
         var entry = await entries.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        entry.Attributes["kind"].ShouldBe("alpha");
-        entry.Attributes.ContainsKey("broken").ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task Logger_ExposesErrorsPortAndDeliversSelectorFailures()
-    {
-        var runtimeNode = CreateNode(
-            options => options
-                .RegisterType<InputMessage>("message")
-                .UseValueSelector<InputMessage>("broken", (_, _) => throw new InvalidOperationException("select failed")),
-            new
-            {
-                inputType = "message",
-                attributeSelectors = new[] { "broken" }
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var errorsPort = runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Errors));
-        errorsPort.ShouldNotBeNull();
-        var errors = new BufferBlock<FlowError>();
-        errorsPort.TryLinkTo(
-            new InputPort<FlowError>(
-                new PortAddress("test", new NodeName("errors"), new PortName("Input")),
-                errors),
-            propagateCompletion: true,
-            out var linkError);
-        linkError.ShouldBeNull();
-        LinkEntries(runtimeNode, new BufferBlock<FlowLogEntry>());
-
-        await input.Target.SendAsync(new InputMessage("alpha", [1], true));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(ObservabilityErrorCodes.LoggerAttributeSelectorFailed);
+        entry.Payload.Attributes["kind"].ShouldBe("alpha");
+        entry.Payload.Attributes.ContainsKey("broken").ShouldBeFalse();
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Logger_DoesNotExpandPlaceholdersFromSubstitutedValues()
     {
-        var runtimeNode = CreateNode(
-            options => options
-                .RegisterType<InputMessage>("message")
-                .UseValueSelector<InputMessage>("kind", (message, _) => message.Kind),
-            new
+        await using var node = new FlowLoggerNode<InputMessage>(
+            new FlowLoggerOptions
             {
-                inputType = "message",
-                messageTemplate = "Observed {kind}",
-                attributeSelectors = new[] { "kind" }
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var entries = new BufferBlock<FlowLogEntry>();
-        LinkEntries(runtimeNode, entries);
+                InputType = "message",
+                MessageTemplate = "Observed {kind}"
+            },
+            Selectors(("kind", (InputMessage message) => message.Kind)));
+        var entries = Sink(node.Output);
 
-        await input.Target.SendAsync(new InputMessage("{category}", [1], true));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new InputMessage("{category}", [1], true)));
 
         var entry = await entries.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        entry.Message.ShouldBe("Observed {category}");
+        entry.Payload.Message.ShouldBe("Observed {category}");
     }
 
     [Fact]
-    public async Task Logger_EmitsDiagnostics()
+    public async Task Logger_EmitsEventCarryingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                category = "workflow.test"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Entries))!
-            .LinkToDiscard();
+        await using var node = new FlowLoggerNode<string>(
+            new FlowLoggerOptions { InputType = "string", Category = "workflow.test" });
+        Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = FlowMessage.Create("hello");
+        await node.Input.SendAsync(sent);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(ObservabilityDiagnosticNames.LoggerEmitted);
-        diagnostic.Attributes["name"].ShouldBe("workflow.test");
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Name.ShouldBe(FlowLoggerNode<string>.Emitted);
+        @event.Level.ShouldBe(FlowEventLevel.Information);
+        @event.CorrelationId.ShouldBe(sent.CorrelationId);
+        @event.Attributes["name"].ShouldBe("workflow.test");
     }
 
     [Fact]
     public void Logger_RejectsUnsupportedLevel()
     {
         var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "string",
-                    level = "Nope"
-                }));
+            () => new FlowLoggerNode<string>(
+                new FlowLoggerOptions { InputType = "string", Level = "Nope" }));
 
         exception.Message.ShouldContain("level");
     }
 
     [Fact]
-    public async Task Logger_TreatsNullAttributeSelectorsAsEmpty()
+    public async Task Logger_TreatsNoAttributeSelectorsAsEmpty()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                attributeSelectors = (string[]?)null
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var entries = new BufferBlock<FlowLogEntry>();
-        LinkEntries(runtimeNode, entries);
+        await using var node = new FlowLoggerNode<string>(
+            new FlowLoggerOptions { InputType = "string" });
+        var entries = Sink(node.Output);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create("hello"));
 
         var entry = await entries.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        entry.Attributes.ShouldBeEmpty();
+        entry.Payload.Attributes.ShouldBeEmpty();
     }
 
-    private static RuntimeNode CreateNode(
-        Action<ObservabilityComponentOptions> configure,
-        object configuration)
+    [Fact]
+    public void Constructor_RequiresOptions()
+        => Should.Throw<ArgumentNullException>(() => new FlowLoggerNode<string>(null!));
+
+    private static IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>> Selectors<TInput>(
+        params (string Name, Func<TInput, object?> Select)[] selectors)
+        => selectors.ToDictionary(
+            selector => selector.Name,
+            selector => (IObservabilityValueSelector<TInput>)new DelegateSelector<TInput>(
+                (input, _) => selector.Select(input)),
+            StringComparer.Ordinal);
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterObservabilityComponents(configure);
-        registry.TryGetFactory(ObservabilityComponentTypes.Logger, out var factory).ShouldBeTrue();
-        return factory(ObservabilityTestHost.CreateContext(
-            ObservabilityComponentTypes.Logger,
-            configuration));
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 
-    private static void LinkEntries(
-        RuntimeNode runtimeNode,
-        BufferBlock<FlowLogEntry> target)
+    private sealed class DelegateSelector<TInput>(
+        Func<TInput, ObservabilityNodeContext, object?> selector)
+        : IObservabilityValueSelector<TInput>
     {
-        runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Entries))!
-            .TryLinkTo(
-                new InputPort<FlowLogEntry>(
-                    new PortAddress("test", new NodeName("entries"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
+        public object? Select(TInput input, ObservabilityNodeContext context)
+            => selector(input, context);
     }
 
     private sealed record InputMessage(string Kind, byte[] Payload, bool Enabled);

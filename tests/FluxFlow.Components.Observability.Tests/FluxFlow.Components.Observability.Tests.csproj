@@ -9,7 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 
   <ItemGroup>

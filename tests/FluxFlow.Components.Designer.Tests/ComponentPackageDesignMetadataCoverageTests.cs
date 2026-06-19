@@ -1,15 +1,10 @@
-using FluxFlow.Components.Assertions;
-using FluxFlow.Components.Control;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.FileSystem;
-using FluxFlow.Components.Mapping;
 using FluxFlow.Components.Mqtt;
-using FluxFlow.Components.Observability;
 using FluxFlow.Components.Routing;
 using FluxFlow.Components.Sessions;
 using FluxFlow.Components.Sources;
-using FluxFlow.Components.State;
 using FluxFlow.Components.Storage;
 using FluxFlow.Components.Timers;
 using FluxFlow.Engine.Definitions;
@@ -52,36 +47,24 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
 
     private static IReadOnlyList<IComponentDesignMetadataProvider> CreateProviders() =>
     [
-        new AssertionsComponentDesignMetadataProvider(),
-        new ControlComponentDesignMetadataProvider(),
         new FileSystemComponentDesignMetadataProvider(),
-        new MappingComponentDesignMetadataProvider(),
         new MqttComponentDesignMetadataProvider(),
-        new ObservabilityComponentDesignMetadataProvider(),
         new RoutingComponentDesignMetadataProvider(),
         new SessionsComponentDesignMetadataProvider(),
         new SourcesComponentDesignMetadataProvider(),
-        new StateComponentDesignMetadataProvider(),
         new StorageComponentDesignMetadataProvider(),
         new TimerComponentDesignMetadataProvider(),
     ];
 
     private static readonly IReadOnlyList<NodeType> ExpectedTypes =
     [
-        AssertionsComponentTypes.Assert,
-        ControlComponentTypes.Filter,
-        ControlComponentTypes.When,
         FileSystemComponentTypes.DirectoryEnumerate,
         FileSystemComponentTypes.FileRead,
         FileSystemComponentTypes.FileWatch,
         FileSystemComponentTypes.FileWrite,
-        MappingComponentTypes.Mapper,
         MqttComponentTypes.Connection,
         MqttComponentTypes.Publish,
         MqttComponentTypes.Subscribe,
-        ObservabilityComponentTypes.Counter,
-        ObservabilityComponentTypes.Logger,
-        ObservabilityComponentTypes.Metrics,
         RoutingComponentTypes.Correlation,
         RoutingComponentTypes.Fork,
         RoutingComponentTypes.Join,
@@ -93,7 +76,6 @@ public sealed class ComponentPackageDesignMetadataCoverageTests
         SessionsComponentTypes.Replay,
         SourcesComponentTypes.Generated,
         SourcesComponentTypes.Sequence,
-        StateComponentTypes.Reducer,
         StorageComponentTypes.Delete,
         StorageComponentTypes.Get,
         StorageComponentTypes.Put,

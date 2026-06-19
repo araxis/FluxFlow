@@ -1,60 +1,87 @@
 using FluxFlow.Components.Control.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Control.Nodes;
+using FluxFlow.Components.Control.Options;
+using FluxFlow.Mapping;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Control.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows input -> WhenTrue/WhenFalse
+// and onto any error for free.
 public sealed class WhenNodeTests
 {
     [Fact]
-    public async Task WhenNode_RoutesItemsToTrueAndFalseOutputs()
+    public async Task RoutesItemsToTrueAndFalsePreservingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                evaluate: (_, context, _) => ((int)context.Variables["input"]!) >= 10)),
-            new
-            {
-                expression = "route",
-                inputType = "int"
-            });
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var trueResults = new BufferBlock<int>();
-        var falseResults = new BufferBlock<int>();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenTrue))!
-            .TryLinkTo(
-                new InputPort<int>(
-                    new PortAddress("test", new NodeName("true"), new PortName("Input")),
-                    trueResults),
-                propagateCompletion: true,
-                out _);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenFalse))!
-            .TryLinkTo(
-                new InputPort<int>(
-                    new PortAddress("test", new NodeName("false"), new PortName("Input")),
-                    falseResults),
-                propagateCompletion: true,
-                out _);
+        await using var node = new WhenNode<int>(
+            Options("route", inputType: "int"),
+            new RecordingExpressionEngine(
+                evaluate: (_, context, _) => ((int)context.Variables["input"]!) >= 10));
+        var whenTrue = Sink(node.WhenTrue);
+        var whenFalse = Sink(node.WhenFalse);
 
-        await input.Target.SendAsync(5);
-        await input.Target.SendAsync(12);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var low = FlowMessage.Create(5);
+        var high = FlowMessage.Create(12);
+        await node.Input.SendAsync(low);
+        await node.Input.SendAsync(high);
 
-        (await falseResults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(5);
-        (await trueResults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(12);
+        var rejected = await whenFalse.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        rejected.Payload.ShouldBe(5);
+        rejected.CorrelationId.ShouldBe(low.CorrelationId);
+
+        var accepted = await whenTrue.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        accepted.Payload.ShouldBe(12);
+        accepted.CorrelationId.ShouldBe(high.CorrelationId);
     }
 
     [Fact]
-    public async Task WhenNode_ReportsExpressionFailureAndContinues()
+    public async Task WhenTrueIsTheBroadcastOutputPort()
+    {
+        // WhenTrue is the node's primary Output: linking either gets the same stream.
+        await using var node = new WhenNode<int>(
+            Options("route", inputType: "int"),
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        var viaWhenTrue = Sink(node.WhenTrue);
+        var viaOutput = Sink(node.Output);
+        node.WhenFalse.LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(7));
+
+        (await viaWhenTrue.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(7);
+        (await viaOutput.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(7);
+    }
+
+    [Fact]
+    public async Task WhenFalse_FansOutToEveryConsumer()
+    {
+        await using var node = new WhenNode<int>(
+            Options("route", inputType: "int"),
+            new RecordingExpressionEngine(evaluate: (_, _, _) => false));
+        var logger = Sink(node.WhenFalse);
+        var mapper = Sink(node.WhenFalse);
+        node.WhenTrue.LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(1);
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(2);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(1);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ExpressionFailure_ReportsErrorWithCorrelationIdAndContinues()
     {
         var calls = 0;
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
+        await using var node = new WhenNode<string>(
+            Options("route", expressionName: "when-test"),
+            new RecordingExpressionEngine(
                 evaluate: (_, _, _) =>
                 {
                     calls++;
@@ -64,74 +91,139 @@ public sealed class WhenNodeTests
                     }
 
                     return true;
-                })),
-            new
-            {
-                expression = "route",
-                expressionName = "when-test"
-            });
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        var trueResults = new BufferBlock<object>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenTrue))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("true"), new PortName("Input")),
-                    trueResults),
-                propagateCompletion: true,
-                out _);
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenFalse))!
-            .LinkToDiscard();
+                }));
+        var errors = Sink(node.Errors);
+        var whenTrue = Sink(node.WhenTrue);
+        node.WhenFalse.LinkTo(DataflowBlock.NullTarget<FlowMessage<string>>());
 
-        await input.Target.SendAsync("first");
-        await input.Target.SendAsync("second");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create("first");
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create("second"));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(ControlErrorCodes.WhenExpressionFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
         error.Context!.ShouldContain("expressionName=when-test");
-        (await trueResults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe("second");
+
+        (await whenTrue.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("second");
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task WhenNode_EmitsRouteDiagnostics()
+    public async Task EmitsRouteEventCarryingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                evaluate: (_, _, _) => false)),
-            new
-            {
-                expression = "route",
-                expressionId = "route-v1"
-        });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(ControlComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenTrue))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ControlComponentPorts.WhenFalse))!.LinkToDiscard();
+        await using var node = new WhenNode<string>(
+            Options("route", expressionId: "route-v1"),
+            new RecordingExpressionEngine(evaluate: (_, _, _) => false));
+        node.WhenTrue.LinkTo(DataflowBlock.NullTarget<FlowMessage<string>>());
+        node.WhenFalse.LinkTo(DataflowBlock.NullTarget<FlowMessage<string>>());
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create("value");
+        await node.Input.SendAsync(message);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(ControlDiagnosticNames.WhenRouted);
-        diagnostic.Attributes["route"].ShouldBe(ControlComponentPorts.WhenFalse);
-        diagnostic.Attributes["expressionId"].ShouldBe("route-v1");
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Name.ShouldBe(ControlDiagnosticNames.WhenRouted);
+        @event.CorrelationId.ShouldBe(message.CorrelationId);
+        @event.Attributes["route"].ShouldBe(ControlComponentPorts.WhenFalse);
+        @event.Attributes["expressionId"].ShouldBe("route-v1");
     }
 
-    private static RuntimeNode CreateNode(
-        Action<Options.ControlComponentOptions> configure,
-        object configuration)
+    [Fact]
+    public async Task ConfiguredClock_StampsErrorTimestamp()
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterControlComponents(configure);
-        registry.TryGetFactory(ControlComponentTypes.When, out var factory).ShouldBeTrue();
-        return factory(ControlTestHost.CreateContext(ControlComponentTypes.When, configuration));
+        var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
+        await using var node = new WhenNode<int>(
+            Options("boom", inputType: "int"),
+            new RecordingExpressionEngine(evaluate: (_, _, _) => throw new InvalidOperationException("boom")),
+            contextFactory: null,
+            clock: new FakeTimeProvider(timestamp));
+        var errors = Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(1));
+
+        (await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Timestamp.ShouldBe(timestamp);
+    }
+
+    [Fact]
+    public async Task UsesProvidedContextFactoryVariables()
+    {
+        await using var node = new WhenNode<Message>(
+            Options("matches"),
+            new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["matches"]),
+            new MatchingContextFactory<Message>(matches: true));
+        var whenTrue = Sink(node.WhenTrue);
+        node.WhenFalse.LinkTo(DataflowBlock.NullTarget<FlowMessage<Message>>());
+
+        var message = new Message("value");
+        var sent = FlowMessage.Create(message);
+        await node.Input.SendAsync(sent);
+
+        var received = await whenTrue.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        received.Payload.ShouldBe(message);
+        received.CorrelationId.ShouldBe(sent.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Completion_PropagatesToBothBranchSinks()
+    {
+        var node = new WhenNode<int>(
+            Options("route", inputType: "int"),
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        var whenTrue = new BufferBlock<FlowMessage<int>>();
+        var whenFalse = new BufferBlock<FlowMessage<int>>();
+        node.WhenTrue.LinkTo(whenTrue, new DataflowLinkOptions { PropagateCompletion = true });
+        node.WhenFalse.LinkTo(whenFalse, new DataflowLinkOptions { PropagateCompletion = true });
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await whenTrue.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await whenFalse.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void Constructor_RequiresExpressionEngine()
+        => Should.Throw<ArgumentNullException>(
+            () => new WhenNode<int>(Options("route"), expressionEngine: null!));
+
+    [Fact]
+    public void Constructor_RequiresPredicate()
+        => Should.Throw<ArgumentNullException>(
+            () => new WhenNode<int>(Options("route"), predicate: null!));
+
+    private static ControlExpressionOptions Options(
+        string expression,
+        string? expressionId = null,
+        string? expressionName = null,
+        string inputType = "object")
+        => new()
+        {
+            Expression = expression,
+            ExpressionId = expressionId,
+            ExpressionName = expressionName,
+            InputType = inputType
+        };
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
+    {
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
+    }
+
+    private sealed record Message(string Value);
+
+    private sealed class MatchingContextFactory<TInput>(bool matches) : IFlowMapContextFactory<TInput>
+    {
+        public FlowMapContext Create(TInput input)
+            => new()
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["matches"] = matches
+                }
+            };
     }
 }

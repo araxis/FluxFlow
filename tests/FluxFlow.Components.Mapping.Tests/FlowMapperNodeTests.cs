@@ -1,137 +1,102 @@
 using FluxFlow.Components.Mapping.Contracts;
-using FluxFlow.Components.Mapping.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
+using FluxFlow.Components.Mapping.Nodes;
+using FluxFlow.Components.Mapping.Options;
 using FluxFlow.Mapping;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Mapping.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows input -> output, onto the
+// Failed branch, and onto any error for free.
 public sealed class FlowMapperNodeTests
 {
     [Fact]
-    public async Task MapperNode_MapsObjectInputToObjectOutput()
+    public async Task MapsObjectInputToObjectOutputPreservingCorrelationId()
     {
-        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => $"{context.Variables["input"]}-mapped");
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(engine),
-            new
-            {
-                expression = "map",
-                boundedCapacity = 4
-            });
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, _) => $"{context.Variables["input"]}-mapped");
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map", BoundedCapacity = 4 },
+            engine);
+        var results = Sink(node.Output);
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var output = runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output));
-        output.ShouldNotBeNull();
-        output.ValueType.ShouldBe(typeof(object));
-
-        var results = new BufferBlock<object>();
-        using var link = output.TryLinkTo(
-            new InputPort<object>(
-                new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                results),
-            propagateCompletion: true,
-            out var error);
-        error.ShouldBeNull();
-        link.ShouldNotBeNull();
-
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create<object>("value");
+        await node.Input.SendAsync(message);
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.ShouldBe("value-mapped");
+        result.CorrelationId.ShouldBe(message.CorrelationId);   // the whole point of the envelope
+        result.Payload.ShouldBe("value-mapped");
     }
 
     [Fact]
-    public async Task MapperNode_UsesRegisteredTypesAndContextFactory()
+    public async Task UsesSuppliedContextFactoryAndTypes()
     {
         var engine = new RecordingExpressionEngine(evaluate: (_, context, resultType) =>
         {
             resultType.ShouldBe(typeof(OutputMessage));
             return new OutputMessage((int)context.Variables["mapped"]!);
         });
-        var runtimeNode = CreateNode(
-            options => options
-                .UseExpressionEngine(engine)
-                .RegisterType<InputMessage>("app.input")
-                .RegisterType<OutputMessage>("app.output")
-                .UseContextFactory(new InputMessageContextFactory()),
-            new
-            {
-                expression = "map",
-                inputType = "app.input",
-                outputType = "app.output"
-            });
+        await using var node = new FlowMapperNode<InputMessage, OutputMessage>(
+            new MapperOptions { Expression = "map", InputType = "app.input", OutputType = "app.output" },
+            engine,
+            contextFactory: new TypedMappingContextFactory<InputMessage>(new InputMessageContextFactory()));
+        var results = Sink(node.Output);
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<InputMessage>>());
 
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var output = runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output));
-        output.ShouldNotBeNull();
-        output.ValueType.ShouldBe(typeof(OutputMessage));
-
-        var results = new BufferBlock<OutputMessage>();
-        using var link = output.TryLinkTo(
-            new InputPort<OutputMessage>(
-                new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                results),
-            propagateCompletion: true,
-            out var error);
-        error.ShouldBeNull();
-        link.ShouldNotBeNull();
-
-        await input.Target.SendAsync(new InputMessage(21));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new InputMessage(21)));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Value.ShouldBe(42);
+        result.Payload.Value.ShouldBe(42);
     }
 
     [Fact]
-    public async Task MapperNode_UsesConfiguredExpressionEngine()
+    public async Task Output_FansOutEveryResultToEveryConsumer()
     {
-        var defaultEngine = new RecordingExpressionEngine(
-            "default",
-            (_, _, _) => "wrong");
-        var namedEngine = new RecordingExpressionEngine(
+        // One node's output linked to two downstream consumers, no engine. Both see
+        // every mapped result.
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, _) => $"{context.Variables["input"]}-mapped");
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map" },
+            engine);
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
+
+        await node.Input.SendAsync(FlowMessage.Create<object>("a"));
+        await node.Input.SendAsync(FlowMessage.Create<object>("b"));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("a-mapped");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("b-mapped");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("a-mapped");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("b-mapped");
+    }
+
+    [Fact]
+    public async Task UsesTheSuppliedExpressionEngine()
+    {
+        var engine = new RecordingExpressionEngine(
             "named",
             (_, context, _) => $"{context.Variables["input"]}-named");
-        var runtimeNode = CreateNode(
-            options => options
-                .UseExpressionEngine(defaultEngine)
-                .UseExpressionEngine(namedEngine, useAsDefault: false),
-            new
-            {
-                expression = "map",
-                engine = "named"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var results = new BufferBlock<object>();
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map" },
+            engine);
+        var results = Sink(node.Output);
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create<object>("value"));
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.ShouldBe("value-named");
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("value-named");
     }
 
     [Fact]
-    public async Task MapperNode_ReportsFailureAndContinues()
+    public async Task FailureReportsErrorWithCorrelationIdAndContinues()
     {
         var calls = 0;
         var engine = new RecordingExpressionEngine(evaluate: (_, context, _) =>
@@ -144,64 +109,42 @@ public sealed class FlowMapperNodeTests
 
             return $"{context.Variables["input"]}-ok";
         });
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(engine),
-            new
-            {
-                expression = "map",
-                expressionName = "test-map"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<object>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map", ExpressionName = "test-map" },
+            engine);
+        var errors = Sink(node.Errors);
+        var results = Sink(node.Output);
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        await input.Target.SendAsync("first");
-        await input.Target.SendAsync("second");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create<object>("first");
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create<object>("second"));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
         error.Context!.ShouldContain("expressionName=test-map");
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.ShouldBe("second-ok");
+        // The pump keeps going: the second message still maps.
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("second-ok");
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task MapperNode_ReportsExpectedTypeWhenResultIsIncompatible()
+    public async Task ReportsExpectedTypeWhenResultIsIncompatible()
     {
         // The compiled-mapper path casts the engine result to the output type, so a
         // wrong-typed return surfaces as a raw InvalidCastException. The node must
         // still report MapperFailed but with a message naming the expected type.
         var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => "not-an-output-message");
-        var runtimeNode = CreateNode(
-            options => options
-                .UseExpressionEngine(engine)
-                .RegisterType<OutputMessage>("app.output"),
-            new
-            {
-                expression = "map",
-                outputType = "app.output",
-                expressionName = "test-map"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        await using var node = new FlowMapperNode<object, OutputMessage>(
+            new MapperOptions { Expression = "map", OutputType = "app.output", ExpressionName = "test-map" },
+            engine);
+        var errors = Sink(node.Errors);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<OutputMessage>>());
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create<object>("value"));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
@@ -212,29 +155,19 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
-    public async Task MapperNode_ReportsExpectedTypeWhenResultIsNull()
+    public async Task ReportsExpectedTypeWhenResultIsNull()
     {
-        // A null return for a non-nullable value-type output surfaces as a raw
-        // NullReferenceException; the node must report the expected type instead.
+        // A null return for a non-nullable value-type output surfaces as a raw cast
+        // failure; the node must report the expected type instead.
         var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => null);
-        var runtimeNode = CreateNode(
-            options => options
-                .UseExpressionEngine(engine)
-                .RegisterType<int>("app.count"),
-            new
-            {
-                expression = "map",
-                outputType = "app.count",
-                expressionName = "test-map"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        runtimeNode.Node.Errors.LinkTo(errors);
+        await using var node = new FlowMapperNode<object, int>(
+            new MapperOptions { Expression = "map", OutputType = "app.count", ExpressionName = "test-map" },
+            engine);
+        var errors = Sink(node.Errors);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create<object>("value"));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
@@ -246,7 +179,7 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
-    public async Task MapperNode_ErrorsPortReceivesPerMessageFailures()
+    public async Task FailedPortReceivesDroppedInputCarryingCorrelationId()
     {
         var calls = 0;
         var engine = new RecordingExpressionEngine(evaluate: (_, context, _) =>
@@ -259,168 +192,97 @@ public sealed class FlowMapperNodeTests
 
             return $"{context.Variables["input"]}-ok";
         });
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(engine),
-            new
-            {
-                expression = "map",
-                expressionName = "test-map"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<object>();
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Errors))!
-            .TryLinkTo(
-                new InputPort<FlowError>(
-                    new PortAddress("test", new NodeName("errors"), new PortName("Input")),
-                    errors),
-                propagateCompletion: true,
-                out var linkError);
-        linkError.ShouldBeNull();
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map", ExpressionName = "test-map" },
+            engine);
+        var errors = Sink(node.Errors);
+        var failed = Sink(node.Failed);
+        var results = Sink(node.Output);
 
-        await input.Target.SendAsync("first");
-        await input.Target.SendAsync("second");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
-        error.Context!.ShouldContain("expressionName=test-map");
-        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe("second-ok");
-    }
-
-    [Fact]
-    public async Task MapperNode_FailedPortReceivesDroppedInput()
-    {
-        var calls = 0;
-        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) =>
-        {
-            calls++;
-            if (calls == 1)
-            {
-                throw new InvalidOperationException("bad expression");
-            }
-
-            return $"{context.Variables["input"]}-ok";
-        });
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(engine),
-            new
-            {
-                expression = "map",
-                expressionName = "test-map"
-            });
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
-        var errors = new BufferBlock<FlowError>();
-        var failed = new BufferBlock<object>();
-        var results = new BufferBlock<object>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Failed))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("failed"), new PortName("Input")),
-                    failed),
-                propagateCompletion: true,
-                out var failedLinkError);
-        failedLinkError.ShouldBeNull();
-        runtimeNode.FindOutput(new PortName(MappingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<object>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
-
-        await input.Target.SendAsync("first");
-        await input.Target.SendAsync("second");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create<object>("first");
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create<object>("second"));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MappingErrorCodes.MapperFailed);
         error.Context!.ShouldContain("expressionName=test-map");
 
         var dropped = await failed.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        dropped.ShouldBe("first");
+        dropped.CorrelationId.ShouldBe(bad.CorrelationId);
+        dropped.Payload.ShouldBe("first");
 
-        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.ShouldBe("second-ok");
+        (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldBe("second-ok");
     }
 
     [Fact]
-    public async Task MapperNode_EmitsDiagnostics()
+    public async Task EmitsSuccessEventCarryingCorrelationIdAndAttributes()
     {
         var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["input"]);
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(engine),
-            new
-            {
-                expression = "map",
-                expressionId = "copy-v1",
-                expressionName = "copy"
-            });
-        var node = runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        node!.Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(MappingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<object>>();
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map", ExpressionId = "copy-v1", ExpressionName = "copy" },
+            engine);
+        var events = Sink(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
 
-        await input.Target.SendAsync("value");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create<object>("value");
+        await node.Input.SendAsync(message);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(MappingDiagnosticNames.MapperSucceeded);
-        diagnostic.Attributes["inputType"].ShouldBe("object");
-        diagnostic.Attributes["outputType"].ShouldBe("object");
-        diagnostic.Attributes["engine"].ShouldBe("test");
-        diagnostic.Attributes["expressionId"].ShouldBe("copy-v1");
-        diagnostic.Attributes["expressionName"].ShouldBe("copy");
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Name.ShouldBe(FlowMapperNode<object, object>.MapperSucceeded);
+        @event.Level.ShouldBe(FlowEventLevel.Information);
+        @event.CorrelationId.ShouldBe(message.CorrelationId);
+        @event.Attributes["inputType"].ShouldBe("object");
+        @event.Attributes["outputType"].ShouldBe("object");
+        @event.Attributes["engine"].ShouldBe("test");
+        @event.Attributes["expressionId"].ShouldBe("copy-v1");
+        @event.Attributes["expressionName"].ShouldBe("copy");
     }
 
     [Fact]
-    public void MapperNode_RejectsMissingExpression()
+    public async Task ConfiguredClock_StampsEventTimestamp()
     {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                options => options.UseExpressionEngine(new RecordingExpressionEngine()),
-                new { }));
+        var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
+        var engine = new RecordingExpressionEngine(evaluate: (_, context, _) => context.Variables["input"]);
+        await using var node = new FlowMapperNode<object, object>(
+            new MapperOptions { Expression = "map" },
+            engine,
+            clock: new FakeTimeProvider(timestamp));
+        var events = Sink(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
+        node.Failed.LinkTo(DataflowBlock.NullTarget<FlowMessage<object>>());
+
+        await node.Input.SendAsync(FlowMessage.Create<object>("value"));
+
+        (await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Timestamp.ShouldBe(timestamp);
+    }
+
+    [Fact]
+    public void Constructor_RejectsMissingExpression()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new FlowMapperNode<object, object>(
+                new MapperOptions { Expression = null },
+                new RecordingExpressionEngine()));
 
         exception.Message.ShouldContain("expression");
     }
 
     [Fact]
-    public void MapperNode_RejectsUnknownType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                options => options.UseExpressionEngine(new RecordingExpressionEngine()),
-                new
-                {
-                    expression = "map",
-                    outputType = "missing.output"
-                }));
+    public void Constructor_RequiresOptions()
+        => Should.Throw<ArgumentNullException>(
+            () => new FlowMapperNode<object, object>(null!, new RecordingExpressionEngine()));
 
-        exception.Message.ShouldContain("missing.output");
-    }
+    [Fact]
+    public void Constructor_RequiresExpressionEngine()
+        => Should.Throw<ArgumentNullException>(
+            () => new FlowMapperNode<object, object>(new MapperOptions { Expression = "map" }, null!));
 
-    private static RuntimeNode CreateNode(
-        Action<Options.MappingComponentOptions> configure,
-        object configuration)
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterMappingComponents(configure);
-        registry.TryGetFactory(MappingComponentTypes.Mapper, out var factory).ShouldBeTrue();
-        return factory(MappingTestHost.CreateContext(configuration));
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 
     private sealed record InputMessage(int Value);

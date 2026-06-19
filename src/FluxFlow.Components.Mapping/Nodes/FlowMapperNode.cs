@@ -1,35 +1,47 @@
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Diagnostics;
 using FluxFlow.Components.Mapping.Options;
-using FluxFlow.Engine.Components;
 using FluxFlow.Mapping;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Mapping.Nodes;
 
-public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
+/// <summary>
+/// A standalone mapper node — a "blockified" expression mapper. Post a
+/// <c>FlowMessage&lt;TInput&gt;</c> to <c>Input</c>; the node maps the payload with a
+/// host-provided <see cref="IFlowExpressionEngine"/> (the mapping expression is
+/// compiled once at construction) and broadcasts a <c>FlowMessage&lt;TOutput&gt;</c> on
+/// <c>Output</c> carrying the same correlation id. When a mapping throws, the original
+/// input is fanned to the <c>Failed</c> port and a <see cref="FlowError"/> surfaces on
+/// <c>Errors</c> (same correlation id); the node keeps processing later messages.
+/// Diagnostics go to <c>Events</c>. Works with nothing but
+/// <c>new FlowMapperNode&lt;TIn, TOut&gt;(options, expressionEngine)</c> — no engine.
+/// </summary>
+public sealed class FlowMapperNode<TInput, TOutput> : FlowNode<TInput, TOutput>
 {
+    public const string MapperSucceeded = MappingDiagnosticNames.MapperSucceeded;
+    public const string MapperFailed = MappingDiagnosticNames.MapperFailed;
+
     private readonly IFlowMapper<TInput, TOutput> _mapper;
     private readonly IMappingContextFactory _contextFactory;
     private readonly MappingNodeContext _nodeContext;
     private readonly string _engineName;
     private readonly MapperOptions _options;
-    private readonly TransformManyBlock<TInput, TOutput> _input;
-    private readonly BufferBlock<TOutput> _output;
-    private readonly BufferBlock<TInput> _failed;
+    private readonly TimeProvider _clock;
+    private readonly BroadcastBlock<FlowMessage<TInput>> _failed;
 
     public FlowMapperNode(
         MapperOptions options,
-        IFlowMapper<TInput, TOutput> mapper,
-        IMappingContextFactory contextFactory,
-        MappingNodeContext nodeContext,
-        string engineName)
+        IFlowExpressionEngine expressionEngine,
+        IMappingContextFactory? contextFactory = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
-        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
+        ArgumentNullException.ThrowIfNull(expressionEngine);
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -37,79 +49,87 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
                 "Mapper bounded capacity must be greater than zero.");
         }
 
-        var inputOptions = new ExecutionDataflowBlockOptions
+        if (string.IsNullOrWhiteSpace(options.Expression))
         {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true
+            throw new ArgumentException("flow.mapper requires an expression.", nameof(options));
+        }
+
+        _options = options;
+        _engineName = expressionEngine.Name;
+        _contextFactory = contextFactory ?? DefaultMappingContextFactory.Instance;
+        _clock = clock ?? TimeProvider.System;
+        _nodeContext = new MappingNodeContext
+        {
+            Options = options,
+            InputType = typeof(TInput),
+            OutputType = typeof(TOutput)
         };
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
-        _input = new TransformManyBlock<TInput, TOutput>(MapAsync, inputOptions);
-        _output = new BufferBlock<TOutput>(blockOptions);
-        _failed = new BufferBlock<TInput>(blockOptions);
-        _input.LinkTo(_output);
-        _input.Completion.ContinueWith(
-            CompleteOutputs,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_output.Completion, _failed.Completion));
+
+        // Compile the mapper expression once; the node evaluates the compiled form
+        // per message via the supplied FlowMapContext.
+        _mapper = new ExpressionFlowMapper<TInput, TOutput>(options.Expression, expressionEngine);
+
+        _failed = AddOutput<FlowMessage<TInput>>();
     }
 
-    public ITargetBlock<TInput> Input => _input;
+    /// <summary>Original input when the mapping fails; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<TInput>> Failed => _failed;
 
-    public ISourceBlock<TOutput> Output => _output;
-
-    public ISourceBlock<TInput> Failed => _failed;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_failed).Fault(exception);
-        }
-    }
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
-    private async Task<IEnumerable<TOutput>> MapAsync(TInput input)
-    {
+        TOutput output;
         try
         {
             var context = _contextFactory.Create(input, _nodeContext);
-            var output = _mapper.Map(input, context);
-            TryEmitDiagnostic(
-                MappingDiagnosticNames.MapperSucceeded,
-                message: "Mapped workflow message.",
-                attributes: CreateAttributes());
-
-            return [output];
+            output = _mapper.Map(input, context);
         }
         catch (Exception exception)
         {
-            TryReportError(
-                MappingErrorCodes.MapperFailed,
-                $"flow.mapper failed to map input: {DescribeFailure(exception)}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                MappingDiagnosticNames.MapperFailed,
-                FlowDiagnosticLevel.Error,
-                "flow.mapper failed to map input.",
-                exception,
-                CreateAttributes());
-
-            await _failed.SendAsync(input).ConfigureAwait(false);
-
-            return [];
+            ReportFailure(message, exception);
+            return Task.CompletedTask;
         }
+
+        // Carry the correlation id forward onto the mapped result.
+        Emit(message.With(output));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = MapperSucceeded,
+            Level = FlowEventLevel.Information,
+            Message = "Mapped workflow message.",
+            Attributes = CreateAttributes()
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
+    {
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = MappingErrorCodes.MapperFailed,
+            Message = $"flow.mapper failed to map input: {DescribeFailure(exception)}",
+            Context = CreateErrorContext(),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = MapperFailed,
+            Level = FlowEventLevel.Error,
+            Message = "flow.mapper failed to map input.",
+            Attributes = CreateAttributes()
+        });
+
+        // Fan the original input (correlation id intact) to the Failed port.
+        _failed.Post(source);
     }
 
     private string DescribeFailure(Exception exception)
@@ -127,19 +147,6 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNodeBase
         => $"the mapping expression returned an incompatible or null value; " +
             $"expected output type '{_nodeContext.OutputType}' (configured as '{_options.EffectiveOutputType}'). " +
             $"{exception.Message}";
-
-    private void CompleteOutputs(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_failed).Fault(exception);
-            return;
-        }
-
-        _output.Complete();
-        _failed.Complete();
-    }
 
     private Dictionary<string, object?> CreateAttributes()
     {

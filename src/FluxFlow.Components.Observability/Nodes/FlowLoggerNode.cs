@@ -1,41 +1,42 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
-public sealed class FlowLoggerNode<TInput> : FlowNodeBase
+/// <summary>
+/// A standalone structured-logging node. Post a <c>FlowMessage&lt;TInput&gt;</c> to
+/// <c>Input</c>; the node renders a message template, selects configured attributes
+/// from the payload, and broadcasts a <c>FlowMessage&lt;FlowLogEntry&gt;</c> on
+/// <c>Output</c> carrying the same correlation id. Attribute-selector failures
+/// surface on <c>Errors</c> (with the original correlation id), the offending
+/// attribute is skipped, and the node still emits the entry. Diagnostics flow on
+/// <c>Events</c>. Works with nothing but <c>new FlowLoggerNode&lt;T&gt;(options)</c> —
+/// no engine.
+/// </summary>
+public sealed class FlowLoggerNode<TInput> : FlowNode<TInput, FlowLogEntry>
 {
+    public const string NodeType = "flow.logger";
+    public const string Emitted = ObservabilityDiagnosticNames.LoggerEmitted;
+    public const string Failed = ObservabilityDiagnosticNames.LoggerFailed;
+
     private readonly FlowLoggerOptions _options;
     private readonly FlowLogLevel _level;
-    private readonly IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> _attributeSelectors;
+    private readonly IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>> _attributeSelectors;
     private readonly ObservabilityNodeContext _nodeContext;
-    private readonly TimeProvider _timeProvider;
-    private readonly ActionBlock<TInput> _input;
-    private readonly BufferBlock<FlowLogEntry> _entries;
+    private readonly TimeProvider _clock;
     private long _sequence;
 
-    internal FlowLoggerNode(
+    public FlowLoggerNode(
         FlowLoggerOptions options,
-        IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
-        ObservabilityNodeContext nodeContext)
-        : this(options, attributeSelectors, nodeContext, TimeProvider.System)
+        IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>>? attributeSelectors = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-    }
-
-    internal FlowLoggerNode(
-        FlowLoggerOptions options,
-        IReadOnlyDictionary<string, ObservabilityComponentOptions.IValueSelector> attributeSelectors,
-        ObservabilityNodeContext nodeContext,
-        TimeProvider timeProvider)
-    {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _level = ObservabilityOptionsReader.ResolveLogLevel(options.Level);
-        _attributeSelectors = attributeSelectors ?? throw new ArgumentNullException(nameof(attributeSelectors));
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -43,49 +44,26 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
                 "Logger bounded capacity must be greater than zero.");
         }
 
-        var inputOptions = new ExecutionDataflowBlockOptions
+        _options = options;
+        _level = options.ResolveLevel();
+        _attributeSelectors = attributeSelectors
+            ?? new Dictionary<string, IObservabilityValueSelector<TInput>>(StringComparer.Ordinal);
+        _clock = clock ?? TimeProvider.System;
+        _nodeContext = new ObservabilityNodeContext
         {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
+            NodeType = NodeType,
+            InputType = typeof(TInput),
+            Name = _options.EffectiveCategory
         };
-        _input = new ActionBlock<TInput>(LogAsync, inputOptions);
-        _entries = new BufferBlock<FlowLogEntry>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_entries.Completion);
     }
 
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<FlowLogEntry> Entries => _entries;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_entries).Fault(exception);
-        }
-    }
-
-    private async Task LogAsync(TInput input)
-    {
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
         var sequence = Interlocked.Increment(ref _sequence);
-        var timestamp = _timeProvider.GetUtcNow();
-        var attributes = CreateSelectedAttributes(input);
+        var timestamp = _clock.GetUtcNow();
+        var attributes = CreateSelectedAttributes(input, message);
         var messageValues = CreateMessageValues(input, sequence, attributes);
         var entry = new FlowLogEntry
         {
@@ -100,18 +78,26 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
             Attributes = attributes
         };
 
-        await _entries.SendAsync(entry).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            ObservabilityDiagnosticNames.LoggerEmitted,
-            message: "flow.logger emitted entry.",
-            attributes: ObservabilityNodeSupport.CreateAttributes(
-                ObservabilityComponentTypes.Logger.Value,
+        // Carry the correlation id forward onto the entry.
+        Emit(message.With(entry));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = Emitted,
+            Level = FlowEventLevel.Information,
+            Message = "flow.logger emitted entry.",
+            Attributes = ObservabilityNodeSupport.CreateAttributes(
+                NodeType,
                 _options.InputType,
                 _options.EffectiveCategory,
-                sequence));
+                sequence)
+        });
+
+        return Task.CompletedTask;
     }
 
-    private Dictionary<string, object?> CreateSelectedAttributes(TInput input)
+    private Dictionary<string, object?> CreateSelectedAttributes(TInput input, FlowMessage<TInput> message)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var (name, selector) in _attributeSelectors)
@@ -122,20 +108,27 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
             }
             catch (Exception exception)
             {
-                TryReportError(
-                    ObservabilityErrorCodes.LoggerAttributeSelectorFailed,
-                    $"flow.logger failed to select attribute '{name}': {exception.Message}",
-                    exception,
-                    CreateErrorContext(name));
-                TryEmitDiagnostic(
-                    ObservabilityDiagnosticNames.LoggerFailed,
-                    FlowDiagnosticLevel.Error,
-                    $"flow.logger failed to select attribute '{name}'.",
-                    exception,
-                    ObservabilityNodeSupport.CreateAttributes(
-                        ObservabilityComponentTypes.Logger.Value,
+                EmitError(new FlowError
+                {
+                    Timestamp = _clock.GetUtcNow(),
+                    CorrelationId = message.CorrelationId,
+                    Code = ObservabilityErrorCodes.LoggerAttributeSelectorFailed,
+                    Message = $"flow.logger failed to select attribute '{name}': {exception.Message}",
+                    Context = CreateErrorContext(name),
+                    Exception = exception
+                });
+                EmitEvent(new FlowEvent
+                {
+                    Timestamp = _clock.GetUtcNow(),
+                    CorrelationId = message.CorrelationId,
+                    Name = Failed,
+                    Level = FlowEventLevel.Error,
+                    Message = $"flow.logger failed to select attribute '{name}'.",
+                    Attributes = ObservabilityNodeSupport.CreateAttributes(
+                        NodeType,
                         _options.InputType,
-                        _options.EffectiveCategory));
+                        _options.EffectiveCategory)
+                });
             }
         }
 
@@ -169,16 +162,5 @@ public sealed class FlowLoggerNode<TInput> : FlowNodeBase
         };
 
         return string.Join("; ", values);
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_entries).Fault(exception);
-            return;
-        }
-
-        _entries.Complete();
     }
 }

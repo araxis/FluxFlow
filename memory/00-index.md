@@ -41,8 +41,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `35-mqtt-topic-validation.md`: MQTT topic validation helper and package behavior record.
 - `36-mapping-component-package.md`: first generic mapping component package record.
 - `37-control-component-package.md`: first generic control component package record.
-- `38-mapping-control-sample.md`: runnable mapping/control package composition sample.
-- `39-mqtt-composition-sample.md`: runnable MQTT composition sample with an in-memory adapter.
 - `40-component-package-template-sample.md`: buildable component package authoring template sample.
 - `41-validation-component-package.md`: first generic validation component package record.
 - `42-filesystem-component-package.md`: first generic file system component package record.
@@ -62,7 +60,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `56-sessions-component-package.md`: first generic session recording and replay component package.
 - `57-sessions-composition-sample.md`: runnable sessions recording/replay composition sample.
 - `58-state-reducer-component-package.md`: first generic state reducer component package.
-- `59-state-composition-sample.md`: runnable timer/mapper/state/counter composition sample.
 - `60-component-composition-docs.md`: package composition guidance and host/package boundary notes.
 - `61-package-readme-composition-links.md`: component package README links to composition guidance.
 - `62-storage-component-package-plan.md`: planned generic storage component package boundary and v0.1 scope.

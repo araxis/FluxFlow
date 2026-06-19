@@ -1,79 +1,81 @@
 using FluxFlow.Components.Control.Diagnostics;
 using FluxFlow.Components.Control.Options;
-using FluxFlow.Engine.Components;
 using FluxFlow.Mapping;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Control.Nodes;
 
-public sealed class WhenNode<TInput> : FlowNodeBase
+/// <summary>
+/// A standalone routing node. Post a <c>FlowMessage&lt;TInput&gt;</c> to
+/// <c>Input</c>; the node evaluates a compiled predicate over the payload and
+/// fans the original message to one of two ports — <c>WhenTrue</c> when the
+/// predicate matches, <c>WhenFalse</c> when it does not — each carrying the same
+/// correlation id. <c>WhenTrue</c> is the node's primary <c>Output</c>;
+/// <c>WhenFalse</c> is an additional broadcast port. Predicate failures surface on
+/// <c>Errors</c> (with the original correlation id) and the node keeps processing
+/// later messages. Diagnostics flow on <c>Events</c>. Works with nothing but
+/// <c>new WhenNode&lt;T&gt;(options, predicate)</c> — no engine.
+/// </summary>
+public sealed class WhenNode<TInput> : FlowNode<TInput, TInput>
 {
+    public const string WhenRouted = ControlDiagnosticNames.WhenRouted;
+    public const string WhenFailed = ControlDiagnosticNames.WhenFailed;
+
     private readonly IFlowPredicate<TInput> _predicate;
     private readonly string _engineName;
     private readonly ControlExpressionOptions _options;
-    private readonly ActionBlock<TInput> _input;
-    private readonly BufferBlock<TInput> _whenTrue;
-    private readonly BufferBlock<TInput> _whenFalse;
+    private readonly TimeProvider _clock;
+    private readonly BroadcastBlock<FlowMessage<TInput>> _whenFalse;
 
-    internal WhenNode(
+    /// <summary>
+    /// Builds a router from a compiled <see cref="IFlowPredicate{TInput}"/>.
+    /// </summary>
+    public WhenNode(
         ControlExpressionOptions options,
         IFlowPredicate<TInput> predicate,
-        string engineName)
+        string? engineName = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = RequireCapacity(options)
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
-        _engineName = engineName ?? throw new ArgumentNullException(nameof(engineName));
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "When bounded capacity must be greater than zero.");
-        }
-
-        var inputOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true
-        };
-        _input = new ActionBlock<TInput>(RouteAsync, inputOptions);
-        _whenTrue = new BufferBlock<TInput>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _whenFalse = new BufferBlock<TInput>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            CompleteOutputs,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_whenTrue.Completion, _whenFalse.Completion));
+        _engineName = engineName ?? string.Empty;
+        _clock = clock ?? TimeProvider.System;
+        _whenFalse = AddOutput<FlowMessage<TInput>>();
     }
 
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<TInput> WhenTrue => _whenTrue;
-
-    public ISourceBlock<TInput> WhenFalse => _whenFalse;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    /// <summary>
+    /// Builds a router that compiles <paramref name="expression"/> once against
+    /// <paramref name="expressionEngine"/> and evaluates the compiled form per message.
+    /// </summary>
+    public WhenNode(
+        ControlExpressionOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IFlowMapContextFactory<TInput>? contextFactory = null,
+        TimeProvider? clock = null)
+        : this(
+            options,
+            BuildPredicate(options, expressionEngine, contextFactory),
+            EngineName(expressionEngine),
+            clock)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_whenTrue).Fault(exception);
-            ((IDataflowBlock)_whenFalse).Fault(exception);
-        }
     }
 
-    private async Task RouteAsync(TInput input)
+    /// <summary>Input the predicate accepted; broadcast (the node's primary <c>Output</c>), carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<TInput>> WhenTrue => Output;
+
+    /// <summary>Input the predicate rejected; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<TInput>> WhenFalse => _whenFalse;
+
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
+
         bool passed;
         try
         {
@@ -81,44 +83,92 @@ public sealed class WhenNode<TInput> : FlowNodeBase
         }
         catch (Exception exception)
         {
-            TryReportError(
-                ControlErrorCodes.WhenExpressionFailed,
-                $"flow.when failed to evaluate input: {exception.Message}",
-                exception,
-                ControlNodeSupport.CreateErrorContext(_options, _engineName));
-            TryEmitDiagnostic(
-                ControlDiagnosticNames.WhenFailed,
-                FlowDiagnosticLevel.Error,
-                "flow.when failed to evaluate input.",
-                exception,
-                ControlNodeSupport.CreateAttributes(_options, _engineName));
-            return;
+            ReportFailure(message, exception);
+            return Task.CompletedTask;
         }
 
         var route = passed ? ControlComponentPorts.WhenTrue : ControlComponentPorts.WhenFalse;
-        TryEmitDiagnostic(
-            ControlDiagnosticNames.WhenRouted,
-            message: $"flow.when routed input to {route}.",
-            attributes: ControlNodeSupport.CreateAttributes(
-                _options,
-                _engineName,
-                passed,
-                route));
-
-        var target = passed ? _whenTrue : _whenFalse;
-        await target.SendAsync(input).ConfigureAwait(false);
-    }
-
-    private void CompleteOutputs(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
+        EmitEvent(new FlowEvent
         {
-            ((IDataflowBlock)_whenTrue).Fault(exception);
-            ((IDataflowBlock)_whenFalse).Fault(exception);
-            return;
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = ControlDiagnosticNames.WhenRouted,
+            Level = FlowEventLevel.Information,
+            Message = $"flow.when routed input to {route}.",
+            Attributes = ControlNodeSupport.CreateAttributes(_options, _engineName, passed, route)
+        });
+
+        // Fan the original envelope to the matching branch; correlation id flows forward.
+        if (passed)
+        {
+            Emit(message.With(input));
+        }
+        else
+        {
+            _whenFalse.Post(message.With(input));
         }
 
-        _whenTrue.Complete();
-        _whenFalse.Complete();
+        return Task.CompletedTask;
+    }
+
+    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
+    {
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = ControlErrorCodes.WhenExpressionFailed,
+            Message = $"flow.when failed to evaluate input: {exception.Message}",
+            Context = ControlNodeSupport.CreateErrorContext(_options, _engineName),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = ControlDiagnosticNames.WhenFailed,
+            Level = FlowEventLevel.Error,
+            Message = "flow.when failed to evaluate input.",
+            Attributes = ControlNodeSupport.CreateAttributes(_options, _engineName)
+        });
+    }
+
+    private static int RequireCapacity(ControlExpressionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "When bounded capacity must be greater than zero.");
+        }
+
+        return options.BoundedCapacity;
+    }
+
+    private static IFlowPredicate<TInput> BuildPredicate(
+        ControlExpressionOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IFlowMapContextFactory<TInput>? contextFactory)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(expressionEngine);
+        if (string.IsNullOrWhiteSpace(options.Expression))
+        {
+            throw new ArgumentException(
+                "flow.when requires a non-empty expression.", nameof(options));
+        }
+
+        // Compile the predicate expression once here (build time); the node only
+        // evaluates the compiled form per message.
+        return contextFactory is null
+            ? new ExpressionFlowPredicate<TInput>(options.Expression, expressionEngine)
+            : new ExpressionFlowPredicate<TInput>(options.Expression, expressionEngine, contextFactory);
+    }
+
+    private static string EngineName(IFlowExpressionEngine expressionEngine)
+    {
+        ArgumentNullException.ThrowIfNull(expressionEngine);
+        return expressionEngine.Name;
     }
 }

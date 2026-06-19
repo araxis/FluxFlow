@@ -1,58 +1,80 @@
 # FluxFlow.Components.Mapping
 
-Reusable mapping components for FluxFlow.
+A standalone mapper node for FluxFlow. It depends only on `FluxFlow.Nodes` and
+`FluxFlow.Mapping` — no engine, registry, or runtime. You `new` the node and
+`LinkTo` the next one.
 
-## Nodes
+## Node
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `flow.mapper` | `Input` -> `Output` | Maps each input message with a host-provided expression engine. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `FlowMapperNode<TInput, TOutput>` | `Input` -> `Output`, `Failed` | Maps each message with a host-provided expression engine. |
 
-The package does not choose an expression language. Applications provide one or
-more `IFlowExpressionEngine` implementations during registration.
+Every message travels as a `FlowMessage<T>` envelope. The mapped result is
+broadcast on `Output` as `FlowMessage<TOutput>`, carrying the same correlation id
+as the input. When a mapping throws, the original input is fanned to `Failed`
+(as `FlowMessage<TInput>`, same correlation id) and a `FlowError` surfaces on
+`Errors`; the node keeps processing later messages.
+
+The package does not choose an expression language. Applications provide an
+`IFlowExpressionEngine` (from `FluxFlow.Mapping`); the node compiles the mapping
+expression once at construction and evaluates the compiled form per message.
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterMappingComponents(options => options
-        .UseExpressionEngine(appExpressionEngine)
-        .RegisterType<AppInput>("app.input")
-        .RegisterType<AppOutput>("app.output")
-        .UseContextFactory(new AppInputContextFactory()));
-```
-
-Basic configuration:
-
-```json
+var options = new MapperOptions
 {
-  "type": "flow.mapper",
-  "inputType": "object",
-  "outputType": "object",
-  "engine": "my-engine",
-  "expressionId": "normalize-v1",
-  "expressionName": "normalize-message",
-  "expression": "..."
-}
+    Expression = "...",
+    ExpressionName = "normalize-message",
+    InputType = "app.input",
+    OutputType = "app.output"
+};
+
+await using var node = new FlowMapperNode<AppInput, AppOutput>(
+    options,
+    appExpressionEngine,
+    contextFactory: new TypedMappingContextFactory<AppInput>(new AppInputContextFactory()));
+
+node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
+node.Failed.LinkTo(deadLetterSink, new DataflowLinkOptions { PropagateCompletion = false });
+
+await node.Input.SendAsync(FlowMessage.Create(appInput));
 ```
 
-`inputType` and `outputType` default to `object`. Register type aliases when the
-mapper needs to connect to typed ports. `targetType` is accepted as an alias for
-`outputType`. Omit `engine` to use the default expression engine configured by
-the host.
+`TInput` and `TOutput` are the real CLR types the node maps between. `MapperOptions`
+carries the descriptive metadata (`InputType`, `OutputType`/`targetType`,
+`ExpressionId`, `ExpressionName`) used in diagnostics and error context, plus the
+`Expression` itself and the input `BoundedCapacity`.
 
-Mapping failures emit `FlowError` and the node continues processing later
-messages. The node also emits diagnostics for successful and failed mappings
-with input type, output type, engine name, expression id, and expression name
-when supplied.
+## Mapping context
 
-## Design Metadata
+By default the node exposes the message payload as the `input` and `value`
+variables on the per-message `FlowMapContext`. Pass an `IMappingContextFactory`
+(for example a `TypedMappingContextFactory<TInput>` wrapping an
+`IFlowMapContextFactory<TInput>` from `FluxFlow.Mapping`) to control the variables
+each expression evaluates against:
 
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+```csharp
+var node = new FlowMapperNode<AppInput, AppOutput>(
+    options,
+    appExpressionEngine,
+    contextFactory: new TypedMappingContextFactory<AppInput>(new AppInputContextFactory()));
+```
 
-## Composition Guidance
+## Behavior
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Mapping failures emit a `FlowError` on `Errors` (carrying the input's correlation
+id and `MappingErrorCodes.MapperFailed`), fan the original input to `Failed`, and
+the node keeps processing later messages. A compiled-mapper path that returns a
+wrong-typed or null value surfaces a clearer "incompatible or null value" message
+naming the expected output type. Per-message `flow.mapper.succeeded` /
+`flow.mapper.failed` events flow on the `Events` port with input type, output
+type, engine name, and the expression id/name when supplied.
+
+## Runtime timing
+
+Diagnostics use the node's clock for `Timestamp` (default `TimeProvider.System`).
+Provide a deterministic clock for tests:
+
+```csharp
+new FlowMapperNode<AppInput, AppOutput>(options, engine, clock: new FakeTimeProvider(timestamp));
+```

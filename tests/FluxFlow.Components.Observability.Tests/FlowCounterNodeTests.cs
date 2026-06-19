@@ -1,10 +1,7 @@
-using FluxFlow.Components.Observability.Contracts;
-using FluxFlow.Components.Observability.Diagnostics;
+using FluxFlow.Components.Observability.Nodes;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
 using FluxFlow.Mapping;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -12,230 +9,171 @@ using Xunit;
 
 namespace FluxFlow.Components.Observability.Tests;
 
+// Every test news the node directly — no engine registry, no runtime. The counter
+// takes an IFlowExpressionEngine (and optional IFlowMapContextFactory) straight from
+// FluxFlow.Mapping; messages travel as FlowMessage<T> envelopes and the correlation
+// id flows input -> snapshot and onto any error for free.
 public sealed class FlowCounterNodeTests
 {
     [Fact]
-    public async Task Counter_CountsMatchingInputs()
+    public async Task Counter_CountsMatchingInputsPreservingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                (_, context, _) => ((InputMessage)context.Variables["input"]!).Enabled))
-                .RegisterType<InputMessage>("message"),
-            new
+        await using var node = new FlowCounterNode<InputMessage>(
+            new FlowCounterOptions
             {
-                inputType = "message",
-                name = "accepted",
-                predicate = "enabled"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var snapshots = new BufferBlock<FlowCounterSnapshot>();
-        LinkSnapshots(runtimeNode, snapshots);
+                InputType = "message",
+                Name = "accepted",
+                Predicate = "enabled"
+            },
+            new RecordingExpressionEngine(
+                (_, context, _) => ((InputMessage)context.Variables["input"]!).Enabled));
+        var snapshots = Sink(node.Output);
 
-        await input.Target.SendAsync(new InputMessage("first", [1], false));
-        await input.Target.SendAsync(new InputMessage("second", [1], true));
-        await input.Target.SendAsync(new InputMessage("third", [1], true));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new InputMessage("first", [1], false)));
+        var second = FlowMessage.Create(new InputMessage("second", [1], true));
+        await node.Input.SendAsync(second);
+        await node.Input.SendAsync(FlowMessage.Create(new InputMessage("third", [1], true)));
 
-        var first = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        first.Count.ShouldBe(1);
-        first.RejectedCount.ShouldBe(1);
-        second.Count.ShouldBe(2);
-        second.Name.ShouldBe("accepted");
-        second.InputType.ShouldBe("message");
+        var firstSnapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var secondSnapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        firstSnapshot.CorrelationId.ShouldBe(second.CorrelationId);   // first ACCEPTED input
+        firstSnapshot.Payload.Count.ShouldBe(1);
+        firstSnapshot.Payload.RejectedCount.ShouldBe(1);
+        secondSnapshot.Payload.Count.ShouldBe(2);
+        secondSnapshot.Payload.Name.ShouldBe("accepted");
+        secondSnapshot.Payload.InputType.ShouldBe("message");
         snapshots.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Output_FansOutEverySnapshotToEveryConsumer()
+    {
+        await using var node = new FlowCounterNode<string>(
+            new FlowCounterOptions { InputType = "string", Name = "items" });
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.Input.SendAsync(FlowMessage.Create("two"));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Count.ShouldBe(1);
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Count.ShouldBe(2);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Count.ShouldBe(1);
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Count.ShouldBe(2);
     }
 
     [Fact]
     public async Task Counter_ReportsPredicateFailureAndContinues()
     {
         var calls = 0;
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                (_, _, _) =>
+        await using var node = new FlowCounterNode<int>(
+            new FlowCounterOptions
+            {
+                InputType = "int",
+                Predicate = "ok",
+                ExpressionName = "counter-test"
+            },
+            new RecordingExpressionEngine((_, _, _) =>
+            {
+                calls++;
+                if (calls == 1)
                 {
-                    calls++;
-                    if (calls == 1)
-                    {
-                        throw new InvalidOperationException("predicate failed");
-                    }
+                    throw new InvalidOperationException("predicate failed");
+                }
 
-                    return true;
-                })),
-            new
-            {
-                inputType = "int",
-                predicate = "ok",
-                expressionName = "counter-test"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var errors = new BufferBlock<FlowError>();
-        var snapshots = new BufferBlock<FlowCounterSnapshot>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        LinkSnapshots(runtimeNode, snapshots);
+                return true;
+            }));
+        var snapshots = Sink(node.Output);
+        var errors = Sink(node.Errors);
 
-        await input.Target.SendAsync(1);
-        await input.Target.SendAsync(2);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var bad = FlowMessage.Create(1);
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(2));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(ObservabilityErrorCodes.CounterPredicateFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
         error.Context!.ShouldContain("expressionName=counter-test");
+
         var snapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.Count.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Counter_ExposesErrorsPortAndDeliversPredicateFailures()
-    {
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                (_, _, _) => throw new InvalidOperationException("predicate failed"))),
-            new
-            {
-                inputType = "int",
-                predicate = "ok"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var errorsPort = runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Errors));
-        errorsPort.ShouldNotBeNull();
-        var errors = new BufferBlock<FlowError>();
-        errorsPort.TryLinkTo(
-            new InputPort<FlowError>(
-                new PortAddress("test", new NodeName("errors"), new PortName("Input")),
-                errors),
-            propagateCompletion: true,
-            out var linkError);
-        linkError.ShouldBeNull();
-        LinkSnapshots(runtimeNode, new BufferBlock<FlowCounterSnapshot>());
-
-        await input.Target.SendAsync(1);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        error.Code.ShouldBe(ObservabilityErrorCodes.CounterPredicateFailed);
+        snapshot.Payload.Count.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
     public async Task Counter_WithoutPredicateDoesNotRequireExpressionEngine()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 18, 31, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(timestamp);
-        var runtimeNode = CreateNode(
-            options => options.UseClock(timeProvider),
-            new
-            {
-                inputType = "string"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var snapshots = new BufferBlock<FlowCounterSnapshot>();
-        LinkSnapshots(runtimeNode, snapshots);
+        await using var node = new FlowCounterNode<string>(
+            new FlowCounterOptions { InputType = "string" },
+            clock: new FakeTimeProvider(timestamp));
+        var snapshots = Sink(node.Output);
 
-        await input.Target.SendAsync("one");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create("one"));
 
         var snapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.Count.ShouldBe(1);
-        snapshot.Timestamp.ShouldBe(timestamp);
-        snapshot.LastObservedAt.ShouldBe(timestamp);
+        snapshot.Payload.Count.ShouldBe(1);
+        snapshot.Payload.Timestamp.ShouldBe(timestamp);
+        snapshot.Payload.LastObservedAt.ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task Counter_UsesMostSpecificAssignableContextFactory()
+    public async Task Counter_UsesSuppliedContextFactory()
     {
-        var runtimeNode = CreateNode(
-            options => options.UseExpressionEngine(new RecordingExpressionEngine(
-                    (_, context, _) => context.Variables["accepted"]))
-                .RegisterType<DerivedCounterMessage>("derived-message")
-                .UseContextFactory<BaseCounterMessage>(
-                    new TestContextFactory<BaseCounterMessage>(accepted: false))
-                .UseContextFactory<DerivedCounterMessage>(
-                    new TestContextFactory<DerivedCounterMessage>(accepted: true)),
-            new
+        await using var node = new FlowCounterNode<DerivedCounterMessage>(
+            new FlowCounterOptions
             {
-                inputType = "derived-message",
-                predicate = "accepted"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<DerivedCounterMessage>>();
-        var snapshots = new BufferBlock<FlowCounterSnapshot>();
-        LinkSnapshots(runtimeNode, snapshots);
+                InputType = "derived-message",
+                Predicate = "accepted"
+            },
+            new RecordingExpressionEngine((_, context, _) => context.Variables["accepted"]),
+            new TestContextFactory<DerivedCounterMessage>(accepted: true));
+        var snapshots = Sink(node.Output);
 
-        await input.Target.SendAsync(new DerivedCounterMessage("first"));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new DerivedCounterMessage("first")));
 
         var snapshot = await snapshots.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        snapshot.Count.ShouldBe(1);
-        snapshot.RejectedCount.ShouldBe(0);
+        snapshot.Payload.Count.ShouldBe(1);
+        snapshot.Payload.RejectedCount.ShouldBe(0);
     }
 
     [Fact]
-    public async Task Counter_EmitsDiagnostics()
+    public async Task Counter_EmitsEventCarryingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                name = "items"
-            });
-        var input = runtimeNode.FindInput(new PortName(ObservabilityComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Snapshots))!
-            .LinkToDiscard();
+        await using var node = new FlowCounterNode<string>(
+            new FlowCounterOptions { InputType = "string", Name = "items" });
+        Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var sent = FlowMessage.Create("hello");
+        await node.Input.SendAsync(sent);
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        diagnostic.Name.ShouldBe(ObservabilityDiagnosticNames.CounterIncremented);
-        diagnostic.Attributes["name"].ShouldBe("items");
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Name.ShouldBe(FlowCounterNode<string>.Incremented);
+        @event.CorrelationId.ShouldBe(sent.CorrelationId);
+        @event.Attributes["name"].ShouldBe("items");
     }
 
-    private static RuntimeNode CreateNode(
-        Action<ObservabilityComponentOptions> configure,
-        object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterObservabilityComponents(configure);
-        registry.TryGetFactory(ObservabilityComponentTypes.Counter, out var factory).ShouldBeTrue();
-        return factory(ObservabilityTestHost.CreateContext(
-            ObservabilityComponentTypes.Counter,
-            configuration));
-    }
+    [Fact]
+    public void Counter_RequiresExpressionEngineWhenPredicateConfigured()
+        => Should.Throw<ArgumentNullException>(
+            () => new FlowCounterNode<string>(
+                new FlowCounterOptions { InputType = "string", Predicate = "ok" }));
 
-    private static void LinkSnapshots(
-        RuntimeNode runtimeNode,
-        BufferBlock<FlowCounterSnapshot> target)
+    [Fact]
+    public void Constructor_RequiresOptions()
+        => Should.Throw<ArgumentNullException>(() => new FlowCounterNode<string>(null!));
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        runtimeNode.FindOutput(new PortName(ObservabilityComponentPorts.Snapshots))!
-            .TryLinkTo(
-                new InputPort<FlowCounterSnapshot>(
-                    new PortAddress("test", new NodeName("snapshots"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 
     private sealed record InputMessage(string Kind, byte[] Payload, bool Enabled);
 
-    private abstract record BaseCounterMessage(string Name);
-
-    private sealed record DerivedCounterMessage(string Name) : BaseCounterMessage(Name);
+    private sealed record DerivedCounterMessage(string Name);
 
     private sealed class TestContextFactory<TInput>(bool accepted) : IFlowMapContextFactory<TInput>
     {

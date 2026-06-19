@@ -8,22 +8,18 @@
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable state reducer components for FluxFlow.</Description>
+    <Description>A standalone keyed state-reducer node for FluxFlow: a reducer input in, an updated state snapshot broadcast out, per-key state kept in the node. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once reducer + factory relocation for state.reducer. Replaces the bespoke IStateClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as a single standalone state.reducer node over the FluxFlow.Nodes kit: a StateReducerInput in, a StateReducerResult broadcast out, reducer/key failures on the error port — all carrying the message correlation id, with per-operation notes and key-limit warnings on the events port. The reducer (and optional key) expression is compiled once at construction. The engine factory, module, registration extensions, design-metadata provider, definition-options reader, component type/port constants, and the expression-engine registry wrapper are removed; the node takes its options, an IFlowExpressionEngine, and a TimeProvider directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

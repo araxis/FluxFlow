@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -8,19 +8,18 @@
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
     <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable expression-driven control components for FluxFlow.</Description>
+    <Description>Standalone expression-driven control nodes for FluxFlow: flow.filter passes matching messages and drops the rest, flow.when routes each message to its WhenTrue/WhenFalse ports. Each node takes an IFlowExpressionEngine directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once predicates for flow.filter and flow.when.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt flow.filter and flow.when as standalone nodes on the FluxFlow.Nodes kit: a message in on Input, the surviving/routed message broadcast out on Output (When also fans to WhenFalse), failures on the error port and diagnostics on the event port — all carrying the message correlation id. Each node compiles its predicate once from an injected IFlowExpressionEngine (and optional IFlowMapContextFactory) and runs without the engine. The node factory, module, registration extensions, design-metadata provider, definition-options reader, and the expression-engine/context-factory registry layer are removed; only the options, ports, error-code, and diagnostic-name constants remain.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
