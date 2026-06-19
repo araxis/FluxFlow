@@ -93,6 +93,13 @@ The bridge implements request/reply over the dataflow realm by correlating on
 `CorrelationId`. The reply travels back as a normal `FlowMessage` (the id is echoed by the
 handler via `With`), never as a delegate threaded through the graph.
 
+A trigger's core job is **correlate + publish**; awaiting a reply is optional. Two modes
+(`RequestReplyOptions.Mode`): **RequestReply** (publish, hold in-flight, await the correlated
+response, reply, time out) and **FireAndForget** (publish into the graph, acknowledge the
+caller immediately, no in-flight/timeout/sweep). The ack is transport-specific via
+`IRequestContext.AcknowledgeAsync` — HTTP writes `202 Accepted`, MQTT sends nothing. A late
+response to a fire-and-forget request is reported `Unmatched`.
+
 Triggers are first-class nodes: `HttpTriggerNode` and `RequestReplyCoordinator<,>`
 implement `IFlowNode` (`Completion`/`Complete`/`Fault`/`DisposeAsync`), so a host drives a
 trigger with the same lifecycle as any node. The coordinator's `Fault` fails in-flight
