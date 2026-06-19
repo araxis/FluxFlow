@@ -1,62 +1,69 @@
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Nodes;
 
-public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone join node — the one routing node with two inputs, so it is built directly on
+/// TPL Dataflow primitives rather than the single-input <see cref="FlowNode{TInput,TOutput}"/>
+/// base (the kit has no two-input base by design). Post <c>FlowMessage&lt;TLeft&gt;</c> to
+/// <c>Left</c> and <c>FlowMessage&lt;TRight&gt;</c> to <c>Right</c>; the node extracts a key
+/// from each payload (via the injected selectors), pairs a left with its matching right by
+/// key in FIFO order, and broadcasts a <c>FlowMessage&lt;FlowJoinResult&lt;TLeft,TRight&gt;&gt;</c>
+/// on <c>Output</c> carrying the left message's correlation id. Unmatched values that go past
+/// the configured timeout — observed against the injected <see cref="TimeProvider"/>, or when
+/// the node completes — are broadcast on <c>Timeouts</c>. Errors/diagnostics fan out on
+/// <c>Errors</c>/<c>Events</c>. Every source port is a broadcast, so one output can feed many
+/// consumers. Works with nothing but <c>new FlowJoinNode&lt;TLeft,TRight&gt;(options, left, right)</c>
+/// — no engine.
+/// </summary>
+public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
 {
     private readonly JoinRoutingOptions _options;
     private readonly Func<TLeft, string?> _leftSelector;
     private readonly Func<TRight, string?> _rightSelector;
     private readonly string? _engineName;
     private readonly TimeProvider _clock;
+    private readonly StringComparer _comparer;
     private readonly Dictionary<string, PendingBucket> _pending;
     private readonly Queue<JoinDeadline> _deadlines = new();
     private readonly TimeSpan _timeout;
-    private readonly ActionBlock<TLeft> _left;
-    private readonly ActionBlock<TRight> _right;
+
+    private readonly BufferBlock<FlowMessage<TLeft>> _left;
+    private readonly BufferBlock<FlowMessage<TRight>> _right;
+    private readonly ActionBlock<FlowMessage<TLeft>> _leftFeeder;
+    private readonly ActionBlock<FlowMessage<TRight>> _rightFeeder;
     private readonly ActionBlock<JoinCommand> _commands;
-    private readonly BufferBlock<FlowJoinResult<TLeft, TRight>> _output;
-    private readonly BufferBlock<FlowJoinTimeout<TLeft, TRight>> _timeouts;
+    private readonly BroadcastBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>> _output;
+    private readonly BroadcastBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>> _timeouts;
+    private readonly BroadcastBlock<FlowError> _errors;
+    private readonly BroadcastBlock<FlowEvent> _events;
+
+    private readonly TaskCompletionSource _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private volatile CancellationTokenSource? _timerCancellation;
     private long _timerVersion;
     private int _pendingCount;
     private bool _leftCompleted;
     private bool _rightCompleted;
-    private bool _disposed;
+    private int _disposed;
 
     public FlowJoinNode(
         JoinRoutingOptions options,
         Func<TLeft, string?> leftSelector,
         Func<TRight, string?> rightSelector,
-        string? engineName)
-        : this(
-            options,
-            leftSelector,
-            rightSelector,
-            TimeProvider.System,
-            engineName)
-    {
-    }
-
-    public FlowJoinNode(
-        JoinRoutingOptions options,
-        Func<TLeft, string?> leftSelector,
-        Func<TRight, string?> rightSelector,
-        TimeProvider clock,
-        string? engineName)
+        string? engineName = null,
+        TimeProvider? clock = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _leftSelector = leftSelector ?? throw new ArgumentNullException(nameof(leftSelector));
         _rightSelector = rightSelector ?? throw new ArgumentNullException(nameof(rightSelector));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _engineName = engineName;
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.LeftKeyExpression);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.RightKeyExpression);
+        _clock = clock ?? TimeProvider.System;
         if (options.TimeoutMilliseconds <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -78,39 +85,51 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
                 "flow.join bounded capacity must be greater than zero.");
         }
 
-        var comparer = options.CaseSensitive
+        _comparer = options.CaseSensitive
             ? StringComparer.Ordinal
             : StringComparer.OrdinalIgnoreCase;
-        _pending = new Dictionary<string, PendingBucket>(comparer);
+        _pending = new Dictionary<string, PendingBucket>(_comparer);
         _timeout = TimeSpan.FromMilliseconds(options.TimeoutMilliseconds);
-        var outputCapacity = Math.Max(options.BoundedCapacity, options.MaxPending);
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = outputCapacity };
+
+        _output = new BroadcastBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>>(static message => message);
+        _timeouts = new BroadcastBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>>(static message => message);
+        _errors = new BroadcastBlock<FlowError>(static value => value);
+        _events = new BroadcastBlock<FlowEvent>(static value => value);
+
         var executionOptions = new ExecutionDataflowBlockOptions
         {
             BoundedCapacity = options.BoundedCapacity,
             EnsureOrdered = true,
             MaxDegreeOfParallelism = 1
         };
+        var blockOptions = new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity };
 
-        _output = new BufferBlock<FlowJoinResult<TLeft, TRight>>(blockOptions);
-        _timeouts = new BufferBlock<FlowJoinTimeout<TLeft, TRight>>(blockOptions);
         _commands = new ActionBlock<JoinCommand>(ProcessCommandAsync, executionOptions);
-        _left = new ActionBlock<TLeft>(
-            async input => await _commands.SendAsync(
-                JoinCommand.FromLeft(input),
-                _lifecycleCancellation.Token).ConfigureAwait(false),
+
+        // Left/Right are bounded BufferBlocks (the public input surface); each links to a
+        // serial feeder that forwards into the single ordered command pump. Completion is
+        // watched on the *feeder* — its Completion fires only after every queued data
+        // command has been sent to _commands, so the CompleteSide signal can never overtake
+        // an in-flight data message and lose a pairing.
+        _left = new BufferBlock<FlowMessage<TLeft>>(blockOptions);
+        _right = new BufferBlock<FlowMessage<TRight>>(blockOptions);
+        _leftFeeder = new ActionBlock<FlowMessage<TLeft>>(
+            async message => await _commands.SendAsync(
+                JoinCommand.FromLeft(message), _lifecycleCancellation.Token).ConfigureAwait(false),
             executionOptions);
-        _right = new ActionBlock<TRight>(
-            async input => await _commands.SendAsync(
-                JoinCommand.FromRight(input),
-                _lifecycleCancellation.Token).ConfigureAwait(false),
+        _rightFeeder = new ActionBlock<FlowMessage<TRight>>(
+            async message => await _commands.SendAsync(
+                JoinCommand.FromRight(message), _lifecycleCancellation.Token).ConfigureAwait(false),
             executionOptions);
-        _left.Completion.ContinueWith(
+        _left.LinkTo(_leftFeeder, new DataflowLinkOptions { PropagateCompletion = true });
+        _right.LinkTo(_rightFeeder, new DataflowLinkOptions { PropagateCompletion = true });
+
+        _leftFeeder.Completion.ContinueWith(
             completion => _ = CompleteSideAsync(FlowJoinSide.Left, completion),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-        _right.Completion.ContinueWith(
+        _rightFeeder.Completion.ContinueWith(
             completion => _ = CompleteSideAsync(FlowJoinSide.Right, completion),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
@@ -120,50 +139,62 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_output.Completion, _timeouts.Completion));
     }
 
-    public ITargetBlock<TLeft> Left => _left;
+    /// <summary>Left input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
+    public ITargetBlock<FlowMessage<TLeft>> Left => _left;
 
-    public ITargetBlock<TRight> Right => _right;
+    /// <summary>Right input port — a bounded buffer; <c>SendAsync</c> applies backpressure.</summary>
+    public ITargetBlock<FlowMessage<TRight>> Right => _right;
 
-    public ISourceBlock<FlowJoinResult<TLeft, TRight>> Output => _output;
+    /// <summary>Matched pairs, carrying the left message's correlation id (primary output).</summary>
+    public ISourceBlock<FlowMessage<FlowJoinResult<TLeft, TRight>>> Output => _output;
 
-    public ISourceBlock<FlowJoinTimeout<TLeft, TRight>> Timeouts => _timeouts;
+    /// <summary>Unmatched values that timed out, carrying their correlation id.</summary>
+    public ISourceBlock<FlowMessage<FlowJoinTimeout<TLeft, TRight>>> Timeouts => _timeouts;
 
-    public override void Complete()
+    /// <summary>Error port — broadcast.</summary>
+    public ISourceBlock<FlowError> Errors => _errors;
+
+    /// <summary>Event port — broadcast.</summary>
+    public ISourceBlock<FlowEvent> Events => _events;
+
+    public Task Completion => _completion.Task;
+
+    public void Complete()
     {
         _left.Complete();
         _right.Complete();
     }
 
-    public override void Fault(Exception exception)
+    public void Fault(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _lifecycleCancellation.Cancel();
-            TryCancelTimer();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_left).Fault(exception);
-            ((IDataflowBlock)_right).Fault(exception);
-            ((IDataflowBlock)_commands).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-            ((IDataflowBlock)_timeouts).Fault(exception);
-        }
+        _lifecycleCancellation.Cancel();
+        TryCancelTimer();
+        ((IDataflowBlock)_left).Fault(exception);
+        ((IDataflowBlock)_right).Fault(exception);
+        ((IDataflowBlock)_leftFeeder).Fault(exception);
+        ((IDataflowBlock)_rightFeeder).Fault(exception);
+        ((IDataflowBlock)_commands).Fault(exception);
+
+        // Data outputs are faulted; Errors/Events are completed (flushed) so the buffered
+        // FlowError explaining the fault survives — the kit fault rule.
+        ((IDataflowBlock)_output).Fault(exception);
+        ((IDataflowBlock)_timeouts).Fault(exception);
+        _errors.Complete();
+        _events.Complete();
+
+        _completion.TrySetException(exception);
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _disposed = true;
         Complete();
         try
         {
@@ -225,21 +256,21 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    private async Task AddLeftAsync(TLeft input)
+    private async Task AddLeftAsync(FlowMessage<TLeft> message)
     {
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
-        var key = EvaluateLeftKey(input);
-        await AddLeftCoreAsync(key, input, now).ConfigureAwait(false);
+        var key = EvaluateLeftKey(message.Payload);
+        await AddLeftCoreAsync(key, message, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
     }
 
-    private async Task AddRightAsync(TRight input)
+    private async Task AddRightAsync(FlowMessage<TRight> message)
     {
         var now = _clock.GetUtcNow();
         await EmitExpiredAsync(now, force: false, _lifecycleCancellation.Token).ConfigureAwait(false);
-        var key = EvaluateRightKey(input);
-        await AddRightCoreAsync(key, input, now).ConfigureAwait(false);
+        var key = EvaluateRightKey(message.Payload);
+        await AddRightCoreAsync(key, message, now).ConfigureAwait(false);
         ScheduleTimer(_clock.GetUtcNow());
     }
 
@@ -281,9 +312,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         return ValidateKey(key, FlowJoinSide.Right);
     }
 
-    private static string ValidateKey(
-        string? key,
-        FlowJoinSide side)
+    private static string ValidateKey(string? key, FlowJoinSide side)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -296,18 +325,14 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         return key;
     }
 
-    private async Task AddLeftCoreAsync(
-        string key,
-        TLeft input,
-        DateTimeOffset now)
+    private async Task AddLeftCoreAsync(string key, FlowMessage<TLeft> message, DateTimeOffset now)
     {
-        if (_pending.TryGetValue(key, out var bucket)
-            && bucket.Rights.Count > 0)
+        if (_pending.TryGetValue(key, out var bucket) && bucket.Rights.Count > 0)
         {
             var right = bucket.Rights.Dequeue();
             _pendingCount--;
             RemoveIfEmpty(key, bucket);
-            await EmitResultAsync(key, new PendingEntry<TLeft>(input, now), right, now)
+            await EmitResultAsync(key, new PendingEntry<TLeft>(message, now), right, now)
                 .ConfigureAwait(false);
             return;
         }
@@ -318,23 +343,19 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         }
 
         bucket = GetOrCreateBucket(key);
-        bucket.Lefts.Enqueue(new PendingEntry<TLeft>(input, now));
+        bucket.Lefts.Enqueue(new PendingEntry<TLeft>(message, now));
         _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Left, now));
         _pendingCount++;
     }
 
-    private async Task AddRightCoreAsync(
-        string key,
-        TRight input,
-        DateTimeOffset now)
+    private async Task AddRightCoreAsync(string key, FlowMessage<TRight> message, DateTimeOffset now)
     {
-        if (_pending.TryGetValue(key, out var bucket)
-            && bucket.Lefts.Count > 0)
+        if (_pending.TryGetValue(key, out var bucket) && bucket.Lefts.Count > 0)
         {
             var left = bucket.Lefts.Dequeue();
             _pendingCount--;
             RemoveIfEmpty(key, bucket);
-            await EmitResultAsync(key, left, new PendingEntry<TRight>(input, now), now)
+            await EmitResultAsync(key, left, new PendingEntry<TRight>(message, now), now)
                 .ConfigureAwait(false);
             return;
         }
@@ -345,7 +366,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         }
 
         bucket = GetOrCreateBucket(key);
-        bucket.Rights.Enqueue(new PendingEntry<TRight>(input, now));
+        bucket.Rights.Enqueue(new PendingEntry<TRight>(message, now));
         _deadlines.Enqueue(new JoinDeadline(key, FlowJoinSide.Right, now));
         _pendingCount++;
     }
@@ -362,9 +383,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         return bucket;
     }
 
-    private bool CanTrackPending(
-        string key,
-        FlowJoinSide side)
+    private bool CanTrackPending(string key, FlowJoinSide side)
     {
         if (_pendingCount < _options.MaxPending)
         {
@@ -392,10 +411,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         ScheduleTimer(_clock.GetUtcNow());
     }
 
-    private async Task EmitExpiredAsync(
-        DateTimeOffset now,
-        bool force,
-        CancellationToken cancellationToken)
+    private async Task EmitExpiredAsync(DateTimeOffset now, bool force, CancellationToken cancellationToken)
     {
         if (_pendingCount == 0)
         {
@@ -423,30 +439,20 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             {
                 var entry = bucket.Lefts.Dequeue();
                 RemoveIfEmpty(deadline.Key, bucket);
-                await EmitTimeoutAsync(
-                    deadline.Key,
-                    FlowJoinSide.Left,
-                    entry,
-                    now,
-                    cancellationToken).ConfigureAwait(false);
+                await EmitTimeoutAsync(deadline.Key, FlowJoinSide.Left, entry, now, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
                 var entry = bucket.Rights.Dequeue();
                 RemoveIfEmpty(deadline.Key, bucket);
-                await EmitTimeoutAsync(
-                    deadline.Key,
-                    FlowJoinSide.Right,
-                    entry,
-                    now,
-                    cancellationToken).ConfigureAwait(false);
+                await EmitTimeoutAsync(deadline.Key, FlowJoinSide.Right, entry, now, cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
     }
 
-    private bool TryPeekPendingEntry(
-        JoinDeadline deadline,
-        out PendingBucket bucket)
+    private bool TryPeekPendingEntry(JoinDeadline deadline, out PendingBucket bucket)
     {
         if (!_pending.TryGetValue(deadline.Key, out bucket!))
         {
@@ -467,8 +473,8 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         var result = new FlowJoinResult<TLeft, TRight>
         {
             Key = key,
-            Left = left.Value,
-            Right = right.Value,
+            Left = left.Message.Payload,
+            Right = right.Message.Payload,
             LeftReceivedAt = left.ReceivedAt,
             RightReceivedAt = right.ReceivedAt,
             JoinedAt = now,
@@ -477,15 +483,18 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
                 : right.ReceivedAt)
         };
 
-        await _output.SendAsync(result, _lifecycleCancellation.Token).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            RoutingDiagnosticNames.JoinMatched,
-            message: "flow.join matched values.",
-            attributes: JoinNodeSupport.CreateAttributes(
-                _options,
-                _engineName,
-                _pendingCount,
-                key));
+        // The matched pair carries the left message's correlation id forward.
+        await _output.SendAsync(left.Message.With(result), _lifecycleCancellation.Token)
+            .ConfigureAwait(false);
+        _events.Post(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = left.Message.CorrelationId,
+            Name = RoutingDiagnosticNames.JoinMatched,
+            Level = FlowEventLevel.Information,
+            Message = "flow.join matched values.",
+            Attributes = CreateAttributes(key)
+        });
     }
 
     private async Task EmitTimeoutAsync(
@@ -499,13 +508,14 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         {
             Key = key,
             Side = side,
-            Left = left.Value,
+            Left = left.Message.Payload,
             ReceivedAt = left.ReceivedAt,
             TimedOutAt = now,
             Timeout = _timeout
         };
 
-        await EmitTimeoutCoreAsync(timeout, key, side, cancellationToken).ConfigureAwait(false);
+        await EmitTimeoutCoreAsync(left.Message.With(timeout), left.Message.CorrelationId, key, side, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task EmitTimeoutAsync(
@@ -519,37 +529,36 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         {
             Key = key,
             Side = side,
-            Right = right.Value,
+            Right = right.Message.Payload,
             ReceivedAt = right.ReceivedAt,
             TimedOutAt = now,
             Timeout = _timeout
         };
 
-        await EmitTimeoutCoreAsync(timeout, key, side, cancellationToken).ConfigureAwait(false);
+        await EmitTimeoutCoreAsync(right.Message.With(timeout), right.Message.CorrelationId, key, side, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task EmitTimeoutCoreAsync(
-        FlowJoinTimeout<TLeft, TRight> timeout,
+        FlowMessage<FlowJoinTimeout<TLeft, TRight>> message,
+        CorrelationId correlationId,
         string key,
         FlowJoinSide side,
         CancellationToken cancellationToken)
     {
-        await _timeouts.SendAsync(timeout, cancellationToken).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            RoutingDiagnosticNames.JoinTimedOut,
-            FlowDiagnosticLevel.Warning,
-            "flow.join emitted timeout.",
-            attributes: JoinNodeSupport.CreateAttributes(
-                _options,
-                _engineName,
-                _pendingCount,
-                key,
-                side));
+        await _timeouts.SendAsync(message, cancellationToken).ConfigureAwait(false);
+        _events.Post(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
+            Name = RoutingDiagnosticNames.JoinTimedOut,
+            Level = FlowEventLevel.Warning,
+            Message = "flow.join emitted timeout.",
+            Attributes = CreateAttributes(key, side)
+        });
     }
 
-    private async Task CompleteSideAsync(
-        FlowJoinSide side,
-        Task completion)
+    private async Task CompleteSideAsync(FlowJoinSide side, Task completion)
     {
         if (completion.IsFaulted && completion.Exception is { } completionException)
         {
@@ -559,9 +568,8 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
         try
         {
-            await _commands.SendAsync(
-                JoinCommand.CompleteSide(side),
-                CancellationToken.None).ConfigureAwait(false);
+            await _commands.SendAsync(JoinCommand.CompleteSide(side), CancellationToken.None)
+                .ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -598,11 +606,37 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         {
             ((IDataflowBlock)_output).Fault(exception);
             ((IDataflowBlock)_timeouts).Fault(exception);
+            // Flush diagnostics rather than discard them — the kit fault rule.
+            _errors.Complete();
+            _events.Complete();
+            _completion.TrySetException(exception);
             return;
         }
 
         _output.Complete();
         _timeouts.Complete();
+        _errors.Complete();
+        _events.Complete();
+        Task.WhenAll(
+                _output.Completion,
+                _timeouts.Completion,
+                _errors.Completion,
+                _events.Completion)
+            .ContinueWith(
+                outputs =>
+                {
+                    if (outputs.IsFaulted && outputs.Exception is { } outputsException)
+                    {
+                        _completion.TrySetException(outputsException);
+                    }
+                    else
+                    {
+                        _completion.TrySetResult();
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
     }
 
     private void ScheduleTimer(DateTimeOffset now)
@@ -622,9 +656,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
             return;
         }
 
-        var delay = dueAt.Value <= now
-            ? TimeSpan.Zero
-            : dueAt.Value - now;
+        var delay = dueAt.Value <= now ? TimeSpan.Zero : dueAt.Value - now;
         var version = _timerVersion;
         var timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _lifecycleCancellation.Token);
@@ -655,10 +687,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         timerCancellation?.Dispose();
     }
 
-    private async Task RunTimerAsync(
-        long version,
-        TimeSpan delay,
-        CancellationToken cancellationToken)
+    private async Task RunTimerAsync(long version, TimeSpan delay, CancellationToken cancellationToken)
     {
         try
         {
@@ -667,18 +696,15 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
                 await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
             }
 
-            await _commands.SendAsync(
-                JoinCommand.Timer(version),
-                _lifecycleCancellation.Token).ConfigureAwait(false);
+            await _commands.SendAsync(JoinCommand.Timer(version), _lifecycleCancellation.Token)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
     }
 
-    private void RemoveIfEmpty(
-        string key,
-        PendingBucket bucket)
+    private void RemoveIfEmpty(string key, PendingBucket bucket)
     {
         if (bucket.Lefts.Count == 0 && bucket.Rights.Count == 0)
         {
@@ -693,30 +719,98 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
         string? key = null,
         FlowJoinSide? side = null)
     {
-        TryReportError(
-            code,
-            message,
-            exception,
-            JoinNodeSupport.CreateErrorContext(
-                _options,
-                _engineName,
-                key,
-                side));
-        TryEmitDiagnostic(
-            RoutingDiagnosticNames.JoinFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            JoinNodeSupport.CreateAttributes(
-                _options,
-                _engineName,
-                _pendingCount,
-                key,
-                side));
+        _errors.Post(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = code,
+            Message = message,
+            Context = CreateErrorContext(key, side),
+            Exception = exception
+        });
+        _events.Post(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = RoutingDiagnosticNames.JoinFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateAttributes(key, side)
+        });
+    }
+
+    private Dictionary<string, object?> CreateAttributes(
+        string? key = null,
+        FlowJoinSide? side = null)
+    {
+        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["leftInputType"] = _options.LeftInputType,
+            ["rightInputType"] = _options.RightInputType,
+            ["engine"] = _engineName,
+            ["caseSensitive"] = _options.CaseSensitive,
+            ["timeoutMilliseconds"] = _options.TimeoutMilliseconds,
+            ["maxPending"] = _options.MaxPending,
+            ["pendingCount"] = _pendingCount
+        };
+
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            attributes["key"] = key;
+        }
+
+        if (side.HasValue)
+        {
+            attributes["side"] = side.Value.ToString();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
+        {
+            attributes["expressionId"] = _options.ExpressionId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
+        {
+            attributes["expressionName"] = _options.ExpressionName;
+        }
+
+        return attributes;
+    }
+
+    private string CreateErrorContext(string? key = null, FlowJoinSide? side = null)
+    {
+        var values = new List<string>
+        {
+            $"leftInputType={_options.LeftInputType}",
+            $"rightInputType={_options.RightInputType}",
+            $"engine={_engineName}",
+            $"timeoutMilliseconds={_options.TimeoutMilliseconds}",
+            $"maxPending={_options.MaxPending}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            values.Add($"key={key}");
+        }
+
+        if (side.HasValue)
+        {
+            values.Add($"side={side.Value}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
+        {
+            values.Add($"expressionId={_options.ExpressionId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
+        {
+            values.Add($"expressionName={_options.ExpressionName}");
+        }
+
+        return string.Join("; ", values);
     }
 
     private sealed record PendingEntry<TValue>(
-        TValue Value,
+        FlowMessage<TValue> Message,
         DateTimeOffset ReceivedAt);
 
     private sealed record JoinDeadline(
@@ -732,16 +826,16 @@ public sealed class FlowJoinNode<TLeft, TRight> : FlowNodeBase, IAsyncDisposable
 
     private sealed record JoinCommand(
         JoinCommandKind Kind,
-        TLeft? Left = default,
-        TRight? Right = default,
+        FlowMessage<TLeft>? Left = null,
+        FlowMessage<TRight>? Right = null,
         FlowJoinSide? Side = null,
         long TimerVersion = 0)
     {
-        public static JoinCommand FromLeft(TLeft input)
-            => new(JoinCommandKind.Left, Left: input);
+        public static JoinCommand FromLeft(FlowMessage<TLeft> message)
+            => new(JoinCommandKind.Left, Left: message);
 
-        public static JoinCommand FromRight(TRight input)
-            => new(JoinCommandKind.Right, Right: input);
+        public static JoinCommand FromRight(FlowMessage<TRight> message)
+            => new(JoinCommandKind.Right, Right: message);
 
         public static JoinCommand Timer(long version)
             => new(JoinCommandKind.Timer, TimerVersion: version);

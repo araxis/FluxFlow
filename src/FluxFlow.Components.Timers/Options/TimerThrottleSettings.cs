@@ -1,10 +1,13 @@
 namespace FluxFlow.Components.Timers.Options;
 
-internal sealed record TimerThrottleSettings
+/// <summary>
+/// Configuration for <see cref="Nodes.TimerThrottleNode{TInput}"/>. <see cref="Interval"/>
+/// is required and must be greater than zero; the node validates these in its constructor.
+/// </summary>
+public sealed record TimerThrottleSettings
 {
-    public required string Name { get; init; }
-    public required string InputType { get; init; }
+    public string Name { get; init; } = "throttle";
     public required TimeSpan Interval { get; init; }
-    public required bool EmitFirstImmediately { get; init; }
-    public required int BoundedCapacity { get; init; }
+    public bool EmitFirstImmediately { get; init; } = true;
+    public int BoundedCapacity { get; init; } = 128;
 }

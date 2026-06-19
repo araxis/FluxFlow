@@ -2,9 +2,8 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -14,174 +13,144 @@ namespace FluxFlow.Components.Routing.Tests;
 public sealed class FlowWindowNodeTests
 {
     [Fact]
-    public async Task Window_EmitsWhenMaxItemsReached()
+    public async Task Window_EmitsWhenMaxItemsReached_PreservingOpeningCorrelation()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            maxItems = 2,
-            boundedCapacity = 8
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowWindow<int>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 2, BoundedCapacity = 8 });
+        var output = RoutingTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(10);
-        await input.Target.SendAsync(20);
-        await input.Target.SendAsync(30);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var first = FlowMessage.Create(10);
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(FlowMessage.Create(20));
+        var third = FlowMessage.Create(30);
+        await node.Input.SendAsync(third);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var windows = await DrainUntilCompletedAsync(output);
+        var windows = await RoutingTestSink.DrainUntilCompletedAsync(output);
         windows.Count.ShouldBe(2);
-        windows[0].Sequence.ShouldBe(1);
-        windows[0].Reason.ShouldBe(FlowWindowEmitReason.Count);
-        windows[0].Items.ShouldBe([10, 20]);
-        windows[1].Sequence.ShouldBe(2);
-        windows[1].Reason.ShouldBe(FlowWindowEmitReason.Completion);
-        windows[1].Items.ShouldBe([30]);
-    }
-
-    [Fact]
-    public async Task Window_EmitsWhenTimeElapsedWithoutNextInput()
-    {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "string",
-            timeMilliseconds = 25,
-            boundedCapacity = 8
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<FlowWindow<string>>();
-        LinkOutput(runtimeNode, output);
-
-        await input.Target.SendAsync("first");
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        window.Reason.ShouldBe(FlowWindowEmitReason.Time);
-        window.Items.ShouldBe(["first"]);
-        // Real clock: only assert a positive elapsed span. GetUtcNow() snaps to the
-        // ~15.6ms Windows system tick, so a 25ms window can measure a single-tick
-        // duration below 20ms under load. The exact (25ms) duration is pinned
-        // deterministically with a fake clock in RoutingClockTests.
-        window.Duration.ShouldBeGreaterThan(TimeSpan.Zero);
+        windows[0].Payload.Sequence.ShouldBe(1);
+        windows[0].Payload.Reason.ShouldBe(FlowWindowEmitReason.Count);
+        windows[0].Payload.Items.ShouldBe([10, 20]);
+        windows[0].CorrelationId.ShouldBe(first.CorrelationId);
+        windows[1].Payload.Sequence.ShouldBe(2);
+        windows[1].Payload.Reason.ShouldBe(FlowWindowEmitReason.Completion);
+        windows[1].Payload.Items.ShouldBe([30]);
+        windows[1].CorrelationId.ShouldBe(third.CorrelationId);
     }
 
     [Fact]
     public async Task Window_EmitsByCountBeforeTimeLimit()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            maxItems = 2,
-            timeMilliseconds = 5_000,
-            boundedCapacity = 8
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowWindow<int>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 2, TimeMilliseconds = 5_000, BoundedCapacity = 8 });
+        var output = RoutingTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(1);
-        await input.Target.SendAsync(2);
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
         var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        window.Reason.ShouldBe(FlowWindowEmitReason.Count);
-        window.Items.ShouldBe([1, 2]);
+        window.Payload.Reason.ShouldBe(FlowWindowEmitReason.Count);
+        window.Payload.Items.ShouldBe([1, 2]);
     }
 
     [Fact]
     public async Task Window_CanSuppressPartialWindowOnCompletion()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            maxItems = 3,
-            emitPartialOnCompletion = false
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowWindow<int>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 3, EmitPartialOnCompletion = false });
+        var output = RoutingTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(1);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Window_CompletesWithoutInput()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            maxItems = 2
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowWindow<int>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 2 });
+        var output = RoutingTestSink.Link(node.Output);
 
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Window_EmitsDiagnostics()
+    public async Task Window_EmitsByTimeUsingConfiguredClock()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            maxItems = 1
-        });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!.LinkToDiscard();
+        var startedAt = DateTimeOffset.Parse("2026-01-01T00:00:02Z");
+        var clock = new TrackingFakeTimeProvider(startedAt);
+        await using var node = new FlowWindowNode<string>(
+            new WindowRoutingOptions { TimeMilliseconds = 25, BoundedCapacity = 8 },
+            clock);
+        var output = RoutingTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(1);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var timerScheduled = clock.NextTimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create("first"));
+        await timerScheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        // The time window stays pending until the fake clock is advanced.
+        output.TryReceive(out _).ShouldBeFalse();
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(RoutingDiagnosticNames.WindowEmitted);
-        diagnostic.Attributes["count"].ShouldBe(1);
-        diagnostic.Attributes["reason"].ShouldBe(FlowWindowEmitReason.Count.ToString());
+        clock.Advance(TimeSpan.FromMilliseconds(25));
+        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        window.Payload.Reason.ShouldBe(FlowWindowEmitReason.Time);
+        window.Payload.Items.ShouldBe(["first"]);
+        window.Payload.StartedAt.ShouldBe(startedAt);
+        window.Payload.EmittedAt.ShouldBe(startedAt.AddMilliseconds(25));
+        window.Payload.Duration.ShouldBe(TimeSpan.FromMilliseconds(25));
+    }
+
+    [Fact]
+    public async Task Window_EmitsEvents()
+    {
+        await using var node = new FlowWindowNode<int>(
+            new WindowRoutingOptions { MaxItems = 1 });
+        var events = RoutingTestSink.Link(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowWindow<int>>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var emitted = (await RoutingTestSink.DrainUntilCompletedAsync(events)).ShouldHaveSingleItem();
+        emitted.Name.ShouldBe(RoutingDiagnosticNames.WindowEmitted);
+        emitted.Attributes["count"].ShouldBe(1);
+        emitted.Attributes["reason"].ShouldBe(FlowWindowEmitReason.Count.ToString());
     }
 
     [Fact]
     public async Task Window_ReportsProcessingFailureAndContinues()
     {
+        // The clock faults on its first read: opening the window for input 1 throws, is
+        // reported as WindowFailed, and the node keeps processing — input 2 opens a new
+        // window that emits by count.
         var clock = new ThrowingTimeProvider();
-        var node = new FlowWindowNode<int>(
+        await using var node = new FlowWindowNode<int>(
             new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 8 },
             clock);
-        var errors = new BufferBlock<FlowError>();
-        var output = new BufferBlock<FlowWindow<int>>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = true });
-        node.Output.LinkTo(output, new DataflowLinkOptions { PropagateCompletion = true });
+        var errors = RoutingTestSink.Link(node.Errors);
+        var output = RoutingTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(1);
-        await node.Input.SendAsync(2);
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var error = (await RoutingTestSink.DrainUntilCompletedAsync(errors)).First();
         error.Code.ShouldBe(RoutingErrorCodes.WindowFailed);
-        var window = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        window.Items.ShouldBe([2]);
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem()
+            .Payload.Items.ShouldBe([2]);
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
@@ -198,75 +167,17 @@ public sealed class FlowWindowNodeTests
 
     [Fact]
     public void Window_RejectsMissingBoundaries()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { inputType = "int" }));
-
-        exception.Message.ShouldContain("maxItems");
-    }
+        => Should.Throw<ArgumentException>(
+            () => new FlowWindowNode<int>(new WindowRoutingOptions()))
+            .Message.ShouldContain("maxItems");
 
     [Fact]
     public void Window_RejectsInvalidCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                maxItems = 1,
-                boundedCapacity = 0
-            }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowWindowNode<int>(
+                new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 0 }));
 
     [Fact]
-    public void Window_RejectsUnknownInputType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "missing.type",
-                maxItems = 1
-            }));
-
-        exception.Message.ShouldContain("not registered");
-    }
-
-    private static RuntimeNode CreateNode(object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterRoutingComponents(new RecordingExpressionEngine());
-        registry.TryGetFactory(RoutingComponentTypes.Window, out var factory).ShouldBeTrue();
-        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Window, configuration));
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        BufferBlock<FlowWindow<T>> target)
-    {
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<FlowWindow<T>>(
-                    new PortAddress("test", new NodeName("windows"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<FlowWindow<T>>> DrainUntilCompletedAsync<T>(
-        BufferBlock<FlowWindow<T>> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var values = new List<FlowWindow<T>>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values;
-    }
+    public void Window_RejectsNullOptions()
+        => Should.Throw<ArgumentNullException>(() => new FlowWindowNode<int>(null!));
 }

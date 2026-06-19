@@ -1,6 +1,5 @@
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Mqtt.Options;
 using Shouldly;
 using Xunit;
 
@@ -11,83 +10,87 @@ public sealed class MqttConnectionNodeTests
     [Fact]
     public void ConnectionNode_ExposesConfiguredProfileAndReconnect()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(
-            registry,
-            new
-            {
-                profile = new
-                {
-                    name = "sample-bus",
-                    host = "broker.example",
-                    port = 8883,
-                    clientId = "publisher-1",
-                    useTls = true
-                },
-                reconnect = new
-                {
-                    enabled = true,
-                    maxAttempts = 5,
-                    initialDelayMilliseconds = 100,
-                    maxDelayMilliseconds = 5000,
-                    backoffMultiplier = 1.5,
-                    useJitter = false,
-                    attributes = new Dictionary<string, string>
-                    {
-                        ["policy"] = "shared"
-                    }
-                }
-            },
-            connectionName: "sample-bus");
+        var profile = new MqttConnectionProfile
+        {
+            Name = "sample-bus",
+            Host = "broker.example",
+            Port = 8883,
+            ClientId = "publisher-1",
+            UseTls = true
+        };
+        var reconnect = new MqttReconnectPolicy
+        {
+            Enabled = true,
+            MaxAttempts = 5,
+            InitialDelayMilliseconds = 100,
+            MaxDelayMilliseconds = 5000,
+            BackoffMultiplier = 1.5,
+            UseJitter = false,
+            Attributes = new Dictionary<string, string> { ["policy"] = "shared" }
+        };
 
-        var node = resources[new NodeName("sample-bus")].Node;
-        var handle = node.ShouldBeAssignableTo<IMqttConnectionHandle>()!;
+        var node = new Nodes.MqttConnectionNode(
+            "sample-bus",
+            profile,
+            reconnect,
+            new ThrowingMqttClientFactory());
 
-        handle.ConnectionName.ShouldBe("sample-bus");
-        handle.Profile.Host.ShouldBe("broker.example");
-        handle.Profile.Port.ShouldBe(8883);
-        handle.Profile.ClientId.ShouldBe("publisher-1");
-        handle.Profile.UseTls.ShouldBeTrue();
+        node.ConnectionName.ShouldBe("sample-bus");
+        node.Profile.Host.ShouldBe("broker.example");
+        node.Profile.Port.ShouldBe(8883);
+        node.Profile.ClientId.ShouldBe("publisher-1");
+        node.Profile.UseTls.ShouldBeTrue();
 
-        var reconnect = handle.Reconnect.ShouldNotBeNull();
-        reconnect.Enabled.ShouldBeTrue();
-        reconnect.MaxAttempts.ShouldBe(5);
-        reconnect.InitialDelayMilliseconds.ShouldBe(100);
-        reconnect.MaxDelayMilliseconds.ShouldBe(5000);
-        reconnect.BackoffMultiplier.ShouldBe(1.5);
-        reconnect.UseJitter.ShouldBe(false);
-        reconnect.Attributes["policy"].ShouldBe("shared");
+        var resolved = node.Reconnect.ShouldNotBeNull();
+        resolved.Enabled.ShouldBeTrue();
+        resolved.MaxAttempts.ShouldBe(5);
+        resolved.InitialDelayMilliseconds.ShouldBe(100);
+        resolved.MaxDelayMilliseconds.ShouldBe(5000);
+        resolved.BackoffMultiplier.ShouldBe(1.5);
+        resolved.UseJitter.ShouldBe(false);
+        resolved.Attributes["policy"].ShouldBe("shared");
     }
 
     [Fact]
     public void ConnectionNode_DefaultsReconnectToNullWhenOmitted()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
-        var resources = MqttResourceTestContext.CreateResources(registry);
+        var node = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
 
-        var handle = resources[new NodeName(MqttResourceTestContext.ConnectionName)].Node
-            .ShouldBeAssignableTo<IMqttConnectionHandle>()!;
-
-        handle.ConnectionName.ShouldBe(MqttResourceTestContext.ConnectionName);
-        handle.Reconnect.ShouldBeNull();
-        handle.Profile.Host.ShouldBe("localhost");
+        node.ConnectionName.ShouldBe(MqttTestContext.ConnectionName);
+        node.Reconnect.ShouldBeNull();
+        node.Profile.Host.ShouldBe("localhost");
     }
 
     [Fact]
-    public void ConnectionNode_RejectsInvalidReconnectPolicy()
+    public void ConnectionNode_RejectsBlankConnectionName()
     {
-        var registry = MqttResourceTestContext.CreateRegistry();
+        Should.Throw<ArgumentException>(
+            () => new Nodes.MqttConnectionNode(
+                "  ",
+                new MqttConnectionProfile(),
+                reconnect: null,
+                new ThrowingMqttClientFactory()));
+    }
 
-        var exception = Should.Throw<InvalidOperationException>(
-            () => MqttResourceTestContext.CreateResources(
-                registry,
-                new
-                {
-                    profile = new { name = "sample-bus" },
-                    reconnect = new { maxAttempts = -1 }
-                },
-                connectionName: "sample-bus"));
+    [Fact]
+    public void ConnectionNode_RejectsNullProfile()
+    {
+        Should.Throw<ArgumentNullException>(
+            () => new Nodes.MqttConnectionNode(
+                "broker",
+                profile: null!,
+                reconnect: null,
+                new ThrowingMqttClientFactory()));
+    }
 
-        exception.Message.ShouldContain("reconnect.maxAttempts");
+    [Fact]
+    public void ConnectionNode_RejectsNullFactory()
+    {
+        Should.Throw<ArgumentNullException>(
+            () => new Nodes.MqttConnectionNode(
+                "broker",
+                new MqttConnectionProfile(),
+                reconnect: null,
+                clientFactory: null!));
     }
 }

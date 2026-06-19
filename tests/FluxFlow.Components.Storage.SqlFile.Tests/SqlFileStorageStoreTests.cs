@@ -468,8 +468,6 @@ public sealed class SqlFileStorageStoreTests
 
         await using var lease = await factory.OpenAsync(new StorageStoreContext
         {
-            Address = new NodeAddress("main", new NodeName("store")),
-            NodeType = new NodeType("storage.put"),
             StoreName = "tenant-a",
             Collection = "items"
         });

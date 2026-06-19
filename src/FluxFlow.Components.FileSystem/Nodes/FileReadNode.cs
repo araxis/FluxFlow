@@ -1,81 +1,60 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Text;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
-public sealed class FileReadNode : FlowNodeBase
+/// <summary>
+/// A standalone file-read node. Post a <c>FlowMessage&lt;FileReadRequest&gt;</c> to
+/// <c>Input</c>; the node resolves the path under its options, reads the file as text
+/// or bytes, and broadcasts a <c>FlowMessage&lt;FileReadResult&gt;</c> on <c>Output</c>
+/// carrying the same correlation id (a note on <c>Events</c>). Path/encoding/size and
+/// IO failures surface on <c>Errors</c> with the request's correlation id, and the node
+/// keeps processing later messages. Works with nothing but
+/// <c>new FileReadNode(options)</c> — no engine.
+/// </summary>
+public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
 {
+    public const string ReadSucceeded = FileSystemDiagnosticNames.FileReadSucceeded;
+    public const string ReadFailed = FileSystemDiagnosticNames.FileReadFailed;
+
     private readonly FileReadOptions _options;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<FileReadRequest> _input;
-    private readonly BufferBlock<FileReadResult> _result;
 
-    internal FileReadNode(
-        FileReadOptions options,
-        TimeProvider clock)
+    public FileReadNode(
+        FileReadOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? new FileReadOptions()).BoundedCapacity,
+            MaxDegreeOfParallelism = 1
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.BoundedCapacity <= 0)
+        _options = options ?? new FileReadOptions();
+        _clock = clock ?? TimeProvider.System;
+        if (_options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "File read bounded capacity must be greater than zero.");
         }
 
-        _input = new ActionBlock<FileReadRequest>(
-            ReadAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _result = new BufferBlock<FileReadResult>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        CompleteWhen(_input.Completion);
-    }
-
-    public ITargetBlock<FileReadRequest> Input => _input;
-
-    public ISourceBlock<FileReadResult> Result => _result;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
+        if (_options.MaxBytes is <= 0)
         {
-            FaultNode(exception);
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "File read 'maxBytes' must be greater than zero when set.");
         }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-        }
+
+        ValidateDefaultEncoding(_options.DefaultEncoding);
     }
 
-    protected override void OnNodeCompleted()
+    protected override async Task ProcessAsync(FlowMessage<FileReadRequest> message)
     {
-        _result.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_result).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private async Task ReadAsync(FileReadRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(message);
+        var request = message.Payload;
 
         ResolvedRead resolved;
         try
@@ -84,12 +63,12 @@ public sealed class FileReadNode : FlowNodeBase
         }
         catch (FileReadNodeException exception)
         {
-            ReportReadError(exception.Code, exception.Message, request, exception.InnerException);
+            ReportReadError(exception.Code, exception.Message, message, exception.InnerException);
             return;
         }
         catch (FileSystemPathResolutionException exception)
         {
-            ReportReadError(exception.Code, exception.Message, request, exception.InnerException);
+            ReportReadError(exception.Code, exception.Message, message, exception.InnerException);
             return;
         }
 
@@ -101,7 +80,7 @@ public sealed class FileReadNode : FlowNodeBase
                 ReportReadError(
                     FileSystemErrorCodes.FileReadNotFound,
                     $"file.read could not find '{request.Path}'.",
-                    request,
+                    message,
                     resolvedPath: resolved.Path);
                 return;
             }
@@ -111,37 +90,44 @@ public sealed class FileReadNode : FlowNodeBase
                 ReportReadError(
                     FileSystemErrorCodes.FileReadTooLarge,
                     $"file.read file '{request.Path}' exceeds maxBytes.",
-                    request,
+                    message,
                     resolvedPath: resolved.Path,
                     bytesRead: fileInfo.Length);
                 return;
             }
 
-            var bytes = await File.ReadAllBytesAsync(resolved.Path).ConfigureAwait(false);
+            var bytes = await File.ReadAllBytesAsync(resolved.Path, Stopping).ConfigureAwait(false);
             if (ExceedsMaxBytes(bytes.LongLength))
             {
                 ReportReadError(
                     FileSystemErrorCodes.FileReadTooLarge,
                     $"file.read file '{request.Path}' exceeds maxBytes.",
-                    request,
+                    message,
                     resolvedPath: resolved.Path,
                     bytesRead: bytes.LongLength);
                 return;
             }
 
             var result = CreateResult(request, resolved, bytes);
-            await _result.SendAsync(result).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                FileSystemDiagnosticNames.FileReadSucceeded,
-                message: $"Read file '{resolved.Path}'.",
-                attributes: CreateAttributes(request, resolved.Path, result.BytesRead, result.Encoding));
+
+            // Carry the correlation id forward onto the result.
+            Emit(message.With(result));
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = ReadSucceeded,
+                Level = FlowEventLevel.Information,
+                Message = $"Read file '{resolved.Path}'.",
+                Attributes = CreateAttributes(request, resolved.Path, result.BytesRead, result.Encoding)
+            });
         }
         catch (FileReadNodeException exception)
         {
             ReportReadError(
                 exception.Code,
                 exception.Message,
-                request,
+                message,
                 exception.InnerException,
                 resolved.Path);
         }
@@ -150,7 +136,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadAccessDenied,
                 $"file.read access was denied for '{request.Path}'.",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -159,7 +145,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadInvalidPath,
                 $"file.read request path is invalid: {exception.Message}",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -168,7 +154,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadInvalidPath,
                 $"file.read request path is invalid: {exception.Message}",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -177,7 +163,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadInvalidPath,
                 $"file.read request path is too long: {exception.Message}",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -186,7 +172,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadNotFound,
                 $"file.read could not find '{request.Path}'.",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -195,7 +181,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadNotFound,
                 $"file.read could not find '{request.Path}'.",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -204,7 +190,7 @@ public sealed class FileReadNode : FlowNodeBase
             ReportReadError(
                 FileSystemErrorCodes.FileReadIoFailed,
                 $"file.read failed for '{request.Path}': {exception.Message}",
-                request,
+                message,
                 exception,
                 resolved.Path);
         }
@@ -288,21 +274,55 @@ public sealed class FileReadNode : FlowNodeBase
     private bool ExceedsMaxBytes(long byteCount)
         => _options.MaxBytes.HasValue && byteCount > _options.MaxBytes.Value;
 
+    private static void ValidateDefaultEncoding(string defaultEncoding)
+    {
+        if (string.IsNullOrWhiteSpace(defaultEncoding))
+        {
+            throw new ArgumentException(
+                "file.read option 'defaultEncoding' cannot be empty.",
+                nameof(defaultEncoding));
+        }
+
+        try
+        {
+            Encoding.GetEncoding(defaultEncoding);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new ArgumentException(
+                "file.read option 'defaultEncoding' is not supported.",
+                nameof(defaultEncoding),
+                exception);
+        }
+    }
+
     private void ReportReadError(
         int code,
         string message,
-        FileReadRequest request,
+        FlowMessage<FileReadRequest> source,
         Exception? exception = null,
         string? resolvedPath = null,
         long? bytesRead = null)
     {
-        TryReportError(code, message, exception, CreateErrorContext(request, resolvedPath));
-        TryEmitDiagnostic(
-            FileSystemDiagnosticNames.FileReadFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateAttributes(request, resolvedPath, bytesRead));
+        var request = source.Payload;
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = CreateErrorContext(request, resolvedPath),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = ReadFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateAttributes(request, resolvedPath, bytesRead)
+        });
     }
 
     private Dictionary<string, object?> CreateAttributes(

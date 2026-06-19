@@ -1,55 +1,85 @@
 # FluxFlow.Components.Control
 
-Reusable expression-driven control components for FluxFlow.
+Standalone expression-driven control nodes for FluxFlow. They depend only on
+`FluxFlow.Nodes` and `FluxFlow.Mapping` — no engine, registry, or runtime. You
+`new` a node and `LinkTo` the next one.
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `flow.filter` | `Input` -> `Output` | Emits only input values that match an expression. |
-| `flow.when` | `Input` -> `WhenTrue` / `WhenFalse` | Routes each input value by expression result. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `FilterNode<TInput>` | `Input` -> `Output` | Re-broadcasts messages whose payload matches an expression; drops the rest. |
+| `WhenNode<TInput>` | `Input` -> `WhenTrue` / `WhenFalse` | Routes each message by expression result. |
 
-The package does not choose an expression language. Applications provide one or
-more `IFlowExpressionEngine` implementations during registration.
+Every message travels as a `FlowMessage<T>` envelope. `FilterNode` re-broadcasts
+the surviving `FlowMessage<TInput>` on `Output`; `WhenNode` fans the original
+message to `WhenTrue` (its primary `Output`) or `WhenFalse`. The routed message
+carries the same correlation id as the input.
+
+The package does not choose an expression language: each node takes an
+`IFlowExpressionEngine` directly and compiles its predicate **once** at
+construction, evaluating only the compiled form per message.
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterControlComponents(options => options
-        .UseExpressionEngine(appExpressionEngine)
-        .RegisterType<AppMessage>("app.message")
-        .UseContextFactory(new AppMessageContextFactory()));
-```
-
-Basic configuration:
-
-```json
+var options = new ControlExpressionOptions
 {
-  "type": "flow.when",
-  "inputType": "object",
-  "engine": "my-engine",
-  "expressionId": "route-v1",
-  "expressionName": "route-important",
-  "expression": "..."
-}
+    Expression = "value > 10",
+    ExpressionId = "route-v1",
+    ExpressionName = "route-important",
+    InputType = "int"
+};
+
+await using var when = new WhenNode<int>(options, appExpressionEngine);
+
+when.WhenTrue.LinkTo(highSink, new DataflowLinkOptions { PropagateCompletion = false });
+when.WhenFalse.LinkTo(lowSink, new DataflowLinkOptions { PropagateCompletion = false });
+
+await when.Input.SendAsync(FlowMessage.Create(42));
 ```
 
-`inputType` defaults to `object`. Register type aliases when a control node
-needs to connect to typed ports. Omit `engine` to use the default expression
-engine configured by the host.
+`FilterNode` works the same way:
 
-Expression evaluation failures emit `FlowError` and the node continues
-processing later messages. Nodes emit diagnostics with input type, engine,
-expression id, expression name, and route metadata where available.
+```csharp
+await using var filter = new FilterNode<int>(
+    new ControlExpressionOptions { Expression = "value % 2 == 0", InputType = "int" },
+    appExpressionEngine);
 
-## Design Metadata
+filter.Output.LinkTo(evenSink, new DataflowLinkOptions { PropagateCompletion = false });
+await filter.Input.SendAsync(FlowMessage.Create(2));
+```
 
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+### Custom mapping context
 
-## Composition Guidance
+By default the predicate sees the payload as the `input` and `value` variables.
+Pass an `IFlowMapContextFactory<TInput>` to shape the variables an expression
+engine evaluates against:
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+```csharp
+var node = new FilterNode<AppMessage>(options, appExpressionEngine, new AppMessageContextFactory());
+```
+
+You can also supply an already-compiled `IFlowPredicate<TInput>` directly when
+you do not want the node to own compilation:
+
+```csharp
+var node = new WhenNode<int>(options, myPredicate, engineName: "my-engine");
+```
+
+## Behavior
+
+Expression-evaluation failures emit a `FlowError` on `Errors` (carrying the
+input's correlation id and a `Code` from `ControlErrorCodes`) and the node keeps
+processing later messages. Per-message diagnostics — `flow.filter.passed` /
+`flow.filter.rejected` / `flow.filter.failed` and `flow.when.routed` /
+`flow.when.failed` (see `ControlDiagnosticNames`) — flow on the `Events` port
+with input type, engine, expression id, expression name, route, and pass/fail
+metadata where available.
+
+## Runtime timing
+
+Error and event timestamps use the node's clock (default `TimeProvider.System`).
+Provide a deterministic clock for tests:
+
+```csharp
+new FilterNode<int>(options, engine, clock: new FakeTimeProvider(timestamp));
+```

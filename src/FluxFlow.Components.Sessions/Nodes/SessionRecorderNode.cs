@@ -1,33 +1,45 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sessions.Nodes;
 
-public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone session recorder node. Post a <c>FlowMessage&lt;SessionRecordInput&gt;</c>
+/// to <c>Input</c>; the node appends each message to a host-provided
+/// <see cref="ISessionStore"/> and broadcasts the stored
+/// <c>FlowMessage&lt;SessionRecord&gt;</c> on <c>Output</c> (carrying the same correlation
+/// id). The session is opened lazily on the first message and closed (with the final
+/// message count) when the node is disposed. Append failures surface on <c>Errors</c>
+/// with the original correlation id and the pump keeps processing later messages;
+/// diagnostics go to <c>Events</c>. Works with nothing but
+/// <c>new SessionRecorderNode(options, store)</c> — no engine.
+/// </summary>
+public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRecord>
 {
-    private readonly object _stateLock = new();
+    public const string RecorderStarted = SessionsDiagnosticNames.RecorderStarted;
+    public const string RecorderRecorded = SessionsDiagnosticNames.RecorderRecorded;
+    public const string RecorderCompleted = SessionsDiagnosticNames.RecorderCompleted;
+    public const string RecorderFailed = SessionsDiagnosticNames.RecorderFailed;
+
     private readonly SessionRecorderOptions _options;
     private readonly ISessionStore _store;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<SessionRecordInput> _input;
-    private readonly BufferBlock<SessionRecord> _output;
-    private readonly CancellationTokenSource _processingCancellation = new();
+    private readonly TaskCompletionSource _completed =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private SessionMetadata? _session;
     private long _sequence;
-    private bool _startRequested;
-    private bool _disposed;
 
-    internal SessionRecorderNode(
+    public SessionRecorderNode(
         SessionRecorderOptions options,
         ISessionStore store,
-        TimeProvider clock)
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -35,149 +47,45 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                 "session.recorder bounded capacity must be greater than zero.");
         }
 
-        _input = new ActionBlock<SessionRecordInput>(
-            RecordAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _output = new BufferBlock<SessionRecord>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _ = _input.Completion.ContinueWith(
-            completion => CompleteRecordingAsync(completion),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default).Unwrap();
+        _options = options;
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? TimeProvider.System;
     }
 
-    public ITargetBlock<SessionRecordInput> Input => _input;
+    /// <summary>
+    /// Completes once the session has been closed in the store during disposal (or
+    /// immediately if no message was ever recorded). Faults if the store's
+    /// <see cref="ISessionStore.CompleteSessionAsync"/> throws while closing.
+    /// </summary>
+    public Task SessionCompleted => _completed.Task;
 
-    public ISourceBlock<SessionRecord> Output => _output;
-
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
+    protected override async Task ProcessAsync(FlowMessage<SessionRecordInput> message)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("session.recorder node has already started.");
-            }
-
-            _startRequested = true;
-        }
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
         SessionMetadata session;
         try
         {
-            session = await _store.StartSessionAsync(
-                new SessionStartRequest
-                {
-                    SessionId = Normalize(_options.SessionId),
-                    Name = Normalize(_options.Name),
-                    StartedAt = _clock.GetUtcNow(),
-                    Notes = Normalize(_options.Notes),
-                    Tags = CopyDictionary(_options.Tags)
-                },
-                cancellationToken).ConfigureAwait(false);
+            session = await EnsureSessionStartedAsync(message).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            TryReportError(
+            ReportRecorderError(
                 SessionsErrorCodes.StoreUnavailable,
                 $"session.recorder failed to start session: {exception.Message}",
+                message,
                 exception);
-            TryEmitDiagnostic(
-                SessionsDiagnosticNames.RecorderFailed,
-                FlowDiagnosticLevel.Error,
-                "session.recorder failed to start session.",
-                exception,
-                CreateSessionAttributes());
-            lock (_stateLock)
-            {
-                _startRequested = false;
-            }
-
-            throw;
-        }
-
-        if (string.IsNullOrWhiteSpace(session.SessionId))
-        {
-            throw new InvalidOperationException(
-                "session.recorder store returned a session without a session id.");
-        }
-
-        lock (_stateLock)
-        {
-            _session = session;
-            _sequence = Math.Max(0, session.MessageCount);
-        }
-
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.RecorderStarted,
-            message: "session.recorder started session.",
-            attributes: CreateSessionAttributes(session));
-    }
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _processingCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        await Completion.ConfigureAwait(false);
-        _processingCancellation.Dispose();
-    }
-
-    private async Task RecordAsync(SessionRecordInput input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-
-        SessionMetadata? session;
-        lock (_stateLock)
-        {
-            session = _session;
-        }
-
-        if (session is null)
-        {
-            ReportRecorderError(
-                SessionsErrorCodes.InvalidSession,
-                "session.recorder has not started.",
-                input,
-                exception: null);
             return;
         }
 
         var sequence = _sequence + 1;
         var timestamp = input.Timestamp ?? _clock.GetUtcNow();
 
+        SessionRecord record;
         try
         {
-            var record = await _store.AppendMessageAsync(
+            record = await _store.AppendMessageAsync(
                 new SessionAppendRequest
                 {
                     Session = session,
@@ -185,17 +93,11 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
                     Sequence = sequence,
                     Timestamp = timestamp
                 },
-                _processingCancellation.Token).ConfigureAwait(false);
+                Stopping).ConfigureAwait(false);
 
             ValidateRecord(record, session.SessionId, sequence);
-            _sequence = record.Sequence;
-            await _output.SendAsync(record, _processingCancellation.Token).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                SessionsDiagnosticNames.RecorderRecorded,
-                message: "session.recorder recorded message.",
-                attributes: CreateRecordAttributes(record));
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -204,79 +106,122 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
             ReportRecorderError(
                 SessionsErrorCodes.RecorderFailed,
                 $"session.recorder failed to record message: {exception.Message}",
-                input,
+                message,
                 exception);
-        }
-    }
-
-    private async Task CompleteRecordingAsync(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } completionException)
-        {
-            ((IDataflowBlock)_output).Fault(completionException.InnerException ?? completionException);
-            FaultNode(completionException.InnerException ?? completionException);
             return;
         }
 
-        SessionMetadata? session;
-        lock (_stateLock)
+        _sequence = record.Sequence;
+
+        // Carry the correlation id forward onto the stored record.
+        Emit(message.With(record));
+        EmitEvent(new FlowEvent
         {
-            session = _session;
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = RecorderRecorded,
+            Level = FlowEventLevel.Information,
+            Message = "session.recorder recorded message.",
+            Attributes = CreateRecordAttributes(record)
+        });
+    }
+
+    /// <summary>
+    /// Closes the session (with the final message count) once the pump has drained and
+    /// the node is disposed. The output/error/event ports are already completed by this
+    /// point, so the completion diagnostic surfaces on <see cref="SessionCompleted"/>
+    /// rather than the <c>Events</c> stream; await it to observe the close.
+    /// </summary>
+    protected override async ValueTask OnDisposeAsync()
+    {
+        var session = _session;
+        if (session is null)
+        {
+            _completed.TrySetResult();
+            return;
         }
 
-        if (session is not null)
+        try
         {
-            try
-            {
-                var completed = await _store.CompleteSessionAsync(
-                    new SessionCompleteRequest
-                    {
-                        Session = session,
-                        EndedAt = _clock.GetUtcNow(),
-                        MessageCount = _sequence
-                    },
-                    CancellationToken.None).ConfigureAwait(false);
-                TryEmitDiagnostic(
-                    SessionsDiagnosticNames.RecorderCompleted,
-                    message: "session.recorder completed session.",
-                    attributes: CreateSessionAttributes(completed));
-            }
-            catch (Exception exception)
-            {
-                TryReportError(
-                    SessionsErrorCodes.RecorderFailed,
-                    $"session.recorder failed to complete session: {exception.Message}",
-                    exception,
-                    CreateSessionContext(session));
-                TryEmitDiagnostic(
-                    SessionsDiagnosticNames.RecorderFailed,
-                    FlowDiagnosticLevel.Error,
-                    "session.recorder failed to complete session.",
-                    exception,
-                    CreateSessionAttributes(session));
-                ((IDataflowBlock)_output).Fault(exception);
-                FaultNode(exception);
-                return;
-            }
+            await _store.CompleteSessionAsync(
+                new SessionCompleteRequest
+                {
+                    Session = session,
+                    EndedAt = _clock.GetUtcNow(),
+                    MessageCount = _sequence
+                },
+                CancellationToken.None).ConfigureAwait(false);
+            _completed.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            _completed.TrySetException(exception);
+        }
+    }
+
+    private async Task<SessionMetadata> EnsureSessionStartedAsync(FlowMessage<SessionRecordInput> message)
+    {
+        if (_session is { } existing)
+        {
+            return existing;
         }
 
-        _output.Complete();
-        CompleteNode();
+        var session = await _store.StartSessionAsync(
+            new SessionStartRequest
+            {
+                SessionId = Normalize(_options.SessionId),
+                Name = Normalize(_options.Name),
+                StartedAt = _clock.GetUtcNow(),
+                Notes = Normalize(_options.Notes),
+                Tags = CopyDictionary(_options.Tags)
+            },
+            Stopping).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(session.SessionId))
+        {
+            throw new InvalidOperationException(
+                "session.recorder store returned a session without a session id.");
+        }
+
+        _session = session;
+        _sequence = Math.Max(0, session.MessageCount);
+
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = RecorderStarted,
+            Level = FlowEventLevel.Information,
+            Message = "session.recorder started session.",
+            Attributes = CreateSessionAttributes(session)
+        });
+        return session;
     }
 
     private void ReportRecorderError(
         int code,
         string message,
-        SessionRecordInput input,
+        FlowMessage<SessionRecordInput> source,
         Exception? exception)
     {
-        TryReportError(code, message, exception, CreateInputContext(input));
-        TryEmitDiagnostic(
-            SessionsDiagnosticNames.RecorderFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateInputAttributes(input));
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = CreateInputContext(source.Payload),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = RecorderFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateInputAttributes(source.Payload)
+        });
     }
 
     private static void ValidateRecord(
@@ -365,9 +310,6 @@ public sealed class SessionRecorderNode : FlowNodeBase, IAsyncDisposable
 
         return string.Join("; ", values);
     }
-
-    private static string CreateSessionContext(SessionMetadata session)
-        => $"sessionId={session.SessionId}";
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

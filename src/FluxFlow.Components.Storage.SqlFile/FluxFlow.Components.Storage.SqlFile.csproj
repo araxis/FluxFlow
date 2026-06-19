@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
@@ -22,6 +22,19 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.27" />
+    <!-- Pin to the newest native SQLite bundle (overrides the 2.1.6 that Microsoft.Data.Sqlite
+         8.0.27 brings in transitively). NOTE: even 2.1.11 bundles SQLite 3.49.1, which predates
+         the 3.50.2 fix for CVE-2025-6965 (GHSA-2m69-gcr7-jv3q) — no patched SQLitePCLRaw is
+         published yet. Bump to the patched bundle the moment one ships, then drop the
+         suppression below. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Risk-accepted (scoped to this one advisory): no patched SQLitePCLRaw exists yet, and
+         this adapter only runs its own parameterized SQL over a local, trusted single-file
+         database (no untrusted SQL), so exposure to CVE-2025-6965 is low. Remove this and bump
+         SQLitePCLRaw once it ships SQLite >= 3.50.2. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

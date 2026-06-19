@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,23 +6,19 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable HTTP request components for FluxFlow.</Description>
+    <Description>A standalone HTTP node for FluxFlow: a blockified HttpClient (request in, response out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke IHttpClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed). Introduces a separate http.client resource component that owns the client configuration (base URL, allowed hosts, redirect policy, timeout, pooling); http.request now references it by a required client name and no longer carries client-level config. For now the client holds configuration only — no HttpClient is established, so http.request reports a not-connected result until a later connect step. Adds an explicit, host-driven connect lifecycle: http.client now exposes ConnectAsync/DisconnectAsync (plus a State and a lock-free TryGetSender), owning the pooled HttpClient/sender built via a new client-scoped sender context; http.request borrows the sender when connected and reports not-connected otherwise, never connecting or disposing. The allowed-hosts/redirect SSRF guard is preserved (per-request validation plus AllowAutoRedirect disabled under a guard). No auto-connect.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as a single standalone http.client node over an injected HttpClient: request in, response broadcast out, failures on the error port. The connection-resource node, sender-factory layer, and in-node SSRF guard are removed — all transport policy lives on the injected HttpClient. The node depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

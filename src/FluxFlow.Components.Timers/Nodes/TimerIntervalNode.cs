@@ -1,215 +1,101 @@
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Globalization;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSource, IAsyncDisposable
+/// <summary>
+/// A standalone interval source — a "blockified" periodic timer. Call <c>StartAsync</c>
+/// and the node broadcasts a <c>FlowMessage&lt;TimerTick&gt;</c> on <c>Output</c> on a
+/// fixed interval (plus diagnostic notes on <c>Events</c>), minting a fresh correlation
+/// id per tick. It runs until <see cref="TimerIntervalSettings.MaxTicks"/> is reached
+/// (source complete) or it is stopped via <c>Complete</c>/dispose. Timing is driven by
+/// the injected <see cref="TimeProvider"/>, so tests can advance a FakeTimeProvider to
+/// fire ticks deterministically. Works with nothing but
+/// <c>new TimerIntervalNode(settings)</c> — no engine.
+/// </summary>
+public sealed class TimerIntervalNode : FlowSource<TimerTick>
 {
-    private readonly object _stateLock = new();
+    public const string Started = TimerDiagnosticNames.IntervalStarted;
+    public const string Tick = TimerDiagnosticNames.IntervalTick;
+    public const string Stopped = TimerDiagnosticNames.IntervalStopped;
+    public const string Failed = TimerDiagnosticNames.IntervalFailed;
+
     private readonly TimerIntervalSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
-    private CancellationTokenSource? _timerCancellation;
-    private Task? _timerTask;
-    private bool _started;
-    private bool _completedBeforeStart;
-    private bool _disposed;
 
-    internal TimerIntervalNode(
+    public TimerIntervalNode(
         TimerIntervalSettings settings,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity })
+        TimeProvider? clock = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (settings.BoundedCapacity <= 0)
+        _clock = clock ?? TimeProvider.System;
+
+        if (_settings.Interval <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(settings),
-                "Timer interval bounded capacity must be greater than zero.");
+                nameof(settings), "timer.interval 'Interval' must be greater than zero.");
+        }
+
+        if (_settings.InitialDelay < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.interval 'InitialDelay' cannot be negative.");
+        }
+
+        if (_settings.MaxTicks is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.interval 'MaxTicks' must be greater than zero when set.");
+        }
+
+        if (_settings.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.interval 'BoundedCapacity' must be greater than zero.");
         }
     }
 
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public override Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_stateLock)
-        {
-            if (_completedBeforeStart)
-            {
-                return Task.CompletedTask;
-            }
-
-            if (_started)
-            {
-                throw new InvalidOperationException("timer.interval node has already started.");
-            }
-
-            _started = true;
-            _timerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.IntervalStarted,
-                message: $"Started timer interval '{_settings.Name}'.",
-                attributes: CreateAttributes());
-            _timerTask = RunTimerAsync(_timerCancellation.Token);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-    {
-        CancellationTokenSource? cancellation;
-        lock (_stateLock)
-        {
-            cancellation = _timerCancellation;
-            if (cancellation is null)
-            {
-                _completedBeforeStart = true;
-            }
-        }
-
-        if (cancellation is null)
-        {
-            CompleteOutput();
-            return;
-        }
-
-        try
-        {
-            cancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the timer loop has stopped.
-        }
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _timerCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the timer loop has stopped.
-        }
-
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-
-        if (_timerTask is not null)
-        {
-            await _timerTask.ConfigureAwait(false);
-        }
-
-        _timerCancellation?.Dispose();
-    }
-
-    protected override void OnNodeCompleted()
-    {
-        _events.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_events).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private async Task RunTimerAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var startedAt = _clock.GetUtcNow();
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = startedAt,
+            Name = Started,
+            Level = FlowEventLevel.Information,
+            Message = $"Started timer interval '{_settings.Name}'.",
+            Attributes = CreateAttributes()
+        });
+
         var sequence = 0L;
         var nextDueAt = ResolveFirstDueAt(startedAt);
 
-        try
+        if (_settings.EmitImmediately)
         {
-            if (_settings.EmitImmediately)
+            sequence = EmitTick(sequence, startedAt, nextDueAt);
+            if (HasReachedMaxTicks(sequence))
             {
-                var emitted = await EmitTickAsync(
-                    sequence,
-                    startedAt,
-                    nextDueAt,
-                    cancellationToken).ConfigureAwait(false);
-                if (emitted is null)
-                {
-                    CompleteTimer(startedAt, sequence);
-                    return;
-                }
-
-                sequence = emitted.Value;
-                if (HasReachedMaxTicks(sequence))
-                {
-                    CompleteTimer(startedAt, sequence);
-                    return;
-                }
-
-                nextDueAt = startedAt + _settings.Interval;
+                CompleteTimer(startedAt, sequence);
+                return;
             }
 
-            while (true)
+            nextDueAt = startedAt + _settings.Interval;
+        }
+
+        while (true)
+        {
+            await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
+            sequence = EmitTick(sequence, startedAt, nextDueAt);
+            if (HasReachedMaxTicks(sequence))
             {
-                await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
-                var emitted = await EmitTickAsync(
-                    sequence,
-                    startedAt,
-                    nextDueAt,
-                    cancellationToken).ConfigureAwait(false);
-                if (emitted is null)
-                {
-                    CompleteTimer(startedAt, sequence);
-                    return;
-                }
-
-                sequence = emitted.Value;
-                if (HasReachedMaxTicks(sequence))
-                {
-                    CompleteTimer(startedAt, sequence);
-                    return;
-                }
-
-                nextDueAt = nextDueAt + _settings.Interval;
+                CompleteTimer(startedAt, sequence);
+                return;
             }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            CompleteTimer(startedAt, sequence);
-        }
-        catch (Exception exception)
-        {
-            TryReportError(
-                TimerErrorCodes.IntervalFailed,
-                $"timer.interval failed: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                TimerDiagnosticNames.IntervalFailed,
-                FlowDiagnosticLevel.Error,
-                "timer.interval failed.",
-                exception,
-                CreateAttributes(sequence));
-            base.Fault(exception);
+
+            nextDueAt += _settings.Interval;
         }
     }
 
@@ -236,14 +122,11 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         }
     }
 
-    private async Task<long?> EmitTickAsync(
+    private long EmitTick(
         long currentSequence,
         DateTimeOffset startedAt,
-        DateTimeOffset dueAt,
-        CancellationToken cancellationToken)
+        DateTimeOffset dueAt)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         var sequence = currentSequence + 1;
         var timestamp = _clock.GetUtcNow();
         var tick = new TimerTick
@@ -258,17 +141,15 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
             Drift = timestamp - dueAt
         };
 
-        if (!await SendOutputAsync(tick, cancellationToken).ConfigureAwait(false))
+        Emit(FlowMessage.Create(tick));
+        EmitEvent(new FlowEvent
         {
-            // The output declined the tick because it has completed; stop the loop.
-            return null;
-        }
-
-        TryEmitDiagnostic(
-            TimerDiagnosticNames.IntervalTick,
-            message: $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
-            attributes: CreateAttributes(tick));
-        EmitTickEvent(tick);
+            Timestamp = timestamp,
+            Name = Tick,
+            Level = FlowEventLevel.Information,
+            Message = $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
+            Attributes = CreateAttributes(tick)
+        });
         return sequence;
     }
 
@@ -276,39 +157,16 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         => _settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value;
 
     private void CompleteTimer(DateTimeOffset startedAt, long sequence)
-    {
-        TryEmitDiagnostic(
-            TimerDiagnosticNames.IntervalStopped,
-            message: $"Stopped timer interval '{_settings.Name}'.",
-            attributes: CreateAttributes(sequence, _clock.GetUtcNow() - startedAt));
-        CompleteOutput();
-    }
-
-    private bool EmitTickEvent(TimerTick tick)
-    {
-        var attributes = new Dictionary<string, string>
+        => EmitEvent(new FlowEvent
         {
-            ["name"] = tick.Name,
-            ["sequence"] = tick.Sequence.ToString(CultureInfo.InvariantCulture),
-            ["intervalMilliseconds"] = tick.Interval.TotalMilliseconds.ToString(CultureInfo.InvariantCulture),
-            ["elapsedMilliseconds"] = tick.Elapsed.TotalMilliseconds.ToString(CultureInfo.InvariantCulture),
-            ["driftMilliseconds"] = tick.Drift.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)
-        };
-
-        return _events.Post(new FlowEvent
-        {
-            Timestamp = tick.Timestamp,
-            Type = TimerEventNames.IntervalTick,
-            Source = Id.ToString(),
-            SourceNodeId = Id,
-            Subject = tick.Name,
-            Channel = TimerEventNames.IntervalTick,
-            Attributes = attributes
+            Timestamp = _clock.GetUtcNow(),
+            Name = Stopped,
+            Level = FlowEventLevel.Information,
+            Message = $"Stopped timer interval '{_settings.Name}'.",
+            Attributes = CreateAttributes(sequence, _clock.GetUtcNow() - startedAt)
         });
-    }
 
-    private Dictionary<string, object?> CreateAttributes(
-        TimerTick? tick = null)
+    private Dictionary<string, object?> CreateAttributes(TimerTick? tick = null)
     {
         var attributes = CreateAttributes(tick?.Sequence);
         if (tick is null)
@@ -350,23 +208,5 @@ public sealed class TimerIntervalNode : SourceFlowNode<TimerTick>, IFlowEventSou
         }
 
         return attributes;
-    }
-
-    private string CreateErrorContext()
-    {
-        var values = new List<string>
-        {
-            $"name={_settings.Name}",
-            $"intervalMilliseconds={_settings.Interval.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)}",
-            $"initialDelayMilliseconds={_settings.InitialDelay.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)}",
-            $"emitImmediately={_settings.EmitImmediately}"
-        };
-
-        if (_settings.MaxTicks.HasValue)
-        {
-            values.Add($"maxTicks={_settings.MaxTicks.Value}");
-        }
-
-        return string.Join("; ", values);
     }
 }

@@ -1,77 +1,80 @@
 # FluxFlow.Components.Sources
 
-Reusable deterministic source components for FluxFlow.
+Standalone deterministic source nodes for FluxFlow, built on the
+[FluxFlow.Nodes](../FluxFlow.Nodes) kit. Every node is a self-contained TPL
+Dataflow processor: `new` it, `LinkTo` the next node, `StartAsync()` it, and run
+it — no engine, registry, or runtime required. All timing is driven by an
+injected `TimeProvider`, so tests stay deterministic with a `FakeTimeProvider`.
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `source.generated` | `Output`, `Errors` | Emits configured JSON items as a registered output type. |
-| `source.sequence` | `Output`, `Errors` | Emits deterministic numeric sequence items. |
+| Node | Kind | Shape | Purpose |
+|------|------|-------|---------|
+| `GeneratedSourceNode<T>` | source | `Output` | Emits a configured list of `T` values as `FlowMessage<T>`. |
+| `SequenceSourceNode` | source | `Output` | Emits a deterministic numeric `FlowMessage<SourceSequenceItem>` sequence. |
 
-`source.generated` uses host-registered type aliases so applications can emit
-plain objects, JSON values, or application-owned records without this package
-knowing those models.
+Both nodes are zero-input emitters. Call `StartAsync()` and they produce until
+their configured count is reached (source complete) or they are stopped via
+`Complete()`/`DisposeAsync()`. Every emitted item is a `FlowMessage<T>` envelope
+with a fresh `CorrelationId`. Lifecycle notes (started, emitted, completed,
+failed) surface on the `Events` port using `SourceDiagnosticNames`; failures
+surface a `FlowError` on the `Errors` port.
 
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSourcesComponents(options => options
-        .RegisterType<AppMessage>("app.message"));
-```
-
-Hosts that need deterministic timing can provide a clock:
+## Generated
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSourcesComponents(options => options
-        .UseClock(sourceClock));
+await using var node = new GeneratedSourceNode<AppMessage>(
+    new GeneratedSourceOptions
+    {
+        Name = "feed",
+        OutputType = "app.message",
+        Loop = true,
+        MaxItems = 5,
+        IntervalMilliseconds = 100
+    },
+    items: new[]
+    {
+        new AppMessage("A-100", "alpha"),
+        new AppMessage("A-101", "beta")
+    });
+node.Output.LinkTo(downstream);
+await node.StartAsync();
 ```
 
-Generated source configuration:
+The host materializes (and, if it started from JSON, deserializes) the items it
+wants to emit and hands them in directly — the package no longer resolves output
+types from strings or deserializes JSON. `MaxItems` caps the emitted count, and
+`Loop = true` (which requires `MaxItems`) cycles through the items until that cap
+is reached.
 
-```json
+## Sequence
+
+```csharp
+await using var node = new SequenceSourceNode(new SequenceSourceOptions
 {
-  "type": "source.generated",
-  "outputType": "app.message",
-  "items": [
-    { "id": "A-100", "value": "alpha" },
-    { "id": "A-101", "value": "beta" }
-  ],
-  "boundedCapacity": 32
-}
+    Name = "numbers",
+    Start = 10,
+    Step = 5,
+    Count = 3,
+    InitialDelayMilliseconds = 0,
+    IntervalMilliseconds = 0
+});
+node.Output.LinkTo(downstream);
+await node.StartAsync();
 ```
 
-Sequence source configuration:
+`SequenceSourceNode` emits `SourceSequenceItem` values with a name, sequence
+number, computed value (`Start + Step * index`), the start/step inputs, and a
+timestamp from the injected clock.
 
-```json
-{
-  "type": "source.sequence",
-  "name": "demo",
-  "start": 10,
-  "step": 5,
-  "count": 3
-}
-```
+## Deterministic time
 
-Timing options are deliberately simple:
-
-- `initialDelayMilliseconds`
-- `intervalMilliseconds`
-- `maxItems` and `loop` for generated lists
-
-`UseClock(...)` controls delay scheduling and source timestamps. Without it,
-sources use the system clock.
-
-Generic replay is intentionally left out of this package for now. Use the
-sessions package for stored session replay, and add a dedicated replay source
-only when a second neutral replay shape is proven.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+Pass a `TimeProvider` to either node's constructor (it defaults to
+`TimeProvider.System`). Both honor `InitialDelayMilliseconds` and
+`IntervalMilliseconds` off that clock, so tests can supply a
+[`FakeTimeProvider`](https://www.nuget.org/packages/Microsoft.Extensions.TimeProvider.Testing)
+and advance it to release each delay without real-time waits, and item
+timestamps come from the configured clock's timeline.
 
 ## Composition Guidance
 

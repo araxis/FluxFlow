@@ -1,101 +1,85 @@
 # FluxFlow.Components.Observability
 
-Reusable observer components for FluxFlow.
+Standalone observer nodes for FluxFlow — counter, logger, and metrics. Each depends
+only on `FluxFlow.Nodes` (and `FluxFlow.Mapping` for the counter's optional predicate)
+— no engine, registry, or runtime. You `new` the node and `LinkTo` the next one.
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `flow.counter` | `Input` -> `Snapshots` | Counts matching inputs and emits counter snapshots. |
-| `flow.logger` | `Input` -> `Entries` | Emits structured log entries from inputs. |
-| `flow.metrics` | `Input` -> `Snapshots` | Emits count, rate, timestamp, and optional size snapshots. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `FlowCounterNode<TInput>` | `Input` -> `Output` (`FlowCounterSnapshot`) | Counts accepted inputs and emits counter snapshots. |
+| `FlowLoggerNode<TInput>` | `Input` -> `Output` (`FlowLogEntry`) | Emits structured log entries from inputs. |
+| `FlowMetricsNode<TInput>` | `Input` -> `Output` (`FlowMetricSnapshot`) | Emits count, rate, timestamp, and optional size snapshots. |
 
-The package emits neutral contracts only. Hosts decide whether those entries or
-snapshots become app logs, dashboards, files, telemetry, or test assertions.
+Every message travels as a `FlowMessage<T>` envelope. Each node broadcasts its result
+on `Output` carrying the same correlation id as the input; failures surface on
+`Errors` (with the input's correlation id and a `Code` from `ObservabilityErrorCodes`)
+and diagnostics flow on `Events`. The package emits neutral contracts only — hosts
+decide whether those entries or snapshots become app logs, dashboards, files,
+telemetry, or test assertions.
 
 ## Counter
 
-```json
-{
-  "type": "flow.counter",
-  "inputType": "message",
-  "name": "received",
-  "predicate": "value.Enabled",
-  "engine": "default",
-  "boundedCapacity": 128
-}
+```csharp
+await using var node = new FlowCounterNode<MyMessage>(
+    new FlowCounterOptions { InputType = "message", Name = "received", Predicate = "value.Enabled" },
+    expressionEngine);
+
+node.Output.LinkTo(snapshotSink, new DataflowLinkOptions { PropagateCompletion = false });
+await node.Input.SendAsync(FlowMessage.Create(message));
 ```
 
-`flow.counter` emits `FlowCounterSnapshot` values with count, rejected count,
-last observed timestamp, name, and input type. When no predicate is configured,
-all inputs are counted.
+`FlowCounterNode` emits `FlowCounterSnapshot` values with count, rejected count, last
+observed timestamp, name, and input type. When a predicate is configured it is
+compiled once at construction from the supplied `IFlowExpressionEngine`; inputs the
+predicate rejects are not counted (but are tallied in `RejectedCount`). With no
+predicate every input is counted and no engine is required. Pass an
+`IFlowMapContextFactory<TInput>` to control the variables the predicate sees
+(defaults to `input`/`value`).
 
 ## Logger
 
-```json
-{
-  "type": "flow.logger",
-  "inputType": "message",
-  "level": "Information",
-  "category": "workflow",
-  "messageTemplate": "Observed {kind} item #{sequence}",
-  "attributeSelectors": [ "kind", "size" ],
-  "boundedCapacity": 128
-}
+```csharp
+await using var node = new FlowLoggerNode<MyMessage>(
+    new FlowLoggerOptions
+    {
+        InputType = "message",
+        Level = "Information",
+        Category = "workflow",
+        MessageTemplate = "Observed {kind} item #{sequence}"
+    },
+    attributeSelectors: new Dictionary<string, IObservabilityValueSelector<MyMessage>>
+    {
+        ["kind"] = new KindSelector()
+    });
 ```
 
-`flow.logger` emits `FlowLogEntry` values. Hosts register selector functions for
-custom attributes. Built-in selectors `input` and `value` return the original
-input.
+`FlowLoggerNode` emits `FlowLogEntry` values. Supply `IObservabilityValueSelector<TInput>`
+selectors keyed by attribute name to enrich each entry; an attribute-selector failure
+is reported on `Errors`, the offending attribute is skipped, and the entry is still
+emitted. An unsupported `Level` throws `InvalidOperationException` at construction.
 
 ## Metrics
 
-```json
-{
-  "type": "flow.metrics",
-  "inputType": "message",
-  "name": "received",
-  "sizeSelector": "payloadBytes",
-  "boundedCapacity": 128
-}
+```csharp
+await using var node = new FlowMetricsNode<MyMessage>(
+    new FlowMetricsOptions { InputType = "message", Name = "received", SizeSelector = "payloadBytes" },
+    sizeSelector: new PayloadSizeSelector());
 ```
 
-`flow.metrics` emits `FlowMetricSnapshot` values with total count, current rate,
-average rate, last observed timestamp, and optional size values. Size selectors
-can return numeric values, strings, byte arrays, or collections.
+`FlowMetricsNode` emits `FlowMetricSnapshot` values with total count, current rate,
+average rate, last observed timestamp, and optional size values. The optional size
+selector can return numeric values, strings, byte arrays, or collections; a
+size-selector failure is reported on `Errors` and the node keeps processing.
 
-## Registration
+## Runtime timing
+
+Snapshots and log entries use the node's clock for `Timestamp` (default
+`TimeProvider.System`). Provide a deterministic clock for tests:
 
 ```csharp
-registry.RegisterObservabilityComponents(options => options
-    .UseClock(timeProvider)
-    .RegisterType<MyMessage>("message")
-    .UseValueSelector<MyMessage>("kind", (message, _) => message.Kind)
-    .UseValueSelector<MyMessage>("payloadBytes", (message, _) => message.Payload.Length));
+new FlowMetricsNode<MyMessage>(options, sizeSelector, clock: new FakeTimeProvider(timestamp));
 ```
 
-`UseClock(...)` is optional. Without it, observer nodes use
-`TimeProvider.System`. Supplying a time provider lets hosts and tests make log
-entry timestamps, counter snapshots, metrics snapshots, and rate calculations
-deterministic.
-
-Register an expression engine only when using counter predicates:
-
-```csharp
-registry.RegisterObservabilityComponents(options => options
-    .UseExpressionEngine(expressionEngine)
-    .RegisterType<MyMessage>("message"));
-```
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
-
-## Composition Guidance
-
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+A time provider also makes counter/metrics rate calculations deterministic.

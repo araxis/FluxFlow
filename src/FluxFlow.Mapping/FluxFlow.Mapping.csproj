@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Mapping</PackageId>
+    <AssemblyName>FluxFlow.Mapping</AssemblyName>
+    <RootNamespace>FluxFlow.Mapping</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Engine-free expression/mapping abstraction for FluxFlow: IFlowExpressionEngine, IFlowMapper, IFlowPredicate, FlowMapContext, and the expression/delegate mapper+predicate adapters. A leaf package referenced by nodes and the engine alike.</Description>
+    <PackageTags>workflow;dataflow;mapping;expressions</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial extraction of the expression/mapping abstraction out of FluxFlow.Engine into a standalone leaf package, so nodes can map/filter with host-provided expressions without referencing the engine. Same types (IFlowExpressionEngine, IFlowCompiledExpression, IFlowMapper, IFlowPredicate, FlowMapContext, IFlowMapContextFactory, Expression/Delegate mappers+predicates, EvaluatingCompiledExpression), now under the FluxFlow.Mapping namespace.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

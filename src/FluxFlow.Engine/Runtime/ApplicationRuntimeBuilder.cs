@@ -1,5 +1,5 @@
 using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Engine.Runtime;
 

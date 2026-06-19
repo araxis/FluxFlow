@@ -6,21 +6,20 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable mapping components for FluxFlow with pluggable expression engines and typed ports.</Description>
+    <Description>A standalone mapper node for FluxFlow: an input in, a mapped output broadcast out, the original input fanned to a Failed port on error. Maps each message with a host-provided expression engine (compiled once). No engine required.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: compile-once mapper for flow.mapper.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as a single standalone flow.mapper node over the FluxFlow.Nodes kit: input in, mapped result broadcast out, the original input fanned to the Failed port when a mapping throws, failures on the error port — all carrying the message correlation id, diagnostics on the event port. The mapping expression is compiled once at construction via a host-provided IFlowExpressionEngine. The engine factory, module, registration extensions, component types/ports, design-metadata provider, definition-options reader, and the expression-engine/type/context-factory registry layer are removed; the node takes its options, expression engine, optional context factory, and TimeProvider directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

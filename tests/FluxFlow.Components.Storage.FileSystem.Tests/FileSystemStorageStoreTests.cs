@@ -354,8 +354,6 @@ public sealed class FileSystemStorageStoreTests
 
         await using var lease = await factory.OpenAsync(new StorageStoreContext
         {
-            Address = new NodeAddress("main", new NodeName("store")),
-            NodeType = new NodeType("storage.put"),
             StoreName = "tenant-a",
             Collection = "items"
         });
@@ -552,8 +550,6 @@ public sealed class FileSystemStorageStoreTests
     private static StorageStoreContext CreateStoreContext()
         => new()
         {
-            Address = new NodeAddress("main", new NodeName("store")),
-            NodeType = new NodeType("storage.put"),
             StoreName = "tenant-a",
             Collection = "items"
         };

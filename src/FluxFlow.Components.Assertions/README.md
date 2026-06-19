@@ -1,57 +1,71 @@
 # FluxFlow.Components.Assertions
 
-Reusable expression-driven assertion components for FluxFlow.
+A standalone expression-driven assertion node for FluxFlow. It depends only on
+`FluxFlow.Nodes` and `FluxFlow.Mapping` — no engine, registry, or runtime. You
+`new` the node and `LinkTo` the next one.
 
-## Nodes
+## Node
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `flow.assert` | `Input` -> `Result`, `Passed`, `Failed`, `Errors` | Evaluates an expression and emits assertion results plus routed input values. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `FlowAssertionComponent<TInput>` | `Input` -> `Output` (result), `Passed`, `Failed` | Evaluates an input against a boolean expression. |
 
-The package does not choose an expression language. Applications provide one or
-more `IFlowExpressionEngine` implementations during registration.
+Every message travels as a `FlowMessage<T>` envelope. The assertion result is
+broadcast on `Output` as `FlowMessage<FlowAssertionResult>`; the original input
+is fanned to `Passed` when the assertion holds or `Failed` when it does not (each
+`FlowMessage<TInput>`). All three carry the same correlation id as the input.
+
+The package does not choose an expression language: applications supply an
+`IFlowExpressionEngine` (from `FluxFlow.Mapping`). The node compiles the boolean
+expression once at construction, so each message only evaluates the compiled
+form.
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterAssertionsComponents(options => options
-        .UseExpressionEngine(appExpressionEngine)
-        .RegisterType<AppMessage>("app.message")
-        .UseContextFactory(new AppMessageContextFactory()));
+var node = new FlowAssertionComponent<AppMessage>(
+    new AssertionOptions
+    {
+        Expression = "score >= 10",
+        InputType = "app.message",
+        Description = "score-check",
+        FailureMessage = "Score too low."
+    },
+    appExpressionEngine,
+    contextFactory: new AppMessageContextFactory());
+
+node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
+node.Passed.LinkTo(passedSink, new DataflowLinkOptions { PropagateCompletion = false });
+node.Failed.LinkTo(failedSink, new DataflowLinkOptions { PropagateCompletion = false });
+
+await node.Input.SendAsync(FlowMessage.Create(new AppMessage(score: 12)));
 ```
 
-Basic configuration:
+`AssertionOptions` validates at construction: a missing `Expression`, an empty
+`InputType`, or a non-positive `BoundedCapacity` throws
+`InvalidOperationException` — configuration mistakes fail fast.
 
-```json
-{
-  "type": "flow.assert",
-  "inputType": "object",
-  "engine": "my-engine",
-  "expressionId": "assert-v1",
-  "expressionName": "valid-message",
-  "description": "message is valid",
-  "failureMessage": "Message failed validation.",
-  "expression": "..."
-}
+## Mapping context
+
+By default the node exposes the input as the `input` and `value` variables to the
+expression engine. Pass an `IFlowMapContextFactory<TInput>` (from
+`FluxFlow.Mapping`) to project named variables from the payload — for example a
+`score` variable read by a `score >= 10` expression.
+
+## Behavior
+
+A failing assertion is not an error: the node emits a `FlowAssertionResult` with
+`Status = Failed` and routes the original input to `Failed`. A passing assertion
+emits a result and routes the input to `Passed`. Routing can be suppressed per
+port via `AssertionOptions.EmitPassedInput` / `EmitFailedInput`. Expression
+evaluation failures emit a `FlowError` on `Errors` (carrying the input's
+correlation id and `AssertionErrorCodes.ExpressionFailed`) and the node keeps
+processing later messages. Per-message `flow.assert.evaluated` /
+`flow.assert.failed` events flow on the `Events` port.
+
+## Runtime timing
+
+Assertion results use the node's clock for `EvaluatedAt` (default
+`TimeProvider.System`). Provide a deterministic clock for tests:
+
+```csharp
+new FlowAssertionComponent<object>(options, engine, clock: new FakeTimeProvider(timestamp));
 ```
-
-`inputType` defaults to `object`. Register type aliases when an assertion node
-needs to connect to typed ports. Omit `engine` to use the default expression
-engine configured by the host.
-
-False assertions emit a `FlowAssertionResult` and route the original input to
-`Failed`. True assertions emit a result and route the original input to
-`Passed`. Expression evaluation failures emit `FlowError` and the node
-continues processing later messages.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
-
-## Composition Guidance
-
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.

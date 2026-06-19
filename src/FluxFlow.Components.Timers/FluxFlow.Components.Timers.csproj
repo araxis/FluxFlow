@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,23 +6,19 @@
     <PackageId>FluxFlow.Components.Timers</PackageId>
     <AssemblyName>FluxFlow.Components.Timers</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable timer components for FluxFlow.</Description>
+    <Description>Standalone timer nodes for FluxFlow: interval and cron-schedule sources plus delay, throttle, and debounce transforms over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;timers</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke ITimerClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt on the FluxFlow.Nodes kit: timer.interval and timer.schedule are FlowSource&lt;T&gt; sources (started via StartAsync, ticks minted as FlowMessage envelopes), and timer.delay/throttle/debounce are FlowNode&lt;TInput, TInput&gt; transforms that preserve the message correlation id and time off the injected TimeProvider. The engine factories, module, registration extensions, design-metadata provider, the definition-options reader, and the string-to-Type resolution layer are removed; each node takes its settings record and TimeProvider directly and depends only on FluxFlow.Nodes (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

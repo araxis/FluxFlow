@@ -4,14 +4,19 @@ namespace FluxFlow.Components.Storage.Tests;
 
 /// <summary>
 /// A minimal in-memory <see cref="IStorageStore"/> test double that supports the
-/// four operations end to end. Tracks dispose calls so tests can assert a store is
-/// disposed exactly once when the resource is disconnected/disposed (Owned lease).
+/// four operations end to end. An optional <see cref="FailWith"/> hook lets a test
+/// drive the store-failure path (the node should surface a <see cref="FluxFlow.Nodes.FlowError"/>
+/// on its Errors port and keep processing). Tracks dispose calls so a test can assert
+/// the host disposes the store, mirroring the shipped adapters.
 /// </summary>
 internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly Dictionary<(string Collection, string Key), StorageRecord> _records = [];
     private int _disposeCalls;
+
+    /// <summary>When set, every operation throws this exception (store-failure path).</summary>
+    public Func<Exception>? FailWith { get; set; }
 
     public int DisposeCalls => Volatile.Read(ref _disposeCalls);
 
@@ -32,6 +37,7 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfFailing();
 
         var collection = Required(request.Collection, "collection");
         var key = Required(request.Key, "key");
@@ -72,6 +78,7 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfFailing();
 
         var collection = Required(request.Collection, "collection");
         var key = Required(request.Key, "key");
@@ -92,6 +99,7 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfFailing();
 
         var collection = Required(request.Collection, "collection");
         lock (_gate)
@@ -102,6 +110,7 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
                     record.Key.StartsWith(request.KeyPrefix, StringComparison.Ordinal))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal)
+                .Skip(request.Offset ?? 0)
                 .Take(request.Limit ?? int.MaxValue)
                 .Select(CopyRecord)
                 .ToArray();
@@ -116,6 +125,7 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfFailing();
 
         var collection = Required(request.Collection, "collection");
         var key = Required(request.Key, "key");
@@ -143,6 +153,14 @@ internal sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         Interlocked.Increment(ref _disposeCalls);
         return ValueTask.CompletedTask;
+    }
+
+    private void ThrowIfFailing()
+    {
+        if (FailWith is { } factory)
+        {
+            throw factory();
+        }
     }
 
     private static string Required(string? value, string name)

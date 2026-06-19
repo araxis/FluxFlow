@@ -2,58 +2,82 @@ using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Expectations.Nodes;
 
-public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone event-expectation node. Post a <c>FlowMessage&lt;ProjectionEvent&gt;</c>
+/// to <c>Input</c>; the node watches for an event that matches its configured
+/// <see cref="EventFilter"/> and resolves exactly once into a single
+/// <c>FlowMessage&lt;EventExpectationResult&gt;</c> broadcast on <c>Output</c>
+/// (failures on <c>Errors</c>, diagnostics on <c>Events</c>). An
+/// <see cref="EventExpectationNodeKind.Expect"/> node is satisfied when a matching
+/// event arrives; a <see cref="EventExpectationNodeKind.Guard"/> node is satisfied
+/// when none arrives. The node resolves on the first of three triggers: a matching
+/// event, a configured timeout (armed over the injected <see cref="TimeProvider"/>),
+/// or input completion via <see cref="CompleteWithResultAsync"/>. Works with nothing
+/// but <c>new EventExpectationNode(options)</c> — no engine. Events are processed
+/// strictly in order on a single worker so resolution stays consistent.
+/// </summary>
+public sealed class EventExpectationNode : FlowNode<ProjectionEvent, EventExpectationResult>
 {
+    // Reference-identity sentinel posted through the ordered input pump to resolve the
+    // expectation once every real event ahead of it has been folded in. Carrying the
+    // completion-resolution in-band keeps it ordered behind every observed event.
+    private static readonly ProjectionEvent CompletionSentinel = new()
+    {
+        Timestamp = default,
+        Type = "__complete__",
+        Source = "__complete__"
+    };
+
     private readonly object _stateLock = new();
-    private readonly EventExpectationSettings _settings;
+    private readonly EventExpectationOptions _options;
+    private readonly EventFilter _filter;
     private readonly TimeProvider _clock;
     private readonly EventExpectationNodeKind _kind;
-    private readonly ActionBlock<FlowEvent> _input;
-    private readonly BufferBlock<EventExpectationResult> _result;
+    private readonly TimeSpan? _timeout;
     private readonly List<EventSummary> _observedEvents = [];
-    private CancellationTokenSource? _timeoutCancellation;
-    private Task? _timeoutTask;
-    private bool _started;
+    private ITimer? _timeoutTimer;
+    private CorrelationId? _lastCorrelationId;
     private bool _resolved;
-    private bool _disposed;
 
-    internal EventExpectationNode(
-        EventExpectationSettings settings,
-        TimeProvider clock,
-        EventExpectationNodeKind kind)
-    {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        _kind = kind;
-        if (settings.BoundedCapacity <= 0)
+    public EventExpectationNode(
+        EventExpectationOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings),
-                "event expectation bounded capacity must be greater than zero.");
-        }
+            InputCapacity = (options ?? new EventExpectationOptions()).BoundedCapacity,
+            MaxDegreeOfParallelism = 1
+        })
+    {
+        _options = options ?? new EventExpectationOptions();
+        // A null filter means match-all (the matcher and the result copy both expect a value).
+        _filter = _options.Filter ?? new EventFilter();
+        _clock = clock ?? TimeProvider.System;
+        _kind = _options.Kind;
 
-        _input = new ActionBlock<FlowEvent>(
-            ProcessEvent,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = settings.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _result = new BufferBlock<EventExpectationResult>(
-            new DataflowBlockOptions { BoundedCapacity = settings.BoundedCapacity });
-        CompleteWhen(_input.Completion);
+        Validate(_options);
+
+        _timeout = _options.TimeoutMilliseconds.HasValue
+            ? TimeSpan.FromMilliseconds(_options.TimeoutMilliseconds.Value)
+            : null;
+
+        // Arm the timeout over the injected TimeProvider so a host (or a test with a
+        // FakeTimeProvider) drives it deterministically — no real-time wait.
+        if (_timeout is { } timeout)
+        {
+            _timeoutTimer = _clock.CreateTimer(
+                static state => ((EventExpectationNode)state!).OnTimeout(),
+                this,
+                timeout,
+                Timeout.InfiniteTimeSpan);
+        }
     }
 
-    public ITargetBlock<FlowEvent> Input => _input;
-
-    public ISourceBlock<EventExpectationResult> Result => _result;
-
+    /// <summary>Number of events observed so far (matching or not), capped at the configured max.</summary>
     public int ObservedEventCount
     {
         get
@@ -65,98 +89,36 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
         }
     }
 
-    public override Task StartAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Resolves the expectation against input completion, emitting the
+    /// not-matched/completed result first when no earlier trigger fired. The
+    /// resolution is sent through the ordered input pump, so it lands behind every
+    /// event already posted before the node completes.
+    /// </summary>
+    public async Task CompleteWithResultAsync()
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_stateLock)
-        {
-            if (_started)
-            {
-                throw new InvalidOperationException("event expectation node has already started.");
-            }
-
-            _started = true;
-            if (_settings.Timeout.HasValue)
-            {
-                _timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                _timeoutTask = RunTimeoutAsync(_timeoutCancellation.Token);
-            }
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        CancelTimeout();
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
+        await Input.SendAsync(FlowMessage.Create(CompletionSentinel)).ConfigureAwait(false);
         Complete();
-        CancelTimeout();
+    }
 
+    protected override Task ProcessAsync(FlowMessage<ProjectionEvent> message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        if (ReferenceEquals(message.Payload, CompletionSentinel))
+        {
+            ResolveOnCompletion();
+            return Task.CompletedTask;
+        }
+
+        var flowEvent = message.Payload;
         try
         {
-            await _input.Completion.ConfigureAwait(false);
-            if (_timeoutTask is not null)
-            {
-                await _timeoutTask.ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            _timeoutCancellation?.Dispose();
-        }
-    }
-
-    protected override void OnNodeCompleted()
-    {
-        CancelTimeout();
-        ResolveOnCompletion();
-        _result.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        CancelTimeout();
-        ((IDataflowBlock)_result).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private Task ProcessEvent(FlowEvent flowEvent)
-    {
-        try
-        {
-            ArgumentNullException.ThrowIfNull(flowEvent);
+            _lastCorrelationId = message.CorrelationId;
             var summary = CreateSummary(flowEvent);
             RememberObservedEvent(summary);
 
-            if (!EventFilterMatcher.IsMatch(flowEvent, _settings.Filter))
+            if (!EventFilterMatcher.IsMatch(flowEvent, _filter))
             {
                 return Task.CompletedTask;
             }
@@ -168,7 +130,8 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                     matched: true,
                     timedOut: false,
                     matchedEvent: summary,
-                    reason: "Matching event observed.");
+                    reason: "Matching event observed.",
+                    correlationId: message.CorrelationId);
             }
             else
             {
@@ -177,53 +140,66 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                     matched: true,
                     timedOut: false,
                     matchedEvent: summary,
-                    reason: "Guarded event observed.");
+                    reason: "Guarded event observed.",
+                    correlationId: message.CorrelationId);
             }
         }
         catch (Exception exception)
         {
-            TryReportError(
-                ExpectationsErrorCodes.EvaluationFailed,
-                $"event expectation failed: {exception.Message}",
-                exception,
-                CreateEventContext(flowEvent));
-            TryEmitDiagnostic(
-                ExpectationDiagnosticNames.EvaluationFailed,
-                FlowDiagnosticLevel.Error,
-                "event expectation failed.",
-                exception,
-                CreateEventAttributes(flowEvent));
+            EmitError(new FlowError
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Code = ExpectationsErrorCodes.EvaluationFailed,
+                Message = $"event expectation failed: {exception.Message}",
+                Context = CreateEventContext(flowEvent),
+                Exception = exception
+            });
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = ExpectationDiagnosticNames.EvaluationFailed,
+                Level = FlowEventLevel.Error,
+                Message = "event expectation failed.",
+                Attributes = CreateEventAttributes(flowEvent)
+            });
         }
 
         return Task.CompletedTask;
     }
 
-    private async Task RunTimeoutAsync(CancellationToken cancellationToken)
+    protected override ValueTask OnDisposeAsync()
     {
-        try
+        // The pump has drained and the output port is closed by the base node, so a
+        // pending expectation can no longer emit. Resolution before completion is the
+        // caller's job via CompleteWithResultAsync; here we only tear the timer down.
+        _timeoutTimer?.Dispose();
+        _timeoutTimer = null;
+        return ValueTask.CompletedTask;
+    }
+
+    private void OnTimeout()
+    {
+        if (_kind == EventExpectationNodeKind.Expect)
         {
-            await Task.Delay(_settings.Timeout!.Value, _clock, cancellationToken).ConfigureAwait(false);
-            if (_kind == EventExpectationNodeKind.Expect)
-            {
-                Resolve(
-                    satisfied: false,
-                    matched: false,
-                    timedOut: true,
-                    matchedEvent: null,
-                    reason: "Expected event was not observed before timeout.");
-            }
-            else
-            {
-                Resolve(
-                    satisfied: true,
-                    matched: false,
-                    timedOut: true,
-                    matchedEvent: null,
-                    reason: "Guard timeout completed without a matching event.");
-            }
+            Resolve(
+                satisfied: false,
+                matched: false,
+                timedOut: true,
+                matchedEvent: null,
+                reason: "Expected event was not observed before timeout.",
+                correlationId: _lastCorrelationId);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        else
         {
+            Resolve(
+                satisfied: true,
+                matched: false,
+                timedOut: true,
+                matchedEvent: null,
+                reason: "Guard timeout completed without a matching event.",
+                correlationId: _lastCorrelationId);
         }
     }
 
@@ -236,7 +212,8 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                 matched: false,
                 timedOut: false,
                 matchedEvent: null,
-                reason: "Input completed before a matching event was observed.");
+                reason: "Input completed before a matching event was observed.",
+                correlationId: _lastCorrelationId);
         }
         else
         {
@@ -245,7 +222,8 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                 matched: false,
                 timedOut: false,
                 matchedEvent: null,
-                reason: "Input completed without a matching event.");
+                reason: "Input completed without a matching event.",
+                correlationId: _lastCorrelationId);
         }
     }
 
@@ -254,7 +232,8 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
         bool matched,
         bool timedOut,
         EventSummary? matchedEvent,
-        string reason)
+        string reason,
+        CorrelationId? correlationId)
     {
         EventExpectationResult result;
         lock (_stateLock)
@@ -268,7 +247,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
             result = new EventExpectationResult
             {
                 EvaluatedAt = _clock.GetUtcNow(),
-                Name = _settings.Name,
+                Name = _options.Name,
                 Kind = _kind == EventExpectationNodeKind.Expect
                     ? EventExpectationResultKind.Expect
                     : EventExpectationResultKind.Guard,
@@ -277,33 +256,46 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                 TimedOut = timedOut,
                 MatchedEvent = matchedEvent,
                 ObservedEvents = _observedEvents.ToArray(),
-                Filter = CopyFilter(_settings.Filter),
+                Filter = CopyFilter(_filter),
                 Reason = reason
             };
         }
 
-        EmitResult(result);
+        // The matched event drives the result's correlation id when there was a match;
+        // otherwise it rides the last observed event's id, or is a fresh exchange.
+        var message = correlationId is { } id
+            ? new FlowMessage<EventExpectationResult>(id, result)
+            : FlowMessage.Create(result);
+        EmitResult(message);
         EmitResultDiagnostic(result);
         return true;
     }
 
-    private void EmitResult(EventExpectationResult result)
+    private void EmitResult(FlowMessage<EventExpectationResult> message)
     {
-        if (_result.Post(result))
+        if (Emit(message))
         {
             return;
         }
 
-        var message = "event expectation result output was full; result was dropped.";
-        TryReportError(
-            ExpectationsErrorCodes.ResultDropped,
-            message,
-            context: CreateResultContext(result));
-        TryEmitDiagnostic(
-            ExpectationDiagnosticNames.ResultDropped,
-            FlowDiagnosticLevel.Warning,
-            message,
-            attributes: CreateResultAttributes(result));
+        var text = "event expectation result output was full; result was dropped.";
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Code = ExpectationsErrorCodes.ResultDropped,
+            Message = text,
+            Context = CreateResultContext(message.Payload)
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = ExpectationDiagnosticNames.ResultDropped,
+            Level = FlowEventLevel.Warning,
+            Message = text,
+            Attributes = CreateResultAttributes(message.Payload)
+        });
     }
 
     private void EmitResultDiagnostic(EventExpectationResult result)
@@ -313,16 +305,20 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
             : result.TimedOut
                 ? ExpectationDiagnosticNames.TimedOut
                 : ExpectationDiagnosticNames.Completed;
-        TryEmitDiagnostic(
-            name,
-            result.Satisfied ? FlowDiagnosticLevel.Information : FlowDiagnosticLevel.Warning,
-            result.Reason,
-            attributes: CreateResultAttributes(result));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = _lastCorrelationId,
+            Name = name,
+            Level = result.Satisfied ? FlowEventLevel.Information : FlowEventLevel.Warning,
+            Message = result.Reason,
+            Attributes = CreateResultAttributes(result)
+        });
     }
 
     private void RememberObservedEvent(EventSummary summary)
     {
-        if (_settings.MaxObservedEvents == 0)
+        if (_options.MaxObservedEvents == 0)
         {
             return;
         }
@@ -330,20 +326,20 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
         lock (_stateLock)
         {
             _observedEvents.Add(summary);
-            while (_observedEvents.Count > _settings.MaxObservedEvents)
+            while (_observedEvents.Count > _options.MaxObservedEvents)
             {
                 _observedEvents.RemoveAt(0);
             }
         }
     }
 
-    private EventSummary CreateSummary(FlowEvent flowEvent)
+    private EventSummary CreateSummary(ProjectionEvent flowEvent)
         => new()
         {
             Timestamp = flowEvent.Timestamp,
             Type = flowEvent.Type,
             Source = flowEvent.Source,
-            SourceNodeId = flowEvent.SourceNodeId?.ToString(),
+            SourceNodeId = flowEvent.SourceNodeId,
             Subject = flowEvent.Subject,
             Status = flowEvent.Status,
             Channel = flowEvent.Channel,
@@ -354,21 +350,40 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
 
     private string? Truncate(string? value)
     {
-        if (value is null || _settings.MaxPreviewChars <= 0)
+        if (value is null || _options.MaxPreviewChars <= 0)
         {
             return null;
         }
 
-        return value.Length <= _settings.MaxPreviewChars
+        return value.Length <= _options.MaxPreviewChars
             ? value
-            : value[.._settings.MaxPreviewChars];
+            : value[.._options.MaxPreviewChars];
     }
 
-    private void CancelTimeout()
+    private static void Validate(EventExpectationOptions options)
     {
-        lock (_stateLock)
+        if (options.TimeoutMilliseconds.HasValue && options.TimeoutMilliseconds.Value <= 0)
         {
-            _timeoutCancellation?.Cancel();
+            throw new InvalidOperationException(
+                "event expectation option 'timeoutMilliseconds' must be greater than zero when set.");
+        }
+
+        if (options.MaxObservedEvents < 0)
+        {
+            throw new InvalidOperationException(
+                "event expectation option 'maxObservedEvents' must be zero or greater.");
+        }
+
+        if (options.MaxPreviewChars < 0)
+        {
+            throw new InvalidOperationException(
+                "event expectation option 'maxPreviewChars' must be zero or greater.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException(
+                "event expectation option 'boundedCapacity' must be greater than zero.");
         }
     }
 
@@ -396,7 +411,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
             ["matchedChannel"] = result.MatchedEvent?.Channel
         };
 
-    private static Dictionary<string, object?> CreateEventAttributes(FlowEvent? flowEvent)
+    private static Dictionary<string, object?> CreateEventAttributes(ProjectionEvent? flowEvent)
         => new(StringComparer.Ordinal)
         {
             ["type"] = flowEvent?.Type,
@@ -416,7 +431,7 @@ public sealed class EventExpectationNode : FlowNodeBase, IAsyncDisposable
                 $"timedOut={result.TimedOut}"
             ]);
 
-    private static string CreateEventContext(FlowEvent? flowEvent)
+    private static string CreateEventContext(ProjectionEvent? flowEvent)
     {
         if (flowEvent is null)
         {

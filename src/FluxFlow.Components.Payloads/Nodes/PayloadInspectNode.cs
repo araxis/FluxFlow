@@ -1,15 +1,24 @@
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
-using FluxFlow.Engine.Components;
+using FluxFlow.Nodes;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using System.Xml.Linq;
 
 namespace FluxFlow.Components.Payloads.Nodes;
 
-public sealed class PayloadInspectNode : FlowNodeBase
+/// <summary>
+/// A standalone payload-inspection node. Post a
+/// <c>FlowMessage&lt;PayloadInspectionRequest&gt;</c> to <c>Input</c>; the node
+/// classifies the payload (JSON object/array/scalar, XML, base64, text, binary,
+/// empty), builds bounded text/formatted previews, and broadcasts a
+/// <c>FlowMessage&lt;PayloadInspectionResult&gt;</c> on <c>Output</c> carrying the
+/// same correlation id. An unsupported encoding hint (or any unexpected failure)
+/// goes to the <c>Errors</c> port; a diagnostic note goes to <c>Events</c>. Works
+/// with nothing but <c>new PayloadInspectNode()</c> — no engine.
+/// </summary>
+public sealed class PayloadInspectNode : FlowNode<PayloadInspectionRequest, PayloadInspectionResult>
 {
     private static readonly JsonSerializerOptions FormattedJsonOptions = new()
     {
@@ -17,68 +26,56 @@ public sealed class PayloadInspectNode : FlowNodeBase
     };
 
     private readonly PayloadInspectOptions _options;
-    private readonly ActionBlock<PayloadInspectionRequest> _input;
-    private readonly BufferBlock<PayloadInspectionResult> _output;
+    private readonly TimeProvider _clock;
 
-    internal PayloadInspectNode(PayloadInspectOptions options)
+    public PayloadInspectNode(
+        PayloadInspectOptions? options = null,
+        TimeProvider? clock = null)
+        : base(BuildFlowOptions(options ?? PayloadInspectOptions.Default))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options ?? PayloadInspectOptions.Default;
+        _clock = clock ?? TimeProvider.System;
+    }
+
+    // Validates the domain options BEFORE the base constructor runs, so the
+    // payload-specific message (not the generic FlowNode one) surfaces.
+    private static FlowNodeOptions BuildFlowOptions(PayloadInspectOptions options)
+    {
+        if (options.MaxInputBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "payload.inspect option 'maxInputBytes' must be greater than zero.");
+        }
+
+        if (options.MaxPreviewBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "payload.inspect option 'maxPreviewBytes' must be greater than zero.");
+        }
+
+        if (options.MaxFormattedChars <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "payload.inspect option 'maxFormattedChars' must be greater than zero.");
+        }
+
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "Payload inspect bounded capacity must be greater than zero.");
+                "payload.inspect option 'boundedCapacity' must be greater than zero.");
         }
 
-        _input = new ActionBlock<PayloadInspectionRequest>(
-            InspectAsync,
-            new ExecutionDataflowBlockOptions
-            {
-                BoundedCapacity = options.BoundedCapacity,
-                EnsureOrdered = true,
-                MaxDegreeOfParallelism = 1
-            });
-        _output = new BufferBlock<PayloadInspectionResult>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        CompleteWhen(_input.Completion);
+        return new FlowNodeOptions { InputCapacity = options.BoundedCapacity };
     }
 
-    public ITargetBlock<PayloadInspectionRequest> Input => _input;
-
-    public ISourceBlock<PayloadInspectionResult> Output => _output;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<PayloadInspectionRequest> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_output).Fault(exception);
-        }
-    }
-
-    protected override void OnNodeCompleted()
-    {
-        _output.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_output).Fault(exception);
-        base.OnNodeFaulted(exception);
-    }
-
-    private async Task InspectAsync(PayloadInspectionRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(message);
+        var request = message.Payload;
 
         PayloadInspectionResult result;
         try
@@ -90,25 +87,32 @@ public sealed class PayloadInspectNode : FlowNodeBase
             ReportInspectionError(
                 exception.Code,
                 exception.Message,
-                request,
+                message,
                 exception.InnerException);
-            return;
+            return Task.CompletedTask;
         }
         catch (Exception exception)
         {
             ReportInspectionError(
                 PayloadErrorCodes.InspectFailed,
                 $"payload.inspect failed: {exception.Message}",
-                request,
+                message,
                 exception);
-            return;
+            return Task.CompletedTask;
         }
 
-        await _output.SendAsync(result).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            PayloadDiagnosticNames.Inspected,
-            message: "payload.inspect classified input.",
-            attributes: CreateAttributes(result));
+        // Carry the correlation id forward onto the result.
+        Emit(message.With(result));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = PayloadDiagnosticNames.Inspected,
+            Level = FlowEventLevel.Information,
+            Message = "payload.inspect classified input.",
+            Attributes = CreateAttributes(result)
+        });
+        return Task.CompletedTask;
     }
 
     private PayloadInspectionResult Inspect(PayloadInspectionRequest request)
@@ -119,6 +123,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return new PayloadInspectionResult
             {
+                Timestamp = _clock.GetUtcNow(),
                 Kind = request.Text is null ? PayloadKind.Binary : PayloadKind.Text,
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = inputByteCount,
@@ -133,6 +138,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return new PayloadInspectionResult
             {
+                Timestamp = _clock.GetUtcNow(),
                 Kind = PayloadKind.Empty,
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = 0,
@@ -146,6 +152,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return new PayloadInspectionResult
             {
+                Timestamp = _clock.GetUtcNow(),
                 Kind = PayloadKind.Binary,
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = payload.ByteCount,
@@ -161,6 +168,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return jsonResult with
             {
+                Timestamp = _clock.GetUtcNow(),
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = payload.ByteCount,
                 DetectedEncoding = payload.EncodingName,
@@ -173,6 +181,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return xmlResult with
             {
+                Timestamp = _clock.GetUtcNow(),
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = payload.ByteCount,
                 DetectedEncoding = payload.EncodingName,
@@ -186,6 +195,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
         {
             return base64Result with
             {
+                Timestamp = _clock.GetUtcNow(),
                 ContentType = NormalizeContentType(request.ContentType),
                 ByteCount = payload.ByteCount,
                 DetectedEncoding = payload.EncodingName,
@@ -196,6 +206,7 @@ public sealed class PayloadInspectNode : FlowNodeBase
 
         return new PayloadInspectionResult
         {
+            Timestamp = _clock.GetUtcNow(),
             Kind = PayloadKind.Text,
             ContentType = NormalizeContentType(request.ContentType),
             ByteCount = payload.ByteCount,
@@ -556,19 +567,31 @@ public sealed class PayloadInspectNode : FlowNodeBase
     private void ReportInspectionError(
         int code,
         string message,
-        PayloadInspectionRequest request,
+        FlowMessage<PayloadInspectionRequest> source,
         Exception? exception = null)
     {
-        TryReportError(code, message, exception, CreateErrorContext(request));
-        TryEmitDiagnostic(
-            PayloadDiagnosticNames.Failed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            CreateAttributes(request));
+        var request = source.Payload;
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = CreateErrorContext(request),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = PayloadDiagnosticNames.Failed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = CreateAttributes(request)
+        });
     }
 
-    private Dictionary<string, object?> CreateAttributes(PayloadInspectionRequest request)
+    private static Dictionary<string, object?> CreateAttributes(PayloadInspectionRequest request)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {

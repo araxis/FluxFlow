@@ -1,8 +1,6 @@
-using FluxFlow.Components.Timers.Diagnostics;
+using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -12,276 +10,172 @@ namespace FluxFlow.Components.Timers.Tests;
 public sealed class TimerDebounceNodeTests
 {
     [Fact]
-    public async Task Debounce_EmitsLatestInputAfterQuietPeriod()
+    public async Task Debounce_EmitsLatestPendingOnCompletion_PreservingCorrelation()
     {
-        var runtimeNode = CreateNode(
-            options => options.RegisterType<InputMessage>("message"),
-            new
+        await using var node = new TimerDebounceNode<InputMessage>(
+            new TimerDebounceSettings
             {
-                inputType = "message",
-                name = "quiet",
-                quietPeriodMilliseconds = 40,
-                boundedCapacity = 4
+                Name = "quiet",
+                QuietPeriod = TimeSpan.FromMilliseconds(40),
+                BoundedCapacity = 4
             });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var output = new BufferBlock<InputMessage>();
-        LinkOutput(runtimeNode, output);
-        var startedAt = DateTimeOffset.UtcNow;
+        var output = TimerTestSink.Link(node.Output);
+        var first = FlowMessage.Create(new InputMessage("one"));
+        var latest = FlowMessage.Create(new InputMessage("two"));
 
-        await input.Target.SendAsync(new InputMessage("one"));
-        await input.Target.SendAsync(new InputMessage("two"));
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(latest);
+        // Completing the input short-circuits the quiet wait and flushes only the latest.
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var emitted = (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        emitted.Payload.Value.ShouldBe("two");
+        emitted.CorrelationId.ShouldBe(latest.CorrelationId);
+    }
 
-        value.Value.ShouldBe("two");
-        DateTimeOffset.UtcNow.ShouldBeGreaterThanOrEqualTo(startedAt.AddMilliseconds(25));
+    [Fact]
+    public async Task Debounce_EmitsAfterQuietPeriodElapses()
+    {
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerDebounceNode<string>(
+            new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(40) },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
+
+        var scheduled = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        // The item is held until the quiet period elapses with no further input.
+        output.TryReceive(out _).ShouldBeFalse();
+        clock.Advance(TimeSpan.FromMilliseconds(40));
+
+        var emitted = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        emitted.Payload.ShouldBe("one");
     }
 
     [Fact]
     public async Task Debounce_FlushesPendingInputOnCompletion()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                quietPeriodMilliseconds = 1000
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
+        // A long quiet period would never elapse on its own; completing the input must
+        // flush the single pending item promptly.
+        await using var node = new TimerDebounceNode<string>(
+            new TimerDebounceSettings { QuietPeriod = TimeSpan.FromSeconds(1000) });
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync("one");
-        input.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        node.Complete();
 
-        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(250));
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        value.ShouldBe("one");
+        var value = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        value.Payload.ShouldBe("one");
     }
 
     [Fact]
     public async Task Debounce_EmitsLatestPerQuietWindow()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerDebounceNode<int>(
+            new TimerDebounceSettings
             {
-                inputType = "int",
-                quietPeriodMilliseconds = 25,
-                boundedCapacity = 8
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<int>();
-        LinkOutput(runtimeNode, output);
+                QuietPeriod = TimeSpan.FromMilliseconds(25),
+                BoundedCapacity = 8
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync(1);
-        await input.Target.SendAsync(2);
+        // First window: 1 then 2 arrive; only the latest (2) survives the quiet period.
+        // Send each item and wait until its quiet-period timer is armed before advancing,
+        // so both items have been observed (the later one supersedes the earlier).
+        var scheduled1 = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await scheduled1.WaitAsync(TimeSpan.FromSeconds(30));
+        var scheduled2 = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create(2));
+        await scheduled2.WaitAsync(TimeSpan.FromSeconds(30));
+        clock.Advance(TimeSpan.FromMilliseconds(25));
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await input.Target.SendAsync(3);
-        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.ShouldBe(2);
-        second.ShouldBe(3);
+        // Second window: a single later item (3) is emitted in its own window.
+        var scheduled3 = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create(3));
+        await scheduled3.WaitAsync(TimeSpan.FromSeconds(30));
+        clock.Advance(TimeSpan.FromMilliseconds(25));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        first.Payload.ShouldBe(2);
+        second.Payload.ShouldBe(3);
     }
 
     [Fact]
-    public async Task Debounce_EmitsDiagnostics()
+    public async Task Debounce_EmitsEvents()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                quietPeriodMilliseconds = 1
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        LinkOutput(runtimeNode, output);
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(
-                diagnostics,
-                new DataflowLinkOptions { PropagateCompletion = true });
+        await using var node = new TimerDebounceNode<string>(
+            new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(1) });
+        var output = TimerTestSink.Link(node.Output);
+        var events = TimerTestSink.Link(node.Events);
 
-        await input.Target.SendAsync("hello");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create("hello"));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["hello"]);
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(TimerDiagnosticNames.DebounceEmitted);
-        diagnostic.Attributes["inputType"].ShouldBe("string");
-        diagnostic.Attributes["sequence"].ShouldBe(1L);
+        (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
+        var flowEvent = (await TimerTestSink.DrainUntilCompletedAsync(events))
+            .ShouldHaveSingleItem();
+        flowEvent.Name.ShouldBe(TimerDebounceNode<string>.Emitted);
+        flowEvent.Attributes["inputType"].ShouldBe(nameof(String));
+        flowEvent.Attributes["sequence"].ShouldBe(1L);
     }
 
     [Fact]
     public async Task Debounce_DisposeFlushesAndCompletesOutput()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                quietPeriodMilliseconds = 1000
-            });
-        var input = runtimeNode.FindInput(new PortName(TimerComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<string>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new TimerDebounceNode<string>(
+            new TimerDebounceSettings { QuietPeriod = TimeSpan.FromSeconds(1000) });
+        var output = TimerTestSink.Link(node.Output);
 
-        await input.Target.SendAsync("one");
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync();
+        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.DisposeAsync();
 
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        (await DrainUntilCompletedAsync(output)).ShouldBe(["one"]);
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        (await TimerTestSink.DrainUntilCompletedAsync(output))
+            .Select(message => message.Payload)
+            .ShouldBe(["one"]);
     }
 
     [Fact]
     public async Task Debounce_DisposeAfterFaultDoesNotThrow()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                inputType = "string",
-                quietPeriodMilliseconds = 1
-            });
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .LinkToDiscard();
+        var node = new TimerDebounceNode<string>(
+            new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(1) });
+        TimerTestSink.Link(node.Output);
 
-        runtimeNode.Node.Fault(new InvalidOperationException("boom"));
-        await runtimeNode.Node.ShouldBeAssignableTo<IAsyncDisposable>()!
-            .DisposeAsync()
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(30));
+        node.Fault(new InvalidOperationException("boom"));
+        await node.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
 
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => runtimeNode.Node.Completion);
-    }
-
-    [Fact]
-    public void Debounce_RejectsMissingQuietPeriod()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(_ => { }, new { inputType = "string" }));
-
-        exception.Message.ShouldContain("quietPeriod");
+        await Should.ThrowAsync<InvalidOperationException>(() => node.Completion);
     }
 
     [Fact]
     public void Debounce_RejectsNonPositiveQuietPeriod()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "string",
-                    quietPeriodMilliseconds = 0
-                }));
-
-        exception.Message.ShouldContain("quietPeriod");
-    }
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerDebounceNode<string>(
+                new TimerDebounceSettings { QuietPeriod = TimeSpan.Zero }))
+            .Message.ShouldContain("QuietPeriod");
 
     [Fact]
     public void Debounce_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new TimerDebounceNode<string>(
+                new TimerDebounceSettings
                 {
-                    inputType = "string",
-                    quietPeriodMilliseconds = 1,
-                    boundedCapacity = 0
+                    QuietPeriod = TimeSpan.FromMilliseconds(1),
+                    BoundedCapacity = 0
                 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
 
     [Fact]
-    public void Debounce_RejectsUnknownInputType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "message",
-                    quietPeriodMilliseconds = 1
-                }));
-
-        exception.Message.ShouldContain("message");
-    }
-
-    [Fact]
-    public void Debounce_RejectsDuplicateQuietPeriodOptions()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "string",
-                    quietPeriod = TimeSpan.FromMilliseconds(1),
-                    quietPeriodMilliseconds = 1
-                }));
-
-        exception.Message.ShouldContain("quietPeriod");
-    }
-
-    private static RuntimeNode CreateNode(
-        Action<TimerComponentOptions> configure,
-        object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterTimerComponents(configure);
-        registry.TryGetFactory(TimerComponentTypes.Debounce, out var factory).ShouldBeTrue();
-        return factory(TimerTestHost.CreateContext(
-            TimerComponentTypes.Debounce,
-            configuration,
-            "debounce"));
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        BufferBlock<T> target)
-    {
-        runtimeNode.FindOutput(new PortName(TimerComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName("items"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var values = new List<T>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values;
-    }
+    public void Debounce_RejectsNullSettings()
+        => Should.Throw<ArgumentNullException>(() => new TimerDebounceNode<string>(null!));
 
     private sealed record InputMessage(string Value);
 }

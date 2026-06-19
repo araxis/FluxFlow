@@ -1,329 +1,347 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.ExceptionServices;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
+using FluxFlow.Nodes;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace FluxFlow.Components.Http.Nodes;
 
 /// <summary>
-/// Owns the HTTP client lifecycle. Establishing and tearing down the shared
-/// request sender is an explicit, host-API-only decision: there is no
-/// auto-connect, no lazy connect, and no in-graph command port. Request nodes
-/// borrow the established sender via <see cref="TryGetSender"/> at call-time
-/// only and never connect or dispose it.
+/// A standalone HTTP node — a "blockified" <see cref="HttpClient"/>. Post a
+/// <c>FlowMessage&lt;HttpRequestInput&gt;</c> to <c>Input</c>; the node sends it
+/// through the injected client and broadcasts a
+/// <c>FlowMessage&lt;HttpResponseOutput&gt;</c> on <c>Output</c> carrying the same
+/// correlation id (failures on <c>Errors</c>, a note on <c>Events</c>). Works with
+/// nothing but <c>new HttpClientNode(httpClient)</c> — no engine. All transport
+/// policy (base address, pooling, redirects, default headers, TLS, any
+/// allow-list/SSRF handler) lives on the injected client; the node never connects
+/// or disposes it.
 /// </summary>
-public sealed class HttpClientNode : FlowNodeBase, IHttpClientHandle, IAsyncDisposable
+public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutput>
 {
-    private readonly NodeAddress _address;
-    private readonly IHttpRequestSenderFactory _senderFactory;
+    public const string RequestSucceeded = "http.request.succeeded";
+    public const string RequestFailed = "http.request.failed";
+
+    private readonly HttpClient _httpClient;
+    private readonly HttpClientNodeOptions _options;
     private readonly TimeProvider _clock;
 
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly CancellationTokenSource _lifecycleCancellation = new();
-
-    private volatile IHttpRequestSender? _sender;
-    private volatile HttpClientConnectionState _state = HttpClientConnectionState.Disconnected;
-
-    private Task<IHttpRequestSender>? _inFlightConnect;
-    private CancellationTokenSource? _connectCts;
-    private bool _userDisconnected;
-    private bool _disposed;
-
-    internal HttpClientNode(
-        NodeAddress address,
-        string clientName,
-        HttpClientOptions options,
-        IHttpRequestSenderFactory senderFactory,
-        TimeProvider clock)
+    public HttpClientNode(
+        HttpClient httpClient,
+        HttpClientNodeOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? HttpClientNodeOptions.Default).BoundedCapacity,
+            MaxDegreeOfParallelism = (options ?? HttpClientNodeOptions.Default).MaxDegreeOfParallelism
+        })
     {
-        ArgumentNullException.ThrowIfNull(address);
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(senderFactory);
-        ArgumentNullException.ThrowIfNull(clock);
-
-        _address = address;
-        _senderFactory = senderFactory;
-        _clock = clock;
-
-        ClientName = clientName;
-        BaseUrl = options.BaseUrl;
-        AllowedHosts = options.AllowedHosts;
-        RestrictToBaseUrlOrigin = options.RestrictToBaseUrlOrigin;
-        FollowRedirects = options.FollowRedirects;
-        DefaultTimeoutMilliseconds = options.DefaultTimeoutMilliseconds;
-        PooledConnectionLifetimeSeconds = options.PooledConnectionLifetimeSeconds;
-        MaxConnectionsPerServer = options.MaxConnectionsPerServer;
-        DefaultHeaders = options.DefaultHeaders;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _options = options ?? HttpClientNodeOptions.Default;
+        _clock = clock ?? TimeProvider.System;
     }
 
-    public string ClientName { get; }
-
-    public string? BaseUrl { get; }
-
-    public IReadOnlyList<string> AllowedHosts { get; }
-
-    public bool RestrictToBaseUrlOrigin { get; }
-
-    public bool FollowRedirects { get; }
-
-    public int DefaultTimeoutMilliseconds { get; }
-
-    public int? PooledConnectionLifetimeSeconds { get; }
-
-    public int? MaxConnectionsPerServer { get; }
-
-    public IReadOnlyDictionary<string, string> DefaultHeaders { get; }
-
-    public HttpClientConnectionState State => _state;
-
-    // StartAsync stays a no-op: connecting is an explicit host decision.
-
-    public bool TryGetSender([NotNullWhen(true)] out IHttpRequestSender? sender)
+    protected override async Task ProcessAsync(FlowMessage<HttpRequestInput> message)
     {
-        // Lock-free borrow. Read state first, then the sender, so a concurrent
-        // disconnect (which clears the sender before flipping state) can only ever
-        // cause a false negative, never a borrow of a torn-down sender.
-        if (_state == HttpClientConnectionState.Connected)
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
+        var startedAt = _clock.GetUtcNow();
+
+        HttpRequestMessage request;
+        try
         {
-            var current = _sender;
-            if (current is not null)
-            {
-                sender = current;
-                return true;
-            }
+            request = BuildRequest(input);
         }
-
-        sender = null;
-        return false;
-    }
-
-    public async Task ConnectAsync(CancellationToken ct = default)
-    {
-        // Idempotent fast path: already connected.
-        if (_state == HttpClientConnectionState.Connected)
+        catch (InvalidUrlException exception)
         {
+            EmitFailure(HttpErrorCodes.InvalidUrl, exception.Message, message, startedAt);
             return;
         }
 
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
-        Task<IHttpRequestSender> connect;
-        try
+        using (request)
+        using (var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(Stopping))
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            if (_state == HttpClientConnectionState.Connected)
+            var timeout = input.TimeoutMilliseconds ?? _options.DefaultTimeoutMilliseconds;
+            if (timeout is { } milliseconds && milliseconds > 0)
             {
+                requestCancellation.CancelAfter(TimeSpan.FromMilliseconds(milliseconds));
+            }
+
+            var method = request.Method.Method;
+            var url = request.RequestUri?.ToString() ?? _httpClient.BaseAddress?.ToString() ?? input.Url;
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient
+                    .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestCancellation.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception) when (
+                requestCancellation.IsCancellationRequested && !Stopping.IsCancellationRequested)
+            {
+                EmitFailure(HttpErrorCodes.Timeout, "http.client request timed out.", message, startedAt, exception, method: method, url: url);
+                return;
+            }
+            catch (OperationCanceledException exception)
+            {
+                EmitFailure(HttpErrorCodes.Canceled, "http.client request was canceled.", message, startedAt, exception, method: method, url: url);
+                return;
+            }
+            catch (HttpRequestException exception)
+            {
+                EmitFailure(HttpErrorCodes.Network, $"http.client request failed to reach the server: {exception.Message}", message, startedAt, exception, method: method, url: url);
+                return;
+            }
+            catch (Exception exception)
+            {
+                EmitFailure(HttpErrorCodes.SendFailed, $"http.client request failed: {exception.Message}", message, startedAt, exception, method: method, url: url);
                 return;
             }
 
-            // Single-flight: if a connect is already running, capture it, release
-            // the gate, and await it instead of building a second sender.
-            if (_inFlightConnect is not null)
+            using (response)
             {
-                connect = _inFlightConnect;
-            }
-            else
-            {
-                _userDisconnected = false;
+                var (bodyBytes, truncated) = await ReadBodyAsync(response, requestCancellation.Token)
+                    .ConfigureAwait(false);
+                var output = BuildResponse(response, method, bodyBytes, truncated, startedAt);
 
-                // Dispose the previous connect CTS before creating a new one so a
-                // sequence of connects cannot leak cancellation sources.
-                _connectCts?.Dispose();
-                _connectCts = CancellationTokenSource.CreateLinkedTokenSource(
-                    _lifecycleCancellation.Token);
-
-                _state = HttpClientConnectionState.Connecting;
-                connect = EstablishAsync(_connectCts.Token);
-                _inFlightConnect = connect;
-            }
-        }
-        finally
-        {
-            _gate.Release();
-        }
-
-        await connect.ConfigureAwait(false);
-    }
-
-    private async Task<IHttpRequestSender> EstablishAsync(CancellationToken ct)
-    {
-        // Yield off the gate-holding caller so the in-flight Task is observable to a
-        // concurrent ConnectAsync before the sender build runs.
-        await Task.Yield();
-
-        IHttpRequestSender? sender = null;
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var context = new HttpClientSenderContext
-            {
-                Address = _address,
-                Client = this,
-                Clock = _clock
-            };
-
-            sender = _senderFactory.CreateClient(context);
-            ArgumentNullException.ThrowIfNull(sender);
-
-            // Re-acquire the gate to publish. A concurrent DisposeAsync may have
-            // disposed the gate while the factory was building, so a re-acquire can
-            // throw ObjectDisposedException: catch it and STILL dispose the fresh
-            // sender so a torn-down gate never strands an HttpClient.
-            try
-            {
-                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                await sender.DisposeAsync().ConfigureAwait(false);
-                return sender;
-            }
-
-            try
-            {
-                // If a disconnect or dispose won the race while we were building, or
-                // a superseding establish already published a live sender, honor it:
-                // drop the freshly built sender and stay as-is. Never overwrite a
-                // non-null _sender.
-                if (_userDisconnected || _disposed || ct.IsCancellationRequested ||
-                    _sender is not null)
+                if (_options.TreatNonSuccessStatusAsError && !output.Success)
                 {
-                    await sender.DisposeAsync().ConfigureAwait(false);
-                    return sender;
+                    EmitFailure(
+                        HttpErrorCodes.NonSuccessStatus,
+                        $"http.client received non-success status {output.StatusCode}.",
+                        message,
+                        startedAt,
+                        statusCode: output.StatusCode,
+                        method: output.Method,
+                        url: output.Url);
+                    return;
                 }
 
-                // Publish order: sender FIRST, then flip state to Connected LAST so
-                // a borrow that observes Connected always sees a non-null sender.
-                _sender = sender;
-                _state = HttpClientConnectionState.Connected;
-                _inFlightConnect = null;
-            }
-            finally
-            {
-                _gate.Release();
-            }
-
-            return sender;
-        }
-        catch (Exception exception)
-        {
-            // Cancellation here is a requested disconnect/dispose, not a fault: do
-            // not clobber the Disconnected state.
-            var cancelled = exception is OperationCanceledException &&
-                (ct.IsCancellationRequested || _lifecycleCancellation.IsCancellationRequested);
-
-            // A concurrent DisposeAsync may have disposed the gate; tolerate that on
-            // re-acquire but STILL dispose any half-built sender so the fault path
-            // never strands an HttpClient.
-            try
-            {
-                await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                if (sender is not null)
+                // Carry the correlation id forward onto the response.
+                Emit(message.With(output));
+                EmitEvent(new FlowEvent
                 {
-                    await sender.DisposeAsync().ConfigureAwait(false);
+                    Timestamp = _clock.GetUtcNow(),
+                    CorrelationId = message.CorrelationId,
+                    Name = RequestSucceeded,
+                    Level = FlowEventLevel.Information,
+                    Message = $"{output.Method} {output.Url} -> {output.StatusCode}",
+                    Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["method"] = output.Method,
+                        ["url"] = output.Url,
+                        ["statusCode"] = output.StatusCode,
+                        ["success"] = output.Success,
+                        ["elapsedMilliseconds"] = output.ElapsedMilliseconds
+                    }
+                });
+            }
+        }
+    }
+
+    private HttpRequestMessage BuildRequest(HttpRequestInput input)
+    {
+        var method = string.IsNullOrWhiteSpace(input.Method)
+            ? HttpMethod.Get
+            : new HttpMethod(input.Method.Trim().ToUpperInvariant());
+
+        var request = new HttpRequestMessage { Method = method };
+
+        if (!string.IsNullOrWhiteSpace(input.Url))
+        {
+            if (!Uri.TryCreate(input.Url.Trim(), UriKind.RelativeOrAbsolute, out var uri))
+            {
+                request.Dispose();
+                throw new InvalidUrlException($"http.client URL '{input.Url}' is invalid.");
+            }
+
+            request.RequestUri = uri;
+        }
+        else if (_httpClient.BaseAddress is null)
+        {
+            request.Dispose();
+            throw new InvalidUrlException(
+                "http.client input requires a URL when the HttpClient has no BaseAddress.");
+        }
+
+        var content = BuildContent(input);
+        if (content is not null)
+        {
+            request.Content = content;
+        }
+
+        foreach (var header in input.Headers)
+        {
+            if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value))
+            {
+                request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        return request;
+    }
+
+    private static HttpContent? BuildContent(HttpRequestInput input)
+    {
+        HttpContent? content = null;
+        if (input.Bytes is not null)
+        {
+            content = new ByteArrayContent(input.Bytes);
+        }
+        else if (input.Body is not null)
+        {
+            content = new StringContent(input.Body, Encoding.UTF8);
+        }
+
+        if (content is not null && !string.IsNullOrWhiteSpace(input.ContentType) &&
+            MediaTypeHeaderValue.TryParse(input.ContentType, out var mediaType))
+        {
+            content.Headers.ContentType = mediaType;
+        }
+
+        return content;
+    }
+
+    private async Task<(byte[] Bytes, bool Truncated)> ReadBodyAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        var max = _options.MaxResponseBodyBytes;
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+            .ConfigureAwait(false);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        var truncated = false;
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            var remaining = max - (int)buffer.Length;
+            if (read > remaining)
+            {
+                if (remaining > 0)
+                {
+                    buffer.Write(chunk, 0, remaining);
                 }
 
-                ExceptionDispatchInfo.Throw(exception);
+                truncated = true;
+                break;
             }
 
-            try
+            buffer.Write(chunk, 0, read);
+        }
+
+        return (buffer.ToArray(), truncated);
+    }
+
+    private HttpResponseOutput BuildResponse(
+        HttpResponseMessage response,
+        string method,
+        byte[] bodyBytes,
+        bool truncated,
+        DateTimeOffset startedAt)
+    {
+        var headers = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in response.Headers)
+        {
+            headers[header.Key] = header.Value.ToArray();
+        }
+
+        foreach (var header in response.Content.Headers)
+        {
+            headers[header.Key] = header.Value.ToArray();
+        }
+
+        var contentType = response.Content.Headers.ContentType?.ToString();
+
+        return new HttpResponseOutput
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Method = method,
+            Url = response.RequestMessage?.RequestUri?.ToString()
+                ?? _httpClient.BaseAddress?.ToString()
+                ?? "",
+            StatusCode = (int)response.StatusCode,
+            ReasonPhrase = response.ReasonPhrase,
+            Headers = headers,
+            BodyBytes = bodyBytes,
+            Body = TryDecodeText(bodyBytes, contentType),
+            ContentType = contentType,
+            ElapsedMilliseconds = Elapsed(startedAt),
+            Success = response.IsSuccessStatusCode,
+            BodyTruncated = truncated
+        };
+    }
+
+    private static string? TryDecodeText(byte[] bodyBytes, string? contentType)
+    {
+        if (bodyBytes.Length == 0)
+        {
+            return null;
+        }
+
+        var isTextual = contentType is not null &&
+            (contentType.Contains("text", StringComparison.OrdinalIgnoreCase) ||
+             contentType.Contains("json", StringComparison.OrdinalIgnoreCase) ||
+             contentType.Contains("xml", StringComparison.OrdinalIgnoreCase) ||
+             contentType.Contains("charset", StringComparison.OrdinalIgnoreCase));
+
+        return isTextual ? Encoding.UTF8.GetString(bodyBytes) : null;
+    }
+
+    private void EmitFailure(
+        int code,
+        string message,
+        FlowMessage<HttpRequestInput> source,
+        DateTimeOffset startedAt,
+        Exception? exception = null,
+        int? statusCode = null,
+        string? method = null,
+        string? url = null)
+    {
+        var elapsed = Elapsed(startedAt);
+        var input = source.Payload;
+        var context = new List<string>
+        {
+            $"method={method ?? input.Method}",
+            $"url={url ?? input.Url}"
+        };
+        if (statusCode.HasValue)
+        {
+            context.Add($"statusCode={statusCode.Value}");
+        }
+
+        context.Add($"elapsedMs={elapsed}");
+
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = string.Join("; ", context),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = RequestFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                _inFlightConnect = null;
-
-                // Never leave a half-built sender behind. Never overwrite a non-null
-                // _sender published by a superseding establish.
-                if (sender is not null)
-                {
-                    await sender.DisposeAsync().ConfigureAwait(false);
-                }
-
-                if (!cancelled && !_userDisconnected && !_disposed && _sender is null)
-                {
-                    _state = HttpClientConnectionState.Faulted;
-                }
+                ["code"] = code,
+                ["method"] = method ?? input.Method,
+                ["url"] = url ?? input.Url,
+                ["statusCode"] = statusCode,
+                ["elapsedMilliseconds"] = elapsed
             }
-            finally
-            {
-                _gate.Release();
-            }
-
-            throw;
-        }
+        });
     }
 
-    public async Task DisconnectAsync(CancellationToken ct = default)
-    {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
-        IHttpRequestSender? sender;
-        try
-        {
-            _userDisconnected = true;
-            _connectCts?.Cancel();
-            _inFlightConnect = null;
+    private long Elapsed(DateTimeOffset startedAt)
+        => Math.Max(0, (long)(_clock.GetUtcNow() - startedAt).TotalMilliseconds);
 
-            // Clear the sender FIRST so borrows immediately observe not-connected,
-            // and flip state so TryGetSender returns false even before teardown.
-            sender = Interlocked.Exchange(ref _sender, null);
-            _state = HttpClientConnectionState.Disconnected;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-
-        // Dispose the old sender (it disposes the HttpClient/handler) AFTER the
-        // borrow-visible state has been cleared.
-        if (sender is not null)
-        {
-            await sender.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        try
-        {
-            // Shared idempotent teardown core; resources dispose LAST in the runtime.
-            await DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (ObjectDisposedException)
-        {
-            // The gate may be disposed by a concurrent dispose path; tolerate it.
-        }
-
-        _lifecycleCancellation.Cancel();
-        _lifecycleCancellation.Dispose();
-        _connectCts?.Dispose();
-
-        try
-        {
-            _gate.Dispose();
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-
-        CompleteNode();
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _lifecycleCancellation.Cancel();
-        FaultNode(exception);
-    }
+    private sealed class InvalidUrlException(string message) : Exception(message);
 }

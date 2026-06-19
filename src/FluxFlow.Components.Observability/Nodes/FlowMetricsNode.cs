@@ -1,43 +1,43 @@
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
-public sealed class FlowMetricsNode<TInput> : FlowNodeBase
+/// <summary>
+/// A standalone metrics node. Post a <c>FlowMessage&lt;TInput&gt;</c> to <c>Input</c>;
+/// the node tracks count, current/average rate, and optional size, then broadcasts a
+/// <c>FlowMessage&lt;FlowMetricSnapshot&gt;</c> on <c>Output</c> carrying the same
+/// correlation id. Size-selector failures surface on <c>Errors</c> (with the original
+/// correlation id) and the node keeps processing. Diagnostics flow on <c>Events</c>.
+/// Works with nothing but <c>new FlowMetricsNode&lt;T&gt;(options)</c> — no engine.
+/// </summary>
+public sealed class FlowMetricsNode<TInput> : FlowNode<TInput, FlowMetricSnapshot>
 {
+    public const string NodeType = "flow.metrics";
+    public const string Observed = ObservabilityDiagnosticNames.MetricsObserved;
+    public const string Failed = ObservabilityDiagnosticNames.MetricsFailed;
+
     private readonly FlowMetricsOptions _options;
-    private readonly ObservabilityComponentOptions.IValueSelector? _sizeSelector;
+    private readonly IObservabilityValueSelector<TInput>? _sizeSelector;
     private readonly ObservabilityNodeContext _nodeContext;
-    private readonly TimeProvider _timeProvider;
-    private readonly ActionBlock<TInput> _input;
-    private readonly BufferBlock<FlowMetricSnapshot> _snapshots;
+    private readonly TimeProvider _clock;
     private DateTimeOffset? _firstObservedAt;
     private DateTimeOffset? _previousObservedAt;
     private long _count;
     private long _sizeCount;
     private double? _totalSize;
 
-    internal FlowMetricsNode(
+    public FlowMetricsNode(
         FlowMetricsOptions options,
-        ObservabilityComponentOptions.IValueSelector? sizeSelector,
-        ObservabilityNodeContext nodeContext)
-        : this(options, sizeSelector, nodeContext, TimeProvider.System)
+        IObservabilityValueSelector<TInput>? sizeSelector = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+        })
     {
-    }
-
-    internal FlowMetricsNode(
-        FlowMetricsOptions options,
-        ObservabilityComponentOptions.IValueSelector? sizeSelector,
-        ObservabilityNodeContext nodeContext,
-        TimeProvider timeProvider)
-    {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _sizeSelector = sizeSelector;
-        _nodeContext = nodeContext ?? throw new ArgumentNullException(nameof(nodeContext));
-        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -45,53 +45,28 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
                 "Metrics bounded capacity must be greater than zero.");
         }
 
-        var inputOptions = new ExecutionDataflowBlockOptions
+        _options = options;
+        _sizeSelector = sizeSelector;
+        _clock = clock ?? TimeProvider.System;
+        _nodeContext = new ObservabilityNodeContext
         {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
+            NodeType = NodeType,
+            InputType = typeof(TInput),
+            Name = _options.EffectiveName
         };
-        _input = new ActionBlock<TInput>(ObserveAsync, inputOptions);
-        _snapshots = new BufferBlock<FlowMetricSnapshot>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_snapshots.Completion);
     }
 
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<FlowMetricSnapshot> Snapshots => _snapshots;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_snapshots).Fault(exception);
-        }
-    }
-
-    private async Task ObserveAsync(TInput input)
-    {
-        var observedAt = _timeProvider.GetUtcNow();
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
+        var observedAt = _clock.GetUtcNow();
         var count = Interlocked.Increment(ref _count);
         _firstObservedAt ??= observedAt;
         var previousObservedAt = _previousObservedAt;
         _previousObservedAt = observedAt;
 
-        var lastSize = TrySelectSize(input);
+        var lastSize = TrySelectSize(input, message);
         if (lastSize.HasValue)
         {
             _sizeCount++;
@@ -114,18 +89,26 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
             AverageSize = totalSize.HasValue && sizeCount > 0 ? totalSize.Value / sizeCount : null
         };
 
-        await _snapshots.SendAsync(snapshot).ConfigureAwait(false);
-        TryEmitDiagnostic(
-            ObservabilityDiagnosticNames.MetricsObserved,
-            message: "flow.metrics observed input.",
-            attributes: ObservabilityNodeSupport.CreateAttributes(
-                ObservabilityComponentTypes.Metrics.Value,
+        // Carry the correlation id forward onto the snapshot.
+        Emit(message.With(snapshot));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = Observed,
+            Level = FlowEventLevel.Information,
+            Message = "flow.metrics observed input.",
+            Attributes = ObservabilityNodeSupport.CreateAttributes(
+                NodeType,
                 _options.InputType,
                 _options.EffectiveName,
-                count));
+                count)
+        });
+
+        return Task.CompletedTask;
     }
 
-    private double? TrySelectSize(TInput input)
+    private double? TrySelectSize(TInput input, FlowMessage<TInput> message)
     {
         if (_sizeSelector is null)
         {
@@ -139,20 +122,27 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
         }
         catch (Exception exception)
         {
-            TryReportError(
-                ObservabilityErrorCodes.MetricsSizeSelectorFailed,
-                $"flow.metrics failed to read size: {exception.Message}",
-                exception,
-                CreateErrorContext());
-            TryEmitDiagnostic(
-                ObservabilityDiagnosticNames.MetricsFailed,
-                FlowDiagnosticLevel.Error,
-                "flow.metrics failed to read size.",
-                exception,
-                ObservabilityNodeSupport.CreateAttributes(
-                    ObservabilityComponentTypes.Metrics.Value,
+            EmitError(new FlowError
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Code = ObservabilityErrorCodes.MetricsSizeSelectorFailed,
+                Message = $"flow.metrics failed to read size: {exception.Message}",
+                Context = CreateErrorContext(),
+                Exception = exception
+            });
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = Failed,
+                Level = FlowEventLevel.Error,
+                Message = "flow.metrics failed to read size.",
+                Attributes = ObservabilityNodeSupport.CreateAttributes(
+                    NodeType,
                     _options.InputType,
-                    _options.EffectiveName));
+                    _options.EffectiveName)
+            });
             return null;
         }
     }
@@ -193,16 +183,5 @@ public sealed class FlowMetricsNode<TInput> : FlowNodeBase
     {
         var seconds = (observedAt - firstObservedAt).TotalSeconds;
         return seconds <= 0 ? count : count / seconds;
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
-        {
-            ((IDataflowBlock)_snapshots).Fault(exception);
-            return;
-        }
-
-        _snapshots.Complete();
     }
 }

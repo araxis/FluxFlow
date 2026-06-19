@@ -1,253 +1,109 @@
-using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Routing.Nodes;
+using FluxFlow.Components.Routing.Options;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
+// Merge is a fan-in node: several upstreams of the same type all link into the single
+// bounded Input (a BufferBlock already merges concurrent producers), and the node
+// re-broadcasts each message on Output preserving the correlation id.
 public sealed class FlowMergeNodeTests
 {
     [Fact]
-    public async Task Merge_EmitsSourceEnvelopeFromConfiguredInputs()
+    public async Task Merge_ReEmitsEveryInput_PreservingCorrelation()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "string",
-            inputs = new[] { "First", "Second" }
-        });
-        var first = runtimeNode.FindInput(new PortName("First"))
-            .ShouldBeOfType<InputPort<string>>();
-        var second = runtimeNode.FindInput(new PortName("Second"))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<FlowMergeItem<string>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowMergeNode<string>(new MergeRoutingOptions());
+        var output = RoutingTestSink.Link(node.Output);
 
-        await first.Target.SendAsync("one");
-        await second.Target.SendAsync("two");
-        first.Target.Complete();
-        second.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var one = FlowMessage.Create("one");
+        var two = FlowMessage.Create("two");
+        await node.Input.SendAsync(one);
+        await node.Input.SendAsync(two);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var values = await DrainUntilCompletedAsync(output);
-        values.Count.ShouldBe(2);
-        values.Select(item => item.Sequence).ShouldBe([1, 2]);
-        var bySource = values.ToDictionary(item => item.Source, StringComparer.Ordinal);
-        bySource["First"].Value.ShouldBe("one");
-        bySource["Second"].Value.ShouldBe("two");
+        var values = await RoutingTestSink.DrainUntilCompletedAsync(output);
+        values.Select(m => m.Payload).ShouldBe(["one", "two"]);
+        values[0].CorrelationId.ShouldBe(one.CorrelationId);
+        values[1].CorrelationId.ShouldBe(two.CorrelationId);
     }
 
     [Fact]
-    public async Task Merge_UsesDefaultLeftAndRightInputs()
+    public async Task Merge_FansInFromMultipleUpstreams()
     {
-        var runtimeNode = CreateNode(new { inputType = "int" });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<int>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowMergeItem<int>>();
-        LinkOutput(runtimeNode, output);
+        // Two independent upstream sources both link into the single merge Input; the
+        // BufferBlock merges them. Order between sources is not guaranteed, so assert on
+        // the set of payloads, not their interleaving.
+        await using var node = new FlowMergeNode<int>(new MergeRoutingOptions());
+        var output = RoutingTestSink.Link(node.Output);
 
-        await left.Target.SendAsync(1);
-        await right.Target.SendAsync(2);
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var left = new BufferBlock<FlowMessage<int>>();
+        var right = new BufferBlock<FlowMessage<int>>();
+        left.LinkTo(node.Input, new DataflowLinkOptions { PropagateCompletion = false });
+        right.LinkTo(node.Input, new DataflowLinkOptions { PropagateCompletion = false });
 
-        var values = await DrainUntilCompletedAsync(output);
-        values.Select(item => item.Sequence).ShouldBe([1, 2]);
-        var bySource = values.ToDictionary(item => item.Source, StringComparer.Ordinal);
-        bySource[RoutingComponentPorts.Left].Value.ShouldBe(1);
-        bySource[RoutingComponentPorts.Right].Value.ShouldBe(2);
+        await left.SendAsync(FlowMessage.Create(1));
+        await right.SendAsync(FlowMessage.Create(2));
+        // Once both upstreams complete, complete the merge input.
+        left.Complete();
+        right.Complete();
+        await Task.WhenAll(left.Completion, right.Completion);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        (await RoutingTestSink.DrainUntilCompletedAsync(output))
+            .Select(m => m.Payload)
+            .ShouldBe([1, 2], ignoreOrder: true);
     }
 
     [Fact]
-    public async Task Merge_AssignsSequenceInOutputOrderWhenInputsAreActive()
+    public async Task Merge_EmitsEventWithSequence()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            boundedCapacity = 1
-        });
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<int>>();
-        var right = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))
-            .ShouldBeOfType<InputPort<int>>();
-        var output = new BufferBlock<FlowMergeItem<int>>();
-        LinkOutput(runtimeNode, output);
+        await using var node = new FlowMergeNode<int>(new MergeRoutingOptions());
+        var output = RoutingTestSink.Link(node.Output);
+        var events = RoutingTestSink.Link(node.Events);
 
-        var sends = Enumerable.Range(0, 40)
-            .Select(value => value % 2 == 0
-                ? left.Target.SendAsync(value)
-                : right.Target.SendAsync(value));
-        await Task.WhenAll(sends);
-        left.Target.Complete();
-        right.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var values = await DrainUntilCompletedAsync(output);
-        values.Count.ShouldBe(40);
-        values.Select(item => item.Sequence).ShouldBe(
-            Enumerable.Range(1, 40).Select(sequence => (long)sequence));
+        (await RoutingTestSink.DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
+        var emitted = await RoutingTestSink.DrainUntilCompletedAsync(events);
+        emitted.Count.ShouldBe(2);
+        emitted[0].Name.ShouldBe(RoutingDiagnosticNames.MergeEmitted);
+        emitted.Select(e => e.Attributes["sequence"]).ShouldBe([1L, 2L]);
     }
 
     [Fact]
-    public async Task Merge_WaitsForAllInputsToComplete()
+    public async Task Merge_UsesConfiguredClockForEventTimestamp()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "string",
-            inputs = new[] { "First", "Second" }
-        });
-        var first = runtimeNode.FindInput(new PortName("First"))
-            .ShouldBeOfType<InputPort<string>>();
-        var second = runtimeNode.FindInput(new PortName("Second"))
-            .ShouldBeOfType<InputPort<string>>();
-        var output = new BufferBlock<FlowMergeItem<string>>();
-        LinkOutput(runtimeNode, output);
+        var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:01Z");
+        await using var node = new FlowMergeNode<string>(
+            new MergeRoutingOptions(),
+            new FakeTimeProvider(timestamp));
+        var events = RoutingTestSink.Link(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<string>>());
 
-        await first.Target.SendAsync("one");
-        first.Target.Complete();
+        await node.Input.SendAsync(FlowMessage.Create("value"));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        // Establish a definitive sync point: once "one" has been emitted the node has
-        // observed First's value and completion, so checking IsCompleted here is no
-        // longer racing background processing. With Second still open the node must
-        // not have completed; awaiting the emitted item (rather than a synchronous
-        // IsCompleted check straight after Complete) keeps this deterministic under load.
-        var item = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        item.Value.ShouldBe("one");
-        runtimeNode.Node.Completion.IsCompleted.ShouldBeFalse();
-
-        second.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        (await DrainUntilCompletedAsync(output)).ShouldBeEmpty();
+        (await RoutingTestSink.DrainUntilCompletedAsync(events)).ShouldHaveSingleItem()
+            .Timestamp.ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task Merge_EmitsDiagnostics()
-    {
-        var runtimeNode = CreateNode(new { inputType = "int" });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var left = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Left))
-            .ShouldBeOfType<InputPort<int>>();
-        runtimeNode.FindInput(new PortName(RoutingComponentPorts.Right))!.Complete();
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!.LinkToDiscard();
-
-        await left.Target.SendAsync(1);
-        left.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(RoutingDiagnosticNames.MergeEmitted);
-        diagnostic.Attributes["source"].ShouldBe(RoutingComponentPorts.Left);
-    }
+    public void Merge_RejectsInvalidCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowMergeNode<int>(new MergeRoutingOptions { BoundedCapacity = 0 }));
 
     [Fact]
-    public void Merge_RejectsEmptyInputs()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                inputs = Array.Empty<string>()
-            }));
-
-        exception.Message.ShouldContain("inputs");
-    }
-
-    [Fact]
-    public void Merge_RejectsDuplicateInputs()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                inputs = new[] { "First", "first" }
-            }));
-
-        exception.Message.ShouldContain("duplicate");
-    }
-
-    [Fact]
-    public void Merge_RejectsInvalidInputPort()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                inputs = new[] { "Bad.Port" }
-            }));
-
-        exception.Message.ShouldContain("invalid port");
-    }
-
-    [Fact]
-    public void Merge_RejectsBuiltInInputPort()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                inputs = new[] { RoutingComponentPorts.Output }
-            }));
-
-        exception.Message.ShouldContain("built-in port");
-    }
-
-    [Fact]
-    public void Merge_RejectsUnknownInputType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "missing.type",
-                inputs = new[] { "First" }
-            }));
-
-        exception.Message.ShouldContain("not registered");
-    }
-
-    private static RuntimeNode CreateNode(object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterRoutingComponents(new RecordingExpressionEngine());
-        registry.TryGetFactory(RoutingComponentTypes.Merge, out var factory).ShouldBeTrue();
-        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Merge, configuration));
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        BufferBlock<FlowMergeItem<T>> target)
-    {
-        runtimeNode.FindOutput(new PortName(RoutingComponentPorts.Output))!
-            .TryLinkTo(
-                new InputPort<FlowMergeItem<T>>(
-                    new PortAddress("test", new NodeName("merge"), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var values = new List<T>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values;
-    }
+    public void Merge_RejectsNullOptions()
+        => Should.Throw<ArgumentNullException>(() => new FlowMergeNode<int>(null!));
 }

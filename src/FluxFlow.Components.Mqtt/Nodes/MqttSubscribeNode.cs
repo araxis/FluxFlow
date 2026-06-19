@@ -1,110 +1,38 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Diagnostics;
 using FluxFlow.Components.Mqtt.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Mqtt.Nodes;
 
-public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFlowEventSource, IAsyncDisposable
+/// <summary>
+/// A standalone MQTT subscribe source. Call <c>StartAsync</c> and the node waits for
+/// the injected <see cref="IMqttConnectionHandle"/> to establish a client, opens an
+/// <see cref="IMqttSubscription"/> on the borrowed adapter, and broadcasts a
+/// <c>FlowMessage&lt;MqttReceivedMessage&gt;</c> on <c>Output</c> for each received
+/// message (plus notes on <c>Events</c>, failures on <c>Errors</c>). It (re)subscribes
+/// on each new connection lease, deduped per connection epoch, and disposes the
+/// subscription — never the adapter — when the connection drops or the node stops. The
+/// node never connects or disposes the client. Works with nothing but a connection
+/// handle — no engine.
+/// </summary>
+public sealed class MqttSubscribeNode : FlowSource<MqttReceivedMessage>
 {
     private const string NotConnectedMessage =
         "MQTT subscribe node is waiting for the mqtt.connection client; establish it (host ConnectAsync) to open the subscription.";
 
-    private readonly object _stateLock = new();
     private readonly IMqttConnectionHandle _connection;
     private readonly MqttSubscriptionOptions _options;
     private readonly TimeProvider _clock;
-    private readonly BroadcastBlock<FlowEvent> _events = new(static flowEvent => flowEvent);
-    private readonly CancellationTokenSource _lifecycleCancellation = new();
 
-    private Task? _loopTask;
-    private bool _started;
-    private bool _disposed;
-
-    internal MqttSubscribeNode(
-        MqttSubscriptionOptions options,
+    public MqttSubscribeNode(
         IMqttConnectionHandle connection,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
+        MqttSubscriptionOptions? options = null,
+        TimeProvider? clock = null)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-    }
-
-    public ISourceBlock<FlowEvent> Events => _events;
-
-    public override Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        lock (_stateLock)
-        {
-            if (_started)
-            {
-                throw new InvalidOperationException("MQTT subscribe node has already started.");
-            }
-
-            _started = true;
-            _loopTask = RunLoopAsync(_lifecycleCancellation.Token);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-    {
-        _lifecycleCancellation.Cancel();
-        base.Complete();
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        _lifecycleCancellation.Cancel();
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        _lifecycleCancellation.Cancel();
-
-        Task? loop;
-        lock (_stateLock)
-        {
-            loop = _loopTask;
-        }
-
-        if (loop is not null)
-        {
-            try
-            {
-                await loop.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-
-        Complete();
-        _lifecycleCancellation.Dispose();
-    }
-
-    protected override void OnNodeCompleted()
-    {
-        _events.Complete();
-        base.OnNodeCompleted();
-    }
-
-    protected override void OnNodeFaulted(Exception exception)
-    {
-        ((IDataflowBlock)_events).Fault(exception);
-        base.OnNodeFaulted(exception);
+        _options = options ?? new MqttSubscriptionOptions();
+        _clock = clock ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -115,7 +43,7 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     /// subscription first. The epoch dedupes so a within-lease Reconnecting -&gt;
     /// Connected transition on the SAME lease does NOT resubscribe.
     /// </summary>
-    private async Task RunLoopAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var notConnectedReported = false;
         var subscribedEpoch = -1;
@@ -154,10 +82,14 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                         subscribedEpoch = epoch;
                         notConnectedReported = false;
 
-                        TryEmitDiagnostic(
-                            MqttDiagnosticNames.SubscribeStarted,
-                            message: $"Started MQTT subscription '{_options.TopicFilter}'.",
-                            attributes: CreateSubscriptionAttributes());
+                        EmitEvent(new FlowEvent
+                        {
+                            Timestamp = _clock.GetUtcNow(),
+                            Name = MqttEventNames.SubscribeStarted,
+                            Level = FlowEventLevel.Information,
+                            Message = $"Started MQTT subscription '{_options.TopicFilter}'.",
+                            Attributes = CreateSubscriptionAttributes()
+                        });
 
                         pumpCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                         pumpTask = PumpAsync(subscription, pumpCancellation.Token);
@@ -172,12 +104,6 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                             MqttErrorCodes.SubscribeStartupFailed,
                             $"MQTT subscribe startup failed: {exception.Message}",
                             exception);
-                        TryEmitDiagnostic(
-                            MqttDiagnosticNames.SubscribeFailed,
-                            FlowDiagnosticLevel.Error,
-                            $"MQTT subscribe startup failed for '{_options.TopicFilter}'.",
-                            exception,
-                            CreateSubscriptionAttributes());
                     }
                 }
                 else if (state != MqttClientHealthState.Connected && subscription is not null)
@@ -189,10 +115,14 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                     subscription = null;
                     subscribedEpoch = -1;
 
-                    TryEmitDiagnostic(
-                        MqttDiagnosticNames.SubscribeStopped,
-                        message: $"Stopped MQTT subscription '{_options.TopicFilter}'.",
-                        attributes: CreateSubscriptionAttributes());
+                    EmitEvent(new FlowEvent
+                    {
+                        Timestamp = _clock.GetUtcNow(),
+                        Name = MqttEventNames.SubscribeStopped,
+                        Level = FlowEventLevel.Information,
+                        Message = $"Stopped MQTT subscription '{_options.TopicFilter}'.",
+                        Attributes = CreateSubscriptionAttributes()
+                    });
                 }
                 else if (state != MqttClientHealthState.Connected &&
                          subscription is null &&
@@ -203,12 +133,8 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                     notConnectedReported = true;
                     ReportSubscribeError(
                         MqttErrorCodes.SubscribeNotConnected,
-                        NotConnectedMessage);
-                    TryEmitDiagnostic(
-                        MqttDiagnosticNames.SubscribeFailed,
-                        FlowDiagnosticLevel.Information,
                         NotConnectedMessage,
-                        attributes: CreateSubscriptionAttributes());
+                        level: FlowEventLevel.Information);
                 }
 
                 try
@@ -240,23 +166,27 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
             {
                 var payloadBytes = message.Payload?.Length ?? 0;
 
-                TryEmitDiagnostic(
-                    MqttDiagnosticNames.SubscribeReceived,
-                    message: $"Received MQTT message from '{message.Topic}'.",
-                    attributes: new Dictionary<string, object?>
+                EmitEvent(new FlowEvent
+                {
+                    Timestamp = _clock.GetUtcNow(),
+                    CorrelationId = ToCorrelationId(message.CorrelationId),
+                    Name = MqttEventNames.SubscribeReceived,
+                    Level = FlowEventLevel.Information,
+                    Message = $"Received MQTT message from '{message.Topic}'.",
+                    Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["topic"] = message.Topic,
                         ["payloadBytes"] = payloadBytes,
-                        ["qualityOfService"] = message.QualityOfService,
+                        ["qualityOfService"] = message.QualityOfService.ToString(),
                         ["retain"] = message.Retain,
-                        ["correlationId"] = message.CorrelationId
-                    });
-                EmitReceivedEvent(message, payloadBytes);
+                        ["correlationId"] = message.CorrelationId,
+                        ["connectionName"] = _connection.ConnectionName
+                    }
+                });
 
-                if (!await SendOutputAsync(message, cancellationToken).ConfigureAwait(false))
-                {
-                    break;
-                }
+                // Mint the first envelope of the inbound exchange, flowing the
+                // adapter-supplied correlation id when present.
+                Emit(FlowMessage.Create(message, ToCorrelationId(message.CorrelationId)));
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -268,12 +198,6 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
                 MqttErrorCodes.SubscribeFailed,
                 $"MQTT subscribe failed: {exception.Message}",
                 exception);
-            TryEmitDiagnostic(
-                MqttDiagnosticNames.SubscribeFailed,
-                FlowDiagnosticLevel.Error,
-                $"MQTT subscribe failed for '{_options.TopicFilter}'.",
-                exception,
-                CreateSubscriptionAttributes());
         }
     }
 
@@ -305,12 +229,32 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
         pumpCancellation?.Dispose();
     }
 
-    private void ReportSubscribeError(int code, string message, Exception? exception = null)
-        => TryReportError(
-            code,
-            message,
-            exception,
-            context: CreateSubscriptionContext());
+    private static CorrelationId? ToCorrelationId(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : new CorrelationId(value);
+
+    private void ReportSubscribeError(
+        int code,
+        string message,
+        Exception? exception = null,
+        FlowEventLevel level = FlowEventLevel.Error)
+    {
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = code,
+            Message = message,
+            Context = CreateSubscriptionContext(),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = MqttEventNames.SubscribeFailed,
+            Level = level,
+            Message = message,
+            Attributes = CreateSubscriptionAttributes()
+        });
+    }
 
     private string CreateSubscriptionContext()
     {
@@ -329,40 +273,12 @@ public sealed class MqttSubscribeNode : SourceFlowNode<MqttReceivedMessage>, IFl
     }
 
     private Dictionary<string, object?> CreateSubscriptionAttributes()
-        => new()
+        => new(StringComparer.Ordinal)
         {
             ["topicFilter"] = _options.TopicFilter,
-            ["qualityOfService"] = _options.QualityOfService,
+            ["qualityOfService"] = _options.QualityOfService.ToString(),
             ["receiveRetainedMessages"] = _options.ReceiveRetainedMessages,
             ["retainAsPublished"] = _options.RetainAsPublished,
             ["connectionName"] = _connection.ConnectionName
         };
-
-    private bool EmitReceivedEvent(MqttReceivedMessage message, int payloadBytes)
-    {
-        var attributes = new Dictionary<string, string>
-        {
-            ["payloadBytes"] = payloadBytes.ToString(),
-            ["qualityOfService"] = message.QualityOfService.ToString(),
-            ["retain"] = message.Retain.ToString()
-        };
-
-        if (!string.IsNullOrWhiteSpace(message.CorrelationId))
-        {
-            attributes["correlationId"] = message.CorrelationId;
-        }
-
-        return _events.Post(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Type = MqttEventNames.SubscribeReceived,
-            Source = Id.ToString(),
-            SourceNodeId = Id,
-            Subject = message.Topic,
-            Channel = MqttEventNames.SubscribeReceived,
-            PayloadBytes = payloadBytes,
-            PayloadPreview = message.PayloadPreview,
-            Attributes = attributes
-        });
-    }
 }

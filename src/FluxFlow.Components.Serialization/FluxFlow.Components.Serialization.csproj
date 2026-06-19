@@ -6,23 +6,19 @@
     <PackageId>FluxFlow.Components.Serialization</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable serialization and encoding components for FluxFlow.</Description>
+    <Description>Standalone serialization and encoding nodes for FluxFlow: JSON parse/stringify, text encode/decode, and base64 encode/decode, each a blockified converter (request in, result out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;serialization;json;base64;text</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>JSON stringify reuses cached serializer options and parse parses input once (performance). Dead internal cancellation plumbing was removed.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as standalone nodes over the FluxFlow.Nodes kit: each node is `new`ed with its options and processes FlowMessage envelopes — request in, converted result broadcast out (carrying the correlation id), per-message failures on the error port, success/failure notes on the event port. The engine factory, module, registration, design-metadata, and definition-based options reader are removed; the node depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

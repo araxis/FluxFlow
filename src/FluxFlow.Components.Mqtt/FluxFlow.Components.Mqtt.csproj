@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -6,20 +6,20 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>MQTT component package for FluxFlow with adapter-backed publish and subscribe nodes.</Description>
+    <Description>Standalone MQTT nodes for FluxFlow over an injected client adapter: a connection handle that owns the client lifecycle (host-driven connect/disconnect), publish (request in, result out) and subscribe (received messages out) nodes that borrow the established adapter, and an MQTT5 request/reply trigger (MqttRequestContext + the transport-neutral RequestReplyCoordinator). One package for the whole MQTT surface — connection, publish, subscribe, and trigger. Broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: the node's static Create(RuntimeNodeFactoryContext …) factory moves into a dedicated internal *NodeFactory class, removing the public static Create from the node type (breaking). Node registration, options, ports, JSON shape, and runtime behavior are unchanged. Replaces the bespoke IMqttClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed). Introduces a separate mqtt.connection resource component that owns the connection profile and reconnect policy; mqtt.publish/mqtt.subscribe now reference it by required connectionName and no longer carry connection/reconnect config. For now the connection holds configuration only — no client is established, so publish/subscribe report a not-connected result until a later connect step. Adds an explicit, host-driven connect lifecycle: mqtt.connection now exposes ConnectAsync/DisconnectAsync (plus a connection State and a lock-free TryGetAdapter), owning the single client lease and health monitor; mqtt.publish/mqtt.subscribe borrow the established adapter when connected (subscribe (re)subscribes on connect, deduped per connection epoch) and report not-connected otherwise, never connecting or disposing. No auto-connect.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt as standalone nodes over the FluxFlow.Nodes kit: the engine and designer dependencies are removed. mqtt.connection becomes a self-contained connection handle (IMqttConnectionHandle) that owns the single client lease, epoch, health monitor, and host-driven ConnectAsync/DisconnectAsync lifecycle, exposing connection health on a broadcast FlowEvent port; the carefully hardened gate/single-flight/lease-ordering/dispose-race concurrency is unchanged. mqtt.publish becomes a FlowNode (MqttPublishRequest in, MqttPublishResult out) and mqtt.subscribe a FlowSource (MqttReceivedMessage out); both borrow the established adapter when connected (subscribe (re)subscribes per connection epoch) and report not-connected on the error port otherwise, never connecting or disposing. NodeAddress is dropped; the connection identity is its ConnectionName. The node registration module, factories, ports, options reader, component types, and design-metadata provider are removed. Contracts, options, topic validation, and diagnostics are preserved. The MQTT request/reply trigger (formerly the separate FluxFlow.Components.Mqtt.RequestReply package) is now folded into this single MQTT package: MqttRequestContext writes the correlated reply to the MQTT5 response topic via a host-supplied IMqttResponsePublisher, driving the transport-neutral RequestReplyCoordinator.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />

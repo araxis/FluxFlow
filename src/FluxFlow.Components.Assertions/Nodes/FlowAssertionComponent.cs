@@ -1,90 +1,68 @@
 using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Mapping;
+using FluxFlow.Components.Assertions.Options;
+using FluxFlow.Mapping;
+using FluxFlow.Nodes;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Assertions.Nodes;
 
-public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
+/// <summary>
+/// A standalone assertion node. Post a <c>FlowMessage&lt;TInput&gt;</c> to
+/// <c>Input</c>; the node evaluates the payload against a pre-compiled boolean
+/// expression and broadcasts a <c>FlowMessage&lt;FlowAssertionResult&gt;</c> on
+/// <c>Output</c>. In addition it fans the original input out to one of two extra
+/// ports — <c>Passed</c> when the assertion holds, <c>Failed</c> when it does not —
+/// each carrying the same correlation id. Expression evaluation failures surface on
+/// <c>Errors</c> (with the original correlation id) and the node keeps processing
+/// later messages; diagnostics flow on <c>Events</c>. The predicate is compiled once
+/// at construction from the supplied <see cref="IFlowExpressionEngine"/>; works with
+/// nothing but <c>new FlowAssertionComponent&lt;T&gt;(options, engine)</c> — no engine
+/// runtime, no registry.
+/// </summary>
+public sealed class FlowAssertionComponent<TInput> : FlowNode<TInput, FlowAssertionResult>
 {
     private readonly IFlowPredicate<TInput> _predicate;
     private readonly AssertionResultMetadata _metadata;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<TInput> _input;
-    private readonly BufferBlock<FlowAssertionResult> _result;
-    private readonly BufferBlock<TInput> _passed;
-    private readonly BufferBlock<TInput> _failed;
+    private readonly BroadcastBlock<FlowMessage<TInput>> _passed;
+    private readonly BroadcastBlock<FlowMessage<TInput>> _failed;
 
     public FlowAssertionComponent(
-        IFlowPredicate<TInput> predicate,
-        AssertionResultMetadata metadata)
-        : this(predicate, metadata, TimeProvider.System)
+        AssertionOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IFlowMapContextFactory<TInput>? contextFactory = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = ValidateOptions(options).BoundedCapacity
+        })
     {
+        ArgumentNullException.ThrowIfNull(expressionEngine);
+        _clock = clock ?? TimeProvider.System;
+
+        // Compile the predicate expression once at construction; IsMatch only
+        // evaluates the compiled form per message.
+        _predicate = contextFactory is null
+            ? new ExpressionFlowPredicate<TInput>(options.Expression!, expressionEngine)
+            : new ExpressionFlowPredicate<TInput>(options.Expression!, expressionEngine, contextFactory);
+        _metadata = CreateMetadata(options, expressionEngine.Name);
+
+        _passed = AddOutput<FlowMessage<TInput>>();
+        _failed = AddOutput<FlowMessage<TInput>>();
     }
 
-    public FlowAssertionComponent(
-        IFlowPredicate<TInput> predicate,
-        AssertionResultMetadata metadata,
-        TimeProvider clock)
+    /// <summary>Original input when the assertion passes; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<TInput>> Passed => _passed;
+
+    /// <summary>Original input when the assertion fails; broadcast, carries the correlation id.</summary>
+    public ISourceBlock<FlowMessage<TInput>> Failed => _failed;
+
+    protected override Task ProcessAsync(FlowMessage<TInput> message)
     {
-        _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
-        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (metadata.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(metadata),
-                "Assertion bounded capacity must be greater than zero.");
-        }
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
-        var blockOptions = new DataflowBlockOptions { BoundedCapacity = metadata.BoundedCapacity };
-        var inputOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = metadata.BoundedCapacity,
-            EnsureOrdered = true
-        };
-        _input = new ActionBlock<TInput>(EvaluateAsync, inputOptions);
-        _result = new BufferBlock<FlowAssertionResult>(blockOptions);
-        _passed = new BufferBlock<TInput>(blockOptions);
-        _failed = new BufferBlock<TInput>(blockOptions);
-        _input.Completion.ContinueWith(
-            CompleteOutputs,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(Task.WhenAll(_result.Completion, _passed.Completion, _failed.Completion));
-    }
-
-    public ITargetBlock<TInput> Input => _input;
-
-    public ISourceBlock<FlowAssertionResult> Result => _result;
-
-    public ISourceBlock<TInput> Passed => _passed;
-
-    public ISourceBlock<TInput> Failed => _failed;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-            ((IDataflowBlock)_passed).Fault(exception);
-            ((IDataflowBlock)_failed).Fault(exception);
-        }
-    }
-
-    private async Task EvaluateAsync(TInput input)
-    {
         bool passed;
         try
         {
@@ -92,36 +70,39 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         }
         catch (Exception exception)
         {
-            TryReportError(
+            ReportProcessingError(
+                message,
                 AssertionErrorCodes.ExpressionFailed,
                 $"flow.assert failed to evaluate input: {exception.Message}",
-                exception,
-                AssertionNodeSupport.CreateErrorContext(_metadata));
-            TryEmitDiagnostic(
-                AssertionDiagnosticNames.ExpressionFailed,
-                FlowDiagnosticLevel.Error,
-                "flow.assert failed to evaluate input.",
-                exception,
-                AssertionNodeSupport.CreateAttributes(_metadata));
-            return;
+                exception);
+            return Task.CompletedTask;
         }
 
         var result = CreateResult(input, passed);
-        await _result.SendAsync(result).ConfigureAwait(false);
+
+        // Carry the correlation id forward onto the result and the branched input.
+        Emit(message.With(result));
         if (passed && _metadata.EmitPassedInput)
         {
-            await _passed.SendAsync(input).ConfigureAwait(false);
+            _passed.Post(message);
         }
 
         if (!passed && _metadata.EmitFailedInput)
         {
-            await _failed.SendAsync(input).ConfigureAwait(false);
+            _failed.Post(message);
         }
 
-        TryEmitDiagnostic(
-            AssertionDiagnosticNames.Evaluated,
-            message: passed ? "flow.assert passed input." : "flow.assert failed input.",
-            attributes: AssertionNodeSupport.CreateAttributes(_metadata, passed));
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = message.CorrelationId,
+            Name = AssertionDiagnosticNames.Evaluated,
+            Level = FlowEventLevel.Information,
+            Message = passed ? "flow.assert passed input." : "flow.assert failed input.",
+            Attributes = AssertionNodeSupport.CreateAttributes(_metadata, passed)
+        });
+
+        return Task.CompletedTask;
     }
 
     private FlowAssertionResult CreateResult(TInput input, bool passed)
@@ -153,18 +134,66 @@ public sealed class FlowAssertionComponent<TInput> : FlowNodeBase
         };
     }
 
-    private void CompleteOutputs(Task completion)
+    private void ReportProcessingError(
+        FlowMessage<TInput> source,
+        int code,
+        string message,
+        Exception exception)
     {
-        if (completion.IsFaulted && completion.Exception is { } exception)
+        EmitError(new FlowError
         {
-            ((IDataflowBlock)_result).Fault(exception);
-            ((IDataflowBlock)_passed).Fault(exception);
-            ((IDataflowBlock)_failed).Fault(exception);
-            return;
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = AssertionNodeSupport.CreateErrorContext(_metadata),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = AssertionDiagnosticNames.ExpressionFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = AssertionNodeSupport.CreateAttributes(_metadata)
+        });
+    }
+
+    private static AssertionResultMetadata CreateMetadata(AssertionOptions options, string engineName)
+        => new()
+        {
+            EffectiveDescription = options.EffectiveDescription,
+            Expression = options.Expression!,
+            ExpressionId = options.ExpressionId,
+            ExpressionName = options.ExpressionName,
+            EngineName = engineName,
+            InputType = options.InputType,
+            EffectiveFailureMessage = options.EffectiveFailureMessage,
+            EmitPassedInput = options.EmitPassedInput,
+            EmitFailedInput = options.EmitFailedInput,
+            BoundedCapacity = options.BoundedCapacity
+        };
+
+    private static AssertionOptions ValidateOptions(AssertionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.Expression))
+        {
+            throw new InvalidOperationException("flow.assert requires configuration value 'expression'.");
         }
 
-        _result.Complete();
-        _passed.Complete();
-        _failed.Complete();
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new InvalidOperationException("flow.assert option 'inputType' cannot be empty.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new InvalidOperationException("flow.assert option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return options;
     }
 }

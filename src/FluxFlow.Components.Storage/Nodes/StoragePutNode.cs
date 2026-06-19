@@ -1,94 +1,43 @@
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Storage.Nodes;
 
-public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
+/// <summary>
+/// A standalone storage write node — a "blockified" put over an injected
+/// <see cref="IStorageStore"/>. Post a <c>FlowMessage&lt;StoragePutRequest&gt;</c> to
+/// <c>Input</c>; the node writes the record through the injected store and broadcasts
+/// a <c>FlowMessage&lt;StorageResult&gt;</c> on <c>Output</c> carrying the same
+/// correlation id (failures on <c>Errors</c>, a note on <c>Events</c>). The host owns
+/// the store lifetime; the node never opens or disposes it. Works with nothing but
+/// <c>new StoragePutNode(store)</c> — no engine.
+/// </summary>
+public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
 {
-    private const string NotAvailableMessage =
-        "storage.put is not available; open the storage.store store (host ConnectAsync) before writing.";
-
+    private readonly IStorageStore _store;
     private readonly StoragePutOptions _options;
-    private readonly IStorageStoreHandle _store;
     private readonly TimeProvider _clock;
-    private readonly ActionBlock<StoragePutRequest> _input;
-    private readonly BufferBlock<StorageResult> _result;
-    private readonly CancellationTokenSource _processingCancellation = new();
-    private bool _disposed;
 
-    internal StoragePutNode(
-        StoragePutOptions options,
-        IStorageStoreHandle store,
-        TimeProvider clock)
+    public StoragePutNode(
+        IStorageStore store,
+        StoragePutOptions? options = null,
+        TimeProvider? clock = null)
+        : base(new FlowNodeOptions
+        {
+            InputCapacity = (options ?? StoragePutOptions.Default).BoundedCapacity
+        })
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-
-        var executionOptions = new ExecutionDataflowBlockOptions
-        {
-            BoundedCapacity = options.BoundedCapacity,
-            EnsureOrdered = true,
-            MaxDegreeOfParallelism = 1
-        };
-        _input = new ActionBlock<StoragePutRequest>(PutAsync, executionOptions);
-        _result = new BufferBlock<StorageResult>(
-            new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity });
-        _input.Completion.ContinueWith(
-            CompleteOutput,
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-        CompleteWhen(_result.Completion);
+        _options = options ?? StoragePutOptions.Default;
+        _clock = clock ?? TimeProvider.System;
     }
 
-    public ITargetBlock<StoragePutRequest> Input => _input;
-
-    public ISourceBlock<StorageResult> Result => _result;
-
-    public override void Complete()
-        => _input.Complete();
-
-    public override void Fault(Exception exception)
+    protected override async Task ProcessAsync(FlowMessage<StoragePutRequest> message)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _processingCancellation.Cancel();
-            FaultNode(exception);
-        }
-        finally
-        {
-            ((IDataflowBlock)_input).Fault(exception);
-            ((IDataflowBlock)_result).Fault(exception);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        try
-        {
-            Complete();
-            await Completion.ConfigureAwait(false);
-        }
-        finally
-        {
-            _processingCancellation.Dispose();
-        }
-    }
-
-    private async Task PutAsync(StoragePutRequest input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(message);
+        var input = message.Payload;
 
         StoragePutRequest request;
         try
@@ -100,28 +49,15 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.InvalidRequest,
                 $"storage.put request is invalid: {exception.Message}",
+                message,
                 input,
                 exception);
             return;
         }
 
-        // Borrow the store the storage.store node opened. The put node never opens
-        // or disposes a store; if none is open the request reports not available.
-        if (!_store.TryGetStore(out var store))
-        {
-            ReportError(
-                StorageErrorCodes.StoreNotAvailable,
-                NotAvailableMessage,
-                request,
-                exception: null);
-            return;
-        }
-
         try
         {
-            var record = await store.PutAsync(
-                request,
-                _processingCancellation.Token).ConfigureAwait(false);
+            var record = await _store.PutAsync(request, Stopping).ConfigureAwait(false);
             ValidateRecord(record, request);
             var result = StorageNodeSupport.CreateRecordResult(
                 "put",
@@ -130,19 +66,24 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
                 request.CorrelationId,
                 _clock);
 
-            await _result.SendAsync(result, _processingCancellation.Token).ConfigureAwait(false);
-            TryEmitDiagnostic(
-                StorageDiagnosticNames.PutStored,
-                message: "storage.put stored record.",
-                attributes: StorageNodeSupport.CreateOperationAttributes(
+            // Carry the correlation id forward onto the result.
+            Emit(message.With(result));
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = _clock.GetUtcNow(),
+                CorrelationId = message.CorrelationId,
+                Name = StorageDiagnosticNames.PutStored,
+                Level = FlowEventLevel.Information,
+                Message = "storage.put stored record.",
+                Attributes = StorageNodeSupport.CreateOperationAttributes(
                     "put",
-                    _store.StoreName,
                     request.Collection!,
                     request.Key,
                     request.CorrelationId,
-                    record.Version));
+                    record.Version)
+            });
         }
-        catch (OperationCanceledException) when (_processingCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
             throw;
         }
@@ -151,6 +92,7 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             ReportError(
                 StorageErrorCodes.PutFailed,
                 $"storage.put failed: {exception.Message}",
+                message,
                 request,
                 exception);
         }
@@ -188,6 +130,7 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
     private void ReportError(
         int code,
         string message,
+        FlowMessage<StoragePutRequest> source,
         StoragePutRequest input,
         Exception? exception)
     {
@@ -196,37 +139,31 @@ public sealed class StoragePutNode : FlowNodeBase, IAsyncDisposable
             ?? "(missing)";
         var key = StorageNodeSupport.Normalize(input.Key) ?? "(missing)";
         var correlationId = StorageNodeSupport.Normalize(input.CorrelationId);
-        TryReportError(
-            code,
-            message,
-            exception,
-            StorageNodeSupport.CreateOperationContext(
-                "put",
-                _store.StoreName,
-                collection,
-                key,
-                correlationId));
-        TryEmitDiagnostic(
-            StorageDiagnosticNames.PutFailed,
-            FlowDiagnosticLevel.Error,
-            message,
-            exception,
-            StorageNodeSupport.CreateOperationAttributes(
-                "put",
-                _store.StoreName,
-                collection,
-                key,
-                correlationId));
-    }
-
-    private void CompleteOutput(Task completion)
-    {
-        if (completion.IsFaulted && completion.Exception is { } exception)
+        EmitError(new FlowError
         {
-            ((IDataflowBlock)_result).Fault(exception);
-            return;
-        }
-
-        _result.Complete();
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Code = code,
+            Message = message,
+            Context = StorageNodeSupport.CreateOperationContext(
+                "put",
+                collection,
+                key,
+                correlationId),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            CorrelationId = source.CorrelationId,
+            Name = StorageDiagnosticNames.PutFailed,
+            Level = FlowEventLevel.Error,
+            Message = message,
+            Attributes = StorageNodeSupport.CreateOperationAttributes(
+                "put",
+                collection,
+                key,
+                correlationId)
+        });
     }
 }

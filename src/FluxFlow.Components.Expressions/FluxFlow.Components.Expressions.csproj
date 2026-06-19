@@ -6,19 +6,19 @@
     <PackageId>FluxFlow.Components.Expressions</PackageId>
     <AssemblyName>FluxFlow.Components.Expressions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expressions</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Shared expression registration helpers for FluxFlow component packages.</Description>
     <PackageTags>workflow;dataflow;components;expressions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>The context factory registry now throws a descriptive error for ambiguous incomparable candidate types instead of picking one by dictionary order.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking: now builds on the extracted FluxFlow.Mapping package (IFlowExpressionEngine, IFlowMapContextFactory, …) instead of FluxFlow.Engine — the shared expression-registration helpers are engine-free. Update usings from FluxFlow.Engine.Mapping to FluxFlow.Mapping.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

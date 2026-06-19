@@ -6,24 +6,20 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Reusable observer components for FluxFlow.</Description>
+    <Description>Standalone observer nodes for FluxFlow (counter, logger, metrics) built on the FluxFlow.Nodes kit: an input in, a snapshot or log entry broadcast out — all carrying the message correlation id. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: flow.counter now receives a predicate compiled once in the factory instead of evaluating an expression string per message; the node no longer holds the expression engine or context factory. Internal refactor, no runtime behavior change. Replaces the bespoke IObservabilityClock abstraction with System.TimeProvider (UseClock now takes a TimeProvider; the old clock interface/implementation are removed).</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt the counter, logger, and metrics nodes as standalone FlowNode&lt;TInput, TOutput&gt; processors over the FluxFlow.Nodes kit: input in, a FlowCounterSnapshot / FlowLogEntry / FlowMetricSnapshot broadcast out, failures on the error port and diagnostics on the events port — all carrying the message correlation id. The engine factory, module, registration extensions, design-metadata provider, component-type/port constants, the definition-options reader, and the type/selector/expression-engine/context-factory resolution layer are removed; each node takes its options record (and, for the counter, an IFlowExpressionEngine and optional IFlowMapContextFactory from FluxFlow.Mapping) plus an optional TimeProvider directly, and depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\FluxFlow.Components.Expressions\FluxFlow.Components.Expressions.csproj" />
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

@@ -1,172 +1,153 @@
 # FluxFlow.Components.Storage
 
-Reusable logical storage components for FluxFlow.
+Standalone storage nodes for FluxFlow: blockified `put`/`get`/`query`/`delete`
+over an injected `IStorageStore`. No engine required.
 
-The package owns workflow storage node behavior and neutral contracts. Hosts
-provide the concrete store through an adapter.
+Each node is a self-contained TPL Dataflow processor built on
+[`FluxFlow.Nodes`](../FluxFlow.Nodes). Every message travels as a
+`FlowMessage<T>` envelope (payload + correlation id), so the correlation id
+flows request -> result for free — and onto the `Found`/`NotFound` and `Records`
+branches. The host owns the `IStorageStore` lifetime and injects the opened
+store into each node; the nodes never open or dispose it (exactly like the HTTP
+node over an `HttpClient`).
 
 ## Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `storage.store` | resource | Owns the store lifecycle. Operation nodes reference it by name and borrow the opened store. |
-| `storage.put` | `Input` -> `Result`, `Errors` | Stores or updates a logical record. |
-| `storage.get` | `Input` -> `Result`, `Found`, `NotFound`, `Errors` | Reads a logical record and routes found/missing results. |
-| `storage.query` | `Input` -> `Result`, `Records`, `Errors` | Queries records by collection, key prefix, attributes, time bounds, and limit. |
-| `storage.delete` | `Input` -> `Result`, `Errors` | Deletes a logical record and reports whether it existed. |
+| Node | Shape | Purpose |
+|------|-------|---------|
+| `StoragePutNode` | `Input` -> `Output`, `Errors`, `Events` | Stores or updates a logical record. |
+| `StorageGetNode` | `Input` -> `Output`, `Found`, `NotFound`, `Errors`, `Events` | Reads a logical record and fans found/missing results. |
+| `StorageQueryNode` | `Input` -> `Output`, `Records`, `Errors`, `Events` | Queries records by collection, key prefix, attributes, time bounds, and limit. |
+| `StorageDeleteNode` | `Input` -> `Output`, `Errors`, `Events` | Deletes a logical record and reports whether it existed. |
 
-## Store resource
+```csharp
+// The host owns the store; the node just borrows it.
+IStorageStore store = ...;
+await using var put = new StoragePutNode(store);
 
-The `storage.store` node owns the store. It is a resource: the operation nodes
-do not open their own store, they borrow the opened store from a `storage.store`
-by name.
-
-```json
+var request = FlowMessage.Create(new StoragePutRequest
 {
-  "type": "storage.store",
-  "name": "default",
-  "storeName": "items-db"
-}
+    Collection = "items",
+    Key = "a",
+    Value = "one"
+});
+await put.Input.SendAsync(request);
+
+var result = await put.Output.ReceiveAsync();      // FlowMessage<StorageResult>
+// result.CorrelationId == request.CorrelationId   // the envelope carries it
 ```
 
-Each operation node requires a `store` that names a `storage.store` resource.
-The reference is mandatory.
-
-```json
-{
-  "type": "storage.put",
-  "name": "save",
-  "store": "default",
-  "collection": "items"
-}
-```
-
-## Store Ownership
-
-The package does not include a concrete database. Register a store factory from
-the host:
-
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterStorageComponents(options => options
-        .UseSharedStore(context => new AppStorageStore(context.StoreName)));
-```
-
-Use `StorageStoreLease.Owned(store)` when the `storage.store` resource should
-dispose the store. Use `StorageStoreLease.Shared(store)` when the host owns the
-store lifetime.
-
-The factory receives the node address, node type, store name, and default
-collection through `StorageStoreContext`.
-
-## Opening (host-driven)
-
-Opening the store is an explicit host decision: there is no auto-open or lazy
-open. `StartAsync` on the `storage.store` resource is a no-op. The host opens and
-closes the store through `IStorageStoreHandle.ConnectAsync` /
-`DisconnectAsync` (named for cross-protocol consistency even though storage
-"opens" a store):
-
-```csharp
-await store.ConnectAsync(cancellationToken);
-// ... run the graph ...
-await store.DisconnectAsync(cancellationToken);
-```
-
-Operation nodes borrow the opened store at call-time and never open or dispose
-it. An operation sent before the store is opened is reported per message on the
-`Errors` port rather than faulting the node.
-
-## Runtime Timing
-
-The package uses `System.TimeProvider` (default `TimeProvider.System`); there is
-no bespoke storage clock interface. Hosts can provide a deterministic
-`TimeProvider` when tests, replay, or deterministic dashboards need stable
-timestamps:
-
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterStorageComponents(options => options
-        .UseClock(storageClock)
-        .UseSharedStore(context => new AppStorageStore(context.StoreName)));
-```
-
-The configured `TimeProvider` is also available on `StorageStoreContext.Clock`,
-so backend stores can use the same time source for stored records and expiration
-checks.
+`Output`, `Found`, `NotFound`, `Records`, `Errors`, and `Events` are all broadcast
+ports — link each to as many downstream consumers as you like.
 
 ## Put
 
-```json
+```csharp
+await using var put = new StoragePutNode(store, new StoragePutOptions
 {
-  "type": "storage.put",
-  "store": "default",
-  "collection": "items",
-  "mode": "upsert",
-  "emitStoredRecord": true,
-  "boundedCapacity": 128
-}
+    Collection = "items",
+    Mode = StorageWriteMode.Upsert,
+    EmitStoredRecord = true,
+    BoundedCapacity = 128
+});
 ```
 
-`storage.put` consumes `StoragePutRequest` and emits `StorageResult`.
-Supported modes are `upsert`, `create`, and `replace`. The request can override
+`StoragePutNode` consumes `StoragePutRequest` and emits `StorageResult`.
+Supported modes are `Upsert`, `Create`, and `Replace`. The request can override
 the node mode per item.
 
 ## Get
 
-```json
+```csharp
+await using var get = new StorageGetNode(store, new StorageGetOptions
 {
-  "type": "storage.get",
-  "store": "default",
-  "collection": "items",
-  "includeExpired": false,
-  "boundedCapacity": 128
-}
+    Collection = "items",
+    IncludeExpired = false
+});
 ```
 
-`storage.get` consumes `StorageGetRequest` and emits `StorageResult` on
-`Result`. Found records are also routed to `Found`; missing records are also
-routed to `NotFound`. Missing records are normal results, not processing
-errors.
+`StorageGetNode` consumes `StorageGetRequest` and emits `StorageResult` on
+`Output`. Found records are also fanned to `Found`; missing records are also
+fanned to `NotFound`. A missing record is a normal result, not a processing
+error.
 
 ## Query
 
-```json
+```csharp
+await using var query = new StorageQueryNode(store, new StorageQueryOptions
 {
-  "type": "storage.query",
-  "store": "default",
-  "collection": "items",
-  "offset": 0,
-  "limit": 100,
-  "includeExpired": false,
-  "emitRecordsInResult": true,
-  "emitRecordOutputs": true,
-  "boundedCapacity": 128
-}
+    Collection = "items",
+    Offset = 0,
+    Limit = 100,
+    IncludeExpired = false,
+    EmitRecordsInResult = true,
+    EmitRecordOutputs = true
+});
 ```
 
-`storage.query` consumes `StorageQueryRequest` and emits one
-`StorageQueryResult` on `Result`. The `Records` port emits each returned
-`StorageRecord` when `emitRecordOutputs` is true.
-
-Requests can filter by collection, key prefix, exact-match attributes, stored
-time bounds, expired-record policy, offset, and limit. Store failures emit
-`FlowError` and the node continues processing later messages.
+`StorageQueryNode` consumes `StorageQueryRequest` and emits one
+`StorageQueryResult` on `Output`. The `Records` port emits each returned
+`StorageRecord` (as a `FlowMessage<StorageRecord>`) when `EmitRecordOutputs` is
+true. Requests can filter by collection, key prefix, exact-match attributes,
+stored time bounds, expired-record policy, offset, and limit.
 
 ## Delete
 
-```json
+```csharp
+await using var delete = new StorageDeleteNode(store, new StorageDeleteOptions
 {
-  "type": "storage.delete",
-  "store": "default",
-  "collection": "items",
-  "emitMissingAsResult": true,
-  "boundedCapacity": 128
-}
+    Collection = "items",
+    EmitMissingAsResult = true
+});
 ```
 
-`storage.delete` consumes `StorageDeleteRequest` and emits `StorageResult`.
-Missing deletes can be emitted as normal results or suppressed.
+`StorageDeleteNode` consumes `StorageDeleteRequest` and emits `StorageResult`.
+Missing deletes can be emitted as normal results or suppressed
+(`EmitMissingAsResult`).
+
+## Errors and events
+
+A store failure or an invalid request surfaces a `FlowError` on `Errors`
+(stamped with the in-flight correlation id and a `Code` from
+`StorageErrorCodes`) and the node keeps processing later messages. Each node
+also emits `FlowEvent` diagnostics on `Events` (names in
+`StorageDiagnosticNames`).
+
+## Store Ownership
+
+The package does not include a concrete database. A host supplies an
+`IStorageStore` — see the [FileSystem](../FluxFlow.Components.Storage.FileSystem)
+and [SqlFile](../FluxFlow.Components.Storage.SqlFile) adapter packages — and
+injects it into the nodes.
+
+Adapter packages register a store factory through `StorageComponentOptions`:
+
+```csharp
+var options = new StorageComponentOptions()
+    .UseFileSystemStorage("./data");      // adapter extension
+IStorageStore store = (await options.StoreFactory
+    .OpenAsync(new StorageStoreContext { StoreName = "items-db" })).Store;
+```
+
+`StorageStoreLease.Owned(store)` marks a store the lease should dispose;
+`StorageStoreLease.Shared(store)` marks a host-owned store that must not be
+disposed. The factory receives the store name, default collection, and clock
+through `StorageStoreContext`.
+
+## Runtime Timing
+
+Each node uses `System.TimeProvider` (default `TimeProvider.System`) for result
+timestamps. Pass a deterministic `TimeProvider` (for example
+`Microsoft.Extensions.Time.Testing.FakeTimeProvider`) when tests, replay, or
+deterministic dashboards need stable timestamps:
+
+```csharp
+await using var put = new StoragePutNode(store, clock: fakeTimeProvider);
+```
+
+The same clock can be supplied to a backend store through
+`StorageStoreContext.Clock` so stored records and expiration checks share one
+time source.
 
 ## Contracts
 
@@ -182,23 +163,11 @@ Core contracts:
 - `StorageWriteMode`
 - `IStorageStore`
 - `IStorageStoreFactory`
-- `IStorageStoreHandle`
 - `StorageStoreContext`
 - `StorageStoreLease`
 
-`StorageRecord.Value` is `object?` in this first slice. Hosts own
-serialization and can compose this package with serialization or payload
-components before storage.
-
-Per-message store failures emit `FlowError` and later messages continue.
-Opening the store fails clearly when the store cannot be opened.
-
-## Design Metadata
-
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+`StorageRecord.Value` is `object?`: hosts own serialization and can compose this
+package with serialization or payload components before storage.
 
 ## Composition Guidance
 

@@ -1,5 +1,189 @@
 # Changelog
 
+<!--
+The 3.x line is the standalone-node era: every component is an engine-free node over the
+FluxFlow.Nodes kit (FlowNode/FlowSource, the FlowMessage envelope + CorrelationId, broadcast
+Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit and support
+packages debut at 1.0.0.
+-->
+
+## FluxFlow.Components.Assertions 3.0.0
+
+Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node is a
+`FlowNode` taking its options/expression engine and `TimeProvider` directly; results fan out
+to Result/Passed/Failed ports via `AddOutput`; correlation flows on `FlowMessage`. The engine
+factory/module/registration/design-metadata glue is removed.
+
+## FluxFlow.Components.Control 3.0.0
+
+Engine-free standalone rewrite. Filter and When are `FlowNode`s over the kit (When fans out to
+WhenTrue/WhenFalse via `AddOutput`); the predicate compiles once at construction against an
+injected expression engine (from FluxFlow.Mapping). Engine glue removed.
+
+## FluxFlow.Components.Expectations 3.0.0
+
+Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic
+timeout armed against an injected `TimeProvider`. Engine glue removed.
+
+## FluxFlow.Components.FileSystem 3.0.0
+
+Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
+are `FlowSource`s (the watcher is disposed in `OnDisposeAsync`). Engine glue removed.
+
+## FluxFlow.Components.Http 3.0.0
+
+Engine-free standalone rewrite to a single `HttpClientNode : FlowNode<HttpRequestInput,
+HttpResponseOutput>` over an injected `HttpClient` — the connection-resource node, sender
+factory, and in-node SSRF guard are gone (transport policy lives on the injected client).
+
+## FluxFlow.Components.Mapping 3.0.0
+
+Engine-free standalone rewrite. The mapper node is a `FlowNode` with the primary result on
+Output and failures on a Failed port (`AddOutput`); the mapping expression compiles once.
+Engine glue removed.
+
+## FluxFlow.Components.Metrics 3.0.0
+
+Engine-free standalone rewrite. The aggregate node is a `FlowNode`; in coalesce mode the single
+final snapshot is emitted from the kit's `OnInputCompletedAsync` drain hook (deterministic, no
+dropped snapshot under load). Engine glue removed.
+
+## FluxFlow.Components.Mqtt 3.0.0
+
+Engine-free standalone rewrite, and now the single MQTT package: connection (a self-contained
+`IMqttConnectionHandle` with the hardened dispose-race lifecycle preserved verbatim), publish
+(`FlowNode`), subscribe (`FlowSource`), and the MQTT5 request/reply trigger (folded in from the
+former FluxFlow.Components.Mqtt.RequestReply package). Engine glue removed.
+
+## FluxFlow.Components.Observability 3.0.0
+
+Engine-free standalone rewrite. Logger/counter/metrics are `FlowNode` transforms over the kit.
+Engine glue removed.
+
+## FluxFlow.Components.Payloads 3.0.0
+
+Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue
+removed.
+
+## FluxFlow.Components.Projections 3.0.0
+
+Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a
+package-owned `ProjectionEvent` contract. Engine glue removed.
+
+## FluxFlow.Components.Routing 3.0.0
+
+Engine-free standalone rewrite. Switch/Fork/Correlation/Window are `FlowNode`s (multi-output via
+`AddOutput`), Merge fans in to a single Input, and Join is a self-contained two-input node over
+the kit's envelope/error/event primitives. Engine glue removed.
+
+## FluxFlow.Components.Serialization 3.0.0
+
+Engine-free standalone rewrite. The serialize/deserialize transforms are `FlowNode`s over the
+kit. Engine glue removed.
+
+## FluxFlow.Components.Sessions 3.0.0
+
+Engine-free standalone rewrite. Recorder is a `FlowNode`, replay is a `FlowSource` (paced by an
+injected `TimeProvider`), query fans out via `AddOutput`. A mid-stream store failure reports
+`ReplayFailed` before faulting. Engine glue removed.
+
+## FluxFlow.Components.Sources 3.0.0
+
+Engine-free standalone rewrite. Generated and sequence sources are `FlowSource`s; the host
+supplies the items directly (the JSON + type-alias reader layer is gone). Engine glue removed.
+
+## FluxFlow.Components.State 3.0.0
+
+Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an
+injected `TimeProvider`. Engine glue removed.
+
+## FluxFlow.Components.Storage 3.0.0
+
+Engine-free standalone rewrite. Put/get/query/delete are `FlowNode`s taking an injected
+`IStorageStore` (the host owns the store lifetime, like `HttpClient`); the in-graph
+storage-connection resource node is removed. Get/query fan out via `AddOutput`. The
+`IStorageStore` contract + store context/lease/factory are preserved for the adapters.
+
+## FluxFlow.Components.Storage.FileSystem 3.0.0
+
+Rebuilt against FluxFlow.Components.Storage 3.0.0 (engine-free). The file-system `IStorageStore`
+adapter is unchanged in behavior.
+
+## FluxFlow.Components.Storage.SqlFile 3.0.0
+
+Rebuilt against FluxFlow.Components.Storage 3.0.0 (engine-free). The SQL-file `IStorageStore`
+adapter is unchanged in behavior.
+
+## FluxFlow.Components.Timers 3.0.0
+
+Engine-free standalone rewrite. Interval/schedule are `FlowSource`s; delay/throttle/debounce are
+`FlowNode`s, all timed against an injected `TimeProvider`. Delay preserves constant-offset-from-
+arrival burst semantics; debounce flushes its pending item via the drain hook. Engine glue
+removed.
+
+## FluxFlow.Components.Validation 3.0.0
+
+Engine-free standalone rewrite. The JSON-schema validator is a `FlowNode` with Valid/Invalid
+fan-out via `AddOutput`. Engine glue removed.
+
+## FluxFlow.Engine 2.0.0
+
+Breaking: the expression/mapping abstraction (IFlowExpressionEngine, IFlowMapper, IFlowPredicate,
+FlowMapContext, …) is extracted into the new leaf package FluxFlow.Mapping (namespace
+FluxFlow.Mapping); the engine now references it. Update usings from `FluxFlow.Engine.Mapping` to
+`FluxFlow.Mapping`. In the standalone-node architecture the engine is an optional composition
+runtime — components no longer require it.
+
+## FluxFlow.Components.Expressions 2.0.0
+
+Breaking: the shared expression-registration helpers now build on the extracted FluxFlow.Mapping
+package instead of FluxFlow.Engine — the package is engine-free. Update usings from
+`FluxFlow.Engine.Mapping` to `FluxFlow.Mapping`.
+
+## FluxFlow.Mapping 1.0.0
+
+Initial extraction of the expression/mapping abstraction out of `FluxFlow.Engine` into a
+standalone leaf package, so nodes can map/filter with host-provided expressions without
+referencing the engine.
+
+- Moves `IFlowExpressionEngine`, `IFlowCompiledExpression`, `IFlowMapper`, `IFlowPredicate`,
+  `FlowMapContext`, `IFlowMapContextFactory`, the Expression/Delegate mapper+predicate
+  adapters, and `EvaluatingCompiledExpression` from `FluxFlow.Engine.Mapping` to the
+  `FluxFlow.Mapping` namespace/package. The engine now references this package.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.0
+
+Initial ASP.NET Core HTTP trigger adapter.
+
+- `HttpTriggerNode` is the trigger as a component: given a keyed request source and using
+  a `RequestReplyCoordinator` internally, it exposes graph-facing `Output`/`Responses`.
+- `AddFluxFlowHttpTrigger(name, configure)` registers the keyed source + trigger + a
+  hosted service; `MapFluxFlowTrigger(pattern, name)` feeds it. A
+  `MapFluxFlowTrigger(pattern, coordinator)` overload supports DI-less/manual composition.
+- `HttpRequestContext` bridges `HttpContext` to the reply contract, writing the correlated
+  response (or `504`/`500`/`503` on timeout/failure/shutdown).
+- The only FluxFlow package that references ASP.NET Core.
+
+## FluxFlow.Components.RequestReply 1.0.0
+
+Initial request/reply bridge.
+
+- `RequestReplyCoordinator<TRequest, TResponse>` correlates a host-supplied
+  `IRequestContext` stream to a one-way graph (`Output` requests, `Responses` input)
+  by `CorrelationId`, replies through the context, evicts timed-out requests, and
+  reports on broadcast error/event ports. Transport-agnostic — reused by HTTP and
+  MQTT triggers.
+
+## FluxFlow.Nodes 1.0.0
+
+Initial shared node kit.
+
+- `FlowNode<TInput, TOutput>` base: a self-contained TPL Dataflow processor with a
+  bounded buffered input and broadcast output/error/event ports. Nodes built on it
+  run standalone — no engine, registry, or runtime.
+- `FlowError` and `FlowEvent` records: the uniform error/event items every node
+  emits.
+
 ## FluxFlow.Components.Sources 2.0.0
 
 2.0 preview: TimeProvider clock migration.

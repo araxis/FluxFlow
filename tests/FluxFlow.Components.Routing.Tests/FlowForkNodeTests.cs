@@ -1,7 +1,7 @@
 using FluxFlow.Components.Routing.Diagnostics;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Components.Routing.Nodes;
+using FluxFlow.Components.Routing.Options;
+using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -11,169 +11,104 @@ namespace FluxFlow.Components.Routing.Tests;
 public sealed class FlowForkNodeTests
 {
     [Fact]
-    public async Task Fork_EmitsEachInputToConfiguredOutputs()
+    public async Task Fork_EmitsEachInputToConfiguredOutputs_PreservingCorrelation()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "string",
-            outputs = new[] { "First", "Second" }
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<string>>();
-        var first = new BufferBlock<string>();
-        var second = new BufferBlock<string>();
-        LinkOutput(runtimeNode, "First", first);
-        LinkOutput(runtimeNode, "Second", second);
+        await using var node = new FlowForkNode<string>(
+            new ForkRoutingOptions { Outputs = ["First", "Second"] });
+        var first = RoutingTestSink.Link(node.Outputs["First"]);
+        var second = RoutingTestSink.Link(node.Outputs["Second"]);
 
-        await input.Target.SendAsync("one");
-        await input.Target.SendAsync("two");
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var one = FlowMessage.Create("one");
+        var two = FlowMessage.Create("two");
+        await node.Input.SendAsync(one);
+        await node.Input.SendAsync(two);
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(first)).ShouldBe(["one", "two"]);
-        (await DrainUntilCompletedAsync(second)).ShouldBe(["one", "two"]);
+        var onFirst = await RoutingTestSink.DrainUntilCompletedAsync(first);
+        onFirst.Select(m => m.Payload).ShouldBe(["one", "two"]);
+        onFirst[0].CorrelationId.ShouldBe(one.CorrelationId);
+        (await RoutingTestSink.DrainUntilCompletedAsync(second)).Select(m => m.Payload)
+            .ShouldBe(["one", "two"]);
+    }
+
+    [Fact]
+    public async Task Fork_FirstOutputIsPrimaryOutputPort()
+    {
+        await using var node = new FlowForkNode<int>(
+            new ForkRoutingOptions { Outputs = ["First", "Second"] });
+
+        node.Outputs["First"].ShouldBeSameAs(node.Output);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
+        node.Outputs["Second"].LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     [Fact]
     public async Task Fork_CompletesWithoutInput()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            outputs = new[] { "First" }
-        });
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        var first = new BufferBlock<int>();
-        LinkOutput(runtimeNode, "First", first);
+        await using var node = new FlowForkNode<int>(
+            new ForkRoutingOptions { Outputs = ["First"] });
+        var first = RoutingTestSink.Link(node.Outputs["First"]);
 
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        (await DrainUntilCompletedAsync(first)).ShouldBeEmpty();
+        (await RoutingTestSink.DrainUntilCompletedAsync(first)).ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Fork_EmitsDiagnostics()
+    public async Task Fork_EmitsEvents()
     {
-        var runtimeNode = CreateNode(new
-        {
-            inputType = "int",
-            outputs = new[] { "First" }
-        });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        var input = runtimeNode.FindInput(new PortName(RoutingComponentPorts.Input))
-            .ShouldBeOfType<InputPort<int>>();
-        runtimeNode.FindOutput(new PortName("First"))!.LinkToDiscard();
+        await using var node = new FlowForkNode<int>(
+            new ForkRoutingOptions { Outputs = ["First"] });
+        var events = RoutingTestSink.Link(node.Events);
+        node.Outputs["First"].LinkTo(DataflowBlock.NullTarget<FlowMessage<int>>());
 
-        await input.Target.SendAsync(1);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var diagnostic = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        diagnostic.Name.ShouldBe(RoutingDiagnosticNames.ForkForwarded);
-        diagnostic.Attributes["outputs"].ShouldBe(1);
+        var flowEvent = (await RoutingTestSink.DrainUntilCompletedAsync(events)).ShouldHaveSingleItem();
+        flowEvent.Name.ShouldBe(RoutingDiagnosticNames.ForkForwarded);
+        flowEvent.Attributes["outputs"].ShouldBe(1);
     }
 
     [Fact]
     public void Fork_RejectsMissingOutputs()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new { inputType = "int" }));
-
-        exception.Message.ShouldContain("outputs");
-    }
+        => Should.Throw<ArgumentException>(
+            () => new FlowForkNode<int>(new ForkRoutingOptions()))
+            .Message.ShouldContain("outputs");
 
     [Fact]
     public void Fork_RejectsDuplicateOutputs()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                outputs = new[] { "First", "first" }
-            }));
-
-        exception.Message.ShouldContain("duplicate");
-    }
+        => Should.Throw<ArgumentException>(
+            () => new FlowForkNode<int>(
+                new ForkRoutingOptions { Outputs = ["First", "first"] }))
+            .Message.ShouldContain("duplicate");
 
     [Fact]
     public void Fork_RejectsInvalidOutputPort()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                outputs = new[] { "Bad.Port" }
-            }));
-
-        exception.Message.ShouldContain("invalid port");
-    }
+        => Should.Throw<ArgumentException>(
+            () => new FlowForkNode<int>(
+                new ForkRoutingOptions { Outputs = ["Bad.Port"] }))
+            .Message.ShouldContain("invalid port");
 
     [Fact]
     public void Fork_RejectsBuiltInOutputPort()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "int",
-                outputs = new[] { RoutingComponentPorts.Input }
-            }));
-
-        exception.Message.ShouldContain("built-in port");
-    }
+        => Should.Throw<ArgumentException>(
+            () => new FlowForkNode<int>(
+                new ForkRoutingOptions { Outputs = [RoutingComponentPorts.Input] }))
+            .Message.ShouldContain("built-in port");
 
     [Fact]
-    public void Fork_RejectsUnknownInputType()
-    {
-        var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(new
-            {
-                inputType = "missing.type",
-                outputs = new[] { "First" }
-            }));
+    public void Fork_RejectsInvalidCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowForkNode<int>(
+                new ForkRoutingOptions { Outputs = ["First"], BoundedCapacity = 0 }));
 
-        exception.Message.ShouldContain("not registered");
-    }
-
-    private static RuntimeNode CreateNode(object configuration)
-    {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterRoutingComponents(new RecordingExpressionEngine());
-        registry.TryGetFactory(RoutingComponentTypes.Fork, out var factory).ShouldBeTrue();
-        return factory(RoutingTestHost.CreateContext(RoutingComponentTypes.Fork, configuration));
-    }
-
-    private static void LinkOutput<T>(
-        RuntimeNode runtimeNode,
-        string port,
-        BufferBlock<T> target)
-    {
-        runtimeNode.FindOutput(new PortName(port))!
-            .TryLinkTo(
-                new InputPort<T>(
-                    new PortAddress("test", new NodeName(port), new PortName("Input")),
-                    target),
-                propagateCompletion: true,
-                out var error);
-        error.ShouldBeNull();
-    }
-
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> output)
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var values = new List<T>();
-        while (await output.OutputAvailableAsync(cancellation.Token))
-        {
-            while (output.TryReceive(out var value))
-            {
-                values.Add(value);
-            }
-        }
-
-        return values;
-    }
+    [Fact]
+    public void Fork_RejectsNullOptions()
+        => Should.Throw<ArgumentNullException>(() => new FlowForkNode<int>(null!));
 }

@@ -2,6 +2,8 @@ namespace FluxFlow.Components.Payloads.Options;
 
 public sealed record PayloadInspectOptions
 {
+    public static readonly PayloadInspectOptions Default = new();
+
     public int MaxInputBytes { get; init; } = 1_048_576;
     public int MaxPreviewBytes { get; init; } = 1024;
     public int MaxFormattedChars { get; init; } = 4096;

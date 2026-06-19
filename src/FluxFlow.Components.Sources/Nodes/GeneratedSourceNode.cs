@@ -1,53 +1,69 @@
 using FluxFlow.Components.Sources.Diagnostics;
 using FluxFlow.Components.Sources.Options;
-using FluxFlow.Engine.Components;
-using System.Threading.Tasks.Dataflow;
+using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Sources.Nodes;
 
-public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsyncDisposable
+/// <summary>
+/// A standalone generated source. Call <c>StartAsync</c> and the node broadcasts its
+/// pre-materialized <typeparamref name="TOutput"/> items as <c>FlowMessage&lt;TOutput&gt;</c>
+/// on <c>Output</c> (each minting a fresh correlation id), honoring the configured
+/// <see cref="GeneratedSourceOptions.MaxItems"/>/<see cref="GeneratedSourceOptions.Loop"/>
+/// count plus the initial delay and inter-item interval off the injected
+/// <see cref="TimeProvider"/>, then completes. Lifecycle notes are emitted on <c>Events</c>
+/// using <see cref="SourceDiagnosticNames"/>; failures surface a <see cref="FlowError"/> on
+/// <c>Errors</c>. The host materializes/deserializes the items it wants to emit and hands
+/// them in directly — no engine, registry, or string-to-Type resolution.
+/// </summary>
+public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
 {
-    private readonly object _stateLock = new();
+    public const string Started = SourceDiagnosticNames.GeneratedStarted;
+    public const string Emitted = SourceDiagnosticNames.GeneratedEmitted;
+    public const string Completed = SourceDiagnosticNames.GeneratedCompleted;
+    public const string Failed = SourceDiagnosticNames.GeneratedFailed;
+
     private readonly GeneratedSourceOptions _options;
     private readonly IReadOnlyList<TOutput> _items;
     private readonly TimeProvider _clock;
-    private CancellationTokenSource? _runCancellation;
-    private Task? _runTask;
-    private bool _startRequested;
-    private bool _completedBeforeStart;
-    private bool _disposed;
 
     public GeneratedSourceNode(
         GeneratedSourceOptions options,
-        IReadOnlyList<TOutput> items)
-        : this(options, items, TimeProvider.System)
-    {
-    }
-
-    internal GeneratedSourceNode(
-        GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items,
-        TimeProvider clock)
-        : base(new DataflowBlockOptions { BoundedCapacity = options.BoundedCapacity })
+        TimeProvider? clock = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _items = items ?? throw new ArgumentNullException(nameof(items));
-        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        if (options.BoundedCapacity <= 0)
+        _clock = clock ?? TimeProvider.System;
+
+        if (_options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.generated bounded capacity must be greater than zero.");
         }
 
-        if (options.MaxItems.HasValue && options.MaxItems.Value <= 0)
+        if (_options.InitialDelayMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.generated option 'initialDelayMilliseconds' cannot be negative.");
+        }
+
+        if (_options.IntervalMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.generated option 'intervalMilliseconds' cannot be negative.");
+        }
+
+        if (_options.MaxItems.HasValue && _options.MaxItems.Value <= 0)
         {
             throw new ArgumentException(
                 "source.generated option 'maxItems' must be greater than zero.",
                 nameof(options));
         }
 
-        if (options.Loop && !options.MaxItems.HasValue)
+        if (_options.Loop && !_options.MaxItems.HasValue)
         {
             throw new ArgumentException(
                 "source.generated option 'maxItems' is required when 'loop' is true.",
@@ -55,98 +71,12 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
         }
     }
 
-    public override Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_stateLock)
-        {
-            if (_completedBeforeStart)
-            {
-                return Task.CompletedTask;
-            }
-
-            if (_startRequested)
-            {
-                throw new InvalidOperationException("source.generated node has already started.");
-            }
-
-            _startRequested = true;
-            _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _runTask = RunAsync(_runCancellation.Token);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public override void Complete()
-    {
-        CancellationTokenSource? cancellation;
-        lock (_stateLock)
-        {
-            cancellation = _runCancellation;
-            if (cancellation is null)
-            {
-                _completedBeforeStart = true;
-            }
-        }
-
-        if (cancellation is null)
-        {
-            CompleteOutput();
-            return;
-        }
-
-        try
-        {
-            cancellation.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the run loop has stopped.
-        }
-    }
-
-    public override void Fault(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        try
-        {
-            _runCancellation?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-            // The node was already disposed; the run loop has stopped.
-        }
-
-        base.Fault(exception);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        Complete();
-        if (_runTask is not null)
-        {
-            await _runTask.ConfigureAwait(false);
-        }
-
-        _runCancellation?.Dispose();
-    }
-
-    private async Task RunAsync(CancellationToken cancellationToken)
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         var emitted = 0;
         try
         {
-            TryEmitDiagnostic(
-                SourceDiagnosticNames.GeneratedStarted,
-                message: "source.generated started.",
-                attributes: CreateAttributes(emitted));
+            EmitDiagnostic(Started, "source.generated started.", CreateAttributes(emitted));
             await SourceNodeTiming.DelayInitialAsync(
                 _options.InitialDelayMilliseconds,
                 _clock,
@@ -157,17 +87,9 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = _items[index % _items.Count];
-                if (!await SendOutputAsync(item, cancellationToken).ConfigureAwait(false))
-                {
-                    CompleteGenerated(emitted, "source.generated stopped.");
-                    return;
-                }
-
+                Emit(FlowMessage.Create(item));
                 emitted++;
-                TryEmitDiagnostic(
-                    SourceDiagnosticNames.GeneratedEmitted,
-                    message: "source.generated emitted item.",
-                    attributes: CreateAttributes(emitted));
+                EmitDiagnostic(Emitted, "source.generated emitted item.", CreateAttributes(emitted));
                 if (index < targetCount - 1)
                 {
                     await SourceNodeTiming.DelayIntervalAsync(
@@ -185,18 +107,8 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
         }
         catch (Exception exception)
         {
-            TryReportError(
-                SourceErrorCodes.GeneratedFailed,
-                $"source.generated failed: {exception.Message}",
-                exception,
-                CreateErrorContext(emitted));
-            TryEmitDiagnostic(
-                SourceDiagnosticNames.GeneratedFailed,
-                FlowDiagnosticLevel.Error,
-                "source.generated failed.",
-                exception,
-                CreateAttributes(emitted));
-            base.Fault(exception);
+            ReportFailure(exception, emitted);
+            throw;
         }
     }
 
@@ -213,13 +125,40 @@ public sealed class GeneratedSourceNode<TOutput> : SourceFlowNode<TOutput>, IAsy
     }
 
     private void CompleteGenerated(int emitted, string message)
+        => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
+
+    private void ReportFailure(Exception exception, int emitted)
     {
-        TryEmitDiagnostic(
-            SourceDiagnosticNames.GeneratedCompleted,
-            message: message,
-            attributes: CreateAttributes(emitted));
-        CompleteOutput();
+        EmitError(new FlowError
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Code = SourceErrorCodes.GeneratedFailed,
+            Message = $"source.generated failed: {exception.Message}",
+            Context = CreateErrorContext(emitted),
+            Exception = exception
+        });
+        EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = Failed,
+            Level = FlowEventLevel.Error,
+            Message = "source.generated failed.",
+            Attributes = CreateAttributes(emitted)
+        });
     }
+
+    private void EmitDiagnostic(
+        string name,
+        string message,
+        IReadOnlyDictionary<string, object?> attributes)
+        => EmitEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = name,
+            Level = FlowEventLevel.Information,
+            Message = message,
+            Attributes = attributes
+        });
 
     private Dictionary<string, object?> CreateAttributes(int emitted)
         => new(StringComparer.Ordinal)

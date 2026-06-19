@@ -1,9 +1,9 @@
+using FluxFlow.Components.Validation;
 using FluxFlow.Components.Validation.Contracts;
-using FluxFlow.Components.Validation.Diagnostics;
+using FluxFlow.Components.Validation.Nodes;
 using FluxFlow.Components.Validation.Options;
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Definitions;
-using FluxFlow.Engine.Runtime;
+using FluxFlow.Nodes;
+using Json.Schema;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using System.Text;
@@ -14,177 +14,118 @@ using Xunit;
 
 namespace FluxFlow.Components.Validation.Tests;
 
+// Every test news the node directly — no engine, no registry. Messages travel as
+// FlowMessage<T> envelopes; the correlation id flows input -> result/Valid/Invalid
+// and onto any error for free.
 public sealed class JsonSchemaValidatorNodeTests
 {
     [Fact]
-    public async Task JsonSchemaValidator_RoutesValidInput()
+    public async Task ValidInput_RoutesToValidAndResultPreservingCorrelationId()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "json",
-                boundedCapacity = 4
-            });
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonElement>>();
-        var resultOutput = runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result));
-        resultOutput.ShouldNotBeNull();
-        resultOutput.ValueType.ShouldBe(typeof(JsonSchemaValidationResult<JsonElement>));
-
-        var results = new BufferBlock<JsonSchemaValidationResult<JsonElement>>();
-        var valid = new BufferBlock<JsonElement>();
-        resultOutput.TryLinkTo(
-            new InputPort<JsonSchemaValidationResult<JsonElement>>(
-                new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                results),
-            propagateCompletion: true,
-            out var resultError);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-            .TryLinkTo(
-                new InputPort<JsonElement>(
-                    new PortAddress("test", new NodeName("valid"), new PortName("Input")),
-                    valid),
-                propagateCompletion: true,
-                out var validError);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
-        resultError.ShouldBeNull();
-        validError.ShouldBeNull();
+        await using var node = new JsonSchemaValidatorNode<JsonElement>(OrderSchema());
+        var results = Sink(node.Output);
+        var valid = Sink(node.Valid);
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
 
         var order = JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 });
-        await input.Target.SendAsync(order);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create(order);
+        await node.Input.SendAsync(message);
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.IsValid.ShouldBeTrue();
-        result.Issues.ShouldBeEmpty();
-        result.ValueSelector.ShouldBe("input");
-        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .GetProperty("id")
-            .GetString()
-            .ShouldBe("A-100");
+        result.CorrelationId.ShouldBe(message.CorrelationId);
+        result.Payload.IsValid.ShouldBeTrue();
+        result.Payload.Issues.ShouldBeEmpty();
+        result.Payload.ValueSelector.ShouldBe("input");
+
+        var routed = await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        routed.CorrelationId.ShouldBe(message.CorrelationId);
+        routed.Payload.GetProperty("id").GetString().ShouldBe("A-100");
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_UsesConfiguredClockForResultTimestamp()
+    public async Task Output_FansOutEveryResultToEveryConsumer()
+    {
+        // One node's output linked to two downstream consumers, no engine. Both see
+        // every result.
+        await using var node = new JsonSchemaValidatorNode<JsonElement>(OrderSchema());
+        var logger = Sink(node.Output);
+        var mapper = Sink(node.Output);
+        node.Valid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+
+        await node.Input.SendAsync(FlowMessage.Create(
+            JsonSerializer.SerializeToElement(new { id = "A-1", total = 1 })));
+        await node.Input.SendAsync(FlowMessage.Create(
+            JsonSerializer.SerializeToElement(new { id = "A-2", total = 2 })));
+
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Input
+            .GetProperty("id").GetString().ShouldBe("A-1");
+        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Input
+            .GetProperty("id").GetString().ShouldBe("A-2");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Input
+            .GetProperty("id").GetString().ShouldBe("A-1");
+        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Input
+            .GetProperty("id").GetString().ShouldBe("A-2");
+    }
+
+    [Fact]
+    public async Task ConfiguredClock_SetsResultTimestamp()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
-        var runtimeNode = CreateNode(
-            options => options.UseClock(new FakeTimeProvider(timestamp)),
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "json",
-                boundedCapacity = 4
-            });
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonElement>>();
-        var results = new BufferBlock<JsonSchemaValidationResult<JsonElement>>();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!
-            .TryLinkTo(
-                new InputPort<JsonSchemaValidationResult<JsonElement>>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out var resultError);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
-        resultError.ShouldBeNull();
+        await using var node = new JsonSchemaValidatorNode<JsonElement>(
+            OrderSchema(),
+            clock: new FakeTimeProvider(timestamp));
+        var results = Sink(node.Output);
+        node.Valid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
 
-        await input.Target.SendAsync(JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 }));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(
+            JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 })));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.Timestamp.ShouldBe(timestamp);
+        result.Payload.Timestamp.ShouldBe(timestamp);
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_RoutesInvalidInputWithoutFlowError()
+    public async Task InvalidInput_RoutesToInvalidWithoutEmittingFlowError()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "json",
-                boundedCapacity = 4
-            });
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonElement>>();
-        var errors = new BufferBlock<FlowError>();
-        var results = new BufferBlock<JsonSchemaValidationResult<JsonElement>>();
-        var invalid = new BufferBlock<JsonElement>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!
-            .TryLinkTo(
-                new InputPort<JsonSchemaValidationResult<JsonElement>>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    results),
-                propagateCompletion: true,
-                out _);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!
-            .TryLinkTo(
-                new InputPort<JsonElement>(
-                    new PortAddress("test", new NodeName("invalid"), new PortName("Input")),
-                    invalid),
-                propagateCompletion: true,
-                out _);
+        await using var node = new JsonSchemaValidatorNode<JsonElement>(OrderSchema());
+        var results = Sink(node.Output);
+        var invalid = Sink(node.Invalid);
+        var errors = Sink(node.Errors);
+        node.Valid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
 
         var order = JsonSerializer.SerializeToElement(new { id = "A-100", total = "wrong" });
-        await input.Target.SendAsync(order);
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var message = FlowMessage.Create(order);
+        await node.Input.SendAsync(message);
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        result.IsValid.ShouldBeFalse();
-        result.Issues.ShouldNotBeEmpty();
-        (await invalid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
-            .GetProperty("id")
-            .GetString()
-            .ShouldBe("A-100");
+        result.Payload.IsValid.ShouldBeFalse();
+        result.Payload.Issues.ShouldNotBeEmpty();
+
+        var routed = await invalid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        routed.CorrelationId.ShouldBe(message.CorrelationId);
+        routed.Payload.GetProperty("id").GetString().ShouldBe("A-100");
+
         errors.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_LoadsSchemaFromPath()
+    public async Task SchemaPath_LoadsSchemaFromFile()
     {
         var schemaPath = Path.Combine(Path.GetTempPath(), $"fluxflow-schema-{Guid.NewGuid():N}.json");
-        await File.WriteAllTextAsync(schemaPath, OrderSchema().GetRawText());
+        await File.WriteAllTextAsync(schemaPath, OrderSchemaJson().GetRawText());
         try
         {
-            var runtimeNode = CreateNode(
-                _ => { },
-                new
-                {
-                    schemaPath,
-                    inputType = "string"
-                });
-            await runtimeNode.Node.StartAsync();
-            var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-                .ShouldBeOfType<InputPort<string>>();
-            var valid = new BufferBlock<string>();
-            runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-            runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-                .TryLinkTo(
-                    new InputPort<string>(
-                        new PortAddress("test", new NodeName("valid"), new PortName("Input")),
-                        valid),
-                    propagateCompletion: true,
-                    out _);
-            runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+            var schema = new JsonSchemaValidatorOptions { SchemaPath = schemaPath }.LoadSchema();
+            await using var node = new JsonSchemaValidatorNode<string>(schema, schemaPath: schemaPath);
+            var valid = Sink(node.Valid);
+            node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<string>>>());
+            node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<string>>());
 
-            await input.Target.SendAsync("""{"id":"A-100","total":125}""");
-            input.Target.Complete();
-            await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            await node.Input.SendAsync(FlowMessage.Create("""{"id":"A-100","total":125}"""));
 
-            (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).ShouldContain("A-100");
+            (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldContain("A-100");
         }
         finally
         {
@@ -193,247 +134,157 @@ public sealed class JsonSchemaValidatorNodeTests
     }
 
     [Fact]
-    public void JsonSchemaValidator_FailsBuildWhenSchemaMissing()
+    public void LoadSchema_FailsWhenSchemaMissing()
     {
         var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    inputType = "object"
-                }));
+            () => new JsonSchemaValidatorOptions { InputType = "object" }.LoadSchema());
 
         exception.Message.ShouldContain("schema");
     }
 
     [Fact]
-    public void JsonSchemaValidator_FailsBuildWhenSchemaMalformed()
+    public void LoadSchema_FailsWhenSchemaMalformed()
     {
         var exception = Should.Throw<InvalidOperationException>(
-            () => CreateNode(
-                _ => { },
-                new
-                {
-                    schema = "{",
-                    inputType = "object"
-                }));
+            () => new JsonSchemaValidatorOptions
+            {
+                Schema = JsonSerializer.SerializeToElement("{")
+            }.LoadSchema());
 
         exception.Message.ShouldContain("schema");
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_ReportsSelectorFailureAndContinues()
+    public async Task SelectorFailure_ReportsErrorWithCorrelationIdAndContinues()
     {
         var calls = 0;
-        var runtimeNode = CreateNode(
-            options => options
-                .RegisterType<InputMessage>("app.input")
-                .UseValueSelector<InputMessage>(
-                    "payload",
-                    (message, _) =>
-                    {
-                        calls++;
-                        if (calls == 1)
-                        {
-                            throw new InvalidOperationException("selector failed");
-                        }
-
-                        return message.Payload;
-                    }),
-            new
+        var selector = new DelegateSelector<InputMessage>((message, _) =>
+        {
+            calls++;
+            if (calls == 1)
             {
-                schema = OrderSchema(),
-                inputType = "app.input",
-                valueSelector = "payload",
-                boundedCapacity = 4
-            });
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputMessage>>();
-        var errors = new BufferBlock<FlowError>();
-        var valid = new BufferBlock<InputMessage>();
-        runtimeNode.Node.Errors.LinkTo(errors);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-            .TryLinkTo(
-                new InputPort<InputMessage>(
-                    new PortAddress("test", new NodeName("valid"), new PortName("Input")),
-                    valid),
-                propagateCompletion: true,
-                out _);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+                throw new InvalidOperationException("selector failed");
+            }
 
-        await input.Target.SendAsync(new InputMessage("""{"id":"bad","total":1}"""));
-        await input.Target.SendAsync(new InputMessage("""{"id":"A-100","total":125}"""));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+            return message.Payload;
+        });
+        await using var node = new JsonSchemaValidatorNode<InputMessage>(
+            OrderSchema(),
+            selector: selector,
+            valueSelector: "payload");
+        var errors = Sink(node.Errors);
+        var valid = Sink(node.Valid);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<InputMessage>>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<InputMessage>>());
+
+        var bad = FlowMessage.Create(new InputMessage("""{"id":"bad","total":1}"""));
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new InputMessage("""{"id":"A-100","total":125}""")));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(ValidationErrorCodes.ValueSelectorFailed);
-        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.ShouldContain("A-100");
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+
+        // The pump keeps going: the second (well-formed) message still validates.
+        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Payload.ShouldContain("A-100");
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_ConvertsBytesJsonNodesAndPlainObjects()
+    public async Task ConvertsBytes()
     {
-        var bytesNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "bytes"
-            });
-        await bytesNode.Node.StartAsync();
-        var byteInput = bytesNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<byte[]>>();
-        var byteValid = new BufferBlock<byte[]>();
-        bytesNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-        bytesNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-            .TryLinkTo(
-                new InputPort<byte[]>(
-                    new PortAddress("test", new NodeName("bytes"), new PortName("Input")),
-                    byteValid),
-                propagateCompletion: true,
-                out _);
-        bytesNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+        await using var node = new JsonSchemaValidatorNode<byte[]>(OrderSchema());
+        var valid = Sink(node.Valid);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<byte[]>>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<byte[]>>());
 
-        await byteInput.Target.SendAsync(Encoding.UTF8.GetBytes("""{"id":"A-100","total":125}"""));
-        byteInput.Target.Complete();
-        await bytesNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        (await byteValid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Length.ShouldBeGreaterThan(0);
+        await node.Input.SendAsync(FlowMessage.Create(
+            Encoding.UTF8.GetBytes("""{"id":"A-100","total":125}""")));
 
-        var jsonNode = CreateNode(
-            options => options.RegisterType<JsonNode>("json-node"),
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "json-node"
-            });
-        await jsonNode.Node.StartAsync();
-        var jsonNodeInput = jsonNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonNode>>();
-        var jsonNodeValid = new BufferBlock<JsonNode>();
-        jsonNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-        jsonNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-            .TryLinkTo(
-                new InputPort<JsonNode>(
-                    new PortAddress("test", new NodeName("jsonNodes"), new PortName("Input")),
-                    jsonNodeValid),
-                propagateCompletion: true,
-                out _);
-        jsonNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
-
-        await jsonNodeInput.Target.SendAsync(
-            JsonNode.Parse("""{"id":"A-100","total":125}""")!);
-        jsonNodeInput.Target.Complete();
-        await jsonNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        (await jsonNodeValid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))["id"]!
-            .GetValue<string>()
-            .ShouldBe("A-100");
-
-        var objectNode = CreateNode(
-            options => options.RegisterType<InputObject>("app.object"),
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "app.object"
-            });
-        await objectNode.Node.StartAsync();
-        var objectInput = objectNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<InputObject>>();
-        var objectValid = new BufferBlock<InputObject>();
-        objectNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-        objectNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!
-            .TryLinkTo(
-                new InputPort<InputObject>(
-                    new PortAddress("test", new NodeName("objects"), new PortName("Input")),
-                    objectValid),
-                propagateCompletion: true,
-                out _);
-        objectNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
-
-        await objectInput.Target.SendAsync(new InputObject("A-100", 125));
-        objectInput.Target.Complete();
-        await objectNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-        (await objectValid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Id.ShouldBe("A-100");
+        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Length.ShouldBeGreaterThan(0);
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_CompletesOutputs()
+    public async Task ConvertsJsonNodes()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = OrderSchema(),
-                inputType = "json",
-                boundedCapacity = 4
-            });
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonElement>>();
-        var resultTarget = new BufferBlock<JsonSchemaValidationResult<JsonElement>>();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!
-            .TryLinkTo(
-                new InputPort<JsonSchemaValidationResult<JsonElement>>(
-                    new PortAddress("test", new NodeName("results"), new PortName("Input")),
-                    resultTarget),
-                propagateCompletion: true,
-                out _);
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+        await using var node = new JsonSchemaValidatorNode<JsonNode>(OrderSchema());
+        var valid = Sink(node.Valid);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<JsonNode>>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonNode>>());
 
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(
+            JsonNode.Parse("""{"id":"A-100","total":125}""")!));
 
-        // Completion propagates through the output port pump asynchronously, so
-        // await it rather than checking IsCompleted synchronously.
-        await resultTarget.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload["id"]!.GetValue<string>().ShouldBe("A-100");
     }
 
     [Fact]
-    public async Task JsonSchemaValidator_EmitsDiagnostics()
+    public async Task ConvertsPlainObjects()
     {
-        var runtimeNode = CreateNode(
-            _ => { },
-            new
-            {
-                schema = OrderSchema(),
-                schemaId = "orders",
-                inputType = "json"
-            });
-        var diagnostics = new BufferBlock<FlowDiagnostic>();
-        runtimeNode.Node.ShouldBeAssignableTo<IFlowDiagnosticSource>()!
-            .Diagnostics.LinkTo(diagnostics);
-        await runtimeNode.Node.StartAsync();
-        var input = runtimeNode.FindInput(new PortName(ValidationComponentPorts.Input))
-            .ShouldBeOfType<InputPort<JsonElement>>();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Result))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Valid))!.LinkToDiscard();
-        runtimeNode.FindOutput(new PortName(ValidationComponentPorts.Invalid))!.LinkToDiscard();
+        await using var node = new JsonSchemaValidatorNode<InputObject>(OrderSchema());
+        var valid = Sink(node.Valid);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<InputObject>>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<InputObject>>());
 
-        await input.Target.SendAsync(JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 }));
-        input.Target.Complete();
-        await runtimeNode.Node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await node.Input.SendAsync(FlowMessage.Create(new InputObject("A-100", 125)));
 
-        var loaded = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        loaded.Name.ShouldBe(ValidationDiagnosticNames.JsonSchemaLoaded);
-        var valid = await diagnostics.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        valid.Name.ShouldBe(ValidationDiagnosticNames.JsonSchemaValid);
+        (await valid.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.Id.ShouldBe("A-100");
+    }
+
+    [Fact]
+    public async Task Completion_PropagatesToOutputSinks()
+    {
+        var node = new JsonSchemaValidatorNode<JsonElement>(OrderSchema());
+        // Propagate completion here so the sink observes the broadcast finishing.
+        var results = new BufferBlock<FlowMessage<JsonSchemaValidationResult<JsonElement>>>();
+        node.Output.LinkTo(results, new DataflowLinkOptions { PropagateCompletion = true });
+        node.Valid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+
+        node.Complete();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Completion propagates through the broadcast output asynchronously.
+        await results.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task EmitsLoadedAndValidEvents()
+    {
+        await using var node = new JsonSchemaValidatorNode<JsonElement>(OrderSchema(), schemaId: "orders");
+        var events = Sink(node.Events);
+        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonSchemaValidationResult<JsonElement>>>());
+        node.Valid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+        node.Invalid.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonElement>>());
+
+        var message = FlowMessage.Create(JsonSerializer.SerializeToElement(new { id = "A-100", total = 125 }));
+        await node.Input.SendAsync(message);
+
+        var loaded = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        loaded.Name.ShouldBe(JsonSchemaValidatorNode<JsonElement>.SchemaLoaded);
+
+        var valid = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        valid.Name.ShouldBe(JsonSchemaValidatorNode<JsonElement>.SchemaValid);
+        valid.CorrelationId.ShouldBe(message.CorrelationId);
         valid.Attributes["schemaId"].ShouldBe("orders");
     }
 
-    private static RuntimeNode CreateNode(
-        Action<ValidationComponentOptions> configure,
-        object configuration)
+    [Fact]
+    public void Constructor_RequiresSchema()
+        => Should.Throw<ArgumentNullException>(() => new JsonSchemaValidatorNode<JsonElement>(null!));
+
+    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
-        var registry = new RuntimeNodeFactoryRegistry()
-            .RegisterValidationComponents(configure);
-        registry.TryGetFactory(ValidationComponentTypes.JsonSchemaValidator, out var factory).ShouldBeTrue();
-        return factory(ValidationTestHost.CreateContext(configuration));
+        var sink = new BufferBlock<T>();
+        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
+        return sink;
     }
 
-    private static JsonElement OrderSchema()
+    private static JsonSchema OrderSchema()
+        => new JsonSchemaValidatorOptions { Schema = OrderSchemaJson() }.LoadSchema();
+
+    private static JsonElement OrderSchemaJson()
         => JsonSerializer.SerializeToElement(new
         {
             type = "object",
@@ -444,6 +295,14 @@ public sealed class JsonSchemaValidatorNodeTests
                 total = new { type = "number" }
             }
         });
+
+    private sealed class DelegateSelector<TInput>(
+        Func<TInput, JsonSchemaValidatorContext, object?> selector)
+        : IJsonSchemaValueSelector<TInput>
+    {
+        public object? Select(TInput input, JsonSchemaValidatorContext context)
+            => selector(input, context);
+    }
 
     private sealed record InputMessage(string Payload);
 

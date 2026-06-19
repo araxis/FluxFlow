@@ -41,8 +41,6 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `35-mqtt-topic-validation.md`: MQTT topic validation helper and package behavior record.
 - `36-mapping-component-package.md`: first generic mapping component package record.
 - `37-control-component-package.md`: first generic control component package record.
-- `38-mapping-control-sample.md`: runnable mapping/control package composition sample.
-- `39-mqtt-composition-sample.md`: runnable MQTT composition sample with an in-memory adapter.
 - `40-component-package-template-sample.md`: buildable component package authoring template sample.
 - `41-validation-component-package.md`: first generic validation component package record.
 - `42-filesystem-component-package.md`: first generic file system component package record.
@@ -60,14 +58,11 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `54-serialization-component-package.md`: first generic serialization component package.
 - `55-metrics-component-package.md`: first generic metrics aggregation component package.
 - `56-sessions-component-package.md`: first generic session recording and replay component package.
-- `57-sessions-composition-sample.md`: runnable sessions recording/replay composition sample.
 - `58-state-reducer-component-package.md`: first generic state reducer component package.
-- `59-state-composition-sample.md`: runnable timer/mapper/state/counter composition sample.
 - `60-component-composition-docs.md`: package composition guidance and host/package boundary notes.
 - `61-package-readme-composition-links.md`: component package README links to composition guidance.
 - `62-storage-component-package-plan.md`: planned generic storage component package boundary and v0.1 scope.
 - `63-storage-component-package.md`: first generic logical storage component package.
-- `64-storage-composition-sample.md`: runnable logical storage composition sample.
 - `65-storage-adapter-and-migration-plan.md`: persisted storage adapter and host migration plan.
 - `66-storage-filesystem-adapter-package.md`: first file-system-backed storage adapter package.
 - `67-assertions-component-package.md`: assertion package split from control and release notes.
@@ -185,6 +180,14 @@ This folder records the extraction work for `FluxFlow.Engine`.
   mapper diagnostic, README refresh, three flake root-cause fixes) and the GA
   cut flipping the 20 component packages from `2.0.0-preview.1` to `2.0.0`
   (engine stays `1.3.0`).
+- `139-standalone-node-architecture.md`: COMPLETE re-architecture (branch
+  `work/http-simplify`, unmerged/unpublished) — the `FluxFlow.Nodes` kit
+  (`FlowNode<,>`/`FlowSource<>`, `AddOutput`, `OnInputCompletedAsync` drain hook,
+  fault-flush rule, `FlowMessage<T>` envelope, guarded `CorrelationId`), the extracted
+  `FluxFlow.Mapping` leaf, all 18 dataflow-node packages migrated engine-free (engine
+  now optional), the transport-neutral `RequestReplyCoordinator` (HTTP/MQTT triggers),
+  5 composition samples retired, and an adversarial verify pass that caught + fixed 3
+  migration regressions. 738 tests green.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
