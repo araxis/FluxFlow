@@ -101,6 +101,33 @@ public sealed class RequestReplyCoordinatorTests
         error.CorrelationId.ShouldBe(new CorrelationId("unknown"));
     }
 
+    [Fact]
+    public async Task Fault_FailsInFlightCallers_AndFaultsCompletion()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var context = new FakeContext("pending");
+        await bridge.Incoming.SendAsync(context);
+        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)); // now in-flight
+
+        bridge.Fault(new InvalidOperationException("boom"));
+
+        // The in-flight caller is failed (not left hanging) with the fault.
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Failed.ShouldBeOfType<InvalidOperationException>();
+        context.Replied.ShouldBeNull();
+
+        // Completion surfaces the fault.
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public async Task Coordinator_IsAFlowNode()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        bridge.ShouldBeAssignableTo<IFlowNode>();
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

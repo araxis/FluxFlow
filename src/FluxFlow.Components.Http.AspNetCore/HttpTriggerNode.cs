@@ -12,7 +12,7 @@ namespace FluxFlow.Components.Http.AspNetCore;
 /// <see cref="Output"/>, responses back on <see cref="Responses"/>. The endpoint and the
 /// transport never appear here — only the request source and the coordinator.
 /// </summary>
-public sealed class HttpTriggerNode : IAsyncDisposable
+public sealed class HttpTriggerNode : IFlowNode
 {
     private readonly RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply> _coordinator;
     private readonly IDisposable _link;
@@ -42,6 +42,8 @@ public sealed class HttpTriggerNode : IAsyncDisposable
     public Task Completion => _coordinator.Completion;
 
     public void Complete() => _coordinator.Complete();
+
+    public void Fault(Exception exception) => _coordinator.Fault(exception);
 
     public async ValueTask DisposeAsync()
     {

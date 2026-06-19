@@ -15,7 +15,7 @@ namespace FluxFlow.Components.RequestReply;
 /// response within the timeout are failed and evicted. The bridge knows nothing about
 /// the transport — that lives entirely in the context's <c>ReplyAsync</c>/<c>FailAsync</c>.
 /// </summary>
-public sealed class RequestReplyCoordinator<TRequest, TResponse> : IAsyncDisposable
+public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 {
     private readonly RequestReplyOptions _options;
     private readonly TimeProvider _clock;
@@ -97,6 +97,36 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IAsyncDisposa
     public Task Completion => Task.WhenAll(_incoming.Completion, _responses.Completion);
 
     public void Complete() => _incoming.Complete();
+
+    public void Fault(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        _stopping.Cancel();
+
+        // Fail anything still in flight so no caller hangs forever.
+        foreach (var pair in _inFlight)
+        {
+            if (_inFlight.TryRemove(pair.Key, out var entry))
+            {
+                _ = SafeFailAsync(entry.Context, exception);
+            }
+        }
+
+        // Fault the data blocks so Completion surfaces the fault (Output first, so the
+        // _incoming-completion continuation's Complete() is a no-op against the faulted
+        // block); flush — not fault — the diagnostic ports so buffered Errors/Events
+        // survive, matching the kit's fault rule.
+        ((IDataflowBlock)_output).Fault(exception);
+        ((IDataflowBlock)_incoming).Fault(exception);
+        ((IDataflowBlock)_responses).Fault(exception);
+        _errors.Complete();
+        _events.Complete();
+    }
 
     private async Task OnIncomingAsync(IRequestContext<TRequest, TResponse> context)
     {

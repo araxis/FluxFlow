@@ -39,6 +39,20 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public async Task TriggerNode_IsAFlowNode_WithPropagatingFault()
+    {
+        var requests = new BufferBlock<IRequestContext<HttpTriggerRequest, HttpTriggerReply>>();
+        await using var node = new HttpTriggerNode(requests);
+
+        // The trigger is a first-class node: it carries the uniform lifecycle contract.
+        node.ShouldBeAssignableTo<IFlowNode>();
+
+        node.Fault(new InvalidOperationException("boom"));
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
     public async Task NoResponseFromGraph_TimesOut_Returns504()
     {
         // Requests are accepted but never answered, so the bridge times them out.
