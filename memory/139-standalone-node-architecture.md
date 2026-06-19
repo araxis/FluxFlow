@@ -90,6 +90,12 @@ The bridge implements request/reply over the dataflow realm by correlating on
 `CorrelationId`. The reply travels back as a normal `FlowMessage` (the id is echoed by the
 handler via `With`), never as a delegate threaded through the graph.
 
+Triggers are first-class nodes: `HttpTriggerNode` and `RequestReplyCoordinator<,>`
+implement `IFlowNode` (`Completion`/`Complete`/`Fault`/`DisposeAsync`), so a host drives a
+trigger with the same lifecycle as any node. The coordinator's `Fault` fails in-flight
+callers (no hung request), faults its data blocks so `Completion` surfaces the fault, and
+flushes Errors/Events per the kit rule.
+
 ## Kit extensions added during the full migration
 
 The kit grew (still tiny) to cover every node shape the migration needed:
