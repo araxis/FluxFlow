@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Payloads</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone payload-inspection node for FluxFlow: classify a byte/text payload (JSON, XML, base64, text, binary, empty) and broadcast a result with bounded previews, plus error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>

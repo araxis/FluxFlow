@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A transport-agnostic request/reply bridge for FluxFlow: turns an inbound request stream into a one-way dataflow graph and correlates the response back to the caller by CorrelationId. Reused by HTTP and MQTT triggers.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>

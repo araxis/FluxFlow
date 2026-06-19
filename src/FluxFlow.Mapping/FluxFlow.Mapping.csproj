@@ -7,7 +7,7 @@
     <PackageId>FluxFlow.Mapping</PackageId>
     <AssemblyName>FluxFlow.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Mapping</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Engine-free expression/mapping abstraction for FluxFlow: IFlowExpressionEngine, IFlowMapper, IFlowPredicate, FlowMapContext, and the expression/delegate mapper+predicate adapters. A leaf package referenced by nodes and the engine alike.</Description>
     <PackageTags>workflow;dataflow;mapping;expressions</PackageTags>

@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone observer nodes for FluxFlow (counter, logger, metrics) built on the FluxFlow.Nodes kit: an input in, a snapshot or log entry broadcast out — all carrying the message correlation id. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>

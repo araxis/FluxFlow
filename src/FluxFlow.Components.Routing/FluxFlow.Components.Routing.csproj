@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone routing nodes for FluxFlow: switch, fork, merge, window, correlation, and join over the FluxFlow.Nodes kit, with broadcast output/error/event ports. Predicate/key extraction comes from FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>

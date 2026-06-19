@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Serialization</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone serialization and encoding nodes for FluxFlow: JSON parse/stringify, text encode/decode, and base64 encode/decode, each a blockified converter (request in, result out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;serialization;json;base64;text</PackageTags>

@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone MQTT nodes for FluxFlow over an injected client adapter: a connection handle that owns the client lifecycle (host-driven connect/disconnect), publish (request in, result out) and subscribe (received messages out) nodes that borrow the established adapter, and an MQTT5 request/reply trigger (MqttRequestContext + the transport-neutral RequestReplyCoordinator). One package for the whole MQTT surface — connection, publish, subscribe, and trigger. Broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>

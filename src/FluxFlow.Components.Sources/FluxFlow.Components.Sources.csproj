@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone deterministic source nodes for FluxFlow: generated and sequence emitters built as FlowSource&lt;T&gt; over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>

@@ -6,7 +6,7 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone metrics-aggregation node for FluxFlow: a blockified aggregator (metric samples in, rolling snapshots out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
