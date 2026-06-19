@@ -60,6 +60,38 @@ public sealed class TimerDelayNodeTests
     }
 
     [Fact]
+    public async Task Delay_BurstSharesOneConstantOffsetFromArrival()
+    {
+        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerDelayNode<int>(
+            new TimerDelaySettings
+            {
+                Delay = TimeSpan.FromMilliseconds(40),
+                BoundedCapacity = 8
+            },
+            clock);
+        var output = TimerTestSink.Link(node.Output);
+
+        // The burst arrives at the same instant, so all three share one due time
+        // (arrival + 40ms) — only the first item arms a timer; the rest are already due.
+        var scheduled = clock.TimerScheduled;
+        await node.Input.SendAsync(FlowMessage.Create(1));
+        await node.Input.SendAsync(FlowMessage.Create(2));
+        await node.Input.SendAsync(FlowMessage.Create(3));
+        await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+        output.TryReceive(out _).ShouldBeFalse();
+
+        // A single advance by one Delay releases the whole burst (constant offset), rather
+        // than accumulating one delay per item (which would need three advances).
+        clock.Advance(TimeSpan.FromMilliseconds(40));
+
+        var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var third = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        new[] { first.Payload, second.Payload, third.Payload }.ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public async Task Delay_ZeroDelayPassesThroughImmediately()
     {
         await using var node = new TimerDelayNode<string>(

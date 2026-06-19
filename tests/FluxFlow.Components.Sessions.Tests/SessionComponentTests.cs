@@ -346,6 +346,30 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Replay_ReportsStoreFailureMidEnumerationThenFaults()
+    {
+        var store = CreateStoreWithRecords(count: 3);
+        // The session loads fine, then the store throws after the first record streams.
+        store.FailReadAfter = 1;
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            store);
+        // Don't propagate completion: the source faults its error port right after posting
+        // the error, and the buffered error must still be observable.
+        var errors = new BufferBlock<FlowError>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+
+        await node.StartAsync();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
+        error.Message.ShouldContain("mid-stream");
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
     public void Replay_RejectsMissingSessionId()
     {
         var exception = Should.Throw<ArgumentException>(
@@ -551,6 +575,7 @@ public sealed class SessionComponentTests
         public long InitialMessageCount { get; set; }
         public bool FailNextAppend { get; set; }
         public bool FailNextQuery { get; set; }
+        public int? FailReadAfter { get; set; }
         public SessionQueryRequest? LastQuery { get; private set; }
 
         public Task<SessionMetadata?> GetSessionAsync(
@@ -710,11 +735,18 @@ public sealed class SessionComponentTests
                 query = query.Take(request.MaxMessages.Value);
             }
 
+            var read = 0;
             foreach (var record in query)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (FailReadAfter.HasValue && read >= FailReadAfter.Value)
+                {
+                    throw new InvalidOperationException("session read failed mid-stream.");
+                }
+
                 await Task.Yield();
                 yield return record;
+                read++;
             }
         }
 

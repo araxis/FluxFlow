@@ -42,17 +42,6 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     private long _totalSize;
     private int _finalSnapshotEmitted;
 
-    // Coalesce-mode handshake (EmitEverySample = false). The final ProcessAsync
-    // opens _finalSampleApplied once it has folded in the last sample, then parks on
-    // _finalSnapshotFlushed. FlushOnInputCompletionAsync — the one component that
-    // knows the input has truly ended — waits for the last sample, emits the single
-    // snapshot while the parked delegate is still holding the processor (so Output is
-    // open), then releases the delegate.
-    private readonly TaskCompletionSource _finalSampleApplied =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TaskCompletionSource _finalSnapshotFlushed =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-
     public MetricsAggregateNode(
         MetricsAggregateOptions? options = null,
         TimeProvider? clock = null)
@@ -67,73 +56,27 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
         _options = options ?? new MetricsAggregateOptions();
         _timeProvider = clock ?? TimeProvider.System;
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
-
-        if (!_options.EmitEverySample)
-        {
-            _ = FlushOnInputCompletionAsync();
-        }
     }
 
-    protected override async Task ProcessAsync(FlowMessage<MetricSampleInput> message)
+    protected override Task ProcessAsync(FlowMessage<MetricSampleInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        await AggregateAsync(message).ConfigureAwait(false);
-
-        if (!_options.EmitEverySample && await IsFinalSampleAsync().ConfigureAwait(false))
-        {
-            // This is the final sample: hand its just-applied state to the flush task
-            // and park — asynchronously, without holding the worker thread — until the
-            // snapshot has been posted. Parking keeps the processor, and so the
-            // broadcast Output, open until the flush completes.
-            _finalSampleApplied.TrySetResult();
-            await _finalSnapshotFlushed.Task.ConfigureAwait(false);
-        }
+        return AggregateAsync(message);
     }
 
-    // The single-DOP, single-slot processor can only have pulled THIS sample (rather
-    // than a later one) once no later sample remains buffered, so when the intake
-    // buffer has completed this is the final sample. Completion is signalled the
-    // instant the processor pulls the sample — before this delegate runs — but the
-    // completion task can take a few scheduling beats to transition; a bounded run of
-    // async yields lets it land. A non-final sample's buffer never completes (its
-    // successors stay queued behind the single-slot processor while this delegate
-    // runs), so it yields out cheaply and returns. Yields free the worker thread
-    // between turns and never block it, and a non-final sample's yields cost only a
-    // handful of scheduler turns — no timers, no spinning.
-    private async Task<bool> IsFinalSampleAsync()
+    // In coalesce mode (EmitEverySample = false) the single final snapshot is emitted from
+    // the kit's drain hook. The kit guarantees this runs after the input has drained and
+    // every ProcessAsync has completed, and before Output is completed — so the final
+    // snapshot reliably reaches consumers without racing input-buffer completion (the
+    // previous bounded-yield handshake could drop it under scheduling pressure).
+    protected override ValueTask OnInputCompletedAsync()
     {
-        for (var i = 0; i < 64 && !Input.Completion.IsCompleted; i++)
+        if (!_options.EmitEverySample)
         {
-            await Task.Yield();
+            TryEmitFinalSnapshot();
         }
 
-        return Input.Completion.IsCompleted;
-    }
-
-    private async Task FlushOnInputCompletionAsync()
-    {
-        try
-        {
-            await Input.Completion.ConfigureAwait(false);
-
-            // Wait for the final sample to be folded in (skip on empty input, where
-            // the processor completes without ever invoking ProcessAsync).
-            var finalSample = await Task
-                .WhenAny(_finalSampleApplied.Task, Completion)
-                .ConfigureAwait(false);
-            if (finalSample == _finalSampleApplied.Task)
-            {
-                TryEmitFinalSnapshot();
-            }
-        }
-        catch
-        {
-            // A faulted/cancelled input still means no further samples arrive.
-        }
-        finally
-        {
-            _finalSnapshotFlushed.TrySetResult();
-        }
+        return ValueTask.CompletedTask;
     }
 
     private Task AggregateAsync(FlowMessage<MetricSampleInput> message)

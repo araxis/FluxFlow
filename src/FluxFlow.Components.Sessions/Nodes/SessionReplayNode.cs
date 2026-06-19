@@ -115,32 +115,51 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
 
         var emitted = 0L;
         SessionRecord? previous = null;
-        await foreach (var record in _store.ReadMessagesAsync(
-                           new SessionReadRequest
-                           {
-                               SessionId = _sessionId,
-                               StartSequence = _options.StartSequence,
-                               MaxMessages = _options.MaxMessages
-                           },
-                           cancellationToken).WithCancellation(cancellationToken)
-                           .ConfigureAwait(false))
+        try
         {
-            await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
-            if (!Emit(FlowMessage.Create(CopyRecord(record))))
+            await foreach (var record in _store.ReadMessagesAsync(
+                               new SessionReadRequest
+                               {
+                                   SessionId = _sessionId,
+                                   StartSequence = _options.StartSequence,
+                                   MaxMessages = _options.MaxMessages
+                               },
+                               cancellationToken).WithCancellation(cancellationToken)
+                               .ConfigureAwait(false))
             {
-                break;
-            }
+                await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
+                if (!Emit(FlowMessage.Create(CopyRecord(record))))
+                {
+                    break;
+                }
 
-            emitted++;
-            previous = record;
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Name = ReplayEmitted,
-                Level = FlowEventLevel.Information,
-                Message = "session.replay emitted message.",
-                Attributes = CreateRecordAttributes(record, emitted)
-            });
+                emitted++;
+                previous = record;
+                EmitEvent(new FlowEvent
+                {
+                    Timestamp = _clock.GetUtcNow(),
+                    Name = ReplayEmitted,
+                    Level = FlowEventLevel.Information,
+                    Message = "session.replay emitted message.",
+                    Attributes = CreateRecordAttributes(record, emitted)
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cooperative stop (Complete/dispose); FlowSource treats it as normal completion.
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // A store failure that occurs mid-enumeration must still surface the
+            // ReplayFailed FlowError + diagnostic before FlowSource faults Completion
+            // (which completes/flushes the buffered Errors/Events ports).
+            ReportReplayError(
+                SessionsErrorCodes.ReplayFailed,
+                $"session.replay failed: {exception.Message}",
+                exception);
+            throw;
         }
 
         EmitEvent(new FlowEvent
