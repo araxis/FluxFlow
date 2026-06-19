@@ -76,11 +76,14 @@ engine's `OutputPort` — so a node could not run without the engine.
   the correlated reply (or 504/500/503) back, holding the response open until the graph
   answers. (Trade noted: resolving the keyed source in the endpoint is a mild
   service-locator seam — accepted for DI-first host ergonomics.)
-- **`FluxFlow.Components.Mqtt.RequestReply`** (new): the SAME bridge driving MQTT, with
-  no MQTT-library dependency — `MqttRequestContext` publishes the reply to the MQTT5
-  response topic (echoing correlation data) via a host-supplied `IMqttResponsePublisher`.
-  This is the transport-neutrality proof: bridge + `IRequestContext` + envelope reused
-  verbatim across HTTP and MQTT.
+- **MQTT request/reply** (the SAME bridge driving MQTT): `MqttRequestContext` publishes
+  the reply to the MQTT5 response topic (echoing correlation data) via a host-supplied
+  `IMqttResponsePublisher`. The transport-neutrality proof: bridge + `IRequestContext` +
+  envelope reused verbatim across HTTP and MQTT. Unlike HTTP — where inbound (ASP.NET Core)
+  and outbound (`HttpClient`) are different heavy deps, so `Http`/`Http.AspNetCore` split —
+  MQTT uses one client library for everything, so this trigger lives **inside the single
+  `FluxFlow.Components.Mqtt` package** (connection + publish + subscribe + trigger), not a
+  separate package.
 
 ## Triggers (the inbound shape)
 
@@ -143,11 +146,11 @@ the `ReplayFailed` error on mid-stream store failure (→ wrapped the read loop)
 
 ## Verification + state
 
-Full solution green at **738 tests, 0 warnings**; flake-prone suites survive heavy
+Full solution green at **741 tests, 0 warnings**; flake-prone suites survive heavy
 oversubscription stress. Real-server end-to-end proven via ASP.NET Core TestServer. New
 packages in `eng/packages.json` + CHANGELOG at `0.1.0` (Nodes, Mapping, RequestReply,
-Http.AspNetCore, Mqtt.RequestReply); migrated components keep their current versions
-(unflipped, unpublished).
+Http.AspNetCore); the MQTT trigger is folded into `FluxFlow.Components.Mqtt` (no separate
+package); migrated components keep their current versions (unflipped, unpublished).
 
 ## Open / next (owner decisions)
 
