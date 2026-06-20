@@ -2,13 +2,13 @@
 
 Date: 2026-06-18
 
-Status: migration COMPLETE on branch `work/http-simplify` (as of 2026-06-19). NOT
-merged to main, NOT published — versioning/publishing of this new major line is a
-pending owner decision. A deliberate re-architecture after the 2.0 GA cut
+Status: COMPLETE, merged to `main`, tagged, and published as of 2026-06-20. The
+old `work/http-simplify` branch is stale and fully contained in `origin/main`.
+This was a deliberate re-architecture after the 2.0 GA cut
 ([[138-2.0-ga-remediation-and-cut]]) that supersedes the engine-coupled component
-model. HTTP was the template; all 18 dataflow-node component packages are now
-engine-free on the kit, and the engine is an optional runtime (only the infra
-packages `Designer` and `Journal` still reference it).
+model. HTTP was the template; the dataflow component packages are now
+engine-free on the kit, and the engine is an optional runtime (only infra
+packages such as `Designer` and `Journal` remain engine-coupled).
 
 ## The owner's principle (why this exists)
 
@@ -31,7 +31,7 @@ engine's `OutputPort` — so a node could not run without the engine.
 3. **Composition/host (optional)** — config -> `new` nodes -> `LinkTo`; endpoint/trigger
    wiring. This is where today's engine becomes an *optional* runtime, not a prerequisite.
 
-## The kit (`FluxFlow.Nodes`, v0.1.0)
+## The kit (`FluxFlow.Nodes`, v1.0.0)
 
 - `FlowNode<TInput, TOutput>`: base node. Input is a **bounded `BufferBlock`**
   (backpressure on intake); Output/Errors/Events are **`BroadcastBlock`** (fan-out,
@@ -126,11 +126,11 @@ The kit grew (still tiny) to cover every node shape the migration needed:
 `IFlowNode`/`IFlowSource` interfaces unify lifecycle. The 2-input `FlowJoin` is hand-rolled
 on these primitives (no speculative 2-input base).
 
-## FluxFlow.Mapping (extracted)
+## FluxFlow.Mapping (extracted, v1.0.0)
 
 The expression/mapping abstraction (`IFlowExpressionEngine`, `IFlowMapper`,
 `IFlowPredicate`, `FlowMapContext`, the Expression/Delegate adapters, …) was moved out of
-`FluxFlow.Engine` into a leaf package **`FluxFlow.Mapping`** (`0.1.0`) so the
+`FluxFlow.Engine` into a leaf package **`FluxFlow.Mapping`** (`1.0.0`) so the
 expression-using components (Mapping/Control/Assertions/Observability/State/Routing) and
 `FluxFlow.Components.Expressions` go engine-free; the engine references it instead.
 
@@ -153,21 +153,23 @@ the `ReplayFailed` error on mid-stream store failure (→ wrapped the read loop)
 
 ## Verification + state
 
-Full solution green at **741 tests, 0 warnings**; flake-prone suites survive heavy
-oversubscription stress. Real-server end-to-end proven via ASP.NET Core TestServer. New
-packages in `eng/packages.json` + CHANGELOG at `0.1.0` (Nodes, Mapping, RequestReply,
-Http.AspNetCore); the MQTT trigger is folded into `FluxFlow.Components.Mqtt` (no separate
-package); migrated components keep their current versions (unflipped, unpublished).
+Full solution green at **742 tests, 0 failures** on 2026-06-20; flake-prone suites
+survived prior heavy oversubscription stress. Real-server end-to-end proven via
+ASP.NET Core TestServer. New packages in `eng/packages.json` and CHANGELOG:
+`FluxFlow.Nodes` `1.0.0`, `FluxFlow.Mapping` `1.0.0`,
+`FluxFlow.Components.RequestReply` `1.0.0`, and
+`FluxFlow.Components.Http.AspNetCore` `1.0.0`. The MQTT trigger is folded into
+`FluxFlow.Components.Mqtt` (no separate package). The engine is tagged
+`2.0.0`; engine-free component packages are tagged on the `3.0.0` line.
 
 ## Open / next (owner decisions)
 
-- **Versioning/publishing** of this new major line — still deferred; the whole branch is
-  unpublished. Needs an explicit call on version numbers + what to publish.
-- **PR/merge** `work/http-simplify` → `main`.
+- Versioning, publishing, and merge are complete.
 - The engine is now an optional Layer-3 runtime. A generic "register a `FlowNode` into the
   engine" adapter (instead of the deleted per-component glue) is the future composition
-  piece; `Designer` (visual-designer `NodeType`/`PortName`) and `Journal` (engine
-  `FlowEvent`→record mapper) are the only infra packages still engine-coupled.
+  piece if engine-hosted composition remains useful; `Designer` (visual-designer
+  `NodeType`/`PortName`) and `Journal` (engine `FlowEvent`→record mapper) are the
+  remaining infra packages with engine coupling.
 
 Builds on [[135-architecture-review-and-roadmap]] and the 2.0 line in
 [[138-2.0-ga-remediation-and-cut]].

@@ -7,6 +7,25 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt 4.0.0
+
+Breaking cleanup of the MQTT component boundary. The core package now exposes
+client-library-neutral publish, trigger, health, received-context, and protocol metadata
+contracts only. Publish and trigger nodes no longer own connection handles, factories,
+profiles, reconnect policy, concrete client creation, or client lifetime. `MqttPublishOptions`
+now contains only node runtime settings; publish topic, quality-of-service, retain flag,
+payload, and MQTT protocol metadata live on `MqttPublishRequest`. Trigger request/reply uses
+`CorrelatedRequestTracker` for pending correlation and timeout mechanics while acknowledgement
+policy stays MQTT-owned. Concrete client-library integrations are split into separate adapter
+packages.
+
+## FluxFlow.Components.RequestReply 1.1.0
+
+Adds `CorrelatedRequestTracker<TContext, TResponse>` as a reusable pending-correlation and
+timeout core for transport nodes that own their own ports and acknowledgement policy.
+`RequestReplyCoordinator<TRequest, TResponse>` now uses the tracker internally without changing
+its public coordinator behavior.
+
 ## FluxFlow.Components.Assertions 3.0.0
 
 Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node is a
@@ -50,10 +69,27 @@ dropped snapshot under load). Engine glue removed.
 
 ## FluxFlow.Components.Mqtt 3.0.0
 
-Engine-free standalone rewrite, and now the single MQTT package: connection (a self-contained
-`IMqttConnectionHandle` with the hardened dispose-race lifecycle preserved verbatim), publish
-(`FlowNode`), subscribe (`FlowSource`), and the MQTT5 request/reply trigger (folded in from the
-former FluxFlow.Components.Mqtt.RequestReply package). Engine glue removed.
+Engine-free standalone rewrite over small client-library-neutral MQTT contracts. Publish is a
+`FlowNode` over `IMqttPublisher`; trigger is a `FlowSource` over `IMqttTriggerSource` and streams
+`IMqttReceivedContext` values for adapter-owned acknowledgement. Connection handles, client
+factories, profiles, reconnect policy, connection nodes, and concrete client creation are removed
+from the core package. Trigger request/reply now uses the shared correlated request tracker.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.0.0
+
+Initial MQTTnet-backed adapter package for FluxFlow MQTT components. `MqttNetClient` owns MQTT
+client creation, broker connection, Last Will setup, reconnect, publish mapping, trigger
+subscriptions, manual acknowledgement hooks, and health events while implementing the neutral
+`IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource` contracts.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 1.0.0
+
+Initial Pulse MQTT-backed adapter package for FluxFlow MQTT components. `PulseMqttClient` owns
+Pulse client creation, transport configuration, start/stop, Last Will setup, publish mapping,
+route-stream trigger subscriptions, and health events while implementing the neutral
+`IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource` contracts. Manual broker
+acknowledgement modes are rejected because Pulse route streams manage acknowledgement internally.
+Targets Pulse MQTT `2.0.0`, using explicit broker subscriptions plus local route streams.
 
 ## FluxFlow.Components.Observability 3.0.0
 

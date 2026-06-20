@@ -7,7 +7,7 @@ Date: 2026-05-31
 Plan the reusable component packages before scaffolding code.
 
 This started as a planning-only step. The first package family has now been
-implemented in `src/FluxFlow.Components.Mqtt`.
+implemented in `src/Mqtt/FluxFlow.Components.Mqtt`.
 
 ## General-Purpose Boundary
 
@@ -30,6 +30,10 @@ src/
 tests/
   FluxFlow.Components.<Category>.Tests/
 ```
+
+When one protocol needs multiple related packages, use a protocol grouping
+folder under `src`. MQTT uses `src/Mqtt/FluxFlow.Components.Mqtt` for the core
+package so future MQTT adapter packages can sit beside it.
 
 Each package may contain several nodes from the same category. For example,
 `FluxFlow.Components.Mqtt` can contain an MQTT trigger/source, publisher/sink,
@@ -184,12 +188,18 @@ Package:
 FluxFlow.Components.Mqtt
 ```
 
+Source layout:
+
+```text
+src/Mqtt/FluxFlow.Components.Mqtt
+```
+
 Planned components:
 
 | Component | Role | Node type | Contract shape | Notes |
 |-----------|------|-----------|----------------|-------|
 | MQTT Trigger | source | `mqtt.subscribe` | emits `MqttReceivedMessage` on `Output` | Subscribes to a topic/filter and emits messages. |
-| MQTT Publisher | sink | `mqtt.publish` | receives `MqttPublishRequest` on `Input`; optional `MqttPublishResult` on `Result` | Publishes requests using static defaults from `MqttPublishOptions`. |
+| MQTT Publisher | sink | `mqtt.publish` | receives `MqttPublishRequest` on `Input`; optional `MqttPublishResult` on `Result` | Publishes explicit per-request topics with operation defaults from `MqttPublishOptions`. |
 | MQTT Topic Filter | transform | `mqtt.topic-filter` | `Input` to `Output` with `MqttReceivedMessage` | Routes or filters messages by topic pattern without broker access. |
 | MQTT Payload Decoder | transform | `mqtt.payload-decode` | `Input` to `Output` with package-owned payload records | Converts payload bytes/text into app-friendly values. |
 | MQTT Payload Encoder | transform | `mqtt.payload-encode` | `Input` to `Output` with package-owned payload records | Converts app values into publishable payloads. |
