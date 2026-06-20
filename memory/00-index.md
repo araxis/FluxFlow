@@ -191,7 +191,8 @@ This folder records the extraction work for `FluxFlow.Engine`.
   742 tests.
 - `140-local-graph-maintenance.md`: local knowledge-graph output rule, hook
   support, and verification/update notes.
-- `141-mqtt-connection-simplification-pilot.md`: MQTT interface cleanup pilot:
+- `141-mqtt-connection-simplification-pilot.md`: merged and released MQTT
+  interface cleanup pilot:
   node-facing `IMqttPublisher` / `IMqttTriggerSource` contracts,
   `IMqttClientHealthSource`, ack-aware `IMqttReceivedContext`, trigger
   request/reply via `MqttTriggerResponse`, publish protocol metadata under

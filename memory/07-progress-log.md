@@ -696,6 +696,15 @@ Date: 2026-05-31
   `4.0.0`, and initial MQTTnet/Pulse MQTT adapter packages `1.0.0`. Release
   preflight and fast package dry-runs passed for all four packages, and full
   solution Release tests passed before merge/publish.
+- Merged and published the MQTT pilot package release set. PR #24 merged into
+  `main` with squash commit `118a06de613a9ebdfd47e9e06b7c6761161a4d37`.
+  Stable releases were created for `FluxFlow.Components.RequestReply` `1.1.0`,
+  `FluxFlow.Components.Mqtt` `4.0.0`,
+  `FluxFlow.Components.Mqtt.MqttNet` `1.0.0`, and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `1.0.0`. The core MQTT and adapter
+  release workflows needed dependency-order reruns because newly published
+  dependencies were not immediately visible on NuGet; the reruns passed and
+  explicit public-feed verification returned `FEED_OK` for all four packages.
 - Refreshed local graph output after the publish-options cleanup with
   `graphify update . --force`: 7966 nodes, 11986 edges, and 764 communities.
   `graph.html` was skipped because the graph exceeds the local HTML
@@ -703,6 +712,10 @@ Date: 2026-05-31
 - Refreshed local graph output after MQTT pilot release prep and version bumps
   with `graphify update . --force`: 7968 nodes, 11988 edges, and
   756 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Refreshed local graph output after recording the merged MQTT pilot release
+  with `graphify update . --force`: 7908 nodes, 11897 edges, and
+  749 communities. `graph.html` was skipped because the graph exceeds the local
   HTML visualization limit.
 
 ## Remaining
@@ -715,6 +728,6 @@ Date: 2026-05-31
   useful as a layer-3 host.
 - Keep local graph output updated after repo changes and keep it out of git.
   See [[140-local-graph-maintenance]].
-- Review the MQTT connection pilot result before broadening the pattern. The
-  shared extraction so far is only correlation/timeout tracking, not a generic
-  transport acknowledgement policy.
+- MQTT connection pilot is merged and published. Review the final result before
+  broadening the pattern. The shared extraction so far is only
+  correlation/timeout tracking, not a generic transport acknowledgement policy.

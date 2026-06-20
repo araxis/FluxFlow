@@ -2,7 +2,7 @@
 
 Date: 2026-06-20
 
-Status: implemented on `work/mqtt-connection-pilot`; not merged or released.
+Status: merged to `main` through PR #24 and released.
 
 ## Owner direction
 
@@ -144,12 +144,31 @@ adapter package.
   packed the `.nupkg`/`.snupkg`, inspected the archive, ran the local consumer
   smoke project, and verified restore/build from the local artifact source plus
   NuGet.
+- PR #24 (`Finalize MQTT package release`) merged into `main` with squash merge
+  commit `118a06de613a9ebdfd47e9e06b7c6761161a4d37`.
+- Stable GitHub releases and NuGet packages were published and verified:
+  `FluxFlow.Components.RequestReply` `1.1.0`
+  (`components-requestreply-v1.1.0`, run `27877804072`),
+  `FluxFlow.Components.Mqtt` `4.0.0`
+  (`components-mqtt-v4.0.0`, run `27877844606`),
+  `FluxFlow.Components.Mqtt.MqttNet` `1.0.0`
+  (`components-mqtt-mqttnet-v1.0.0`, run `27877876917`), and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `1.0.0`
+  (`components-mqtt-pulsemqtt-v1.0.0`, run `27877966707`).
+  The core MQTT and adapter workflows initially hit dependency-index ordering
+  before their just-published dependencies were visible on NuGet; rerunning in
+  dependency order passed, and explicit public-feed verification returned
+  `FEED_OK` for all four package IDs.
 - Full solution Release tests passed after the project-layout move:
   `dotnet test .\FluxFlow.sln --configuration Release --no-restore --verbosity quiet --nologo`.
 - `graphify update . --force` refreshed local graph output after adding the
   MQTTnet adapter package and updating memory: 7783 nodes, 11712 edges,
   740 communities. `graph.html` was skipped because the graph exceeds the local
   HTML visualization limit.
+- `graphify update . --force` refreshed local graph output after recording the
+  merged MQTT pilot release: 7908 nodes, 11897 edges, 749 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
 - Live `src`/`tests` references to the removed factory/profile/lease types were
   eliminated. Remaining mentions are historical changelog and older memory
   records.

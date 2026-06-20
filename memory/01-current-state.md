@@ -4,12 +4,11 @@ Date: 2026-06-20
 
 ## Repository
 
-- `D:\Projects\FluxFlow` has `main` matching `origin/main`; active local work is
-  on `work/mqtt-connection-pilot`.
+- `D:\Projects\FluxFlow` has `main` matching `origin/main`.
 - Private remote: `https://github.com/araxis/FluxFlow`.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
-- Active pilot branch: `work/mqtt-connection-pilot` simplifies
+- MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
   `IMqttClientHealthSource`, and the package no longer includes a connection
@@ -68,6 +67,14 @@ Date: 2026-06-20
   `2.4.0` development cycle; workflow run `27876562110` passed on rerun and all
   ten `2.4.0-preview.75` packages indexed. FluxFlow still targets stable Pulse
   MQTT `2.0.0` until a separate adapter adoption step.
+- MQTT pilot release set is published and indexed on NuGet:
+  `FluxFlow.Components.RequestReply` `1.1.0`,
+  `FluxFlow.Components.Mqtt` `4.0.0`,
+  `FluxFlow.Components.Mqtt.MqttNet` `1.0.0`, and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `1.0.0`. PR #24 merged with squash
+  commit `118a06de613a9ebdfd47e9e06b7c6761161a4d37`; release workflow runs
+  `27877804072`, `27877844606`, `27877876917`, and `27877966707` completed
+  successfully. The package feed was explicitly verified after publication.
 
 ## FluxFlow solution
 
@@ -185,6 +192,10 @@ Date: 2026-06-20
   `FluxFlow.Components.Mqtt.MqttNet` / `FluxFlow.Components.Mqtt.PulseMqtt`
   `1.0.0` packages. Release preflight and fast package dry-runs passed for all
   four packages; full solution Release tests also passed.
+- MQTT pilot packages were published and verified on NuGet after PR #24 merged:
+  RequestReply `1.1.0`, core MQTT `4.0.0`, MQTTnet adapter `1.0.0`, and
+  Pulse MQTT adapter `1.0.0`. All four release workflow runs completed
+  successfully after dependency-order reruns where needed.
 - `graphify update . --force` refreshed `graphify-out/` after recording the
   upstream Pulse MQTT LiteDB storage package memory: 7966 nodes, 11987 edges,
   755 communities. `graph.html` was skipped because the graph exceeds the local
@@ -199,5 +210,9 @@ Date: 2026-06-20
   exceeds the local HTML visualization limit.
 - `graphify update . --force` refreshed `graphify-out/` after MQTT pilot release
   prep and version bumps: 7968 nodes, 11988 edges, 756 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- `graphify update . --force` refreshed `graphify-out/` after recording the
+  merged MQTT pilot release: 7908 nodes, 11897 edges, 749 communities.
   `graph.html` was skipped because the graph exceeds the local HTML
   visualization limit.
