@@ -2,6 +2,12 @@
 
 Date: 2026-06-02
 
+Superseded note (2026-06-20): the `work/mqtt-connection-pilot` branch removed
+the package-owned MQTT health monitor and kept health as an optional
+`IMqttClientHealthSource` contract only. Current adapter-owned health event
+naming is `mqtt.client.healthChanged`; publish and trigger nodes do not forward
+health directly. See `141-mqtt-connection-simplification-pilot.md`.
+
 `FluxFlow.Components.Mqtt` `0.3.0-alpha.1` adds optional adapter health
 forwarding.
 
@@ -18,8 +24,9 @@ state changes without changing the core publish/subscribe adapter contract.
 - `mqtt.publish` starts a health monitor when its adapter implements the
   optional contract.
 - `mqtt.subscribe` starts the same monitor after subscription startup succeeds.
-- Health entries are forwarded as diagnostics and events named
-  `mqtt.connection.healthChanged`.
+- Health entries were forwarded as diagnostics and events with the then-current
+  connection-health name. This behavior is superseded by the 2026-06-20 pilot
+  note above.
 - Health stream failures are reported as health diagnostics/events and do not
   fault the MQTT node.
 

@@ -522,33 +522,199 @@ Date: 2026-05-31
   (resolves version from csproj, reuses the existing tag). For future
   multi-package releases, push tags in batches of <=3 or dispatch.
 
-- Standalone-node re-architecture (branch `work/http-simplify`, in progress,
-  unmerged, unpublished — full detail in [[139-standalone-node-architecture]]).
-  Owner principle: build nodes that connect, not a framework; a node must run
-  with no engine (`new` it, post input, `LinkTo` output), delegating complexity
-  to TPL Dataflow and the real library (HttpClient, the host's server, an MQTT
-  client). Three layers: the `FluxFlow.Nodes` kit (`FlowNode<TIn,TOut>` with a
-  bounded BufferBlock input + BroadcastBlock output/error/event ports; the
-  `FlowMessage<T>` envelope carrying a guarded strong `CorrelationId` that flows
-  via `With`; FlowError/FlowEvent stamped with it) -> self-contained component
-  nodes -> optional composition/host. Reworked so far: `FluxFlow.Components.Http`
-  collapsed to one engine-free `HttpClientNode` over an injected HttpClient (SSRF
-  guard, pooling, redirects all move to the injected client / a DelegatingHandler);
-  new `FluxFlow.Components.RequestReply` (`RequestReplyCoordinator<TReq,TResp>` brings
-  request/reply to the one-way graph, correlating on CorrelationId, with timeout
-  eviction and reliable bounded request delivery); new
-  `FluxFlow.Components.Http.AspNetCore` (the only ASP.NET-aware package;
-  `MapFluxFlowTrigger`); new `FluxFlow.Components.Mqtt.RequestReply` (same bridge,
-  no MQTT-library dep — transport-neutrality proof). Full solution green at 731
-  tests, 0 warnings; real-server end-to-end via ASP.NET Core TestServer. The other
-  ~27 components remain engine-coupled; rolling the kit/envelope across them is the
-  large migration gated on an explicit go-ahead.
+- Standalone-node re-architecture is now merged to `main`, tagged, and published
+  (full detail in [[139-standalone-node-architecture]]). The old
+  `work/http-simplify` branch is stale: it has no commits that `origin/main`
+  lacks. Current tags at `main` include `nodes-v1.0.0`, `mapping-v1.0.0`,
+  `engine-v2.0.0`, `components-requestreply-v1.0.0`,
+  `components-http-aspnetcore-v1.0.0`, and the engine-free component package
+  `3.0.0` tags. Verified current `main` with
+  `dotnet test FluxFlow.sln --configuration Release`, then a no-build TRX run:
+  742 tests passed, 0 failed, 0 skipped.
+- Installed local knowledge-graph maintenance hooks and kept the generated
+  `graphify-out/` directory local-only through `.git/info/exclude`. The hook
+  maintains code-derived graph output after local commits/checkouts; run the
+  incremental graph update manually after documentation or memory edits.
+- Started the MQTT connection simplification pilot on
+  `work/mqtt-connection-pilot`: MQTT publish/trigger nodes no longer create
+  clients or depend on connection helpers, factories, profiles, leases, or
+  adapter composition. `MqttPublishNode` depends only on `IMqttPublisher`,
+  `MqttTriggerNode` depends only on `IMqttTriggerSource`, and optional health
+  uses `IMqttClientHealthSource`. The old MQTT-specific request/reply helper
+  folder was removed; trigger request/reply is now a correlated
+  `MqttTriggerResponse` sent to `MqttTriggerNode.Responses`, with ack-on-emit
+  or ack-on-success behavior through `IMqttReceivedContext`. The generic
+  request/reply package now exposes `CorrelatedRequestTracker`, and both
+  `RequestReplyCoordinator` and `MqttTriggerNode` use it for pending correlation,
+  duplicate detection, timeout, and shutdown cleanup. Publish transport
+  correlation moved from top-level `MqttPublishRequest.CorrelationId` to
+  `MqttPublishRequest.Properties.CorrelationId`, so `FlowMessage.CorrelationId`
+  remains the workflow correlation source. `MqttPublishOptions.DefaultTopic` was
+  removed so publish topics are explicit per request. `MqttPublishOptions`
+  later shed quality-of-service and retain defaults too; those are now
+  request-owned MQTT publish semantics, while publish options only keep timeout
+  and bounded capacity. The package-owned MQTT topic validator now covers
+  trigger `TopicFilter` validation too, keeping protocol rules in the core
+  package while leaving stricter broker/library policy to adapters. MQTT Last
+  Will was recorded as a future adapter/client-
+  session configuration concern, not a core publish/trigger node option. Review
+  cleanup added constructor validation for publish/trigger static options,
+  removed the stale trigger-invalid-topic error code, renamed the surviving
+  health event constant to `mqtt.client.healthChanged`, and documented the
+  adapter-owned client-session boundary. The duplicate `MqttDiagnosticNames`
+  constants were removed, leaving `MqttEventNames` as the single MQTT event-name
+  surface. The core MQTT package project was moved to
+  `src/Mqtt/FluxFlow.Components.Mqtt` and the solution gained an `Mqtt` folder
+  under `src`, leaving package id, assembly, namespace, and public contracts
+  unchanged for future MQTT-related libraries to sit beside it. Focused
+  RequestReply tests passed at 15 tests and focused MQTT tests passed at 48
+  tests; release convention tests passed at 33 tests and full Release solution
+  verification passed after the layout move. `git diff --check` passed after
+  the MQTT review cleanup. `graphify update . --force` refreshed local graph
+  output to 7631 nodes, 11491 edges, and 729 communities.
+  See
+  [[141-mqtt-connection-simplification-pilot]].
+- Added the first concrete MQTT adapter package on
+  `work/mqtt-connection-pilot`: `FluxFlow.Components.Mqtt.MqttNet` under
+  `src/Mqtt/FluxFlow.Components.Mqtt.MqttNet`, plus
+  `tests/FluxFlow.Components.Mqtt.MqttNet.Tests`. `MqttNetClient` owns MQTTnet
+  client creation, explicit `ConnectAsync`/`DisconnectAsync`, Last Will
+  configuration, reconnect/resubscribe behavior, publish mapping, trigger
+  subscription streams, manual acknowledgement hooks, and health events while
+  implementing the neutral `IMqttPublisher`, `IMqttTriggerSource`, and
+  `IMqttClientHealthSource` contracts. Registered the package in
+  `eng/packages.json`, added it to `FluxFlow.sln`, updated `CHANGELOG.md`, and
+  documented usage in the package README. Verification: adapter build passed,
+  focused MQTT tests passed at 48, focused adapter tests passed at 19, release
+  convention tests passed at 33, and the full Release solution test passed after
+  rerunning one transient existing Nodes test. See
+  [[142-mqttnet-adapter-package]].
+- Refreshed local graph output after the MQTTnet adapter package and memory
+  updates with `graphify update . --force`: 7783 nodes, 11712 edges, and
+  740 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Added the second concrete MQTT adapter package on
+  `work/mqtt-connection-pilot`: `FluxFlow.Components.Mqtt.PulseMqtt` under
+  `src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt`, plus
+  `tests/FluxFlow.Components.Mqtt.PulseMqtt.Tests`. `PulseMqttClient` wraps
+  Pulse `ResilientMqttClient`, owns TCP/TLS or injected Pulse transport
+  configuration, exposes `StartAsync`/`StopAsync` plus connected-waiting
+  `ConnectAsync`, maps publish requests, route-stream trigger subscriptions,
+  Last Will, and health events to the neutral MQTT contracts, and keeps strict
+  disconnected publish behavior by default unless the caller explicitly opts
+  into Pulse's offline queue. Manual broker acknowledgement modes are rejected
+  because Pulse route streams manage acknowledgement internally. Registered the
+  package in `eng/packages.json`, added it to `FluxFlow.sln`, updated
+  `CHANGELOG.md`, and documented usage in the package README. Verification:
+  adapter build passed, focused MQTT tests passed at 48, focused MQTTnet tests
+  passed at 19, focused Pulse tests passed at 8, release convention tests passed
+  at 33, and the full Release solution test passed. See
+  [[143-pulsemqtt-adapter-package]].
+- Refreshed local graph output after the Pulse MQTT adapter package and memory
+  updates with `graphify update . --force`: 7938 nodes, 11960 edges, and
+  759 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Updated the FluxFlow Pulse MQTT adapter to target stable upstream Pulse MQTT
+  `2.0.0` (`Pulse.Mqtt.Client` and `Pulse.Mqtt.Testing`). The adapter now uses
+  the v2 `OpenRouteStream` API and keeps broker subscription ownership on the
+  explicit `SubscribeAsync` call. Verification passed: Pulse adapter build,
+  Pulse adapter tests (`8`), core MQTT tests (`48`), and release convention
+  tests (`33`). See [[145-fluxflow-pulsemqtt-v2-adoption]].
+- Refreshed local graph output after the Pulse MQTT `2.0.0` adapter adoption
+  with `graphify update . --force`: 7950 nodes, 11971 edges, and
+  753 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Restored the minimal one-line route convenience upstream in Pulse MQTT
+  (`D:\Projects\MqttNg`) for the local `2.1.0` development line:
+  `ResilientMqttClient.OnAsync(...)` now registers a local raw/typed handler,
+  subscribes the route's broker filter, and returns `MqttSubscribedRoute` so
+  disposal unregisters locally and unsubscribes from the broker. The explicit v2
+  model remains the advanced contract. Verification passed with a clean Release
+  build, 442 non-soak/non-broker-matrix tests, and the docs build from
+  `docs/`. Refreshed local graph output with `graphify update . --force`. See
+  [[146-pulsemqtt-onasync-convenience]].
+- Released the upstream `OnAsync(...)` convenience as stable Pulse MQTT
+  `2.1.0`: PR #97 merged, tag `v2.1.0` was pushed, workflow run `27873206048`
+  passed, the release attached all nine package artifacts, and public feed
+  flat-container checks returned `200` for every `2.1.0` package. Opened the
+  next upstream development cycle through PR #98 (`2.2.0` on `main`);
+  workflow run `27873384358` passed and all nine `2.2.0-preview.69` packages
+  indexed. FluxFlow dependency adoption remains a separate decision. See
+  [[146-pulsemqtt-onasync-convenience]].
+- Added the next upstream Pulse MQTT route ergonomics helper locally on
+  `feature/route-template-subscribe`: route-template `SubscribeAsync(...)`
+  extension overloads allow parsed `MqttRouteTemplate` subscriptions with QoS
+  and cancellation while delegating to the existing broker filter subscription
+  path. Hidden string-template detection was avoided. Verification passed with
+  the client build, client tests (`89`), full Release build, broad
+  non-soak/non-broker-matrix tests (`442`), and docs build. See
+  [[147-pulsemqtt-route-template-subscribe-helper]].
+- Released the route-template `SubscribeAsync(...)` helper as stable Pulse MQTT
+  `2.2.0`: PR #99 merged, tag `v2.2.0` was pushed, release workflow run
+  `27875265109` passed, GitHub release
+  `https://github.com/araxis/pulse-mqtt/releases/tag/v2.2.0` was created, and
+  all nine stable packages indexed on NuGet. The broker matrix had one transient
+  HiveMQ shared-subscription timeout before rerunning green. PR #100 then opened
+  the `2.3.0` development cycle on `main`; release workflow run `27875467096`
+  passed and all nine `2.3.0-preview.72` packages indexed. See
+  [[147-pulsemqtt-route-template-subscribe-helper]].
+- Refreshed local graph output after recording the upstream Pulse MQTT `2.2.0`
+  release and `2.3.0-preview.72` publish with `graphify update . --force`:
+  7962 nodes, 11983 edges, and 753 communities. `graph.html` was skipped because
+  the graph exceeds the local HTML visualization limit.
+- Released the next upstream Pulse MQTT durable storage add-on:
+  `Pulse.Mqtt.Storage.LiteDB` exposes `LiteDbMessageStore` and
+  `LiteDbSessionStore` over the same `IMessageStore` / `ISessionStore`
+  contracts as SQLite, keeps LiteDB details internal through `BsonDocument`
+  rows and a shared serialized store gate, and updates solution, package docs,
+  resilience/migration docs, changelog, and the release workflow package list.
+  Verification passed with the LiteDB package build, LiteDB tests (`21`), full
+  Release build, broad non-soak/non-broker tests (`463`), package creation for
+  ten packages including `Pulse.Mqtt.Storage.LiteDB.2.3.0.nupkg`, docs build,
+  PR #101 checks, stable `v2.3.0` release workflow run `27876350812`, and NuGet
+  indexing for all ten `2.3.0` packages. PR #102 opened `2.4.0`; workflow run
+  `27876562110` published `2.4.0-preview.75` for all ten packages after a rerun
+  of one existing chaos integration flake. See
+  [[148-pulsemqtt-litedb-storage-package]].
+- Refreshed local graph output after recording the Pulse MQTT LiteDB storage
+  package memory with `graphify update . --force`: 7966 nodes, 11987 edges, and
+  755 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Refreshed local graph output after recording the upstream Pulse MQTT `2.3.0`
+  stable release and `2.4.0-preview.75` publish with
+  `graphify update . --force`: 7967 nodes, 11988 edges, and 762 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- Removed quality-of-service and retain defaults from `MqttPublishOptions` on
+  the MQTT pilot. `MqttPublishRequest` now owns the actual MQTT message
+  semantics with at-most-once and non-retained defaults, and publish options
+  only keep node runtime settings (`PublishTimeoutMilliseconds` and
+  `BoundedCapacity`). Verification passed for core MQTT tests (`48`), MQTTnet
+  adapter tests (`19`), Pulse MQTT adapter tests (`8`), and release convention
+  tests (`33`).
+- Prepared the MQTT pilot package release set: RequestReply `1.1.0`, core MQTT
+  `4.0.0`, and initial MQTTnet/Pulse MQTT adapter packages `1.0.0`. Release
+  preflight and fast package dry-runs passed for all four packages, and full
+  solution Release tests passed before merge/publish.
+- Refreshed local graph output after the publish-options cleanup with
+  `graphify update . --force`: 7966 nodes, 11986 edges, and 764 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- Refreshed local graph output after MQTT pilot release prep and version bumps
+  with `graphify update . --force`: 7968 nodes, 11988 edges, and
+  756 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
 
 ## Remaining
 
 - 2.0 GA line is fully published. (The `1.0.0` component release track is also
   complete.)
-- Standalone-node re-architecture: HTTP + request/reply + HTTP/MQTT triggers done
-  on `work/http-simplify`; pending decisions — roll the kit/envelope across the
-  remaining ~27 components, then version/publish the reworked packages (new major
-  line). See [[139-standalone-node-architecture]].
+- Standalone-node line is merged, tagged, and published. The next architecture
+  item is optional composition support: a generic adapter for registering
+  standalone `FlowNode` instances into the engine runtime if that runtime remains
+  useful as a layer-3 host.
+- Keep local graph output updated after repo changes and keep it out of git.
+  See [[140-local-graph-maintenance]].
+- Review the MQTT connection pilot result before broadening the pattern. The
+  shared extraction so far is only correlation/timeout tracking, not a generic
+  transport acknowledgement policy.

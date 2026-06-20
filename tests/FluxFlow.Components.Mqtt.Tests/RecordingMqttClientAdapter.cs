@@ -7,15 +7,19 @@ namespace FluxFlow.Components.Mqtt.Tests;
 
 /// <summary>
 /// Deterministic in-memory MQTT adapter test double. Publish round-trips into
-/// <see cref="Published"/>; subscriptions are fed through a bounded channel so
+/// <see cref="Published"/>; trigger subscriptions are fed through a channel so
 /// tests can push messages and observe delivery without sleeps. The adapter also
 /// exposes an optional health stream for connection health assertions.
 /// </summary>
-internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClientHealthSource
+internal sealed class RecordingMqttClientAdapter :
+    IMqttPublisher,
+    IMqttTriggerSource,
+    IMqttClientHealthSource,
+    IAsyncDisposable
 {
     private readonly object _gate = new();
-    private readonly Channel<MqttReceivedMessage> _incoming =
-        Channel.CreateUnbounded<MqttReceivedMessage>();
+    private readonly Channel<IMqttReceivedContext> _incoming =
+        Channel.CreateUnbounded<IMqttReceivedContext>();
     private readonly Channel<MqttClientHealthEvent> _health =
         Channel.CreateUnbounded<MqttClientHealthEvent>();
     private readonly List<MqttPublishRequest> _published = [];
@@ -52,7 +56,7 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClie
 
     public int DisposeCalls => Volatile.Read(ref _disposeCalls);
 
-    public MqttSubscriptionOptions? SubscriptionOptions { get; private set; }
+    public MqttTriggerOptions? TriggerOptions { get; private set; }
 
     /// <summary>Completes when SubscribeAsync is first invoked.</summary>
     public Task Subscribed => _subscribed.Task;
@@ -71,12 +75,12 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClie
     }
 
     public ValueTask<IMqttSubscription> SubscribeAsync(
-        MqttSubscriptionOptions options,
+        MqttTriggerOptions options,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _subscribeCalls);
-        SubscriptionOptions = options;
+        TriggerOptions = options;
 
         var subscription = new RecordingMqttSubscription(_incoming.Reader);
         lock (_gate)
@@ -97,8 +101,12 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClie
     }
 
     /// <summary>Pushes a message to whichever subscription is currently pumping.</summary>
-    public void PushMessage(MqttReceivedMessage message)
-        => _incoming.Writer.TryWrite(message);
+    public RecordingMqttReceivedContext PushMessage(MqttReceivedMessage message)
+    {
+        var context = new RecordingMqttReceivedContext(message);
+        _incoming.Writer.TryWrite(context);
+        return context;
+    }
 
     public void PushHealth(MqttClientHealthEvent health)
         => _health.Writer.TryWrite(health);
@@ -118,7 +126,7 @@ internal sealed class RecordingMqttClientAdapter : IMqttClientAdapter, IMqttClie
     }
 }
 
-internal sealed class RecordingMqttSubscription(ChannelReader<MqttReceivedMessage> reader)
+internal sealed class RecordingMqttSubscription(ChannelReader<IMqttReceivedContext> reader)
     : IMqttSubscription
 {
     private int _disposeCalls;
@@ -127,11 +135,53 @@ internal sealed class RecordingMqttSubscription(ChannelReader<MqttReceivedMessag
 
     public bool Disposed => DisposeCalls > 0;
 
-    public IAsyncEnumerable<MqttReceivedMessage> Messages => reader.ReadAllAsync();
+    public IAsyncEnumerable<IMqttReceivedContext> Messages => reader.ReadAllAsync();
 
     public ValueTask DisposeAsync()
     {
         Interlocked.Increment(ref _disposeCalls);
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class RecordingMqttReceivedContext(MqttReceivedMessage message)
+    : IMqttReceivedContext
+{
+    private readonly TaskCompletionSource _acked =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<Exception?> _nacked =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _ackCalls;
+    private int _nackCalls;
+
+    public MqttReceivedMessage Message { get; } = message;
+
+    public int AckCalls => Volatile.Read(ref _ackCalls);
+
+    public int NackCalls => Volatile.Read(ref _nackCalls);
+
+    public Exception? LastNackError { get; private set; }
+
+    public Task Acked => _acked.Task;
+
+    public Task<Exception?> Nacked => _nacked.Task;
+
+    public ValueTask AckAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _ackCalls);
+        _acked.TrySetResult();
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask NackAsync(
+        Exception? error = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _nackCalls);
+        LastNackError = error;
+        _nacked.TrySetResult(error);
         return ValueTask.CompletedTask;
     }
 }

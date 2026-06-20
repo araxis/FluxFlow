@@ -45,8 +45,22 @@
     "alias": "components-mqtt",
     "tagPrefix": "components-mqtt",
     "packageId": "FluxFlow.Components.Mqtt",
-    "project": "src/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj",
+    "project": "src/Mqtt/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj",
     "notesName": "FluxFlow.Components.Mqtt"
+  },
+  {
+    "alias": "components-mqtt-mqttnet",
+    "tagPrefix": "components-mqtt-mqttnet",
+    "packageId": "FluxFlow.Components.Mqtt.MqttNet",
+    "project": "src/Mqtt/FluxFlow.Components.Mqtt.MqttNet/FluxFlow.Components.Mqtt.MqttNet.csproj",
+    "notesName": "FluxFlow.Components.Mqtt.MqttNet"
+  },
+  {
+    "alias": "components-mqtt-pulsemqtt",
+    "tagPrefix": "components-mqtt-pulsemqtt",
+    "packageId": "FluxFlow.Components.Mqtt.PulseMqtt",
+    "project": "src/Mqtt/FluxFlow.Components.Mqtt.PulseMqtt/FluxFlow.Components.Mqtt.PulseMqtt.csproj",
+    "notesName": "FluxFlow.Components.Mqtt.PulseMqtt"
   },
   {
     "alias": "components-mapping",

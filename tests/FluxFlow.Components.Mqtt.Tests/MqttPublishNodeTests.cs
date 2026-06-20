@@ -13,17 +13,14 @@ namespace FluxFlow.Components.Mqtt.Tests;
 public sealed class MqttPublishNodeTests
 {
     [Fact]
-    public async Task PublishNode_ReportsNotConnectedForValidRequest()
+    public async Task PublishNode_ReportsNotConnectedForUnavailablePublisher()
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
-        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory(), clock);
+        var publisher = new UnavailablePublisher();
         await using var node = new MqttPublishNode(
-            connection,
+            publisher,
             new MqttPublishOptions
             {
-                DefaultTopic = "devices/temperature",
-                Retain = true,
-                QualityOfService = MqttQualityOfService.AtLeastOnce,
                 BoundedCapacity = 4
             },
             clock);
@@ -35,19 +32,19 @@ public sealed class MqttPublishNodeTests
         await node.Input.SendAsync(FlowMessage.Create(
             new MqttPublishRequest
             {
+                Topic = "devices/temperature",
                 Payload = [1, 2, 3],
                 PayloadPreview = "010203",
-                CorrelationId = "abc"
+                Properties = new MqttPublishProperties { CorrelationId = "abc" }
             },
             new CorrelationId("corr-1")));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
-        error.Message.ShouldContain("not connected");
+        error.Message.ShouldContain("not started");
         error.CorrelationId.ShouldBe(new CorrelationId("corr-1"));
         error.Context.ShouldNotBeNull();
-        error.Context.ShouldContain("correlationId=abc");
-        error.Context.ShouldContain($"connectionName={MqttTestContext.ConnectionName}");
+        error.Context.ShouldContain("mqttCorrelationId=abc");
 
         var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         flowEvent.Name.ShouldBe(MqttEventNames.PublishFailed);
@@ -55,70 +52,67 @@ public sealed class MqttPublishNodeTests
         flowEvent.CorrelationId.ShouldBe(new CorrelationId("corr-1"));
         flowEvent.Timestamp.ShouldBe(clock.GetUtcNow());
         flowEvent.Attributes["topic"].ShouldBe("devices/temperature");
-        flowEvent.Attributes["correlationId"].ShouldBe("abc");
+        flowEvent.Attributes["mqttCorrelationId"].ShouldBe("abc");
 
-        // No client => no result is produced.
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
         results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task PublishNode_RoundTripsThroughBorrowedAdapterAcrossConnectLifecycle()
+    public async Task PublishNode_RoundTripsThroughPublisher()
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 2, 3, 7, 1, 2, TimeSpan.Zero));
-        var adapter = new RecordingMqttClientAdapter();
-        var factory = new RecordingMqttClientFactory(adapter, ownLease: false);
-        await using var connection = MqttTestContext.CreateConnection(factory, clock);
+        var publisher = new RecordingMqttClientAdapter();
         await using var node = new MqttPublishNode(
-            connection,
+            publisher,
             new MqttPublishOptions
             {
-                DefaultTopic = "devices/temperature",
-                QualityOfService = MqttQualityOfService.AtLeastOnce,
                 BoundedCapacity = 8
             },
             clock);
 
         var results = MqttTestContext.Sink(node.Output);
-        var errors = MqttTestContext.Sink(node.Errors);
 
-        // Before connect: not connected.
         await node.Input.SendAsync(FlowMessage.Create(
-            new MqttPublishRequest { Payload = [1], CorrelationId = "before" }));
-        var beforeError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        beforeError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
-
-        // After host ConnectAsync: round-trips through the borrowed adapter, carrying the
-        // envelope correlation id forward onto the result.
-        await connection.ConnectAsync();
-        await node.Input.SendAsync(FlowMessage.Create(
-            new MqttPublishRequest { Payload = [1, 2, 3], CorrelationId = "after" },
+            new MqttPublishRequest
+            {
+                Topic = "devices/temperature",
+                Payload = [1, 2, 3],
+                QualityOfService = MqttQualityOfService.AtLeastOnce,
+                Retain = true,
+                Properties = new MqttPublishProperties { CorrelationId = "after" }
+            },
             new CorrelationId("envelope-after")));
 
         var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         result.CorrelationId.ShouldBe(new CorrelationId("envelope-after"));
         result.Payload.Topic.ShouldBe("devices/temperature");
         result.Payload.PayloadBytes.ShouldBe(3);
-        result.Payload.CorrelationId.ShouldBe("after");
-        adapter.Published.ShouldContain(request => request.CorrelationId == "after");
-
-        // After DisconnectAsync: not connected again.
-        await connection.DisconnectAsync();
-        await node.Input.SendAsync(FlowMessage.Create(
-            new MqttPublishRequest { Payload = [9], CorrelationId = "afterDisconnect" }));
-        var afterError = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        afterError.Code.ShouldBe(MqttErrorCodes.PublishNotConnected);
+        result.Payload.QualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce);
+        result.Payload.Retain.ShouldBeTrue();
+        result.Payload.Properties.ShouldNotBeNull();
+        result.Payload.Properties.CorrelationId.ShouldBe("after");
+        publisher.Published
+            .Any(request =>
+                request.Properties?.CorrelationId == "after" &&
+                request.QualityOfService == MqttQualityOfService.AtLeastOnce &&
+                request.Retain)
+            .ShouldBeTrue();
     }
 
     [Fact]
     public async Task PublishNode_ReportsErrorWhenTopicIsMissing()
     {
-        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
-        await using var node = new MqttPublishNode(connection);
+        var publisher = new RecordingMqttClientAdapter();
+        await using var node = new MqttPublishNode(publisher);
         var errors = MqttTestContext.Sink(node.Errors);
 
-        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest { Payload = [1] }));
+        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest
+        {
+            Topic = null!,
+            Payload = [1]
+        }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishInvalidTopic);
@@ -128,8 +122,8 @@ public sealed class MqttPublishNodeTests
     [Fact]
     public async Task PublishNode_ReportsErrorWhenTopicContainsWildcard()
     {
-        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
-        await using var node = new MqttPublishNode(connection);
+        var publisher = new RecordingMqttClientAdapter();
+        await using var node = new MqttPublishNode(publisher);
         var errors = MqttTestContext.Sink(node.Errors);
 
         await node.Input.SendAsync(FlowMessage.Create(
@@ -143,13 +137,15 @@ public sealed class MqttPublishNodeTests
     [Fact]
     public async Task PublishNode_ReportsErrorWhenPayloadIsMissing()
     {
-        await using var connection = MqttTestContext.CreateConnection(new ThrowingMqttClientFactory());
-        await using var node = new MqttPublishNode(
-            connection,
-            new MqttPublishOptions { DefaultTopic = "devices/state" });
+        var publisher = new RecordingMqttClientAdapter();
+        await using var node = new MqttPublishNode(publisher);
         var errors = MqttTestContext.Sink(node.Errors);
 
-        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest { Payload = null! }));
+        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest
+        {
+            Topic = "devices/state",
+            Payload = null!
+        }));
 
         var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         error.Code.ShouldBe(MqttErrorCodes.PublishInvalidPayload);
@@ -157,6 +153,45 @@ public sealed class MqttPublishNodeTests
     }
 
     [Fact]
-    public void PublishNode_RejectsNullConnection()
-        => Should.Throw<ArgumentNullException>(() => new MqttPublishNode(connection: null!));
+    public void PublishNode_RejectsNullPublisher()
+        => Should.Throw<ArgumentNullException>(() => new MqttPublishNode(publisher: null!));
+
+    [Fact]
+    public void PublishNode_RejectsInvalidBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(() => new MqttPublishNode(
+            new RecordingMqttClientAdapter(),
+            new MqttPublishOptions { BoundedCapacity = 0 }));
+
+    [Fact]
+    public void PublishNode_RejectsInvalidPublishTimeout()
+        => Should.Throw<ArgumentOutOfRangeException>(() => new MqttPublishNode(
+            new RecordingMqttClientAdapter(),
+            new MqttPublishOptions { PublishTimeoutMilliseconds = 0 }));
+
+    [Fact]
+    public async Task PublishNode_ReportsErrorWhenRequestQualityOfServiceIsInvalid()
+    {
+        var publisher = new RecordingMqttClientAdapter();
+        await using var node = new MqttPublishNode(publisher);
+        var errors = MqttTestContext.Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new MqttPublishRequest
+        {
+            Topic = "devices/state",
+            Payload = [1],
+            QualityOfService = (MqttQualityOfService)99
+        }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MqttErrorCodes.PublishInvalidQualityOfService);
+        error.Message.ShouldContain("quality");
+    }
+
+    private sealed class UnavailablePublisher : IMqttPublisher
+    {
+        public ValueTask PublishAsync(
+            MqttPublishRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new MqttClientUnavailableException("MQTT publisher is not started.");
+    }
 }

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A transport-agnostic request/reply bridge for FluxFlow: turns an inbound request stream into a one-way dataflow graph and correlates the response back to the caller by CorrelationId. Reused by HTTP and MQTT triggers.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial request/reply bridge: RequestReplyCoordinator&lt;TRequest, TResponse&gt; correlates a host-supplied IRequestContext stream to a one-way graph (Output requests, Responses input) by CorrelationId, replies via the context, evicts timed-out requests, and reports on broadcast error/event ports.</PackageReleaseNotes>
+    <PackageReleaseNotes>Initial request/reply bridge: RequestReplyCoordinator&lt;TRequest, TResponse&gt; correlates a host-supplied IRequestContext stream to a one-way graph (Output requests, Responses input) by CorrelationId, replies via the context, evicts timed-out requests, and reports on broadcast error/event ports. CorrelatedRequestTracker&lt;TContext, TResponse&gt; exposes the lower-level reusable pending-correlation and timeout core for transport nodes that own their own ports and acknowledgement policy.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

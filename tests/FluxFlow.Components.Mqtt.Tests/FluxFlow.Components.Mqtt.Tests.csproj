@@ -8,8 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Components.RequestReply\FluxFlow.Components.RequestReply.csproj" />
+    <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 

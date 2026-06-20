@@ -180,14 +180,58 @@ This folder records the extraction work for `FluxFlow.Engine`.
   mapper diagnostic, README refresh, three flake root-cause fixes) and the GA
   cut flipping the 20 component packages from `2.0.0-preview.1` to `2.0.0`
   (engine stays `1.3.0`).
-- `139-standalone-node-architecture.md`: COMPLETE re-architecture (branch
-  `work/http-simplify`, unmerged/unpublished) — the `FluxFlow.Nodes` kit
-  (`FlowNode<,>`/`FlowSource<>`, `AddOutput`, `OnInputCompletedAsync` drain hook,
-  fault-flush rule, `FlowMessage<T>` envelope, guarded `CorrelationId`), the extracted
-  `FluxFlow.Mapping` leaf, all 18 dataflow-node packages migrated engine-free (engine
-  now optional), the transport-neutral `RequestReplyCoordinator` (HTTP/MQTT triggers),
-  5 composition samples retired, and an adversarial verify pass that caught + fixed 3
-  migration regressions. 738 tests green.
+- `139-standalone-node-architecture.md`: COMPLETE re-architecture, now merged,
+  tagged, and published — the `FluxFlow.Nodes` kit (`FlowNode<,>`/`FlowSource<>`,
+  `AddOutput`, `OnInputCompletedAsync` drain hook, fault-flush rule,
+  `FlowMessage<T>` envelope, guarded `CorrelationId`), the extracted
+  `FluxFlow.Mapping` leaf, engine-free dataflow component packages (engine now
+  optional), the transport-neutral `RequestReplyCoordinator` (HTTP/MQTT
+  triggers), retired engine-based composition samples, and an adversarial verify
+  pass that caught + fixed 3 migration regressions. Current main verifies at
+  742 tests.
+- `140-local-graph-maintenance.md`: local knowledge-graph output rule, hook
+  support, and verification/update notes.
+- `141-mqtt-connection-simplification-pilot.md`: MQTT interface cleanup pilot:
+  node-facing `IMqttPublisher` / `IMqttTriggerSource` contracts,
+  `IMqttClientHealthSource`, ack-aware `IMqttReceivedContext`, trigger
+  request/reply via `MqttTriggerResponse`, publish protocol metadata under
+  `MqttPublishProperties`, request-owned publish QoS/retain semantics, shared
+  `CorrelatedRequestTracker` reuse for pending request/reply mechanics, removed
+  connection helper/adapter/factory/profile/lease ownership, and
+  next-improvement criteria.
+- `142-mqttnet-adapter-package.md`: first concrete MQTT adapter package under
+  `src/Mqtt`: `FluxFlow.Components.Mqtt.MqttNet`, explicit
+  `MqttNetClient` session lifecycle, MQTTnet publish/trigger/health
+  implementation, Last Will options, reconnect/resubscribe behavior,
+  acknowledgement mapping, package manifest entry, and verification.
+- `143-pulsemqtt-adapter-package.md`: second concrete MQTT adapter package under
+  `src/Mqtt`: `FluxFlow.Components.Mqtt.PulseMqtt`, Pulse
+  `ResilientMqttClient` lifecycle, transport injection, strict publish semantics
+  with optional offline queue, route-stream trigger subscriptions, Last Will
+  options, internal-managed acknowledgement boundary, package manifest entry,
+  and verification.
+- `144-pulsemqtt-2.0-route-subscription-release.md`: upstream Pulse MQTT v2.0
+  breaking cleanup and release record: broker subscribe/unsubscribe split from
+  local routing, explicit route registration/streams, PR #96 merge, stable
+  `2.0.0` NuGet release, and post-release `2.1.0` preview cycle.
+- `145-fluxflow-pulsemqtt-v2-adoption.md`: FluxFlow Pulse MQTT adapter moved
+  from Pulse MQTT `1.1.0` to stable `2.0.0`, with the route stream API rename
+  and focused verification.
+- `146-pulsemqtt-onasync-convenience.md`: upstream Pulse MQTT `2.1.0` stable
+  release restoring a minimal endpoint-style `OnAsync(...)` convenience over
+  explicit subscribe plus local route registration, followed by the upstream
+  `2.2.0` development-cycle bump; FluxFlow package dependencies were not
+  changed yet.
+- `147-pulsemqtt-route-template-subscribe-helper.md`: upstream Pulse MQTT
+  `2.2.0` stable release adding explicit route-template `SubscribeAsync(...)`
+  extension overloads so callers can subscribe parsed route templates without
+  hidden string detection or repeated `ToTopicFilter`, plus the follow-up
+  `2.3.0-preview.72` development-cycle publish.
+- `148-pulsemqtt-litedb-storage-package.md`: upstream Pulse MQTT
+  `Pulse.Mqtt.Storage.LiteDB` release record: LiteDB-backed durable
+  `IMessageStore` / `ISessionStore` provider beside the existing SQLite storage
+  add-on, PR #101 merge, stable `2.3.0` release with all ten packages indexed,
+  and PR #102 follow-up `2.4.0-preview.75` publish.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -1,5 +1,4 @@
 using FluxFlow.Nodes;
-using System.Collections.Concurrent;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.RequestReply;
@@ -24,8 +23,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     private readonly BufferBlock<FlowMessage<TRequest>> _output;
     private readonly BroadcastBlock<FlowError> _errors;
     private readonly BroadcastBlock<FlowEvent> _events;
-    private readonly ConcurrentDictionary<CorrelationId, InFlight> _inFlight = new();
-    private readonly ITimer? _sweep;
+    private readonly CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>? _tracker;
     private readonly CancellationTokenSource _stopping = new();
     private int _disposed;
 
@@ -43,6 +41,17 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         }
 
         _clock = clock ?? TimeProvider.System;
+        _tracker = _options.Mode == RequestReplyMode.RequestReply
+            ? new CorrelatedRequestTracker<IRequestContext<TRequest, TResponse>, TResponse>(
+                OnTrackedResponseAsync,
+                OnTrackedFailureAsync,
+                new CorrelatedRequestTrackerOptions
+                {
+                    Timeout = _options.Timeout,
+                    SweepInterval = _options.SweepInterval
+                },
+                _clock)
+            : null;
 
         _output = new BufferBlock<FlowMessage<TRequest>>(new DataflowBlockOptions
         {
@@ -74,11 +83,6 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
-
-        // Fire-and-forget never holds a request in flight, so there is nothing to time out.
-        _sweep = _options.Mode == RequestReplyMode.RequestReply
-            ? _clock.CreateTimer(_ => Sweep(), null, _options.SweepInterval, _options.SweepInterval)
-            : null;
     }
 
     /// <summary>Inbound request contexts — the host posts here (bounded; backpressure).</summary>
@@ -95,7 +99,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     public ISourceBlock<FlowEvent> Events => _events;
 
     /// <summary>In-flight request count (requests awaiting a response).</summary>
-    public int InFlightCount => _inFlight.Count;
+    public int InFlightCount => _tracker?.PendingCount ?? 0;
 
     public Task Completion => Task.WhenAll(_incoming.Completion, _responses.Completion);
 
@@ -112,12 +116,9 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         _stopping.Cancel();
 
         // Fail anything still in flight so no caller hangs forever.
-        foreach (var pair in _inFlight)
+        if (_tracker is not null)
         {
-            if (_inFlight.TryRemove(pair.Key, out var entry))
-            {
-                _ = SafeFailAsync(entry.Context, exception);
-            }
+            _ = _tracker.FailAllAsync(exception).AsTask();
         }
 
         // Fault the data blocks so Completion surfaces the fault (Output first, so the
@@ -164,13 +165,20 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             return;
         }
 
-        var entry = new InFlight(context, _clock.GetUtcNow() + _options.Timeout);
-        if (!_inFlight.TryAdd(id, entry))
+        var startResult = _tracker!.TryAdd(id, context);
+        if (startResult == CorrelatedRequestStartResult.DuplicateCorrelationId)
         {
             await SafeFailAsync(context, new InvalidOperationException(
                 $"A request with correlation id '{id}' is already in flight.")).ConfigureAwait(false);
             EmitError(RequestReplyErrorCodes.DuplicateCorrelationId,
                 $"Duplicate correlation id '{id}'.", id);
+            return;
+        }
+
+        if (startResult == CorrelatedRequestStartResult.Stopped)
+        {
+            await SafeFailAsync(context, new InvalidOperationException(
+                "The request/reply bridge is shutting down.")).ConfigureAwait(false);
             return;
         }
 
@@ -187,17 +195,18 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             accepted = false;
         }
 
-        if (!accepted && _inFlight.TryRemove(id, out _))
+        if (!accepted && _tracker.TryRemove(id, out var removed))
         {
             // Output closed (shutdown) before the request reached the graph.
-            await SafeFailAsync(context, new InvalidOperationException(
+            await SafeFailAsync(removed, new InvalidOperationException(
                 "The request/reply bridge is shutting down.")).ConfigureAwait(false);
         }
     }
 
     private async Task OnResponseAsync(FlowMessage<TResponse> message)
     {
-        if (!_inFlight.TryRemove(message.CorrelationId, out var entry))
+        if (_tracker is null
+            || !await _tracker.TryCompleteAsync(message, _stopping.Token).ConfigureAwait(false))
         {
             // No matching request: late/duplicate response or already timed out.
             EmitError(RequestReplyErrorCodes.Unmatched,
@@ -205,47 +214,52 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             EmitEvent(RequestReplyEvents.Unmatched, message.CorrelationId, FlowEventLevel.Warning);
             return;
         }
+    }
 
+    private async ValueTask OnTrackedResponseAsync(
+        CorrelationId correlationId,
+        IRequestContext<TRequest, TResponse> context,
+        FlowMessage<TResponse> message,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            await entry.Context.ReplyAsync(message.Payload, _stopping.Token).ConfigureAwait(false);
-            EmitEvent(RequestReplyEvents.Replied, message.CorrelationId);
+            await context.ReplyAsync(message.Payload, cancellationToken).ConfigureAwait(false);
+            EmitEvent(RequestReplyEvents.Replied, correlationId);
         }
         catch (Exception exception)
         {
             EmitError(RequestReplyErrorCodes.ReplyFailed,
-                $"Failed to reply: {exception.Message}", message.CorrelationId, exception);
+                $"Failed to reply: {exception.Message}", correlationId, exception);
         }
     }
 
-    private void Sweep()
+    private async ValueTask OnTrackedFailureAsync(
+        CorrelationId correlationId,
+        IRequestContext<TRequest, TResponse> context,
+        Exception exception,
+        CancellationToken cancellationToken)
     {
-        var now = _clock.GetUtcNow();
-        foreach (var pair in _inFlight)
+        await SafeFailAsync(context, exception, cancellationToken).ConfigureAwait(false);
+
+        if (exception is TimeoutException)
         {
-            if (pair.Value.Deadline <= now && _inFlight.TryRemove(pair.Key, out var entry))
-            {
-                _ = TimeOutAsync(pair.Key, entry);
-            }
+            EmitError(RequestReplyErrorCodes.TimedOut,
+                $"Request '{correlationId}' timed out after {_options.Timeout.TotalMilliseconds:0} ms.",
+                correlationId,
+                exception);
+            EmitEvent(RequestReplyEvents.TimedOut, correlationId, FlowEventLevel.Warning);
         }
-    }
-
-    private async Task TimeOutAsync(CorrelationId id, InFlight entry)
-    {
-        await SafeFailAsync(entry.Context, new TimeoutException(
-            $"No response within {_options.Timeout.TotalMilliseconds:0} ms.")).ConfigureAwait(false);
-        EmitError(RequestReplyErrorCodes.TimedOut,
-            $"Request '{id}' timed out after {_options.Timeout.TotalMilliseconds:0} ms.", id);
-        EmitEvent(RequestReplyEvents.TimedOut, id, FlowEventLevel.Warning);
     }
 
     private static async Task SafeFailAsync(
         IRequestContext<TRequest, TResponse> context,
-        Exception error)
+        Exception error,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            await context.FailAsync(error).ConfigureAwait(false);
+            await context.FailAsync(error, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -290,19 +304,11 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         {
             return;
         }
-
-        _sweep?.Dispose();
         _incoming.Complete();
         _stopping.Cancel();
-
-        // Fail anything still in flight so no caller hangs forever.
-        foreach (var pair in _inFlight)
+        if (_tracker is not null)
         {
-            if (_inFlight.TryRemove(pair.Key, out var entry))
-            {
-                await SafeFailAsync(entry.Context, new OperationCanceledException(
-                    "The request/reply bridge was disposed.")).ConfigureAwait(false);
-            }
+            await _tracker.DisposeAsync().ConfigureAwait(false);
         }
 
         _output.Complete();
@@ -310,6 +316,4 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         _events.Complete();
         _stopping.Dispose();
     }
-
-    private sealed record InFlight(IRequestContext<TRequest, TResponse> Context, DateTimeOffset Deadline);
 }

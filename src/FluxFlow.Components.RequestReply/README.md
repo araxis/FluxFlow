@@ -25,6 +25,10 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - The bridge matches by id, calls `ReplyAsync`, and evicts. Requests with no response
   within `Timeout` are failed (`FailAsync`) and evicted, so the map never leaks and no
   caller hangs forever.
+- `CorrelatedRequestTracker<TContext, TResponse>` is the lower-level reusable core
+  for nodes that already own their transport ports. It handles pending correlation,
+  duplicate detection, timeout, and cleanup while the node decides how to emit,
+  acknowledge, reject, or reply.
 
 ## Notes
 

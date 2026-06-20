@@ -52,28 +52,28 @@ component categories into this project.
 
 ```text
 src/
-  FluxFlow.Components.Mqtt/
-    FluxFlow.Components.Mqtt.csproj
-    MqttComponentTypes.cs
-    MqttComponentModule.cs
-    MqttComponentRegistrationExtensions.cs
-    Options/
-      MqttComponentOptions.cs
-      MqttConnectionProfile.cs
-      MqttSubscriptionOptions.cs
-      MqttPublishOptions.cs
-    Contracts/
-      IMqttClientAdapter.cs
-      IMqttClientFactory.cs
-      MqttPublishRequest.cs
-      MqttPublishResult.cs
-      MqttReceivedMessage.cs
-    Nodes/
-      MqttSubscribeNode.cs
-      MqttPublishNode.cs
-    Diagnostics/
-      MqttDiagnosticNames.cs
-      MqttEventNames.cs
+  Mqtt/
+    FluxFlow.Components.Mqtt/
+      FluxFlow.Components.Mqtt.csproj
+      MqttComponentTypes.cs
+      MqttComponentModule.cs
+      MqttComponentRegistrationExtensions.cs
+      Options/
+        MqttComponentOptions.cs
+        MqttConnectionProfile.cs
+        MqttSubscriptionOptions.cs
+        MqttPublishOptions.cs
+      Contracts/
+        IMqttClientAdapter.cs
+        IMqttClientFactory.cs
+        MqttPublishRequest.cs
+        MqttPublishResult.cs
+        MqttReceivedMessage.cs
+      Nodes/
+        MqttSubscribeNode.cs
+        MqttPublishNode.cs
+      Diagnostics/
+        MqttEventNames.cs
 
 tests/
   FluxFlow.Components.Mqtt.Tests/
@@ -131,10 +131,10 @@ For the MQTT package:
 - publish node receives `MqttPublishRequest` on `Input`
 - publish node may emit `MqttPublishResult` on `Result`
 
-The request model carries per-message data such as topic override, payload,
-content type, retain override, and correlation metadata. The options model
-carries static node defaults such as connection profile, default topic, payload
-format, retain default, and quality setting.
+The request model carries per-message data such as topic, payload, content type,
+retain override, and correlation metadata. The options model carries static
+operation defaults such as retain default, quality setting, timeout, and
+capacity.
 
 ## Options Boundary
 

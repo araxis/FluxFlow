@@ -9,7 +9,8 @@ separate package artifact.
 
 ## Decisions
 
-- Package project: `src/FluxFlow.Components.Mqtt`.
+- Package project: originally `src/FluxFlow.Components.Mqtt`; current
+  `work/mqtt-connection-pilot` layout is `src/Mqtt/FluxFlow.Components.Mqtt`.
 - Test project: `tests/FluxFlow.Components.Mqtt.Tests`.
 - Package identity: `FluxFlow.Components.Mqtt`.
 - Package version: `0.2.0-alpha.1`.
