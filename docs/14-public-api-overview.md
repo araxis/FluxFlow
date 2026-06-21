@@ -147,6 +147,28 @@ closed generic `flow.filter` and `flow.when` node factories. The factories
 resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
 factory and clock resources stay host-owned.
 
+## Validation Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Validation.Composition
+```
+
+Main types:
+
+- `ValidationCompositionNodeRegistryExtensions`
+- `ValidationCompositionNodeTypes`
+- `ValidationCompositionPortNames`
+- `ValidationCompositionResourceNames`
+
+Use `RegisterJsonSchemaValidator<TInput>()` from the optional
+`FluxFlow.Components.Validation.Composition` package when a composition host
+wants closed generic `json.schema-validator` node factories. The factory binds
+`JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
+composition build, and resolves optional keyed typed selector and clock
+resources through the host.
+
 ## MQTT Composition
 
 Namespace:

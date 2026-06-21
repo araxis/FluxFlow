@@ -243,6 +243,15 @@ removed.
 Engine-free standalone rewrite. The JSON-schema validator is a `FlowNode` with Valid/Invalid
 fan-out via `AddOutput`. Engine glue removed.
 
+## FluxFlow.Components.Validation.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for closed generic
+JSON schema validator nodes. The package registers explicit
+`json.schema-validator` factories, binds `JsonSchemaValidatorOptions` from
+composition configuration, compiles inline `schema` or `schemaPath` during
+composition build, and resolves optional keyed `IJsonSchemaValueSelector<TInput>`
+and `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Engine 2.0.0
 
 Breaking: the expression/mapping abstraction (IFlowExpressionEngine, IFlowMapper, IFlowPredicate,

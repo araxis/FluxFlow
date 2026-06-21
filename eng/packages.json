@@ -147,6 +147,13 @@
     "notesName": "FluxFlow.Components.Validation"
   },
   {
+    "alias": "components-validation-composition",
+    "tagPrefix": "components-validation-composition",
+    "packageId": "FluxFlow.Components.Validation.Composition",
+    "project": "src/FluxFlow.Components.Validation.Composition/FluxFlow.Components.Validation.Composition.csproj",
+    "notesName": "FluxFlow.Components.Validation.Composition"
+  },
+  {
     "alias": "components-filesystem",
     "tagPrefix": "components-filesystem",
     "packageId": "FluxFlow.Components.FileSystem",
