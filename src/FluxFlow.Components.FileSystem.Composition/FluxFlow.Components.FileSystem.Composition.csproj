@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
+    <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional FluxFlow.Composition registration helpers for standalone file system nodes over host-owned keyed clocks.</Description>
+    <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial optional composition adapter for file system nodes. Registers file.read, file.write, directory.enumerate, and file.watch factories, binds existing file system options from composition configuration, and resolves optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.FileSystem\FluxFlow.Components.FileSystem.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

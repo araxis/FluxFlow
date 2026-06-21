@@ -322,6 +322,28 @@ a `payload.inspect` node factory. The factory binds existing
 `PayloadInspectOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
 
+## FileSystem Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.FileSystem.Composition
+```
+
+Main types:
+
+- `FileSystemCompositionNodeRegistryExtensions`
+- `FileSystemCompositionNodeTypes`
+- `FileSystemCompositionPortNames`
+- `FileSystemCompositionResourceNames`
+
+Use `RegisterFileRead()`, `RegisterFileWrite()`,
+`RegisterDirectoryEnumerate()`, and `RegisterFileWatch()` from the optional
+`FluxFlow.Components.FileSystem.Composition` package when a composition host
+wants file-system node factories. The factories bind existing file-system
+options and can resolve an optional keyed `TimeProvider` resource through the
+host.
+
 ## Projections Composition
 
 Namespace:
