@@ -66,3 +66,9 @@ Console.WriteLine(report.HasErrors);
 This package only normalizes validation. Hosts still decide where resources and
 secret values live, how they are secured, when they are resolved, and how
 diagnostics are displayed or logged.
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. Composition adapters may use these validation contracts indirectly
+when a host wants to validate resource and secret references.

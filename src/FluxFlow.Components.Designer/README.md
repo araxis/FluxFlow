@@ -98,3 +98,11 @@ rendering hints separately from package-owned metadata.
 This package only defines metadata contracts and catalog helpers. Hosts decide
 how metadata is rendered, stored, localized, or combined with their own design
 system.
+
+## Composition
+
+This package does not expose standalone workflow nodes or
+`FluxFlow.Composition` factories. It composes design metadata for host palettes,
+editors, validation views, and generated documentation; engine-aware definition
+types remain part of that metadata contract where they describe node and port
+identifiers.

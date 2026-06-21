@@ -15,3 +15,10 @@ adapter packages still provide `IFlowExpressionEngine` implementations.
 The package is intended for component package authors. Application code usually
 uses higher-level registration methods from packages such as Mapping, Control,
 Assertions, Routing, State, or Observability.
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. Composition adapters that need expressions resolve host-owned
+`IFlowExpressionEngine` or context factory resources directly; these registries
+are optional helper infrastructure for hosts and adapter packages.

@@ -39,3 +39,9 @@ var result = await store.QueryAsync(new JournalQuery
     Limit = 10
 });
 ```
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. It is a support package for host-owned journal persistence; workflow
+nodes that emit events remain in their owning component packages.

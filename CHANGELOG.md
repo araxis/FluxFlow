@@ -323,12 +323,16 @@ optional keyed `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 ## FluxFlow.Components.Storage.FileSystem 3.0.0
 
 Rebuilt against FluxFlow.Components.Storage 3.0.0 (engine-free). The file-system `IStorageStore`
-adapter is unchanged in behavior.
+adapter is unchanged in behavior. Documentation now shows the backend adapter
+as a host-owned `IStorageStore` source for `FluxFlow.Components.Storage.Composition`,
+not as a workflow node composition package.
 
 ## FluxFlow.Components.Storage.SqlFile 3.0.0
 
 Rebuilt against FluxFlow.Components.Storage 3.0.0 (engine-free). The SQL-file `IStorageStore`
-adapter is unchanged in behavior.
+adapter is unchanged in behavior. Documentation now shows the backend adapter
+as a host-owned `IStorageStore` source for `FluxFlow.Components.Storage.Composition`,
+not as a workflow node composition package.
 
 ## FluxFlow.Components.Timers 3.0.0
 
@@ -371,7 +375,8 @@ runtime — components no longer require it.
 
 Breaking: the shared expression-registration helpers now build on the extracted FluxFlow.Mapping
 package instead of FluxFlow.Engine — the package is engine-free. Update usings from
-`FluxFlow.Engine.Mapping` to `FluxFlow.Mapping`.
+`FluxFlow.Engine.Mapping` to `FluxFlow.Mapping`. Documentation now states that
+this is a support package, not a standalone node composition adapter.
 
 ## FluxFlow.Mapping 1.0.0
 
@@ -1031,6 +1036,8 @@ Retention and lookup performance release.
 - The in-memory journal store gains an optional retention-options constructor
   that enforces `MaxRecords` on append.
 - Duplicate-id detection is O(1).
+- Documentation now states that Journal is host-owned store support, not a
+  workflow node composition adapter.
 
 ## FluxFlow.Components.Sessions 1.2.0
 
@@ -1064,6 +1071,8 @@ Redaction coverage release.
 - Default redaction fragments now cover pwd, passphrase, auth, bearer,
   connectionstring, cert, pin, and salt.
 - `ShouldRedact` is null-safe.
+- Documentation now states that Secrets is a support package consumed by hosts
+  and adapters, not a workflow node composition adapter.
 
 ## FluxFlow.Components.Resources 1.1.0
 
@@ -1071,6 +1080,8 @@ Default-instance correctness release.
 
 - `ResourceName.ToString()` returns an empty string for default instances
   instead of null.
+- Documentation now states that Resources is a support package consumed by
+  hosts and adapters, not a workflow node composition adapter.
 
 ## FluxFlow.Components.Storage.FileSystem 1.1.0
 
@@ -1100,6 +1111,8 @@ Documentation maintenance release.
 
 - Updates the packaged README guidance for package-owned design metadata
   providers and host catalog composition.
+- States that Designer composes metadata, not workflow nodes; engine-aware
+  definition identifiers remain part of the metadata contract.
 - Keeps Designer public contracts unchanged.
 
 ## FluxFlow.Components.Mqtt 1.1.0
@@ -1323,6 +1336,9 @@ Stable component package boundary.
 - Promotes `FluxFlow.Components.Configuration` to `1.0.0`.
 - Freezes configuration validation report contracts for resource and secret
   option checks.
+- Documentation and package release notes now describe Configuration as a
+  support package with host-owned resource and secret ownership, not an engine
+  or workflow node adapter.
 
 ## FluxFlow.Components.Designer 1.0.0
 
