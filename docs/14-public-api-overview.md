@@ -105,6 +105,27 @@ closed generic `flow.mapper` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed context factory and clock
 resources stay host-owned.
 
+## Assertions Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Assertions.Composition
+```
+
+Main types:
+
+- `AssertionsCompositionNodeRegistryExtensions`
+- `AssertionsCompositionNodeTypes`
+- `AssertionsCompositionPortNames`
+- `AssertionsCompositionResourceNames`
+
+Use `RegisterAssertion<TInput>()` from the optional
+`FluxFlow.Components.Assertions.Composition` package when a composition host
+wants closed generic `flow.assert` node factories. The factory resolves a keyed
+`IFlowExpressionEngine` resource; optional keyed typed context factory and clock
+resources stay host-owned.
+
 ## Control Composition
 
 Namespace:

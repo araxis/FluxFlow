@@ -58,6 +58,14 @@ Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node i
 to Result/Passed/Failed ports via `AddOutput`; correlation flows on `FlowMessage`. The engine
 factory/module/registration/design-metadata glue is removed.
 
+## FluxFlow.Components.Assertions.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for closed generic
+assertion nodes. The package registers explicit `flow.assert` factories, binds
+`AssertionOptions` from composition configuration, and resolves keyed
+`IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and `TimeProvider`
+resources through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Control 3.0.0
 
 Engine-free standalone rewrite. Filter and When are `FlowNode`s over the kit (When fans out to
