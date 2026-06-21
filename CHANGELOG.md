@@ -304,6 +304,14 @@ Engine-free standalone rewrite. Put/get/query/delete are `FlowNode`s taking an i
 storage-connection resource node is removed. Get/query fan out via `AddOutput`. The
 `IStorageStore` contract + store context/lease/factory are preserved for the adapters.
 
+## FluxFlow.Components.Storage.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for standalone
+storage nodes. The package registers explicit `storage.put`, `storage.get`,
+`storage.query`, and `storage.delete` factories, binds existing storage options
+from composition configuration, and resolves keyed `IStorageStore` plus
+optional keyed `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Storage.FileSystem 3.0.0
 
 Rebuilt against FluxFlow.Components.Storage 3.0.0 (engine-free). The file-system `IStorageStore`

@@ -365,6 +365,28 @@ Use `RegisterStateReducer()` from the optional
 resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
 keyed `TimeProvider` resource through the host.
 
+## Storage Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Storage.Composition
+```
+
+Main types:
+
+- `StorageCompositionNodeRegistryExtensions`
+- `StorageCompositionNodeTypes`
+- `StorageCompositionPortNames`
+- `StorageCompositionResourceNames`
+
+Use `RegisterStoragePut()`, `RegisterStorageGet()`,
+`RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
+`FluxFlow.Components.Storage.Composition` package when a composition host wants
+storage node factories. The factories bind existing storage options, resolve a
+required keyed `IStorageStore`, and can resolve an optional keyed
+`TimeProvider` resource through the host.
+
 ## Projections Composition
 
 Namespace:
