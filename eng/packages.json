@@ -357,6 +357,13 @@
     "notesName": "FluxFlow.Components.Storage"
   },
   {
+    "alias": "components-storage-composition",
+    "tagPrefix": "components-storage-composition",
+    "packageId": "FluxFlow.Components.Storage.Composition",
+    "project": "src/FluxFlow.Components.Storage.Composition/FluxFlow.Components.Storage.Composition.csproj",
+    "notesName": "FluxFlow.Components.Storage.Composition"
+  },
+  {
     "alias": "components-storage-filesystem",
     "tagPrefix": "components-storage-filesystem",
     "packageId": "FluxFlow.Components.Storage.FileSystem",

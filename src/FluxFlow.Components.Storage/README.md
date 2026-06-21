@@ -169,8 +169,29 @@ Core contracts:
 `StorageRecord.Value` is `object?`: hosts own serialization and can compose this
 package with serialization or payload components before storage.
 
-## Composition Guidance
+## Composition
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node package. This package is just the standalone
+nodes and storage contracts.
+
+Use `FluxFlow.Components.Storage.Composition` when a `FluxFlow.Composition`
+host should register the optional storage factories:
+
+```csharp
+services.AddKeyedSingleton<IStorageStore>("items-store", store);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterStoragePut()
+        .RegisterStorageGet()
+        .RegisterStorageQuery()
+        .RegisterStorageDelete());
+```
+
+The composition adapter binds the existing storage option records from node
+configuration, resolves the required store from the keyed `store` resource, and
+can resolve an optional keyed `TimeProvider` resource named `clock`. Concrete
+store setup still belongs to the host or backend adapter packages; the
+composition adapter only consumes an already registered `IStorageStore`.
