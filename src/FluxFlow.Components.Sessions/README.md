@@ -116,9 +116,27 @@ Records carry neutral fields: session id, sequence, timestamp, type, name, paylo
 content type, and string attributes. Hosts can map their own envelope or event types
 into these contracts.
 
-## Composition Guidance
+## Composition
 
-Use these nodes as parts of a host-composed graph: construct them, link their ports with
-`LinkTo`, and drive them directly. See
-[Component Composition](../../docs/12-component-composition.md) for recommended host and
-package boundaries.
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node package. This package is just the standalone
+nodes and session contracts.
+
+Use `FluxFlow.Components.Sessions.Composition` when a `FluxFlow.Composition`
+host should register the optional session factories:
+
+```csharp
+services.AddKeyedSingleton<ISessionStore>("sessions", sessionStore);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterSessionRecorder()
+        .RegisterSessionReplay()
+        .RegisterSessionQuery());
+```
+
+The composition adapter binds the existing session option records from node
+configuration, resolves the required store from the keyed `store` resource, and
+can resolve an optional keyed `TimeProvider` resource named `clock`. Store
+implementation, retention policy, and persistence setup remain host concerns.

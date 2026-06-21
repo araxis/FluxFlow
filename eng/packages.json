@@ -336,6 +336,13 @@
     "notesName": "FluxFlow.Components.Sessions"
   },
   {
+    "alias": "components-sessions-composition",
+    "tagPrefix": "components-sessions-composition",
+    "packageId": "FluxFlow.Components.Sessions.Composition",
+    "project": "src/FluxFlow.Components.Sessions.Composition/FluxFlow.Components.Sessions.Composition.csproj",
+    "notesName": "FluxFlow.Components.Sessions.Composition"
+  },
+  {
     "alias": "components-state",
     "tagPrefix": "components-state",
     "packageId": "FluxFlow.Components.State",
