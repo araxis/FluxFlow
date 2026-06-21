@@ -224,6 +224,13 @@
     "notesName": "FluxFlow.Components.Serialization"
   },
   {
+    "alias": "components-serialization-composition",
+    "tagPrefix": "components-serialization-composition",
+    "packageId": "FluxFlow.Components.Serialization.Composition",
+    "project": "src/FluxFlow.Components.Serialization.Composition/FluxFlow.Components.Serialization.Composition.csproj",
+    "notesName": "FluxFlow.Components.Serialization.Composition"
+  },
+  {
     "alias": "components-metrics",
     "tagPrefix": "components-metrics",
     "packageId": "FluxFlow.Components.Metrics",
