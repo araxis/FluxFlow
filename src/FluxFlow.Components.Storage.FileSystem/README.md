@@ -13,13 +13,22 @@ implementation and registration helpers for the existing storage nodes:
 ## Register
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterStorageComponents(options => options
-        .UseFileSystemStorage(new FileSystemStorageStoreOptions
-        {
-            RootDirectory = "data/storage",
-            DefaultCollection = "items"
-        }));
+var options = new StorageComponentOptions()
+    .UseFileSystemStorage(new FileSystemStorageStoreOptions
+    {
+        RootDirectory = "data/storage",
+        DefaultCollection = "items"
+    });
+
+await using var lease = await options.StoreFactory.OpenAsync(
+    new StorageStoreContext
+    {
+        StoreName = "default",
+        DefaultCollection = "items",
+        Clock = options.Clock
+    });
+
+IStorageStore store = lease.Store;
 ```
 
 Set `StorageComponentOptions.UseClock(...)` when node results and adapter
@@ -58,3 +67,10 @@ first version.
 
 The package persists only neutral `StorageRecord` data. Hosts that need exact
 payload shaping should compose serialization or payload nodes before storage.
+
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. Use
+`FluxFlow.Components.Storage.Composition` for `storage.put`, `storage.get`,
+`storage.query`, and `storage.delete`; register the opened `IStorageStore` as a
+host-owned keyed resource for those factories.

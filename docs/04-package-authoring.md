@@ -58,6 +58,14 @@ adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
 resources from keyed DI, but the adapter still owns the concrete client/store
 options and lifetime.
 
+## Support Packages
+
+Support packages do not need node constants, composition registration, or engine
+modules unless they expose actual standalone node behavior. Resource, secret,
+configuration, expression, journal, design metadata, and storage-backend
+packages can stay as contracts, helpers, or concrete resource factories that
+hosts and node adapters consume.
+
 ## Package Rules
 
 Each component package should own:

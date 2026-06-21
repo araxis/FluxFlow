@@ -61,3 +61,10 @@ Use `ResourceDiagnostics` to:
 
 This package only defines resource contracts and helper logic. Hosts decide how
 resources are created, secured, refreshed, shared, disposed, and displayed.
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. Composition adapters consume host-owned resources through their own
+keyed resource names and may use these contracts for higher-level resource
+catalogs.

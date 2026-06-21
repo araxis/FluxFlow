@@ -472,6 +472,32 @@ Use `RegisterMqttNodes()` from the optional
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
 the host still own broker/client registration.
 
+## Support Packages
+
+These packages are intentionally not standalone node composition adapters:
+
+- `FluxFlow.Components.Configuration` validates resource and secret references.
+- `FluxFlow.Components.Resources` defines named resource contracts and lookup
+  diagnostics.
+- `FluxFlow.Components.Secrets` defines secret references, resolution results,
+  option helpers, and redaction helpers.
+- `FluxFlow.Components.Expressions` provides expression engine and context
+  factory registries used by adapters that resolve host-owned expression
+  services.
+- `FluxFlow.Components.Journal` provides journal store contracts and
+  in-memory support for hosts.
+- `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
+  and is intentionally not covered by composition adapters in this pass.
+- `FluxFlow.Components.Designer` provides design metadata contracts and may
+  remain engine-aware where it models engine definition types.
+- `FluxFlow.Components.Storage.FileSystem` and
+  `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
+  backend factories consumed by host-owned storage registration.
+
+Composition hosts consume these packages indirectly through adapter-owned
+resources or host setup. They should not add `FluxFlow.Composition` node
+factories unless a package later exposes actual standalone node behavior.
+
 ## Engine
 
 `FluxFlow.Engine` exposes a small set of public namespaces. The goal for v1 is

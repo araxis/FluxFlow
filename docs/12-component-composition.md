@@ -53,6 +53,20 @@ The host should avoid putting reusable processing logic inside adapters. If an
 adapter starts to parse, validate, route, aggregate, or persist in a generic
 way, it is probably hiding a future component package.
 
+## Support Package Boundary
+
+Not every component package should get a composition adapter. Packages such as
+configuration validation, resource lookup, secret resolution, expression
+registries, journal stores, design metadata, and concrete storage backends are
+support packages. A composition adapter should consume them through host-owned
+resources or setup code only when a real standalone node needs them.
+
+For example, `FluxFlow.Components.Storage.FileSystem` and
+`FluxFlow.Components.Storage.SqlFile` create `IStorageStore` implementations;
+`FluxFlow.Components.Storage.Composition` is the package that registers the
+`storage.put`, `storage.get`, `storage.query`, and `storage.delete` node
+factories.
+
 ## Package Boundary
 
 A component package should own:

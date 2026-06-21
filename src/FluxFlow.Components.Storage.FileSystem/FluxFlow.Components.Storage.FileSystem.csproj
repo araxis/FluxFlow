@@ -11,7 +11,7 @@
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>2.0 preview: TimeProvider clock migration. Replaces the package's bespoke clock abstraction with System.TimeProvider — the clock is now configured via UseClock(TimeProvider)/the TimeProvider-typed Clock option, and the old IXxxClock/System*Clock public types are removed (breaking). Runtime behavior is unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rebuilt against FluxFlow.Components.Storage 3.0.0 as a file-system IStorageStore backend. The package remains a backend adapter consumed by host-owned store registration, not a workflow node composition package.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

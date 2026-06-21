@@ -102,3 +102,10 @@ such as `Kind`.
 This package does not own concrete secret storage. It only defines neutral
 contracts and helper logic. Hosts own persistence, access control, refresh,
 rotation, auditing, and disposal.
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. Component options should keep secret references; hosts and adapters
+resolve them through a host-owned `ISecretResolver` before constructing
+resources that need secret values.
