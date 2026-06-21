@@ -83,3 +83,34 @@ Provide a deterministic clock for tests:
 ```csharp
 new FilterNode<int>(options, engine, clock: new FakeTimeProvider(timestamp));
 ```
+
+## Composition
+
+Add `FluxFlow.Components.Control.Composition` when a host wants to instantiate
+control nodes from `FluxFlow.Composition` fluent/config definitions. That
+optional package registers closed generic `FilterNode<TInput>` and
+`WhenNode<TInput>` factories.
+
+```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterFilter<AppMessage>()
+        .RegisterWhen<AppMessage>());
+```
+
+Use custom node type names when one host needs several input shapes:
+
+```csharp
+registry
+    .RegisterFilter<OrderMessage>("flow.filter.order")
+    .RegisterWhen<HttpResponseOutput>("flow.when.http-response");
+```
+
+Composition resolves the expression engine from the keyed `engine` resource.
+Optional keyed `contextFactory` and `clock` resources can provide custom
+expression variables and deterministic diagnostics. The configured `InputType`
+remains diagnostic metadata; CLR port types come from the closed generic
+registration.

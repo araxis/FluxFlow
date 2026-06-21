@@ -64,6 +64,14 @@ Engine-free standalone rewrite. Filter and When are `FlowNode`s over the kit (Wh
 WhenTrue/WhenFalse via `AddOutput`); the predicate compiles once at construction against an
 injected expression engine (from FluxFlow.Mapping). Engine glue removed.
 
+## FluxFlow.Components.Control.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for closed generic
+control nodes. The package registers explicit `flow.filter` and `flow.when`
+factories, binds `ControlExpressionOptions` from composition configuration, and
+resolves keyed `IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and
+`TimeProvider` resources through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Expectations 3.0.0
 
 Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic
