@@ -36,7 +36,9 @@ await node.Input.SendAsync(FlowMessage.Create(input)); // feed it
 ```
 
 Reading config and composing a graph (new the nodes, `LinkTo`, run a host) is a separate
-layer — the optional engine runtime, or just your own startup code.
+layer. Add an optional `FluxFlow.Composition` registration extension later when a host needs
+fluent or configuration-based composition. Use the optional engine runtime only when a host
+intentionally targets the engine model.
 
 Run the template tests from the repository root:
 

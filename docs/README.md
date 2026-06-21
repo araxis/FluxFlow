@@ -1,67 +1,19 @@
-# FluxFlow.Engine Docs
+# FluxFlow Docs
 
-These docs describe the standalone `FluxFlow.Engine` package.
+FluxFlow is standalone-node-first. Start with `FluxFlow.Nodes`; add
+`FluxFlow.Composition` when you want fluent C# or `IConfiguration` JSON to build
+and link standalone nodes. Add `FluxFlow.Composition.Hosting` when a .NET host
+should build/start the composition through DI and resolve adapter-owned keyed
+resources. Use `FluxFlow.Engine` only when the older `ApplicationDefinition`
+runtime is the right fit for a host.
 
-Start with the neutral consumer sample in `samples/FluxFlow.SampleApp`. It shows
-the intended application boundary: app-owned workspace metadata stays outside
-the engine, and only executable resources and workflows are projected into
-`ApplicationDefinition`.
+## Current Samples
 
-Then run `samples/FluxFlow.MappingControlSample` to see package composition with
-host-owned source/sink nodes and reusable mapping, control, and assertion nodes.
-
-Add `FluxFlow.Components.Assertions` when a workflow needs expression-driven
-assertion results and pass/fail routing.
-
-Add `FluxFlow.Components.Sources` when a workflow needs deterministic generated
-or sequence-driven source messages without a transport adapter.
-
-Add `FluxFlow.Components.Routing` when a workflow needs expression-driven route
-keys, route envelopes, direct route outputs, neutral matched/default streams,
-key-based request/response pairing, count/time stream windows, two-stream joins,
-reliable same-stream fan-out, or source-tagged stream merge.
-
-Add `FluxFlow.Components.Validation` when a workflow needs package-owned JSON
-schema validation with host-owned value selection.
-
-Add `FluxFlow.Components.FileSystem` when a workflow needs package-owned file
-system operations such as `file.write`, `file.read`, `file.watch`, and
-`directory.enumerate`.
-
-Add `FluxFlow.Components.Observability` when a workflow needs neutral
-structured log entries, metrics snapshots, or counter snapshots.
-
-Add `FluxFlow.Components.Timers` when a workflow needs package-owned interval
-ticks, cron schedule ticks, typed pass-through delays, output rate limits, or
-quiet-period coalescing.
-
-Run `samples/FluxFlow.MqttCompositionSample` to see MQTT package integration
-through a host-owned in-memory adapter.
-
-Run `samples/FluxFlow.SessionsCompositionSample` to see session recording and
-replay with host-owned storage.
-
-Add `FluxFlow.Components.State` when a workflow needs per-key state updates
-through reducer expressions.
-
-Run `samples/FluxFlow.StateCompositionSample` to see a finite timer stream
-mapped into `state.reducer` and observed by `flow.counter`.
-
-Add `FluxFlow.Components.Storage` when a workflow needs host-backed logical
-record storage through put, get, query, and delete nodes.
-
-Run `samples/FluxFlow.StorageCompositionSample` to see the storage package with
-a host-owned store adapter.
-
-Add `FluxFlow.Components.Storage.FileSystem` when a workflow needs a simple
-file-backed file-system store for the storage package.
-
-Add `FluxFlow.Components.Designer` when a host needs reusable component design
-metadata contracts, catalogs, and provider composition for palettes, editors,
-validation views, or generated documentation.
-
-Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable starting point
-for a new component package.
+- `samples/FluxFlow.CompositionSample`: pure in-memory standalone composition.
+- `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with in-memory adapter resources.
+- `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
+- `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.
+- `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
 
 ## Contents
 
@@ -82,24 +34,5 @@ for a new component package.
 15. [Engine Compatibility](15-engine-compatibility.md)
 16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
 
-## Current Boundary
-
-`FluxFlow.Engine` owns:
-
-- executable definitions
-- typed ports
-- runtime graph building
-- lifecycle coordination
-- fanout and conditional links
-- event and diagnostic aggregation
-- structured validation and build errors
-- node and package authoring helpers
-
-Applications and component packages own the pieces outside the engine boundary:
-
-- component packages own external protocols, clients, storage adapters, and
-  reusable component design metadata
-- applications own renderer-specific UI state, dashboards, designers, test
-  scenarios, app-specific validation, and app-specific workspace files
-
-Historical extraction notes live under `memory`.
+Pages 2 and later still describe engine-era APIs where named. Treat those as
+optional advanced runtime guidance, not the default component-package contract.

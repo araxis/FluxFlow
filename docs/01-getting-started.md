@@ -1,117 +1,108 @@
 # Getting Started
 
-This page walks through the smallest useful path: install the package, run the
-sample, then build a graph from an application definition.
+The smallest useful FluxFlow path is standalone-node-first:
+
+1. Add `FluxFlow.Nodes`.
+2. Build nodes as normal C# objects over `FlowNode` or `FlowSource`.
+3. Link nodes directly, or add `FluxFlow.Composition` for fluent/config-based composition.
 
 ## Install
 
 ```sh
-dotnet add package FluxFlow.Engine
+dotnet add package FluxFlow.Nodes
+dotnet add package FluxFlow.Composition
+dotnet add package FluxFlow.Composition.Hosting
 ```
 
-Reusable component packages are released separately and now also have a stable
-`1.0.0` line. Add only the component packages your host needs.
+Add component packages only when your host needs those nodes or adapters.
 
-## Run The Sample
+## Run The Standalone Composition Sample
 
 From the repository root:
+
+```sh
+dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj
+```
+
+Expected output:
+
+```text
+ALPHA
+BETA
+```
+
+The sample builds a pure in-memory workflow:
+
+```text
+source.Output -> upper.Input -> upper.Output -> sink.Input
+```
+
+Run the MQTT-shaped composition sample when you want to see keyed adapter
+resources in the hosted composition path:
+
+```sh
+dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
+```
+
+That sample uses an in-memory `IMqttTriggerSource` and `IMqttPublisher` with
+the same `mqtt.trigger` and `mqtt.publish` factories a real adapter package
+would use.
+
+## Composition Flow
+
+Every composition host follows the same core steps:
+
+1. Register node type strings with explicit factories.
+2. Build a `CompositionDefinition` from fluent C# or `IConfiguration`.
+3. Validate and build with `CompositionRuntimeBuilder`.
+4. Start, observe, stop, and dispose the `CompositionRuntime`.
+
+```csharp
+var registry = new CompositionNodeRegistry()
+    .Register(
+        "sample.uppercase",
+        _ =>
+        {
+            var node = new UppercaseNode();
+            return ValueTask.FromResult(ComposedNode.Create(
+                node,
+                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                outputs: [CompositionPorts.Output<string>("Output", node.Output)]));
+        },
+        inputs: [CompositionPorts.Metadata<string>("Input")],
+        outputs: [CompositionPorts.Metadata<string>("Output")]);
+
+var definition = CompositionDefinitionBuilder
+    .Create()
+    .Workflow("main", workflow => workflow
+        .Node("upper", "sample.uppercase"))
+    .Build();
+
+var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition);
+```
+
+## Engine Path
+
+`FluxFlow.Engine` is still available for hosts that need the older
+`ApplicationDefinition` runtime, conditional links, and engine lifecycle:
 
 ```sh
 dotnet run --project samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj
 ```
 
-The sample creates three orders, reviews each order, then routes reviewed orders
-to either a `priority` or `standard` sink with conditional links.
+Keep app screens, dashboards, resource registration, protocol clients, stores,
+and secrets outside reusable component nodes. Composition records resource names;
+the host or adapter DI layer owns the actual resources.
 
-Expected shape:
-
-```text
-Workspace: sample-order-workspace
-Views kept outside engine: 1
-Checks kept outside engine: 1
-
-priority: A-100 Harbor Market $125.00 priority=True
-standard: A-101 Cedar Supply $42.00 priority=False
-priority: A-102 Summit Works $230.00 priority=True
-
-Events observed: 3
-Diagnostics observed: 6
-```
-
-The component composition sample uses host-owned source and sink nodes with
-reusable mapping/control nodes:
-
-```sh
-dotnet build samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample.csproj /nr:false
-dotnet run --project samples/FluxFlow.MappingControlSample/FluxFlow.MappingControlSample.csproj --no-build
-```
-
-The MQTT composition sample uses an in-memory host adapter, so it does not need
-a live broker:
-
-```sh
-dotnet build samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj /nr:false
-dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj --no-build
-```
-
-The sessions composition sample uses a host-owned in-memory store to record and
-then replay a session:
-
-```sh
-dotnet build samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsCompositionSample.csproj /nr:false
-dotnet run --project samples/FluxFlow.SessionsCompositionSample/FluxFlow.SessionsCompositionSample.csproj --no-build
-```
-
-The state composition sample maps timer ticks into a state reducer and observes
-the reducer stream with a counter:
-
-```sh
-dotnet build samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSample.csproj /nr:false
-dotnet run --project samples/FluxFlow.StateCompositionSample/FluxFlow.StateCompositionSample.csproj --no-build
-```
-
-The storage composition sample uses a host-owned in-memory store with
-`storage.put`, `storage.get`, `storage.query`, and `storage.delete`:
-
-```sh
-dotnet build samples/FluxFlow.StorageCompositionSample/FluxFlow.StorageCompositionSample.csproj /nr:false
-dotnet run --project samples/FluxFlow.StorageCompositionSample/FluxFlow.StorageCompositionSample.csproj --no-build
-```
-
-## Basic Flow
-
-Every app follows the same core steps:
-
-1. Define node types and node factories.
-2. Build an `ApplicationDefinition`.
-3. Register node factories in `RuntimeNodeFactoryRegistry`.
-4. Create a `FlowApplicationHost`.
-5. Start, observe, stop, and dispose the host.
+When the host should own build/start/stop, register the optional hosting bridge:
 
 ```csharp
-var workspace = SampleWorkspaceDefinition.CreateDefault();
-var store = new InMemoryOrderStore();
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSampleOrderComponents(store);
-
-await using var host = FlowApplicationHost.Create(
-    workspace.ToEngineDefinition(),
-    registry,
-    new SampleExpressionEngine());
-
-var result = await host.StartAsync();
-if (!result.IsSuccess)
-{
-    foreach (var error in result.Errors)
-        Console.Error.WriteLine(error.Message);
-}
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterMyNodes());
 ```
 
-## What The Engine Does Not Own
-
-The engine does not need to know about app screens, dashboards, storage, test
-scenarios, or external protocol clients. Keep those in the application or a
-component package, then project only executable resources and workflows into
-`ApplicationDefinition`.
+Node factories can then resolve named resources from adapter-owned keyed DI
+services with `context.GetRequiredResource<T>("resourceSlot")`.
 
 Next: [Definitions And Links](02-definitions-and-links.md).

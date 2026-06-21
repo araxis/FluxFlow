@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

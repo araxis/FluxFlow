@@ -1,5 +1,92 @@
 # Public API Overview
 
+FluxFlow's default public surface is standalone-node-first:
+
+- `FluxFlow.Nodes` for node authoring.
+- `FluxFlow.Composition` for fluent/config composition of standalone nodes.
+- `FluxFlow.Engine` for the optional advanced engine runtime.
+
+## Composition
+
+Namespace:
+
+```text
+FluxFlow.Composition
+```
+
+Main types:
+
+- `CompositionDefinition`
+- `WorkflowDefinition`
+- `NodeDefinition`
+- `LinkDefinition`
+- `NodeReference`
+- `PortReference`
+- `CompositionDefinitionBuilder`
+- `CompositionConfigurationLoader`
+- `CompositionNodeRegistry`
+- `CompositionNodeRegistration`
+- `CompositionNodeFactoryContext`
+- `ComposedNode`
+- `CompositionPorts`
+- `CompositionPortMetadata`
+- `CompositionValidator`
+- `CompositionRuntimeBuilder`
+- `CompositionRuntime`
+- `CompositionBuildResult`
+- `ICompositionDefinitionSource`
+- `ICompositionReloadPlanner`
+
+Use these types when the host wants direct standalone-node composition from
+fluent C# or `IConfiguration` JSON without depending on the engine.
+
+## Composition Hosting
+
+Namespace:
+
+```text
+FluxFlow.Composition.Hosting
+```
+
+Main types:
+
+- `CompositionHostingOptions`
+- `CompositionHostingBuilder`
+- `ICompositionRuntimeHost`
+- `CompositionRuntimeHost`
+- `CompositionHostingException`
+- `StaticCompositionDefinitionSource`
+- `ConfigurationCompositionDefinitionSource`
+- `ICompositionNodeRegistryContributor`
+- `CompositionNodeFactoryContextResourceExtensions`
+
+Use these types when a .NET host wants DI to load, build, start, stop, and
+observe a composition runtime. Resource helpers resolve named node resource
+references from keyed DI services; adapter packages still own the resources.
+
+## MQTT Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt.Composition
+```
+
+Main types:
+
+- `MqttCompositionNodeRegistryExtensions`
+- `MqttCompositionNodeTypes`
+- `MqttCompositionPortNames`
+- `MqttCompositionResourceNames`
+
+Use `RegisterMqttNodes()` from the optional
+`FluxFlow.Components.Mqtt.Composition` package when a composition host wants
+`mqtt.publish` and `mqtt.trigger` node factories. The factories resolve keyed
+`IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
+the host still own broker/client registration.
+
+## Engine
+
 `FluxFlow.Engine` exposes a small set of public namespaces. The goal for v1 is
 that a host can author nodes, load executable definitions, build a runtime, and
 observe lifecycle state without depending on internal runtime details.

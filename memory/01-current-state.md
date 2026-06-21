@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-06-20
+Date: 2026-06-21
 
 ## Repository
 
@@ -39,13 +39,15 @@ Date: 2026-06-20
   Pulse `ResilientMqttClient`, supports TCP/TLS or injected Pulse transports,
   exposes `StartAsync`/`StopAsync` plus connected-waiting `ConnectAsync`,
   maps publish/trigger/health contracts, preserves strict disconnected publish
-  behavior by default, and rejects manual broker acknowledgement modes because
-  Pulse route streams manage acknowledgement internally. It now targets the
-  stable upstream Pulse MQTT `2.0.0` packages and uses explicit broker
-  `SubscribeAsync` plus local `OpenRouteStream` routing. See
+  behavior by default, uses Pulse managed acknowledgement for
+  `MqttTriggerAcknowledgement.None`, and maps manual trigger acknowledgement
+  modes to Pulse `OpenAcknowledgedRouteStream(...)` contexts. It now targets the
+  stable upstream Pulse MQTT `2.5.0` packages and uses explicit broker
+  `SubscribeAsync` plus local route streams. See
   `141-mqtt-connection-simplification-pilot.md`,
-  `142-mqttnet-adapter-package.md`, `143-pulsemqtt-adapter-package.md`, and
-  `144-pulsemqtt-2.0-route-subscription-release.md`.
+  `142-mqttnet-adapter-package.md`, `143-pulsemqtt-adapter-package.md`,
+  `149-pulsemqtt-manual-ack-adoption.md`, and
+  `151-pulsemqtt-2.5-lifecycle-update.md`.
 - Upstream Pulse MQTT source at `D:\Projects\MqttNg` has a merged v2 route and
   subscription cleanup. PR #96 split broker subscribe/unsubscribe from local
   route registration, tagged `v2.0.0`, published all nine stable packages to
@@ -65,8 +67,15 @@ Date: 2026-06-20
   tests; it is tagged as `v2.3.0`, release workflow run `27876350812` passed,
   and all ten stable `2.3.0` packages indexed on NuGet. PR #102 opened the
   `2.4.0` development cycle; workflow run `27876562110` passed on rerun and all
-  ten `2.4.0-preview.75` packages indexed. FluxFlow still targets stable Pulse
-  MQTT `2.0.0` until a separate adapter adoption step.
+  ten `2.4.0-preview.75` packages indexed. Commit `99963b4` then added manual
+  inbound broker acknowledgement support, tag `v2.4.0` was pushed, release
+  workflow run `27880444942` passed, GitHub release
+  `https://github.com/araxis/pulse-mqtt/releases/tag/v2.4.0` was created, and
+  all ten stable `2.4.0` packages indexed on NuGet. Pulse MQTT `2.5.0` is the
+  current stable line consumed by the FluxFlow Pulse adapter source; FluxFlow
+  now uses the upstream MQTT-named `ConnectAsync` / `DisconnectAsync` lifecycle
+  APIs internally while keeping its adapter-level `StartAsync` / `StopAsync`
+  host lifecycle helpers.
 - MQTT pilot release set is published and indexed on NuGet:
   `FluxFlow.Components.RequestReply` `1.1.0`,
   `FluxFlow.Components.Mqtt` `4.0.0`,
@@ -75,6 +84,20 @@ Date: 2026-06-20
   commit `118a06de613a9ebdfd47e9e06b7c6761161a4d37`; release workflow runs
   `27877804072`, `27877844606`, `27877876917`, and `27877966707` completed
   successfully. The package feed was explicitly verified after publication.
+  Current source keeps core `FluxFlow.Components.Mqtt` pure at `4.0.0` with no
+  client capability descriptor or cross-adapter registration package.
+  `FluxFlow.Components.Mqtt.MqttNet` is bumped to `1.1.0` for adapter-local DI
+  registration and optional hosted connect/disconnect lifetime.
+  `FluxFlow.Components.Mqtt.PulseMqtt` is bumped to `1.1.0` for Pulse MQTT
+  `2.5.0` manual acknowledgement support, adapter-local DI registration,
+  optional hosted startup, and optional Pulse message/session store hooks. These
+  FluxFlow package changes have not yet been published.
+  `FluxFlow.Components.Mqtt.Composition` is now added as an optional
+  composition adapter package for `mqtt.publish` and `mqtt.trigger` node
+  factories over keyed `IMqttPublisher` / `IMqttTriggerSource` resources; core
+  MQTT remains pure and broker/client ownership stays in adapters or hosts. See
+  `150-mqtt-di-and-adapter-owned-features.md` and
+  `154-mqtt-composition-adapter.md`.
 
 ## FluxFlow solution
 
@@ -82,8 +105,25 @@ Date: 2026-06-20
 - Target frameworks: `net8.0` and `net10.0`.
 - The current mainline is the standalone-node architecture:
   - `FluxFlow.Nodes` `1.0.0`: shared node kit.
+  - `FluxFlow.Composition` `1.0.0`: optional standalone-first composition layer
+    for fluent C# and `IConfiguration` JSON. It references `FluxFlow.Nodes`,
+    does not reference `FluxFlow.Engine`, uses explicit factory registration,
+    validates structure, links standalone node ports directly, and owns runtime
+    lifecycle/diagnostic aggregation for composed graphs.
+  - `FluxFlow.Composition.Hosting` `1.0.0`: optional DI/host bridge for
+    standalone compositions. It references `FluxFlow.Composition`, registers a
+    hosted runtime with `IServiceCollection`, loads definitions from static
+    objects or `IConfiguration`, starts/stops through `IHostedService`, exposes
+    build diagnostics through `ICompositionRuntimeHost`, and provides
+    keyed-resource helpers for adapter-owned resources.
+  - `FluxFlow.Components.Mqtt.Composition` `1.0.0`: optional MQTT composition
+    adapter registering explicit `mqtt.publish` and `mqtt.trigger` factories
+    over keyed adapter-owned MQTT resources.
+  - `samples/FluxFlow.MqttCompositionSample`: broker-free hosted composition
+    sample showing `mqtt.trigger -> sample.mqtt.reply -> mqtt.publish` through
+    both `appsettings.json` and fluent definitions.
   - `FluxFlow.Mapping` `1.0.0`: extracted mapping/expression abstractions.
-  - `FluxFlow.Engine` `2.0.0`: optional composition runtime.
+  - `FluxFlow.Engine` `2.0.0`: optional legacy/advanced executable runtime.
   - `FluxFlow.Components.RequestReply` `1.0.0`.
   - `FluxFlow.Components.Http.AspNetCore` `1.0.0`.
   - Engine-free dataflow component packages are on the `3.0.0` line.
@@ -144,6 +184,15 @@ Date: 2026-06-20
   `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --nologo`,
   `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`8` passed),
+  `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  (`48` passed), and
+  `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  (`33` passed).
+- FluxFlow Pulse MQTT adapter adoption of upstream `2.4.0` passed:
+  `dotnet restore tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --nologo`,
+  `dotnet build src\Mqtt\FluxFlow.Components.Mqtt.PulseMqtt\FluxFlow.Components.Mqtt.PulseMqtt.csproj --configuration Release --no-restore --nologo`,
+  `dotnet test tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests\FluxFlow.Components.Mqtt.PulseMqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
+  (`9` passed),
   `dotnet test tests\FluxFlow.Components.Mqtt.Tests\FluxFlow.Components.Mqtt.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
   (`48` passed), and
   `dotnet test tests\FluxFlow.Release.Tests\FluxFlow.Release.Tests.csproj --configuration Release --no-restore --verbosity quiet --nologo`
@@ -214,5 +263,64 @@ Date: 2026-06-20
   visualization limit.
 - `graphify update . --force` refreshed `graphify-out/` after recording the
   merged MQTT pilot release: 7908 nodes, 11897 edges, 749 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- `graphify update . --force` refreshed `graphify-out/` after adopting Pulse
+  MQTT `2.4.0` in the FluxFlow adapter: 7921 nodes, 11917 edges,
+  750 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- MQTT DI and adapter-owned feature implementation verification passed on
+  2026-06-21: MQTTnet adapter Release build, Pulse adapter Release build, core
+  MQTT tests (`48`), Pulse adapter tests (`12`), MQTTnet adapter tests (`23`),
+  release convention tests (`33`), full solution Release tests, and package
+  release preflight for `components-mqtt-mqttnet` (`1.1.0`) and
+  `components-mqtt-pulsemqtt` (`1.1.0`).
+- FluxFlow Pulse MQTT adapter update to upstream `2.5.0` passed on 2026-06-21:
+  Pulse adapter restore, Release build, Pulse adapter tests (`12`), core MQTT
+  tests (`48`), release convention tests (`33`), and package release preflight
+  for `components-mqtt-pulsemqtt` (`1.1.0`). MQTTnet was checked separately and
+  remains on current stable `5.1.0.1559`.
+- `graphify update . --force` refreshed `graphify-out/` after updating the
+  Pulse MQTT adapter to upstream `2.5.0`: 7995 nodes, 11998 edges, and
+  756 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- `graphify update . --force` refreshed `graphify-out/` after the MQTT DI and
+  adapter-owned feature implementation: 7989 nodes, 11992 edges, and
+  757 communities. `graph.html` was skipped because the graph exceeds the local
+  HTML visualization limit.
+- Final Release verification before adapter `1.1.0` publish passed on
+  2026-06-21:
+  `dotnet test .\FluxFlow.sln --configuration Release --no-restore --verbosity quiet --nologo`
+  passed, `eng\package-release-dry-run.ps1 -Package components-mqtt-mqttnet -Version 1.1.0`
+  passed with `DRY_RUN_OK=FluxFlow.Components.Mqtt.MqttNet`, and
+  `eng\package-release-dry-run.ps1 -Package components-mqtt-pulsemqtt -Version 1.1.0`
+  passed with `DRY_RUN_OK=FluxFlow.Components.Mqtt.PulseMqtt`.
+- The MQTTnet adapter registration now leaves hosted connect/disconnect off by
+  default (`ConnectWithHost = false`) so composition layers opt in explicitly.
+  Verification after the default change passed for MQTTnet adapter tests (`23`),
+  release convention tests (`33`), and the MQTTnet package release dry-run
+  (`DRY_RUN_OK=FluxFlow.Components.Mqtt.MqttNet`).
+- `FluxFlow.Composition` v1 implementation verification passed on 2026-06-21:
+  full solution Debug build, composition tests (`12`), release convention tests
+  (`33`), the full no-build solution test suite, and the pure in-memory
+  composition sample. The package is listed in `eng/packages.json`, has package
+  release notes/changelog/readme, and is wired into `FluxFlow.sln` with its
+  tests and sample.
+- `graphify update . --force` refreshed `graphify-out/` after the standalone
+  composition layer implementation: 8317 nodes, 12404 edges, and 799
+  communities. `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- `FluxFlow.Composition.Hosting` v1 implementation verification passed on
+  2026-06-21: full solution Debug build, composition hosting tests (`5`),
+  composition tests (`12`), release convention tests (`33`), and the full
+  no-build solution test suite. The package is listed in `eng/packages.json`,
+  has package release notes/changelog/readme, and is wired into `FluxFlow.sln`
+  with its tests.
+- `graphify update . --force` refreshed `graphify-out/` after the composition
+  hosting layer implementation: 8456 nodes, 12587 edges, and 814 communities.
+  `graph.html` was skipped because the graph exceeds the local HTML
+  visualization limit.
+- `graphify update . --force` refreshed `graphify-out/` after the MQTTnet
+  hosted-connect default change: 7996 nodes, 12001 edges, and 749 communities.
   `graph.html` was skipped because the graph exceeds the local HTML
   visualization limit.
