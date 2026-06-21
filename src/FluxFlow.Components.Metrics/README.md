@@ -84,7 +84,17 @@ await using var node = new MetricsAggregateNode(options, timeProvider);
 
 ## Composition
 
-Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the node; wire it from
-whatever composition/host layer you use (`appsettings.json` → construct nodes →
-`LinkTo`).
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node. This package is just the standalone node.
+
+Use `FluxFlow.Components.Metrics.Composition` when a `FluxFlow.Composition`
+host should register the optional `metrics.aggregate` factory:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterMetricsAggregate());
+```
+
+The composition adapter binds `MetricsAggregateOptions` from node configuration
+and can resolve an optional keyed `TimeProvider` resource named `clock`.

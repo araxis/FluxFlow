@@ -252,6 +252,13 @@
     "notesName": "FluxFlow.Components.Metrics"
   },
   {
+    "alias": "components-metrics-composition",
+    "tagPrefix": "components-metrics-composition",
+    "packageId": "FluxFlow.Components.Metrics.Composition",
+    "project": "src/FluxFlow.Components.Metrics.Composition/FluxFlow.Components.Metrics.Composition.csproj",
+    "notesName": "FluxFlow.Components.Metrics.Composition"
+  },
+  {
     "alias": "components-projections",
     "tagPrefix": "components-projections",
     "packageId": "FluxFlow.Components.Projections",
