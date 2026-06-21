@@ -161,6 +161,13 @@
     "notesName": "FluxFlow.Components.Http"
   },
   {
+    "alias": "components-http-composition",
+    "tagPrefix": "components-http-composition",
+    "packageId": "FluxFlow.Components.Http.Composition",
+    "project": "src/FluxFlow.Components.Http.Composition/FluxFlow.Components.Http.Composition.csproj",
+    "notesName": "FluxFlow.Components.Http.Composition"
+  },
+  {
     "alias": "components-serialization",
     "tagPrefix": "components-serialization",
     "packageId": "FluxFlow.Components.Serialization",

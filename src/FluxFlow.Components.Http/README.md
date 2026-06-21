@@ -61,6 +61,10 @@ new HttpClientNodeOptions
 ## Composition
 
 Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the node; wire it from
-whatever composition/host layer you use (`appsettings.json` → construct nodes →
-`LinkTo`).
+separate concern from the node. This package is just the node.
+
+Add `FluxFlow.Components.Http.Composition` when a host wants to instantiate
+`HttpClientNode` from `FluxFlow.Composition` fluent/config definitions. That
+optional package registers the `http.client` factory and resolves a keyed
+`HttpClient` resource named `client`; the host still owns the client lifetime
+and transport policy.

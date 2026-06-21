@@ -64,6 +64,26 @@ Use these types when a .NET host wants DI to load, build, start, stop, and
 observe a composition runtime. Resource helpers resolve named node resource
 references from keyed DI services; adapter packages still own the resources.
 
+## HTTP Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Http.Composition
+```
+
+Main types:
+
+- `HttpCompositionNodeRegistryExtensions`
+- `HttpCompositionNodeTypes`
+- `HttpCompositionPortNames`
+- `HttpCompositionResourceNames`
+
+Use `RegisterHttpNodes()` from the optional
+`FluxFlow.Components.Http.Composition` package when a composition host wants an
+`http.client` node factory. The factory resolves a keyed `HttpClient` resource;
+the host still owns client lifetime and transport policy.
+
 ## MQTT Composition
 
 Namespace:

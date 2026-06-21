@@ -1,8 +1,9 @@
 # Component Composition
 
 Component packages are meant to be composed by an application host. The engine
-builds and runs the graph; packages provide reusable node behavior; the host
-adapts resources, storage, expressions, and app-specific models.
+is only one optional runtime path. The default path is direct standalone-node
+composition; packages provide reusable node behavior, and the host adapts
+resources, storage, expressions, and app-specific models.
 
 ## Recommended Path
 
