@@ -76,8 +76,23 @@ Pass a `TimeProvider` to either node's constructor (it defaults to
 and advance it to release each delay without real-time waits, and item
 timestamps come from the configured clock's timeline.
 
-## Composition Guidance
+## Composition
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+The optional `FluxFlow.Components.Sources.Composition` package registers source
+factories for `FluxFlow.Composition`. It binds the existing source options from
+node configuration, resolves an optional keyed `TimeProvider` resource owned by
+the host, and deserializes `source.generated` inline `items` into the closed
+generic output type registered by the host.
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterGeneratedSource<AppMessage>()
+        .RegisterSequenceSource());
+```
+
+Use custom node type strings for multiple generated output shapes, for example
+`source.generated.order` and `source.generated.http`. `OutputType` remains
+diagnostic metadata; the CLR output port type comes from the closed generic
+registration.

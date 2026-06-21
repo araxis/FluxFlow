@@ -209,6 +209,15 @@ injected `TimeProvider`), query fans out via `AddOutput`. A mid-stream store fai
 Engine-free standalone rewrite. Generated and sequence sources are `FlowSource`s; the host
 supplies the items directly (the JSON + type-alias reader layer is gone). Engine glue removed.
 
+## FluxFlow.Components.Sources.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for standalone source
+nodes. The package registers explicit `source.generated` and `source.sequence`
+factories, binds existing source options from composition configuration,
+deserializes inline generated `items` into closed generic output types, and
+resolves optional keyed `TimeProvider` resources through
+`FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.State 3.0.0
 
 Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an
