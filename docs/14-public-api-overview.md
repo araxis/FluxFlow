@@ -84,6 +84,27 @@ Use `RegisterHttpNodes()` from the optional
 `http.client` node factory. The factory resolves a keyed `HttpClient` resource;
 the host still owns client lifetime and transport policy.
 
+## Mapping Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Mapping.Composition
+```
+
+Main types:
+
+- `MappingCompositionNodeRegistryExtensions`
+- `MappingCompositionNodeTypes`
+- `MappingCompositionPortNames`
+- `MappingCompositionResourceNames`
+
+Use `RegisterMapper<TInput,TOutput>()` from the optional
+`FluxFlow.Components.Mapping.Composition` package when a composition host wants
+closed generic `flow.mapper` node factories. The factory resolves a keyed
+`IFlowExpressionEngine` resource; optional keyed context factory and clock
+resources stay host-owned.
+
 ## MQTT Composition
 
 Namespace:

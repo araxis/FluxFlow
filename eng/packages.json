@@ -91,6 +91,13 @@
     "notesName": "FluxFlow.Components.Mapping"
   },
   {
+    "alias": "components-mapping-composition",
+    "tagPrefix": "components-mapping-composition",
+    "packageId": "FluxFlow.Components.Mapping.Composition",
+    "project": "src/FluxFlow.Components.Mapping.Composition/FluxFlow.Components.Mapping.Composition.csproj",
+    "notesName": "FluxFlow.Components.Mapping.Composition"
+  },
+  {
     "alias": "components-control",
     "tagPrefix": "components-control",
     "packageId": "FluxFlow.Components.Control",

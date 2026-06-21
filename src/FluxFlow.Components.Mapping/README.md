@@ -78,3 +78,31 @@ Provide a deterministic clock for tests:
 ```csharp
 new FlowMapperNode<AppInput, AppOutput>(options, engine, clock: new FakeTimeProvider(timestamp));
 ```
+
+## Composition
+
+Add `FluxFlow.Components.Mapping.Composition` when a host wants to instantiate
+mapper nodes from `FluxFlow.Composition` fluent/config definitions. That optional
+package registers closed generic `FlowMapperNode<TInput,TOutput>` factories.
+
+```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry =>
+        registry.RegisterMapper<AppInput, AppOutput>());
+```
+
+Use custom node type names when one host needs several mapper type pairs:
+
+```csharp
+registry.RegisterMapper<HttpResponseOutput, MqttPublishRequest>(
+    "flow.mapper.http-to-mqtt");
+```
+
+Composition resolves the expression engine from the keyed `engine` resource.
+Optional keyed `contextFactory` and `clock` resources can provide custom mapping
+context variables and deterministic diagnostics. The configured `InputType`,
+`OutputType`, and `targetType` remain diagnostic metadata; CLR port types come
+from the closed generic registration.
