@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.MqttNet</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.MqttNet</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.MqttNet</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTTnet-backed adapter for FluxFlow MQTT components. Owns MQTT client creation, connection, Last Will setup, publish, trigger subscriptions, acknowledgement, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;mqttnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Initial MQTTnet adapter package for FluxFlow MQTT components. Adds an explicit client-session object that implements IMqttPublisher, IMqttTriggerSource, and IMqttClientHealthSource, including broker connection options, Last Will configuration, publish mapping, subscription streams, manual acknowledgement hooks, and connection health events.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds adapter-local DI registration through AddFluxFlowMqttClient, exposing one keyed adapter client session as IMqttPublisher, IMqttTriggerSource, and IMqttClientHealthSource with optional hosted connect/disconnect lifetime.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -24,6 +24,8 @@
     <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.MqttNet.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
   </ItemGroup>
   <ItemGroup>

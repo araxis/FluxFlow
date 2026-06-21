@@ -1,6 +1,7 @@
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using FluxFlow.Components.Mqtt.Contracts;
+using Pulse.Mqtt.Resilience;
 
 namespace FluxFlow.Components.Mqtt.PulseMqtt;
 
@@ -37,6 +38,10 @@ public sealed record PulseMqttClientOptions
     public bool QueueQos0WhenDisconnected { get; init; }
 
     public bool PropagateTraceContext { get; init; }
+
+    public IMessageStore? MessageStore { get; init; }
+
+    public ISessionStore? SessionStore { get; init; }
 
     public Dictionary<string, string> UserProperties { get; init; } = [];
 

@@ -48,6 +48,39 @@ When the MQTT client is disconnected, publish and subscribe throw
 `MqttClientUnavailableException`, which the core nodes translate into their
 not-connected diagnostics.
 
+## Dependency Injection
+
+Register a named client session when the host wants DI-owned lifetime and keyed
+MQTT roles:
+
+```csharp
+services.AddFluxFlowMqttClient(
+    "primary",
+    new MqttNetClientOptions
+    {
+        Host = "localhost",
+        Port = 1883,
+        ClientId = "fluxflow-worker"
+    });
+```
+
+The extension registers one keyed `MqttNetClient` and exposes the same singleton
+as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
+
+By default, the registration leaves connection lifetime to the composition
+layer. Set `ConnectWithHost = true` when the host should call `ConnectAsync`
+during start and `DisconnectAsync` during stop:
+
+```csharp
+services.AddFluxFlowMqttClient(
+    "primary",
+    options,
+    new MqttClientRegistrationOptions { ConnectWithHost = true });
+```
+
+Workflow nodes should still be created and linked by the composition layer; the
+registration owns only the adapter client session.
+
 ## Last Will
 
 Last Will is adapter-owned because it is registered during MQTT `CONNECT`. It is

@@ -39,7 +39,7 @@ var trigger = new MqttTriggerNode(mqtt, new MqttTriggerOptions
 {
     TopicFilter = "commands/+",
     Mode = MqttTriggerMode.RequestReply,
-    Acknowledgement = MqttTriggerAcknowledgement.None
+    Acknowledgement = MqttTriggerAcknowledgement.OnSuccessfulResponse
 });
 ```
 
@@ -52,6 +52,48 @@ By default, FluxFlow publish semantics stay strict: publishing while disconnecte
 throws `MqttClientUnavailableException`. Set
 `AllowOfflinePublishQueue = true` to opt into Pulse MQTT's offline publish queue.
 
+## Dependency Injection
+
+Register a named client session when the host wants DI-owned lifetime and keyed
+MQTT roles:
+
+```csharp
+services.AddFluxFlowMqttClient(
+    "primary",
+    new PulseMqttClientOptions
+    {
+        Host = "localhost",
+        Port = 1883,
+        ClientId = "fluxflow-worker"
+    });
+```
+
+The extension registers one keyed `PulseMqttClient` and exposes the same singleton
+as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
+
+By default, the registration adds a hosted lifetime and starts the client with the
+host. Set `StartWithHost = false` when the composition layer will start the
+client explicitly:
+
+```csharp
+services.AddFluxFlowMqttClient(
+    "primary",
+    options,
+    new MqttClientRegistrationOptions { StartWithHost = false });
+```
+
+Use `WaitForConnectedOnStart = true` only when application startup should wait for
+an established connection. Workflow nodes should still be created and linked by the
+composition layer; the registration owns only the adapter client session.
+
+## Durable Stores
+
+Durable message and session stores are adapter-owned. Provide Pulse MQTT store
+implementations through `PulseMqttClientOptions.MessageStore` and
+`PulseMqttClientOptions.SessionStore`. A message store is accepted only when
+`AllowOfflinePublishQueue = true`, because the core FluxFlow publish contract stays
+strict unless the host explicitly opts into offline queueing.
+
 ## Last Will
 
 Last Will is adapter-owned because it is registered during MQTT `CONNECT`. It is
@@ -61,9 +103,18 @@ online/offline status messages.
 
 ## Acknowledgement
 
-Pulse MQTT route streams manage protocol acknowledgement inside the client and
-do not expose per-message manual acknowledgement to this adapter. For that
-reason, `PulseMqttClient` supports `MqttTriggerAcknowledgement.None` and rejects
-manual acknowledgement modes. Request/reply mode can still be used with
-`Acknowledgement.None`; the response signal coordinates graph behavior, not
-broker-level acknowledgement.
+`MqttTriggerAcknowledgement.None` uses Pulse MQTT's normal route stream, where
+protocol acknowledgement is completed inside the client after local delivery.
+`OnEmit` and `OnSuccessfulResponse` use Pulse MQTT acknowledged route streams
+and expose broker acknowledgement through `IMqttReceivedContext.AckAsync` and
+`NackAsync`.
+
+Pulse acknowledged route streams are single-owner for each matching publish.
+Avoid overlapping manual-ack subscriptions on the same `PulseMqttClient` when
+each route must receive the same broker message; use `Acknowledgement.None` for
+Pulse's normal managed-ack route delivery.
+
+Negative acknowledgement depends on the active MQTT delivery. MQTT 5 QoS 1/2
+publishes can carry a protocol-level rejection; QoS 0 and MQTT 3.1.1 deliveries
+cannot. When the broker protocol cannot carry a rejection, `NackAsync` surfaces
+that Pulse MQTT limitation to the trigger node as an acknowledgement failure.

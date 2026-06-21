@@ -1,0 +1,78 @@
+using FluxFlow.Components.Mqtt.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Shouldly;
+using Xunit;
+
+namespace FluxFlow.Components.Mqtt.MqttNet.Tests;
+
+public sealed class MqttNetRegistrationTests
+{
+    [Fact]
+    public async Task AddFluxFlowMqttClient_RegistersKeyedClientContracts()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            "primary",
+            new MqttNetClientOptions { Host = "localhost" });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredKeyedService<MqttNetClient>("primary");
+
+        provider.GetRequiredKeyedService<IMqttPublisher>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttTriggerSource>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttClientHealthSource>("primary").ShouldBeSameAs(client);
+        provider.GetServices<IHostedService>().Any().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task AddFluxFlowMqttClient_DoesNotRegisterHostedLifetimeByDefault()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            "primary",
+            new MqttNetClientOptions { Host = "localhost" });
+
+        await using var provider = services.BuildServiceProvider();
+        var lifetimes = provider.GetServices<IHostedService>().ToArray();
+
+        lifetimes.Length.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task AddFluxFlowMqttClient_CanRegisterHostedLifetime()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            "primary",
+            new MqttNetClientOptions { Host = "localhost" },
+            new MqttClientRegistrationOptions { ConnectWithHost = true });
+
+        await using var provider = services.BuildServiceProvider();
+        var lifetimes = provider.GetServices<IHostedService>().ToArray();
+
+        lifetimes.Length.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task AddFluxFlowMqttClient_UsesServiceProviderFactories()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(TimeProvider.System);
+        services.AddFluxFlowMqttClient(
+            "primary",
+            provider => new MqttNetClientOptions
+            {
+                Host = provider.GetRequiredService<TimeProvider>() == TimeProvider.System
+                    ? "localhost"
+                    : "invalid"
+            },
+            registrationOptions: null,
+            provider => provider.GetRequiredService<TimeProvider>());
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredKeyedService<MqttNetClient>("primary");
+
+        client.IsConnected.ShouldBeFalse();
+    }
+}

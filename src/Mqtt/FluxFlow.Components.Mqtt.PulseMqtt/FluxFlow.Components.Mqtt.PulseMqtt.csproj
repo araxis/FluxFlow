@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Pulse MQTT-backed adapter for FluxFlow MQTT components. Owns Pulse client creation, start/stop, broker transport configuration, Last Will setup, publish mapping, trigger subscriptions, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Initial Pulse MQTT adapter package for FluxFlow MQTT components. Adds a PulseMqttClient session object that implements IMqttPublisher, IMqttTriggerSource, and IMqttClientHealthSource, including broker transport options, Last Will configuration, publish mapping, route-stream trigger subscriptions, and connection health events.</PackageReleaseNotes>
+    <PackageReleaseNotes>Updates the Pulse MQTT dependency to 2.5.0, uses the Pulse MQTT-named lifecycle APIs internally, maps FluxFlow manual trigger acknowledgement modes to Pulse acknowledged route streams, adds adapter-local DI registration, and exposes optional Pulse durable store hooks.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -24,7 +24,9 @@
     <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.PulseMqtt.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Pulse.Mqtt.Client" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Pulse.Mqtt.Client" Version="2.5.0" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
