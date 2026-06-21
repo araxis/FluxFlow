@@ -212,6 +212,29 @@ host wants generated or sequence source factories. The generated factory
 deserializes inline `items` into the closed output type; both factories resolve
 optional keyed `TimeProvider` resources through the host.
 
+## Routing Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Routing.Composition
+```
+
+Main types:
+
+- `RoutingCompositionNodeRegistryExtensions`
+- `RoutingCompositionNodeTypes`
+- `RoutingCompositionPortNames`
+- `RoutingCompositionResourceNames`
+
+Use `RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`,
+`RegisterMerge<TInput>()`, `RegisterWindow<TInput>()`,
+`RegisterCorrelation<TInput>()`, and `RegisterJoin<TLeft,TRight>()` from the
+optional `FluxFlow.Components.Routing.Composition` package when a composition
+host wants routing node factories. Switch, correlation, and join factories
+resolve host-owned keyed selector delegates; all factories can resolve an
+optional keyed `TimeProvider` resource through the host.
+
 ## MQTT Composition
 
 Namespace:
