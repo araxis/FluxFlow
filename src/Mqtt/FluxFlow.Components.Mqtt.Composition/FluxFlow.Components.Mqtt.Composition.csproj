@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
+    <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional FluxFlow.Composition registration helpers for standalone MQTT publish and trigger nodes over adapter-owned keyed MQTT resources.</Description>
+    <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial optional composition adapter for MQTT nodes. Registers explicit publish and trigger node factories, binds MQTT node options from composition configuration, and resolves keyed IMqttPublisher/IMqttTriggerSource resources owned by the host or concrete MQTT adapter packages.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Mqtt\FluxFlow.Components.Mqtt.csproj" />
+    <ProjectReference Include="..\..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,268 @@
+using System.Threading.Channels;
+using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Shouldly;
+using Xunit;
+
+namespace FluxFlow.Components.Mqtt.Composition.Tests;
+
+public sealed class MqttCompositionNodeRegistryExtensionsTests
+{
+    [Fact]
+    public void RegisterMqttNodes_registers_publish_and_trigger_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterMqttNodes();
+
+        var publish = registry.Registrations[MqttCompositionNodeTypes.Publish];
+        publish.Inputs[MqttCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(MqttPublishRequest));
+        publish.Outputs[MqttCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(MqttPublishResult));
+
+        var trigger = registry.Registrations[MqttCompositionNodeTypes.Trigger];
+        trigger.Inputs[MqttCompositionPortNames.Responses].MessageType.ShouldBe(
+            typeof(MqttTriggerResponse));
+        trigger.Outputs[MqttCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(MqttReceivedMessage));
+    }
+
+    [Fact]
+    public async Task Hosted_publish_node_resolves_keyed_publisher_and_publishes()
+    {
+        var adapter = new RecordingMqttAdapter();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IMqttPublisher>("primary", adapter);
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "publish",
+                    MqttCompositionNodeTypes.Publish,
+                    node => node
+                        .Resource(MqttCompositionResourceNames.Publisher, "primary")
+                        .Configure("publishTimeoutMilliseconds", 1_000)
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterMqttNodes())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var runtime = host.Runtime.ShouldNotBeNull();
+        var publishNode = runtime.Nodes.ShouldHaveSingleItem();
+        var input = publishNode.Descriptor.Inputs[MqttCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<MqttPublishRequest>>();
+        var output = publishNode.Descriptor.Outputs[MqttCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<MqttPublishResult>>();
+        var results = new BufferBlock<FlowMessage<MqttPublishResult>>();
+        output.Source.LinkTo(
+            results,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/temperature",
+            Payload = [1, 2, 3],
+            QualityOfService = MqttQualityOfService.AtLeastOnce,
+            Retain = true,
+            Properties = new MqttPublishProperties { CorrelationId = "mqtt-correlation" }
+        };
+
+        (await input.Target.SendAsync(FlowMessage.Create(
+                request,
+                new CorrelationId("workflow-correlation")))
+            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        input.Target.Complete();
+
+        var result = await results.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        adapter.Published.ShouldHaveSingleItem().ShouldBe(request);
+        result.CorrelationId.ShouldBe(new CorrelationId("workflow-correlation"));
+        result.Payload.Topic.ShouldBe("devices/temperature");
+        result.Payload.PayloadBytes.ShouldBe(3);
+        result.Payload.QualityOfService.ShouldBe(MqttQualityOfService.AtLeastOnce);
+        result.Payload.Retain.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Hosted_trigger_node_resolves_keyed_trigger_source_and_emits_messages()
+    {
+        var adapter = new RecordingMqttAdapter();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IMqttTriggerSource>("primary", adapter);
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "trigger",
+                    MqttCompositionNodeTypes.Trigger,
+                    node => node
+                        .Resource(MqttCompositionResourceNames.TriggerSource, "primary")
+                        .Configure("topicFilter", "devices/+")
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterMqttNodes())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var runtime = host.Runtime.ShouldNotBeNull();
+        var triggerNode = runtime.Nodes.ShouldHaveSingleItem();
+        var output = triggerNode.Descriptor.Outputs[MqttCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<MqttReceivedMessage>>();
+        var messages = new BufferBlock<FlowMessage<MqttReceivedMessage>>();
+        output.Source.LinkTo(
+            messages,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        await host.StartRuntimeAsync(CancellationToken.None);
+        await adapter.Subscribed.WaitAsync(TimeSpan.FromSeconds(5));
+
+        adapter.PushMessage(new MqttReceivedMessage
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Topic = "devices/a",
+            Payload = [9, 8, 7],
+            CorrelationId = "mqtt-message"
+        });
+
+        var received = await messages.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        await hostedService.StopAsync(CancellationToken.None);
+
+        adapter.SubscribeCalls.ShouldBe(1);
+        adapter.TriggerOptions.ShouldNotBeNull();
+        adapter.TriggerOptions.TopicFilter.ShouldBe("devices/+");
+        received.CorrelationId.ShouldBe(new CorrelationId("mqtt-message"));
+        received.Payload.Topic.ShouldBe("devices/a");
+        received.Payload.Payload.ShouldBe([9, 8, 7]);
+    }
+
+    [Fact]
+    public async Task Missing_resource_reference_surfaces_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "publish",
+                    MqttCompositionNodeTypes.Publish))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterMqttNodes())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(
+                MqttCompositionResourceNames.Publisher,
+                StringComparison.Ordinal));
+    }
+
+    private sealed class RecordingMqttAdapter :
+        IMqttPublisher,
+        IMqttTriggerSource
+    {
+        private readonly object _gate = new();
+        private readonly Channel<IMqttReceivedContext> _incoming =
+            Channel.CreateUnbounded<IMqttReceivedContext>();
+        private readonly List<MqttPublishRequest> _published = [];
+        private readonly TaskCompletionSource _subscribed =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private int _subscribeCalls;
+
+        public IReadOnlyList<MqttPublishRequest> Published
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _published.ToArray();
+                }
+            }
+        }
+
+        public int SubscribeCalls => Volatile.Read(ref _subscribeCalls);
+
+        public Task Subscribed => _subscribed.Task;
+
+        public MqttTriggerOptions? TriggerOptions { get; private set; }
+
+        public ValueTask PublishAsync(
+            MqttPublishRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                _published.Add(request);
+            }
+
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<IMqttSubscription> SubscribeAsync(
+            MqttTriggerOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _subscribeCalls);
+            TriggerOptions = options;
+            _subscribed.TrySetResult();
+            return ValueTask.FromResult<IMqttSubscription>(
+                new RecordingMqttSubscription(_incoming.Reader));
+        }
+
+        public void PushMessage(MqttReceivedMessage message)
+            => _incoming.Writer.TryWrite(new RecordingMqttReceivedContext(message));
+    }
+
+    private sealed class RecordingMqttSubscription(
+        ChannelReader<IMqttReceivedContext> reader)
+        : IMqttSubscription
+    {
+        public IAsyncEnumerable<IMqttReceivedContext> Messages => reader.ReadAllAsync();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingMqttReceivedContext(MqttReceivedMessage message)
+        : IMqttReceivedContext
+    {
+        public MqttReceivedMessage Message { get; } = message;
+
+        public ValueTask AckAsync(CancellationToken cancellationToken = default)
+            => ValueTask.CompletedTask;
+
+        public ValueTask NackAsync(
+            Exception? error = null,
+            CancellationToken cancellationToken = default)
+            => ValueTask.CompletedTask;
+    }
+}
