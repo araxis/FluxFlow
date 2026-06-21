@@ -175,6 +175,13 @@
     "notesName": "FluxFlow.Components.FileSystem"
   },
   {
+    "alias": "components-filesystem-composition",
+    "tagPrefix": "components-filesystem-composition",
+    "packageId": "FluxFlow.Components.FileSystem.Composition",
+    "project": "src/FluxFlow.Components.FileSystem.Composition/FluxFlow.Components.FileSystem.Composition.csproj",
+    "notesName": "FluxFlow.Components.FileSystem.Composition"
+  },
+  {
     "alias": "components-observability",
     "tagPrefix": "components-observability",
     "packageId": "FluxFlow.Components.Observability",

@@ -98,6 +98,14 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
 are `FlowSource`s (the watcher is disposed in `OnDisposeAsync`). Engine glue removed.
 
+## FluxFlow.Components.FileSystem.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for standalone file
+system nodes. The package registers explicit `file.read`, `file.write`,
+`directory.enumerate`, and `file.watch` factories, binds existing file system
+options from composition configuration, and resolves optional keyed
+`TimeProvider` resources through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Http 3.0.0
 
 Engine-free standalone rewrite to a single `HttpClientNode : FlowNode<HttpRequestInput,

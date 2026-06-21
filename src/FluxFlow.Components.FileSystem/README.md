@@ -129,3 +129,27 @@ escape it are rejected.
 
 `FileReadOptions.MaxBytes` defaults to 16777216 (16 MiB). Set it higher for larger
 files, or set it explicitly to `null` to keep unlimited reads.
+
+## Composition
+
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node package. This package is just the standalone
+nodes.
+
+Use `FluxFlow.Components.FileSystem.Composition` when a
+`FluxFlow.Composition` host should register optional file-system factories:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterFileRead()
+        .RegisterFileWrite()
+        .RegisterDirectoryEnumerate()
+        .RegisterFileWatch());
+```
+
+The composition adapter binds existing FileSystem option records from node
+configuration and can resolve an optional keyed `TimeProvider` resource named
+`clock`. Base-directory and absolute-path behavior remain normal node options;
+the adapter does not add a separate path-resource or sandbox model.
