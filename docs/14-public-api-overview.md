@@ -343,6 +343,27 @@ wants an `event.projection` node factory. The factory binds existing
 `EventProjectionOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
 
+## Expectations Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Expectations.Composition
+```
+
+Main types:
+
+- `ExpectationsCompositionNodeRegistryExtensions`
+- `ExpectationsCompositionNodeTypes`
+- `ExpectationsCompositionPortNames`
+- `ExpectationsCompositionResourceNames`
+
+Use `RegisterEventExpectation()` from the optional
+`FluxFlow.Components.Expectations.Composition` package when a composition host
+wants an `event.expectation` node factory. The factory binds existing
+`EventExpectationOptions` and can resolve an optional keyed `TimeProvider`
+resource through the host.
+
 ## MQTT Composition
 
 Namespace:

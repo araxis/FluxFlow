@@ -85,6 +85,14 @@ resolves keyed `IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and
 Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic
 timeout armed against an injected `TimeProvider`. Engine glue removed.
 
+## FluxFlow.Components.Expectations.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for the standalone
+event expectation node. The package registers the explicit `event.expectation`
+factory, binds `EventExpectationOptions` from composition configuration, and
+resolves optional keyed `TimeProvider` resources through
+`FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.FileSystem 3.0.0
 
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
