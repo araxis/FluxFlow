@@ -259,6 +259,13 @@
     "notesName": "FluxFlow.Components.Projections"
   },
   {
+    "alias": "components-projections-composition",
+    "tagPrefix": "components-projections-composition",
+    "packageId": "FluxFlow.Components.Projections.Composition",
+    "project": "src/FluxFlow.Components.Projections.Composition/FluxFlow.Components.Projections.Composition.csproj",
+    "notesName": "FluxFlow.Components.Projections.Composition"
+  },
+  {
     "alias": "components-expectations",
     "tagPrefix": "components-expectations",
     "packageId": "FluxFlow.Components.Expectations",
