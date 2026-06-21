@@ -289,6 +289,14 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an
 injected `TimeProvider`. Engine glue removed.
 
+## FluxFlow.Components.State.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for the standalone
+state reducer node. The package registers the explicit `state.reducer` factory,
+binds `StateReducerOptions` from composition configuration, and resolves a
+keyed `IFlowExpressionEngine` plus optional keyed `TimeProvider` resources
+through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Storage 3.0.0
 
 Engine-free standalone rewrite. Put/get/query/delete are `FlowNode`s taking an injected

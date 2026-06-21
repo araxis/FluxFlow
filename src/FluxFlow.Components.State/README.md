@@ -68,8 +68,24 @@ available).
 new StateReducerNode(options, myExpressionEngine, clock: new FakeTimeProvider(timestamp));
 ```
 
-## Composition Guidance
+## Composition
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node package. This package is just the standalone
+node.
+
+Use `FluxFlow.Components.State.Composition` when a `FluxFlow.Composition` host
+should register the optional `state.reducer` factory:
+
+```csharp
+services
+    .AddKeyedSingleton<IFlowExpressionEngine>("state", myExpressionEngine)
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterStateReducer());
+```
+
+The composition adapter binds `StateReducerOptions` from node configuration,
+resolves the required expression engine from the keyed `engine` resource, and
+can resolve an optional keyed `TimeProvider` resource named `clock`.
+`StateReducerOptions.Engine` remains diagnostic/config metadata; it is not used
+for DI selection by the composition adapter.
