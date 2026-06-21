@@ -147,6 +147,13 @@
     "notesName": "FluxFlow.Components.Routing"
   },
   {
+    "alias": "components-routing-composition",
+    "tagPrefix": "components-routing-composition",
+    "packageId": "FluxFlow.Components.Routing.Composition",
+    "project": "src/FluxFlow.Components.Routing.Composition/FluxFlow.Components.Routing.Composition.csproj",
+    "notesName": "FluxFlow.Components.Routing.Composition"
+  },
+  {
     "alias": "components-validation",
     "tagPrefix": "components-validation",
     "packageId": "FluxFlow.Components.Validation",

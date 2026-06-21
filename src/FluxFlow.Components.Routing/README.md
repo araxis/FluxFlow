@@ -122,3 +122,33 @@ pending-capacity overflow surface on `Errors` and the node keeps processing.
 Each node implements `IFlowNode`: `Complete()` drains and completes the outputs, `Fault`
 faults the data outputs while flushing (completing) `Errors`/`Events` so buffered
 diagnostics survive, and `await DisposeAsync()` completes, drains, and releases timers.
+
+## Composition
+
+The optional `FluxFlow.Components.Routing.Composition` package registers
+closed generic routing factories for `FluxFlow.Composition`. The adapter binds
+the existing routing options from node configuration and resolves host-owned
+keyed selector delegates plus optional keyed `TimeProvider` resources.
+
+```csharp
+services.AddKeyedSingleton<Func<AppMessage, string?>>(
+    "route",
+    message => message.Category);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterSwitch<AppMessage>()
+        .RegisterFork<AppMessage>()
+        .RegisterMerge<AppMessage>()
+        .RegisterWindow<AppMessage>()
+        .RegisterCorrelation<AppMessage>()
+        .RegisterJoin<RequestMessage, ResponseMessage>());
+```
+
+Use custom node type strings for multiple input shapes, for example
+`flow.switch.order`, `flow.window.http`, and `flow.join.request-response`.
+Selector expressions are not compiled by the composition adapter; compile or
+create delegates in the host and expose them as keyed resources such as
+`routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`, and
+`rightKeySelector`.
