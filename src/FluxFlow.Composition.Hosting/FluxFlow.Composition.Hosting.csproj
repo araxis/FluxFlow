@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Composition.Hosting</PackageId>
+    <AssemblyName>FluxFlow.Composition.Hosting</AssemblyName>
+    <RootNamespace>FluxFlow.Composition.Hosting</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional hosting bridge for FluxFlow.Composition that builds standalone compositions from DI/configuration, starts them with host lifecycle, and resolves adapter-owned keyed resources.</Description>
+    <PackageTags>workflow;dataflow;composition;hosting</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial hosting bridge for standalone composition: DI registration builder, hosted runtime lifecycle, static/config definition sources, build diagnostics, and keyed resource resolution helpers for adapter-owned resources.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
