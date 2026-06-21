@@ -1,69 +1,76 @@
 # Package Authoring
 
-Reusable component families should be shipped outside `FluxFlow.Engine`.
-The engine provides small registration helpers so package authors can expose
-their nodes as an explicit group.
+Reusable component packages should be standalone-node-first. The package's core
+job is to expose normal nodes over `FluxFlow.Nodes`; composition adapters,
+engine modules, DI helpers, and design metadata are optional layers.
 
-## Module Shape
+## Default Shape
 
 ```csharp
-public sealed class OrderModule : IFlowNodeModule
+public sealed class OrderReviewNode : FlowNode<Order, ReviewedOrder>
 {
-    public OrderModule(IOrderStore store)
+    protected override Task ProcessAsync(FlowMessage<Order> message)
     {
-        Registrations =
-        [
-            new FlowNodeRegistration(OrderNodeTypes.Source, OrderSourceNode.Create),
-            new FlowNodeRegistration(OrderNodeTypes.Review, OrderReviewNode.Create),
-            new FlowNodeRegistration(
-                OrderNodeTypes.Sink,
-                context => OrderSinkNode.Create(context, store))
-        ];
+        var reviewed = Review(message.Payload);
+        Emit(message.With(reviewed));
+        return Task.CompletedTask;
     }
-
-    public IReadOnlyCollection<IFlowNodeRegistration> Registrations { get; }
 }
 ```
 
-Register a module directly:
+Consumers can construct and link the node directly:
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .Register(new OrderModule(store));
+var review = new OrderReviewNode();
+review.Output.LinkTo(sink.Input, new DataflowLinkOptions { PropagateCompletion = true });
 ```
 
-Or expose a package-owned extension:
+## Optional Composition Registration
+
+If the package wants fluent/config composition support, expose a small extension
+that registers explicit factories with `CompositionNodeRegistry`:
 
 ```csharp
-public static RuntimeNodeFactoryRegistry RegisterOrderComponents(
-    this RuntimeNodeFactoryRegistry registry,
-    IOrderStore store)
+public static CompositionNodeRegistry RegisterOrderNodes(
+    this CompositionNodeRegistry registry,
+    IOrderPolicy policy)
 {
-    return registry.Register(new OrderModule(store));
+    return registry.Register(
+        "order.review",
+        _ =>
+        {
+            var node = new OrderReviewNode(policy);
+            return ValueTask.FromResult(ComposedNode.Create(
+                node,
+                inputs: [CompositionPorts.Input<Order>("Input", node.Input)],
+                outputs: [CompositionPorts.Output<ReviewedOrder>("Output", node.Output)]));
+        },
+        inputs: [CompositionPorts.Metadata<Order>("Input")],
+        outputs: [CompositionPorts.Metadata<ReviewedOrder>("Output")]);
 }
 ```
 
-## Registration Safety
+Use engine `IFlowNodeModule` only for packages that intentionally support the
+optional engine runtime. It is not required for normal component packages.
 
-`RegisterRange` and module registration validate duplicate node types before
-mutating the registry. If a group contains a duplicate, the registry is left
-unchanged.
-
-The existing registry duplicate check still applies when registering one item at
-a time.
+If the package also owns concrete resources, keep those registrations in an
+adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
+resources from keyed DI, but the adapter still owns the concrete client/store
+options and lifetime.
 
 ## Package Rules
 
 Each component package should own:
 
-- node type constants
+- node type constants when the package supports composition or engine definitions
 - node implementations
 - option models and parsing helpers
 - package-specific validation
 - diagnostics and event names
-- registration module
-- package-owned design metadata provider when designer-friendly host
-  composition is useful
+- adapter-local DI extensions when the package owns a concrete integration
+- optional composition registration
+- optional engine module
+- optional design metadata provider
 - tests
 - a small runnable sample when useful
 
@@ -75,44 +82,31 @@ Avoid:
 - hidden dependency lookups
 - app workspace schemas
 - renderer-specific UI metadata
+- forcing engine dependencies into standalone node packages
 
-Dependencies should be passed through constructors, delegates, or package-owned
-options.
-
-## Design Metadata
-
-Reusable packages can expose an `IComponentDesignMetadataProvider` from
-`FluxFlow.Components.Designer` when hosts need package-owned palette entries,
-option editor hints, port labels, validation-facing option shape, or generated
-documentation.
-
-Keep this metadata neutral and tied to the package's public node type constants.
-Hosts compose package providers into a `ComponentDesignMetadataCatalog`, then add
-app-specific rendering, localization, resource pickers, and behavior overrides
-outside the package descriptor.
+Dependencies should be passed through constructors, delegates, options, or
+adapter-owned DI.
 
 ## Copyable Template
 
-The repository includes a small buildable template under
+The repository includes a small buildable standalone-node template under
 `samples/FluxFlow.ComponentPackageTemplate`. It contains one transform node and
 the expected package pieces:
 
 - contracts
-- options and option parsing
+- options
 - diagnostics and error codes
-- node type and port constants
 - node implementation
-- module and registry extension
-- design metadata provider when useful
 - focused tests
 
-Use it as the starting shape for new component families, then replace the
-sample contracts and node with the real package contract.
+Use it as the starting shape for new component families, then add composition or
+engine adapters only when a real host needs them.
 
 ## Versioning Guidance
 
-Treat node type names and port names as part of the package contract. Changing a
-node type or port name can break persisted definitions, so prefer additive
-changes whenever possible.
+Treat node type names and port names as part of the package contract when they
+are exposed through composition or engine definitions. Changing a node type or
+port name can break persisted definitions, so prefer additive changes whenever
+possible.
 
 Next: [Hosting And Observability](05-hosting-and-observability.md).

@@ -233,6 +233,29 @@ This folder records the extraction work for `FluxFlow.Engine`.
   `IMessageStore` / `ISessionStore` provider beside the existing SQLite storage
   add-on, PR #101 merge, stable `2.3.0` release with all ten packages indexed,
   and PR #102 follow-up `2.4.0-preview.75` publish.
+- `149-pulsemqtt-manual-ack-adoption.md`: FluxFlow Pulse MQTT adapter adoption
+  of upstream Pulse MQTT `2.4.0`; `FluxFlow.Components.Mqtt.PulseMqtt` `1.1.0`
+  now maps manual trigger acknowledgement modes to Pulse acknowledged route
+  streams instead of rejecting them.
+- `150-mqtt-di-and-adapter-owned-features.md`: MQTT DI and adapter-owned feature
+  plan implementation: adapter-local concrete client registration, hosted
+  lifecycle options, optional Pulse store hooks, and release notes.
+- `151-pulsemqtt-2.5-lifecycle-update.md`: FluxFlow Pulse MQTT adapter update
+  to stable upstream Pulse MQTT `2.5.0`, including MQTT-named internal
+  lifecycle calls and verification.
+- `152-standalone-composition-layer.md`: `FluxFlow.Composition` v1
+  implementation record: standalone-first composition package, explicit
+  factory registration, fluent/config DTO path, direct Dataflow linking,
+  lifecycle boundary, pure sample, docs cleanup, and verification.
+- `153-composition-hosting-layer.md`: `FluxFlow.Composition.Hosting` v1
+  implementation record: optional DI/host bridge, hosted composition runtime,
+  static/config definition sources, keyed resource resolution helpers,
+  diagnostics behavior, docs/manifest wiring, and verification.
+- `154-mqtt-composition-adapter.md`: optional MQTT composition adapter package:
+  `RegisterMqttNodes()`, `mqtt.publish` / `mqtt.trigger` factories, resource
+  names for keyed `IMqttPublisher` / `IMqttTriggerSource` / `TimeProvider`,
+  broker-free MQTT composition sample, package/docs/manifest wiring, and
+  verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

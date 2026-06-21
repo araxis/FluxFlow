@@ -7,6 +7,23 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.0
+
+Adds the standalone-first composition layer for building linked node workflows
+from fluent C# or `IConfiguration` JSON without depending on `FluxFlow.Engine`.
+The package includes composition DTOs, explicit node factory registration, port
+metadata, structural validation, direct typed Dataflow linking, runtime
+lifecycle APIs, reload-facing contracts, and cleanup on build failure.
+
+## FluxFlow.Composition.Hosting 1.0.0
+
+Adds the optional hosting bridge for standalone compositions. The package
+registers a composition runtime with `IServiceCollection`, loads definitions
+from static objects or `IConfiguration`, builds and starts the runtime through
+`IHostedService`, exposes build diagnostics through `ICompositionRuntimeHost`,
+and provides keyed-resource helpers so node factories can resolve host or
+adapter-owned resources from `NodeDefinition.Resources`.
+
 ## FluxFlow.Components.Mqtt 4.0.0
 
 Breaking cleanup of the MQTT component boundary. The core package now exposes
@@ -18,6 +35,14 @@ payload, and MQTT protocol metadata live on `MqttPublishRequest`. Trigger reques
 `CorrelatedRequestTracker` for pending correlation and timeout mechanics while acknowledgement
 policy stays MQTT-owned. Concrete client-library integrations are split into separate adapter
 packages.
+
+## FluxFlow.Components.Mqtt.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for MQTT publish and
+trigger nodes. The package registers explicit `mqtt.publish` and `mqtt.trigger`
+factories, binds existing MQTT node options from composition configuration, and
+resolves adapter-owned keyed `IMqttPublisher` and `IMqttTriggerSource` resources
+through `FluxFlow.Composition.Hosting`.
 
 ## FluxFlow.Components.RequestReply 1.1.0
 
@@ -75,12 +100,37 @@ Engine-free standalone rewrite over small client-library-neutral MQTT contracts.
 factories, profiles, reconnect policy, connection nodes, and concrete client creation are removed
 from the core package. Trigger request/reply now uses the shared correlated request tracker.
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.0
+
+Adds adapter-local DI registration through `AddFluxFlowMqttClient`, keyed
+registrations for `MqttNetClient`, `IMqttPublisher`, `IMqttTriggerSource`, and
+`IMqttClientHealthSource`, plus optional hosted connect/disconnect lifetime
+through `MqttClientRegistrationOptions`. Hosted connect/disconnect is opt-in
+with `ConnectWithHost = true`; the default registration only creates the keyed
+client and MQTT role services.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.0.0
 
 Initial MQTTnet-backed adapter package for FluxFlow MQTT components. `MqttNetClient` owns MQTT
 client creation, broker connection, Last Will setup, reconnect, publish mapping, trigger
 subscriptions, manual acknowledgement hooks, and health events while implementing the neutral
 `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource` contracts.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 1.1.0
+
+Updates the adapter to Pulse MQTT `2.5.0`, uses the Pulse MQTT-named lifecycle
+APIs internally, and maps FluxFlow manual trigger acknowledgement modes to Pulse
+acknowledged route streams. `Acknowledgement.None` keeps managed route-stream
+acknowledgement; `OnEmit` and `OnSuccessfulResponse` now delegate `AckAsync` /
+`NackAsync` to the Pulse message context. Manual acknowledged Pulse routes are
+single-owner for each matching publish, matching Pulse MQTT's acknowledged-route
+contract.
+
+Adds adapter-local DI registration through `AddFluxFlowMqttClient`, keyed
+registrations for `PulseMqttClient`, `IMqttPublisher`, `IMqttTriggerSource`,
+and `IMqttClientHealthSource`, plus optional hosted client startup. Also exposes
+optional Pulse durable message/session store hooks while keeping offline queueing
+opt-in.
 
 ## FluxFlow.Components.Mqtt.PulseMqtt 1.0.0
 

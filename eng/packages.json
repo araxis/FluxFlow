@@ -7,6 +7,20 @@
     "notesName": "FluxFlow.Nodes"
   },
   {
+    "alias": "composition",
+    "tagPrefix": "composition",
+    "packageId": "FluxFlow.Composition",
+    "project": "src/FluxFlow.Composition/FluxFlow.Composition.csproj",
+    "notesName": "FluxFlow.Composition"
+  },
+  {
+    "alias": "composition-hosting",
+    "tagPrefix": "composition-hosting",
+    "packageId": "FluxFlow.Composition.Hosting",
+    "project": "src/FluxFlow.Composition.Hosting/FluxFlow.Composition.Hosting.csproj",
+    "notesName": "FluxFlow.Composition.Hosting"
+  },
+  {
     "alias": "mapping",
     "tagPrefix": "mapping",
     "packageId": "FluxFlow.Mapping",
@@ -47,6 +61,13 @@
     "packageId": "FluxFlow.Components.Mqtt",
     "project": "src/Mqtt/FluxFlow.Components.Mqtt/FluxFlow.Components.Mqtt.csproj",
     "notesName": "FluxFlow.Components.Mqtt"
+  },
+  {
+    "alias": "components-mqtt-composition",
+    "tagPrefix": "components-mqtt-composition",
+    "packageId": "FluxFlow.Components.Mqtt.Composition",
+    "project": "src/Mqtt/FluxFlow.Components.Mqtt.Composition/FluxFlow.Components.Mqtt.Composition.csproj",
+    "notesName": "FluxFlow.Components.Mqtt.Composition"
   },
   {
     "alias": "components-mqtt-mqttnet",

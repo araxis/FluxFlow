@@ -1,265 +1,127 @@
-# FluxFlow.Engine
+# FluxFlow
 
-[![Package Version](https://img.shields.io/nuget/vpre/FluxFlow.Engine?label=package)](https://www.nuget.org/packages/FluxFlow.Engine)
-[![Package Downloads](https://img.shields.io/nuget/dt/FluxFlow.Engine?label=downloads)](https://www.nuget.org/packages/FluxFlow.Engine)
+FluxFlow is a standalone-node-first workflow toolkit for .NET.
 
-**A protocol-neutral, dataflow-based workflow engine for .NET.**
+The default architecture is:
 
-Define graphs of typed processing nodes in JSON, build them into live
-[TPL Dataflow](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/dataflow-task-parallel-library)
-networks, and drive them through a phase-ordered lifecycle — without any
-protocol-specific dependencies.
+1. Build reusable nodes over `FluxFlow.Nodes`.
+2. Compose those nodes directly with TPL Dataflow, fluent C#, or configuration.
+3. Keep resources such as clients, stores, secrets, and protocol adapters owned by the host or adapter package.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  ApplicationDefinition (JSON or code)                               │
-│  ┌─────────────┐  ┌────────────────────────────────────────────┐   │
-│  │  resources  │  │  workflows.main                             │   │
-│  │  ──────────  │  │  ──────────────────────────────────────────│   │
-│  │  shared     │  │  source ──→ filter ──→ mapper ──→ sink      │   │
-│  └─────────────┘  └────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-         │
-         ▼  ApplicationRuntimeBuilder.Build()
-┌─────────────────────────────────────────────────────────────────────┐
-│  ApplicationRuntime (live TPL Dataflow graph)                       │
-│  StateChanges  ──  ISourceBlock<ApplicationStateChanged>            │
-│  Events        ──  ISourceBlock<FlowEvent>                          │
-└─────────────────────────────────────────────────────────────────────┘
-```
+`FluxFlow.Engine` remains available as an optional advanced executable runtime
+for hosts that need its older `ApplicationDefinition` model, conditional links,
+and engine lifecycle. It is no longer the required path for normal component
+packages.
 
----
+## Main Packages
 
-## Features
+| Package | Purpose |
+|---------|---------|
+| `FluxFlow.Nodes` | Minimal standalone node kit: `FlowNode`, `FlowSource`, `FlowMessage`, `FlowError`, and `FlowEvent`. |
+| `FluxFlow.Composition` | Optional composition layer for fluent C# and `IConfiguration` JSON. It links standalone nodes directly and does not reference `FluxFlow.Engine`. |
+| `FluxFlow.Composition.Hosting` | Optional DI/host bridge that builds and starts a composition runtime and resolves adapter-owned keyed resources. |
+| `FluxFlow.Engine` | Optional legacy/advanced runtime for `ApplicationDefinition`-based execution. |
 
-| Feature | Description |
-|---------|-------------|
-| **Typed ports** | `InputPort<T>` / `OutputPort<T>`; type mismatches are caught at build time |
-| **Reliable fan-out** | Runtime-owned output delivery sends each item to every linked input |
-| **Conditional links** | Link-level `when` expressions route each output item to matching inputs |
-| **Phase-ordered startup** | Nodes declare a `phase` integer; the runtime starts lower phases first |
-| **Completion propagation** | Entry nodes drive completion through the whole graph |
-| **State streams** | `ApplicationRuntime.StateChanges` and `Workflow.StateChanges` are `ISourceBlock<T>` |
-| **Event stream** | `ApplicationRuntime.Events` aggregates `FlowEvent` from every `IFlowEventSource` node |
-| **Diagnostics stream** | `FlowApplicationHost.Diagnostics` and `ApplicationRuntime.Diagnostics` aggregate node health, status, and metric diagnostics |
-| **Expression boundary** | Host-provided expression engines behind `IFlowExpressionEngine` |
-| **Node authoring helpers** | Base classes and a fluent node builder reduce factory and port boilerplate |
-| **Package authoring helpers** | `IFlowNodeModule` and `FlowNodeRegistration` group component families explicitly |
-| **JSON definitions** | Full round-trip via `ApplicationDefinitionJson.CreateSerializerOptions()` |
-| **Host lifecycle** | `FlowApplicationHost` owns build → start → stop → dispose |
+Component packages should expose normal standalone nodes first. Composition
+factory registration, engine modules, design metadata, and host-specific DI
+helpers are optional adapters around those nodes.
 
----
-
-## Quick start
-
-### 1. Implement a node
+## Standalone Node Example
 
 ```csharp
-using FluxFlow.Engine.Components;
-using FluxFlow.Engine.Runtime;
-
-public sealed class NumberSource : SourceFlowNode<int>
+public sealed class UppercaseNode : FlowNode<string, string>
 {
-    public static RuntimeNode Create(RuntimeNodeFactoryContext ctx)
+    protected override Task ProcessAsync(FlowMessage<string> message)
     {
-        var node = new NumberSource();
-        return ctx.CreateNode(node)
-            .Output("Output", node.OutputBlock)
-            .Build();
-    }
-
-    public override async Task StartAsync(CancellationToken ct = default)
-    {
-        for (var i = 0; i < 10; i++)
-            await SendOutputAsync(i, ct);
-
-        CompleteOutput();
+        Emit(message.With(message.Payload.ToUpperInvariant()));
+        return Task.CompletedTask;
     }
 }
 ```
 
-Use `SinkFlowNode<T>`, `TransformFlowNode<TInput,TOutput>`, `MapFlowNode<TInput,TOutput>`,
-and `EventFlowNodeBase` when those shapes fit. Direct `IFlowNode` implementations
-still work when a node needs full control.
+Nodes are plain Dataflow processors. Construct them, link their ports, send
+`FlowMessage<T>` values, and await completion.
 
-Nodes derived from `FlowNodeBase` can also emit operational diagnostics:
+## Composition Example
 
-```csharp
-TryEmitDiagnostic(
-    "demo.node.ready",
-    FlowDiagnosticLevel.Information,
-    "Node is ready.");
-```
-
-The runtime labels each diagnostic with the node address, id, phase, and type.
-Use diagnostics for health, status, counters, and live monitoring data. Use
-`FlowEvent` for workflow/domain activity.
-
-Subscribe to `FlowApplicationHost.Diagnostics` before `StartAsync` when startup
-diagnostics matter:
+`FluxFlow.Composition` adds DTOs, explicit factory registration, validation,
+and runtime lifecycle around standalone nodes:
 
 ```csharp
-var diagnostics = new BufferBlock<RuntimeFlowDiagnostic>();
-host.Diagnostics.LinkTo(diagnostics, new DataflowLinkOptions { PropagateCompletion = true });
+var registry = new CompositionNodeRegistry()
+    .Register(
+        "sample.uppercase",
+        _ =>
+        {
+            var node = new UppercaseNode();
+            return ValueTask.FromResult(ComposedNode.Create(
+                node,
+                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                events: node.Events,
+                errors: node.Errors));
+        },
+        inputs: [CompositionPorts.Metadata<string>("Input")],
+        outputs: [CompositionPorts.Metadata<string>("Output")]);
 
-var result = await host.StartAsync();
+var definition = CompositionDefinitionBuilder
+    .Create()
+    .Workflow("main", workflow => workflow
+        .Node("upper", "sample.uppercase"))
+    .Build();
+
+var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition);
 ```
 
-### 2. Define the graph in JSON
+There is no reflection, assembly scanning, or engine dependency in this path.
 
-```json
-{
-  "workflows": {
-    "main": {
-      "source": { "type": "demo.numbers" },
-      "printer": {
-        "type": "demo.printer",
-        "Input": { "from": "source.Output" }
-      }
-    }
-  }
-}
-```
-
-If no `when` expression is set, the link receives every item. If a definition
-uses `when`, the host must pass an `IFlowExpressionEngine` to
-`ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`; the engine
-does not ship a concrete expression language.
-
-### 3. Register, build, run
+`FluxFlow.Composition.Hosting` can own the host lifecycle around the same model:
 
 ```csharp
-var registry = new RuntimeNodeFactoryRegistry();
-registry.Register(new NodeType("demo.numbers"), NumberSource.Create);
-registry.Register(new NodeType("demo.printer"),  PrinterNode.Create);
-
-var json       = File.ReadAllText("flow.json");
-var opts       = ApplicationDefinitionJson.CreateSerializerOptions();
-var definition = JsonSerializer.Deserialize<ApplicationDefinition>(json, opts)!;
-
-var host = FlowApplicationHost.Create(definition, registry);
-
-var result = await host.StartAsync();
-if (!result.IsSuccess)
-    foreach (var e in result.Errors) Console.WriteLine(e.Message);
-
-await host.StopAsync();
-await host.DisposeAsync();
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterMyNodes());
 ```
 
----
-
-## Documentation
-
-The package README is the short entrypoint. The focused docs set starts at
-[docs/README.md](docs/README.md) and covers getting started, definitions, node
-authoring, package authoring, hosting, observability, workspace projection, and
-validation, error handling, runtime states, JSON conversion, and expression
-mapping, package versioning, component composition, and storage host adapters.
-
----
+Adapter packages still own concrete resources and register them in DI, usually
+as named keyed services.
 
 ## Samples
 
-See [samples/FluxFlow.SampleApp](samples/FluxFlow.SampleApp) for a small
-consumer-style console app. It keeps app-specific workspace metadata outside the
-engine, projects executable resources and workflows into `ApplicationDefinition`,
-registers typed components explicitly, and runs conditional links.
+Run the standalone composition sample:
 
-See [samples/FluxFlow.MappingControlSample](samples/FluxFlow.MappingControlSample)
-for a broker-free component composition sample. It keeps source and sink nodes in
-the host, then composes `flow.mapper`, `flow.filter`, `flow.when`, and
-`flow.assert` from reusable packages.
+```sh
+dotnet run --project samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj
+```
 
-See [samples/FluxFlow.MqttCompositionSample](samples/FluxFlow.MqttCompositionSample)
-for an MQTT composition sample backed by an in-memory host adapter. It composes
-`mqtt.subscribe`, mapping/control nodes, and `mqtt.publish` without requiring a
-live broker.
+Run the MQTT composition sample with in-memory adapter resources:
 
-See [samples/FluxFlow.SessionsCompositionSample](samples/FluxFlow.SessionsCompositionSample)
-for a session recording and replay sample. It keeps storage in the host, records
-messages through `session.recorder`, then replays them through `session.replay`.
+```sh
+dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
+```
 
-See [samples/FluxFlow.StateCompositionSample](samples/FluxFlow.StateCompositionSample)
-for a timer, mapper, state reducer, and counter composition sample. It keeps
-host-specific expressions and sinks outside the reusable packages.
+Run the HTTP trigger sample:
 
-See [samples/FluxFlow.StorageCompositionSample](samples/FluxFlow.StorageCompositionSample)
-for a logical storage composition sample. It keeps the concrete store in the
-host while composing `storage.put`, `storage.get`, `storage.query`, and
-`storage.delete`.
+```sh
+dotnet run --project samples/FluxFlow.HttpTriggerSample/FluxFlow.HttpTriggerSample.csproj
+```
 
-See [samples/FluxFlow.ComponentPackageTemplate](samples/FluxFlow.ComponentPackageTemplate)
-for a copyable component package shape with contracts, options, diagnostics,
-module registration, and tests.
+Run the engine sample when you need the advanced engine runtime:
 
----
+```sh
+dotnet run --project samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj
+```
 
-## Component Packages
-
-Reusable components live outside `FluxFlow.Engine` and are released separately.
-All listed packages have a stable `1.0.0` line.
-
-| Package | Nodes | Purpose |
-|---------|-------|---------|
-| `FluxFlow.Components.Mqtt` | `mqtt.publish`, `mqtt.subscribe` | Adapter-backed MQTT publish and subscribe nodes. |
-| `FluxFlow.Components.Mapping` | `flow.mapper` | Pluggable expression mapping with generic or typed ports. |
-| `FluxFlow.Components.Control` | `flow.filter`, `flow.when` | Pluggable expression-driven filtering and routing. |
-| `FluxFlow.Components.Assertions` | `flow.assert` | Pluggable expression-driven assertions with result and routed input ports. |
-| `FluxFlow.Components.Sources` | `source.generated`, `source.sequence` | Deterministic generated and sequence source nodes. |
-| `FluxFlow.Components.Routing` | `flow.switch`, `flow.correlation`, `flow.window`, `flow.join`, `flow.fork`, `flow.merge` | Expression-driven route-key evaluation, route envelopes, direct route outputs, key-based pairing, windows, joins, fan-out, and stream merge. |
-| `FluxFlow.Components.Validation` | `json.schema-validator` | JSON schema validation with result, valid, and invalid routing. |
-| `FluxFlow.Components.FileSystem` | `file.write`, `file.read`, `file.watch`, `directory.enumerate` | File system operations with package-owned path safety. |
-| `FluxFlow.Components.Observability` | `flow.logger`, `flow.metrics`, `flow.counter` | Neutral observer nodes for structured entries, metrics, and counters. |
-| `FluxFlow.Components.Timers` | `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, `timer.debounce` | Interval, cron schedule, delay, rate-limit, and quiet-period timing nodes. |
-| `FluxFlow.Components.Projections` | `event.projection` | Runtime event count, latest-event, and rolling-rate projection snapshots. |
-| `FluxFlow.Components.Expectations` | `event.expect`, `event.guard` | Runtime event expectation and guard results. |
-| `FluxFlow.Components.Designer` | metadata contracts | Component, option, and port metadata for host-generated editors. |
-| `FluxFlow.Components.Resources` | resource contracts | Named resource references, descriptors, lookup, and diagnostics. |
-| `FluxFlow.Components.Journal` | journal contracts | Event journal records, queries, retention options, and in-memory store. |
-| `FluxFlow.Components.Sessions` | `session.recorder`, `session.replay`, `session.query` | Host-store-backed session recording, replay, and metadata query. |
-| `FluxFlow.Components.State` | `state.reducer` | Per-key state updates through host-provided expression engines. |
-| `FluxFlow.Components.Storage` | `storage.put`, `storage.get`, `storage.query`, `storage.delete` | Host-store-backed logical record storage. |
-| `FluxFlow.Components.Storage.FileSystem` | adapter only | File-system-backed adapter for storage nodes. |
-| `FluxFlow.Components.Storage.SqlFile` | adapter only | Single-file SQL adapter for storage nodes. |
-
-Reusable runtime component packages can also expose package-owned
-`IComponentDesignMetadataProvider` implementations. Hosts compose those
-providers with `ComponentDesignMetadataCatalog` to populate palettes, editors,
-validation views, and generated documentation while keeping renderer-specific UI
-state in the application.
-
----
+Use `samples/FluxFlow.ComponentPackageTemplate` as the copyable shape for new
+component packages.
 
 ## Building
 
 ```sh
 dotnet build FluxFlow.sln
-dotnet test  FluxFlow.sln
+dotnet test FluxFlow.sln
 ```
-
----
 
 ## License
 
-FluxFlow.Engine is licensed under the MIT License.
-
----
-
-## Extension boundary
-
-FluxFlow.Engine does not ship transport, storage, web, or designer components.
-Applications add those behaviors by:
-
-1. Implementing `IFlowNode` for each external capability
-2. Registering node factories with `RuntimeNodeFactoryRegistry`
-3. Composing flows as JSON that FluxFlow.Engine builds and runs
-
-Component packages should own their own options, validation, event names, tests,
-and documentation. They can expose an `IFlowNodeModule` or a registry extension
-that registers one module, plus a package-owned design metadata provider when a
-host should present the package's nodes.
-
-Applications are free to keep richer workspace files with dashboards, tests,
-connections, or UI state. Project only the executable resources and workflows
-into `ApplicationDefinition` before building the engine runtime.
+FluxFlow is licensed under the MIT License.
