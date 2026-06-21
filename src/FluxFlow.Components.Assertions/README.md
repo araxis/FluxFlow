@@ -69,3 +69,33 @@ Assertion results use the node's clock for `EvaluatedAt` (default
 ```csharp
 new FlowAssertionComponent<object>(options, engine, clock: new FakeTimeProvider(timestamp));
 ```
+
+## Composition
+
+Add `FluxFlow.Components.Assertions.Composition` when a host wants to instantiate
+assertion nodes from `FluxFlow.Composition` fluent/config definitions. That
+optional package registers closed generic `FlowAssertionComponent<TInput>`
+factories.
+
+```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry =>
+        registry.RegisterAssertion<AppMessage>());
+```
+
+Use custom node type names when one host needs several input shapes:
+
+```csharp
+registry
+    .RegisterAssertion<OrderMessage>("flow.assert.order")
+    .RegisterAssertion<HttpResponseOutput>("flow.assert.http-response");
+```
+
+Composition resolves the expression engine from the keyed `engine` resource.
+Optional keyed `contextFactory` and `clock` resources can provide custom
+expression variables and deterministic result/diagnostic timestamps. The
+configured `InputType` remains diagnostic metadata; CLR port types come from the
+closed generic registration.

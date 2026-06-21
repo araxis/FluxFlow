@@ -119,6 +119,13 @@
     "notesName": "FluxFlow.Components.Assertions"
   },
   {
+    "alias": "components-assertions-composition",
+    "tagPrefix": "components-assertions-composition",
+    "packageId": "FluxFlow.Components.Assertions.Composition",
+    "project": "src/FluxFlow.Components.Assertions.Composition/FluxFlow.Components.Assertions.Composition.csproj",
+    "notesName": "FluxFlow.Components.Assertions.Composition"
+  },
+  {
     "alias": "components-sources",
     "tagPrefix": "components-sources",
     "packageId": "FluxFlow.Components.Sources",
