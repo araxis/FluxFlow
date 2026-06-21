@@ -105,6 +105,27 @@ closed generic `flow.mapper` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed context factory and clock
 resources stay host-owned.
 
+## Control Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Control.Composition
+```
+
+Main types:
+
+- `ControlCompositionNodeRegistryExtensions`
+- `ControlCompositionNodeTypes`
+- `ControlCompositionPortNames`
+- `ControlCompositionResourceNames`
+
+Use `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` from the optional
+`FluxFlow.Components.Control.Composition` package when a composition host wants
+closed generic `flow.filter` and `flow.when` node factories. The factories
+resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
+factory and clock resources stay host-owned.
+
 ## MQTT Composition
 
 Namespace:

@@ -105,6 +105,13 @@
     "notesName": "FluxFlow.Components.Control"
   },
   {
+    "alias": "components-control-composition",
+    "tagPrefix": "components-control-composition",
+    "packageId": "FluxFlow.Components.Control.Composition",
+    "project": "src/FluxFlow.Components.Control.Composition/FluxFlow.Components.Control.Composition.csproj",
+    "notesName": "FluxFlow.Components.Control.Composition"
+  },
+  {
     "alias": "components-assertions",
     "tagPrefix": "components-assertions",
     "packageId": "FluxFlow.Components.Assertions",
