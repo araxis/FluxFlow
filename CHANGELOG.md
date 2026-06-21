@@ -93,6 +93,14 @@ Engine-free standalone rewrite. The mapper node is a `FlowNode` with the primary
 Output and failures on a Failed port (`AddOutput`); the mapping expression compiles once.
 Engine glue removed.
 
+## FluxFlow.Components.Mapping.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for closed generic
+mapper nodes. The package registers explicit `flow.mapper` factories, binds
+`MapperOptions` from composition configuration, and resolves keyed
+`IFlowExpressionEngine`, `IMappingContextFactory`, and `TimeProvider` resources
+through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Metrics 3.0.0
 
 Engine-free standalone rewrite. The aggregate node is a `FlowNode`; in coalesce mode the single
