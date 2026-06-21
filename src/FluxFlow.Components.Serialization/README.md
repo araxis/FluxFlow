@@ -52,21 +52,35 @@ new Base64DecodeRequest
 };
 ```
 
-## Registration
+## Direct Use
 
 ```csharp
-registry.RegisterSerializationComponents();
+await using var node = new JsonParseNode(
+    new SerializationNodeOptions { AllowTrailingCommas = true });
 ```
 
-## Design Metadata
+Each node is standalone: create it with `SerializationNodeOptions` and an
+optional `TimeProvider`, post `FlowMessage<TRequest>` to `Input`, and link
+`Output`, `Errors`, or `Events` to the next stage.
 
-This package exposes a package-owned `IComponentDesignMetadataProvider` for its
-node types. Hosts can compose it through `ComponentDesignMetadataCatalog` to
-populate palettes, editors, validation views, and documentation without
-duplicating package descriptors.
+## Composition
 
-## Composition Guidance
+The optional `FluxFlow.Components.Serialization.Composition` package registers
+serialization factories for `FluxFlow.Composition`. It binds the existing
+`SerializationNodeOptions` from node configuration and resolves an optional
+keyed `TimeProvider` resource owned by the host.
 
-Use this package as one part of a host-composed graph. See
-[Component Composition](../../docs/12-component-composition.md) for recommended
-host boundaries, package boundaries, and extraction timing.
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterJsonParse()
+        .RegisterJsonStringify()
+        .RegisterTextEncode()
+        .RegisterTextDecode()
+        .RegisterBase64Encode()
+        .RegisterBase64Decode());
+```
+
+The request/result CLR types are fixed by the serialization contracts; no type
+alias or string-to-type resolution is needed.

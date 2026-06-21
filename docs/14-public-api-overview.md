@@ -235,6 +235,29 @@ host wants routing node factories. Switch, correlation, and join factories
 resolve host-owned keyed selector delegates; all factories can resolve an
 optional keyed `TimeProvider` resource through the host.
 
+## Serialization Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Serialization.Composition
+```
+
+Main types:
+
+- `SerializationCompositionNodeRegistryExtensions`
+- `SerializationCompositionNodeTypes`
+- `SerializationCompositionPortNames`
+- `SerializationCompositionResourceNames`
+
+Use `RegisterJsonParse()`, `RegisterJsonStringify()`,
+`RegisterTextEncode()`, `RegisterTextDecode()`, `RegisterBase64Encode()`, and
+`RegisterBase64Decode()` from the optional
+`FluxFlow.Components.Serialization.Composition` package when a composition host
+wants serialization and encoding factories. The factories bind existing
+serialization options and can resolve an optional keyed `TimeProvider` resource
+through the host.
+
 ## MQTT Composition
 
 Namespace:

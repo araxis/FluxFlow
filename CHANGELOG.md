@@ -207,6 +207,15 @@ resources through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. The serialize/deserialize transforms are `FlowNode`s over the
 kit. Engine glue removed.
 
+## FluxFlow.Components.Serialization.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for standalone
+serialization nodes. The package registers explicit `json.parse`,
+`json.stringify`, `text.encode`, `text.decode`, `base64.encode`, and
+`base64.decode` factories, binds existing serialization options from
+composition configuration, and resolves optional keyed `TimeProvider` resources
+through `FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Sessions 3.0.0
 
 Engine-free standalone rewrite. Recorder is a `FlowNode`, replay is a `FlowSource` (paced by an
