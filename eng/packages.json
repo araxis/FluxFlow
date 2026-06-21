@@ -343,6 +343,13 @@
     "notesName": "FluxFlow.Components.State"
   },
   {
+    "alias": "components-state-composition",
+    "tagPrefix": "components-state-composition",
+    "packageId": "FluxFlow.Components.State.Composition",
+    "project": "src/FluxFlow.Components.State.Composition/FluxFlow.Components.State.Composition.csproj",
+    "notesName": "FluxFlow.Components.State.Composition"
+  },
+  {
     "alias": "components-storage",
     "tagPrefix": "components-storage",
     "packageId": "FluxFlow.Components.Storage",

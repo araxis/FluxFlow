@@ -344,6 +344,27 @@ wants file-system node factories. The factories bind existing file-system
 options and can resolve an optional keyed `TimeProvider` resource through the
 host.
 
+## State Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.State.Composition
+```
+
+Main types:
+
+- `StateCompositionNodeRegistryExtensions`
+- `StateCompositionNodeTypes`
+- `StateCompositionPortNames`
+- `StateCompositionResourceNames`
+
+Use `RegisterStateReducer()` from the optional
+`FluxFlow.Components.State.Composition` package when a composition host wants a
+`state.reducer` node factory. The factory binds existing `StateReducerOptions`,
+resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
+keyed `TimeProvider` resource through the host.
+
 ## Projections Composition
 
 Namespace:

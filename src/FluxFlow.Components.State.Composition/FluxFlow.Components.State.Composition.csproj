@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.State.Composition</PackageId>
+    <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional FluxFlow.Composition registration helpers for the standalone state reducer node over host-owned keyed expression resources.</Description>
+    <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial optional composition adapter for state reducers. Registers the state.reducer factory, binds existing state reducer options from composition configuration, and resolves keyed IFlowExpressionEngine and optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.State\FluxFlow.Components.State.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
+    <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
