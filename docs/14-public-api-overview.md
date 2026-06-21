@@ -301,6 +301,27 @@ a `payload.inspect` node factory. The factory binds existing
 `PayloadInspectOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
 
+## Projections Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Projections.Composition
+```
+
+Main types:
+
+- `ProjectionsCompositionNodeRegistryExtensions`
+- `ProjectionsCompositionNodeTypes`
+- `ProjectionsCompositionPortNames`
+- `ProjectionsCompositionResourceNames`
+
+Use `RegisterEventProjection()` from the optional
+`FluxFlow.Components.Projections.Composition` package when a composition host
+wants an `event.projection` node factory. The factory binds existing
+`EventProjectionOptions` and can resolve an optional keyed `TimeProvider`
+resource through the host.
+
 ## MQTT Composition
 
 Namespace:

@@ -203,6 +203,14 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a
 package-owned `ProjectionEvent` contract. Engine glue removed.
 
+## FluxFlow.Components.Projections.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for the standalone
+event projection node. The package registers the explicit `event.projection`
+factory, binds `EventProjectionOptions` from composition configuration, and
+resolves optional keyed `TimeProvider` resources through
+`FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Routing 3.0.0
 
 Engine-free standalone rewrite. Switch/Fork/Correlation/Window are `FlowNode`s (multi-output via
