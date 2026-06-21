@@ -1,0 +1,205 @@
+using System.Net;
+using System.Text;
+using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Http.Composition;
+using FluxFlow.Components.Http.Contracts;
+using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
+using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Shouldly;
+using Xunit;
+
+namespace FluxFlow.Components.Http.Composition.Tests;
+
+public sealed class HttpCompositionNodeRegistryExtensionsTests
+{
+    [Fact]
+    public void RegisterHttpNodes_registers_client_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterHttpNodes();
+
+        var client = registry.Registrations[HttpCompositionNodeTypes.Client];
+        client.Inputs[HttpCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(HttpRequestInput));
+        client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(HttpResponseOutput));
+    }
+
+    [Fact]
+    public async Task Hosted_client_node_resolves_keyed_http_client_and_sends_request()
+    {
+        var handler = new RecordingHandler(
+            (_, _) => Respond(HttpStatusCode.OK, "pong", "text/plain"));
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton(
+            "primary",
+            (_, _) => new HttpClient(handler)
+            {
+                BaseAddress = new Uri("https://api.example.test/")
+            });
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "api",
+                    HttpCompositionNodeTypes.Client,
+                    node => node
+                        .Resource(HttpCompositionResourceNames.Client, "primary")
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterHttpNodes())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var runtime = host.Runtime.ShouldNotBeNull();
+        var clientNode = runtime.Nodes.ShouldHaveSingleItem();
+        var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<HttpRequestInput>>();
+        var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<HttpResponseOutput>>();
+        var responses = new BufferBlock<FlowMessage<HttpResponseOutput>>();
+        output.Source.LinkTo(
+            responses,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        var request = FlowMessage.Create(
+            new HttpRequestInput { Method = "GET", Url = "v1/status" },
+            new CorrelationId("http-correlation"));
+
+        (await input.Target.SendAsync(request)
+            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        input.Target.Complete();
+
+        var response = await responses.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
+        response.Payload.StatusCode.ShouldBe(200);
+        response.Payload.Body.ShouldBe("pong");
+        handler.LastRequest!.RequestUri!.ToString()
+            .ShouldBe("https://api.example.test/v1/status");
+    }
+
+    [Fact]
+    public async Task Hosted_client_node_binds_options_from_configuration()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton(
+            "primary",
+            (_, _) => new HttpClient(new RecordingHandler(
+                (_, _) => Respond(HttpStatusCode.InternalServerError, "boom", "text/plain"))));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "api",
+                    HttpCompositionNodeTypes.Client,
+                    node => node
+                        .Resource(HttpCompositionResourceNames.Client, "primary")
+                        .Configure("treatNonSuccessStatusAsError", true)
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterHttpNodes())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var runtime = host.Runtime.ShouldNotBeNull();
+        var clientNode = runtime.Nodes.ShouldHaveSingleItem();
+        var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<HttpRequestInput>>();
+        var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<HttpResponseOutput>>();
+        var errors = clientNode.Descriptor.Errors.ShouldNotBeNull();
+        var errorSink = new BufferBlock<FlowError>();
+        errors.LinkTo(errorSink);
+        var responseSink = new BufferBlock<FlowMessage<HttpResponseOutput>>();
+        output.Source.LinkTo(responseSink);
+
+        (await input.Target.SendAsync(FlowMessage.Create(
+                new HttpRequestInput { Url = "https://example.test/" }))
+            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+
+        var error = await errorSink.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        responseSink.Count.ShouldBe(0);
+        error.Context.ShouldNotBeNull().ShouldContain("statusCode=500");
+    }
+
+    [Fact]
+    public async Task Missing_client_resource_reference_surfaces_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "api",
+                    HttpCompositionNodeTypes.Client))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterHttpNodes())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(
+                HttpCompositionResourceNames.Client,
+                StringComparison.Ordinal));
+    }
+
+    private static Task<HttpResponseMessage> Respond(
+        HttpStatusCode status,
+        string body,
+        string? contentType)
+    {
+        var response = new HttpResponseMessage(status)
+        {
+            Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body))
+        };
+        if (contentType is not null)
+        {
+            response.Content.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        }
+
+        return Task.FromResult(response);
+    }
+
+    private sealed class RecordingHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+        : HttpMessageHandler
+    {
+        public HttpRequestMessage? LastRequest { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            LastRequest = request;
+            var response = await handler(request, cancellationToken)
+                .ConfigureAwait(false);
+            response.RequestMessage ??= request;
+            return response;
+        }
+    }
+}
