@@ -175,6 +175,13 @@
     "notesName": "FluxFlow.Components.Timers"
   },
   {
+    "alias": "components-timers-composition",
+    "tagPrefix": "components-timers-composition",
+    "packageId": "FluxFlow.Components.Timers.Composition",
+    "project": "src/FluxFlow.Components.Timers.Composition/FluxFlow.Components.Timers.Composition.csproj",
+    "notesName": "FluxFlow.Components.Timers.Composition"
+  },
+  {
     "alias": "components-payloads",
     "tagPrefix": "components-payloads",
     "packageId": "FluxFlow.Components.Payloads",
