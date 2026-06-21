@@ -58,7 +58,7 @@ public sealed class PulseMqttClientTests
     }
 
     [Fact]
-    public async Task SubscribeAsync_RejectsManualAcknowledgement()
+    public async Task SubscribeAsync_AllowsManualAcknowledgement()
     {
         await using var broker = new PulseMqttTestBroker();
         await using var client = new PulseMqttClient(
@@ -70,12 +70,65 @@ public sealed class PulseMqttClientTests
             transportFactory: broker);
         await client.ConnectAsync();
 
-        await Should.ThrowAsync<NotSupportedException>(
-            async () => await client.SubscribeAsync(new MqttTriggerOptions
+        await using var subscription = await client.SubscribeAsync(new MqttTriggerOptions
+        {
+            TopicFilter = "devices/+",
+            QualityOfService = MqttQualityOfService.AtLeastOnce,
+            Acknowledgement = MqttTriggerAcknowledgement.OnEmit
+        });
+
+        await client.PublishAsync(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1],
+            QualityOfService = MqttQualityOfService.AtLeastOnce
+        });
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var context = await ReadNextAsync(subscription, timeout.Token);
+
+        context.Message.Topic.ShouldBe("devices/a");
+        await context.AckAsync(timeout.Token);
+        await context.AckAsync(timeout.Token);
+    }
+
+    [Fact]
+    public async Task ManualAcknowledgement_CanRejectReceivedMessage()
+    {
+        await using var broker = new PulseMqttTestBroker();
+        await using var client = new PulseMqttClient(
+            new PulseMqttClientOptions
             {
-                TopicFilter = "devices/+",
-                Acknowledgement = MqttTriggerAcknowledgement.OnEmit
-            }));
+                ClientId = "fluxflow-pulse-manual-nack",
+                ConnectTimeout = TimeSpan.FromSeconds(5)
+            },
+            transportFactory: broker);
+        await client.ConnectAsync();
+
+        await using var subscription = await client.SubscribeAsync(new MqttTriggerOptions
+        {
+            TopicFilter = "devices/+",
+            QualityOfService = MqttQualityOfService.AtLeastOnce,
+            Acknowledgement = MqttTriggerAcknowledgement.OnEmit
+        });
+
+        await client.PublishAsync(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [2],
+            QualityOfService = MqttQualityOfService.AtLeastOnce
+        });
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var context = await ReadNextAsync(subscription, timeout.Token);
+
+        context.Message.Topic.ShouldBe("devices/a");
+        await context.NackAsync(
+            new InvalidOperationException("handler failed"),
+            timeout.Token);
+        await context.NackAsync(
+            new InvalidOperationException("handler failed"),
+            timeout.Token);
     }
 
     [Fact]

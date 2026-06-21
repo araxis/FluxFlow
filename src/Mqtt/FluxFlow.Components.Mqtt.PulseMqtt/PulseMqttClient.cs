@@ -82,7 +82,7 @@ public sealed class PulseMqttClient :
 
             try
             {
-                await _client.StartAsync(linkedCancellation.Token).ConfigureAwait(false);
+                await _client.ConnectAsync(linkedCancellation.Token).ConfigureAwait(false);
                 _started = true;
             }
             catch (OperationCanceledException)
@@ -132,7 +132,7 @@ public sealed class PulseMqttClient :
                 return;
             }
 
-            await _client.StopAsync(cancellationToken).ConfigureAwait(false);
+            await _client.DisconnectAsync(cancellationToken).ConfigureAwait(false);
             _started = false;
         }
         finally
@@ -246,12 +246,17 @@ public sealed class PulseMqttClient :
             Capacity = options.BoundedCapacity,
             Overflow = RouteOverflow.Wait
         };
-        var stream = _client.OpenRouteStream(routeTemplate, routeOptions);
-        var subscription = new PulseMqttSubscription(
-            this,
-            stream,
-            routeTemplate.TopicFilter,
-            _clock);
+        var subscription = options.Acknowledgement == MqttTriggerAcknowledgement.None
+            ? new PulseMqttSubscription(
+                this,
+                _client.OpenRouteStream(routeTemplate, routeOptions),
+                routeTemplate.TopicFilter,
+                _clock)
+            : new PulseMqttSubscription(
+                this,
+                _client.OpenAcknowledgedRouteStream(routeTemplate, routeOptions),
+                routeTemplate.TopicFilter,
+                _clock);
 
         try
         {
@@ -284,7 +289,7 @@ public sealed class PulseMqttClient :
 
         try
         {
-            await _client.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            await _client.DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {
@@ -412,8 +417,9 @@ public sealed class PulseMqttClient :
                 IncludeQos0 = options.QueueQos0WhenDisconnected
             },
             MessageStore = options.AllowOfflinePublishQueue
-                ? null
+                ? options.MessageStore
                 : new RejectingMessageStore(),
+            SessionStore = options.SessionStore,
             PropagateTraceContext = options.PropagateTraceContext,
             Will = will
         };
@@ -550,6 +556,13 @@ public sealed class PulseMqttClient :
                 "MQTT keep-alive period is too large.");
         }
 
+        if (!options.AllowOfflinePublishQueue && options.MessageStore is not null)
+        {
+            throw new ArgumentException(
+                "An MQTT offline publish message store requires AllowOfflinePublishQueue.",
+                nameof(options));
+        }
+
         if (options.LastWill is not null)
         {
             ValidateLastWill(options.LastWill);
@@ -640,12 +653,6 @@ public sealed class PulseMqttClient :
                 nameof(options),
                 options.Acknowledgement,
                 "MQTT subscription acknowledgement mode is not supported.");
-        }
-
-        if (options.Acknowledgement != MqttTriggerAcknowledgement.None)
-        {
-            throw new NotSupportedException(
-                "Pulse MQTT route streams use managed acknowledgement and do not expose per-message manual acknowledgement.");
         }
     }
 
