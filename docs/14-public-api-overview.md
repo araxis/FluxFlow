@@ -169,6 +169,28 @@ wants closed generic `json.schema-validator` node factories. The factory binds
 composition build, and resolves optional keyed typed selector and clock
 resources through the host.
 
+## Timers Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Timers.Composition
+```
+
+Main types:
+
+- `TimersCompositionNodeRegistryExtensions`
+- `TimersCompositionNodeTypes`
+- `TimersCompositionPortNames`
+- `TimersCompositionResourceNames`
+
+Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
+`RegisterTimerDelay<TInput>()`, `RegisterTimerThrottle<TInput>()`, and
+`RegisterTimerDebounce<TInput>()` from the optional
+`FluxFlow.Components.Timers.Composition` package when a composition host wants
+timer source and transform node factories. The factories bind existing timer
+settings and resolve optional keyed `TimeProvider` resources through the host.
+
 ## MQTT Composition
 
 Namespace:

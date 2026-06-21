@@ -88,3 +88,26 @@ Pass a `TimeProvider` to any node's constructor (it defaults to
 [`FakeTimeProvider`](https://www.nuget.org/packages/Microsoft.Extensions.TimeProvider.Testing)
 and advance it to fire interval ticks, schedule occurrences, delays, throttle
 windows, and debounce quiet periods without real-time waits.
+
+## Composition
+
+The optional `FluxFlow.Components.Timers.Composition` package registers timer
+factories for `FluxFlow.Composition`. It binds the existing timer settings from
+node configuration and resolves an optional keyed `TimeProvider` resource owned
+by the host.
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterTimerInterval()
+        .RegisterTimerSchedule()
+        .RegisterTimerDelay<MyMessage>()
+        .RegisterTimerThrottle<MyMessage>()
+        .RegisterTimerDebounce<MyMessage>());
+```
+
+Use custom node type strings for multiple transform input shapes, for example
+`timer.delay.order` and `timer.debounce.http`. Schedule composition uses the
+existing `TimerScheduleSettings` model; this adapter does not add time zone id
+conversion.
