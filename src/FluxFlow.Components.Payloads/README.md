@@ -93,7 +93,18 @@ used for result/event/error timestamps (defaults to `TimeProvider.System`).
 
 ## Composition
 
-Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the node; wire it from
-whatever composition/host layer you use (`appsettings.json` → construct nodes →
-`LinkTo`).
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from the node. This package is just the standalone node.
+
+Use `FluxFlow.Components.Payloads.Composition` when a `FluxFlow.Composition`
+host should register the optional `payload.inspect` factory:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterPayloadInspect());
+```
+
+The composition adapter binds `PayloadInspectOptions` from node configuration
+and can resolve an optional keyed `TimeProvider` resource named `clock`. The
+request/result contracts and node behavior stay the same.
