@@ -133,6 +133,13 @@
     "notesName": "FluxFlow.Components.Sources"
   },
   {
+    "alias": "components-sources-composition",
+    "tagPrefix": "components-sources-composition",
+    "packageId": "FluxFlow.Components.Sources.Composition",
+    "project": "src/FluxFlow.Components.Sources.Composition/FluxFlow.Components.Sources.Composition.csproj",
+    "notesName": "FluxFlow.Components.Sources.Composition"
+  },
+  {
     "alias": "components-routing",
     "tagPrefix": "components-routing",
     "packageId": "FluxFlow.Components.Routing",

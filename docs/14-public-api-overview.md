@@ -191,6 +191,27 @@ Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
 timer source and transform node factories. The factories bind existing timer
 settings and resolve optional keyed `TimeProvider` resources through the host.
 
+## Sources Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Sources.Composition
+```
+
+Main types:
+
+- `SourcesCompositionNodeRegistryExtensions`
+- `SourcesCompositionNodeTypes`
+- `SourcesCompositionPortNames`
+- `SourcesCompositionResourceNames`
+
+Use `RegisterGeneratedSource<TOutput>()` and `RegisterSequenceSource()` from the
+optional `FluxFlow.Components.Sources.Composition` package when a composition
+host wants generated or sequence source factories. The generated factory
+deserializes inline `items` into the closed output type; both factories resolve
+optional keyed `TimeProvider` resources through the host.
+
 ## MQTT Composition
 
 Namespace:
