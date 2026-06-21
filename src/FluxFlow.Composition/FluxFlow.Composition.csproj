@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Composition</PackageId>
+    <AssemblyName>FluxFlow.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Composition</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional standalone-first FluxFlow composition layer for building linked node workflows from fluent C# or Microsoft.Extensions.Configuration without depending on FluxFlow.Engine.</Description>
+    <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial standalone-first composition package with DTOs, explicit node factory registration, fluent and configuration builders, structural validation, direct Dataflow linking, runtime lifecycle APIs, and reload-facing contracts.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
+    <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
