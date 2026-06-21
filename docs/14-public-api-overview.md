@@ -387,6 +387,28 @@ storage node factories. The factories bind existing storage options, resolve a
 required keyed `IStorageStore`, and can resolve an optional keyed
 `TimeProvider` resource through the host.
 
+## Sessions Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Sessions.Composition
+```
+
+Main types:
+
+- `SessionsCompositionNodeRegistryExtensions`
+- `SessionsCompositionNodeTypes`
+- `SessionsCompositionPortNames`
+- `SessionsCompositionResourceNames`
+
+Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
+`RegisterSessionQuery()` from the optional
+`FluxFlow.Components.Sessions.Composition` package when a composition host wants
+session node factories. The factories bind existing session options, resolve a
+required keyed `ISessionStore`, and can resolve an optional keyed
+`TimeProvider` resource through the host.
+
 ## Projections Composition
 
 Namespace:

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
+    <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
+    <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Optional FluxFlow.Composition registration helpers for standalone session recording, replay, and query nodes over host-owned keyed session stores.</Description>
+    <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Initial optional composition adapter for session nodes. Registers session.recorder, session.replay, and session.query factories, binds existing session options from composition configuration, and resolves keyed ISessionStore plus optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Components.Sessions\FluxFlow.Components.Sessions.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
