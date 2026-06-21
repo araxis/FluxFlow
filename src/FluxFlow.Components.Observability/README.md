@@ -83,3 +83,26 @@ new FlowMetricsNode<MyMessage>(options, sizeSelector, clock: new FakeTimeProvide
 ```
 
 A time provider also makes counter/metrics rate calculations deterministic.
+
+## Composition
+
+Building a workflow, reading config, creating nodes, and linking them is a
+separate concern from these observer nodes. This package is just the standalone
+nodes.
+
+Use `FluxFlow.Components.Observability.Composition` when a
+`FluxFlow.Composition` host should register optional observability factories:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterCounter<MyMessage>()
+        .RegisterLogger<MyMessage>()
+        .RegisterMetrics<MyMessage>());
+```
+
+The composition adapter binds the existing options records from node
+configuration. It resolves host-owned keyed resources for `clock`, counter
+`engine` and `contextFactory`, metrics `sizeSelector`, and logger attribute
+selectors named as `attribute:{name}`.

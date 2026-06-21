@@ -182,6 +182,13 @@
     "notesName": "FluxFlow.Components.Observability"
   },
   {
+    "alias": "components-observability-composition",
+    "tagPrefix": "components-observability-composition",
+    "packageId": "FluxFlow.Components.Observability.Composition",
+    "project": "src/FluxFlow.Components.Observability.Composition/FluxFlow.Components.Observability.Composition.csproj",
+    "notesName": "FluxFlow.Components.Observability.Composition"
+  },
+  {
     "alias": "components-timers",
     "tagPrefix": "components-timers",
     "packageId": "FluxFlow.Components.Timers",
