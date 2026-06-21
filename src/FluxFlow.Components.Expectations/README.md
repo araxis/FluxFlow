@@ -97,5 +97,22 @@ var node = new EventExpectationNode(options, timeProvider);
 ## Composition
 
 Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the node; wire it from
-whatever composition/host layer you use.
+separate concern from the node. This package is just the standalone node.
+
+Use `FluxFlow.Components.Expectations.Composition` when a
+`FluxFlow.Composition` host should register the optional `event.expectation`
+factory:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry.RegisterEventExpectation());
+```
+
+The composition adapter binds `EventExpectationOptions` from node configuration
+and can resolve an optional keyed `TimeProvider` resource named `clock`.
+
+`CompleteWithResultAsync()` remains a direct node lifecycle feature in v1.
+Composition runtime stop uses normal node completion. Use the direct node API
+when a completion-result flush is required until composition grows an explicit
+final-flush lifecycle hook.

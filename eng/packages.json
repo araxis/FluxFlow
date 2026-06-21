@@ -280,6 +280,13 @@
     "notesName": "FluxFlow.Components.Expectations"
   },
   {
+    "alias": "components-expectations-composition",
+    "tagPrefix": "components-expectations-composition",
+    "packageId": "FluxFlow.Components.Expectations.Composition",
+    "project": "src/FluxFlow.Components.Expectations.Composition/FluxFlow.Components.Expectations.Composition.csproj",
+    "notesName": "FluxFlow.Components.Expectations.Composition"
+  },
+  {
     "alias": "components-designer",
     "tagPrefix": "components-designer",
     "packageId": "FluxFlow.Components.Designer",
