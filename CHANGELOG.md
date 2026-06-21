@@ -182,6 +182,14 @@ Engine glue removed.
 Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue
 removed.
 
+## FluxFlow.Components.Payloads.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for the standalone
+payload inspection node. The package registers the explicit `payload.inspect`
+factory, binds `PayloadInspectOptions` from composition configuration, and
+resolves optional keyed `TimeProvider` resources through
+`FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Projections 3.0.0
 
 Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a

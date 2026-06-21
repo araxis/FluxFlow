@@ -203,6 +203,13 @@
     "notesName": "FluxFlow.Components.Payloads"
   },
   {
+    "alias": "components-payloads-composition",
+    "tagPrefix": "components-payloads-composition",
+    "packageId": "FluxFlow.Components.Payloads.Composition",
+    "project": "src/FluxFlow.Components.Payloads.Composition/FluxFlow.Components.Payloads.Composition.csproj",
+    "notesName": "FluxFlow.Components.Payloads.Composition"
+  },
+  {
     "alias": "components-http",
     "tagPrefix": "components-http",
     "packageId": "FluxFlow.Components.Http",

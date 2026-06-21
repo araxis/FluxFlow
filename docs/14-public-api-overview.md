@@ -258,6 +258,27 @@ wants serialization and encoding factories. The factories bind existing
 serialization options and can resolve an optional keyed `TimeProvider` resource
 through the host.
 
+## Payloads Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Payloads.Composition
+```
+
+Main types:
+
+- `PayloadsCompositionNodeRegistryExtensions`
+- `PayloadsCompositionNodeTypes`
+- `PayloadsCompositionPortNames`
+- `PayloadsCompositionResourceNames`
+
+Use `RegisterPayloadInspect()` from the optional
+`FluxFlow.Components.Payloads.Composition` package when a composition host wants
+a `payload.inspect` node factory. The factory binds existing
+`PayloadInspectOptions` and can resolve an optional keyed `TimeProvider`
+resource through the host.
+
 ## MQTT Composition
 
 Namespace:
