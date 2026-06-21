@@ -174,6 +174,23 @@ Pass a `TimeProvider` to any node when tests or hosts need deterministic package
 timestamps such as publish result times, node event times, and trigger response
 timeouts.
 
+## Composition Support
+
+Add `FluxFlow.Components.Mqtt.Composition` when a host wants to instantiate MQTT
+nodes from `FluxFlow.Composition` fluent definitions or `IConfiguration` JSON.
+That optional package registers explicit `mqtt.publish` and `mqtt.trigger`
+factories while this core package stays focused on standalone nodes and neutral
+MQTT contracts.
+
+Composition node factories resolve adapter-owned keyed resources:
+
+- `publisher` maps to a keyed `IMqttPublisher`.
+- `triggerSource` maps to a keyed `IMqttTriggerSource`.
+- `clock` optionally maps to a keyed `TimeProvider`.
+
+Concrete adapter packages or the host still own broker settings, credentials,
+connection lifetime, reconnect behavior, and any client-specific features.
+
 ## Topic Validation
 
 Use `MqttTopicValidator.ValidatePublishTopic` and
