@@ -185,6 +185,14 @@ observability nodes. The package registers explicit `flow.counter`,
 options from composition configuration, and resolves host-owned keyed
 expression, selector, context, and clock resources.
 
+## FluxFlow.Components.Metrics.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for the standalone
+metrics aggregate node. The package registers the explicit `metrics.aggregate`
+factory, binds `MetricsAggregateOptions` from composition configuration, and
+resolves optional keyed `TimeProvider` resources through
+`FluxFlow.Composition.Hosting`.
+
 ## FluxFlow.Components.Payloads 3.0.0
 
 Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue

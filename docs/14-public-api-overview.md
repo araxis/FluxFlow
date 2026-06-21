@@ -234,6 +234,27 @@ wants counter, logger, or metrics node factories. The factories bind existing
 observability options and resolve host-owned keyed expression, selector,
 context, and clock resources.
 
+## Metrics Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Metrics.Composition
+```
+
+Main types:
+
+- `MetricsCompositionNodeRegistryExtensions`
+- `MetricsCompositionNodeTypes`
+- `MetricsCompositionPortNames`
+- `MetricsCompositionResourceNames`
+
+Use `RegisterMetricsAggregate()` from the optional
+`FluxFlow.Components.Metrics.Composition` package when a composition host wants
+a `metrics.aggregate` node factory. The factory binds existing
+`MetricsAggregateOptions` and can resolve an optional keyed `TimeProvider`
+resource through the host.
+
 ## Routing Composition
 
 Namespace:
