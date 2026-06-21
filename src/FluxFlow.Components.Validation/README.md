@@ -77,3 +77,24 @@ Validation results use the node's clock for `Timestamp` (default
 ```csharp
 new JsonSchemaValidatorNode<JsonElement>(schema, clock: new FakeTimeProvider(timestamp));
 ```
+
+## Composition
+
+The optional `FluxFlow.Components.Validation.Composition` package registers
+closed generic `json.schema-validator` factories for `FluxFlow.Composition`.
+The adapter binds `JsonSchemaValidatorOptions`, compiles inline `schema` or
+`schemaPath` during composition build, and resolves optional keyed
+`IJsonSchemaValueSelector<TInput>` and `TimeProvider` resources owned by the
+host.
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry =>
+        registry.RegisterJsonSchemaValidator<JsonElement>());
+```
+
+Use custom node type strings for multiple input shapes, for example
+`json.schema-validator.order` and `json.schema-validator.http`. `InputType`
+remains diagnostic metadata; the CLR port type comes from the closed generic
+registration.
