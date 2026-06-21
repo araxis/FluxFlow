@@ -177,6 +177,14 @@ Targets Pulse MQTT `2.0.0`, using explicit broker subscriptions plus local route
 Engine-free standalone rewrite. Logger/counter/metrics are `FlowNode` transforms over the kit.
 Engine glue removed.
 
+## FluxFlow.Components.Observability.Composition 1.0.0
+
+Adds optional `FluxFlow.Composition` registration helpers for standalone
+observability nodes. The package registers explicit `flow.counter`,
+`flow.logger`, and `flow.metrics` factories, binds the existing observability
+options from composition configuration, and resolves host-owned keyed
+expression, selector, context, and clock resources.
+
 ## FluxFlow.Components.Payloads 3.0.0
 
 Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue

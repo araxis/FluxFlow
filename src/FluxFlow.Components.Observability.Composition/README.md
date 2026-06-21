@@ -1,0 +1,78 @@
+# FluxFlow.Components.Observability.Composition
+
+Optional `FluxFlow.Composition` registration helpers for the standalone
+observability nodes from `FluxFlow.Components.Observability`.
+
+This package does not create telemetry sinks, scan assemblies, resolve CLR types
+from strings, or own expression and selector services. Hosts register the
+observability node factories explicitly and provide keyed resources when a node
+configuration needs them.
+
+## Registration
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry => registry
+        .RegisterCounter<MyMessage>()
+        .RegisterLogger<MyMessage>()
+        .RegisterMetrics<MyMessage>());
+```
+
+## Node Types
+
+| Type | Node | Ports |
+|------|------|-------|
+| `flow.counter` | `FlowCounterNode<TInput>` | `Input`, `Output` |
+| `flow.logger` | `FlowLoggerNode<TInput>` | `Input`, `Output` |
+| `flow.metrics` | `FlowMetricsNode<TInput>` | `Input`, `Output` |
+
+All factories expose `Events` and `Errors`. Registrations are closed over
+`TInput`; hosts that need multiple input shapes should use custom node type
+strings such as `flow.counter.order`.
+
+## Resources
+
+- `clock`: optional keyed `TimeProvider` for all nodes.
+- `engine`: required keyed `IFlowExpressionEngine` only when counter options
+  configure `predicate` or `expression`.
+- `contextFactory`: optional keyed `IFlowMapContextFactory<TInput>` for counters.
+- `sizeSelector`: optional keyed `IObservabilityValueSelector<TInput>` for
+  metrics.
+- `attribute:{name}`: required keyed `IObservabilityValueSelector<TInput>` for
+  each logger `attributeSelectors` entry.
+
+## Configuration
+
+```json
+{
+  "FluxFlow": {
+    "Composition": {
+      "workflows": {
+        "main": {
+          "nodes": {
+            "logger": {
+              "type": "flow.logger",
+              "resources": {
+                "clock": "fixed",
+                "attribute:kind": "kind-selector"
+              },
+              "configuration": {
+                "inputType": "message",
+                "level": "Information",
+                "category": "workflow",
+                "messageTemplate": "Observed {kind} item #{sequence}",
+                "attributeSelectors": [ "kind" ],
+                "boundedCapacity": 128
+              }
+            }
+          },
+          "links": []
+        }
+      }
+    }
+  }
+}
+```
+
+Each node binds its existing options record from composition configuration.

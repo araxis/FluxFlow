@@ -212,6 +212,28 @@ host wants generated or sequence source factories. The generated factory
 deserializes inline `items` into the closed output type; both factories resolve
 optional keyed `TimeProvider` resources through the host.
 
+## Observability Composition
+
+Namespace:
+
+```text
+FluxFlow.Components.Observability.Composition
+```
+
+Main types:
+
+- `ObservabilityCompositionNodeRegistryExtensions`
+- `ObservabilityCompositionNodeTypes`
+- `ObservabilityCompositionPortNames`
+- `ObservabilityCompositionResourceNames`
+
+Use `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
+`RegisterMetrics<TInput>()` from the optional
+`FluxFlow.Components.Observability.Composition` package when a composition host
+wants counter, logger, or metrics node factories. The factories bind existing
+observability options and resolve host-owned keyed expression, selector,
+context, and clock resources.
+
 ## Routing Composition
 
 Namespace:
