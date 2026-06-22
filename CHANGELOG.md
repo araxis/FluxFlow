@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.0.0
+
+Breaking Designer contract cleanup. `ComponentDesignMetadata.Type` now uses the
+Designer-owned `ComponentType` value type, and `PortDesignMetadata.Name` now
+uses `ComponentPortName`. The package no longer references `FluxFlow.Engine`,
+so future component metadata providers can remain standalone-node-first and
+runtime-neutral.
+
 ## FluxFlow.Composition 1.0.0
 
 Adds the standalone-first composition layer for building linked node workflows

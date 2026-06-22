@@ -1,10 +1,8 @@
-using FluxFlow.Engine.Definitions;
-
 namespace FluxFlow.Components.Designer.Contracts;
 
 public sealed record ComponentDesignMetadata
 {
-    public required NodeType Type { get; init; }
+    public required ComponentType Type { get; init; }
     public string? DisplayName { get; init; }
     public string? Category { get; init; }
     public string? Summary { get; init; }

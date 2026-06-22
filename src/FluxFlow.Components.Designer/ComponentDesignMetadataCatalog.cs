@@ -1,12 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Engine.Definitions;
 
 namespace FluxFlow.Components.Designer;
 
 public sealed class ComponentDesignMetadataCatalog
 {
-    private readonly Dictionary<NodeType, ComponentDesignMetadata> _metadata = [];
+    private readonly Dictionary<ComponentType, ComponentDesignMetadata> _metadata = [];
 
     public IReadOnlyCollection<ComponentDesignMetadata> All => _metadata.Values.ToArray();
 
@@ -48,6 +47,6 @@ public sealed class ComponentDesignMetadataCatalog
         return this;
     }
 
-    public bool TryGet(NodeType type, [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
+    public bool TryGet(ComponentType type, [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
         => _metadata.TryGetValue(type, out metadata);
 }

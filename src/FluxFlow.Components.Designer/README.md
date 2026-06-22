@@ -15,6 +15,8 @@ component without depending on a specific rendering framework.
   text, min/max values, choices, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
+- `ComponentType` and `ComponentPortName`: Designer-owned identifiers for
+  component types and ports. They do not depend on engine definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
@@ -39,11 +41,10 @@ The option kind contract supports:
 ```csharp
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Engine.Definitions;
 
 var metadata = new ComponentDesignMetadata
 {
-    Type = new NodeType("sample.transform"),
+    Type = new ComponentType("sample.transform"),
     DisplayName = "Sample Transform",
     Category = "Samples",
     Summary = "Transforms a sample value.",
@@ -64,14 +65,14 @@ var metadata = new ComponentDesignMetadata
     [
         new PortDesignMetadata
         {
-            Name = new PortName("Input"),
+            Name = new ComponentPortName("Input"),
             Direction = PortDirection.Input,
             Order = 0,
             IsPrimary = true
         },
         new PortDesignMetadata
         {
-            Name = new PortName("Output"),
+            Name = new ComponentPortName("Output"),
             Direction = PortDirection.Output,
             Order = 0,
             IsPrimary = true
@@ -97,12 +98,11 @@ rendering hints separately from package-owned metadata.
 
 This package only defines metadata contracts and catalog helpers. Hosts decide
 how metadata is rendered, stored, localized, or combined with their own design
-system.
+system. The contracts are neutral and do not depend on `FluxFlow.Engine` or
+`FluxFlow.Composition`; hosts can map them to either runtime model.
 
 ## Composition
 
 This package does not expose standalone workflow nodes or
 `FluxFlow.Composition` factories. It composes design metadata for host palettes,
-editors, validation views, and generated documentation; engine-aware definition
-types remain part of that metadata contract where they describe node and port
-identifiers.
+editors, validation views, and generated documentation.

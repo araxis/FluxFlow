@@ -8,12 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The per-component design-metadata providers were removed when the components
-         became engine-free standalone nodes, so the package-coverage test is gone. The
-         remaining catalog test exercises the Designer package's own contracts, which need
-         only the Designer package and the engine's NodeType/PortName definitions. -->
     <ProjectReference Include="..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

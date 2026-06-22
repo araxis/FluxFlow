@@ -6,20 +6,17 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Documentation maintenance release covering package-owned provider composition for host palettes, editors, validation views, generated docs, and catalogs.</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking release that replaces Engine identifier types with Designer-owned component and port identifiers, keeping design metadata engine-free.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

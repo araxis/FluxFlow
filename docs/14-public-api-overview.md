@@ -472,6 +472,35 @@ Use `RegisterMqttNodes()` from the optional
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
 the host still own broker/client registration.
 
+## Designer Metadata
+
+Namespace:
+
+```text
+FluxFlow.Components.Designer
+FluxFlow.Components.Designer.Contracts
+```
+
+Main types:
+
+- `ComponentType`
+- `ComponentPortName`
+- `ComponentDesignMetadata`
+- `OptionDesignMetadata`
+- `OptionChoiceMetadata`
+- `OptionValueKind`
+- `PortDesignMetadata`
+- `PortDirection`
+- `IComponentDesignMetadataProvider`
+- `ComponentDesignMetadataCatalog`
+- `ComponentDesignMetadataModule`
+- `ComponentDesignMetadataValidator`
+- `DesignerMetadataValidationError`
+
+Use these types when reusable packages want to describe neutral palette,
+editor, validation, and generated-doc metadata without depending on either the
+composition runtime or the engine runtime.
+
 ## Support Packages
 
 These packages are intentionally not standalone node composition adapters:
@@ -488,8 +517,8 @@ These packages are intentionally not standalone node composition adapters:
   in-memory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   and is intentionally not covered by composition adapters in this pass.
-- `FluxFlow.Components.Designer` provides design metadata contracts and may
-  remain engine-aware where it models engine definition types.
+- `FluxFlow.Components.Designer` provides engine/composition-neutral design
+  metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and
   `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
   backend factories consumed by host-owned storage registration.

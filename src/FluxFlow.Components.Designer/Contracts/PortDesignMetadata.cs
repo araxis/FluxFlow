@@ -1,10 +1,8 @@
-using FluxFlow.Engine.Definitions;
-
 namespace FluxFlow.Components.Designer.Contracts;
 
 public sealed record PortDesignMetadata
 {
-    public required PortName Name { get; init; }
+    public required ComponentPortName Name { get; init; }
     public required PortDirection Direction { get; init; }
     public string? DisplayName { get; init; }
     public string? Group { get; init; }
