@@ -1,4 +1,6 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Composition;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Composition;
@@ -42,6 +44,72 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         registry.Registrations["flow.mapper.string-int"]
             .Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(int));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_flow_mapper_metadata()
+    {
+        var metadata = new MappingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
+        metadata.DisplayName.ShouldBe("Mapper");
+        metadata.Category.ShouldBe("Mapping");
+        metadata.PreferredNodeName.ShouldBe("map");
+        metadata.SuggestedEditorWidth.ShouldBe(420);
+        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+            ("expression", OptionValueKind.Expression),
+            ("expressionId", OptionValueKind.Text),
+            ("expressionName", OptionValueKind.Text),
+            ("engine", OptionValueKind.Text),
+            ("inputType", OptionValueKind.Text),
+            ("outputType", OptionValueKind.Text),
+            ("targetType", OptionValueKind.Text),
+            ("boundedCapacity", OptionValueKind.Number)
+        ]);
+        metadata.Options.Single(option => option.Name == "expression")
+            .IsRequired.ShouldBeTrue();
+        metadata.Options.Single(option => option.Name == "boundedCapacity")
+            .Min.ShouldBe(1);
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(MappingCompositionResourceNames.ContextFactory);
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(MappingCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_mapper_ports()
+    {
+        var metadata = new MappingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "TOutput"),
+            (MappingCompositionPortNames.Failed, PortDirection.Output, 2, false, "TInput")
+        ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new MappingComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.TryGet(
+            new ComponentType(MappingCompositionNodeTypes.Mapper),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull();
+        metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
     }
 
     [Fact]
