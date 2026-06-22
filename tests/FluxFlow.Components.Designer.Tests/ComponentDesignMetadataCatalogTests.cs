@@ -1,5 +1,4 @@
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Engine.Definitions;
 using Shouldly;
 using Xunit;
 
@@ -14,7 +13,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 
-        catalog.TryGet(new NodeType("sample.transform"), out var found).ShouldBeTrue();
+        catalog.TryGet(new ComponentType("sample.transform"), out var found).ShouldBeTrue();
         found.ShouldBeSameAs(metadata);
         found.Options[0].Kind.ShouldBe(OptionValueKind.Expression);
         found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
@@ -50,7 +49,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var metadata = new ComponentDesignMetadata
         {
-            Type = new NodeType("sample.invalid"),
+            Type = new ComponentType("sample.invalid"),
             DisplayName = " ",
             SuggestedEditorWidth = 0,
             Options =
@@ -82,12 +81,12 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new PortDesignMetadata
                 {
-                    Name = new PortName("Input"),
+                    Name = new ComponentPortName("Input"),
                     Direction = PortDirection.Input
                 },
                 new PortDesignMetadata
                 {
-                    Name = new PortName("Input"),
+                    Name = new ComponentPortName("Input"),
                     Direction = PortDirection.Input
                 }
             ]
@@ -136,21 +135,73 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentType_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentType("flow.mapper");
+        var second = new ComponentType("flow.mapper");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("flow.mapper");
+        first.ToString().ShouldBe("flow.mapper");
+        new ComponentType("flow.filter").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentType_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentType(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component type cannot be empty");
+    }
+
+    [Fact]
+    public void ComponentPortName_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentPortName("Input");
+        var second = new ComponentPortName("Input");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("Input");
+        first.ToString().ShouldBe("Input");
+        new ComponentPortName("Output").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("node.port")]
+    public void ComponentPortName_rejects_invalid_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentPortName(value);
+        };
+
+        act.ShouldThrow<ArgumentException>();
+    }
+
+    [Fact]
     public void Port_metadata_preserves_ordering_grouping_and_type_hints()
     {
         var ports = CreateMetadata().Ports.OrderBy(port => port.Order).ToArray();
 
-        ports[0].Name.ShouldBe(new PortName("Input"));
+        ports[0].Name.ShouldBe(new ComponentPortName("Input"));
         ports[0].Group.ShouldBe("Messages");
         ports[0].ValueType.ShouldBe("SampleInput");
         ports[0].IsPrimary.ShouldBeTrue();
-        ports[1].Name.ShouldBe(new PortName("Output"));
+        ports[1].Name.ShouldBe(new ComponentPortName("Output"));
         ports[1].Direction.ShouldBe(PortDirection.Output);
     }
 
     private static ComponentDesignMetadata CreateMetadata(string type = "sample.transform") => new()
     {
-        Type = new NodeType(type),
+        Type = new ComponentType(type),
         DisplayName = "Sample Transform",
         Category = "Samples",
         Summary = "Transforms sample values.",
@@ -183,7 +234,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         [
             new PortDesignMetadata
             {
-                Name = new PortName("Input"),
+                Name = new ComponentPortName("Input"),
                 Direction = PortDirection.Input,
                 DisplayName = "Input",
                 Group = "Messages",
@@ -194,7 +245,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             },
             new PortDesignMetadata
             {
-                Name = new PortName("Output"),
+                Name = new ComponentPortName("Output"),
                 Direction = PortDirection.Output,
                 DisplayName = "Output",
                 Group = "Messages",

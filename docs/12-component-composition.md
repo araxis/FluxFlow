@@ -102,7 +102,9 @@ application.
 Package metadata should stay neutral: display names, categories, option editor
 hints, port labels, defaults, and documentation hints that travel with the
 package. Hosts can layer app-specific behavior, localization, resource pickers,
-or visual styling after catalog composition.
+or visual styling after catalog composition. Designer metadata uses its own
+component and port identifiers so component packages can describe nodes without
+referencing either the composition runtime or the engine runtime.
 
 ## Common Shapes
 
