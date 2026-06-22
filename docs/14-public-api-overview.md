@@ -95,6 +95,7 @@ FluxFlow.Components.Mapping.Composition
 Main types:
 
 - `MappingCompositionNodeRegistryExtensions`
+- `MappingComponentDesignMetadataProvider`
 - `MappingCompositionNodeTypes`
 - `MappingCompositionPortNames`
 - `MappingCompositionResourceNames`
@@ -104,6 +105,10 @@ Use `RegisterMapper<TInput,TOutput>()` from the optional
 closed generic `flow.mapper` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed context factory and clock
 resources stay host-owned.
+
+`MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `flow.mapper` composition node so hosts can compose palette, editor,
+validation, or documentation hints without copying package descriptors.
 
 ## Assertions Composition
 

@@ -133,6 +133,12 @@ Engine-free standalone rewrite. The mapper node is a `FlowNode` with the primary
 Output and failures on a Failed port (`AddOutput`); the mapping expression compiles once.
 Engine glue removed.
 
+## FluxFlow.Components.Mapping.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `flow.mapper` composition node.
+The provider describes mapper options and ports while runtime resources remain
+host-owned and mapper behavior stays unchanged.
+
 ## FluxFlow.Components.Mapping.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for closed generic

@@ -106,6 +106,11 @@ or visual styling after catalog composition. Designer metadata uses its own
 component and port identifiers so component packages can describe nodes without
 referencing either the composition runtime or the engine runtime.
 
+When metadata describes stable composition node types, prefer placing the
+provider in the optional `.Composition` package. This keeps the pure node package
+focused on standalone runtime behavior while the composition package owns the
+composition-facing node type, port names, resource names, and design hints.
+
 ## Common Shapes
 
 Use request/result nodes when behavior acts like a function:

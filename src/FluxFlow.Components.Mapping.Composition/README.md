@@ -69,3 +69,13 @@ for deterministic diagnostics.
 `MapperOptions.InputType`, `OutputType`, and `targetType` remain diagnostic
 metadata. The actual composition port types come from the closed generic
 registration selected by the host.
+
+## Design Metadata
+
+`MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `flow.mapper` composition node. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and ports only. Runtime resources such as
+`engine`, `contextFactory`, and `clock` remain host-owned composition resources.

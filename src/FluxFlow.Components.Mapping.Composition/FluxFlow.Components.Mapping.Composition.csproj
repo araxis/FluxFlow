@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mapping.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for closed generic standalone mapper nodes over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for mapping nodes. Registers closed generic flow.mapper factories, binds MapperOptions from composition configuration, and resolves keyed IFlowExpressionEngine, IMappingContextFactory, and TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for the flow.mapper composition node while keeping mapper runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Mapping\FluxFlow.Components.Mapping.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
