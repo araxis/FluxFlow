@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Payloads.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone payload inspection node over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;payloads;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for payload inspection. Registers the payload.inspect factory, binds existing payload inspection options from composition configuration, and resolves optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for the payload.inspect composition node while keeping payload inspection runtime behavior and host-owned clock resources unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Payloads\FluxFlow.Components.Payloads.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>

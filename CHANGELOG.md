@@ -240,6 +240,13 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue
 removed.
 
+## FluxFlow.Components.Payloads.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `payload.inspect` composition
+node. The provider describes payload inspection options and fixed
+request/result ports while `clock` remains a host-owned resource and runtime
+behavior stays unchanged.
+
 ## FluxFlow.Components.Payloads.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for the standalone

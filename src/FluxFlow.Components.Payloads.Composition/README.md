@@ -61,3 +61,13 @@ The request/result CLR types are fixed to `PayloadInspectionRequest` and
 
 The node binds the existing `PayloadInspectOptions` shape from composition
 configuration.
+
+## Design Metadata
+
+`PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `payload.inspect` composition node. The metadata describes the fixed
+request/result ports and `PayloadInspectOptions` surface for hosts that build
+palettes, editors, validators, or documentation views.
+
+The optional `clock` resource remains host-owned and is not represented as an
+editable node option.

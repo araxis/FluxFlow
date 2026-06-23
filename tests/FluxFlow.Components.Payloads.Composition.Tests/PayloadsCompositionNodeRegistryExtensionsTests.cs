@@ -1,8 +1,11 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Payloads;
 using FluxFlow.Components.Payloads.Composition;
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
+using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -29,6 +32,113 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(PayloadInspectionRequest));
         registration.Outputs[PayloadsCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(PayloadInspectionResult));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_payload_metadata()
+    {
+        var metadata = PayloadDesignMetadata();
+
+        metadata.Type.Value.ShouldBe(PayloadsCompositionNodeTypes.Inspect);
+        metadata.DisplayName.ShouldBe("Payload Inspect");
+        metadata.Category.ShouldBe("Payloads");
+        metadata.SuggestedEditorWidth.ShouldBe(420);
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Options.ShouldNotContain(option =>
+            option.Name == PayloadsCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_payload_ports()
+    {
+        var metadata = PayloadDesignMetadata();
+
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(PayloadsCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(nameof(PayloadInspectionRequest));
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(PayloadsCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(nameof(PayloadInspectionResult));
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_payload_options()
+    {
+        var metadata = PayloadDesignMetadata();
+        var defaults = PayloadInspectOptions.Default;
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "maxInputBytes",
+            "maxPreviewBytes",
+            "maxFormattedChars",
+            "detectBase64",
+            "formatJson",
+            "formatXml",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "maxInputBytes",
+            OptionValueKind.Number,
+            defaults.MaxInputBytes,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxPreviewBytes",
+            OptionValueKind.Number,
+            defaults.MaxPreviewBytes,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxFormattedChars",
+            OptionValueKind.Number,
+            defaults.MaxFormattedChars,
+            min: 1);
+        AssertOption(
+            metadata,
+            "detectBase64",
+            OptionValueKind.Boolean,
+            defaults.DetectBase64);
+        AssertOption(
+            metadata,
+            "formatJson",
+            OptionValueKind.Boolean,
+            defaults.FormatJson);
+        AssertOption(
+            metadata,
+            "formatXml",
+            OptionValueKind.Boolean,
+            defaults.FormatXml);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new PayloadsComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.ShouldHaveSingleItem();
+        catalog.TryGet(
+            new ComponentType(PayloadsCompositionNodeTypes.Inspect),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull()
+            .DisplayName.ShouldBe("Payload Inspect");
     }
 
     [Fact]
@@ -182,6 +292,24 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             configureServices);
 
         return result.ShouldNotBeNull();
+    }
+
+    private static ComponentDesignMetadata PayloadDesignMetadata()
+        => new PayloadsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static async Task WithNodeAsync(
