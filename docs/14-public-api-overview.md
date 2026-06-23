@@ -418,12 +418,18 @@ Main types:
 - `StateCompositionNodeTypes`
 - `StateCompositionPortNames`
 - `StateCompositionResourceNames`
+- `StateComponentDesignMetadataProvider`
 
 Use `RegisterStateReducer()` from the optional
 `FluxFlow.Components.State.Composition` package when a composition host wants a
 `state.reducer` node factory. The factory binds existing `StateReducerOptions`,
 resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
 keyed `TimeProvider` resource through the host.
+
+`StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`state.reducer`, including the existing reducer options and fixed ports.
+Expression engines and clocks remain host-owned keyed resources; the `engine`
+option is diagnostic/config metadata, not DI selection.
 
 ## Storage Composition
 

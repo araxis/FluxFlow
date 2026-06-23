@@ -63,3 +63,13 @@ resource for deterministic result, event, and error timestamps.
 The node binds the existing `StateReducerOptions` shape from composition
 configuration. `StateReducerOptions.Engine` remains configuration metadata; the
 composition adapter resolves the expression engine from the `engine` resource.
+
+## Design Metadata
+
+`StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`state.reducer` so hosts can build palettes, editors, validation hints, or
+documentation without copying package descriptors. The metadata describes the
+existing `StateReducerOptions` configuration surface and fixed `Input`/`Output`
+ports. The required keyed expression engine resource and optional keyed
+`TimeProvider` stay host-owned; the `engine` option remains only
+diagnostic/config metadata and is not used for DI selection.
