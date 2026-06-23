@@ -1,5 +1,7 @@
 using System.Threading.Channels;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Options;
@@ -32,6 +34,162 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             typeof(MqttTriggerResponse));
         trigger.Outputs[MqttCompositionPortNames.Output].MessageType.ShouldBe(
             typeof(MqttReceivedMessage));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_mqtt_metadata()
+    {
+        var metadata = DesignMetadataByType();
+
+        metadata.Keys.ShouldBe([
+            MqttCompositionNodeTypes.Publish,
+            MqttCompositionNodeTypes.Trigger
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("MQTT");
+            item.Options.ShouldNotContain(option =>
+                option.Name == MqttCompositionResourceNames.Publisher ||
+                option.Name == MqttCompositionResourceNames.TriggerSource ||
+                option.Name == MqttCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_publish_ports_and_options()
+    {
+        var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Publish];
+        var defaults = new MqttPublishOptions();
+
+        metadata.DisplayName.ShouldBe("MQTT Publish");
+        metadata.SuggestedEditorWidth.ShouldBe(420);
+        AssertPorts<MqttPublishRequest, MqttPublishResult>(
+            metadata,
+            MqttCompositionPortNames.Input);
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "publishTimeoutMilliseconds",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+        AssertOption(
+            metadata,
+            "publishTimeoutMilliseconds",
+            OptionValueKind.Number,
+            defaults.PublishTimeoutMilliseconds,
+            min: 1);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_trigger_ports_and_options()
+    {
+        var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Trigger];
+        var defaults = new MqttTriggerOptions();
+
+        metadata.DisplayName.ShouldBe("MQTT Trigger");
+        metadata.SuggestedEditorWidth.ShouldBe(460);
+        AssertPorts<MqttTriggerResponse, MqttReceivedMessage>(
+            metadata,
+            MqttCompositionPortNames.Responses);
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "topicFilter",
+            "qualityOfService",
+            "receiveRetainedMessages",
+            "retainAsPublished",
+            "boundedCapacity",
+            "mode",
+            "acknowledgement",
+            "responseTimeout"
+        ], ignoreOrder: false);
+
+        var topicFilter = AssertOption(
+            metadata,
+            "topicFilter",
+            OptionValueKind.Text,
+            defaultValue: null);
+        topicFilter.IsRequired.ShouldBeTrue();
+
+        var qualityOfService = AssertOption(
+            metadata,
+            "qualityOfService",
+            OptionValueKind.Enum,
+            defaults.QualityOfService.ToString());
+        qualityOfService.Choices.Select(choice => choice.Value).ShouldBe([
+            MqttQualityOfService.AtMostOnce.ToString(),
+            MqttQualityOfService.AtLeastOnce.ToString(),
+            MqttQualityOfService.ExactlyOnce.ToString()
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "receiveRetainedMessages",
+            OptionValueKind.Boolean,
+            defaults.ReceiveRetainedMessages);
+        AssertOption(
+            metadata,
+            "retainAsPublished",
+            OptionValueKind.Boolean,
+            defaults.RetainAsPublished);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+
+        var mode = AssertOption(
+            metadata,
+            "mode",
+            OptionValueKind.Enum,
+            defaults.Mode.ToString());
+        mode.Choices.Select(choice => choice.Value).ShouldBe([
+            MqttTriggerMode.FireAndForget.ToString(),
+            MqttTriggerMode.RequestReply.ToString()
+        ], ignoreOrder: false);
+
+        var acknowledgement = AssertOption(
+            metadata,
+            "acknowledgement",
+            OptionValueKind.Enum,
+            defaults.Acknowledgement.ToString());
+        acknowledgement.Choices.Select(choice => choice.Value).ShouldBe([
+            MqttTriggerAcknowledgement.None.ToString(),
+            MqttTriggerAcknowledgement.OnEmit.ToString(),
+            MqttTriggerAcknowledgement.OnSuccessfulResponse.ToString()
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "responseTimeout",
+            OptionValueKind.Duration,
+            defaults.ResponseTimeout,
+            min: 0.000001);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new MqttComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(2);
+        catalog.TryGet(
+            new ComponentType(MqttCompositionNodeTypes.Publish),
+            out var publishMetadata).ShouldBeTrue();
+        catalog.TryGet(
+            new ComponentType(MqttCompositionNodeTypes.Trigger),
+            out var triggerMetadata).ShouldBeTrue();
+
+        publishMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Publish");
+        triggerMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Trigger");
     }
 
     [Fact]
@@ -182,6 +340,46 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains(
                 MqttCompositionResourceNames.Publisher,
                 StringComparison.Ordinal));
+    }
+
+    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
+        => new MqttComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertPorts<TInput, TOutput>(
+        ComponentDesignMetadata metadata,
+        string inputPortName)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.ShouldBe(new ComponentPortName(inputPortName));
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.IsPrimary.ShouldBeTrue();
+        input.Order.ShouldBe(0);
+
+        var output = metadata.Ports[1];
+        output.Name.ShouldBe(new ComponentPortName(MqttCompositionPortNames.Output));
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.IsPrimary.ShouldBeTrue();
+        output.Order.ShouldBe(1);
+    }
+
+    private static OptionDesignMetadata AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
+        return option;
     }
 
     private sealed class RecordingMqttAdapter :

@@ -74,3 +74,12 @@ quality of service, retain flags, and MQTT protocol metadata still come from
 To publish a response to a received MQTT message, insert a transform node that
 maps `MqttReceivedMessage` to `MqttPublishRequest` before linking into
 `publishResult.Input`.
+
+## Design Metadata
+
+`MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`mqtt.publish` and `mqtt.trigger` so hosts can build palettes, editors,
+validation hints, or documentation without copying package descriptors. The
+metadata describes the existing MQTT node option records and fixed ports.
+`IMqttPublisher`, `IMqttTriggerSource`, and optional keyed `TimeProvider` clocks
+remain host-owned resources and are not modeled as editable node options.
