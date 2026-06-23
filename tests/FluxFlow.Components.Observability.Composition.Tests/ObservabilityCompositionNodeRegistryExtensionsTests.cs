@@ -1,7 +1,10 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Observability;
 using FluxFlow.Components.Observability.Composition;
 using FluxFlow.Components.Observability.Contracts;
+using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Mapping;
@@ -35,6 +38,167 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         AssertMetadata<FlowMetricSnapshot>(
             registry,
             ObservabilityCompositionNodeTypes.Metrics);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_observability_metadata()
+    {
+        var metadata = MetadataByType();
+
+        metadata.Keys.ShouldBe([
+            ObservabilityCompositionNodeTypes.Counter,
+            ObservabilityCompositionNodeTypes.Logger,
+            ObservabilityCompositionNodeTypes.Metrics
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            item.Category.ShouldBe("Observability");
+            item.SuggestedEditorWidth.ShouldBe(460);
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Options.ShouldNotContain(option =>
+                option.Name == ObservabilityCompositionResourceNames.Clock ||
+                option.Name == ObservabilityCompositionResourceNames.ContextFactory ||
+                option.Name.StartsWith("attribute:", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_observability_ports()
+    {
+        var metadata = MetadataByType();
+
+        AssertPorts(
+            metadata[ObservabilityCompositionNodeTypes.Counter],
+            nameof(FlowCounterSnapshot));
+        AssertPorts(
+            metadata[ObservabilityCompositionNodeTypes.Logger],
+            nameof(FlowLogEntry));
+        AssertPorts(
+            metadata[ObservabilityCompositionNodeTypes.Metrics],
+            nameof(FlowMetricSnapshot));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_counter_options()
+    {
+        var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Counter];
+        var defaults = new FlowCounterOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "inputType",
+            "name",
+            "engine",
+            "predicate",
+            "expression",
+            "expressionId",
+            "expressionName",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
+        AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
+        AssertOption(metadata, "engine", OptionValueKind.Text, defaultValue: null);
+        AssertOption(metadata, "predicate", OptionValueKind.Expression, defaultValue: null);
+        AssertOption(metadata, "expression", OptionValueKind.Expression, defaultValue: null);
+        AssertOption(metadata, "expressionId", OptionValueKind.Text, defaultValue: null);
+        AssertOption(metadata, "expressionName", OptionValueKind.Text, defaultValue: null);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_logger_options()
+    {
+        var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Logger];
+        var defaults = new FlowLoggerOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "inputType",
+            "level",
+            "category",
+            "messageTemplate",
+            "attributeSelectors",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
+
+        var level = metadata.Options.Single(option => option.Name == "level");
+        level.Kind.ShouldBe(OptionValueKind.Enum);
+        level.DefaultValue.ShouldBe(defaults.Level);
+        level.Choices.Select(choice => choice.Value).ShouldBe([
+            FlowLogLevel.Trace.ToString(),
+            FlowLogLevel.Debug.ToString(),
+            FlowLogLevel.Information.ToString(),
+            FlowLogLevel.Warning.ToString(),
+            FlowLogLevel.Error.ToString(),
+            FlowLogLevel.Critical.ToString()
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "category", OptionValueKind.Text, defaults.Category);
+        AssertOption(metadata, "messageTemplate", OptionValueKind.MultilineText, defaultValue: null);
+
+        var selectors = metadata.Options.Single(option => option.Name == "attributeSelectors");
+        selectors.Kind.ShouldBe(OptionValueKind.Json);
+        selectors.DefaultValue.ShouldBeOfType<string[]>().ShouldBeEmpty();
+
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_metrics_options()
+    {
+        var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Metrics];
+        var defaults = new FlowMetricsOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "inputType",
+            "name",
+            "sizeSelector",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
+        AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
+        AssertOption(metadata, "sizeSelector", OptionValueKind.Text, defaultValue: null);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new ObservabilityComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(3);
+        catalog.TryGet(
+            new ComponentType(ObservabilityCompositionNodeTypes.Counter),
+            out var counter).ShouldBeTrue();
+        catalog.TryGet(
+            new ComponentType(ObservabilityCompositionNodeTypes.Logger),
+            out var logger).ShouldBeTrue();
+        catalog.TryGet(
+            new ComponentType(ObservabilityCompositionNodeTypes.Metrics),
+            out var metrics).ShouldBeTrue();
+
+        counter.ShouldNotBeNull().DisplayName.ShouldBe("Counter");
+        logger.ShouldNotBeNull().DisplayName.ShouldBe("Logger");
+        metrics.ShouldNotBeNull().DisplayName.ShouldBe("Metrics");
     }
 
     [Fact]
@@ -397,6 +561,45 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(TestMessage));
         registration.Outputs[ObservabilityCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(TOutput));
+    }
+
+    private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
+        => new ObservabilityComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertPorts(
+        ComponentDesignMetadata metadata,
+        string outputType)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe("TInput");
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(outputType);
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static async Task AssertFactoryDiagnosticAsync(

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone observability nodes over host-owned keyed expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for observability nodes. Registers flow.counter, flow.logger, and flow.metrics factories, binds existing observability options from composition configuration, and resolves host-owned keyed expression, selector, context, and clock resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for observability composition nodes while keeping expression engines, selectors, context factories, and clocks host-owned resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
