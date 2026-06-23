@@ -98,3 +98,8 @@ services
 
 The composition adapter binds `MetricsAggregateOptions` from node configuration
 and can resolve an optional keyed `TimeProvider` resource named `clock`.
+
+The optional composition package also exposes
+`MetricsComponentDesignMetadataProvider` for neutral Designer metadata over the
+`metrics.aggregate` composition node type. The standalone Metrics package
+remains free of Designer, Composition, and Engine dependencies.

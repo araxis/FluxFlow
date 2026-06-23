@@ -242,6 +242,13 @@ observability nodes. The package registers explicit `flow.counter`,
 options from composition configuration, and resolves host-owned keyed
 expression, selector, context, and clock resources.
 
+## FluxFlow.Components.Metrics.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `metrics.aggregate` composition
+node. The provider describes metrics aggregate options and fixed request/result
+ports while `clock` remains a host-owned resource and runtime behavior stays
+unchanged.
+
 ## FluxFlow.Components.Metrics.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for the standalone
