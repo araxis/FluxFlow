@@ -1,8 +1,11 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Metrics;
 using FluxFlow.Components.Metrics.Composition;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
+using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -29,6 +32,120 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(MetricSampleInput));
         registration.Outputs[MetricsCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(MetricSnapshotOutput));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_metrics_metadata()
+    {
+        var metadata = MetricsDesignMetadata();
+
+        metadata.Type.Value.ShouldBe(MetricsCompositionNodeTypes.Aggregate);
+        metadata.DisplayName.ShouldBe("Metrics Aggregate");
+        metadata.Category.ShouldBe("Metrics");
+        metadata.SuggestedEditorWidth.ShouldBe(460);
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Options.ShouldNotContain(option =>
+            option.Name == MetricsCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_metrics_ports()
+    {
+        var metadata = MetricsDesignMetadata();
+
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(MetricsCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(nameof(MetricSampleInput));
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(MetricsCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(nameof(MetricSnapshotOutput));
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_metrics_options()
+    {
+        var metadata = MetricsDesignMetadata();
+        var defaults = new MetricsAggregateOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "rateWindowSeconds",
+            "boundedCapacity",
+            "maxGroups",
+            "emitEverySample",
+            "trackLatest",
+            "trackMinMax",
+            "trackSize",
+            "groupByTag",
+            "treatMissingValueAsZero"
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "rateWindowSeconds",
+            OptionValueKind.Number,
+            defaults.RateWindowSeconds,
+            min: 0.000001);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxGroups",
+            OptionValueKind.Number,
+            defaults.MaxGroups,
+            min: 0);
+        AssertOption(
+            metadata,
+            "emitEverySample",
+            OptionValueKind.Boolean,
+            defaults.EmitEverySample);
+        AssertOption(
+            metadata,
+            "trackLatest",
+            OptionValueKind.Boolean,
+            defaults.TrackLatest);
+        AssertOption(
+            metadata,
+            "trackMinMax",
+            OptionValueKind.Boolean,
+            defaults.TrackMinMax);
+        AssertOption(
+            metadata,
+            "trackSize",
+            OptionValueKind.Boolean,
+            defaults.TrackSize);
+        AssertOption(metadata, "groupByTag", OptionValueKind.Text, defaultValue: null);
+        AssertOption(
+            metadata,
+            "treatMissingValueAsZero",
+            OptionValueKind.Boolean,
+            defaults.TreatMissingValueAsZero);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new MetricsComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.ShouldHaveSingleItem();
+        catalog.TryGet(
+            new ComponentType(MetricsCompositionNodeTypes.Aggregate),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull()
+            .DisplayName.ShouldBe("Metrics Aggregate");
     }
 
     [Fact]
@@ -203,6 +320,24 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains(
                 "greater than zero",
                 StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static ComponentDesignMetadata MetricsDesignMetadata()
+        => new MetricsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static async Task WithNodeAsync(

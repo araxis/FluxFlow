@@ -63,3 +63,12 @@ and error timestamps. The request/result CLR types are fixed to
 
 The node binds the existing `MetricsAggregateOptions` shape from composition
 configuration.
+
+## Design Metadata
+
+`MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`metrics.aggregate` so hosts can build palettes, editors, validation hints, or
+documentation without copying package descriptors. The metadata describes the
+existing metrics aggregate option record and fixed ports. Optional keyed
+`TimeProvider` clocks remain host-owned resources and are not modeled as
+editable node options.

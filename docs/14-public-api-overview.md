@@ -278,6 +278,7 @@ FluxFlow.Components.Metrics.Composition
 
 Main types:
 
+- `MetricsComponentDesignMetadataProvider`
 - `MetricsCompositionNodeRegistryExtensions`
 - `MetricsCompositionNodeTypes`
 - `MetricsCompositionPortNames`
@@ -288,6 +289,10 @@ Use `RegisterMetricsAggregate()` from the optional
 a `metrics.aggregate` node factory. The factory binds existing
 `MetricsAggregateOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
+
+`MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `metrics.aggregate` composition node, including existing metrics aggregate
+options and fixed ports. Clocks remain host-owned keyed resources.
 
 ## Routing Composition
 
