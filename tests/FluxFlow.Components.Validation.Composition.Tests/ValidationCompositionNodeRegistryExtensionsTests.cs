@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Validation.Composition;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
@@ -50,6 +52,72 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         registry.Registrations["json.schema-validator.input"]
             .Outputs[ValidationCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(JsonSchemaValidationResult<InputMessage>));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_json_schema_validator_metadata()
+    {
+        var metadata = new ValidationComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Type.ShouldBe(new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator));
+        metadata.DisplayName.ShouldBe("JSON Schema Validator");
+        metadata.Category.ShouldBe("Validation");
+        metadata.PreferredNodeName.ShouldBe("validate");
+        metadata.SuggestedEditorWidth.ShouldBe(460);
+        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+            ("schema", OptionValueKind.Json),
+            ("schemaPath", OptionValueKind.Text),
+            ("schemaId", OptionValueKind.Text),
+            ("inputType", OptionValueKind.Text),
+            ("valueSelector", OptionValueKind.Text),
+            ("payloadSelector", OptionValueKind.Text),
+            ("boundedCapacity", OptionValueKind.Number)
+        ]);
+        metadata.Options.Single(option => option.Name == "valueSelector")
+            .DefaultValue.ShouldBe("input");
+        metadata.Options.Single(option => option.Name == "boundedCapacity")
+            .Min.ShouldBe(1);
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(ValidationCompositionResourceNames.Selector);
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(ValidationCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_json_schema_validator_ports()
+    {
+        var metadata = new ValidationComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (ValidationCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (ValidationCompositionPortNames.Output, PortDirection.Output, 1, true, "JsonSchemaValidationResult<TInput>"),
+            (ValidationCompositionPortNames.Valid, PortDirection.Output, 2, false, "TInput"),
+            (ValidationCompositionPortNames.Invalid, PortDirection.Output, 3, false, "TInput")
+        ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new ValidationComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.TryGet(
+            new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull();
+        metadata.Type.ShouldBe(new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator));
     }
 
     [Fact]

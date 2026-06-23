@@ -173,6 +173,7 @@ FluxFlow.Components.Validation.Composition
 Main types:
 
 - `ValidationCompositionNodeRegistryExtensions`
+- `ValidationComponentDesignMetadataProvider`
 - `ValidationCompositionNodeTypes`
 - `ValidationCompositionPortNames`
 - `ValidationCompositionResourceNames`
@@ -183,6 +184,10 @@ wants closed generic `json.schema-validator` node factories. The factory binds
 `JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
 composition build, and resolves optional keyed typed selector and clock
 resources through the host.
+
+`ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the `json.schema-validator` composition node so hosts can compose palette,
+editor, validation, or documentation hints without copying package descriptors.
 
 ## Timers Composition
 

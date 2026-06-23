@@ -85,3 +85,13 @@ does not perform file I/O or schema compilation in its message pump.
 `JsonSchemaValidatorOptions.InputType` remains diagnostic metadata. The actual
 composition port type comes from the closed generic registration selected by the
 host.
+
+## Design Metadata
+
+`ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `json.schema-validator` composition node. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and ports only. Runtime resources such as
+`selector` and `clock` remain host-owned composition resources.

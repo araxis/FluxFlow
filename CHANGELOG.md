@@ -380,6 +380,12 @@ timer settings from composition configuration, and resolves optional keyed
 Engine-free standalone rewrite. The JSON-schema validator is a `FlowNode` with Valid/Invalid
 fan-out via `AddOutput`. Engine glue removed.
 
+## FluxFlow.Components.Validation.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `json.schema-validator`
+composition node. The provider describes validator options and ports while
+runtime resources remain host-owned and validation behavior stays unchanged.
+
 ## FluxFlow.Components.Validation.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for closed generic

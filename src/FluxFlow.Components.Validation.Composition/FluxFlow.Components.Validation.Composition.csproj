@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone JSON schema validator nodes over host-owned keyed selector and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for JSON schema validator nodes. Registers closed generic json.schema-validator factories, binds JsonSchemaValidatorOptions from composition configuration, compiles schemas at build time, and resolves optional keyed IJsonSchemaValueSelector and TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for the json.schema-validator composition node while keeping validation runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Validation\FluxFlow.Components.Validation.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>
