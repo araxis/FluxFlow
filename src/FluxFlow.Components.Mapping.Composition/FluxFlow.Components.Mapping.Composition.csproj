@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mapping.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for closed generic standalone mapper nodes over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for the flow.mapper composition node while keeping mapper runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for flow.mapper host-owned engine, context factory, and clock resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

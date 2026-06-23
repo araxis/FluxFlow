@@ -10,9 +10,12 @@ component without depending on a specific rendering framework.
 ## Contracts
 
 - `ComponentDesignMetadata`: component display name, category, summary, icon key,
-  preferred node name, suggested editor width, options, ports, and attributes.
+  preferred node name, suggested editor width, options, resources, ports, and
+  attributes.
 - `OptionDesignMetadata`: option name, kind, default value, required flag, helper
   text, min/max values, choices, and attributes.
+- `ResourceDesignMetadata`: host-owned resource name, display text, order,
+  required flag, value type hint, summary, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
 - `ComponentType` and `ComponentPortName`: Designer-owned identifiers for
@@ -40,6 +43,12 @@ Enum options must provide at least one choice. Choice lists are reserved for
 enum options; non-enum options should use their value kind plus optional
 constraints such as `Min` and `Max`.
 
+## Resource Metadata
+
+Resources describe host-owned dependencies such as keyed clients, stores,
+expression engines, or clocks. They are metadata only; this package does not
+register, resolve, validate, or dispose those resources.
+
 ## Example
 
 ```csharp
@@ -62,6 +71,17 @@ var metadata = new ComponentDesignMetadata
             Name = "expression",
             Kind = OptionValueKind.Expression,
             DisplayName = "Expression",
+            IsRequired = true
+        }
+    ],
+    Resources =
+    [
+        new ResourceDesignMetadata
+        {
+            Name = "engine",
+            DisplayName = "Engine",
+            Order = 0,
+            ValueType = "IExpressionEngine",
             IsRequired = true
         }
     ],
