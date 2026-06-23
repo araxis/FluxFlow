@@ -1,6 +1,8 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Control.Composition;
 using FluxFlow.Components.Control.Diagnostics;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Mapping;
@@ -66,6 +68,100 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
         registry.Registrations["flow.when.int"]
             .Outputs[ControlCompositionPortNames.WhenFalse].MessageType.ShouldBe(
                 typeof(int));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_control_metadata()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata()
+            .OrderBy(item => item.Type.Value)
+            .ToArray();
+
+        metadata.Length.ShouldBe(2);
+        metadata.Select(item => item.Type).ShouldBe([
+            new ComponentType(ControlCompositionNodeTypes.Filter),
+            new ComponentType(ControlCompositionNodeTypes.When)
+        ]);
+        foreach (var item in metadata)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("Control");
+            item.SuggestedEditorWidth.ShouldBe(420);
+            item.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+                ("expression", OptionValueKind.Expression),
+                ("expressionId", OptionValueKind.Text),
+                ("expressionName", OptionValueKind.Text),
+                ("engine", OptionValueKind.Text),
+                ("inputType", OptionValueKind.Text),
+                ("boundedCapacity", OptionValueKind.Number)
+            ]);
+            item.Options.Single(option => option.Name == "expression")
+                .IsRequired.ShouldBeTrue();
+            item.Options.Single(option => option.Name == "boundedCapacity")
+                .Min.ShouldBe(1);
+            item.Options.Select(option => option.Name)
+                .ShouldNotContain(ControlCompositionResourceNames.ContextFactory);
+            item.Options.Select(option => option.Name)
+                .ShouldNotContain(ControlCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_filter_ports()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata()
+            .Single(item => item.Type == new ComponentType(ControlCompositionNodeTypes.Filter));
+
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
+        ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_when_ports_and_output_alias()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata()
+            .Single(item => item.Type == new ComponentType(ControlCompositionNodeTypes.When));
+
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput"),
+            (ControlCompositionPortNames.WhenTrue, PortDirection.Output, 2, false, "TInput"),
+            (ControlCompositionPortNames.WhenFalse, PortDirection.Output, 3, false, "TInput")
+        ]);
+        metadata.Ports.Single(port => port.Name.Value == ControlCompositionPortNames.Output)
+            .Attributes["aliasOf"].ShouldBe(ControlCompositionPortNames.WhenTrue);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new ControlComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.TryGet(
+            new ComponentType(ControlCompositionNodeTypes.Filter),
+            out var filter).ShouldBeTrue();
+        catalog.TryGet(
+            new ComponentType(ControlCompositionNodeTypes.When),
+            out var when).ShouldBeTrue();
+        filter.ShouldNotBeNull();
+        when.ShouldNotBeNull();
     }
 
     [Fact]

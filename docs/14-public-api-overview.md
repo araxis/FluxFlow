@@ -142,6 +142,7 @@ FluxFlow.Components.Control.Composition
 Main types:
 
 - `ControlCompositionNodeRegistryExtensions`
+- `ControlComponentDesignMetadataProvider`
 - `ControlCompositionNodeTypes`
 - `ControlCompositionPortNames`
 - `ControlCompositionResourceNames`
@@ -151,6 +152,10 @@ Use `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` from the optional
 closed generic `flow.filter` and `flow.when` node factories. The factories
 resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
 factory and clock resources stay host-owned.
+
+`ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `flow.filter` and `flow.when` composition nodes so hosts can compose palette,
+editor, validation, or documentation hints without copying package descriptors.
 
 ## Validation Composition
 
