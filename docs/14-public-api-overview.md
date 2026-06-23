@@ -121,6 +121,7 @@ FluxFlow.Components.Assertions.Composition
 Main types:
 
 - `AssertionsCompositionNodeRegistryExtensions`
+- `AssertionsComponentDesignMetadataProvider`
 - `AssertionsCompositionNodeTypes`
 - `AssertionsCompositionPortNames`
 - `AssertionsCompositionResourceNames`
@@ -130,6 +131,10 @@ Use `RegisterAssertion<TInput>()` from the optional
 wants closed generic `flow.assert` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed typed context factory and clock
 resources stay host-owned.
+
+`AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the `flow.assert` composition node so hosts can compose palette, editor,
+validation, or documentation hints without copying package descriptors.
 
 ## Control Composition
 

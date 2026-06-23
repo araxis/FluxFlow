@@ -66,6 +66,12 @@ Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node i
 to Result/Passed/Failed ports via `AddOutput`; correlation flows on `FlowMessage`. The engine
 factory/module/registration/design-metadata glue is removed.
 
+## FluxFlow.Components.Assertions.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `flow.assert` composition node.
+The provider describes assertion options and ports while runtime resources
+remain host-owned and assertion behavior stays unchanged.
+
 ## FluxFlow.Components.Assertions.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for closed generic
