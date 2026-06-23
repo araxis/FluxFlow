@@ -36,6 +36,10 @@ The option kind contract supports:
 - duration
 - secret
 
+Enum options must provide at least one choice. Choice lists are reserved for
+enum options; non-enum options should use their value kind plus optional
+constraints such as `Min` and `Max`.
+
 ## Example
 
 ```csharp

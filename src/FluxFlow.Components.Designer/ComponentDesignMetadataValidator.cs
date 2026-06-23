@@ -76,8 +76,36 @@ public static class ComponentDesignMetadataValidator
 
             ValidateOptionalText(option.DisplayName, $"{path}.{nameof(OptionDesignMetadata.DisplayName)}", errors);
             ValidateOptionalText(option.HelperText, $"{path}.{nameof(OptionDesignMetadata.HelperText)}", errors);
+            ValidateChoiceUsage(option, path, errors);
             ValidateChoices(option.Choices, path, errors);
             ValidateAttributes(option.Attributes, $"{path}.{nameof(OptionDesignMetadata.Attributes)}", errors);
+        }
+    }
+
+    private static void ValidateChoiceUsage(
+        OptionDesignMetadata option,
+        string optionPath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        var choicesPath = $"{optionPath}.{nameof(OptionDesignMetadata.Choices)}";
+
+        if (option.Kind == OptionValueKind.Enum)
+        {
+            if (option.Choices.Count == 0)
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    choicesPath,
+                    "Enum options must define at least one choice."));
+            }
+
+            return;
+        }
+
+        if (option.Choices.Count > 0)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                choicesPath,
+                "Only enum options can define choices."));
         }
     }
 
