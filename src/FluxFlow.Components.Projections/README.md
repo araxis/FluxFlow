@@ -114,6 +114,11 @@ services
 The composition adapter binds `EventProjectionOptions` from node configuration
 and can resolve an optional keyed `TimeProvider` resource named `clock`.
 
+The optional composition package also exposes
+`ProjectionsComponentDesignMetadataProvider` for neutral Designer metadata over
+the `event.projection` composition node type. The standalone Projections package
+remains free of Designer, Composition, and Engine dependencies.
+
 ## Boundaries
 
 This package has no UI dependency and no host-specific resource assumptions. It
