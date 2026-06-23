@@ -545,7 +545,8 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     private sealed class TrackingFakeTimeProvider : FakeTimeProvider
     {
         private readonly object _gate = new();
-        private TaskCompletionSource _nextTimer = CreateSource();
+        private readonly TaskCompletionSource _timerScheduled = CreateSource();
+        private bool _timerWasScheduled;
 
         public TrackingFakeTimeProvider(DateTimeOffset startDateTime)
             : base(startDateTime)
@@ -559,14 +560,12 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             TimeSpan period)
         {
             var timer = base.CreateTimer(callback, state, dueTime, period);
-            TaskCompletionSource signalled;
             lock (_gate)
             {
-                signalled = _nextTimer;
-                _nextTimer = CreateSource();
+                _timerWasScheduled = true;
+                _timerScheduled.TrySetResult();
             }
 
-            signalled.TrySetResult();
             return timer;
         }
 
@@ -576,7 +575,9 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             {
                 lock (_gate)
                 {
-                    return _nextTimer.Task;
+                    return _timerWasScheduled
+                        ? Task.CompletedTask
+                        : _timerScheduled.Task;
                 }
             }
         }
