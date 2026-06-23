@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.1.0
+
+Tightens Designer metadata validation for option choices.
+
+- Requires enum options to define at least one choice.
+- Rejects choice lists on non-enum options so provider metadata remains
+  unambiguous for generated editors and documentation.
+
 ## FluxFlow.Components.Designer 2.0.0
 
 Breaking Designer contract cleanup. `ComponentDesignMetadata.Type` now uses the

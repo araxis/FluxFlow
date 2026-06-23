@@ -611,6 +611,10 @@ Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
 
+`ComponentDesignMetadataValidator` enforces identifier, option, choice, port,
+and attribute consistency. Enum options must define choices, and choice lists
+are valid only on enum options.
+
 ## Support Packages
 
 These packages are intentionally not standalone node composition adapters:

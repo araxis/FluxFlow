@@ -117,6 +117,56 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_enum_option_without_choices()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "mode",
+                    Kind = OptionValueKind.Enum
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.Choices)}" &&
+            error.Message.Contains("Enum options", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_reports_choices_on_non_enum_option()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "expression",
+                    Kind = OptionValueKind.Expression,
+                    Choices =
+                    [
+                        new OptionChoiceMetadata { Value = "value" }
+                    ]
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.Choices)}" &&
+            error.Message.Contains("Only enum", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Option_metadata_supports_all_expected_value_kinds()
     {
         var kinds = Enum.GetValues<OptionValueKind>();
