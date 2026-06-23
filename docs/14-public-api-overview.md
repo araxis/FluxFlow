@@ -329,6 +329,7 @@ FluxFlow.Components.Serialization.Composition
 
 Main types:
 
+- `SerializationComponentDesignMetadataProvider`
 - `SerializationCompositionNodeRegistryExtensions`
 - `SerializationCompositionNodeTypes`
 - `SerializationCompositionPortNames`
@@ -341,6 +342,11 @@ Use `RegisterJsonParse()`, `RegisterJsonStringify()`,
 wants serialization and encoding factories. The factories bind existing
 serialization options and can resolve an optional keyed `TimeProvider` resource
 through the host.
+
+`SerializationComponentDesignMetadataProvider` exposes neutral Designer
+metadata for the six serialization composition nodes so hosts can compose
+palette, editor, validation, or documentation hints without copying package
+descriptors. The metadata keeps `clock` as a host-owned resource.
 
 ## Payloads Composition
 

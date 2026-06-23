@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Serialization.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone serialization and encoding nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for serialization nodes. Registers json.parse, json.stringify, text.encode, text.decode, base64.encode, and base64.decode factories, binds existing serialization options from composition configuration, and resolves optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for serialization composition nodes while keeping serialization runtime behavior and host-owned clock resources unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Serialization\FluxFlow.Components.Serialization.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>
