@@ -80,6 +80,12 @@ Engine-free standalone rewrite. Filter and When are `FlowNode`s over the kit (Wh
 WhenTrue/WhenFalse via `AddOutput`); the predicate compiles once at construction against an
 injected expression engine (from FluxFlow.Mapping). Engine glue removed.
 
+## FluxFlow.Components.Control.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `flow.filter` and `flow.when`
+composition nodes. The provider describes control options and ports while
+runtime resources remain host-owned and control behavior stays unchanged.
+
 ## FluxFlow.Components.Control.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for closed generic

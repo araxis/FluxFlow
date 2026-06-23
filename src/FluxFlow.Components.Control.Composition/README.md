@@ -73,3 +73,13 @@ For `flow.when`, `Output` is an alias for the node's primary `WhenTrue` stream.
 `ControlExpressionOptions.InputType` remains diagnostic metadata. The actual
 composition port type comes from the closed generic registration selected by the
 host.
+
+## Design Metadata
+
+`ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `flow.filter` and `flow.when` composition nodes. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and ports only. Runtime resources such as
+`engine`, `contextFactory`, and `clock` remain host-owned composition resources.
