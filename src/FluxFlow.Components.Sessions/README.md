@@ -140,3 +140,8 @@ The composition adapter binds the existing session option records from node
 configuration, resolves the required store from the keyed `store` resource, and
 can resolve an optional keyed `TimeProvider` resource named `clock`. Store
 implementation, retention policy, and persistence setup remain host concerns.
+
+The optional composition package also exposes
+`SessionsComponentDesignMetadataProvider` for neutral Designer metadata over the
+session composition node types. The standalone Sessions package remains free of
+Designer, Composition, and Engine dependencies.

@@ -327,6 +327,13 @@ Engine-free standalone rewrite. Recorder is a `FlowNode`, replay is a `FlowSourc
 injected `TimeProvider`), query fans out via `AddOutput`. A mid-stream store failure reports
 `ReplayFailed` before faulting. Engine glue removed.
 
+## FluxFlow.Components.Sessions.Composition 1.1.0
+
+Adds package-owned Designer metadata for `session.recorder`, `session.replay`,
+and `session.query` composition nodes. The provider describes session options
+and fixed ports while session stores and `clock` remain host-owned resources and
+runtime behavior stays unchanged.
+
 ## FluxFlow.Components.Sessions.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for standalone

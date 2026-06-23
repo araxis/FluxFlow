@@ -1,9 +1,12 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Sessions.Composition;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Nodes;
+using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -42,6 +45,190 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(SessionQueryResult));
         query.Outputs[SessionsCompositionPortNames.Sessions].MessageType
             .ShouldBe(typeof(SessionMetadata));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_sessions_metadata()
+    {
+        var metadata = DesignMetadataByType();
+
+        metadata.Keys.ShouldBe([
+            SessionsCompositionNodeTypes.Recorder,
+            SessionsCompositionNodeTypes.Replay,
+            SessionsCompositionNodeTypes.Query
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("Sessions");
+            item.SuggestedEditorWidth.ShouldBe(460);
+            item.Options.ShouldNotContain(option =>
+                option.Name == SessionsCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_sessions_ports()
+    {
+        var metadata = DesignMetadataByType();
+
+        AssertTransformPorts<SessionRecordInput, SessionRecord>(
+            metadata[SessionsCompositionNodeTypes.Recorder]);
+        AssertSourcePort<SessionRecord>(
+            metadata[SessionsCompositionNodeTypes.Replay]);
+        AssertQueryPorts(metadata[SessionsCompositionNodeTypes.Query]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_sessions_options()
+    {
+        var metadata = DesignMetadataByType();
+        var recorderDefaults = new SessionRecorderOptions();
+        var replayDefaults = new SessionReplayOptions();
+        var queryDefaults = new SessionQueryOptions();
+
+        AssertOptionNames(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "store",
+            "sessionId",
+            "name",
+            "notes",
+            "tags",
+            "boundedCapacity");
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "store",
+            OptionValueKind.Text);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "sessionId",
+            OptionValueKind.Text);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "notes",
+            OptionValueKind.MultilineText);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "tags",
+            OptionValueKind.Json);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Recorder],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            recorderDefaults.BoundedCapacity,
+            min: 1);
+
+        AssertOptionNames(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "store",
+            "sessionId",
+            "mode",
+            "boundedCapacity",
+            "startSequence",
+            "maxMessages",
+            "fixedIntervalMilliseconds",
+            "speedMultiplier");
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "sessionId",
+            OptionValueKind.Text,
+            isRequired: true);
+        var mode = AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "mode",
+            OptionValueKind.Enum,
+            replayDefaults.Mode.ToString());
+        mode.Choices.Select(choice => choice.Value).ShouldBe([
+            nameof(SessionReplayMode.RealTime),
+            nameof(SessionReplayMode.FixedInterval),
+            nameof(SessionReplayMode.Multiplier),
+            nameof(SessionReplayMode.Instant)
+        ], ignoreOrder: false);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            replayDefaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "startSequence",
+            OptionValueKind.Number,
+            min: 1);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "maxMessages",
+            OptionValueKind.Number,
+            min: 1);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "fixedIntervalMilliseconds",
+            OptionValueKind.Number,
+            replayDefaults.FixedIntervalMilliseconds,
+            min: 0);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Replay],
+            "speedMultiplier",
+            OptionValueKind.Number,
+            replayDefaults.SpeedMultiplier,
+            min: 0.000001);
+
+        AssertOptionNames(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "store",
+            "name",
+            "namePrefix",
+            "tags",
+            "includeActive",
+            "includeCompleted",
+            "limit",
+            "emitSessionsInResult",
+            "emitSessionOutputs",
+            "boundedCapacity");
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "includeActive",
+            OptionValueKind.Boolean,
+            queryDefaults.IncludeActive);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "includeCompleted",
+            OptionValueKind.Boolean,
+            queryDefaults.IncludeCompleted);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "limit",
+            OptionValueKind.Number,
+            queryDefaults.Limit,
+            min: 1);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "emitSessionsInResult",
+            OptionValueKind.Boolean,
+            queryDefaults.EmitSessionsInResult);
+        AssertOption(
+            metadata[SessionsCompositionNodeTypes.Query],
+            "emitSessionOutputs",
+            OptionValueKind.Boolean,
+            queryDefaults.EmitSessionOutputs);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new SessionsComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(3);
+        catalog.TryGet(
+            new ComponentType(SessionsCompositionNodeTypes.Recorder),
+            out var recorderMetadata).ShouldBeTrue();
+        recorderMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Recorder");
+        catalog.TryGet(
+            new ComponentType(SessionsCompositionNodeTypes.Replay),
+            out var replayMetadata).ShouldBeTrue();
+        replayMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Replay");
     }
 
     [Fact]
@@ -488,6 +675,104 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .RegisterSessionRecorder()
             .RegisterSessionReplay()
             .RegisterSessionQuery();
+
+    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
+        => new SessionsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertTransformPorts<TInput, TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        AssertOutputPort(
+            output,
+            SessionsCompositionPortNames.Output,
+            typeof(TOutput).Name,
+            order: 1,
+            isPrimary: true);
+    }
+
+    private static void AssertSourcePort<TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(1);
+
+        AssertOutputPort(
+            metadata.Ports[0],
+            SessionsCompositionPortNames.Output,
+            typeof(TOutput).Name,
+            order: 0,
+            isPrimary: true);
+    }
+
+    private static void AssertQueryPorts(ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(3);
+
+        metadata.Ports[0].Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
+        metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
+        metadata.Ports[0].Order.ShouldBe(0);
+        metadata.Ports[0].ValueType.ShouldBe(nameof(SessionQueryRequest));
+        metadata.Ports[0].IsPrimary.ShouldBeTrue();
+
+        AssertOutputPort(
+            metadata.Ports[1],
+            SessionsCompositionPortNames.Output,
+            nameof(SessionQueryResult),
+            order: 1,
+            isPrimary: true);
+        AssertOutputPort(
+            metadata.Ports[2],
+            SessionsCompositionPortNames.Sessions,
+            nameof(SessionMetadata),
+            order: 2);
+    }
+
+    private static void AssertOutputPort(
+        PortDesignMetadata port,
+        string name,
+        string valueType,
+        int order,
+        bool isPrimary = false)
+    {
+        port.Name.Value.ShouldBe(name);
+        port.Direction.ShouldBe(PortDirection.Output);
+        port.Order.ShouldBe(order);
+        port.ValueType.ShouldBe(valueType);
+        port.IsPrimary.ShouldBe(isPrimary);
+    }
+
+    private static void AssertOptionNames(
+        ComponentDesignMetadata metadata,
+        params string[] names)
+        => metadata.Options.Select(option => option.Name)
+            .ShouldBe(names, ignoreOrder: false);
+
+    private static OptionDesignMetadata AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue = null,
+        double? min = null,
+        bool isRequired = false)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
+        option.IsRequired.ShouldBe(isRequired);
+        return option;
+    }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {

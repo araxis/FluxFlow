@@ -66,3 +66,13 @@ for deterministic result, event, error, and replay timing.
 The adapter binds the existing session option records from node configuration.
 The `Store` option remains configuration metadata; the composition adapter
 resolves the concrete `ISessionStore` from the `store` resource.
+
+## Design Metadata
+
+`SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`session.recorder`, `session.replay`, and `session.query` so hosts can build
+palettes, editors, validation hints, or documentation without copying package
+descriptors. The metadata describes the existing session option records and
+fixed ports. Concrete `ISessionStore` instances and optional keyed
+`TimeProvider` clocks remain host-owned resources and are not modeled as editable
+node options; the `store` option remains only diagnostic/config metadata.
