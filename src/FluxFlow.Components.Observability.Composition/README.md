@@ -76,3 +76,14 @@ strings such as `flow.counter.order`.
 ```
 
 Each node binds its existing options record from composition configuration.
+
+## Design Metadata
+
+`ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
+for `flow.counter`, `flow.logger`, and `flow.metrics` so hosts can build
+palettes, editors, validation hints, or documentation without copying package
+descriptors. The metadata describes the existing observability option records
+and fixed ports. Expression engines, context factories, selectors, and optional
+keyed `TimeProvider` clocks remain host-owned resources; option fields such as
+`engine`, `attributeSelectors`, and `sizeSelector` only carry the existing
+configuration metadata used by the nodes and factories.

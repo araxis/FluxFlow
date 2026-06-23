@@ -106,3 +106,9 @@ The composition adapter binds the existing options records from node
 configuration. It resolves host-owned keyed resources for `clock`, counter
 `engine` and `contextFactory`, metrics `sizeSelector`, and logger attribute
 selectors named as `attribute:{name}`.
+
+The optional composition package also exposes
+`ObservabilityComponentDesignMetadataProvider` for neutral Designer metadata
+over the `flow.counter`, `flow.logger`, and `flow.metrics` composition node
+types. The standalone Observability package remains free of Designer,
+Composition, and Engine dependencies.

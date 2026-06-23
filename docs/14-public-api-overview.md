@@ -256,6 +256,7 @@ FluxFlow.Components.Observability.Composition
 
 Main types:
 
+- `ObservabilityComponentDesignMetadataProvider`
 - `ObservabilityCompositionNodeRegistryExtensions`
 - `ObservabilityCompositionNodeTypes`
 - `ObservabilityCompositionPortNames`
@@ -267,6 +268,11 @@ Use `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
 wants counter, logger, or metrics node factories. The factories bind existing
 observability options and resolve host-owned keyed expression, selector,
 context, and clock resources.
+
+`ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the three observability composition nodes, including existing option records
+and fixed ports. Expression engines, context factories, selectors, and clocks
+remain host-owned keyed resources.
 
 ## Metrics Composition
 
