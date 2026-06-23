@@ -191,6 +191,11 @@ Composition node factories resolve adapter-owned keyed resources:
 Concrete adapter packages or the host still own broker settings, credentials,
 connection lifetime, reconnect behavior, and any client-specific features.
 
+The optional composition package also exposes
+`MqttComponentDesignMetadataProvider` for neutral Designer metadata over the
+`mqtt.publish` and `mqtt.trigger` composition node types. The standalone MQTT
+package remains free of Designer, Composition, and Engine dependencies.
+
 ## Topic Validation
 
 Use `MqttTopicValidator.ValidatePublishTopic` and

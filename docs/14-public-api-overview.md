@@ -566,6 +566,7 @@ FluxFlow.Components.Mqtt.Composition
 
 Main types:
 
+- `MqttComponentDesignMetadataProvider`
 - `MqttCompositionNodeRegistryExtensions`
 - `MqttCompositionNodeTypes`
 - `MqttCompositionPortNames`
@@ -576,6 +577,10 @@ Use `RegisterMqttNodes()` from the optional
 `mqtt.publish` and `mqtt.trigger` node factories. The factories resolve keyed
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
 the host still own broker/client registration.
+
+`MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
+MQTT publish and trigger composition nodes, including existing options and fixed
+ports. Publisher, trigger source, and clock resources remain host-owned.
 
 ## Designer Metadata
 

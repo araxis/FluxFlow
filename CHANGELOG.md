@@ -44,6 +44,13 @@ payload, and MQTT protocol metadata live on `MqttPublishRequest`. Trigger reques
 policy stays MQTT-owned. Concrete client-library integrations are split into separate adapter
 packages.
 
+## FluxFlow.Components.Mqtt.Composition 1.1.0
+
+Adds package-owned Designer metadata for `mqtt.publish` and `mqtt.trigger`
+composition nodes. The provider describes MQTT node options and fixed ports
+while publisher, trigger source, and clock resources remain host-owned and
+runtime behavior stays unchanged.
+
 ## FluxFlow.Components.Mqtt.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for MQTT publish and
