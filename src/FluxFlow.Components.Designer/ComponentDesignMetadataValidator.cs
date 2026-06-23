@@ -31,6 +31,7 @@ public static class ComponentDesignMetadataValidator
         }
 
         ValidateOptions(metadata.Options, errors);
+        ValidateResources(metadata.Resources, errors);
         ValidatePorts(metadata.Ports, errors);
         ValidateAttributes(metadata.Attributes, nameof(ComponentDesignMetadata.Attributes), errors);
 
@@ -133,6 +134,33 @@ public static class ComponentDesignMetadataValidator
             ValidateOptionalText(choice.DisplayName, $"{path}.{nameof(OptionChoiceMetadata.DisplayName)}", errors);
             ValidateOptionalText(choice.HelperText, $"{path}.{nameof(OptionChoiceMetadata.HelperText)}", errors);
             ValidateAttributes(choice.Attributes, $"{path}.{nameof(OptionChoiceMetadata.Attributes)}", errors);
+        }
+    }
+
+    private static void ValidateResources(
+        IReadOnlyList<ResourceDesignMetadata> resources,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var index = 0; index < resources.Count; index++)
+        {
+            var resource = resources[index];
+            var path = $"{nameof(ComponentDesignMetadata.Resources)}[{index}]";
+
+            if (string.IsNullOrWhiteSpace(resource.Name))
+            {
+                errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(ResourceDesignMetadata.Name)}", "Resource name is required."));
+            }
+            else if (!names.Add(resource.Name))
+            {
+                errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(ResourceDesignMetadata.Name)}", $"Resource name '{resource.Name}' is already used."));
+            }
+
+            ValidateOptionalText(resource.DisplayName, $"{path}.{nameof(ResourceDesignMetadata.DisplayName)}", errors);
+            ValidateOptionalText(resource.Summary, $"{path}.{nameof(ResourceDesignMetadata.Summary)}", errors);
+            ValidateOptionalText(resource.ValueType, $"{path}.{nameof(ResourceDesignMetadata.ValueType)}", errors);
+            ValidateAttributes(resource.Attributes, $"{path}.{nameof(ResourceDesignMetadata.Attributes)}", errors);
         }
     }
 

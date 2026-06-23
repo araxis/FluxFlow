@@ -113,7 +113,9 @@ resources stay host-owned.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.mapper` composition node so hosts can compose palette, editor,
-validation, or documentation hints without copying package descriptors.
+validation, or documentation hints without copying package descriptors. The
+metadata includes editable options, ports, and resource hints for the required
+`engine` resource plus optional `contextFactory` and `clock` resources.
 
 ## Assertions Composition
 
@@ -599,6 +601,7 @@ Main types:
 - `OptionDesignMetadata`
 - `OptionChoiceMetadata`
 - `OptionValueKind`
+- `ResourceDesignMetadata`
 - `PortDesignMetadata`
 - `PortDirection`
 - `IComponentDesignMetadataProvider`
@@ -611,9 +614,9 @@ Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
 
-`ComponentDesignMetadataValidator` enforces identifier, option, choice, port,
-and attribute consistency. Enum options must define choices, and choice lists
-are valid only on enum options.
+`ComponentDesignMetadataValidator` enforces identifier, option, choice,
+resource, port, and attribute consistency. Enum options must define choices,
+and choice lists are valid only on enum options.
 
 ## Support Packages
 

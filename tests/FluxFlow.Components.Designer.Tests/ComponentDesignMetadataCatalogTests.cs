@@ -167,6 +167,42 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_invalid_resource_metadata_shape()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = "",
+                    DisplayName = " ",
+                    Attributes = new Dictionary<string, string>
+                    {
+                        [""] = "resource"
+                    }
+                },
+                new ResourceDesignMetadata
+                {
+                    Name = "engine"
+                },
+                new ResourceDesignMetadata
+                {
+                    Name = "engine"
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error => error.Message.Contains("Resource name", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Resources)}[0].{nameof(ResourceDesignMetadata.DisplayName)}");
+        errors.ShouldContain(error => error.Message.Contains("already used", StringComparison.Ordinal));
+        errors.ShouldContain(error => error.Message.Contains("Attribute keys", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Option_metadata_supports_all_expected_value_kinds()
     {
         var kinds = Enum.GetValues<OptionValueKind>();
@@ -220,6 +256,19 @@ public sealed class ComponentDesignMetadataCatalogTests
         first.Value.ShouldBe("Input");
         first.ToString().ShouldBe("Input");
         new ComponentPortName("Output").ShouldNotBe(first);
+    }
+
+    [Fact]
+    public void Resource_metadata_preserves_ordering_required_flag_and_type_hints()
+    {
+        var resources = CreateMetadata().Resources.OrderBy(resource => resource.Order).ToArray();
+
+        resources[0].Name.ShouldBe("engine");
+        resources[0].DisplayName.ShouldBe("Engine");
+        resources[0].ValueType.ShouldBe("IExpressionEngine");
+        resources[0].IsRequired.ShouldBeTrue();
+        resources[1].Name.ShouldBe("clock");
+        resources[1].IsRequired.ShouldBeFalse();
     }
 
     [Theory]
@@ -278,6 +327,26 @@ public sealed class ComponentDesignMetadataCatalogTests
                     new OptionChoiceMetadata { Value = "strict", DisplayName = "Strict" },
                     new OptionChoiceMetadata { Value = "relaxed", DisplayName = "Relaxed" }
                 ]
+            }
+        ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = "engine",
+                DisplayName = "Engine",
+                Order = 0,
+                Summary = "Expression engine resource.",
+                ValueType = "IExpressionEngine",
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = "clock",
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional clock resource.",
+                ValueType = nameof(TimeProvider)
             }
         ],
         Ports =

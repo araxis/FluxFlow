@@ -77,6 +77,15 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             .ShouldNotContain(MappingCompositionResourceNames.ContextFactory);
         metadata.Options.Select(option => option.Name)
             .ShouldNotContain(MappingCompositionResourceNames.Clock);
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (MappingCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
+            (MappingCompositionResourceNames.ContextFactory, 1, false, nameof(IMappingContextFactory)),
+            (MappingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+        ]);
     }
 
     [Fact]

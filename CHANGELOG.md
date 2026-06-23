@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.0
+
+Adds neutral resource metadata contracts for package-owned design metadata.
+
+- Adds `ResourceDesignMetadata` and `ComponentDesignMetadata.Resources`.
+- Validates resource names, duplicate resources, resource optional text, and
+  resource attributes.
+- Keeps resource metadata descriptive only; hosts still own resource
+  registration, selection, lifetime, and disposal.
+
 ## FluxFlow.Components.Designer 2.1.0
 
 Tightens Designer metadata validation for option choices.
@@ -181,6 +191,15 @@ host-owned keyed `HttpClient` resource through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. The mapper node is a `FlowNode` with the primary result on
 Output and failures on a Failed port (`AddOutput`); the mapping expression compiles once.
 Engine glue removed.
+
+## FluxFlow.Components.Mapping.Composition 1.2.0
+
+Adds Designer resource metadata for `flow.mapper`.
+
+- Describes the required `engine` resource and optional `contextFactory` and
+  `clock` resources separately from editable mapper options.
+- Keeps runtime behavior unchanged; hosts still own keyed resource
+  registration and lifetime.
 
 ## FluxFlow.Components.Mapping.Composition 1.1.0
 

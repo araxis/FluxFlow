@@ -1,6 +1,8 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Options;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Composition;
 
@@ -80,6 +82,34 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 DefaultValue = 128,
                 Min = 1,
                 HelperText = "Maximum queued input messages."
+            }
+        ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = MappingCompositionResourceNames.Engine,
+                DisplayName = "Engine",
+                Order = 0,
+                Summary = "Keyed expression engine service used to evaluate mapper expressions.",
+                ValueType = nameof(IFlowExpressionEngine),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = MappingCompositionResourceNames.ContextFactory,
+                DisplayName = "Context Factory",
+                Order = 1,
+                Summary = "Optional keyed mapping context factory for custom expression variables.",
+                ValueType = nameof(IMappingContextFactory)
+            },
+            new ResourceDesignMetadata
+            {
+                Name = MappingCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 2,
+                Summary = "Optional keyed clock for deterministic mapper diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ],
         Ports =
