@@ -70,3 +70,13 @@ The adapter binds the existing storage option records from node configuration.
 Backend packages such as file-system or SQL-file storage remain host concerns:
 open or register the store in the host, then reference it from composition with
 the `store` resource.
+
+## Design Metadata
+
+`StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`storage.put`, `storage.get`, `storage.query`, and `storage.delete` so hosts can
+build palettes, editors, validation hints, or documentation without copying
+package descriptors. The metadata describes the existing storage option records
+and fixed ports. Concrete `IStorageStore` instances and optional keyed
+`TimeProvider` clocks remain host-owned resources and are not modeled as editable
+node options.

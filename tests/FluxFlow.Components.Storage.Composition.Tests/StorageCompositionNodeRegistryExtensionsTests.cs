@@ -1,7 +1,10 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Storage.Composition;
 using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Diagnostics;
+using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -51,6 +54,167 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(StorageDeleteRequest));
         delete.Outputs[StorageCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(StorageResult));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_storage_metadata()
+    {
+        var metadata = DesignMetadataByType();
+
+        metadata.Keys.ShouldBe([
+            StorageCompositionNodeTypes.Put,
+            StorageCompositionNodeTypes.Get,
+            StorageCompositionNodeTypes.Query,
+            StorageCompositionNodeTypes.Delete
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("Storage");
+            item.SuggestedEditorWidth.ShouldBe(460);
+            item.Options.ShouldNotContain(option =>
+                option.Name == StorageCompositionResourceNames.Store ||
+                option.Name == StorageCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_storage_ports()
+    {
+        var metadata = DesignMetadataByType();
+
+        AssertTransformPorts<StoragePutRequest, StorageResult>(
+            metadata[StorageCompositionNodeTypes.Put]);
+        AssertGetPorts(metadata[StorageCompositionNodeTypes.Get]);
+        AssertQueryPorts(metadata[StorageCompositionNodeTypes.Query]);
+        AssertTransformPorts<StorageDeleteRequest, StorageResult>(
+            metadata[StorageCompositionNodeTypes.Delete]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_storage_options()
+    {
+        var metadata = DesignMetadataByType();
+        var putDefaults = new StoragePutOptions();
+        var getDefaults = new StorageGetOptions();
+        var queryDefaults = new StorageQueryOptions();
+        var deleteDefaults = new StorageDeleteOptions();
+
+        AssertOptionNames(
+            metadata[StorageCompositionNodeTypes.Put],
+            "collection",
+            "mode",
+            "emitStoredRecord",
+            "boundedCapacity");
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Put],
+            "collection",
+            OptionValueKind.Text);
+        var mode = AssertOption(
+            metadata[StorageCompositionNodeTypes.Put],
+            "mode",
+            OptionValueKind.Enum,
+            putDefaults.Mode.ToString());
+        mode.Choices.Select(choice => choice.Value).ShouldBe([
+            nameof(StorageWriteMode.Upsert),
+            nameof(StorageWriteMode.Create),
+            nameof(StorageWriteMode.Replace)
+        ], ignoreOrder: false);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Put],
+            "emitStoredRecord",
+            OptionValueKind.Boolean,
+            putDefaults.EmitStoredRecord);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Put],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            putDefaults.BoundedCapacity,
+            min: 1);
+
+        AssertOptionNames(
+            metadata[StorageCompositionNodeTypes.Get],
+            "collection",
+            "includeExpired",
+            "boundedCapacity");
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Get],
+            "includeExpired",
+            OptionValueKind.Boolean,
+            getDefaults.IncludeExpired);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Get],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            getDefaults.BoundedCapacity,
+            min: 1);
+
+        AssertOptionNames(
+            metadata[StorageCompositionNodeTypes.Query],
+            "collection",
+            "includeExpired",
+            "offset",
+            "limit",
+            "emitRecordsInResult",
+            "emitRecordOutputs",
+            "boundedCapacity");
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Query],
+            "offset",
+            OptionValueKind.Number,
+            queryDefaults.Offset,
+            min: 0);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Query],
+            "limit",
+            OptionValueKind.Number,
+            queryDefaults.Limit,
+            min: 1);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Query],
+            "emitRecordsInResult",
+            OptionValueKind.Boolean,
+            queryDefaults.EmitRecordsInResult);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Query],
+            "emitRecordOutputs",
+            OptionValueKind.Boolean,
+            queryDefaults.EmitRecordOutputs);
+
+        AssertOptionNames(
+            metadata[StorageCompositionNodeTypes.Delete],
+            "collection",
+            "emitMissingAsResult",
+            "boundedCapacity");
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Delete],
+            "emitMissingAsResult",
+            OptionValueKind.Boolean,
+            deleteDefaults.EmitMissingAsResult);
+        AssertOption(
+            metadata[StorageCompositionNodeTypes.Delete],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            deleteDefaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new StorageComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(4);
+        catalog.TryGet(
+            new ComponentType(StorageCompositionNodeTypes.Put),
+            out var putMetadata).ShouldBeTrue();
+        putMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Put");
+        catalog.TryGet(
+            new ComponentType(StorageCompositionNodeTypes.Query),
+            out var queryMetadata).ShouldBeTrue();
+        queryMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Query");
     }
 
     [Fact]
@@ -393,6 +557,114 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             .RegisterStorageGet()
             .RegisterStorageQuery()
             .RegisterStorageDelete();
+
+    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
+        => new StorageComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertTransformPorts<TInput, TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(StorageCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(StorageCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    private static void AssertGetPorts(ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(4);
+
+        metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
+        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageGetRequest));
+        metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
+        metadata.Ports[0].IsPrimary.ShouldBeTrue();
+
+        AssertOutputPort(
+            metadata.Ports[1],
+            StorageCompositionPortNames.Output,
+            nameof(StorageResult),
+            order: 1,
+            isPrimary: true);
+        AssertOutputPort(
+            metadata.Ports[2],
+            StorageCompositionPortNames.Found,
+            nameof(StorageResult),
+            order: 2);
+        AssertOutputPort(
+            metadata.Ports[3],
+            StorageCompositionPortNames.NotFound,
+            nameof(StorageResult),
+            order: 3);
+    }
+
+    private static void AssertQueryPorts(ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(3);
+
+        metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
+        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageQueryRequest));
+        metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
+        metadata.Ports[0].IsPrimary.ShouldBeTrue();
+
+        AssertOutputPort(
+            metadata.Ports[1],
+            StorageCompositionPortNames.Output,
+            nameof(StorageQueryResult),
+            order: 1,
+            isPrimary: true);
+        AssertOutputPort(
+            metadata.Ports[2],
+            StorageCompositionPortNames.Records,
+            nameof(StorageRecord),
+            order: 2);
+    }
+
+    private static void AssertOutputPort(
+        PortDesignMetadata port,
+        string name,
+        string valueType,
+        int order,
+        bool isPrimary = false)
+    {
+        port.Name.Value.ShouldBe(name);
+        port.Direction.ShouldBe(PortDirection.Output);
+        port.Order.ShouldBe(order);
+        port.ValueType.ShouldBe(valueType);
+        port.IsPrimary.ShouldBe(isPrimary);
+    }
+
+    private static void AssertOptionNames(
+        ComponentDesignMetadata metadata,
+        params string[] names)
+        => metadata.Options.Select(option => option.Name)
+            .ShouldBe(names, ignoreOrder: false);
+
+    private static OptionDesignMetadata AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue = null,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
+        return option;
+    }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {
