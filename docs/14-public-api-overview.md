@@ -472,6 +472,7 @@ Main types:
 - `SessionsCompositionNodeTypes`
 - `SessionsCompositionPortNames`
 - `SessionsCompositionResourceNames`
+- `SessionsComponentDesignMetadataProvider`
 
 Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 `RegisterSessionQuery()` from the optional
@@ -479,6 +480,11 @@ Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 session node factories. The factories bind existing session options, resolve a
 required keyed `ISessionStore`, and can resolve an optional keyed
 `TimeProvider` resource through the host.
+
+`SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the three session composition nodes, including existing session options and fixed
+ports. Session stores and clocks remain host-owned keyed resources; the `store`
+option is diagnostic/config metadata, not DI selection.
 
 ## Projections Composition
 
