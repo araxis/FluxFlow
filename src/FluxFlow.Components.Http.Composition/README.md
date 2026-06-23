@@ -62,3 +62,12 @@ The composition package binds only `HttpClientNodeOptions`. HTTP method, URL,
 headers, body, content type, and per-message timeout still come from
 `HttpRequestInput` messages at runtime. Transport policy stays on the injected
 `HttpClient`.
+
+## Design Metadata
+
+`HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for
+`http.client` so hosts can build palettes, editors, validation hints, or
+documentation without copying package descriptors. The metadata describes the
+existing `HttpClientNodeOptions` configuration surface and fixed request/result
+ports. `HttpClient` instances and optional keyed `TimeProvider` clocks remain
+host-owned resources and are not modeled as editable node options.
