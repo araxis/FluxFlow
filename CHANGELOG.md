@@ -367,6 +367,13 @@ Engine-free standalone rewrite. Interval/schedule are `FlowSource`s; delay/throt
 arrival burst semantics; debounce flushes its pending item via the drain hook. Engine glue
 removed.
 
+## FluxFlow.Components.Timers.Composition 1.1.0
+
+Adds package-owned Designer metadata for `timer.interval`, `timer.schedule`,
+`timer.delay`, `timer.throttle`, and `timer.debounce` composition nodes. The
+provider describes timer options and ports while `clock` remains a host-owned
+resource and runtime behavior stays unchanged.
+
 ## FluxFlow.Components.Timers.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for all standalone

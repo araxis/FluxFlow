@@ -1,4 +1,6 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Composition;
@@ -57,6 +59,106 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         registry.Registrations["timer.throttle.string"]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(string));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_timer_metadata()
+    {
+        var metadata = new TimersComponentDesignMetadataProvider().GetMetadata();
+
+        metadata.Select(item => item.Type.Value).ShouldBe([
+            TimersCompositionNodeTypes.Interval,
+            TimersCompositionNodeTypes.Schedule,
+            TimersCompositionNodeTypes.Delay,
+            TimersCompositionNodeTypes.Throttle,
+            TimersCompositionNodeTypes.Debounce
+        ]);
+        metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
+        metadata.SelectMany(item => item.Options)
+            .Select(option => option.Name)
+            .ShouldNotContain(TimersCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_timer_ports()
+    {
+        var metadata = MetadataByType();
+
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Interval], nameof(TimerTick));
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Schedule], nameof(ScheduleTick));
+        AssertTransformPorts(metadata[TimersCompositionNodeTypes.Delay]);
+        AssertTransformPorts(metadata[TimersCompositionNodeTypes.Throttle]);
+        AssertTransformPorts(metadata[TimersCompositionNodeTypes.Debounce]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_timer_options()
+    {
+        var metadata = MetadataByType();
+
+        AssertOptions(
+            metadata[TimersCompositionNodeTypes.Interval],
+            [
+                ("name", OptionValueKind.Text, "interval", false),
+                ("interval", OptionValueKind.Duration, null, true),
+                ("initialDelay", OptionValueKind.Duration, TimeSpan.Zero, false),
+                ("emitImmediately", OptionValueKind.Boolean, false, false),
+                ("maxTicks", OptionValueKind.Number, null, false),
+                ("boundedCapacity", OptionValueKind.Number, 128, false)
+            ]);
+        AssertOptions(
+            metadata[TimersCompositionNodeTypes.Schedule],
+            [
+                ("name", OptionValueKind.Text, "schedule", false),
+                ("cron", OptionValueKind.Text, null, true),
+                ("maxTicks", OptionValueKind.Number, null, false),
+                ("boundedCapacity", OptionValueKind.Number, 128, false)
+            ]);
+        metadata[TimersCompositionNodeTypes.Schedule].Options
+            .Select(option => option.Name)
+            .ShouldNotContain("timeZone");
+        AssertOptions(
+            metadata[TimersCompositionNodeTypes.Delay],
+            [
+                ("name", OptionValueKind.Text, "delay", false),
+                ("delay", OptionValueKind.Duration, null, true),
+                ("boundedCapacity", OptionValueKind.Number, 128, false)
+            ]);
+        AssertOptions(
+            metadata[TimersCompositionNodeTypes.Throttle],
+            [
+                ("name", OptionValueKind.Text, "throttle", false),
+                ("interval", OptionValueKind.Duration, null, true),
+                ("emitFirstImmediately", OptionValueKind.Boolean, true, false),
+                ("boundedCapacity", OptionValueKind.Number, 128, false)
+            ]);
+        AssertOptions(
+            metadata[TimersCompositionNodeTypes.Debounce],
+            [
+                ("name", OptionValueKind.Text, "debounce", false),
+                ("quietPeriod", OptionValueKind.Duration, null, true),
+                ("boundedCapacity", OptionValueKind.Number, 128, false)
+            ]);
+
+        metadata.Values
+            .SelectMany(item => item.Options)
+            .Where(option => option.Name == "boundedCapacity" || option.Name == "maxTicks")
+            .ShouldAllBe(option => option.Min == 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new TimersComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(5);
+        catalog.TryGet(
+            new ComponentType(TimersCompositionNodeTypes.Interval),
+            out var interval).ShouldBeTrue();
+        interval.ShouldNotBeNull();
+        interval.Type.ShouldBe(new ComponentType(TimersCompositionNodeTypes.Interval));
     }
 
     [Fact]
@@ -315,6 +417,49 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         registry.Registrations[nodeType]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(InputMessage));
+    }
+
+    private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
+        => new TimersComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertSourcePorts(
+        ComponentDesignMetadata metadata,
+        string outputType)
+    {
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, outputType)
+        ]);
+    }
+
+    private static void AssertTransformPorts(ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
+        ]);
+    }
+
+    private static void AssertOptions(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, OptionValueKind Kind, object? DefaultValue, bool IsRequired)> expected)
+    {
+        metadata.Options.Select(option => (
+            option.Name,
+            option.Kind,
+            option.DefaultValue,
+            option.IsRequired)).ShouldBe(expected);
     }
 
     private static IServiceCollection CreateTransformServices(

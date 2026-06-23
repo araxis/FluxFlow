@@ -199,6 +199,7 @@ FluxFlow.Components.Timers.Composition
 
 Main types:
 
+- `TimersComponentDesignMetadataProvider`
 - `TimersCompositionNodeRegistryExtensions`
 - `TimersCompositionNodeTypes`
 - `TimersCompositionPortNames`
@@ -210,6 +211,12 @@ Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
 `FluxFlow.Components.Timers.Composition` package when a composition host wants
 timer source and transform node factories. The factories bind existing timer
 settings and resolve optional keyed `TimeProvider` resources through the host.
+
+`TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the five timer composition nodes so hosts can compose palette, editor,
+validation, or documentation hints without copying package descriptors. The
+metadata keeps `clock` as a host-owned resource and does not add schedule
+time-zone string conversion.
 
 ## Sources Composition
 
