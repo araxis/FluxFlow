@@ -299,6 +299,7 @@ FluxFlow.Components.Routing.Composition
 
 Main types:
 
+- `RoutingComponentDesignMetadataProvider`
 - `RoutingCompositionNodeRegistryExtensions`
 - `RoutingCompositionNodeTypes`
 - `RoutingCompositionPortNames`
@@ -311,6 +312,12 @@ optional `FluxFlow.Components.Routing.Composition` package when a composition
 host wants routing node factories. Switch, correlation, and join factories
 resolve host-owned keyed selector delegates; all factories can resolve an
 optional keyed `TimeProvider` resource through the host.
+
+`RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the six routing composition nodes so hosts can compose palette, editor,
+validation, or documentation hints without copying package descriptors. The
+metadata describes built-in ports and option-defined dynamic output surfaces
+while keeping selector delegates and `clock` as host-owned resources.
 
 ## Serialization Composition
 

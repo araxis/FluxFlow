@@ -56,6 +56,20 @@ composition build time. Static registry metadata is intentionally limited to
 their input ports so config-defined output names are validated after their
 factories bind options.
 
+## Design Metadata
+
+`RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the six routing composition nodes. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and built-in ports only. Selector delegates
+such as `routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`,
+and `rightKeySelector` remain host-owned resources and are not exposed as
+editable node options. Switch `routeOutputs` and fork `outputs` are represented
+as configuration options because those dynamic ports are exposed after the
+composition factory binds node options.
+
 ## Configuration
 
 ```json
