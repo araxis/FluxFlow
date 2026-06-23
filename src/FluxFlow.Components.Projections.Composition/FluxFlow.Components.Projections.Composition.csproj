@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Projections.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Projections.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone event projection node over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial optional composition adapter for event projections. Registers the event.projection factory, binds existing event projection options from composition configuration, and resolves optional keyed TimeProvider resources owned by the host.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds package-owned Designer metadata for the event projection composition node while keeping clocks host-owned resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
+    <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>

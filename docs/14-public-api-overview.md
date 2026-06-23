@@ -496,6 +496,7 @@ FluxFlow.Components.Projections.Composition
 
 Main types:
 
+- `ProjectionsComponentDesignMetadataProvider`
 - `ProjectionsCompositionNodeRegistryExtensions`
 - `ProjectionsCompositionNodeTypes`
 - `ProjectionsCompositionPortNames`
@@ -506,6 +507,11 @@ Use `RegisterEventProjection()` from the optional
 wants an `event.projection` node factory. The factory binds existing
 `EventProjectionOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
+
+`ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the `event.projection` composition node, including existing projection
+options and fixed ports. Clocks remain host-owned keyed resources; the final
+snapshot lifecycle remains a direct node API in this composition pass.
 
 ## Expectations Composition
 

@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Projections.Composition\FluxFlow.Components.Projections.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\..\src\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
