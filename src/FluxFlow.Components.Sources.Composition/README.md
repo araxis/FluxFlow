@@ -40,6 +40,18 @@ The composition runtime starts both sources through the normal `IFlowSource`
 lifecycle. `source.generated` deserializes inline `items` from node
 configuration into the closed generic output type registered by the host.
 
+## Design Metadata
+
+`SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the generated and sequence source composition nodes. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and ports only. Inline generated `items`
+are node configuration and are exposed as JSON metadata. The optional `clock`
+resource remains a host-owned composition resource and is not exposed as an
+editable node option.
+
 ## Configuration
 
 ```json

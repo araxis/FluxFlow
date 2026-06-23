@@ -228,6 +228,7 @@ FluxFlow.Components.Sources.Composition
 
 Main types:
 
+- `SourcesComponentDesignMetadataProvider`
 - `SourcesCompositionNodeRegistryExtensions`
 - `SourcesCompositionNodeTypes`
 - `SourcesCompositionPortNames`
@@ -238,6 +239,12 @@ optional `FluxFlow.Components.Sources.Composition` package when a composition
 host wants generated or sequence source factories. The generated factory
 deserializes inline `items` into the closed output type; both factories resolve
 optional keyed `TimeProvider` resources through the host.
+
+`SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
+generated and sequence source composition nodes so hosts can compose palette,
+editor, validation, or documentation hints without copying package descriptors.
+The metadata includes inline generated `items` as JSON node configuration while
+keeping `clock` as a host-owned resource.
 
 ## Observability Composition
 
