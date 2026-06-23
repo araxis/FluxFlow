@@ -45,6 +45,18 @@ The composition runtime starts interval and schedule sources through the normal
 `IFlowSource` lifecycle. Transform nodes preserve the input correlation id when
 they re-emit the original payload.
 
+## Design Metadata
+
+`TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for the
+five timer composition nodes. Hosts can add it to a
+`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
+views, or generated documentation.
+
+The provider describes node options and ports only. The optional `clock`
+resource remains a host-owned composition resource and is not exposed as an
+editable node option. Schedule metadata covers cron/default UTC composition
+behavior; this package still does not add time zone id conversion.
+
 ## Configuration
 
 ```json
