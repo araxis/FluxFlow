@@ -1,4 +1,6 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Routing.Composition;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Composition;
@@ -73,6 +75,206 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         registry.Registrations["flow.join.primitives"]
             .Outputs[RoutingCompositionPortNames.Timeouts].MessageType.ShouldBe(
                 typeof(FlowJoinTimeout<string, int>));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_routing_metadata()
+    {
+        var metadata = new RoutingComponentDesignMetadataProvider().GetMetadata();
+
+        metadata.Select(item => item.Type.Value).ShouldBe([
+            RoutingCompositionNodeTypes.Switch,
+            RoutingCompositionNodeTypes.Fork,
+            RoutingCompositionNodeTypes.Merge,
+            RoutingCompositionNodeTypes.Window,
+            RoutingCompositionNodeTypes.Correlation,
+            RoutingCompositionNodeTypes.Join
+        ]);
+        metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
+
+        var optionNames = metadata.SelectMany(item => item.Options)
+            .Select(option => option.Name)
+            .ToArray();
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.Clock);
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.RouteKeySelector);
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.KeySelector);
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.SideSelector);
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.LeftKeySelector);
+        optionNames.ShouldNotContain(RoutingCompositionResourceNames.RightKeySelector);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_static_routing_ports()
+    {
+        var metadata = MetadataByType();
+
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            [
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput"),
+                (RoutingCompositionPortNames.Matched, PortDirection.Output, 2, false, "TInput"),
+                (RoutingCompositionPortNames.Default, PortDirection.Output, 3, false, "TInput"),
+                (RoutingCompositionPortNames.Routed, PortDirection.Output, 4, false, "TInput")
+            ]);
+        metadata[RoutingCompositionNodeTypes.Switch].Ports
+            .Select(port => port.Name.Value)
+            .ShouldNotContain("Priority");
+        metadata[RoutingCompositionNodeTypes.Switch].Attributes["dynamicOutputsOption"]
+            .ShouldBe("routeOutputs");
+
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Fork],
+            [
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
+            ]);
+        metadata[RoutingCompositionNodeTypes.Fork].Attributes["dynamicOutputsOption"]
+            .ShouldBe("outputs");
+
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Merge],
+            [
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
+            ]);
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Window],
+            [
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowWindow<TInput>")
+            ]);
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Correlation],
+            [
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowCorrelationMatch<TInput>"),
+                (RoutingCompositionPortNames.Matched, PortDirection.Output, 2, false, "FlowCorrelationMatch<TInput>"),
+                (RoutingCompositionPortNames.Timeouts, PortDirection.Output, 3, false, "FlowCorrelationTimeout<TInput>")
+            ]);
+        AssertPorts(
+            metadata[RoutingCompositionNodeTypes.Join],
+            [
+                (RoutingCompositionPortNames.Left, PortDirection.Input, 0, true, "TLeft"),
+                (RoutingCompositionPortNames.Right, PortDirection.Input, 1, false, "TRight"),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 2, true, "FlowJoinResult<TLeft,TRight>"),
+                (RoutingCompositionPortNames.Timeouts, PortDirection.Output, 3, false, "FlowJoinTimeout<TLeft,TRight>")
+            ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_routing_options()
+    {
+        var metadata = MetadataByType();
+
+        AssertOptionNames(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            [
+                "engine", "expression", "expressionId", "expressionName", "inputType",
+                "routes", "routeOutputs", "defaultRoute", "caseSensitive",
+                "emitMatchedInput", "emitDefaultInput", "emitRouteEnvelope",
+                "boundedCapacity"
+            ]);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            "expression",
+            OptionValueKind.Expression);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            "routes",
+            OptionValueKind.Json);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            "routeOutputs",
+            OptionValueKind.Json);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Switch],
+            "caseSensitive",
+            OptionValueKind.Boolean,
+            true);
+
+        AssertOptionNames(
+            metadata[RoutingCompositionNodeTypes.Fork],
+            ["inputType", "outputs", "boundedCapacity"]);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Fork],
+            "outputs",
+            OptionValueKind.Json,
+            isRequired: true);
+
+        AssertOptionNames(
+            metadata[RoutingCompositionNodeTypes.Window],
+            ["inputType", "maxItems", "timeMilliseconds", "emitPartialOnCompletion", "boundedCapacity"]);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Window],
+            "maxItems",
+            OptionValueKind.Number,
+            0,
+            0);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Window],
+            "emitPartialOnCompletion",
+            OptionValueKind.Boolean,
+            true);
+
+        AssertOptionNames(
+            metadata[RoutingCompositionNodeTypes.Correlation],
+            [
+                "engine", "keyExpression", "sideExpression", "expressionId",
+                "expressionName", "inputType", "requestSide", "responseSide",
+                "caseSensitive", "timeoutMilliseconds", "maxPending",
+                "boundedCapacity"
+            ]);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Correlation],
+            "keyExpression",
+            OptionValueKind.Expression);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Correlation],
+            "timeoutMilliseconds",
+            OptionValueKind.Number,
+            30_000,
+            1);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Correlation],
+            "maxPending",
+            OptionValueKind.Number,
+            1_024,
+            1);
+
+        AssertOptionNames(
+            metadata[RoutingCompositionNodeTypes.Join],
+            [
+                "engine", "leftKeyExpression", "rightKeyExpression",
+                "expressionId", "expressionName", "leftInputType",
+                "rightInputType", "caseSensitive", "timeoutMilliseconds",
+                "maxPending", "boundedCapacity"
+            ]);
+        AssertOption(
+            metadata[RoutingCompositionNodeTypes.Join],
+            "leftInputType",
+            OptionValueKind.Text,
+            "object");
+
+        foreach (var item in metadata.Values)
+        {
+            AssertOption(item, "boundedCapacity", OptionValueKind.Number, 128, 1);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new RoutingComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(6);
+        catalog.TryGet(
+            new ComponentType(RoutingCompositionNodeTypes.Join),
+            out var join).ShouldBeTrue();
+        join.ShouldNotBeNull();
+        join.Type.ShouldBe(new ComponentType(RoutingCompositionNodeTypes.Join));
     }
 
     [Fact]
@@ -491,6 +693,57 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         host.Diagnostics.ShouldContain(diagnostic =>
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
             diagnostic.Message.Contains("built-in", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
+        => new RoutingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertPorts(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, PortDirection Direction, int Order, bool IsPrimary, string ValueType)> expected)
+    {
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType!)).ShouldBe(expected);
+    }
+
+    private static void AssertOptionNames(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<string> expected)
+    {
+        metadata.Options.Select(option => option.Name).ShouldBe(expected);
+    }
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string optionName,
+        OptionValueKind kind,
+        object? defaultValue = null,
+        double? min = null,
+        bool? isRequired = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == optionName);
+        option.Kind.ShouldBe(kind);
+
+        if (defaultValue is not null)
+        {
+            option.DefaultValue.ShouldBe(defaultValue);
+        }
+
+        if (min.HasValue)
+        {
+            option.Min.ShouldBe(min);
+        }
+
+        if (isRequired.HasValue)
+        {
+            option.IsRequired.ShouldBe(isRequired.Value);
+        }
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

@@ -267,6 +267,14 @@ Engine-free standalone rewrite. Switch/Fork/Correlation/Window are `FlowNode`s (
 `AddOutput`), Merge fans in to a single Input, and Join is a self-contained two-input node over
 the kit's envelope/error/event primitives. Engine glue removed.
 
+## FluxFlow.Components.Routing.Composition 1.1.0
+
+Adds package-owned Designer metadata for `flow.switch`, `flow.fork`,
+`flow.merge`, `flow.window`, `flow.correlation`, and `flow.join` composition
+nodes. The provider describes routing options and built-in ports while selector
+delegates and `clock` remain host-owned resources and runtime behavior stays
+unchanged.
+
 ## FluxFlow.Components.Routing.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for standalone routing
