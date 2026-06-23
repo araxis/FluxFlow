@@ -1,4 +1,6 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Sources.Composition;
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Composition;
@@ -42,6 +44,75 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         registry.Registrations["source.generated.string"]
             .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(string));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_source_metadata()
+    {
+        var metadata = new SourcesComponentDesignMetadataProvider().GetMetadata();
+
+        metadata.Select(item => item.Type.Value).ShouldBe([
+            SourcesCompositionNodeTypes.Generated,
+            SourcesCompositionNodeTypes.Sequence
+        ]);
+        metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
+        metadata.SelectMany(item => item.Options)
+            .Select(option => option.Name)
+            .ShouldNotContain(SourcesCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_source_ports()
+    {
+        var metadata = MetadataByType();
+
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Generated], "TOutput");
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Sequence], nameof(SourceSequenceItem));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_source_options()
+    {
+        var metadata = MetadataByType();
+
+        AssertOptions(
+            metadata[SourcesCompositionNodeTypes.Generated],
+            [
+                ("name", OptionValueKind.Text, "generated", null),
+                ("outputType", OptionValueKind.Text, "object", null),
+                ("items", OptionValueKind.Json, null, null),
+                ("loop", OptionValueKind.Boolean, false, null),
+                ("maxItems", OptionValueKind.Number, null, 1),
+                ("initialDelayMilliseconds", OptionValueKind.Number, 0, 0),
+                ("intervalMilliseconds", OptionValueKind.Number, 0, 0),
+                ("boundedCapacity", OptionValueKind.Number, 128, 1)
+            ]);
+        AssertOptions(
+            metadata[SourcesCompositionNodeTypes.Sequence],
+            [
+                ("name", OptionValueKind.Text, "sequence", null),
+                ("start", OptionValueKind.Number, 1, null),
+                ("step", OptionValueKind.Number, 1, null),
+                ("count", OptionValueKind.Number, 1, 1),
+                ("initialDelayMilliseconds", OptionValueKind.Number, 0, 0),
+                ("intervalMilliseconds", OptionValueKind.Number, 0, 0),
+                ("boundedCapacity", OptionValueKind.Number, 128, 1)
+            ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new SourcesComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(2);
+        catalog.TryGet(
+            new ComponentType(SourcesCompositionNodeTypes.Generated),
+            out var generated).ShouldBeTrue();
+        generated.ShouldNotBeNull();
+        generated.Type.ShouldBe(new ComponentType(SourcesCompositionNodeTypes.Generated));
     }
 
     [Fact]
@@ -263,6 +334,36 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         host.Diagnostics.ShouldContain(diagnostic =>
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
             diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
+        => new SourcesComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertSourcePorts(
+        ComponentDesignMetadata metadata,
+        string outputType)
+    {
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (SourcesCompositionPortNames.Output, PortDirection.Output, 0, true, outputType)
+        ]);
+    }
+
+    private static void AssertOptions(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, OptionValueKind Kind, object? DefaultValue, double? Min)> expected)
+    {
+        metadata.Options.Select(option => (
+            option.Name,
+            option.Kind,
+            option.DefaultValue,
+            option.Min)).ShouldBe(expected);
     }
 
     private static async Task BuildCompositionAsync(ServiceProvider provider)

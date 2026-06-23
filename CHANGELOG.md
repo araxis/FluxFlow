@@ -309,6 +309,13 @@ optional keyed `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. Generated and sequence sources are `FlowSource`s; the host
 supplies the items directly (the JSON + type-alias reader layer is gone). Engine glue removed.
 
+## FluxFlow.Components.Sources.Composition 1.1.0
+
+Adds package-owned Designer metadata for `source.generated` and
+`source.sequence` composition nodes. The provider describes source options and
+ports, including inline generated `items`, while `clock` remains a host-owned
+resource and runtime behavior stays unchanged.
+
 ## FluxFlow.Components.Sources.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for standalone source
