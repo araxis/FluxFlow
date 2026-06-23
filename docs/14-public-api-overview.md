@@ -445,6 +445,7 @@ Main types:
 - `StorageCompositionNodeTypes`
 - `StorageCompositionPortNames`
 - `StorageCompositionResourceNames`
+- `StorageComponentDesignMetadataProvider`
 
 Use `RegisterStoragePut()`, `RegisterStorageGet()`,
 `RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
@@ -452,6 +453,10 @@ Use `RegisterStoragePut()`, `RegisterStorageGet()`,
 storage node factories. The factories bind existing storage options, resolve a
 required keyed `IStorageStore`, and can resolve an optional keyed
 `TimeProvider` resource through the host.
+
+`StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the four storage composition nodes, including existing storage options and fixed
+ports. Concrete stores and clocks remain host-owned keyed resources.
 
 ## Sessions Composition
 

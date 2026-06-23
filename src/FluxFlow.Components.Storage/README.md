@@ -195,3 +195,8 @@ configuration, resolves the required store from the keyed `store` resource, and
 can resolve an optional keyed `TimeProvider` resource named `clock`. Concrete
 store setup still belongs to the host or backend adapter packages; the
 composition adapter only consumes an already registered `IStorageStore`.
+
+The optional composition package also exposes
+`StorageComponentDesignMetadataProvider` for neutral Designer metadata over the
+storage composition node types. The standalone Storage package remains free of
+Designer, Composition, and Engine dependencies.
