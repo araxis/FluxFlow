@@ -69,3 +69,13 @@ types are fixed to the contracts from `FluxFlow.Components.Serialization`.
 
 Each node binds the existing `SerializationNodeOptions` shape from composition
 configuration.
+
+## Design Metadata
+
+`SerializationComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the six serialization composition nodes. The metadata describes the fixed
+request/result ports and shared `SerializationNodeOptions` surface for hosts
+that build palettes, editors, validators, or documentation views.
+
+The optional `clock` resource remains host-owned and is not represented as an
+editable node option.

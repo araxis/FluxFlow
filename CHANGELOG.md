@@ -289,6 +289,14 @@ resources through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. The serialize/deserialize transforms are `FlowNode`s over the
 kit. Engine glue removed.
 
+## FluxFlow.Components.Serialization.Composition 1.1.0
+
+Adds package-owned Designer metadata for `json.parse`, `json.stringify`,
+`text.encode`, `text.decode`, `base64.encode`, and `base64.decode` composition
+nodes. The provider describes serialization options and fixed request/result
+ports while `clock` remains a host-owned resource and runtime behavior stays
+unchanged.
+
 ## FluxFlow.Components.Serialization.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for standalone

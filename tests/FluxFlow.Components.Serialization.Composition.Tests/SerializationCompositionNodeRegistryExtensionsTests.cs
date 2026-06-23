@@ -2,10 +2,13 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Serialization;
 using FluxFlow.Components.Serialization.Composition;
 using FluxFlow.Components.Serialization.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
+using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -50,6 +53,77 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         AssertMetadata<Base64DecodeRequest, Base64DecodeResult>(
             registry,
             SerializationCompositionNodeTypes.Base64Decode);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_serialization_metadata()
+    {
+        var metadata = DesignMetadataByType();
+
+        metadata.Keys.ShouldBe([
+            SerializationCompositionNodeTypes.JsonParse,
+            SerializationCompositionNodeTypes.JsonStringify,
+            SerializationCompositionNodeTypes.TextEncode,
+            SerializationCompositionNodeTypes.TextDecode,
+            SerializationCompositionNodeTypes.Base64Encode,
+            SerializationCompositionNodeTypes.Base64Decode
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("Serialization");
+            item.SuggestedEditorWidth.ShouldBe(420);
+            item.Options.ShouldNotContain(option =>
+                option.Name == SerializationCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_fixed_serialization_ports()
+    {
+        var metadata = DesignMetadataByType();
+
+        AssertDesignPorts<JsonParseRequest, JsonParseResult>(
+            metadata[SerializationCompositionNodeTypes.JsonParse]);
+        AssertDesignPorts<JsonStringifyRequest, JsonStringifyResult>(
+            metadata[SerializationCompositionNodeTypes.JsonStringify]);
+        AssertDesignPorts<TextEncodeRequest, TextEncodeResult>(
+            metadata[SerializationCompositionNodeTypes.TextEncode]);
+        AssertDesignPorts<TextDecodeRequest, TextDecodeResult>(
+            metadata[SerializationCompositionNodeTypes.TextDecode]);
+        AssertDesignPorts<Base64EncodeRequest, Base64EncodeResult>(
+            metadata[SerializationCompositionNodeTypes.Base64Encode]);
+        AssertDesignPorts<Base64DecodeRequest, Base64DecodeResult>(
+            metadata[SerializationCompositionNodeTypes.Base64Decode]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_shared_serialization_options()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+            AssertSharedOptions(item);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new SerializationComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(6);
+        catalog.TryGet(
+            new ComponentType(SerializationCompositionNodeTypes.JsonParse),
+            out var jsonParseMetadata).ShouldBeTrue();
+        jsonParseMetadata.ShouldNotBeNull()
+            .DisplayName.ShouldBe("JSON Parse");
+        catalog.TryGet(
+            new ComponentType(SerializationCompositionNodeTypes.Base64Decode),
+            out var base64DecodeMetadata).ShouldBeTrue();
+        base64DecodeMetadata.ShouldNotBeNull()
+            .DisplayName.ShouldBe("Base64 Decode");
     }
 
     [Fact]
@@ -243,6 +317,98 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(TInput));
         registration.Outputs[SerializationCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(TOutput));
+    }
+
+    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
+        => new SerializationComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertDesignPorts<TInput, TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(SerializationCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(SerializationCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    private static void AssertSharedOptions(ComponentDesignMetadata metadata)
+    {
+        var defaults = new SerializationNodeOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "boundedCapacity",
+            "defaultEncoding",
+            "maxInputBytes",
+            "maxOutputBytes",
+            "writeIndented",
+            "allowTrailingCommas",
+            "skipComments"
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata,
+            "defaultEncoding",
+            OptionValueKind.Text,
+            defaults.DefaultEncoding);
+        AssertOption(
+            metadata,
+            "maxInputBytes",
+            OptionValueKind.Number,
+            defaults.MaxInputBytes,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxOutputBytes",
+            OptionValueKind.Number,
+            defaults.MaxOutputBytes,
+            min: 1);
+        AssertOption(
+            metadata,
+            "writeIndented",
+            OptionValueKind.Boolean,
+            defaults.WriteIndented);
+        AssertOption(
+            metadata,
+            "allowTrailingCommas",
+            OptionValueKind.Boolean,
+            defaults.AllowTrailingCommas);
+        AssertOption(
+            metadata,
+            "skipComments",
+            OptionValueKind.Boolean,
+            defaults.SkipComments);
+    }
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(
