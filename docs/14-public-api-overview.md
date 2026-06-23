@@ -358,6 +358,7 @@ FluxFlow.Components.Payloads.Composition
 
 Main types:
 
+- `PayloadsComponentDesignMetadataProvider`
 - `PayloadsCompositionNodeRegistryExtensions`
 - `PayloadsCompositionNodeTypes`
 - `PayloadsCompositionPortNames`
@@ -368,6 +369,11 @@ Use `RegisterPayloadInspect()` from the optional
 a `payload.inspect` node factory. The factory binds existing
 `PayloadInspectOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
+
+`PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
+the `payload.inspect` composition node so hosts can compose palette, editor,
+validation, or documentation hints without copying package descriptors. The
+metadata keeps `clock` as a host-owned resource.
 
 ## FileSystem Composition
 
