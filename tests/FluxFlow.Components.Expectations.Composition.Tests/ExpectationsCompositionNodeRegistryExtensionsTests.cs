@@ -1,9 +1,12 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Expectations;
 using FluxFlow.Components.Expectations.Composition;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Nodes;
+using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
@@ -31,6 +34,112 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(EventExpectationResult));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_expectation_metadata()
+    {
+        var metadata = ExpectationDesignMetadata();
+
+        metadata.Type.Value.ShouldBe(ExpectationsCompositionNodeTypes.EventExpectation);
+        metadata.DisplayName.ShouldBe("Event Expectation");
+        metadata.Category.ShouldBe("Expectations");
+        metadata.SuggestedEditorWidth.ShouldBe(460);
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Options.ShouldNotContain(option =>
+            option.Name == ExpectationsCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_expectation_ports()
+    {
+        var metadata = ExpectationDesignMetadata();
+
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(ExpectationsCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(nameof(ProjectionEvent));
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(ExpectationsCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(nameof(EventExpectationResult));
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_expectation_options()
+    {
+        var metadata = ExpectationDesignMetadata();
+        var defaults = new EventExpectationOptions();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "kind",
+            "name",
+            "filter",
+            "timeoutMilliseconds",
+            "maxObservedEvents",
+            "maxPreviewChars",
+            "boundedCapacity"
+        ], ignoreOrder: false);
+
+        var kind = metadata.Options.Single(option => option.Name == "kind");
+        kind.Kind.ShouldBe(OptionValueKind.Enum);
+        kind.DefaultValue.ShouldBe(defaults.Kind.ToString());
+        kind.Choices.Select(choice => choice.Value).ShouldBe([
+            EventExpectationNodeKind.Expect.ToString(),
+            EventExpectationNodeKind.Guard.ToString()
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
+
+        var filter = metadata.Options.Single(option => option.Name == "filter");
+        filter.Kind.ShouldBe(OptionValueKind.Json);
+        filter.DefaultValue.ShouldBeOfType<EventFilter>();
+
+        AssertOption(
+            metadata,
+            "timeoutMilliseconds",
+            OptionValueKind.Number,
+            defaultValue: null,
+            min: 0.000001);
+        AssertOption(
+            metadata,
+            "maxObservedEvents",
+            OptionValueKind.Number,
+            defaults.MaxObservedEvents,
+            min: 0);
+        AssertOption(
+            metadata,
+            "maxPreviewChars",
+            OptionValueKind.Number,
+            defaults.MaxPreviewChars,
+            min: 0);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new ExpectationsComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.ShouldHaveSingleItem();
+        catalog.TryGet(
+            new ComponentType(ExpectationsCompositionNodeTypes.EventExpectation),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull()
+            .DisplayName.ShouldBe("Event Expectation");
     }
 
     [Fact]
@@ -270,6 +379,24 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
             (diagnostic.Message.Contains(optionName, StringComparison.OrdinalIgnoreCase) ||
              diagnostic.Message.Contains("capacity", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static ComponentDesignMetadata ExpectationDesignMetadata()
+        => new ExpectationsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static async Task WithNodeAsync(

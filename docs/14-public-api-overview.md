@@ -523,6 +523,7 @@ FluxFlow.Components.Expectations.Composition
 
 Main types:
 
+- `ExpectationsComponentDesignMetadataProvider`
 - `ExpectationsCompositionNodeRegistryExtensions`
 - `ExpectationsCompositionNodeTypes`
 - `ExpectationsCompositionPortNames`
@@ -533,6 +534,11 @@ Use `RegisterEventExpectation()` from the optional
 wants an `event.expectation` node factory. The factory binds existing
 `EventExpectationOptions` and can resolve an optional keyed `TimeProvider`
 resource through the host.
+
+`ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the `event.expectation` composition node, including existing expectation
+options and fixed ports. Clocks remain host-owned keyed resources; completion
+result flushing remains a direct node API in this composition pass.
 
 ## MQTT Composition
 

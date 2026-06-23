@@ -70,6 +70,15 @@ The node binds the existing `EventExpectationOptions` shape from composition
 configuration. `kind` follows the existing enum values: `0` for expect and `1`
 for guard.
 
+## Design Metadata
+
+`ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
+for `event.expectation` so hosts can build palettes, editors, validation hints,
+or documentation without copying package descriptors. The metadata describes the
+existing event expectation option record and fixed ports. Optional keyed
+`TimeProvider` clocks remain host-owned resources and are not modeled as
+editable node options.
+
 `CompleteWithResultAsync()` remains a direct node lifecycle feature in v1.
 Composition runtime stop uses normal node completion; callers that need a
 completion-result flush should use `EventExpectationNode.CompleteWithResultAsync()`

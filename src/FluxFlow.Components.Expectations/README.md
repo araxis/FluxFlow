@@ -112,6 +112,11 @@ services
 The composition adapter binds `EventExpectationOptions` from node configuration
 and can resolve an optional keyed `TimeProvider` resource named `clock`.
 
+The optional composition package also exposes
+`ExpectationsComponentDesignMetadataProvider` for neutral Designer metadata over
+the `event.expectation` composition node type. The standalone Expectations
+package remains free of Designer, Composition, and Engine dependencies.
+
 `CompleteWithResultAsync()` remains a direct node lifecycle feature in v1.
 Composition runtime stop uses normal node completion. Use the direct node API
 when a completion-result flush is required until composition grows an explicit
