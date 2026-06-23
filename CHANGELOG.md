@@ -118,6 +118,14 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
 are `FlowSource`s (the watcher is disposed in `OnDisposeAsync`). Engine glue removed.
 
+## FluxFlow.Components.FileSystem.Composition 1.1.0
+
+Adds package-owned Designer metadata for `file.read`, `file.write`,
+`directory.enumerate`, and `file.watch` composition nodes. The provider
+describes file-system options and fixed ports while path policy remains node
+configuration, `clock` remains a host-owned resource, and runtime behavior
+stays unchanged.
+
 ## FluxFlow.Components.FileSystem.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for standalone file
