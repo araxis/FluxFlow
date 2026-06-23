@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.State;
 using FluxFlow.Components.State.Composition;
 using FluxFlow.Components.State.Contracts;
@@ -31,6 +33,91 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(StateReducerInput));
         reducer.Outputs[StateCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(StateReducerResult));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_state_metadata()
+    {
+        var metadata = DesignMetadata();
+
+        metadata.Type.Value.ShouldBe(StateCompositionNodeTypes.Reducer);
+        metadata.DisplayName.ShouldBe("State Reducer");
+        metadata.Category.ShouldBe("State");
+        metadata.SuggestedEditorWidth.ShouldBe(460);
+        metadata.Options.ShouldNotContain(option =>
+            option.Name == StateCompositionResourceNames.Clock);
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_state_ports()
+    {
+        var metadata = DesignMetadata();
+
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(StateCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(nameof(StateReducerInput));
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(StateCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(nameof(StateReducerResult));
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_state_options()
+    {
+        var metadata = DesignMetadata();
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "engine",
+            "keyExpression",
+            "reducer",
+            "expressionId",
+            "expressionName",
+            "initialState",
+            "boundedCapacity",
+            "maxKeys"
+        ], ignoreOrder: false);
+
+        AssertOption(metadata, "engine", OptionValueKind.Text);
+        AssertOption(metadata, "keyExpression", OptionValueKind.Text);
+        AssertOption(metadata, "reducer", OptionValueKind.Text, isRequired: true);
+        AssertOption(metadata, "expressionId", OptionValueKind.Text);
+        AssertOption(metadata, "expressionName", OptionValueKind.Text);
+        AssertOption(metadata, "initialState", OptionValueKind.Json);
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaultValue: 128,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxKeys",
+            OptionValueKind.Number,
+            defaultValue: 1024,
+            min: 0);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new StateComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(1);
+        catalog.TryGet(
+            new ComponentType(StateCompositionNodeTypes.Reducer),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull().DisplayName.ShouldBe("State Reducer");
     }
 
     [Fact]
@@ -346,6 +433,26 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         var buffer = new BufferBlock<T>();
         source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
         return buffer;
+    }
+
+    private static ComponentDesignMetadata DesignMetadata()
+        => new StateComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue = null,
+        double? min = null,
+        bool isRequired = false)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
+        option.IsRequired.ShouldBe(isRequired);
     }
 
     private sealed class SampleExpressionEngine : IFlowExpressionEngine
