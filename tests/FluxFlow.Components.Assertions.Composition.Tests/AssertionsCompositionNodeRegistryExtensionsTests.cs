@@ -1,6 +1,8 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Assertions.Composition;
 using FluxFlow.Components.Assertions.Contracts;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Mapping;
@@ -48,6 +50,79 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         registry.Registrations["flow.assert.input"]
             .Outputs[AssertionsCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(FlowAssertionResult));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_assertion_metadata()
+    {
+        var metadata = new AssertionsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
+        metadata.DisplayName.ShouldBe("Assertion");
+        metadata.Category.ShouldBe("Assertions");
+        metadata.PreferredNodeName.ShouldBe("assert");
+        metadata.SuggestedEditorWidth.ShouldBe(420);
+        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+            ("expression", OptionValueKind.Expression),
+            ("expressionId", OptionValueKind.Text),
+            ("expressionName", OptionValueKind.Text),
+            ("engine", OptionValueKind.Text),
+            ("inputType", OptionValueKind.Text),
+            ("boundedCapacity", OptionValueKind.Number),
+            ("description", OptionValueKind.Text),
+            ("failureMessage", OptionValueKind.Text),
+            ("emitPassedInput", OptionValueKind.Boolean),
+            ("emitFailedInput", OptionValueKind.Boolean)
+        ]);
+        metadata.Options.Single(option => option.Name == "expression")
+            .IsRequired.ShouldBeTrue();
+        metadata.Options.Single(option => option.Name == "boundedCapacity")
+            .Min.ShouldBe(1);
+        metadata.Options.Single(option => option.Name == "description")
+            .DefaultValue.ShouldBe("Flow assertion");
+        metadata.Options.Single(option => option.Name == "failureMessage")
+            .DefaultValue.ShouldBe("Assertion failed.");
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(AssertionsCompositionResourceNames.ContextFactory);
+        metadata.Options.Select(option => option.Name)
+            .ShouldNotContain(AssertionsCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_assertion_ports()
+    {
+        var metadata = new AssertionsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.IsPrimary,
+            port.ValueType)).ShouldBe([
+            (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
+            (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(FlowAssertionResult)),
+            (AssertionsCompositionPortNames.Passed, PortDirection.Output, 2, false, "TInput"),
+            (AssertionsCompositionPortNames.Failed, PortDirection.Output, 3, false, "TInput")
+        ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new AssertionsComponentDesignMetadataProvider();
+
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.TryGet(
+            new ComponentType(AssertionsCompositionNodeTypes.Assert),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull();
+        metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
     }
 
     [Fact]
