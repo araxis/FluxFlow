@@ -1,7 +1,10 @@
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.FileSystem.Composition;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
+using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -45,6 +48,190 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         registry.Registrations[FileSystemCompositionNodeTypes.Watch]
             .Outputs[FileSystemCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FileWatchEvent));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_file_system_metadata()
+    {
+        var metadata = DesignMetadataByType();
+
+        metadata.Keys.ShouldBe([
+            FileSystemCompositionNodeTypes.Read,
+            FileSystemCompositionNodeTypes.Write,
+            FileSystemCompositionNodeTypes.DirectoryEnumerate,
+            FileSystemCompositionNodeTypes.Watch
+        ], ignoreOrder: false);
+
+        foreach (var item in metadata.Values)
+        {
+            ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
+            item.Category.ShouldBe("FileSystem");
+            item.SuggestedEditorWidth.ShouldBe(460);
+            item.Options.ShouldNotContain(option =>
+                option.Name == FileSystemCompositionResourceNames.Clock);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_file_system_ports()
+    {
+        var metadata = DesignMetadataByType();
+
+        AssertTransformPorts<FileReadRequest, FileReadResult>(
+            metadata[FileSystemCompositionNodeTypes.Read]);
+        AssertTransformPorts<FileWriteRequest, FileWriteResult>(
+            metadata[FileSystemCompositionNodeTypes.Write]);
+        AssertSourcePort<DirectoryEnumerateEntry>(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate]);
+        AssertSourcePort<FileWatchEvent>(
+            metadata[FileSystemCompositionNodeTypes.Watch]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_file_system_options()
+    {
+        var metadata = DesignMetadataByType();
+        var readDefaults = new FileReadOptions();
+        var writeDefaults = new FileWriteOptions();
+        var enumerateDefaults = new DirectoryEnumerateOptions();
+        var watchDefaults = new FileWatchOptions();
+
+        AssertOptionNames(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "boundedCapacity",
+            "baseDirectory",
+            "allowAbsolutePaths",
+            "defaultEncoding",
+            "maxBytes");
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            readDefaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "baseDirectory",
+            OptionValueKind.Text);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "allowAbsolutePaths",
+            OptionValueKind.Boolean,
+            readDefaults.AllowAbsolutePaths);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "defaultEncoding",
+            OptionValueKind.Text,
+            readDefaults.DefaultEncoding);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Read],
+            "maxBytes",
+            OptionValueKind.Number,
+            readDefaults.MaxBytes,
+            min: 1);
+
+        AssertOptionNames(
+            metadata[FileSystemCompositionNodeTypes.Write],
+            "boundedCapacity",
+            "baseDirectory",
+            "allowAbsolutePaths",
+            "defaultEncoding");
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Write],
+            "boundedCapacity",
+            OptionValueKind.Number,
+            writeDefaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Write],
+            "defaultEncoding",
+            OptionValueKind.Text,
+            writeDefaults.DefaultEncoding);
+
+        AssertOptionNames(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
+            "boundedCapacity",
+            "directory",
+            "filter",
+            "includeSubdirectories",
+            "includeFiles",
+            "includeDirectories",
+            "baseDirectory",
+            "allowAbsolutePaths",
+            "maxEntries");
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
+            "directory",
+            OptionValueKind.Text,
+            enumerateDefaults.Directory,
+            isRequired: true);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
+            "filter",
+            OptionValueKind.Text,
+            enumerateDefaults.Filter,
+            isRequired: true);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
+            "includeFiles",
+            OptionValueKind.Boolean,
+            enumerateDefaults.IncludeFiles);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
+            "maxEntries",
+            OptionValueKind.Number,
+            min: 1);
+
+        AssertOptionNames(
+            metadata[FileSystemCompositionNodeTypes.Watch],
+            "boundedCapacity",
+            "directory",
+            "baseDirectory",
+            "allowAbsolutePaths",
+            "filter",
+            "includeSubdirectories",
+            "notifyFilters",
+            "internalBufferSize");
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Watch],
+            "directory",
+            OptionValueKind.Text,
+            watchDefaults.Directory,
+            isRequired: true);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Watch],
+            "filter",
+            OptionValueKind.Text,
+            watchDefaults.Filter,
+            isRequired: true);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Watch],
+            "notifyFilters",
+            OptionValueKind.Json,
+            watchDefaults.NotifyFilters);
+        AssertOption(
+            metadata[FileSystemCompositionNodeTypes.Watch],
+            "internalBufferSize",
+            OptionValueKind.Number,
+            min: 4096,
+            max: 65536);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new FileSystemComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(4);
+        catalog.TryGet(
+            new ComponentType(FileSystemCompositionNodeTypes.Read),
+            out var readMetadata).ShouldBeTrue();
+        readMetadata.ShouldNotBeNull().DisplayName.ShouldBe("File Read");
+        catalog.TryGet(
+            new ComponentType(FileSystemCompositionNodeTypes.Watch),
+            out var watchMetadata).ShouldBeTrue();
+        watchMetadata.ShouldNotBeNull().DisplayName.ShouldBe("File Watch");
     }
 
     [Fact]
@@ -392,6 +579,75 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             .ShouldBeOfType<CompositionOutputPort<TOutput>>();
 
         await run(input, output, descriptor);
+    }
+
+    private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
+        => new FileSystemComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
+
+    private static void AssertTransformPorts<TInput, TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.Value.ShouldBe(FileSystemCompositionPortNames.Input);
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.Order.ShouldBe(0);
+        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.IsPrimary.ShouldBeTrue();
+
+        var output = metadata.Ports[1];
+        output.Name.Value.ShouldBe(FileSystemCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(1);
+        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    private static void AssertSourcePort<TOutput>(
+        ComponentDesignMetadata metadata)
+    {
+        metadata.Ports.Count.ShouldBe(1);
+
+        var output = metadata.Ports[0];
+        output.Name.Value.ShouldBe(FileSystemCompositionPortNames.Output);
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.Order.ShouldBe(0);
+        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.IsPrimary.ShouldBeTrue();
+    }
+
+    private static void AssertOptionNames(
+        ComponentDesignMetadata metadata,
+        params string[] names)
+        => metadata.Options.Select(option => option.Name)
+            .ShouldBe(names, ignoreOrder: false);
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue = null,
+        double? min = null,
+        double? max = null,
+        bool isRequired = false)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        if (defaultValue is string[] expectedArray)
+        {
+            option.DefaultValue.ShouldBeOfType<string[]>().ShouldBe(expectedArray);
+        }
+        else
+        {
+            option.DefaultValue.ShouldBe(defaultValue);
+        }
+
+        option.Min.ShouldBe(min);
+        option.Max.ShouldBe(max);
+        option.IsRequired.ShouldBe(isRequired);
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

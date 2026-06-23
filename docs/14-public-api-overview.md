@@ -385,6 +385,7 @@ FluxFlow.Components.FileSystem.Composition
 
 Main types:
 
+- `FileSystemComponentDesignMetadataProvider`
 - `FileSystemCompositionNodeRegistryExtensions`
 - `FileSystemCompositionNodeTypes`
 - `FileSystemCompositionPortNames`
@@ -396,6 +397,12 @@ Use `RegisterFileRead()`, `RegisterFileWrite()`,
 wants file-system node factories. The factories bind existing file-system
 options and can resolve an optional keyed `TimeProvider` resource through the
 host.
+
+`FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
+for the four file-system composition nodes so hosts can compose palette,
+editor, validation, or documentation hints without copying package descriptors.
+The metadata keeps path policy as node configuration and `clock` as a
+host-owned resource.
 
 ## State Composition
 
