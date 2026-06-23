@@ -1,8 +1,11 @@
 using System.Net;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Http.Composition;
 using FluxFlow.Components.Http.Contracts;
+using FluxFlow.Components.Http.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Nodes;
@@ -26,6 +29,101 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             typeof(HttpRequestInput));
         client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
             typeof(HttpResponseOutput));
+    }
+
+    [Fact]
+    public void Design_metadata_provider_returns_valid_http_client_metadata()
+    {
+        var metadata = GetClientDesignMetadata();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Type.ShouldBe(new ComponentType(HttpCompositionNodeTypes.Client));
+        metadata.DisplayName.ShouldBe("HTTP Client");
+        metadata.Category.ShouldBe("HTTP");
+        metadata.SuggestedEditorWidth.ShouldBe(420);
+        metadata.Options.ShouldNotContain(option =>
+            option.Name == HttpCompositionResourceNames.Client ||
+            option.Name == HttpCompositionResourceNames.Clock);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_http_client_ports()
+    {
+        var metadata = GetClientDesignMetadata();
+
+        metadata.Ports.Count.ShouldBe(2);
+
+        var input = metadata.Ports[0];
+        input.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Input));
+        input.Direction.ShouldBe(PortDirection.Input);
+        input.ValueType.ShouldBe(nameof(HttpRequestInput));
+        input.IsPrimary.ShouldBeTrue();
+        input.Order.ShouldBe(0);
+
+        var output = metadata.Ports[1];
+        output.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Output));
+        output.Direction.ShouldBe(PortDirection.Output);
+        output.ValueType.ShouldBe(nameof(HttpResponseOutput));
+        output.IsPrimary.ShouldBeTrue();
+        output.Order.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_http_client_options()
+    {
+        var metadata = GetClientDesignMetadata();
+        var defaults = HttpClientNodeOptions.Default;
+
+        metadata.Options.Select(option => option.Name).ShouldBe([
+            "boundedCapacity",
+            "maxResponseBodyBytes",
+            "treatNonSuccessStatusAsError",
+            "maxDegreeOfParallelism",
+            "defaultTimeoutMilliseconds"
+        ], ignoreOrder: false);
+
+        AssertOption(
+            metadata,
+            "boundedCapacity",
+            OptionValueKind.Number,
+            defaults.BoundedCapacity,
+            min: 1);
+        AssertOption(
+            metadata,
+            "maxResponseBodyBytes",
+            OptionValueKind.Number,
+            defaults.MaxResponseBodyBytes,
+            min: 1);
+        AssertOption(
+            metadata,
+            "treatNonSuccessStatusAsError",
+            OptionValueKind.Boolean,
+            defaults.TreatNonSuccessStatusAsError);
+        AssertOption(
+            metadata,
+            "maxDegreeOfParallelism",
+            OptionValueKind.Number,
+            defaults.MaxDegreeOfParallelism,
+            min: 1);
+        AssertOption(
+            metadata,
+            "defaultTimeoutMilliseconds",
+            OptionValueKind.Number,
+            defaultValue: null,
+            min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var provider = new HttpComponentDesignMetadataProvider();
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        catalog.All.Count.ShouldBe(1);
+        catalog.TryGet(
+            new ComponentType(HttpCompositionNodeTypes.Client),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull().DisplayName.ShouldBe("HTTP Client");
     }
 
     [Fact]
@@ -165,6 +263,24 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains(
                 HttpCompositionResourceNames.Client,
                 StringComparison.Ordinal));
+    }
+
+    private static ComponentDesignMetadata GetClientDesignMetadata()
+        => new HttpComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static void AssertOption(
+        ComponentDesignMetadata metadata,
+        string name,
+        OptionValueKind kind,
+        object? defaultValue,
+        double? min = null)
+    {
+        var option = metadata.Options.Single(option => option.Name == name);
+        option.Kind.ShouldBe(kind);
+        option.DefaultValue.ShouldBe(defaultValue);
+        option.Min.ShouldBe(min);
     }
 
     private static Task<HttpResponseMessage> Respond(

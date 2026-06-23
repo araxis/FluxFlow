@@ -147,6 +147,13 @@ Engine-free standalone rewrite to a single `HttpClientNode : FlowNode<HttpReques
 HttpResponseOutput>` over an injected `HttpClient` — the connection-resource node, sender
 factory, and in-node SSRF guard are gone (transport policy lives on the injected client).
 
+## FluxFlow.Components.Http.Composition 1.1.0
+
+Adds package-owned Designer metadata for the `http.client` composition node.
+The provider describes HTTP client options and fixed request/result ports while
+`HttpClient` instances and clocks remain host-owned resources and runtime
+behavior stays unchanged.
+
 ## FluxFlow.Components.Http.Composition 1.0.0
 
 Adds optional `FluxFlow.Composition` registration helpers for the standalone

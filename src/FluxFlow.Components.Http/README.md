@@ -68,3 +68,8 @@ Add `FluxFlow.Components.Http.Composition` when a host wants to instantiate
 optional package registers the `http.client` factory and resolves a keyed
 `HttpClient` resource named `client`; the host still owns the client lifetime
 and transport policy.
+
+The optional composition package also exposes
+`HttpComponentDesignMetadataProvider` for neutral Designer metadata over the
+`http.client` composition node type. The standalone HTTP package remains free
+of Designer, Composition, and Engine dependencies.

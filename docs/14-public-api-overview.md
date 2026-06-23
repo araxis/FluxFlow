@@ -74,6 +74,7 @@ FluxFlow.Components.Http.Composition
 
 Main types:
 
+- `HttpComponentDesignMetadataProvider`
 - `HttpCompositionNodeRegistryExtensions`
 - `HttpCompositionNodeTypes`
 - `HttpCompositionPortNames`
@@ -83,6 +84,10 @@ Use `RegisterHttpNodes()` from the optional
 `FluxFlow.Components.Http.Composition` package when a composition host wants an
 `http.client` node factory. The factory resolves a keyed `HttpClient` resource;
 the host still owns client lifetime and transport policy.
+
+`HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for the
+HTTP client composition node, including the existing options and fixed ports.
+`HttpClient` instances and clocks remain host-owned keyed resources.
 
 ## Mapping Composition
 
