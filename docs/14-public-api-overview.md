@@ -86,8 +86,9 @@ Use `RegisterHttpNodes()` from the optional
 the host still owns client lifetime and transport policy.
 
 `HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-HTTP client composition node, including the existing options and fixed ports.
-`HttpClient` instances and clocks remain host-owned keyed resources.
+HTTP client composition node, including existing options, fixed ports, and
+resource hints for the required `client` resource and optional `clock`
+resource. `HttpClient` instances and clocks remain host-owned keyed resources.
 
 ## Mapping Composition
 
@@ -581,8 +582,10 @@ Use `RegisterMqttNodes()` from the optional
 the host still own broker/client registration.
 
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-MQTT publish and trigger composition nodes, including existing options and fixed
-ports. Publisher, trigger source, and clock resources remain host-owned.
+MQTT publish and trigger composition nodes, including existing options, fixed
+ports, and resource hints for `publisher`, `triggerSource`, and optional
+`clock` resources. Publisher, trigger source, and clock resources remain
+host-owned.
 
 ## Designer Metadata
 

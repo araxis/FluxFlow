@@ -39,6 +39,23 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             },
             BoundedCapacityOption(PublishDefaults.BoundedCapacity)
         ],
+        Resources =
+        [
+            Resource(
+                MqttCompositionResourceNames.Publisher,
+                "Publisher",
+                nameof(IMqttPublisher),
+                "Keyed MQTT publisher used to send publish requests.",
+                isRequired: true,
+                order: 0),
+            Resource(
+                MqttCompositionResourceNames.Clock,
+                "Clock",
+                nameof(TimeProvider),
+                "Optional keyed clock for deterministic publish diagnostics.",
+                isRequired: false,
+                order: 1)
+        ],
         Ports =
         [
             InputPort(
@@ -125,6 +142,23 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
                 HelperText = "Timeout for request/reply responses; must be greater than zero."
             }
         ],
+        Resources =
+        [
+            Resource(
+                MqttCompositionResourceNames.TriggerSource,
+                "Trigger Source",
+                nameof(IMqttTriggerSource),
+                "Keyed MQTT trigger source used to open subscriptions.",
+                isRequired: true,
+                order: 0),
+            Resource(
+                MqttCompositionResourceNames.Clock,
+                "Clock",
+                nameof(TimeProvider),
+                "Optional keyed clock for deterministic trigger diagnostics and response timeouts.",
+                isRequired: false,
+                order: 1)
+        ],
         Ports =
         [
             InputPort(
@@ -147,6 +181,22 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
         Min = 1,
         HelperText = "Maximum queued messages."
     };
+
+    private static ResourceDesignMetadata Resource(
+        string name,
+        string displayName,
+        string valueType,
+        string summary,
+        bool isRequired,
+        int order) => new()
+        {
+            Name = name,
+            DisplayName = displayName,
+            Order = order,
+            Summary = summary,
+            ValueType = valueType,
+            IsRequired = isRequired
+        };
 
     private static PortDesignMetadata InputPort(
         string name,

@@ -62,6 +62,15 @@ payload, and MQTT protocol metadata live on `MqttPublishRequest`. Trigger reques
 policy stays MQTT-owned. Concrete client-library integrations are split into separate adapter
 packages.
 
+## FluxFlow.Components.Mqtt.Composition 1.2.0
+
+Adds Designer resource metadata for `mqtt.publish` and `mqtt.trigger`.
+
+- Describes the required `publisher` resource for publish nodes.
+- Describes the required `triggerSource` resource for trigger nodes.
+- Describes the optional `clock` resource separately from editable MQTT node
+  options.
+
 ## FluxFlow.Components.Mqtt.Composition 1.1.0
 
 Adds package-owned Designer metadata for `mqtt.publish` and `mqtt.trigger`
@@ -171,6 +180,15 @@ options from composition configuration, and resolves optional keyed
 Engine-free standalone rewrite to a single `HttpClientNode : FlowNode<HttpRequestInput,
 HttpResponseOutput>` over an injected `HttpClient` — the connection-resource node, sender
 factory, and in-node SSRF guard are gone (transport policy lives on the injected client).
+
+## FluxFlow.Components.Http.Composition 1.2.0
+
+Adds Designer resource metadata for `http.client`.
+
+- Describes the required `client` resource separately from editable HTTP client
+  node options.
+- Describes the optional `clock` resource for deterministic diagnostics and
+  timeout behavior.
 
 ## FluxFlow.Components.Http.Composition 1.1.0
 

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone MQTT publish and trigger nodes over adapter-owned keyed MQTT resources.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for mqtt.publish and mqtt.trigger composition nodes while keeping MQTT publisher, trigger source, and clocks host-owned resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for mqtt.publish and mqtt.trigger host-owned publisher, trigger source, and clock resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -85,6 +85,10 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             OptionValueKind.Number,
             defaults.BoundedCapacity,
             min: 1);
+        AssertResources(
+            metadata,
+            (MqttCompositionResourceNames.Publisher, true, nameof(IMqttPublisher)),
+            (MqttCompositionResourceNames.Clock, false, nameof(TimeProvider)));
     }
 
     [Fact]
@@ -172,6 +176,10 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             OptionValueKind.Duration,
             defaults.ResponseTimeout,
             min: 0.000001);
+        AssertResources(
+            metadata,
+            (MqttCompositionResourceNames.TriggerSource, true, nameof(IMqttTriggerSource)),
+            (MqttCompositionResourceNames.Clock, false, nameof(TimeProvider)));
     }
 
     [Fact]
@@ -380,6 +388,22 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         return option;
+    }
+
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        params (string Name, bool IsRequired, string ValueType)[] expected)
+    {
+        metadata.Resources.Count.ShouldBe(expected.Length);
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var resource = metadata.Resources[index];
+            resource.Name.ShouldBe(expected[index].Name);
+            resource.Order.ShouldBe(index);
+            resource.IsRequired.ShouldBe(expected[index].IsRequired);
+            resource.ValueType.ShouldBe(expected[index].ValueType);
+        }
     }
 
     private sealed class RecordingMqttAdapter :
