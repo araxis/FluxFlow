@@ -1,3 +1,4 @@
+using System.Net.Http;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Http.Contracts;
@@ -65,6 +66,26 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 DisplayName = "Default Timeout Milliseconds",
                 Min = 1,
                 HelperText = "Optional per-request timeout used when the input message omits one."
+            }
+        ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = HttpCompositionResourceNames.Client,
+                DisplayName = "Client",
+                Order = 0,
+                Summary = "Keyed HttpClient used to send request messages.",
+                ValueType = nameof(HttpClient),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = HttpCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional keyed clock for deterministic request timeouts and diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ],
         Ports =

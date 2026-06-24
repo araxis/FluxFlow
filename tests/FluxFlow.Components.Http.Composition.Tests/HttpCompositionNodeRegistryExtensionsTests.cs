@@ -44,6 +44,14 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         metadata.Options.ShouldNotContain(option =>
             option.Name == HttpCompositionResourceNames.Client ||
             option.Name == HttpCompositionResourceNames.Clock);
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (HttpCompositionResourceNames.Client, 0, true, nameof(HttpClient)),
+            (HttpCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
     }
 
     [Fact]
