@@ -73,6 +73,7 @@ resolves the concrete `ISessionStore` from the `store` resource.
 `session.recorder`, `session.replay`, and `session.query` so hosts can build
 palettes, editors, validation hints, or documentation without copying package
 descriptors. The metadata describes the existing session option records and
-fixed ports. Concrete `ISessionStore` instances and optional keyed
-`TimeProvider` clocks remain host-owned resources and are not modeled as editable
-node options; the `store` option remains only diagnostic/config metadata.
+fixed ports, plus resource hints for the required `store` and optional `clock`
+resources. Concrete `ISessionStore` instances and optional keyed `TimeProvider`
+clocks remain host-owned resources and are not modeled as editable node options;
+the `store` option remains only diagnostic/config metadata.

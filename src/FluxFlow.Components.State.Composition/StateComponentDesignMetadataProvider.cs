@@ -1,6 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.State.Contracts;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.State.Composition;
 
@@ -83,6 +84,26 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 DefaultValue = DefaultMaxKeys,
                 Min = 0,
                 HelperText = "Maximum number of keys to track. Zero rejects new keys."
+            }
+        ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = StateCompositionResourceNames.Engine,
+                DisplayName = "Engine",
+                Order = 0,
+                Summary = "Required keyed expression engine used to evaluate reducer and key expressions.",
+                ValueType = nameof(IFlowExpressionEngine),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = StateCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional keyed clock for deterministic state reducer results and diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ],
         Ports =

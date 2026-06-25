@@ -77,6 +77,7 @@ the `store` resource.
 `storage.put`, `storage.get`, `storage.query`, and `storage.delete` so hosts can
 build palettes, editors, validation hints, or documentation without copying
 package descriptors. The metadata describes the existing storage option records
-and fixed ports. Concrete `IStorageStore` instances and optional keyed
-`TimeProvider` clocks remain host-owned resources and are not modeled as editable
-node options.
+and fixed ports, plus resource hints for the required `store` and optional
+`clock` resources. Concrete `IStorageStore` instances and optional keyed
+`TimeProvider` clocks remain host-owned resources and are not modeled as
+editable node options.

@@ -46,6 +46,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
             option.Name == StateCompositionResourceNames.Clock);
+        AssertResources(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
 
@@ -453,6 +454,18 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         option.IsRequired.ShouldBe(isRequired);
+    }
+
+    private static void AssertResources(ComponentDesignMetadata metadata)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (StateCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
+            (StateCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
     }
 
     private sealed class SampleExpressionEngine : IFlowExpressionEngine

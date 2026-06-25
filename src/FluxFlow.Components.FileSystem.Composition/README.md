@@ -82,9 +82,9 @@ and `file.watch`; normal runtime stop/dispose stops `file.watch`.
 
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes. The metadata describes fixed
-request/result ports, source outputs, and the existing FileSystem option
-records for hosts that build palettes, editors, validators, or documentation
-views.
+request/result ports, source outputs, the existing FileSystem option records,
+and optional `clock` resource hints for hosts that build palettes, editors,
+validators, or documentation views.
 
 Path safety remains runtime configuration through `baseDirectory` and
 `allowAbsolutePaths`. The optional `clock` resource remains host-owned and is

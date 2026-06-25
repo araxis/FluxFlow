@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone file system nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for file system composition nodes while keeping file-system runtime behavior, path policy, and host-owned clock resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for file-system clock resources while keeping file-system runtime behavior, path policy, and host-owned clocks unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

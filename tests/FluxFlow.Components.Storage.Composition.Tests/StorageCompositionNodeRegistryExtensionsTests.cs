@@ -76,6 +76,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             item.Options.ShouldNotContain(option =>
                 option.Name == StorageCompositionResourceNames.Store ||
                 option.Name == StorageCompositionResourceNames.Clock);
+            AssertResources(item);
         }
     }
 
@@ -664,6 +665,18 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         return option;
+    }
+
+    private static void AssertResources(ComponentDesignMetadata metadata)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (StorageCompositionResourceNames.Store, 0, true, nameof(IStorageStore)),
+            (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

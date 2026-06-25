@@ -69,6 +69,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
                 option.Name == FileSystemCompositionResourceNames.Clock);
+            AssertClockResource(item);
         }
     }
 
@@ -648,6 +649,17 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         option.Min.ShouldBe(min);
         option.Max.ShouldBe(max);
         option.IsRequired.ShouldBe(isRequired);
+    }
+
+    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    {
+        var resource = metadata.Resources.ShouldHaveSingleItem();
+
+        resource.Name.ShouldBe(FileSystemCompositionResourceNames.Clock);
+        resource.DisplayName.ShouldBe("Clock");
+        resource.Order.ShouldBe(0);
+        resource.IsRequired.ShouldBeFalse();
+        resource.ValueType.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

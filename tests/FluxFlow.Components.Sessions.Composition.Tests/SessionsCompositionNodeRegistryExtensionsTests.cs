@@ -65,6 +65,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
                 option.Name == SessionsCompositionResourceNames.Clock);
+            AssertResources(item);
         }
     }
 
@@ -772,6 +773,18 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         option.Min.ShouldBe(min);
         option.IsRequired.ShouldBe(isRequired);
         return option;
+    }
+
+    private static void AssertResources(ComponentDesignMetadata metadata)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (SessionsCompositionResourceNames.Store, 0, true, nameof(ISessionStore)),
+            (SessionsCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

@@ -70,6 +70,7 @@ composition adapter resolves the expression engine from the `engine` resource.
 `state.reducer` so hosts can build palettes, editors, validation hints, or
 documentation without copying package descriptors. The metadata describes the
 existing `StateReducerOptions` configuration surface and fixed `Input`/`Output`
-ports. The required keyed expression engine resource and optional keyed
-`TimeProvider` stay host-owned; the `engine` option remains only
-diagnostic/config metadata and is not used for DI selection.
+ports, plus resource hints for the required keyed expression engine and
+optional keyed `TimeProvider`. Those resources stay host-owned; the `engine`
+option remains only diagnostic/config metadata and is not used for DI
+selection.

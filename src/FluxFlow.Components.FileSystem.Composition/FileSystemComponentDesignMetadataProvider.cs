@@ -46,6 +46,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 HelperText = "Optional maximum file size to read. Leave empty for unlimited reads."
             }
         ],
+        Resources = ClockResources(),
         Ports = TransformPorts(
             nameof(FileReadRequest),
             "File read request.",
@@ -69,6 +70,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             AllowAbsolutePathsOption(WriteDefaults.AllowAbsolutePaths),
             DefaultEncodingOption(WriteDefaults.DefaultEncoding)
         ],
+        Resources = ClockResources(),
         Ports = TransformPorts(
             nameof(FileWriteRequest),
             "File write request.",
@@ -125,6 +127,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 HelperText = "Optional maximum number of entries to emit."
             }
         ],
+        Resources = ClockResources(),
         Ports = SourcePorts(nameof(DirectoryEnumerateEntry), "Directory entry.")
     };
 
@@ -170,6 +173,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 HelperText = "Optional watcher buffer size in bytes."
             }
         ],
+        Resources = ClockResources(),
         Ports = SourcePorts(nameof(FileWatchEvent), "File watch event.")
     };
 
@@ -228,6 +232,19 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         HelperText = "File-system wildcard filter.",
         IsRequired = true
     };
+
+    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = FileSystemCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic file-system diagnostics and timestamps.",
+                ValueType = nameof(TimeProvider)
+            }
+        ];
 
     private static IReadOnlyList<PortDesignMetadata> TransformPorts(
         string inputType,

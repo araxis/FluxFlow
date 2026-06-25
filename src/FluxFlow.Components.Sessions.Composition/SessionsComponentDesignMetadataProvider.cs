@@ -51,6 +51,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             TagsOption(),
             BoundedCapacityOption(RecorderDefaults.BoundedCapacity)
         ],
+        Resources = SessionResources(),
         Ports = TransformPorts(
             nameof(SessionRecordInput),
             "Session record input.",
@@ -116,6 +117,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 HelperText = "Multiplier used by Multiplier replay mode; must be greater than zero."
             }
         ],
+        Resources = SessionResources(),
         Ports =
         [
             OutputPort(
@@ -199,6 +201,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             },
             BoundedCapacityOption(QueryDefaults.BoundedCapacity)
         ],
+        Resources = SessionResources(),
         Ports =
         [
             InputPort(nameof(SessionQueryRequest), "Session query request."),
@@ -275,6 +278,28 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             DisplayName = displayName,
             HelperText = helperText
         };
+
+    private static IReadOnlyList<ResourceDesignMetadata> SessionResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = SessionsCompositionResourceNames.Store,
+                DisplayName = "Store",
+                Order = 0,
+                Summary = "Required keyed session store used to record, replay, or query sessions.",
+                ValueType = nameof(ISessionStore),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = SessionsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ];
 
     private static IReadOnlyList<PortDesignMetadata> TransformPorts(
         string inputType,

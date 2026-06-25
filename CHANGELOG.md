@@ -186,6 +186,15 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
 are `FlowSource`s (the watcher is disposed in `OnDisposeAsync`). Engine glue removed.
 
+## FluxFlow.Components.FileSystem.Composition 1.2.0
+
+Adds Designer resource metadata for file-system composition nodes.
+
+- Describes the optional `clock` resource separately from editable file-system
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.FileSystem.Composition 1.1.0
 
 Adds package-owned Designer metadata for `file.read`, `file.write`,
@@ -478,6 +487,15 @@ Engine-free standalone rewrite. Recorder is a `FlowNode`, replay is a `FlowSourc
 injected `TimeProvider`), query fans out via `AddOutput`. A mid-stream store failure reports
 `ReplayFailed` before faulting. Engine glue removed.
 
+## FluxFlow.Components.Sessions.Composition 1.2.0
+
+Adds Designer resource metadata for session composition nodes.
+
+- Describes the required `store` resource and optional `clock` resource
+  separately from editable session options.
+- Keeps runtime behavior unchanged; hosts still own keyed session store and
+  clock registration and lifetime.
+
 ## FluxFlow.Components.Sessions.Composition 1.1.0
 
 Adds package-owned Designer metadata for `session.recorder`, `session.replay`,
@@ -528,6 +546,15 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an
 injected `TimeProvider`. Engine glue removed.
 
+## FluxFlow.Components.State.Composition 1.2.0
+
+Adds Designer resource metadata for `state.reducer`.
+
+- Describes the required `engine` resource and optional `clock` resource
+  separately from editable reducer options.
+- Keeps runtime behavior unchanged; hosts still own keyed expression engine and
+  clock registration and lifetime.
+
 ## FluxFlow.Components.State.Composition 1.1.0
 
 Adds package-owned Designer metadata for the `state.reducer` composition node.
@@ -549,6 +576,15 @@ Engine-free standalone rewrite. Put/get/query/delete are `FlowNode`s taking an i
 `IStorageStore` (the host owns the store lifetime, like `HttpClient`); the in-graph
 storage-connection resource node is removed. Get/query fan out via `AddOutput`. The
 `IStorageStore` contract + store context/lease/factory are preserved for the adapters.
+
+## FluxFlow.Components.Storage.Composition 1.2.0
+
+Adds Designer resource metadata for storage composition nodes.
+
+- Describes the required `store` resource and optional `clock` resource
+  separately from editable storage options.
+- Keeps runtime behavior unchanged; hosts still own keyed storage store and
+  clock registration and lifetime.
 
 ## FluxFlow.Components.Storage.Composition 1.1.0
 

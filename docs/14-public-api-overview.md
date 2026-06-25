@@ -429,8 +429,8 @@ host.
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata keeps path policy as node configuration and `clock` as a
-host-owned resource.
+The metadata keeps path policy as node configuration and includes a resource
+hint for the optional `clock` resource.
 
 ## State Composition
 
@@ -455,9 +455,9 @@ resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
 keyed `TimeProvider` resource through the host.
 
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reducer`, including the existing reducer options and fixed ports.
-Expression engines and clocks remain host-owned keyed resources; the `engine`
-option is diagnostic/config metadata, not DI selection.
+`state.reducer`, including the existing reducer options, fixed ports, and
+resource hints for the required `engine` resource plus optional `clock`
+resource. The `engine` option is diagnostic/config metadata, not DI selection.
 
 ## Storage Composition
 
@@ -484,7 +484,8 @@ required keyed `IStorageStore`, and can resolve an optional keyed
 
 `StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the four storage composition nodes, including existing storage options and fixed
-ports. Concrete stores and clocks remain host-owned keyed resources.
+ports, plus resource hints for the required `store` resource and optional
+`clock` resource.
 
 ## Sessions Composition
 
@@ -511,8 +512,9 @@ required keyed `ISessionStore`, and can resolve an optional keyed
 
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the three session composition nodes, including existing session options and fixed
-ports. Session stores and clocks remain host-owned keyed resources; the `store`
-option is diagnostic/config metadata, not DI selection.
+ports, plus resource hints for the required `store` resource and optional
+`clock` resource. The `store` option is diagnostic/config metadata, not DI
+selection.
 
 ## Projections Composition
 

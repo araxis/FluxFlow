@@ -52,6 +52,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             },
             BoundedCapacityOption(PutDefaults.BoundedCapacity)
         ],
+        Resources = StorageResources(),
         Ports = TransformPorts(
             nameof(StoragePutRequest),
             "Storage put request.",
@@ -74,6 +75,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             IncludeExpiredOption(GetDefaults.IncludeExpired),
             BoundedCapacityOption(GetDefaults.BoundedCapacity)
         ],
+        Resources = StorageResources(),
         Ports =
         [
             InputPort(nameof(StorageGetRequest), "Storage get request."),
@@ -151,6 +153,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             },
             BoundedCapacityOption(QueryDefaults.BoundedCapacity)
         ],
+        Resources = StorageResources(),
         Ports =
         [
             InputPort(nameof(StorageQueryRequest), "Storage query request."),
@@ -194,6 +197,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             },
             BoundedCapacityOption(DeleteDefaults.BoundedCapacity)
         ],
+        Resources = StorageResources(),
         Ports = TransformPorts(
             nameof(StorageDeleteRequest),
             "Storage delete request.",
@@ -245,6 +249,28 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             DisplayName = displayName,
             HelperText = helperText
         };
+
+    private static IReadOnlyList<ResourceDesignMetadata> StorageResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = StorageCompositionResourceNames.Store,
+                DisplayName = "Store",
+                Order = 0,
+                Summary = "Required keyed storage store used for put, get, query, and delete operations.",
+                ValueType = nameof(IStorageStore),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = StorageCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional keyed clock for deterministic storage diagnostics and timestamps.",
+                ValueType = nameof(TimeProvider)
+            }
+        ];
 
     private static IReadOnlyList<PortDesignMetadata> TransformPorts(
         string inputType,
