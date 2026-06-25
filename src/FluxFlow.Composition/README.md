@@ -30,6 +30,8 @@ mutate the definition later.
 `ComposedNode` disposal always attempts both the node disposal path and the
 optional descriptor cleanup hook. If both fail, the failures are reported
 together so cleanup diagnostics do not hide an adapter-owned resource leak.
+If a build is canceled after nodes or links have been allocated, the runtime
+builder disposes the partially built graph before rethrowing cancellation.
 
 ## Fluent Composition
 

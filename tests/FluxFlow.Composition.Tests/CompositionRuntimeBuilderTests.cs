@@ -93,6 +93,64 @@ public sealed class CompositionRuntimeBuilderTests
         tracker.DisposedNodes.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Build_cancellation_disposes_nodes_that_were_already_created()
+    {
+        var tracker = new BuildTracker();
+        using var cancellation = new CancellationTokenSource();
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "test.cancel-after-created",
+                _ =>
+                {
+                    var node = new TrackedSourceNode(tracker);
+                    cancellation.Cancel();
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        node,
+                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        events: node.Events,
+                        errors: node.Errors));
+                },
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "test.never-created",
+                _ => throw new InvalidOperationException("factory should not run"));
+        var definition = CompositionDefinitionBuilder
+            .Create()
+            .Workflow("main", workflow => workflow
+                .Node("created", "test.cancel-after-created")
+                .Node("never", "test.never-created"))
+            .Build();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            async () => await new CompositionRuntimeBuilder(registry)
+                .BuildAsync(definition, cancellationToken: cancellation.Token));
+
+        tracker.DisposedNodes.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Factory_cancellation_propagates_when_build_token_is_canceled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "test.canceled-factory",
+                _ =>
+                {
+                    cancellation.Cancel();
+                    throw new OperationCanceledException(cancellation.Token);
+                });
+        var definition = CompositionDefinitionBuilder
+            .Create()
+            .Workflow("main", workflow => workflow.Node("source", "test.canceled-factory"))
+            .Build();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            async () => await new CompositionRuntimeBuilder(registry)
+                .BuildAsync(definition, cancellationToken: cancellation.Token));
+    }
+
     private static CompositionDefinition CreateTextPipeline(string[] messages)
         => CompositionDefinitionBuilder
             .Create()

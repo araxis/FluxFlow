@@ -73,6 +73,8 @@ DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.
 `ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
 independently, and reports both failures together when both paths fail.
+Runtime builder cancellation disposes partially built nodes and links before
+rethrowing cancellation.
 
 ## Composition Hosting
 
