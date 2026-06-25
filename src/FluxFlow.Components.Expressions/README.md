@@ -14,6 +14,8 @@ adapter packages still provide `IFlowExpressionEngine` implementations.
 
 Use `Use(engine, useAsDefault: false)` for a named-only engine that should be
 resolved explicitly by name but not become the fallback engine for empty names.
+Engine names are trimmed for registration and lookup. Blank lookup names are
+treated as the default engine, including when a custom resolver is configured.
 
 The package is intended for component package authors. Application code usually
 uses higher-level registration methods from packages such as Mapping, Control,

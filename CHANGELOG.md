@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expressions 2.0.2
+
+Hardens expression engine registry name normalization.
+
+- `FlowExpressionEngineRegistry` now trims resolver lookup names before
+  invoking custom resolvers.
+- Blank resolver lookup names are normalized to the default-engine `null`
+  lookup, matching the built-in registry behavior.
+- Unknown-engine diagnostics now report the normalized engine name.
+
 ## FluxFlow.Components.Storage.FileSystem 3.1.3
 
 Hardens file-system storage backend options and lease caching.

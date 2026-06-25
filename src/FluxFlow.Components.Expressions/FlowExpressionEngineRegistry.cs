@@ -21,9 +21,15 @@ public sealed class FlowExpressionEngineRegistry
         bool useAsDefault = true)
     {
         ArgumentNullException.ThrowIfNull(expressionEngine);
-        ArgumentException.ThrowIfNullOrWhiteSpace(expressionEngine.Name);
+        var engineName = NormalizeName(expressionEngine.Name);
+        if (engineName is null)
+        {
+            throw new ArgumentException(
+                "Expression engine name is required.",
+                nameof(expressionEngine));
+        }
 
-        _expressionEngines[expressionEngine.Name.Trim()] = expressionEngine;
+        _expressionEngines[engineName] = expressionEngine;
         if (useAsDefault)
         {
             _defaultExpressionEngine = expressionEngine;
@@ -41,25 +47,30 @@ public sealed class FlowExpressionEngineRegistry
 
     public IFlowExpressionEngine Resolve(string? name)
     {
+        var engineName = NormalizeName(name);
+
         if (_resolver is not null)
         {
-            var resolved = _resolver(name);
+            var resolved = _resolver(engineName);
             return resolved ?? throw new InvalidOperationException(
                 $"{_scopeName} expression engine resolver returned null.");
         }
 
-        if (string.IsNullOrWhiteSpace(name))
+        if (engineName is null)
         {
             return _defaultExpressionEngine ?? throw new InvalidOperationException(
                 $"{_scopeName} components require an expression engine.");
         }
 
-        if (_expressionEngines.TryGetValue(name.Trim(), out var expressionEngine))
+        if (_expressionEngines.TryGetValue(engineName, out var expressionEngine))
         {
             return expressionEngine;
         }
 
         throw new InvalidOperationException(
-            $"{_scopeName} expression engine '{name}' is not registered.");
+            $"{_scopeName} expression engine '{engineName}' is not registered.");
     }
+
+    private static string? NormalizeName(string? name)
+        => string.IsNullOrWhiteSpace(name) ? null : name.Trim();
 }
