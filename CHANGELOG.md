@@ -17,6 +17,15 @@ Hardens file-system storage backend options and lease caching.
 - Shared store leases now compare root paths with operating-system path
   case-sensitivity instead of uppercasing paths before caching.
 
+## FluxFlow.Components.Storage.SqlFile 3.1.3
+
+Hardens SQL-file storage backend options.
+
+- `SqlFileStorageStoreOptions` now trims database path, store name, and default
+  collection text when assigned.
+- Invalid `MaxValueBytes` and `BusyTimeoutMilliseconds` values are rejected at
+  option assignment.
+
 ## FluxFlow.Components.Journal 2.0.2
 
 Hardens journal contract normalization.

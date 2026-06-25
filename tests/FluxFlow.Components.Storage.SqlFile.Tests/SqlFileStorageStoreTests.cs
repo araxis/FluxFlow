@@ -589,6 +589,30 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public void Options_NormalizeTextFieldsAndRejectInvalidNumericLimits()
+    {
+        var options = new SqlFileStorageStoreOptions
+        {
+            DatabasePath = " data/storage.db ",
+            StoreName = " tenant-a ",
+            DefaultCollection = " items "
+        };
+
+        options.DatabasePath.ShouldBe("data/storage.db");
+        options.StoreName.ShouldBe("tenant-a");
+        options.DefaultCollection.ShouldBe("items");
+
+        Should.Throw<ArgumentOutOfRangeException>(() => new SqlFileStorageStoreOptions
+        {
+            MaxValueBytes = 0
+        });
+        Should.Throw<ArgumentOutOfRangeException>(() => new SqlFileStorageStoreOptions
+        {
+            BusyTimeoutMilliseconds = 0
+        });
+    }
+
+    [Fact]
     public void Options_RejectAbsoluteDatabasePathWhenDisabled()
     {
         using var temp = TempDirectory.Create();

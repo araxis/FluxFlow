@@ -67,6 +67,10 @@ JSON files.
 | `BusyTimeoutMilliseconds` | Wait time for a locked database before failing. |
 | `Clock` | Optional direct-store time source override. |
 
+`DatabasePath`, `StoreName`, and `DefaultCollection` are trimmed when assigned;
+blank store names and default collections are treated as absent. `MaxValueBytes`
+and `BusyTimeoutMilliseconds` must be greater than zero.
+
 The package persists only neutral `StorageRecord` data. Hosts that need exact
 payload shaping should compose serialization or payload nodes before storage.
 Attribute keys and values are trimmed before persistence and query matching.
