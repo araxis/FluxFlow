@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional standalone-first FluxFlow composition layer for building linked node workflows from fluent C# or Microsoft.Extensions.Configuration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial standalone-first composition package with DTOs, explicit node factory registration, fluent and configuration builders, structural validation, direct Dataflow linking, runtime lifecycle APIs, and reload-facing contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Composition definition DTO collection properties now copy assigned dictionaries and lists with ordinal key comparison so caller-owned collections cannot mutate a built definition.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

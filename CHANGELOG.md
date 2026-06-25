@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.1
+
+Hardens composition definition collection assignment.
+
+- `CompositionDefinition`, `WorkflowDefinition`, and `NodeDefinition` now copy
+  assigned dictionaries and lists so caller mutations cannot change a built
+  definition through the original collection references.
+- Definition dictionaries now normalize assigned collection comparers back to
+  ordinal key comparison.
+- Adds direct composition DTO tests for workflow, node, link, configuration,
+  and resource collection copy behavior.
+
 ## FluxFlow.Nodes 1.1.1
 
 Hardens node envelope and diagnostic metadata snapshots.

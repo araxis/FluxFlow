@@ -6,6 +6,13 @@ namespace FluxFlow.Composition;
 /// </summary>
 public sealed record CompositionDefinition
 {
-    public Dictionary<string, WorkflowDefinition> Workflows { get; init; } =
-        new(StringComparer.Ordinal);
+    private Dictionary<string, WorkflowDefinition> _workflows = new(StringComparer.Ordinal);
+
+    public Dictionary<string, WorkflowDefinition> Workflows
+    {
+        get => _workflows;
+        init => _workflows = value is null
+            ? new Dictionary<string, WorkflowDefinition>(StringComparer.Ordinal)
+            : new Dictionary<string, WorkflowDefinition>(value, StringComparer.Ordinal);
+    }
 }

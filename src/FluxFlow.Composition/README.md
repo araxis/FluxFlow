@@ -22,6 +22,11 @@ It does not own broker clients, stores, secrets, resource registration, file
 watching, YAML, live reload, assembly scanning, reflection discovery, or engine
 projection.
 
+Definition DTO collection properties copy assigned dictionaries and lists with
+ordinal key comparison. A host can still intentionally edit the model before
+validation/build, but caller-owned collections used during construction cannot
+mutate the definition later.
+
 ## Fluent Composition
 
 ```csharp
