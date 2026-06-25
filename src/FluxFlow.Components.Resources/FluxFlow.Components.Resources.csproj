@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Resources</PackageId>
     <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
-    <Version>1.2.3</Version>
+    <Version>1.2.4</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable named resource contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Resource metadata and attribute maps now normalize valid keys and values by trimming whitespace, while duplicate keys after trimming are reported as structured invalid-resource diagnostics.</PackageReleaseNotes>
+    <PackageReleaseNotes>Resource diagnostics now report null descriptor and reference entries as structured invalid-resource diagnostics instead of surfacing null-reference failures.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

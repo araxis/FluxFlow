@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.2.4
+
+Hardens resource collection diagnostics.
+
+- Null resource descriptors are now reported as structured `InvalidResource`
+  diagnostics at their collection index.
+- Missing-resource and unused-resource helpers now tolerate null reference or
+  descriptor entries instead of surfacing accidental null-reference failures.
+
 ## FluxFlow.Components.Metrics 3.0.3
 
 Hardens metrics option normalization and validation.
