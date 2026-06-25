@@ -66,6 +66,8 @@ node keeps processing later messages. Per-operation notes
 (`state.reducer.updated`/`reset`/`cleared`), reducer failures, and key-limit
 warnings flow on the `Events` port (also carrying the correlation id where one is
 available).
+Unsupported per-message operations are reported as `InvalidMessage` errors and
+later valid messages continue through the node.
 
 ## Runtime timing
 

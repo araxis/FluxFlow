@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.State 3.0.4
+
+Hardens state reducer per-message operation validation.
+
+- Unsupported `StateReducerInput.Operation` values now emit `InvalidMessage`
+  errors instead of generic reducer failures.
+- Later valid messages continue processing after an unsupported operation.
+
 ## FluxFlow.Components.State 3.0.3
 
 Hardens state reducer option normalization and validation.

@@ -6,4 +6,5 @@ public static class StateErrorCodes
     public const int KeyEvaluationFailed = 13001;
     public const int InvalidKey = 13002;
     public const int KeyLimitReached = 13003;
+    public const int InvalidMessage = 13004;
 }
