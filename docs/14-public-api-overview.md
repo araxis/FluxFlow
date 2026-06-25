@@ -858,7 +858,9 @@ Main types:
 
 These contracts live in an engine-free leaf package. The engine and standalone
 component packages consume them, but concrete expression languages, expression
-validation, and context factory registration remain host-owned.
+validation, and context factory registration remain host-owned. `FlowMapContext`
+copies assigned variable dictionaries with ordinal key comparison so each
+per-message expression context is stable after creation.
 
 ## Stability Notes
 
