@@ -98,6 +98,17 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 HelperText = "Count missing numeric values as zero-valued observations."
             }
         ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = MetricsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic metric timestamps and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ],
         Ports =
         [
             new PortDesignMetadata

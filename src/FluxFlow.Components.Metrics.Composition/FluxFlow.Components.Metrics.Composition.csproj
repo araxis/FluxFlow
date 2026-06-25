@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Metrics.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone metrics aggregate node over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;metrics;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for the metrics aggregate composition node while keeping clocks host-owned resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for the metrics aggregate clock resource while keeping clocks host-owned resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

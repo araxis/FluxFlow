@@ -79,6 +79,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
             PreferredNodeName = preferredNodeName,
             SuggestedEditorWidth = 420,
             Options = SharedOptions(),
+            Resources = ClockResources(),
             Ports =
             [
                 new PortDesignMetadata
@@ -167,6 +168,19 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 DisplayName = "Skip Comments",
                 DefaultValue = Defaults.SkipComments,
                 HelperText = "Skip comments while parsing JSON."
+            }
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = SerializationCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic serialization diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ];
 }

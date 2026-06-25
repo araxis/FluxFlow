@@ -313,7 +313,7 @@ resource through the host.
 
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `metrics.aggregate` composition node, including existing metrics aggregate
-options and fixed ports. Clocks remain host-owned keyed resources.
+options, fixed ports, and a resource hint for the optional `clock` resource.
 
 ## Routing Composition
 
@@ -372,7 +372,8 @@ through the host.
 `SerializationComponentDesignMetadataProvider` exposes neutral Designer
 metadata for the six serialization composition nodes so hosts can compose
 palette, editor, validation, or documentation hints without copying package
-descriptors. The metadata keeps `clock` as a host-owned resource.
+descriptors. The metadata includes shared options, fixed ports, and a resource
+hint for the optional `clock` resource.
 
 ## Payloads Composition
 
@@ -399,7 +400,8 @@ resource through the host.
 `PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `payload.inspect` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata keeps `clock` as a host-owned resource.
+metadata includes options, fixed ports, and a resource hint for the optional
+`clock` resource.
 
 ## FileSystem Composition
 
@@ -536,8 +538,9 @@ resource through the host.
 
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.projection` composition node, including existing projection
-options and fixed ports. Clocks remain host-owned keyed resources; the final
-snapshot lifecycle remains a direct node API in this composition pass.
+options, fixed ports, and a resource hint for the optional `clock` resource.
+The final snapshot lifecycle remains a direct node API in this composition
+pass.
 
 ## Expectations Composition
 
@@ -563,8 +566,8 @@ resource through the host.
 
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.expectation` composition node, including existing expectation
-options and fixed ports. Clocks remain host-owned keyed resources; completion
-result flushing remains a direct node API in this composition pass.
+options, fixed ports, and a resource hint for the optional `clock` resource.
+Completion result flushing remains a direct node API in this composition pass.
 
 ## MQTT Composition
 

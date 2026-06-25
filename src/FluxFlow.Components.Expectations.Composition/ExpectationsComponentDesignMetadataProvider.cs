@@ -89,6 +89,17 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 HelperText = "Maximum queued input messages."
             }
         ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = ExpectationsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ],
         Ports =
         [
             new PortDesignMetadata

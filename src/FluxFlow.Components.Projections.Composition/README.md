@@ -74,9 +74,9 @@ configuration.
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for `event.projection` so hosts can build palettes, editors, validation hints,
 or documentation without copying package descriptors. The metadata describes the
-existing event projection option record and fixed ports. Optional keyed
-`TimeProvider` clocks remain host-owned resources and are not modeled as
-editable node options.
+existing event projection option record, fixed ports, and optional `clock`
+resource hint. Optional keyed `TimeProvider` clocks remain host-owned resources
+and are not modeled as editable node options.
 
 `EmitFinalSnapshot` remains a direct node lifecycle feature in v1. Composition
 runtime stop uses normal node completion; callers that need a final snapshot

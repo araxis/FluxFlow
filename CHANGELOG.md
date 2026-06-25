@@ -157,6 +157,15 @@ resolves keyed `IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and
 Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic
 timeout armed against an injected `TimeProvider`. Engine glue removed.
 
+## FluxFlow.Components.Expectations.Composition 1.2.0
+
+Adds Designer resource metadata for `event.expectation`.
+
+- Describes the optional `clock` resource separately from editable expectation
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.Expectations.Composition 1.1.0
 
 Adds package-owned Designer metadata for the `event.expectation` composition
@@ -327,6 +336,15 @@ observability nodes. The package registers explicit `flow.counter`,
 options from composition configuration, and resolves host-owned keyed
 expression, selector, context, and clock resources.
 
+## FluxFlow.Components.Metrics.Composition 1.2.0
+
+Adds Designer resource metadata for `metrics.aggregate`.
+
+- Describes the optional `clock` resource separately from editable metrics
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.Metrics.Composition 1.1.0
 
 Adds package-owned Designer metadata for the `metrics.aggregate` composition
@@ -347,6 +365,15 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. The inspect node is a `FlowNode` over the kit. Engine glue
 removed.
 
+## FluxFlow.Components.Payloads.Composition 1.2.0
+
+Adds Designer resource metadata for `payload.inspect`.
+
+- Describes the optional `clock` resource separately from editable payload
+  inspection options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.Payloads.Composition 1.1.0
 
 Adds package-owned Designer metadata for the `payload.inspect` composition
@@ -366,6 +393,15 @@ resolves optional keyed `TimeProvider` resources through
 
 Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a
 package-owned `ProjectionEvent` contract. Engine glue removed.
+
+## FluxFlow.Components.Projections.Composition 1.2.0
+
+Adds Designer resource metadata for `event.projection`.
+
+- Describes the optional `clock` resource separately from editable projection
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
 
 ## FluxFlow.Components.Projections.Composition 1.1.0
 
@@ -409,6 +445,15 @@ resources through `FluxFlow.Composition.Hosting`.
 
 Engine-free standalone rewrite. The serialize/deserialize transforms are `FlowNode`s over the
 kit. Engine glue removed.
+
+## FluxFlow.Components.Serialization.Composition 1.2.0
+
+Adds Designer resource metadata for serialization composition nodes.
+
+- Describes the optional `clock` resource separately from editable
+  serialization options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
 
 ## FluxFlow.Components.Serialization.Composition 1.1.0
 
