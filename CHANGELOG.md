@@ -7,6 +7,26 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.1.1
+
+Hardens file-system storage attribute handling.
+
+- Normalizes attribute keys and values before persistence and query matching.
+- Rejects blank attribute keys/values and duplicate attribute keys after
+  trimming.
+- Keeps file layout, value serialization, store factory sharing, and host-owned
+  storage setup unchanged.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.1
+
+Hardens SQL-file storage attribute handling.
+
+- Normalizes attribute keys and values before persistence and query matching.
+- Rejects blank attribute keys/values and duplicate attribute keys after
+  trimming.
+- Keeps database schema, value serialization, owned lease behavior, and
+  host-owned storage setup unchanged.
+
 ## FluxFlow.Components.Journal 2.0.1
 
 Hardens journal record normalization.

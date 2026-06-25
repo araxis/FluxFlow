@@ -68,6 +68,9 @@ first version.
 
 The package persists only neutral `StorageRecord` data. Hosts that need exact
 payload shaping should compose serialization or payload nodes before storage.
+Attribute keys and values are trimmed before persistence and query matching.
+Blank attribute keys/values and duplicate attribute keys after trimming are
+rejected so attribute filters stay deterministic.
 
 ## Composition
 

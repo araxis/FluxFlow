@@ -191,6 +191,81 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_NormalizesAttributesAndQueryMatchesNormalizedAttributes()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = " primary "
+            }
+        });
+
+        var loaded = await store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        });
+        var records = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = " primary "
+            }
+        });
+
+        loaded.ShouldNotBeNull();
+        loaded.Attributes.ContainsKey("tenant").ShouldBeTrue();
+        loaded.Attributes["tenant"].ShouldBe("primary");
+        records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
+    }
+
+    [Fact]
+    public async Task Put_RejectsInvalidAttributes()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "blank-key",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" "] = "primary"
+            }
+        }));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "blank-value",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                ["tenant"] = " "
+            }
+        }));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "duplicate-key",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = "primary",
+                ["tenant"] = "secondary"
+            }
+        }));
+    }
+
+    [Fact]
     public async Task Query_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 3, 4, TimeSpan.Zero);

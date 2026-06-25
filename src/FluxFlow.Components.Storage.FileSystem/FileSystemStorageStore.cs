@@ -409,9 +409,35 @@ public sealed class FileSystemStorageStore : IStorageStore
 
     private static Dictionary<string, string> CopyAttributes(
         Dictionary<string, string>? source)
-        => source is null
-            ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+    {
+        if (source is null)
+        {
+            return [];
+        }
+
+        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in source)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidOperationException("File-system storage attribute keys are required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException("File-system storage attribute values are required.");
+            }
+
+            var normalizedKey = key.Trim();
+            if (!copy.TryAdd(normalizedKey, value.Trim()))
+            {
+                throw new InvalidOperationException(
+                    $"File-system storage attribute '{normalizedKey}' is declared more than once.");
+            }
+        }
+
+        return copy;
+    }
 
     private static string? Normalize(string? value)
         => FileSystemStorageStoreOptions.Normalize(value);
