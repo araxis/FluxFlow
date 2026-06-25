@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.RequestReply 1.1.2
+
+Hardens request/reply coordinator option validation.
+
+- `RequestReplyCoordinator<TRequest,TResponse>` now validates
+  `RequestReplyOptions.Mode` before creating dataflow blocks.
+- Capacity, timeout, and sweep interval validation now use one fail-fast
+  coordinator options path.
+- Invalid sweep intervals are rejected consistently, including fire-and-forget
+  mode where no tracker is created.
+- Keeps request correlation, fire-and-forget behavior, lifecycle completion,
+  and transport ownership unchanged.
+
 ## FluxFlow.Components.Secrets 1.2.4
 
 Hardens secret metadata and attribute map normalization.

@@ -685,7 +685,8 @@ These packages are intentionally not standalone node composition adapters:
 - `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
   record mapping, store contracts, and in-memory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
-  and is intentionally not covered by composition adapters in this pass.
+  with fail-fast option validation, and is intentionally not covered by
+  composition adapters in this pass.
 - `FluxFlow.Components.Designer` provides engine/composition-neutral design
   metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and

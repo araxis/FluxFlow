@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A transport-agnostic request/reply bridge for FluxFlow: turns an inbound request stream into a one-way dataflow graph and correlates the response back to the caller by CorrelationId. Reused by HTTP and MQTT triggers.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Fixes RequestReplyCoordinator completion and disposal so all dataflow blocks settle and in-flight callers are failed instead of leaving Completion awaiters hanging.</PackageReleaseNotes>
+    <PackageReleaseNotes>RequestReplyCoordinator now validates mode, capacity, timeout, and sweep interval options before creating dataflow blocks or timers, producing clear fail-fast option errors.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

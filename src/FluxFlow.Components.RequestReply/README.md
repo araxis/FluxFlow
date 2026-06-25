@@ -37,6 +37,9 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - Everything is keyed on `CorrelationId` from `FluxFlow.Nodes` — the same envelope id
   that flows through the whole graph.
 - Inject a `TimeProvider` for deterministic timeout tests.
+- `RequestReplyCoordinator<TRequest, TResponse>` validates `RequestReplyOptions`
+  before creating dataflow blocks or timers. Unsupported modes, non-positive
+  capacity, non-positive timeout, and non-positive sweep interval fail fast.
 - `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
   in-flight callers with `OperationCanceledException`, so `Completion` can be
   awaited without leaving callers hanging.

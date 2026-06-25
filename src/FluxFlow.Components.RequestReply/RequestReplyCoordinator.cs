@@ -30,15 +30,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     public RequestReplyCoordinator(RequestReplyOptions? options = null, TimeProvider? clock = null)
     {
         _options = options ?? new RequestReplyOptions();
-        if (_options.Capacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), "Capacity must be greater than zero.");
-        }
-
-        if (_options.Timeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), "Timeout must be greater than zero.");
-        }
+        ValidateOptions(_options);
 
         _clock = clock ?? TimeProvider.System;
         _tracker = _options.Mode == RequestReplyMode.RequestReply
@@ -353,4 +345,39 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     private ValueTask FailInFlightAsync(Exception exception)
         => _tracker?.FailAllAsync(exception) ?? ValueTask.CompletedTask;
+
+    private static void ValidateOptions(RequestReplyOptions options)
+    {
+        if (!Enum.IsDefined(options.Mode))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Mode,
+                "Request/reply mode is not supported.");
+        }
+
+        if (options.Capacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Capacity,
+                "Capacity must be greater than zero.");
+        }
+
+        if (options.Timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Timeout,
+                "Timeout must be greater than zero.");
+        }
+
+        if (options.SweepInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.SweepInterval,
+                "Sweep interval must be greater than zero.");
+        }
+    }
 }

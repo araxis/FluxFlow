@@ -161,6 +161,34 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public void Constructor_rejects_invalid_options()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Mode = (RequestReplyMode)999 }))
+            .Message.ShouldContain("mode", Case.Insensitive);
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Capacity = 0 }))
+            .Message.ShouldContain("Capacity");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Timeout = TimeSpan.Zero }))
+            .Message.ShouldContain("Timeout");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions
+                {
+                    Mode = RequestReplyMode.FireAndForget,
+                    SweepInterval = TimeSpan.Zero
+                }))
+            .Message.ShouldContain("Sweep interval");
+    }
+
+    [Fact]
     public async Task FireAndForget_PublishesThenAcknowledges_WithoutHoldingInFlight()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>(
