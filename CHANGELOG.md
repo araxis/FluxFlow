@@ -290,6 +290,17 @@ mapper nodes. The package registers explicit `flow.mapper` factories, binds
 `IFlowExpressionEngine`, `IMappingContextFactory`, and `TimeProvider` resources
 through `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Metrics 3.0.1
+
+Aligns metrics aggregate constructor option validation with the standalone node
+family.
+
+- Reports invalid `rateWindowSeconds`, `boundedCapacity`, and `maxGroups` as
+  `ArgumentOutOfRangeException` with metrics option names.
+- Rejects non-finite rate windows before rate calculations are configured.
+- Leaves aggregation, grouping, diagnostics, and error-port behavior unchanged
+  for valid options.
+
 ## FluxFlow.Components.Metrics 3.0.0
 
 Engine-free standalone rewrite. The aggregate node is a `FlowNode`; in coalesce mode the single

@@ -443,12 +443,35 @@ public sealed class MetricsAggregateNodeTests
     [Fact]
     public void Aggregate_RejectsInvalidBoundedCapacity()
     {
-        // BoundedCapacity maps to the kit's input-buffer capacity, which must be
-        // greater than zero.
         var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new MetricsAggregateNode(new MetricsAggregateOptions { BoundedCapacity = 0 }));
 
-        exception.Message.ShouldContain("greater than zero");
+        exception.Message.ShouldContain("boundedCapacity");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Aggregate_RejectsInvalidRateWindow(double rateWindowSeconds)
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new MetricsAggregateNode(new MetricsAggregateOptions
+            {
+                RateWindowSeconds = rateWindowSeconds
+            }));
+
+        exception.Message.ShouldContain("rateWindowSeconds");
+    }
+
+    [Fact]
+    public void Aggregate_RejectsInvalidMaxGroups()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new MetricsAggregateNode(new MetricsAggregateOptions { MaxGroups = -1 }));
+
+        exception.Message.ShouldContain("maxGroups");
     }
 
     [Fact]

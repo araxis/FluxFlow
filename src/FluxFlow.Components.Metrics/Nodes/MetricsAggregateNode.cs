@@ -45,17 +45,50 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     public MetricsAggregateNode(
         MetricsAggregateOptions? options = null,
         TimeProvider? clock = null)
+        : this(ResolveOptions(options), clock, validated: true)
+    {
+    }
+
+    private MetricsAggregateNode(
+        MetricsAggregateOptions options,
+        TimeProvider? clock,
+        bool validated)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new MetricsAggregateOptions()).BoundedCapacity,
+            InputCapacity = options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        // BoundedCapacity flows to the kit's input-buffer capacity, which the base
-        // constructor validates (> 0) before this body runs.
-        _options = options ?? new MetricsAggregateOptions();
+        _options = options;
         _timeProvider = clock ?? TimeProvider.System;
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+    }
+
+    private static MetricsAggregateOptions ResolveOptions(MetricsAggregateOptions? options)
+    {
+        var resolved = options ?? new MetricsAggregateOptions();
+        if (!double.IsFinite(resolved.RateWindowSeconds) || resolved.RateWindowSeconds <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "metrics.aggregate option 'rateWindowSeconds' must be a finite value greater than zero.");
+        }
+
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "metrics.aggregate option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (resolved.MaxGroups < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "metrics.aggregate option 'maxGroups' must be zero or greater.");
+        }
+
+        return resolved;
     }
 
     protected override Task ProcessAsync(FlowMessage<MetricSampleInput> message)

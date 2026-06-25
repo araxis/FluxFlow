@@ -74,6 +74,10 @@ new MetricsAggregateOptions
 };
 ```
 
+`MetricsAggregateOptions` validates at construction: `RateWindowSeconds` must be
+a finite positive value, `BoundedCapacity` must be positive, and `MaxGroups` must
+be zero or greater.
+
 A `TimeProvider` can be injected for deterministic fallback timestamps. Explicit
 sample timestamps always win; the time provider is used only when
 `MetricSampleInput` omits `Timestamp`.

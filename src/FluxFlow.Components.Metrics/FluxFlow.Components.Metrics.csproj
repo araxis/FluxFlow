@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone metrics-aggregation node for FluxFlow: a blockified aggregator (metric samples in, rolling snapshots out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone metrics.aggregate node over the FluxFlow.Nodes kit: samples in, rolling MetricSnapshotOutput broadcast out, rejected-group/invalid-sample failures on the error port, diagnostics on the event port. The node factory, module, registration extensions, component-type/port constants, JSON-from-definition options reader, and design-metadata provider are removed; the clock is now an injected TimeProvider. The node depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: invalid rateWindowSeconds, boundedCapacity, and maxGroups now report ArgumentOutOfRangeException with metrics option names. Runtime aggregation behavior is unchanged for valid options.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
