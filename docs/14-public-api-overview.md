@@ -32,7 +32,9 @@ Use these types to author standalone nodes directly. `FlowNodeOptions`
 configures bounded transform intake. `FlowSourceOptions` lets source nodes opt
 into bounded broadcast output and awaitable output-block acceptance while
 sources that do not pass options keep the original unbounded broadcast
-behavior.
+behavior. `FlowMessage<T>` headers and `FlowEvent` attributes copy assigned
+dictionaries with ordinal key comparison, keeping broadcast envelopes and
+diagnostics stable after creation.
 
 ## Composition
 

@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Nodes 1.1.1
+
+Hardens node envelope and diagnostic metadata snapshots.
+
+- `FlowMessage<T>.Headers` now copies assigned dictionaries so caller mutations
+  cannot change an existing message envelope.
+- `FlowEvent.Attributes` now copies assigned dictionaries so diagnostics remain
+  stable after creation.
+- Header and attribute snapshots use ordinal key comparison for deterministic
+  lookup across hosts.
+
 ## FluxFlow.Mapping 1.0.1
 
 Hardens mapping context variable snapshots.
