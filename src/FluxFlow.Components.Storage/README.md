@@ -186,6 +186,11 @@ identity/diagnostic fields, normalize blank optional values to absent, copy
 attribute dictionaries with ordinal key comparison, and copy query result record
 lists on assignment.
 
+Node option records trim default collection names and treat blank collections as
+absent. Invalid capacities, query paging values, and write modes are rejected
+when options are assigned so direct-code and configuration-bound callers fail at
+the component boundary.
+
 ## Composition
 
 Building a workflow, reading config, creating nodes, and linking them is a

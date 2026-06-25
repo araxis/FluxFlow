@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.5
+
+Hardens storage node option normalization and validation.
+
+- `StoragePutOptions`, `StorageGetOptions`, `StorageQueryOptions`, and
+  `StorageDeleteOptions` now trim default collections when assigned.
+- Blank default collections are treated as absent.
+- Non-positive bounded capacities are rejected at option assignment.
+- `StorageQueryOptions` now rejects negative offsets and non-positive limits.
+- `StoragePutOptions` now rejects unsupported write-mode values.
+
 ## FluxFlow.Components.Storage 3.0.4
 
 Hardens storage output contract normalization.
