@@ -2,6 +2,23 @@ namespace FluxFlow.Components.Configuration.Contracts;
 
 internal static class ConfigurationContractMap
 {
+    public static string NormalizeRequired(string? value)
+        => value?.Trim() ?? string.Empty;
+
+    public static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+
+    public static IReadOnlyDictionary<string, string> Copy(
+        IReadOnlyDictionary<string, string>? values)
+    {
+        if (values is null)
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+
+        return values.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
     public static IReadOnlyDictionary<string, string>? NormalizeOrPreserveInvalid(
         IReadOnlyDictionary<string, string>? values)
     {

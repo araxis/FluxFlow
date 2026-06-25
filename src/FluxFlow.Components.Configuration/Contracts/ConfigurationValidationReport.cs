@@ -2,7 +2,14 @@ namespace FluxFlow.Components.Configuration.Contracts;
 
 public sealed record ConfigurationValidationReport
 {
-    public IReadOnlyList<ConfigurationDiagnostic> Diagnostics { get; init; } = [];
+    private IReadOnlyList<ConfigurationDiagnostic> _diagnostics = [];
+
+    public IReadOnlyList<ConfigurationDiagnostic> Diagnostics
+    {
+        get => _diagnostics;
+        init => _diagnostics = value?.ToArray() ?? [];
+    }
+
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == ConfigurationDiagnosticSeverity.Error);
     public int ErrorCount => Diagnostics.Count(diagnostic => diagnostic.Severity == ConfigurationDiagnosticSeverity.Error);
     public int WarningCount => Diagnostics.Count(diagnostic => diagnostic.Severity == ConfigurationDiagnosticSeverity.Warning);

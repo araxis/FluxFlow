@@ -11,6 +11,82 @@ namespace FluxFlow.Components.Configuration.Tests;
 public sealed class ConfigurationValidatorTests
 {
     [Fact]
+    public void Configuration_diagnostic_normalizes_text_and_copies_metadata()
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["referencePath"] = "resource.name"
+        };
+
+        var diagnostic = new ConfigurationDiagnostic
+        {
+            Source = ConfigurationDiagnosticSource.Resource,
+            Code = " InvalidResource ",
+            Severity = ConfigurationDiagnosticSeverity.Error,
+            Message = " Resource failed. ",
+            Path = " connections.primary ",
+            Name = " primary ",
+            Kind = " connection ",
+            Metadata = metadata
+        };
+
+        metadata["referencePath"] = "changed";
+
+        diagnostic.Code.ShouldBe("InvalidResource");
+        diagnostic.Message.ShouldBe("Resource failed.");
+        diagnostic.Path.ShouldBe("connections.primary");
+        diagnostic.Name.ShouldBe("primary");
+        diagnostic.Kind.ShouldBe("connection");
+        diagnostic.Metadata["referencePath"].ShouldBe("resource.name");
+        diagnostic.ToString().ShouldBe("Error Resource.InvalidResource at connections.primary: Resource failed.");
+    }
+
+    [Fact]
+    public void Configuration_diagnostic_treats_blank_optional_text_as_absent()
+    {
+        var diagnostic = new ConfigurationDiagnostic
+        {
+            Source = ConfigurationDiagnosticSource.Configuration,
+            Code = "Invalid",
+            Severity = ConfigurationDiagnosticSeverity.Warning,
+            Message = "Message",
+            Path = " ",
+            Name = " ",
+            Kind = " ",
+            Metadata = null!
+        };
+
+        diagnostic.Path.ShouldBeNull();
+        diagnostic.Name.ShouldBeNull();
+        diagnostic.Kind.ShouldBeNull();
+        diagnostic.Metadata.ShouldBeEmpty();
+        diagnostic.ToString().ShouldBe("Warning Configuration.Invalid: Message");
+    }
+
+    [Fact]
+    public void Validation_report_copies_diagnostics_and_handles_null_assignment()
+    {
+        var diagnostic = new ConfigurationDiagnostic
+        {
+            Source = ConfigurationDiagnosticSource.Configuration,
+            Code = "Invalid",
+            Severity = ConfigurationDiagnosticSeverity.Error,
+            Message = "Invalid configuration."
+        };
+        var diagnostics = new List<ConfigurationDiagnostic> { diagnostic };
+
+        var report = ConfigurationValidationReport.FromDiagnostics(diagnostics);
+        diagnostics.Clear();
+        var empty = new ConfigurationValidationReport { Diagnostics = null! };
+
+        report.Diagnostics.Count.ShouldBe(1);
+        report.HasErrors.ShouldBeTrue();
+        report.ErrorCount.ShouldBe(1);
+        empty.Diagnostics.ShouldBeEmpty();
+        empty.HasErrors.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task ValidateAsync_returns_empty_report_for_valid_references()
     {
         var resourceLookup = new ResourceDescriptorCatalog(
