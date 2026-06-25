@@ -103,6 +103,12 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
         try
         {
             var sessions = await _store.QuerySessionsAsync(request, Stopping).ConfigureAwait(false);
+            if (sessions is null)
+            {
+                throw new InvalidOperationException(
+                    "session.query store returned a null session query result.");
+            }
+
             copiedSessions = sessions
                 .Select(ValidateAndCopySession)
                 .Take(request.Limit!.Value)
@@ -189,8 +195,14 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
             CorrelationId = request.CorrelationId
         };
 
-    private static SessionMetadata ValidateAndCopySession(SessionMetadata session)
+    private static SessionMetadata ValidateAndCopySession(SessionMetadata? session)
     {
+        if (session is null)
+        {
+            throw new InvalidOperationException(
+                "session.query store returned a null session.");
+        }
+
         if (string.IsNullOrWhiteSpace(session.SessionId))
         {
             throw new InvalidOperationException(

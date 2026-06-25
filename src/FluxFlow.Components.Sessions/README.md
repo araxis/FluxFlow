@@ -35,6 +35,10 @@ Storage is injected by the host through `ISessionStore`, passed directly to each
 constructor. This keeps database paths, schemas, workspace ownership, and retention
 policy outside the component package. Hosts that need deterministic recording or replay
 timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
+Stores are expected to honor the non-null parts of `ISessionStore`; when a store
+returns a null session, record, query result, or replay stream where the contract
+requires a value, the node reports a clear session error instead of surfacing an
+ambiguous null-reference failure.
 
 ```csharp
 ISessionStore store = new MySessionStore(...);

@@ -94,8 +94,7 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                     Timestamp = timestamp
                 },
                 Stopping).ConfigureAwait(false);
-
-            ValidateRecord(record, session.SessionId, sequence);
+            record = ValidateRecord(record, session.SessionId, sequence);
         }
         catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
@@ -143,7 +142,7 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
 
         try
         {
-            await _store.CompleteSessionAsync(
+            var completed = await _store.CompleteSessionAsync(
                 new SessionCompleteRequest
                 {
                     Session = session,
@@ -151,6 +150,12 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                     MessageCount = _sequence
                 },
                 CancellationToken.None).ConfigureAwait(false);
+            if (completed is null)
+            {
+                throw new InvalidOperationException(
+                    "session.recorder store returned a null completed session.");
+            }
+
             _completed.TrySetResult();
         }
         catch (Exception exception)
@@ -176,6 +181,12 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                 Tags = CopyDictionary(_options.Tags)
             },
             Stopping).ConfigureAwait(false);
+
+        if (session is null)
+        {
+            throw new InvalidOperationException(
+                "session.recorder store returned a null session.");
+        }
 
         if (string.IsNullOrWhiteSpace(session.SessionId))
         {
@@ -224,11 +235,17 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
         });
     }
 
-    private static void ValidateRecord(
-        SessionRecord record,
+    private static SessionRecord ValidateRecord(
+        SessionRecord? record,
         string expectedSessionId,
         long expectedSequence)
     {
+        if (record is null)
+        {
+            throw new InvalidOperationException(
+                "session.recorder store returned a null record.");
+        }
+
         if (string.IsNullOrWhiteSpace(record.SessionId))
         {
             throw new InvalidOperationException(
@@ -246,6 +263,8 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
             throw new InvalidOperationException(
                 "session.recorder store returned a record with an invalid sequence.");
         }
+
+        return record;
     }
 
     private static SessionRecordInput CopyInput(SessionRecordInput input, DateTimeOffset timestamp)

@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.3
+
+Hardens session store response validation.
+
+- `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode` now report
+  clear failures when a host store returns null sessions, records, query
+  results, or replay streams where `ISessionStore` requires a value.
+- Recorder and query nodes keep later-message continuation for recoverable store
+  contract failures.
+
 ## FluxFlow.Components.Sessions 3.1.2
 
 Hardens session option normalization and validation.

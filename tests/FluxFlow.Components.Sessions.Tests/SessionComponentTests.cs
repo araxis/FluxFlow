@@ -90,6 +90,80 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Recorder_ReportsNullStartSessionWithCorrelationAndContinues()
+    {
+        var store = new TestSessionStore { ReturnNullStartSessionOnce = true };
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.StoreUnavailable);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("null session");
+        recorded.Payload.Name.ShouldBe("good");
+        store.Records.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Recorder_ReportsNullAppendResultWithCorrelationAndContinues()
+    {
+        var store = new TestSessionStore { ReturnNullAppendOnce = true };
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("null record");
+        recorded.Payload.Sequence.ShouldBe(1);
+        recorded.Payload.Name.ShouldBe("good");
+        store.Records.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Recorder_SessionCompletedFaultsWhenStoreReturnsNullCompleteSession()
+    {
+        var store = new TestSessionStore { ReturnNullCompleteOnce = true };
+        var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "only" }));
+        node.Complete();
+
+        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await node.DisposeAsync();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30)));
+        exception.Message.ShouldContain("null completed session");
+    }
+
+    [Fact]
     public async Task Recorder_ContinuesFromExistingMessageCountAndCopiesNullAttributes()
     {
         var store = new TestSessionStore { InitialMessageCount = 5 };
@@ -370,6 +444,48 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Replay_ReportsNullReadStreamThenFaults()
+    {
+        var store = CreateStoreWithRecords(count: 1);
+        store.ReturnNullReadStreamOnce = true;
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            store);
+        var errors = new BufferBlock<FlowError>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+
+        await node.StartAsync();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
+        error.Message.ShouldContain("null message stream");
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public async Task Replay_ReportsNullRecordThenFaults()
+    {
+        var store = CreateStoreWithRecords(count: 1);
+        store.ReturnNullReadRecordOnce = true;
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            store);
+        var errors = new BufferBlock<FlowError>();
+        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+
+        await node.StartAsync();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
+        error.Message.ShouldContain("null record");
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
     public void Replay_RejectsMissingSessionId()
     {
         var exception = Should.Throw<ArgumentException>(
@@ -494,6 +610,58 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Query_ReportsNullResultAndContinues()
+    {
+        var store = new TestSessionStore { ReturnNullQueryResultOnce = true };
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-1",
+            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+        });
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null session query result");
+        result.Payload.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Query_ReportsNullSessionAndContinues()
+    {
+        var store = new TestSessionStore { ReturnNullQuerySessionOnce = true };
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-1",
+            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+        });
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null session");
+        result.Payload.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Query_EmitsStartedEventAtConstruction()
     {
         var store = new TestSessionStore();
@@ -576,6 +744,13 @@ public sealed class SessionComponentTests
         public bool FailNextAppend { get; set; }
         public bool FailNextQuery { get; set; }
         public int? FailReadAfter { get; set; }
+        public bool ReturnNullStartSessionOnce { get; set; }
+        public bool ReturnNullAppendOnce { get; set; }
+        public bool ReturnNullCompleteOnce { get; set; }
+        public bool ReturnNullQueryResultOnce { get; set; }
+        public bool ReturnNullQuerySessionOnce { get; set; }
+        public bool ReturnNullReadStreamOnce { get; set; }
+        public bool ReturnNullReadRecordOnce { get; set; }
         public SessionQueryRequest? LastQuery { get; private set; }
 
         public Task<SessionMetadata?> GetSessionAsync(
@@ -589,6 +764,12 @@ public sealed class SessionComponentTests
             SessionStartRequest request,
             CancellationToken cancellationToken = default)
         {
+            if (ReturnNullStartSessionOnce)
+            {
+                ReturnNullStartSessionOnce = false;
+                return Task.FromResult<SessionMetadata>(null!);
+            }
+
             Metadata = new SessionMetadata
             {
                 SessionId = string.IsNullOrWhiteSpace(request.SessionId)
@@ -616,6 +797,12 @@ public sealed class SessionComponentTests
                 throw new InvalidOperationException("append failed");
             }
 
+            if (ReturnNullAppendOnce)
+            {
+                ReturnNullAppendOnce = false;
+                return Task.FromResult<SessionRecord>(null!);
+            }
+
             var record = new SessionRecord
             {
                 SessionId = request.Session.SessionId,
@@ -637,6 +824,12 @@ public sealed class SessionComponentTests
             SessionCompleteRequest request,
             CancellationToken cancellationToken = default)
         {
+            if (ReturnNullCompleteOnce)
+            {
+                ReturnNullCompleteOnce = false;
+                return Task.FromResult<SessionMetadata>(null!);
+            }
+
             Metadata = request.Session with
             {
                 EndedAt = request.EndedAt,
@@ -654,6 +847,18 @@ public sealed class SessionComponentTests
             {
                 FailNextQuery = false;
                 throw new InvalidOperationException("query failed");
+            }
+
+            if (ReturnNullQueryResultOnce)
+            {
+                ReturnNullQueryResultOnce = false;
+                return Task.FromResult<IReadOnlyList<SessionMetadata>>(null!);
+            }
+
+            if (ReturnNullQuerySessionOnce)
+            {
+                ReturnNullQuerySessionOnce = false;
+                return Task.FromResult<IReadOnlyList<SessionMetadata>>([null!]);
             }
 
             LastQuery = request;
@@ -718,7 +923,20 @@ public sealed class SessionComponentTests
             return Task.FromResult<IReadOnlyList<SessionMetadata>>(sessions);
         }
 
-        public async IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
+        public IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
+            SessionReadRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (ReturnNullReadStreamOnce)
+            {
+                ReturnNullReadStreamOnce = false;
+                return null!;
+            }
+
+            return ReadMessagesCoreAsync(request, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<SessionRecord> ReadMessagesCoreAsync(
             SessionReadRequest request,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
@@ -745,7 +963,16 @@ public sealed class SessionComponentTests
                 }
 
                 await Task.Yield();
-                yield return record;
+                if (ReturnNullReadRecordOnce)
+                {
+                    ReturnNullReadRecordOnce = false;
+                    yield return null!;
+                }
+                else
+                {
+                    yield return record;
+                }
+
                 read++;
             }
         }
