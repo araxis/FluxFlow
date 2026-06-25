@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.1.4
+
+Hardens configuration diagnostic contracts.
+
+- Updates `FluxFlow.Components.Configuration` diagnostic and report contracts.
+- `ConfigurationDiagnostic` now trims text fields and treats blank optional
+  path/name/kind values as absent.
+- Diagnostic metadata is copied on assignment so later caller mutations do not
+  leak into diagnostics.
+- `ConfigurationValidationReport` now copies assigned diagnostic collections
+  and treats null assignments as an empty report.
+
 ## FluxFlow.Components.Secrets 1.2.5
 
 Hardens secret collection diagnostics.
