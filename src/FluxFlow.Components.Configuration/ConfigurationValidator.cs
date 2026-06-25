@@ -269,6 +269,14 @@ public static class ConfigurationValidator
                     "Resource option metadata values are required."));
             }
         }
+
+        foreach (var key in ConfigurationContractMap.FindDuplicateNormalizedKeys(metadata))
+        {
+            diagnostics.Add(InvalidResourceOptionMetadata(
+                optionPath,
+                "resource.metadata",
+                $"Resource option metadata key '{key}' is declared more than once after trimming."));
+        }
     }
 
     private static ConfigurationDiagnostic InvalidResourceOptionMetadata(

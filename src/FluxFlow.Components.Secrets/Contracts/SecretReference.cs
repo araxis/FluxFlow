@@ -4,6 +4,7 @@ public sealed record SecretReference
 {
     private string? _version;
     private string? _kind;
+    private IReadOnlyDictionary<string, string>? _attributes = new Dictionary<string, string>();
 
     public required SecretName Name { get; init; }
     public string? Version
@@ -18,7 +19,11 @@ public sealed record SecretReference
         init => _kind = value?.Trim();
     }
 
-    public IReadOnlyDictionary<string, string> Attributes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Attributes
+    {
+        get => _attributes!;
+        init => _attributes = SecretContractMap.NormalizeOrPreserveInvalid(value);
+    }
 
     public override string ToString()
         => string.IsNullOrWhiteSpace(Version)

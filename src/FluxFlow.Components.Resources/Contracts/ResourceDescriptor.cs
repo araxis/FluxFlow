@@ -5,6 +5,7 @@ public sealed record ResourceDescriptor
     private string? _kind;
     private string? _displayName;
     private string? _summary;
+    private IReadOnlyDictionary<string, string>? _metadata = new Dictionary<string, string>();
 
     public required ResourceName Name { get; init; }
     public string? Kind
@@ -25,5 +26,9 @@ public sealed record ResourceDescriptor
         init => _summary = value?.Trim();
     }
 
-    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Metadata
+    {
+        get => _metadata!;
+        init => _metadata = ResourceContractMap.NormalizeOrPreserveInvalid(value);
+    }
 }

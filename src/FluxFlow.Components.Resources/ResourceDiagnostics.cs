@@ -182,5 +182,10 @@ public static class ResourceDiagnostics
             if (string.IsNullOrWhiteSpace(value.Value))
                 diagnostics.Add(Invalid($"{path}.{value.Key}", "Values are required."));
         }
+
+        foreach (var key in ResourceContractMap.FindDuplicateNormalizedKeys(values))
+        {
+            diagnostics.Add(Invalid(path, $"Key '{key}' is declared more than once after trimming."));
+        }
     }
 }

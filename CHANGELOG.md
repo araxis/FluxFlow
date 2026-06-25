@@ -7,6 +7,44 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.4
+
+Hardens secret metadata and attribute map normalization.
+
+- Secret descriptor metadata, secret reference attributes, and secret option
+  metadata now trim valid keys and values when assigned.
+- Duplicate map keys after trimming are reported as structured `InvalidSecret`
+  diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps secret resolution, redaction, option resolution, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.3
+
+Hardens resource metadata and attribute map normalization.
+
+- Resource descriptor metadata and resource reference attributes now trim valid
+  keys and values when assigned.
+- Duplicate map keys after trimming are reported as structured
+  `InvalidResource` diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps resource lookup, kind matching, and host-owned resource ownership
+  unchanged.
+
+## FluxFlow.Components.Configuration 1.1.3
+
+Hardens configuration resource option metadata normalization.
+
+- Updates `FluxFlow.Components.Configuration` validation contracts.
+- Resource option metadata now trims valid keys and values when assigned.
+- Duplicate metadata keys after trimming are reported as structured
+  configuration diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps resource and secret lookup ownership unchanged.
+
 ## FluxFlow.Components.Secrets 1.2.3
 
 Hardens secret scalar text normalization for config-bound callers.

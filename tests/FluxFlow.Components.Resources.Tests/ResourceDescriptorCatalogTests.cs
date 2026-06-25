@@ -128,6 +128,56 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Descriptor_metadata_and_reference_attributes_trim_keys_and_values()
+    {
+        var descriptor = new ResourceDescriptor
+        {
+            Name = new ResourceName("primary"),
+            Metadata = new Dictionary<string, string>
+            {
+                [" owner "] = " runtime "
+            }
+        };
+        var reference = new ResourceReference
+        {
+            Name = new ResourceName("primary"),
+            Attributes = new Dictionary<string, string>
+            {
+                [" scope "] = " workflow "
+            }
+        };
+
+        descriptor.Metadata.ContainsKey("owner").ShouldBeTrue();
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+        descriptor.Metadata.ContainsKey(" owner ").ShouldBeFalse();
+        reference.Attributes.ContainsKey("scope").ShouldBeTrue();
+        reference.Attributes["scope"].ShouldBe("workflow");
+        reference.Attributes.ContainsKey(" scope ").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Metadata_validation_reports_duplicate_keys_after_trimming()
+    {
+        var diagnostics = ResourceDiagnostics.ValidateDescriptors(
+        [
+            new ResourceDescriptor
+            {
+                Name = new ResourceName("primary"),
+                Metadata = new Dictionary<string, string>
+                {
+                    ["owner"] = "runtime",
+                    [" owner "] = "design"
+                }
+            }
+        ]);
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == ResourceDiagnosticCode.InvalidResource
+            && diagnostic.Metadata["path"] == "resources[0].metadata"
+            && diagnostic.Message.Contains("after trimming", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Duplicate_helper_reports_duplicate_names()
     {
         var diagnostics = ResourceDiagnostics.FindDuplicateResources(

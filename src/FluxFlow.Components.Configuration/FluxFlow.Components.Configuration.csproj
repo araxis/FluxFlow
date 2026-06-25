@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.1.2</Version>
+    <Version>1.1.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Configuration resource reference paths now trim surrounding whitespace so diagnostics and option metadata use the same normalized config path.</PackageReleaseNotes>
+    <PackageReleaseNotes>Configuration resource option metadata now normalizes valid keys and values by trimming whitespace, while duplicate keys after trimming are reported as structured configuration diagnostics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

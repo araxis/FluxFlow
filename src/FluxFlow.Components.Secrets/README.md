@@ -103,6 +103,11 @@ configuration-bound records and references matching the same logical name,
 version, and kind, and makes duplicate detection catch declarations that differ
 only by padding.
 
+Valid metadata, attribute, and option metadata maps trim surrounding whitespace
+from keys and values when assigned. Maps with null values, blank keys or values,
+or duplicate keys after trimming are preserved so `SecretDiagnostics` can report
+structured invalid-secret diagnostics.
+
 Secret declarations are unique by name plus optional version. When multiple
 versions exist, callers should provide `Version` or another narrowing field
 such as `Kind`.

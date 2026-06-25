@@ -304,6 +304,48 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Resource_option_metadata_trims_keys_and_values()
+    {
+        var option = new ConfigurationResourceReference
+        {
+            Path = "connections.primary",
+            Metadata = new Dictionary<string, string>
+            {
+                [" owner "] = " runtime "
+            }
+        };
+
+        option.Metadata.ContainsKey("owner").ShouldBeTrue();
+        option.Metadata["owner"].ShouldBe("runtime");
+        option.Metadata.ContainsKey(" owner ").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ValidateResourcesAsync_reports_duplicate_metadata_keys_after_trimming()
+    {
+        var diagnostics = await ConfigurationValidator.ValidateResourcesAsync(
+            new ResourceDescriptorCatalog([]),
+            [
+                new ConfigurationResourceReference
+                {
+                    Path = "connections.primary",
+                    Required = false,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["owner"] = "runtime",
+                        [" owner "] = "design"
+                    }
+                }
+            ]);
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Source == ConfigurationDiagnosticSource.Configuration
+            && diagnostic.Code == "InvalidResourceReference"
+            && diagnostic.Metadata["referencePath"] == "resource.metadata"
+            && diagnostic.Message.Contains("after trimming", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ValidateSecretsAsync_reports_null_entries()
     {
         var diagnostics = await ConfigurationValidator.ValidateSecretsAsync(

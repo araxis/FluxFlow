@@ -220,6 +220,11 @@ public static class SecretDiagnostics
             if (string.IsNullOrWhiteSpace(value.Value))
                 diagnostics.Add(Invalid($"{path}.{value.Key}", "Values are required."));
         }
+
+        foreach (var key in SecretContractMap.FindDuplicateNormalizedKeys(values))
+        {
+            diagnostics.Add(Invalid(path, $"Key '{key}' is declared more than once after trimming."));
+        }
     }
 
     private static IReadOnlyDictionary<string, string> AddPath(

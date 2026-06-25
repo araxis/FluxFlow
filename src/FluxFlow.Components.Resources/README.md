@@ -65,6 +65,11 @@ whitespace when assigned. This keeps configuration-bound descriptors and
 references matching the same logical name and kind, and makes duplicate
 detection catch names that differ only by padding.
 
+Valid metadata and attribute maps trim surrounding whitespace from keys and
+values when assigned. Maps with null values, blank keys or values, or duplicate
+keys after trimming are preserved so `ResourceDiagnostics` can report structured
+invalid-resource diagnostics.
+
 ## Boundaries
 
 This package only defines resource contracts and helper logic. Hosts decide how

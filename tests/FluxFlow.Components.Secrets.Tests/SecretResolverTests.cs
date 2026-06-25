@@ -103,6 +103,60 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Secret_metadata_and_reference_attributes_trim_keys_and_values()
+    {
+        var descriptor = new SecretDescriptor
+        {
+            Name = new SecretName("primary"),
+            Metadata = new Dictionary<string, string>
+            {
+                [" owner "] = " runtime "
+            }
+        };
+        var reference = new SecretReference
+        {
+            Name = new SecretName("primary"),
+            Attributes = new Dictionary<string, string>
+            {
+                [" scope "] = " workflow "
+            }
+        };
+
+        descriptor.Metadata.ContainsKey("owner").ShouldBeTrue();
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+        descriptor.Metadata.ContainsKey(" owner ").ShouldBeFalse();
+        reference.Attributes.ContainsKey("scope").ShouldBeTrue();
+        reference.Attributes["scope"].ShouldBe("workflow");
+        reference.Attributes.ContainsKey(" scope ").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Metadata_validation_reports_duplicate_keys_after_trimming()
+    {
+        var diagnostics = SecretDiagnostics.ValidateRecords(
+        [
+            new SecretRecord
+            {
+                Descriptor = new SecretDescriptor
+                {
+                    Name = new SecretName("primary"),
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["owner"] = "runtime",
+                        [" owner "] = "design"
+                    }
+                },
+                Value = new SecretValue("value")
+            }
+        ]);
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "secrets[0].descriptor.metadata"
+            && diagnostic.Message.Contains("after trimming", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Resolver_returns_missing_diagnostic_for_unknown_reference()
     {
         var resolver = new InMemorySecretResolver([CreateRecord("primary-token", "runtime-value")]);

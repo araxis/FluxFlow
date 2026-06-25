@@ -6,6 +6,7 @@ public sealed record SecretDescriptor
     private string? _kind;
     private string? _displayName;
     private string? _summary;
+    private IReadOnlyDictionary<string, string>? _metadata = new Dictionary<string, string>();
 
     public required SecretName Name { get; init; }
     public string? Version
@@ -32,7 +33,11 @@ public sealed record SecretDescriptor
         init => _summary = value?.Trim();
     }
 
-    public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<string, string> Metadata
+    {
+        get => _metadata!;
+        init => _metadata = SecretContractMap.NormalizeOrPreserveInvalid(value);
+    }
 
     public override string ToString()
         => string.IsNullOrWhiteSpace(Version)

@@ -78,6 +78,10 @@ Resource option paths trim surrounding whitespace when assigned, matching the
 secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and
 metadata therefore report the normalized option path.
 
+Valid resource option metadata maps trim surrounding whitespace from keys and
+values when assigned. Null maps, blank keys or values, and duplicate keys after
+trimming are reported as structured configuration diagnostics.
+
 ## Composition
 
 This package does not expose standalone nodes or `FluxFlow.Composition`

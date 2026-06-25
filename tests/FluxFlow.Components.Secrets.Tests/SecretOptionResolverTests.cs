@@ -42,6 +42,23 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public void Secret_option_metadata_trims_keys_and_values()
+    {
+        var option = new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Metadata = new Dictionary<string, string>
+            {
+                [" owner "] = " runtime "
+            }
+        };
+
+        option.Metadata.ContainsKey("owner").ShouldBeTrue();
+        option.Metadata["owner"].ShouldBe("runtime");
+        option.Metadata.ContainsKey(" owner ").ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task ResolveRequired_returns_diagnostic_when_reference_is_missing()
     {
         var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
@@ -140,6 +157,26 @@ public sealed class SecretOptionResolverTests
         diagnostics.Select(diagnostic => diagnostic.Metadata["path"]).ShouldAllBe(path => path == "credential");
         diagnostics.Select(diagnostic => diagnostic.Metadata["optionPath"]).ShouldAllBe(path => path == "credential");
         diagnostics.ShouldContain(diagnostic => diagnostic.Metadata["referencePath"] == "reference.name");
+    }
+
+    [Fact]
+    public void ValidateOptionReference_reports_duplicate_metadata_keys_after_trimming()
+    {
+        var diagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Required = false,
+            Metadata = new Dictionary<string, string>
+            {
+                ["owner"] = "runtime",
+                [" owner "] = "design"
+            }
+        });
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "option.metadata"
+            && diagnostic.Message.Contains("after trimming", StringComparison.Ordinal));
     }
 
     private static SecretRecord CreateRecord(
