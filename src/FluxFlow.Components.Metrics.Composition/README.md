@@ -69,6 +69,6 @@ configuration.
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `metrics.aggregate` so hosts can build palettes, editors, validation hints, or
 documentation without copying package descriptors. The metadata describes the
-existing metrics aggregate option record and fixed ports. Optional keyed
-`TimeProvider` clocks remain host-owned resources and are not modeled as
-editable node options.
+existing metrics aggregate option record, fixed ports, and optional `clock`
+resource hint. Optional keyed `TimeProvider` clocks remain host-owned resources
+and are not modeled as editable node options.

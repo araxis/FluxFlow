@@ -82,6 +82,17 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 HelperText = "Maximum queued input messages."
             }
         ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = ProjectionsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic projection snapshot timestamps and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ],
         Ports =
         [
             new PortDesignMetadata

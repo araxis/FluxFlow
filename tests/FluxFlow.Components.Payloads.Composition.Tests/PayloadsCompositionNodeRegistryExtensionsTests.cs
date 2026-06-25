@@ -46,6 +46,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
             option.Name == PayloadsCompositionResourceNames.Clock);
+        AssertClockResource(metadata);
     }
 
     [Fact]
@@ -310,6 +311,17 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
+    }
+
+    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    {
+        var resource = metadata.Resources.ShouldHaveSingleItem();
+
+        resource.Name.ShouldBe(PayloadsCompositionResourceNames.Clock);
+        resource.DisplayName.ShouldBe("Clock");
+        resource.Order.ShouldBe(0);
+        resource.IsRequired.ShouldBeFalse();
+        resource.ValueType.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task WithNodeAsync(

@@ -84,6 +84,17 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 HelperText = "Maximum queued input messages."
             }
         ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = PayloadsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic payload inspection results and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ],
         Ports =
         [
             new PortDesignMetadata

@@ -76,6 +76,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             item.SuggestedEditorWidth.ShouldBe(420);
             item.Options.ShouldNotContain(option =>
                 option.Name == SerializationCompositionResourceNames.Clock);
+            AssertClockResource(item);
         }
     }
 
@@ -409,6 +410,17 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
+    }
+
+    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    {
+        var resource = metadata.Resources.ShouldHaveSingleItem();
+
+        resource.Name.ShouldBe(SerializationCompositionResourceNames.Clock);
+        resource.DisplayName.ShouldBe("Clock");
+        resource.Order.ShouldBe(0);
+        resource.IsRequired.ShouldBeFalse();
+        resource.ValueType.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(

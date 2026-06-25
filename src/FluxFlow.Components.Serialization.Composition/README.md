@@ -74,8 +74,9 @@ configuration.
 
 `SerializationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the six serialization composition nodes. The metadata describes the fixed
-request/result ports and shared `SerializationNodeOptions` surface for hosts
-that build palettes, editors, validators, or documentation views.
+request/result ports, shared `SerializationNodeOptions` surface, and optional
+`clock` resource hint for hosts that build palettes, editors, validators, or
+documentation views.
 
 The optional `clock` resource remains host-owned and is not represented as an
 editable node option.
