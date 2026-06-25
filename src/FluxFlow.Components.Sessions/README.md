@@ -122,6 +122,11 @@ Records carry neutral fields: session id, sequence, timestamp, type, name, paylo
 content type, and string attributes. Hosts can map their own envelope or event types
 into these contracts.
 
+Contract records normalize optional text by trimming it and treating blank values as
+absent. Tag and attribute maps are copied with ordinal key comparison when assigned,
+and nested session/input values are copied by the request/result contracts that carry
+them.
+
 ## Composition
 
 Building a workflow, reading config, creating nodes, and linking them is a

@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.1
+
+Hardens session contract normalization.
+
+- Session request, record, metadata, and query result contracts now trim optional
+  text values and treat blank optional text as absent.
+- Tag and attribute maps are copied with ordinal key comparison when assigned.
+- Nested session/input contracts in append, complete, and query-result payloads
+  are copied so later caller mutations do not leak into the contract object.
+
 ## FluxFlow.Components.Storage 3.0.9
 
 Hardens storage store non-null result handling.

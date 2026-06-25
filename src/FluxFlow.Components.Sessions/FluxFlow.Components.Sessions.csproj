@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sessions</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
-    <Version>3.1.0</Version>
+    <Version>3.1.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires session.replay boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Replay now awaits output-block acceptance while preserving store ownership, replay pacing, correlation, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Session contracts now normalize optional text and defensively copy tag, attribute, and nested session metadata maps.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
