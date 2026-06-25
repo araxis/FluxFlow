@@ -573,6 +573,17 @@ deserializes inline generated `items` into closed generic output types, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.State 3.0.1
+
+Aligns state reducer constructor option validation with the standalone node
+family.
+
+- Reports missing `reducer` and empty `keyExpression` as `ArgumentException`.
+- Reports non-positive `boundedCapacity` and negative `maxKeys` as
+  `ArgumentOutOfRangeException`.
+- Leaves reducer execution, state updates, diagnostics, and error-port behavior
+  unchanged.
+
 ## FluxFlow.Components.State 3.0.0
 
 Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an

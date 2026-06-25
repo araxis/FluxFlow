@@ -284,14 +284,47 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
-    public void Reducer_RejectsInvalidOptions()
+    public void Reducer_RejectsMissingReducer()
     {
-        var exception = Should.Throw<InvalidOperationException>(
+        var exception = Should.Throw<ArgumentException>(
             () => new StateReducerNode(
                 new StateReducerOptions { Reducer = "", BoundedCapacity = 1 },
                 new SampleExpressionEngine()));
 
         exception.Message.ShouldContain("reducer");
+    }
+
+    [Fact]
+    public void Reducer_RejectsEmptyKeyExpression()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", KeyExpression = " " },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("keyExpression");
+    }
+
+    [Fact]
+    public void Reducer_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", BoundedCapacity = 0 },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
+
+    [Fact]
+    public void Reducer_RejectsInvalidMaxKeys()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", MaxKeys = -1 },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("maxKeys");
     }
 
     [Fact]
