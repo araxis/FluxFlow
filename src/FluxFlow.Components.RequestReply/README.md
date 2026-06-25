@@ -37,3 +37,6 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - Everything is keyed on `CorrelationId` from `FluxFlow.Nodes` — the same envelope id
   that flows through the whole graph.
 - Inject a `TimeProvider` for deterministic timeout tests.
+- `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
+  in-flight callers with `OperationCanceledException`, so `Completion` can be
+  awaited without leaving callers hanging.

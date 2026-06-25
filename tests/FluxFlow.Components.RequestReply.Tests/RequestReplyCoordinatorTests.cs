@@ -122,6 +122,38 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task Complete_FailsInFlightCallers_AndSettlesCompletion()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var context = new FakeContext("pending");
+        await bridge.Incoming.SendAsync(context);
+        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        bridge.Complete();
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Failed.ShouldBeOfType<OperationCanceledException>();
+        context.Replied.ShouldBeNull();
+        await bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task DisposeAsync_FailsInFlightCallers_AndSettlesCompletion()
+    {
+        var bridge = new RequestReplyCoordinator<string, string>();
+        var context = new FakeContext("pending");
+        await bridge.Incoming.SendAsync(context);
+        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        await bridge.DisposeAsync();
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Failed.ShouldBeOfType<OperationCanceledException>();
+        context.Replied.ShouldBeNull();
+        await bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
     public async Task Coordinator_IsAFlowNode()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();

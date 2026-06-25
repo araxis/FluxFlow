@@ -36,6 +36,18 @@ Hardens component design metadata validation for config-bound callers.
   diagnostics.
 - Keeps the Designer contracts engine/composition neutral.
 
+## FluxFlow.Components.RequestReply 1.1.1
+
+Fixes request/reply coordinator lifecycle completion.
+
+- `RequestReplyCoordinator<TRequest,TResponse>.Complete()` now closes both
+  coordinator inputs, completes output/diagnostic ports, and fails in-flight
+  callers with `OperationCanceledException`.
+- `DisposeAsync()` now settles `Completion` instead of leaving awaiters blocked
+  on the response input block.
+- Keeps fault semantics unchanged: `Fault(exception)` still faults dataflow
+  blocks and fails in-flight callers with the original exception.
+
 ## FluxFlow.Components.Secrets 1.2.0
 
 Hardens secret metadata validation for config-bound callers.

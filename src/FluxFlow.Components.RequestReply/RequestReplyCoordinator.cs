@@ -101,9 +101,25 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     /// <summary>In-flight request count (requests awaiting a response).</summary>
     public int InFlightCount => _tracker?.PendingCount ?? 0;
 
-    public Task Completion => Task.WhenAll(_incoming.Completion, _responses.Completion);
+    public Task Completion => Task.WhenAll(
+        _incoming.Completion,
+        _responses.Completion,
+        _output.Completion,
+        _errors.Completion,
+        _events.Completion);
 
-    public void Complete() => _incoming.Complete();
+    public void Complete()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        CompleteBlocks();
+        _ = FailInFlightAsync(new OperationCanceledException(
+                "The request/reply bridge was completed."))
+            .AsTask();
+    }
 
     public void Fault(Exception exception)
     {
@@ -121,10 +137,9 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             _ = _tracker.FailAllAsync(exception).AsTask();
         }
 
-        // Fault the data blocks so Completion surfaces the fault (Output first, so the
-        // _incoming-completion continuation's Complete() is a no-op against the faulted
-        // block); flush — not fault — the diagnostic ports so buffered Errors/Events
-        // survive, matching the kit's fault rule.
+        // Fault the data blocks so Completion surfaces the fault. Flush — not fault —
+        // the diagnostic ports so buffered Errors/Events survive, matching the kit's
+        // fault rule.
         ((IDataflowBlock)_output).Fault(exception);
         ((IDataflowBlock)_incoming).Fault(exception);
         ((IDataflowBlock)_responses).Fault(exception);
@@ -304,16 +319,38 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         {
             return;
         }
-        _incoming.Complete();
-        _stopping.Cancel();
+
+        CompleteBlocks();
+        await FailInFlightAsync(new OperationCanceledException(
+                "The request/reply bridge was disposed."))
+            .ConfigureAwait(false);
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Completion may surface a fault; disposal must still release resources.
+        }
+
         if (_tracker is not null)
         {
             await _tracker.DisposeAsync().ConfigureAwait(false);
         }
 
+        _stopping.Dispose();
+    }
+
+    private void CompleteBlocks()
+    {
+        _incoming.Complete();
+        _responses.Complete();
         _output.Complete();
         _errors.Complete();
         _events.Complete();
-        _stopping.Dispose();
+        _stopping.Cancel();
     }
+
+    private ValueTask FailInFlightAsync(Exception exception)
+        => _tracker?.FailAllAsync(exception) ?? ValueTask.CompletedTask;
 }
