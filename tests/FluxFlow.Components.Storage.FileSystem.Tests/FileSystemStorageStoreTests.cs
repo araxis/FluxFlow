@@ -1,18 +1,10 @@
 using FluxFlow.Components.Storage.Contracts;
-using FluxFlow.Engine.Definitions;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
 
 namespace FluxFlow.Components.Storage.FileSystem.Tests;
 
-// NOTE: The through-the-node round-trip integration tests
-// (Registration_StoresThroughStorageNode, Registration_QueriesThroughStorageNode,
-// Registration_PropagatesConfiguredClockToStoreContext) were removed pending the
-// Wave 3 store-open step. The logical storage operation nodes are now config-only
-// and report StoreNotAvailable at runtime (no store is opened yet), so driving a
-// real put/get/query through the registered node no longer round-trips. The
-// direct FileSystemStorageStore / factory coverage below remains valid.
 public sealed class FileSystemStorageStoreTests
 {
     [Fact]
