@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Journal</PackageId>
     <AssemblyName>FluxFlow.Components.Journal</AssemblyName>
     <RootNamespace>FluxFlow.Components.Journal</RootNamespace>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event journal contracts and in-memory store for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;journal;store</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Journal record normalization now trims optional text fields and attributes consistently, rejects blank attribute values, and reports duplicate attribute keys after trimming.</PackageReleaseNotes>
+    <PackageReleaseNotes>Journal contracts now normalize text fields and copy attribute maps and query results so caller mutations cannot change records, queries, events, or returned results.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

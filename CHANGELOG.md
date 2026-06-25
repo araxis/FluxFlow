@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.0.2
+
+Hardens journal contract normalization.
+
+- `JournalRecord`, `JournalEventInput`, and `JournalQuery` now trim text fields
+  when assigned.
+- Attribute maps are normalized and copied on assignment so caller mutations do
+  not leak into records, event inputs, or queries.
+- `JournalQueryResult` now copies assigned record collections so returned
+  results remain stable after caller list mutations.
+
 ## FluxFlow.Components.Configuration 1.1.4
 
 Hardens configuration diagnostic contracts.

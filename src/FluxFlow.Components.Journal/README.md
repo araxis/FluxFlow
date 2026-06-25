@@ -52,7 +52,11 @@ nodes that emit events remain in their owning component packages.
 Journal is runtime-neutral. Hosts that use another runtime should adapt runtime
 events into `JournalEventInput` before calling `JournalRecordMapper`.
 
-`InMemoryJournalStore` and `JournalRecordMapper` normalize incoming text so
-record ids, optional fields, and attribute keys/values are trimmed before
-storage. Blank attribute values and duplicate attribute keys after trimming are
-rejected to keep query matching deterministic.
+Journal contracts normalize incoming text so record ids, optional fields, query
+filters, and attribute keys/values are trimmed before storage or matching. Blank
+attribute values and duplicate attribute keys after trimming are rejected to keep
+query matching deterministic.
+
+Record, event, and query attribute maps are copied on assignment. Query result
+record lists are copied on assignment. Later caller mutations do not change
+already-created records, queries, event inputs, or query results.
