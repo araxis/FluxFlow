@@ -58,6 +58,7 @@ public static class SecretOptionResolver
         IEnumerable<SecretOptionReference> options,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(options);
 
         var results = new List<SecretOptionResolution>();

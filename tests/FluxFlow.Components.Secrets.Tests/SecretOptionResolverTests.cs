@@ -83,6 +83,16 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public async Task ResolveAll_rejects_null_resolver_even_when_options_are_empty()
+    {
+        var act = async () => await SecretOptionResolver.ResolveAllAsync(
+            null!,
+            []);
+
+        await act.ShouldThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
     public async Task ResolveAsync_returns_invalid_option_diagnostic_before_resolving()
     {
         var resolver = new CountingSecretResolver();

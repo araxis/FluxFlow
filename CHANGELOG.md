@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.1
+
+Hardens secret option batch resolution contracts.
+
+- `SecretOptionResolver.ResolveAllAsync(...)` now validates the resolver
+  argument before returning an empty result.
+- Keeps secret resolution, redaction, and host-owned secret ownership
+  unchanged.
+
 ## FluxFlow.Components.Resources 1.2.0
 
 Hardens resource metadata validation for config-bound callers.
