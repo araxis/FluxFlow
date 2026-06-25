@@ -444,7 +444,7 @@ public sealed class MetricsAggregateNodeTests
     public void Aggregate_RejectsInvalidBoundedCapacity()
     {
         var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateNode(new MetricsAggregateOptions { BoundedCapacity = 0 }));
+            () => new MetricsAggregateOptions { BoundedCapacity = 0 });
 
         exception.Message.ShouldContain("boundedCapacity");
     }
@@ -457,10 +457,10 @@ public sealed class MetricsAggregateNodeTests
     public void Aggregate_RejectsInvalidRateWindow(double rateWindowSeconds)
     {
         var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateNode(new MetricsAggregateOptions
+            () => new MetricsAggregateOptions
             {
                 RateWindowSeconds = rateWindowSeconds
-            }));
+            });
 
         exception.Message.ShouldContain("rateWindowSeconds");
     }
@@ -469,7 +469,7 @@ public sealed class MetricsAggregateNodeTests
     public void Aggregate_RejectsInvalidMaxGroups()
     {
         var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new MetricsAggregateNode(new MetricsAggregateOptions { MaxGroups = -1 }));
+            () => new MetricsAggregateOptions { MaxGroups = -1 });
 
         exception.Message.ShouldContain("maxGroups");
     }
