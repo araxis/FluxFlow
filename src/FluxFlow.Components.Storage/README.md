@@ -181,6 +181,11 @@ null as empty. Nodes and stores still own required collection/key validation so
 invalid workflow messages surface as normal storage errors instead of
 constructor failures.
 
+Output contracts follow the same rule: records and results trim textual
+identity/diagnostic fields, normalize blank optional values to absent, copy
+attribute dictionaries with ordinal key comparison, and copy query result record
+lists on assignment.
+
 ## Composition
 
 Building a workflow, reading config, creating nodes, and linking them is a

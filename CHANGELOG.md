@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.4
+
+Hardens storage output contract normalization.
+
+- `StorageRecord`, `StorageResult`, and `StorageQueryResult` now trim textual
+  identity and diagnostic fields when assigned.
+- Blank optional content-type, message, and correlation values are treated as
+  absent.
+- Output attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- `StorageQueryResult.Records` now copies assigned record lists so later caller
+  mutations do not change the result.
+
 ## FluxFlow.Components.Storage 3.0.3
 
 Hardens storage request contract normalization.
