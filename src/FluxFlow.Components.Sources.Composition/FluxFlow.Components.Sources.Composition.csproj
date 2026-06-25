@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sources.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sources.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone generated and sequence source nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;sources;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for source composition nodes while keeping source runtime behavior and host-owned clock resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for source clock resources while keeping source runtime behavior and host-owned clocks unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

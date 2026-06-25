@@ -74,6 +74,25 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 HelperText = "Maximum queued input messages."
             }
         ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = ValidationCompositionResourceNames.Selector,
+                DisplayName = "Selector",
+                Order = 0,
+                Summary = "Optional keyed JSON schema value selector used to choose the value to validate.",
+                ValueType = "IJsonSchemaValueSelector<TInput>"
+            },
+            new ResourceDesignMetadata
+            {
+                Name = ValidationCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 1,
+                Summary = "Optional keyed clock for deterministic validation results and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ],
         Ports =
         [
             new PortDesignMetadata

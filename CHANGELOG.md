@@ -453,6 +453,15 @@ optional keyed `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. Generated and sequence sources are `FlowSource`s; the host
 supplies the items directly (the JSON + type-alias reader layer is gone). Engine glue removed.
 
+## FluxFlow.Components.Sources.Composition 1.2.0
+
+Adds Designer resource metadata for `source.generated` and `source.sequence`.
+
+- Describes the optional `clock` resource separately from editable source
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.Sources.Composition 1.1.0
 
 Adds package-owned Designer metadata for `source.generated` and
@@ -532,6 +541,15 @@ Engine-free standalone rewrite. Interval/schedule are `FlowSource`s; delay/throt
 arrival burst semantics; debounce flushes its pending item via the drain hook. Engine glue
 removed.
 
+## FluxFlow.Components.Timers.Composition 1.2.0
+
+Adds Designer resource metadata for timer composition nodes.
+
+- Describes the optional `clock` resource separately from editable timer
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
+
 ## FluxFlow.Components.Timers.Composition 1.1.0
 
 Adds package-owned Designer metadata for `timer.interval`, `timer.schedule`,
@@ -551,6 +569,15 @@ timer settings from composition configuration, and resolves optional keyed
 
 Engine-free standalone rewrite. The JSON-schema validator is a `FlowNode` with Valid/Invalid
 fan-out via `AddOutput`. Engine glue removed.
+
+## FluxFlow.Components.Validation.Composition 1.2.0
+
+Adds Designer resource metadata for `json.schema-validator`.
+
+- Describes optional `selector` and `clock` resources separately from editable
+  validation options.
+- Keeps runtime behavior unchanged; hosts still own keyed selector and clock
+  registration and lifetime.
 
 ## FluxFlow.Components.Validation.Composition 1.1.0
 

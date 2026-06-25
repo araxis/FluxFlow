@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone JSON schema validator nodes over host-owned keyed selector and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for the json.schema-validator composition node while keeping validation runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for the optional selector and clock resources while keeping validation runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -47,10 +47,10 @@ the generated and sequence source composition nodes. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and ports only. Inline generated `items`
-are node configuration and are exposed as JSON metadata. The optional `clock`
-resource remains a host-owned composition resource and is not exposed as an
-editable node option.
+The provider describes node options, ports, and a resource hint for the
+optional `clock` resource. Inline generated `items` are node configuration and
+are exposed as JSON metadata. The clock remains a host-owned composition
+resource and is not exposed as an editable node option.
 
 ## Configuration
 

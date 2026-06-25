@@ -77,6 +77,10 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         metadata.SelectMany(item => item.Options)
             .Select(option => option.Name)
             .ShouldNotContain(TimersCompositionResourceNames.Clock);
+        foreach (var item in metadata)
+        {
+            AssertClockResource(item);
+        }
     }
 
     [Fact]
@@ -449,6 +453,17 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
         ]);
+    }
+
+    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    {
+        var resource = metadata.Resources.ShouldHaveSingleItem();
+
+        resource.Name.ShouldBe(TimersCompositionResourceNames.Clock);
+        resource.DisplayName.ShouldBe("Clock");
+        resource.Order.ShouldBe(0);
+        resource.IsRequired.ShouldBeFalse();
+        resource.ValueType.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertOptions(

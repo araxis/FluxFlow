@@ -52,10 +52,11 @@ five timer composition nodes. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and ports only. The optional `clock`
-resource remains a host-owned composition resource and is not exposed as an
-editable node option. Schedule metadata covers cron/default UTC composition
-behavior; this package still does not add time zone id conversion.
+The provider describes node options, ports, and a resource hint for the
+optional `clock` resource. The clock remains a host-owned composition resource
+and is not exposed as an editable node option. Schedule metadata covers
+cron/default UTC composition behavior; this package still does not add time
+zone id conversion.
 
 ## Configuration
 
