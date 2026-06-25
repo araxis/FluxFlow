@@ -115,6 +115,47 @@ public sealed class CompositionRuntimeHostTests
     }
 
     [Fact]
+    public async Task Hosted_runtime_start_is_idempotent()
+    {
+        var source = new CountingSourceNode();
+        var services = new ServiceCollection();
+        services.AddSingleton(source);
+        services
+            .AddFluxFlowComposition(CreateLifecycleDefinition())
+            .RegisterNodes(RegisterLifecycleNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        await hostedService.StartAsync(CancellationToken.None);
+
+        source.StartCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Hosted_runtime_stop_is_idempotent()
+    {
+        var source = new CountingSourceNode();
+        var services = new ServiceCollection();
+        services.AddSingleton(source);
+        services
+            .AddFluxFlowComposition(CreateLifecycleDefinition())
+            .RegisterNodes(RegisterLifecycleNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        await hostedService.StopAsync(CancellationToken.None);
+        await hostedService.StopAsync(CancellationToken.None);
+        await hostedService.StartAsync(CancellationToken.None);
+
+        source.StartCount.ShouldBe(1);
+        source.CompleteCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Hosted_runtime_surfaces_diagnostics_without_throwing_when_configured()
     {
         var services = new ServiceCollection();
@@ -171,6 +212,12 @@ public sealed class CompositionRuntimeHostTests
             })
             .Build();
 
+    private static CompositionDefinition CreateLifecycleDefinition()
+        => CompositionDefinitionBuilder
+            .Create()
+            .Workflow("main", workflow => workflow.Node("source", "test.hosting.lifecycle-source"))
+            .Build();
+
     private static void RegisterTestNodes(CompositionNodeRegistry registry)
     {
         registry
@@ -200,6 +247,17 @@ public sealed class CompositionRuntimeHostTests
                         errors: node.Errors));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")]);
+    }
+
+    private static void RegisterLifecycleNodes(CompositionNodeRegistry registry)
+    {
+        registry.Register(
+            "test.hosting.lifecycle-source",
+            context =>
+            {
+                var node = context.Services.GetRequiredService<CountingSourceNode>();
+                return ValueTask.FromResult(ComposedNode.Create(node));
+            });
     }
 
     private sealed record SourceOptions
@@ -249,6 +307,49 @@ public sealed class CompositionRuntimeHostTests
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CountingSourceNode : IFlowSource
+    {
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _completeCount;
+        private int _disposeCount;
+        private int _startCount;
+
+        public int CompleteCount => _completeCount;
+
+        public int DisposeCount => _disposeCount;
+
+        public int StartCount => _startCount;
+
+        public Task Completion => _completion.Task;
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _startCount);
+            return Task.CompletedTask;
+        }
+
+        public void Complete()
+        {
+            Interlocked.Increment(ref _completeCount);
+            _completion.TrySetResult();
+        }
+
+        public void Fault(Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+            _completion.TrySetException(exception);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _disposeCount);
+            _completion.TrySetResult();
+            return ValueTask.CompletedTask;
         }
     }
 
