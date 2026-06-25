@@ -7,6 +7,39 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.3
+
+Hardens secret scalar text normalization for config-bound callers.
+
+- Secret descriptors and references now trim version, kind, display name, and
+  summary fields when assigned.
+- Secret option references and option resolution results now trim option paths.
+- Secret resolution and duplicate detection now treat padded versions and kinds
+  as the same logical values.
+- Keeps secret values, redaction, metadata maps, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.2
+
+Hardens resource scalar text normalization for config-bound callers.
+
+- Resource descriptors and references now trim kind, display name, and summary
+  fields when assigned.
+- Resource lookup now treats padded kinds as the same logical kind.
+- Keeps resource names, metadata maps, attributes, and host-owned resource
+  ownership unchanged.
+
+## FluxFlow.Components.Configuration 1.1.2
+
+Hardens configuration option path normalization.
+
+- Updates `FluxFlow.Components.Configuration` validation contracts.
+- `ConfigurationResourceReference.Path` now trims surrounding whitespace when
+  assigned.
+- Resource diagnostics and option metadata now report the normalized option
+  path.
+- Keeps validation ownership, lookup behavior, and diagnostic codes unchanged.
+
 ## FluxFlow.Components.Secrets 1.2.2
 
 Hardens secret name handling for config-bound callers.

@@ -286,6 +286,24 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public async Task ValidateResourcesAsync_trims_resource_option_paths()
+    {
+        var diagnostics = await ConfigurationValidator.ValidateResourcesAsync(
+            new ResourceDescriptorCatalog([]),
+            [
+                new ConfigurationResourceReference
+                {
+                    Path = " connections.primary ",
+                    Reference = new ResourceReference { Name = new ResourceName("missing") }
+                }
+            ]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Path.ShouldBe("connections.primary");
+        diagnostics[0].Metadata["path"].ShouldBe("connections.primary");
+    }
+
+    [Fact]
     public async Task ValidateSecretsAsync_reports_null_entries()
     {
         var diagnostics = await ConfigurationValidator.ValidateSecretsAsync(

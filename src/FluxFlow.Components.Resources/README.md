@@ -60,9 +60,10 @@ Use `ResourceDiagnostics` to:
 Metadata and attribute maps are validated as part of descriptors and references;
 null maps are reported as structured invalid-resource diagnostics.
 
-`ResourceName` trims surrounding whitespace when constructed. This keeps
-configuration-bound descriptors and references matching the same logical name
-and makes duplicate detection catch names that differ only by padding.
+`ResourceName`, resource `Kind`, `DisplayName`, and `Summary` trim surrounding
+whitespace when assigned. This keeps configuration-bound descriptors and
+references matching the same logical name and kind, and makes duplicate
+detection catch names that differ only by padding.
 
 ## Boundaries
 

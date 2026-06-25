@@ -26,6 +26,22 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public async Task ResolveRequired_trims_option_path()
+    {
+        var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
+        var reference = new SecretReference
+        {
+            Name = new SecretName("primary")
+        };
+
+        var result = await SecretOptionResolver.ResolveRequiredAsync(resolver, reference, " credential ");
+
+        result.Resolved.ShouldBeTrue();
+        result.OptionPath.ShouldBe("credential");
+        result.ToString().ShouldBe("Resolved secret option 'credential'.");
+    }
+
+    [Fact]
     public async Task ResolveRequired_returns_diagnostic_when_reference_is_missing()
     {
         var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
@@ -115,7 +131,7 @@ public sealed class SecretOptionResolverTests
     {
         var diagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
         {
-            OptionPath = "credential",
+            OptionPath = " credential ",
             Reference = new SecretReference { Name = default }
         });
 

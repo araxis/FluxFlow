@@ -74,6 +74,28 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Resource_descriptor_and_reference_text_fields_trim_surrounding_whitespace()
+    {
+        var descriptor = new ResourceDescriptor
+        {
+            Name = new ResourceName("primary"),
+            Kind = " profile ",
+            DisplayName = " Primary ",
+            Summary = " Reusable profile. "
+        };
+        var reference = new ResourceReference
+        {
+            Name = new ResourceName("primary"),
+            Kind = " profile "
+        };
+
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary");
+        descriptor.Summary.ShouldBe("Reusable profile.");
+        reference.Kind.ShouldBe("profile");
+    }
+
+    [Fact]
     public async Task Lookup_matches_trimmed_resource_names()
     {
         var descriptor = CreateDescriptor(" primary-profile ", "profile");
@@ -87,6 +109,22 @@ public sealed class ResourceDescriptorCatalogTests
 
         result.Found.ShouldBeTrue();
         result.Descriptor.ShouldBeSameAs(descriptor);
+    }
+
+    [Fact]
+    public async Task Lookup_matches_trimmed_resource_kinds()
+    {
+        var descriptor = CreateDescriptor("primary-profile", " profile ");
+        var catalog = new ResourceDescriptorCatalog([descriptor]);
+
+        var result = await catalog.LookupAsync(new ResourceReference
+        {
+            Name = new ResourceName("primary-profile"),
+            Kind = " profile "
+        });
+
+        result.Found.ShouldBeTrue();
+        result.Diagnostic.ShouldBeNull();
     }
 
     [Fact]

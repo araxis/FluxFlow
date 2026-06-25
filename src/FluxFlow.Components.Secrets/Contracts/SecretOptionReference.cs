@@ -2,7 +2,14 @@ namespace FluxFlow.Components.Secrets.Contracts;
 
 public sealed record SecretOptionReference
 {
-    public required string OptionPath { get; init; }
+    private string _optionPath = string.Empty;
+
+    public required string OptionPath
+    {
+        get => _optionPath;
+        init => _optionPath = value?.Trim() ?? string.Empty;
+    }
+
     public SecretReference? Reference { get; init; }
     public bool Required { get; init; } = true;
     public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();

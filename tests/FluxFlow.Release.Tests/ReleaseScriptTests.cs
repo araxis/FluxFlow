@@ -138,7 +138,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Hardens configuration validation for null config-bound collections.");
+            notes.ShouldContain("Hardens configuration option path normalization.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
         }

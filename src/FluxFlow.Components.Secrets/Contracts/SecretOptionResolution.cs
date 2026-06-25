@@ -2,7 +2,14 @@ namespace FluxFlow.Components.Secrets.Contracts;
 
 public sealed record SecretOptionResolution
 {
-    public required string OptionPath { get; init; }
+    private string _optionPath = string.Empty;
+
+    public required string OptionPath
+    {
+        get => _optionPath;
+        init => _optionPath = value?.Trim() ?? string.Empty;
+    }
+
     public SecretReference? Reference { get; init; }
     public SecretDescriptor? Descriptor { get; init; }
     public SecretValue? Value { get; init; }

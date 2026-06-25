@@ -38,6 +38,32 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Secret_descriptor_and_reference_text_fields_trim_surrounding_whitespace()
+    {
+        var descriptor = new SecretDescriptor
+        {
+            Name = new SecretName("primary"),
+            Version = " v1 ",
+            Kind = " profile ",
+            DisplayName = " Primary ",
+            Summary = " Runtime credential. "
+        };
+        var reference = new SecretReference
+        {
+            Name = new SecretName("primary"),
+            Version = " v1 ",
+            Kind = " profile "
+        };
+
+        descriptor.Version.ShouldBe("v1");
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary");
+        descriptor.Summary.ShouldBe("Runtime credential.");
+        reference.Version.ShouldBe("v1");
+        reference.Kind.ShouldBe("profile");
+    }
+
+    [Fact]
     public async Task Resolver_matches_trimmed_secret_names()
     {
         var resolver = new InMemorySecretResolver(
@@ -49,6 +75,26 @@ public sealed class SecretResolverTests
         {
             Name = new SecretName("primary-token"),
             Kind = "profile"
+        });
+
+        result.Resolved.ShouldBeTrue();
+        result.Value.ShouldNotBeNull();
+        result.Value.Reveal().ShouldBe("runtime-value");
+    }
+
+    [Fact]
+    public async Task Resolver_matches_trimmed_version_and_kind()
+    {
+        var resolver = new InMemorySecretResolver(
+        [
+            CreateRecord("primary-token", "runtime-value", version: " v1 ", kind: " profile ")
+        ]);
+
+        var result = await resolver.ResolveAsync(new SecretReference
+        {
+            Name = new SecretName("primary-token"),
+            Version = " v1 ",
+            Kind = " profile "
         });
 
         result.Resolved.ShouldBeTrue();
@@ -167,6 +213,19 @@ public sealed class SecretResolverTests
         var act = () => new InMemorySecretResolver(
         [
             CreateRecord(" primary ", "one", version: "v1"),
+            CreateRecord("primary", "two", version: "v1")
+        ]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain(nameof(SecretDiagnosticCode.DuplicateSecret));
+    }
+
+    [Fact]
+    public void Resolver_rejects_duplicate_records_after_trimming_versions()
+    {
+        var act = () => new InMemorySecretResolver(
+        [
+            CreateRecord("primary", "one", version: " v1 "),
             CreateRecord("primary", "two", version: "v1")
         ]);
 

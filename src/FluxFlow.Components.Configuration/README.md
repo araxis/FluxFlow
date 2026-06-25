@@ -74,6 +74,10 @@ also reported as structured configuration diagnostics, which keeps
 configuration-file binding issues in the validation report instead of surfacing
 as normalization exceptions.
 
+Resource option paths trim surrounding whitespace when assigned, matching the
+secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and
+metadata therefore report the normalized option path.
+
 ## Composition
 
 This package does not expose standalone nodes or `FluxFlow.Composition`

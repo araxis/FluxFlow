@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Resources</PackageId>
     <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>1.2.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable named resource contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>ResourceName now trims surrounding whitespace at construction so config-bound descriptors and references match consistently and duplicate detection catches names that differ only by padding.</PackageReleaseNotes>
+    <PackageReleaseNotes>Resource descriptors and references now trim scalar text fields such as kind, display name, and summary so config-bound resource metadata matches consistently.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
