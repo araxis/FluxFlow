@@ -197,6 +197,74 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_normalizes_record_fields_and_attributes()
+    {
+        var store = new InMemoryJournalStore();
+
+        var appended = await store.AppendAsync(CreateRecord(
+            "  spaced-id  ",
+            type: " item.accepted ",
+            status: " ok ",
+            source: " source-a ",
+            workflowId: " wf-1 ",
+            workflowName: " main ",
+            nodeId: " node-1 ",
+            componentId: " component-1 ",
+            subject: " items/1 ",
+            channel: " events/items ",
+            severity: " info ",
+            level: " low ",
+            attributes: new Dictionary<string, string>
+            {
+                [" tenant "] = " primary "
+            }));
+
+        appended.Record.Id.ShouldBe("spaced-id");
+        appended.Record.Type.ShouldBe("item.accepted");
+        appended.Record.Status.ShouldBe("ok");
+        appended.Record.Source.ShouldBe("source-a");
+        appended.Record.WorkflowId.ShouldBe("wf-1");
+        appended.Record.WorkflowName.ShouldBe("main");
+        appended.Record.NodeId.ShouldBe("node-1");
+        appended.Record.ComponentId.ShouldBe("component-1");
+        appended.Record.Subject.ShouldBe("items/1");
+        appended.Record.Channel.ShouldBe("events/items");
+        appended.Record.Severity.ShouldBe("info");
+        appended.Record.Level.ShouldBe("low");
+        appended.Record.Attributes.ContainsKey("tenant").ShouldBeTrue();
+        appended.Record.Attributes["tenant"].ShouldBe("primary");
+    }
+
+    [Fact]
+    public async Task AppendAsync_rejects_blank_attribute_values()
+    {
+        var store = new InMemoryJournalStore();
+
+        await Should.ThrowAsync<ArgumentException>(() =>
+            store.AppendAsync(CreateRecord(
+                "blank-attribute",
+                attributes: new Dictionary<string, string>
+                {
+                    ["tenant"] = " "
+                })).AsTask());
+    }
+
+    [Fact]
+    public async Task AppendAsync_rejects_duplicate_attribute_keys_after_trimming()
+    {
+        var store = new InMemoryJournalStore();
+
+        await Should.ThrowAsync<ArgumentException>(() =>
+            store.AppendAsync(CreateRecord(
+                "duplicate-attributes",
+                attributes: new Dictionary<string, string>
+                {
+                    [" tenant "] = "primary",
+                    ["tenant"] = "secondary"
+                })).AsTask());
+    }
+
+    [Fact]
     public async Task QueryAsync_validates_pagination()
     {
         var store = new InMemoryJournalStore();
@@ -275,6 +343,59 @@ public sealed class InMemoryJournalStoreTests
         var record = JournalRecordMapper.FromEvent(input, "evt-1");
 
         record.NodeId.ShouldBe("node-from-attributes");
+    }
+
+    [Fact]
+    public void FromEvent_normalizes_event_fields_and_attributes()
+    {
+        var input = new JournalEventInput
+        {
+            Timestamp = Timestamp(1),
+            Type = " item.accepted ",
+            Source = " source-a ",
+            SourceNodeId = " node-1 ",
+            Subject = " items/1 ",
+            Status = " ok ",
+            Channel = " events/items ",
+            PayloadPreview = " accepted ",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = " primary ",
+                [JournalRecordMapper.WorkflowIdAttribute] = " wf-1 ",
+                [JournalRecordMapper.SummaryAttribute] = " summary "
+            }
+        };
+
+        var record = JournalRecordMapper.FromEvent(input, " evt-1 ");
+
+        record.Id.ShouldBe("evt-1");
+        record.Type.ShouldBe("item.accepted");
+        record.Source.ShouldBe("source-a");
+        record.NodeId.ShouldBe("node-1");
+        record.Subject.ShouldBe("items/1");
+        record.Status.ShouldBe("ok");
+        record.Channel.ShouldBe("events/items");
+        record.WorkflowId.ShouldBe("wf-1");
+        record.Summary.ShouldBe("summary");
+        record.PayloadPreview.ShouldBe("accepted");
+        record.Attributes["tenant"].ShouldBe("primary");
+    }
+
+    [Fact]
+    public void FromEvent_rejects_duplicate_attribute_keys_after_trimming()
+    {
+        var input = new JournalEventInput
+        {
+            Timestamp = Timestamp(1),
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = "primary",
+                ["tenant"] = "secondary"
+            }
+        };
+
+        Should.Throw<ArgumentException>(() =>
+            JournalRecordMapper.FromEvent(input, "evt-1"));
     }
 
     [Fact]

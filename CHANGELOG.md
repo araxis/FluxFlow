@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.0.1
+
+Hardens journal record normalization.
+
+- Trims optional journal record and event-mapped text fields consistently.
+- Normalizes journal attribute keys and values, rejects blank attribute values,
+  and reports duplicate attribute keys after trimming.
+- Keeps journal storage, query, retention, and runtime-neutral contracts
+  unchanged.
+
 ## FluxFlow.Components.Configuration 1.1.1
 
 Hardens configuration validation for null config-bound collections.

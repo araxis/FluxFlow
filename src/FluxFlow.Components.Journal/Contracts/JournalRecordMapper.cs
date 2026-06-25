@@ -22,20 +22,20 @@ public static class JournalRecordMapper
         {
             Id = id.Trim(),
             Timestamp = input.Timestamp,
-            Type = input.Type,
-            Status = input.Status,
-            Source = input.Source,
+            Type = NormalizeOptional(input.Type),
+            Status = NormalizeOptional(input.Status),
+            Source = NormalizeOptional(input.Source),
             WorkflowId = GetAttribute(attributes, WorkflowIdAttribute),
             WorkflowName = GetAttribute(attributes, WorkflowNameAttribute),
-            NodeId = input.SourceNodeId ?? GetAttribute(attributes, NodeIdAttribute),
+            NodeId = NormalizeOptional(input.SourceNodeId) ?? GetAttribute(attributes, NodeIdAttribute),
             ComponentId = GetAttribute(attributes, ComponentIdAttribute),
-            Subject = input.Subject,
-            Channel = input.Channel,
+            Subject = NormalizeOptional(input.Subject),
+            Channel = NormalizeOptional(input.Channel),
             Severity = GetAttribute(attributes, SeverityAttribute),
             Level = GetAttribute(attributes, LevelAttribute),
-            Summary = GetAttribute(attributes, SummaryAttribute) ?? input.PayloadPreview,
+            Summary = GetAttribute(attributes, SummaryAttribute) ?? NormalizeOptional(input.PayloadPreview),
             PayloadBytes = input.PayloadBytes,
-            PayloadPreview = input.PayloadPreview,
+            PayloadPreview = NormalizeOptional(input.PayloadPreview),
             Attributes = attributes
         };
     }
@@ -48,12 +48,26 @@ public static class JournalRecordMapper
 
         foreach (var (key, value) in attributes)
         {
-            copy[key] = value;
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Journal event attribute keys are required.");
+
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Journal event attribute values are required.");
+
+            var normalizedKey = key.Trim();
+            if (!copy.TryAdd(normalizedKey, value.Trim()))
+            {
+                throw new ArgumentException(
+                    $"Journal event attribute '{normalizedKey}' is declared more than once.");
+            }
         }
 
         return copy;
     }
 
     private static string? GetAttribute(IReadOnlyDictionary<string, string> attributes, string key)
-        => attributes.TryGetValue(key, out var value) ? value : null;
+        => attributes.TryGetValue(key, out var value) ? NormalizeOptional(value) : null;
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
