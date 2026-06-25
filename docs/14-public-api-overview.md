@@ -687,6 +687,9 @@ These packages are intentionally not standalone node composition adapters:
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   with fail-fast option validation, and is intentionally not covered by
   composition adapters in this pass.
+- `FluxFlow.Components.Storage` provides storage nodes and host-owned store
+  contracts, including normalized `StorageStoreContext` values for backend
+  factories.
 - `FluxFlow.Components.Designer` provides engine/composition-neutral design
   metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and

@@ -9,7 +9,31 @@ namespace FluxFlow.Components.Storage.Contracts;
 /// </summary>
 public sealed record StorageStoreContext
 {
-    public string? StoreName { get; init; }
-    public string? Collection { get; init; }
-    public TimeProvider Clock { get; init; } = TimeProvider.System;
+    private string? _storeName;
+    private string? _collection;
+    private TimeProvider _clock = TimeProvider.System;
+
+    public string? StoreName
+    {
+        get => _storeName;
+        init => _storeName = Normalize(value);
+    }
+
+    public string? Collection
+    {
+        get => _collection;
+        init => _collection = Normalize(value);
+    }
+
+    public TimeProvider Clock
+    {
+        get => _clock;
+        init => _clock = value ?? TimeProvider.System;
+    }
+
+    private static string? Normalize(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
 }

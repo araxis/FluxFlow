@@ -47,4 +47,41 @@ public sealed class StorageComponentOptionsTests
         await act.ShouldThrowAsync<ArgumentNullException>();
         invoked.ShouldBeFalse();
     }
+
+    [Fact]
+    public async Task UseStore_receives_normalized_context_values()
+    {
+        StorageStoreContext? received = null;
+        var options = new StorageComponentOptions()
+            .UseStore((context, _) =>
+            {
+                received = context;
+                return ValueTask.FromResult(StorageStoreLease.Shared(new InMemoryStorageStore()));
+            });
+
+        await using var lease = await options.StoreFactory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = " tenant-a ",
+            Collection = " items "
+        });
+
+        received.ShouldNotBeNull();
+        received.StoreName.ShouldBe("tenant-a");
+        received.Collection.ShouldBe("items");
+    }
+
+    [Fact]
+    public void StorageStoreContext_normalizes_blank_values_and_null_clock()
+    {
+        var context = new StorageStoreContext
+        {
+            StoreName = " ",
+            Collection = "\t",
+            Clock = null!
+        };
+
+        context.StoreName.ShouldBeNull();
+        context.Collection.ShouldBeNull();
+        context.Clock.ShouldBe(TimeProvider.System);
+    }
 }

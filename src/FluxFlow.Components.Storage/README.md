@@ -135,6 +135,9 @@ disposed. The factory receives the store name, default collection, and clock
 through `StorageStoreContext`. Delegate-backed factories registered through
 `StorageComponentOptions.UseStore(...)` must return a non-null
 `StorageStoreLease`; shared-store delegates must return a non-null store.
+`StorageStoreContext` trims store names and default collections, treats blank
+values as absent, and falls back to `TimeProvider.System` when a null clock is
+assigned.
 
 ## Runtime Timing
 

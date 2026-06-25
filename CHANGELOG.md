@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.2
+
+Hardens storage store context normalization.
+
+- `StorageStoreContext.StoreName` and `StorageStoreContext.Collection` now trim
+  surrounding whitespace when assigned.
+- Blank store names and collections are treated as absent before delegate-backed
+  factories receive the context.
+- Assigning a null `StorageStoreContext.Clock` now falls back to
+  `TimeProvider.System`.
+- Keeps store ownership, backend factories, storage nodes, and request
+  contracts unchanged.
+
 ## FluxFlow.Components.RequestReply 1.1.2
 
 Hardens request/reply coordinator option validation.
