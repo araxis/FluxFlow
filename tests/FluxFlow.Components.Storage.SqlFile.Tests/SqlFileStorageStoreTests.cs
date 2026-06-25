@@ -402,6 +402,27 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Query_RejectsInvalidPaging()
+    {
+        using var temp = TempDirectory.Create();
+        await using var store = CreateStore(Path.Combine(temp.Path, "records.db"));
+
+        var offset = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Offset = -1
+        }));
+        var limit = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Limit = 0
+        }));
+
+        offset.Message.ShouldContain("offset");
+        limit.Message.ShouldContain("limit");
+    }
+
+    [Fact]
     public async Task Query_PagesWithoutDuplicatesOrGaps()
     {
         using var temp = TempDirectory.Create();
