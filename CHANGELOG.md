@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.1.1
+
+Hardens configuration validation for null config-bound collections.
+
+- Updates `FluxFlow.Components.Configuration` validation helpers.
+- Reports null `Resources` and `Secrets` collections on
+  `ConfigurationValidationRequest` as structured configuration diagnostics.
+- Reports null resource or secret validation entries by index instead of
+  throwing during validation.
+- Keeps resource and secret lookup ownership unchanged.
+
 ## FluxFlow.Components.Storage 3.0.1
 
 Hardens delegate-backed storage factory registration.

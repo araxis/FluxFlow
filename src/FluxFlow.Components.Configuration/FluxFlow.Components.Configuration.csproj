@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Configuration validation now reports invalid or null resource option metadata with structured diagnostics instead of throwing during metadata normalization.</PackageReleaseNotes>
+    <PackageReleaseNotes>Configuration validation now reports null request resource/secret collections and null validation entries as structured configuration diagnostics instead of throwing while normalizing config-bound input.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

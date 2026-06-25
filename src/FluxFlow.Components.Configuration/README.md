@@ -69,6 +69,10 @@ diagnostics are displayed or logged.
 
 Resource option metadata is validated as configuration input. Null maps, empty
 keys, and empty values are reported as structured configuration diagnostics.
+Null request-level resource/secret collections and null validation entries are
+also reported as structured configuration diagnostics, which keeps
+configuration-file binding issues in the validation report instead of surfacing
+as normalization exceptions.
 
 ## Composition
 

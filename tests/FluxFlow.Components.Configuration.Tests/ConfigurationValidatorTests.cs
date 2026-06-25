@@ -143,6 +143,36 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public async Task ValidateAsync_reports_null_request_collections_as_diagnostics()
+    {
+        var report = await ConfigurationValidator.ValidateAsync(
+            new ResourceDescriptorCatalog([]),
+            new InMemorySecretResolver([]),
+            new ConfigurationValidationRequest
+            {
+                Resources = null!,
+                Secrets = null!
+            });
+
+        report.HasErrors.ShouldBeTrue();
+        report.ErrorCount.ShouldBe(2);
+        report.Diagnostics.ShouldAllBe(diagnostic =>
+            diagnostic.Source == ConfigurationDiagnosticSource.Configuration);
+        report.Diagnostics.ShouldAllBe(diagnostic =>
+            diagnostic.Code == "InvalidConfigurationValidationRequest");
+        report.Diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            "resources",
+            "secrets"
+        ]);
+        report.Diagnostics.Select(diagnostic => diagnostic.Metadata["referencePath"]).ShouldBe(
+        [
+            "request.resources",
+            "request.secrets"
+        ]);
+    }
+
+    [Fact]
     public async Task Invalid_resource_reference_includes_option_and_reference_paths()
     {
         var diagnostics = await ConfigurationValidator.ValidateResourcesAsync(
@@ -161,6 +191,20 @@ public sealed class ConfigurationValidatorTests
         diagnostics[0].Path.ShouldBe("connections.primary");
         diagnostics[0].Metadata["path"].ShouldBe("connections.primary");
         diagnostics[0].Metadata["referencePath"].ShouldBe("reference.name");
+    }
+
+    [Fact]
+    public async Task ValidateResourcesAsync_reports_null_entries()
+    {
+        var diagnostics = await ConfigurationValidator.ValidateResourcesAsync(
+            new ResourceDescriptorCatalog([]),
+            [null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Source.ShouldBe(ConfigurationDiagnosticSource.Configuration);
+        diagnostics[0].Code.ShouldBe("InvalidConfigurationValidationRequest");
+        diagnostics[0].Path.ShouldBe("resources[0]");
+        diagnostics[0].Metadata["referencePath"].ShouldBe("resources[0]");
     }
 
     [Fact]
@@ -239,6 +283,20 @@ public sealed class ConfigurationValidatorTests
         diagnostics[0].Source.ShouldBe(ConfigurationDiagnosticSource.Secret);
         diagnostics[0].Code.ShouldBe(nameof(SecretDiagnosticCode.MissingSecret));
         diagnostics[0].Path.ShouldBe("connections.primary.credential");
+    }
+
+    [Fact]
+    public async Task ValidateSecretsAsync_reports_null_entries()
+    {
+        var diagnostics = await ConfigurationValidator.ValidateSecretsAsync(
+            new InMemorySecretResolver([]),
+            [null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Source.ShouldBe(ConfigurationDiagnosticSource.Configuration);
+        diagnostics[0].Code.ShouldBe("InvalidConfigurationValidationRequest");
+        diagnostics[0].Path.ShouldBe("secrets[0]");
+        diagnostics[0].Metadata["referencePath"].ShouldBe("secrets[0]");
     }
 
     [Fact]

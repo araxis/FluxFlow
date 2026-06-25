@@ -19,8 +19,29 @@ public static class ConfigurationValidator
         ArgumentNullException.ThrowIfNull(request);
 
         var diagnostics = new List<ConfigurationDiagnostic>();
-        diagnostics.AddRange(await ValidateResourcesAsync(resourceLookup, request.Resources, cancellationToken).ConfigureAwait(false));
-        diagnostics.AddRange(await ValidateSecretsAsync(secretResolver, request.Secrets, cancellationToken).ConfigureAwait(false));
+        if (request.Resources is null)
+        {
+            diagnostics.Add(InvalidValidationRequest(
+                "resources",
+                "request.resources",
+                "Configuration validation resources collection cannot be null."));
+        }
+        else
+        {
+            diagnostics.AddRange(await ValidateResourcesAsync(resourceLookup, request.Resources, cancellationToken).ConfigureAwait(false));
+        }
+
+        if (request.Secrets is null)
+        {
+            diagnostics.Add(InvalidValidationRequest(
+                "secrets",
+                "request.secrets",
+                "Configuration validation secrets collection cannot be null."));
+        }
+        else
+        {
+            diagnostics.AddRange(await ValidateSecretsAsync(secretResolver, request.Secrets, cancellationToken).ConfigureAwait(false));
+        }
 
         return ConfigurationValidationReport.FromDiagnostics(diagnostics);
     }
@@ -34,19 +55,33 @@ public static class ConfigurationValidator
         ArgumentNullException.ThrowIfNull(references);
 
         var diagnostics = new List<ConfigurationDiagnostic>();
+        var index = 0;
         foreach (var option in references)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (option is null)
+            {
+                diagnostics.Add(InvalidValidationRequest(
+                    $"resources[{index}]",
+                    $"resources[{index}]",
+                    $"Resource validation reference at index {index} cannot be null."));
+                index++;
+                continue;
+            }
 
             var optionDiagnostics = ValidateResourceOption(option);
             if (optionDiagnostics.Count > 0)
             {
                 diagnostics.AddRange(optionDiagnostics);
+                index++;
                 continue;
             }
 
             if (option.Reference is null)
+            {
+                index++;
                 continue;
+            }
 
             var referenceDiagnostics = ResourceDiagnostics
                 .ValidateReference(option.Reference)
@@ -56,12 +91,15 @@ public static class ConfigurationValidator
             if (referenceDiagnostics.Length > 0)
             {
                 diagnostics.AddRange(referenceDiagnostics);
+                index++;
                 continue;
             }
 
             var result = await lookup.LookupAsync(option.Reference, cancellationToken).ConfigureAwait(false);
             if (result.Diagnostic is not null)
                 diagnostics.Add(FromResourceDiagnostic(result.Diagnostic, option.Path));
+
+            index++;
         }
 
         return diagnostics;
@@ -76,20 +114,33 @@ public static class ConfigurationValidator
         ArgumentNullException.ThrowIfNull(options);
 
         var diagnostics = new List<ConfigurationDiagnostic>();
+        var index = 0;
         foreach (var option in options)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (option is null)
+            {
+                diagnostics.Add(InvalidValidationRequest(
+                    $"secrets[{index}]",
+                    $"secrets[{index}]",
+                    $"Secret validation reference at index {index} cannot be null."));
+                index++;
+                continue;
+            }
 
             var optionDiagnostics = SecretDiagnostics.ValidateOptionReference(option);
             if (optionDiagnostics.Count > 0)
             {
                 diagnostics.AddRange(optionDiagnostics.Select(diagnostic => FromSecretDiagnostic(diagnostic, option.OptionPath)));
+                index++;
                 continue;
             }
 
             var result = await SecretOptionResolver.ResolveAsync(resolver, option, cancellationToken).ConfigureAwait(false);
             if (result.Diagnostic is not null)
                 diagnostics.Add(FromSecretDiagnostic(result.Diagnostic, result.OptionPath));
+
+            index++;
         }
 
         return diagnostics;
@@ -235,5 +286,22 @@ public static class ConfigurationValidator
             {
                 ["referencePath"] = referencePath
             }, optionPath)
+        };
+
+    private static ConfigurationDiagnostic InvalidValidationRequest(
+        string path,
+        string referencePath,
+        string message)
+        => new()
+        {
+            Source = ConfigurationDiagnosticSource.Configuration,
+            Code = "InvalidConfigurationValidationRequest",
+            Severity = ConfigurationDiagnosticSeverity.Error,
+            Message = message,
+            Path = path,
+            Metadata = Merge(new Dictionary<string, string>
+            {
+                ["referencePath"] = referencePath
+            }, path)
         };
 }
