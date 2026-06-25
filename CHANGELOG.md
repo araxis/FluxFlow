@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.State 3.0.2
+
+Hardens state reducer contract normalization.
+
+- `StateReducerInput` and `StateReducerResult` now trim key text when assigned.
+- `StateReducerInput.Variables` is copied with ordinal key comparison so later
+  caller mutations do not leak into the message contract.
+
 ## FluxFlow.Components.Sessions 3.1.4
 
 Hardens session query response validation.

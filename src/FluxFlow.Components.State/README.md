@@ -15,6 +15,10 @@ is broadcast on `Output` as `FlowMessage<StateReducerResult>` carrying the same
 correlation id as the input. State updates are serial, so each key observes
 deterministic, ordered changes.
 
+State reducer contracts trim key text on assignment. `StateReducerInput`
+defensively copies `Variables` with ordinal key comparison so later caller
+mutations do not change the message seen by the node.
+
 ```csharp
 await using var node = new StateReducerNode(
     new StateReducerOptions

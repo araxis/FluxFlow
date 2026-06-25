@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.State</PackageId>
     <AssemblyName>FluxFlow.Components.State</AssemblyName>
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone keyed state-reducer node for FluxFlow: a reducer input in, an updated state snapshot broadcast out, per-key state kept in the node. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: missing reducer and empty keyExpression now report ArgumentException, while invalid boundedCapacity and maxKeys report ArgumentOutOfRangeException. Runtime reducer behavior is unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>State reducer contracts now trim key text and defensively copy variables with ordinal key comparison.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
