@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 1.0.1
+
+Hardens hosted runtime lifecycle transitions.
+
+- `CompositionRuntimeHost` now serializes build/start/stop transitions through
+  the host lifecycle gate.
+- Repeated hosted or manual start calls no longer start the same runtime more
+  than once.
+- Repeated stop calls no longer complete an already stopped runtime again.
+- A runtime that has been stopped is not started again by the host.
+- Adds direct hosting tests with a non-idempotent source to prove the host owns
+  this lifecycle guarantee.
+
 ## FluxFlow.Composition 1.0.1
 
 Hardens composition definition collection assignment.
