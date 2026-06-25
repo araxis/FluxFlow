@@ -262,9 +262,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 optionTypeFile.ShouldNotBeNull(
                     $"{entry.PackageId} binds unknown option type '{optionType}'.");
 
+                var optionContent = File.ReadAllText(optionTypeFile);
                 var optionNames = OptionPropertyRegex()
-                    .Matches(File.ReadAllText(optionTypeFile))
+                    .Matches(optionContent)
+                    .Concat(ValidatedOptionPropertyRegex().Matches(optionContent))
                     .Select(match => ToConfigurationKey(match.Groups["name"].Value))
+                    .Distinct(StringComparer.Ordinal)
                     .ToArray();
 
                 optionNames.ShouldNotBeEmpty(
@@ -346,4 +349,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"public\s+(?:required\s+)?[^\r\n{]+\s+(?<name>\w+)\s*\{\s*get;\s*init;\s*\}")]
     private static partial Regex OptionPropertyRegex();
+
+    [GeneratedRegex(@"public\s+(?:required\s+)?[^\r\n{]+\s+(?<name>\w+)\s*\{\s*get\s*=>[^{};]+;\s*init\s*=>[^{};]+;\s*\}")]
+    private static partial Regex ValidatedOptionPropertyRegex();
 }

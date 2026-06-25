@@ -24,12 +24,24 @@ acceptance while replay pacing remains deterministic. Output remains
 broadcast/latest-wins; use a dedicated durable buffer if replay delivery must
 guarantee no loss.
 
+Session option records normalize optional text and copy tag maps at assignment.
+Invalid capacity, replay range, replay mode, pacing, and query limit values are
+rejected when assigned, so invalid configuration fails during node or factory
+construction.
+
 ## Storage
 
 Storage is injected by the host through `ISessionStore`, passed directly to each node's
 constructor. This keeps database paths, schemas, workspace ownership, and retention
 policy outside the component package. Hosts that need deterministic recording or replay
 timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
+Stores are expected to honor the non-null parts of `ISessionStore`; when a store
+returns a null session, record, query result, or replay stream where the contract
+requires a value, the node reports a clear session error instead of surfacing an
+ambiguous null-reference failure.
+Query results are also validated against the normalized query request. A store
+that returns sessions outside the requested filters, or more sessions than the
+requested limit, is reported through the query error port.
 
 ```csharp
 ISessionStore store = new MySessionStore(...);
@@ -121,6 +133,11 @@ The package owns the recording and replay contracts:
 Records carry neutral fields: session id, sequence, timestamp, type, name, payload,
 content type, and string attributes. Hosts can map their own envelope or event types
 into these contracts.
+
+Contract records normalize optional text by trimming it and treating blank values as
+absent. Tag and attribute maps are copied with ordinal key comparison when assigned,
+and nested session/input values are copied by the request/result contracts that carry
+them.
 
 ## Composition
 

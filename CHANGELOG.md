@@ -7,6 +7,44 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.4
+
+Hardens session query response validation.
+
+- `SessionQueryNode` now validates store-returned sessions against the
+  normalized name, prefix, tag, date range, active/completed, and limit filters.
+- Store results outside the query filter or above the requested limit now emit a
+  `QueryFailed` error instead of being silently emitted or truncated.
+
+## FluxFlow.Components.Sessions 3.1.3
+
+Hardens session store response validation.
+
+- `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode` now report
+  clear failures when a host store returns null sessions, records, query
+  results, or replay streams where `ISessionStore` requires a value.
+- Recorder and query nodes keep later-message continuation for recoverable store
+  contract failures.
+
+## FluxFlow.Components.Sessions 3.1.2
+
+Hardens session option normalization and validation.
+
+- `SessionRecorderOptions`, `SessionReplayOptions`, and `SessionQueryOptions`
+  now trim optional text and copy tag maps with ordinal key comparison.
+- Invalid bounded capacities, query limits, replay ranges, replay modes, and
+  timing values are rejected at option assignment.
+
+## FluxFlow.Components.Sessions 3.1.1
+
+Hardens session contract normalization.
+
+- Session request, record, metadata, and query result contracts now trim optional
+  text values and treat blank optional text as absent.
+- Tag and attribute maps are copied with ordinal key comparison when assigned.
+- Nested session/input contracts in append, complete, and query-result payloads
+  are copied so later caller mutations do not leak into the contract object.
+
 ## FluxFlow.Components.Storage 3.0.9
 
 Hardens storage store non-null result handling.
