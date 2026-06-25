@@ -514,6 +514,7 @@ public sealed class FileSystemStorageStoreTests
             Key = "alpha"
         });
 
+        first.Store.ShouldNotBeSameAs(second.Store);
         firstLoaded.ShouldNotBeNull();
         firstLoaded.Collection.ShouldBe("items");
         firstLoaded.Value.ShouldBe("first");
@@ -544,6 +545,7 @@ public sealed class FileSystemStorageStoreTests
             Key = "alpha"
         });
 
+        first.Store.ShouldBeSameAs(second.Store);
         loaded.ShouldNotBeNull();
         loaded.Collection.ShouldBe("items");
         loaded.Value.ShouldBe("first");
@@ -716,6 +718,27 @@ public sealed class FileSystemStorageStoreTests
                 RootDirectory = missing,
                 CreateDirectory = false
             }));
+    }
+
+    [Fact]
+    public void Options_NormalizeTextFieldsAndRejectInvalidValueLimit()
+    {
+        var options = new FileSystemStorageStoreOptions
+        {
+            RootDirectory = " data/storage ",
+            StoreName = " tenant-a ",
+            DefaultCollection = " items "
+        };
+
+        options.RootDirectory.ShouldBe("data/storage");
+        options.StoreName.ShouldBe("tenant-a");
+        options.DefaultCollection.ShouldBe("items");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new FileSystemStorageStoreOptions
+            {
+                MaxValueBytes = 0
+            });
     }
 
     private static FileSystemStorageStore CreateStore(

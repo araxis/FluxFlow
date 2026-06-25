@@ -5,12 +5,37 @@ namespace FluxFlow.Components.Storage.FileSystem;
 
 public sealed record FileSystemStorageStoreOptions
 {
-    public string? RootDirectory { get; init; }
-    public string? StoreName { get; init; }
+    private string? _rootDirectory;
+    private string? _storeName;
+    private long _maxValueBytes = 1_048_576;
+    private string? _defaultCollection;
+
+    public string? RootDirectory
+    {
+        get => _rootDirectory;
+        init => _rootDirectory = Normalize(value);
+    }
+
+    public string? StoreName
+    {
+        get => _storeName;
+        init => _storeName = Normalize(value);
+    }
+
     public bool CreateDirectory { get; init; } = true;
     public bool AllowAbsoluteRootDirectory { get; init; } = true;
-    public long MaxValueBytes { get; init; } = 1_048_576;
-    public string? DefaultCollection { get; init; }
+    public long MaxValueBytes
+    {
+        get => _maxValueBytes;
+        init => _maxValueBytes = ValidateMaxValueBytes(value);
+    }
+
+    public string? DefaultCollection
+    {
+        get => _defaultCollection;
+        init => _defaultCollection = Normalize(value);
+    }
+
     public bool FlushOnWrite { get; init; } = true;
     public TimeProvider? Clock { get; init; }
 
@@ -27,12 +52,6 @@ public sealed record FileSystemStorageStoreOptions
         {
             throw new InvalidOperationException(
                 "File-system storage root directory cannot be absolute when absolute roots are disabled.");
-        }
-
-        if (MaxValueBytes <= 0)
-        {
-            throw new InvalidOperationException(
-                "File-system storage max value bytes must be greater than zero.");
         }
 
         var fullRoot = Path.GetFullPath(rootDirectory);
@@ -64,4 +83,12 @@ public sealed record FileSystemStorageStoreOptions
 
     internal static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static long ValidateMaxValueBytes(long value)
+        => value > 0
+            ? value
+            : throw new ArgumentOutOfRangeException(
+                nameof(value),
+                value,
+                "File-system storage max value bytes must be greater than zero.");
 }

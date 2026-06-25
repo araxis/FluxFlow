@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.FileSystem</RootNamespace>
-    <Version>3.1.2</Version>
+    <Version>3.1.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>File-system storage now rejects unsupported write mode values instead of treating them as upserts.</PackageReleaseNotes>
+    <PackageReleaseNotes>File-system storage options now normalize text fields on assignment, reject invalid value-size limits early, and use OS-aware root-path comparison for shared store leases.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

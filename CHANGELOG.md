@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.1.3
+
+Hardens file-system storage backend options and lease caching.
+
+- `FileSystemStorageStoreOptions` now trims root, store name, and default
+  collection text when assigned.
+- Invalid `MaxValueBytes` values are rejected at option assignment.
+- Shared store leases now compare root paths with operating-system path
+  case-sensitivity instead of uppercasing paths before caching.
+
 ## FluxFlow.Components.Journal 2.0.2
 
 Hardens journal contract normalization.
