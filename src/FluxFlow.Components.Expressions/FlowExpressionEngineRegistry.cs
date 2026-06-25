@@ -24,7 +24,7 @@ public sealed class FlowExpressionEngineRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(expressionEngine.Name);
 
         _expressionEngines[expressionEngine.Name.Trim()] = expressionEngine;
-        if (useAsDefault || _defaultExpressionEngine is null)
+        if (useAsDefault)
         {
             _defaultExpressionEngine = expressionEngine;
         }

@@ -16,6 +16,16 @@ Hardens resource metadata validation for config-bound callers.
 - Keeps resource lookup, duplicate detection, and host-owned resource ownership
   unchanged.
 
+## FluxFlow.Components.Expressions 2.0.1
+
+Fixes named-only expression engine registration.
+
+- `FlowExpressionEngineRegistry.Use(engine, useAsDefault: false)` no longer
+  makes the first registered engine the default fallback.
+- Named resolution still works for named-only engines.
+- Existing default engines remain unchanged when later named-only engines are
+  registered.
+
 ## FluxFlow.Components.Secrets 1.2.0
 
 Hardens secret metadata validation for config-bound callers.

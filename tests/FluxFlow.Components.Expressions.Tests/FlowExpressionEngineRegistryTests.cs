@@ -29,6 +29,31 @@ public sealed class FlowExpressionEngineRegistryTests
     }
 
     [Fact]
+    public void Resolve_DoesNotUseFirstEngineAsDefaultWhenDisabled()
+    {
+        var engine = new TestExpressionEngine("primary");
+        var registry = new FlowExpressionEngineRegistry("Mapping")
+            .Use(engine, useAsDefault: false);
+
+        registry.Resolve("primary").ShouldBeSameAs(engine);
+        var exception = Should.Throw<InvalidOperationException>(() => registry.Resolve(null));
+        exception.Message.ShouldContain("Mapping components require an expression engine");
+    }
+
+    [Fact]
+    public void Resolve_KeepsExistingDefaultWhenRegisteringNamedOnlyEngine()
+    {
+        var defaultEngine = new TestExpressionEngine("default");
+        var namedEngine = new TestExpressionEngine("named");
+        var registry = new FlowExpressionEngineRegistry("Mapping")
+            .Use(defaultEngine)
+            .Use(namedEngine, useAsDefault: false);
+
+        registry.Resolve(null).ShouldBeSameAs(defaultEngine);
+        registry.Resolve("named").ShouldBeSameAs(namedEngine);
+    }
+
+    [Fact]
     public void Resolve_UsesResolverWhenConfigured()
     {
         var engine = new TestExpressionEngine("custom");
