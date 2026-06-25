@@ -44,26 +44,46 @@ public sealed class EventProjectionNode : FlowNode<ProjectionEvent, EventProject
     public EventProjectionNode(
         EventProjectionOptions? options = null,
         TimeProvider? timeProvider = null)
+        : this(ResolveOptions(options), timeProvider, validated: true)
+    {
+    }
+
+    private EventProjectionNode(
+        EventProjectionOptions options,
+        TimeProvider? timeProvider,
+        bool validated)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new EventProjectionOptions()).BoundedCapacity,
+            InputCapacity = options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options ?? new EventProjectionOptions();
-        // A null filter means match-all (matcher and snapshot copy both expect a value).
-        _options = _options with { Filter = _options.Filter ?? new EventFilter() };
+        _options = options;
         _timeProvider = timeProvider ?? TimeProvider.System;
 
-        // BoundedCapacity > 0 is enforced by the base FlowNode (InputCapacity).
-        if (_options.RateWindowSeconds <= 0)
+        _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+    }
+
+    private static EventProjectionOptions ResolveOptions(EventProjectionOptions? options)
+    {
+        var resolved = options ?? new EventProjectionOptions();
+
+        if (resolved.RateWindowSeconds <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "event.projection option 'rateWindowSeconds' must be greater than zero.");
         }
 
-        _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "event.projection option 'boundedCapacity' must be greater than zero.");
+        }
+
+        // A null filter means match-all (matcher and snapshot copy both expect a value).
+        return resolved with { Filter = resolved.Filter ?? new EventFilter() };
     }
 
     /// <summary>

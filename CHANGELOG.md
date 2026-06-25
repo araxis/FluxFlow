@@ -431,6 +431,16 @@ factory, binds `PayloadInspectOptions` from composition configuration, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Projections 3.0.1
+
+Aligns event projection constructor option validation with the standalone node
+family.
+
+- Reports non-positive `boundedCapacity` as `ArgumentOutOfRangeException` with
+  the projection option name.
+- Leaves projection counting, rate calculation, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Projections 3.0.0
 
 Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a

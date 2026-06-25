@@ -55,6 +55,9 @@ The snapshot includes:
 - latest matching event summary
 - latest payload preview with a configured length limit
 
+`EventProjectionOptions` validates at construction: non-positive
+`RateWindowSeconds` or `BoundedCapacity` fails fast as an argument exception.
+
 ## Filters
 
 `EventFilter` supports:

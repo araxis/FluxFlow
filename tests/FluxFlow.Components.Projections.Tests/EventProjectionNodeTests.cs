@@ -267,6 +267,15 @@ public sealed class EventProjectionNodeTests
     }
 
     [Fact]
+    public void Projection_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new EventProjectionNode(new EventProjectionOptions { BoundedCapacity = 0 }));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
+
+    [Fact]
     public void EventFilterMatcher_MatchesAttributeAndPrefixes()
     {
         var flowEvent = CreateEvent(

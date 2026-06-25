@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Projections</PackageId>
     <AssemblyName>FluxFlow.Components.Projections</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone event-projection node for FluxFlow: post ProjectionEvent values, fold matching events into rolling EventProjectionSnapshot counts/rate/latest, broadcast on output with error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone event.projection node over the FluxFlow.Nodes kit: post FlowMessage&lt;ProjectionEvent&gt; in, rolling FlowMessage&lt;EventProjectionSnapshot&gt; broadcast out, failures on the error port, diagnostics on the event port. The engine glue (node factory, module, registration extensions, component-type/port constants, JSON options reader, and design-metadata provider) is removed; the node depends only on FluxFlow.Nodes and runs without the engine. ProjectionEvent replaces the engine FlowEvent as the standalone input contract; correlation flows event -> snapshot via the envelope.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: invalid boundedCapacity now reports ArgumentOutOfRangeException with the projection option name. Runtime projection behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
