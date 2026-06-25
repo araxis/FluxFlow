@@ -91,7 +91,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 .ShouldHaveSingleItem();
             var providerContent = File.ReadAllText(providerFile);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
-            var resourceConstants = ResourceConstantRegex()
+            var resourceConstants = PublicStringConstantRegex()
                 .Matches(File.ReadAllText(resourceNamesFiles[0]))
                 .Select(match => match.Groups["name"].Value)
                 .ToArray();
@@ -108,6 +108,64 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 var resourceReference = $"{resourceTypeName}.{resourceConstant}";
                 providerContent.Contains(resourceReference, StringComparison.Ordinal)
                     .ShouldBeTrue($"{entry.PackageId} provider must expose resource '{resourceReference}'.");
+            }
+        }
+    }
+
+    [Fact]
+    public void Component_composition_port_names_are_exposed_by_designer_metadata()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var portNamesFiles = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionPortNames.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            portNamesFiles.Length.ShouldBeLessThanOrEqualTo(
+                1,
+                $"{entry.PackageId} must keep port-name constants in one file.");
+
+            if (portNamesFiles.Length == 0)
+                continue;
+
+            var providerFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*ComponentDesignMetadataProvider.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem();
+            var providerContent = File.ReadAllText(providerFile);
+            var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
+            var portConstants = PublicStringConstantRegex()
+                .Matches(File.ReadAllText(portNamesFiles[0]))
+                .Select(match => match.Groups["name"].Value)
+                .ToArray();
+
+            portConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} port-name file should expose at least one port constant.");
+            providerContent.Contains(
+                    "PortDesignMetadata",
+                    StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} provider must expose Designer port metadata.");
+
+            foreach (var portConstant in portConstants)
+            {
+                var portReference = $"{portTypeName}.{portConstant}";
+                providerContent.Contains(portReference, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} provider must expose port '{portReference}'.");
             }
         }
     }
@@ -222,7 +280,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
 
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
-    private static partial Regex ResourceConstantRegex();
+    private static partial Regex PublicStringConstantRegex();
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
