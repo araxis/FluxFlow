@@ -34,18 +34,13 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         SessionReplayOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? TimeProvider.System;
         _sessionId = Normalize(options.SessionId)
             ?? throw new ArgumentException("session.replay requires a session id.", nameof(options));
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.replay bounded capacity must be greater than zero.");
-        }
 
         if (options.StartSequence is <= 0)
         {
@@ -128,7 +123,8 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
                                .ConfigureAwait(false))
             {
                 await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
-                if (!Emit(FlowMessage.Create(CopyRecord(record))))
+                if (!await EmitAsync(FlowMessage.Create(CopyRecord(record)), cancellationToken)
+                        .ConfigureAwait(false))
                 {
                     break;
                 }
@@ -197,6 +193,19 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         }
 
         await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(SessionReplayOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay bounded capacity must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private void ReportReplayError(int code, string message, Exception? exception)

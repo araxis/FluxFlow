@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Nodes</PackageId>
     <AssemblyName>FluxFlow.Nodes</AssemblyName>
     <RootNamespace>FluxFlow.Nodes</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Minimal base for FluxFlow nodes: a self-contained TPL Dataflow processor with a buffered input and broadcast output/error/event ports. Nodes built on it run standalone — no engine required.</Description>
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Initial shared node kit: FlowNode&lt;TInput, TOutput&gt; base (buffered input, broadcast output/error/event ports) plus the FlowError and FlowEvent records. Nodes built on it run standalone, with no engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds FlowSourceOptions and awaitable FlowSource emission so source nodes can opt into bounded source output capacity while preserving existing unbounded source behavior by default.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

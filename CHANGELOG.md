@@ -7,6 +7,62 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Nodes 1.1.0
+
+Adds bounded source-output support for standalone source nodes.
+
+- Adds `FlowSourceOptions` with explicit output capacity configuration.
+- Adds awaitable `FlowSource<TOutput>` emission so source loops can honor
+  bounded source output capacity.
+- Keeps existing source behavior unbounded by default for sources that do not
+  pass `FlowSourceOptions`.
+- Updates loop-driven source components to wire their existing
+  `BoundedCapacity` options into the shared source output contract.
+
+## FluxFlow.Components.Sources 3.1.0
+
+Wires source bounded-capacity options into the shared source-output contract.
+
+- `source.generated` and `source.sequence` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Loop-driven source emission awaits output delivery so the source output block
+  can apply backpressure when its configured capacity is full.
+- Keeps item materialization, timing, fresh correlation ids, diagnostics, and
+  standalone construction behavior unchanged.
+
+## FluxFlow.Components.Timers 3.1.0
+
+Wires timer source bounded-capacity options into the shared source-output
+contract.
+
+- `timer.interval` and `timer.schedule` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Timer source loops await tick delivery so the source output block can apply
+  backpressure when its configured capacity is full.
+- Transform timer nodes keep their existing bounded input behavior.
+
+## FluxFlow.Components.FileSystem 3.1.0
+
+Wires file-system source bounded-capacity options into the shared source-output
+contract.
+
+- `directory.enumerate` and `file.watch` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Directory enumeration awaits output delivery so the source output block can
+  apply backpressure when its configured capacity is full.
+- File watching keeps nonblocking watcher callbacks while using the configured
+  bounded source output.
+
+## FluxFlow.Components.Sessions 3.1.0
+
+Wires session replay bounded-capacity options into the shared source-output
+contract.
+
+- `session.replay` now passes `boundedCapacity` to `FluxFlow.Nodes` source
+  output configuration.
+- Replay awaits output capacity while preserving store ownership, replay
+  pacing, correlation, diagnostics, and standalone construction behavior.
+
 ## FluxFlow.Components.Designer 2.2.0
 
 Adds neutral resource metadata contracts for package-owned design metadata.

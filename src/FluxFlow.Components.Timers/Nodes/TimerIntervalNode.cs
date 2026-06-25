@@ -29,8 +29,9 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
     public TimerIntervalNode(
         TimerIntervalSettings settings,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(settings))
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = settings;
         _clock = clock ?? TimeProvider.System;
 
         if (_settings.Interval <= TimeSpan.Zero)
@@ -51,11 +52,6 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
                 nameof(settings), "timer.interval 'MaxTicks' must be greater than zero when set.");
         }
 
-        if (_settings.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.interval 'BoundedCapacity' must be greater than zero.");
-        }
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -75,7 +71,15 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
 
         if (_settings.EmitImmediately)
         {
-            sequence = EmitTick(sequence, startedAt, nextDueAt);
+            var nextSequence = sequence + 1;
+            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                CompleteTimer(startedAt, sequence);
+                return;
+            }
+
+            sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
             {
                 CompleteTimer(startedAt, sequence);
@@ -88,7 +92,15 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         while (true)
         {
             await DelayUntilAsync(nextDueAt, cancellationToken).ConfigureAwait(false);
-            sequence = EmitTick(sequence, startedAt, nextDueAt);
+            var nextSequence = sequence + 1;
+            if (!await TryEmitTickAsync(nextSequence, startedAt, nextDueAt, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                CompleteTimer(startedAt, sequence);
+                return;
+            }
+
+            sequence = nextSequence;
             if (HasReachedMaxTicks(sequence))
             {
                 CompleteTimer(startedAt, sequence);
@@ -122,12 +134,12 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
         }
     }
 
-    private long EmitTick(
-        long currentSequence,
+    private async Task<bool> TryEmitTickAsync(
+        long sequence,
         DateTimeOffset startedAt,
-        DateTimeOffset dueAt)
+        DateTimeOffset dueAt,
+        CancellationToken cancellationToken)
     {
-        var sequence = currentSequence + 1;
         var timestamp = _clock.GetUtcNow();
         var tick = new TimerTick
         {
@@ -141,7 +153,11 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
             Drift = timestamp - dueAt
         };
 
-        Emit(FlowMessage.Create(tick));
+        if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
         EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
@@ -150,11 +166,23 @@ public sealed class TimerIntervalNode : FlowSource<TimerTick>
             Message = $"Emitted timer interval tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
             Attributes = CreateAttributes(tick)
         });
-        return sequence;
+        return true;
     }
 
     private bool HasReachedMaxTicks(long sequence)
         => _settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value;
+
+    private static FlowSourceOptions BuildSourceOptions(TimerIntervalSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.interval 'BoundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = settings.BoundedCapacity };
+    }
 
     private void CompleteTimer(DateTimeOffset startedAt, long sequence)
         => EmitEvent(new FlowEvent

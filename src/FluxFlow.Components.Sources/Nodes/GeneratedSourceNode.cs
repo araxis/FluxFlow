@@ -30,17 +30,11 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
         GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _items = items ?? throw new ArgumentNullException(nameof(items));
         _clock = clock ?? TimeProvider.System;
-
-        if (_options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "source.generated bounded capacity must be greater than zero.");
-        }
 
         if (_options.InitialDelayMilliseconds < 0)
         {
@@ -87,7 +81,11 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var item = _items[index % _items.Count];
-                Emit(FlowMessage.Create(item));
+                if (!await EmitAsync(FlowMessage.Create(item), cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
                 emitted++;
                 EmitDiagnostic(Emitted, "source.generated emitted item.", CreateAttributes(emitted));
                 if (index < targetCount - 1)
@@ -122,6 +120,19 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
         return _options.Loop
             ? _options.MaxItems!.Value
             : Math.Min(_options.MaxItems ?? _items.Count, _items.Count);
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(GeneratedSourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.generated bounded capacity must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private void CompleteGenerated(int emitted, string message)

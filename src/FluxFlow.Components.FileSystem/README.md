@@ -53,6 +53,12 @@ Options validate at construction. Invalid capacities and size limits fail fast
 with the corresponding node option name, while path policy failures remain
 runtime diagnostics on each node's `Errors` port.
 
+`BoundedCapacity` configures transform input capacity for read/write nodes and
+source output capacity for directory enumeration and file watching. Directory
+enumeration awaits output delivery; file watching keeps nonblocking watcher
+callbacks and reports a `FlowError` if the bounded source output is not
+accepting events.
+
 ## Read / Write transforms
 
 ```csharp

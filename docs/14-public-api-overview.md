@@ -6,6 +6,33 @@ FluxFlow's default public surface is standalone-node-first:
 - `FluxFlow.Composition` for fluent/config composition of standalone nodes.
 - `FluxFlow.Engine` for the optional advanced engine runtime.
 
+## Node Kit
+
+Namespace:
+
+```text
+FluxFlow.Nodes
+```
+
+Main types:
+
+- `FlowMessage<T>`
+- `CorrelationId`
+- `FlowNode<TInput,TOutput>`
+- `FlowNodeOptions`
+- `FlowSource<TOutput>`
+- `FlowSourceOptions`
+- `IFlowNode`
+- `IFlowSource`
+- `FlowError`
+- `FlowEvent`
+- `FlowEventLevel`
+
+Use these types to author standalone nodes directly. `FlowNodeOptions`
+configures bounded transform intake. `FlowSourceOptions` lets source nodes opt
+into bounded output and awaitable emission while sources that do not pass
+options keep the original unbounded broadcast behavior.
+
 ## Composition
 
 Namespace:

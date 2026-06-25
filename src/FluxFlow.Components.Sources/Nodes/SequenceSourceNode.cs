@@ -26,16 +26,10 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
     private readonly TimeProvider _clock;
 
     public SequenceSourceNode(SequenceSourceOptions options, TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _clock = clock ?? TimeProvider.System;
-
-        if (_options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "source.sequence option 'boundedCapacity' must be greater than zero.");
-        }
 
         if (_options.InitialDelayMilliseconds < 0)
         {
@@ -89,7 +83,11 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
                     Step = _options.Step,
                     Timestamp = _clock.GetUtcNow()
                 };
-                Emit(FlowMessage.Create(item));
+                if (!await EmitAsync(FlowMessage.Create(item), cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
                 emitted++;
                 EmitDiagnostic(
                     Emitted,
@@ -119,6 +117,19 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
 
     private void CompleteSequence(int emitted, string message)
         => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
+
+    private static FlowSourceOptions BuildSourceOptions(SequenceSourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
+    }
 
     private void ReportFailure(Exception exception, int emitted)
     {

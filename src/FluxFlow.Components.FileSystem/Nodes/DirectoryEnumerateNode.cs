@@ -26,8 +26,9 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
     public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _clock = clock ?? TimeProvider.System;
         ValidateOptions(_options);
     }
@@ -74,7 +75,11 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
                     break;
                 }
 
-                Emit(FlowMessage.Create(entry));
+                if (!await EmitAsync(FlowMessage.Create(entry), cancellationToken).ConfigureAwait(false))
+                {
+                    break;
+                }
+
                 emitted++;
 
                 EmitEvent(new FlowEvent
@@ -247,13 +252,6 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
 
     private static void ValidateOptions(DirectoryEnumerateOptions options)
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.Directory))
         {
             throw new ArgumentException(
@@ -281,6 +279,19 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
                 nameof(options),
                 "directory.enumerate option 'maxEntries' must be greater than zero when set.");
         }
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(DirectoryEnumerateOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private Dictionary<string, object?> CreateAttributes(

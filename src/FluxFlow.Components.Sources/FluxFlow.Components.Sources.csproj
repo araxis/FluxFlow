@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone deterministic source nodes for FluxFlow: generated and sequence emitters built as FlowSource&lt;T&gt; over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt on the FluxFlow.Nodes kit: source.generated and source.sequence are FlowSource&lt;T&gt; sources (started via StartAsync, items minted as FlowMessage envelopes carrying a fresh correlation id) that time off the injected TimeProvider. The engine factories, module, registration extensions, ports, type constants, design-metadata provider, the definition-options reader, and the JSON item/string-to-Type resolution layer (SourcesComponentOptions) are removed; GeneratedSourceNode takes its options plus the already-materialized items, SequenceSourceNode takes its options, and both take a TimeProvider directly and depend only on FluxFlow.Nodes (runs without the engine).</PackageReleaseNotes>
+    <PackageReleaseNotes>Wires source.generated and source.sequence boundedCapacity into FluxFlow.Nodes bounded source output. Loop-driven source emission now awaits bounded source output capacity while preserving existing correlation, timing, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

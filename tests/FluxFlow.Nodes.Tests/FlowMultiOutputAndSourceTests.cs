@@ -65,6 +65,38 @@ public sealed class FlowMultiOutputAndSourceTests
         source.Completion.IsFaulted.ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task Source_EmitAsync_WaitsWhenBoundedOutputIsFull()
+    {
+        await using var source = new BoundedCountingSource();
+        var sink = new BufferBlock<FlowMessage<int>>(new DataflowBlockOptions
+        {
+            BoundedCapacity = 1
+        });
+        source.Output.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+
+        await source.StartAsync();
+        await source.FirstAccepted.WaitAsync(TimeSpan.FromSeconds(30));
+
+        source.SecondAccepted.IsCompleted.ShouldBeFalse();
+        source.Completion.IsCompleted.ShouldBeFalse();
+
+        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.ShouldBe(1);
+
+        await source.SecondAccepted.WaitAsync(TimeSpan.FromSeconds(30));
+        (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload.ShouldBe(2);
+        await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public void Source_RejectsInvalidOutputCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new InvalidCapacitySource());
+
+        exception.Message.ShouldContain("OutputCapacity");
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
@@ -122,5 +154,32 @@ public sealed class FlowMultiOutputAndSourceTests
                 }
             }
         }
+    }
+
+    private sealed class BoundedCountingSource()
+        : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 1 })
+    {
+        private readonly TaskCompletionSource _firstAccepted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _secondAccepted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task FirstAccepted => _firstAccepted.Task;
+
+        public Task SecondAccepted => _secondAccepted.Task;
+
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
+            _firstAccepted.TrySetResult();
+            await EmitAsync(FlowMessage.Create(2), cancellationToken).ConfigureAwait(false);
+            _secondAccepted.TrySetResult();
+        }
+    }
+
+    private sealed class InvalidCapacitySource()
+        : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 0 })
+    {
+        protected override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

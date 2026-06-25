@@ -12,15 +12,33 @@ namespace FluxFlow.Nodes;
 /// </summary>
 public abstract class FlowSource<TOutput> : IFlowSource
 {
-    private readonly BroadcastBlock<FlowMessage<TOutput>> _output = new(static message => message);
-    private readonly BroadcastBlock<FlowError> _errors = new(static value => value);
-    private readonly BroadcastBlock<FlowEvent> _events = new(static value => value);
+    private readonly BroadcastBlock<FlowMessage<TOutput>> _output;
+    private readonly BroadcastBlock<FlowError> _errors;
+    private readonly BroadcastBlock<FlowEvent> _events;
     private readonly List<IDataflowBlock> _extraOutputs = new();
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _started;
     private int _disposed;
+
+    protected FlowSource(FlowSourceOptions? options = null)
+    {
+        options ??= new FlowSourceOptions();
+        if (options.OutputCapacity != FlowSourceOptions.UnboundedOutputCapacity
+            && options.OutputCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "OutputCapacity must be greater than zero or unbounded.");
+        }
+
+        _output = new BroadcastBlock<FlowMessage<TOutput>>(
+            static message => message,
+            CreateOutputBlockOptions(options.OutputCapacity));
+        _errors = new BroadcastBlock<FlowError>(static value => value);
+        _events = new BroadcastBlock<FlowEvent>(static value => value);
+    }
 
     public ISourceBlock<FlowMessage<TOutput>> Output => _output;
 
@@ -48,6 +66,11 @@ public abstract class FlowSource<TOutput> : IFlowSource
     protected abstract Task RunAsync(CancellationToken cancellationToken);
 
     protected bool Emit(FlowMessage<TOutput> message) => _output.Post(message);
+
+    protected Task<bool> EmitAsync(
+        FlowMessage<TOutput> message,
+        CancellationToken cancellationToken = default)
+        => _output.SendAsync(message, cancellationToken);
 
     /// <summary>Additional broadcast output port, completed/faulted with the source (see FlowNode.AddOutput).</summary>
     protected BroadcastBlock<T> AddOutput<T>()
@@ -160,5 +183,16 @@ public abstract class FlowSource<TOutput> : IFlowSource
         // authoritative fault is surfaced on Completion by the caller.
         _errors.Complete();
         _events.Complete();
+    }
+
+    private static DataflowBlockOptions CreateOutputBlockOptions(int outputCapacity)
+    {
+        var options = new DataflowBlockOptions();
+        if (outputCapacity != FlowSourceOptions.UnboundedOutputCapacity)
+        {
+            options.BoundedCapacity = outputCapacity;
+        }
+
+        return options;
     }
 }

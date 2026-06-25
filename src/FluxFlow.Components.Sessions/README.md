@@ -18,6 +18,11 @@ fresh correlation id per record. Domain failures surface on the broadcast `Error
 (`FlowError`, with the original correlation id where one exists) and the pump keeps
 processing later messages; diagnostics go to `Events` (`FlowEvent`).
 
+`BoundedCapacity` configures bounded input capacity for recorder/query nodes and
+bounded source output capacity for replay. Replay awaits output delivery, so
+the source output block can apply backpressure when its configured capacity is
+full while replay pacing remains deterministic.
+
 ## Storage
 
 Storage is injected by the host through `ISessionStore`, passed directly to each node's

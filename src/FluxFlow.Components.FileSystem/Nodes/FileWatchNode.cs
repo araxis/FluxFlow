@@ -30,8 +30,9 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
     public FileWatchNode(
         FileWatchOptions options,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = options;
         _clock = clock ?? TimeProvider.System;
         ValidateOptions(_options);
         _notifyFilters = FileWatchNotifyFilters.Resolve(_options);
@@ -189,7 +190,15 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
     private void PublishChange(FileWatchEvent watchEvent)
     {
         // Broadcast output; carries a fresh correlation id for this change.
-        Emit(FlowMessage.Create(watchEvent));
+        if (!Emit(FlowMessage.Create(watchEvent)))
+        {
+            ReportWatchError(
+                FileSystemErrorCodes.FileWatchFailed,
+                "file.watch output is not accepting events.",
+                resolvedDirectory: watchEvent.Directory);
+            return;
+        }
+
         EmitEvent(new FlowEvent
         {
             Timestamp = watchEvent.Timestamp,
@@ -216,13 +225,6 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
 
     private static void ValidateOptions(FileWatchOptions options)
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "file.watch option 'boundedCapacity' must be greater than zero.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.Directory))
         {
             throw new ArgumentException(
@@ -243,6 +245,19 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
                 nameof(options),
                 "file.watch option 'internalBufferSize' must be between 4096 and 65536 bytes when set.");
         }
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(FileWatchOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "file.watch option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private Dictionary<string, object?> CreateAttributes(string? resolvedDirectory = null)

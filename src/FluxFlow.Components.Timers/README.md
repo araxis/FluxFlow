@@ -24,6 +24,11 @@ the correlation id of each input message they re-emit. Errors surface on the
 tick contracts only — hosts decide whether ticks drive polling, health checks,
 metrics, file work, message publishing, or other activity.
 
+For interval and schedule sources, `BoundedCapacity` configures source output
+capacity. Tick loops await output delivery, so the source output block can apply
+backpressure when its configured capacity is full. Delay, throttle, and debounce
+keep using `BoundedCapacity` as their bounded input capacity.
+
 ## Interval
 
 ```csharp

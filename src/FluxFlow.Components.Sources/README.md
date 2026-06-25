@@ -20,6 +20,10 @@ with a fresh `CorrelationId`. Lifecycle notes (started, emitted, completed,
 failed) surface on the `Events` port using `SourceDiagnosticNames`; failures
 surface a `FlowError` on the `Errors` port.
 
+`BoundedCapacity` configures the source output capacity. Generated and sequence
+loops await output delivery, so the source output block can apply backpressure
+when its configured capacity is full.
+
 ## Generated
 
 ```csharp

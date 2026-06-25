@@ -30,8 +30,9 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
     public TimerScheduleNode(
         TimerScheduleSettings settings,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(settings))
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = settings;
         _clock = clock ?? TimeProvider.System;
 
         if (string.IsNullOrWhiteSpace(_settings.Cron))
@@ -44,12 +45,6 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
         {
             throw new ArgumentOutOfRangeException(
                 nameof(settings), "timer.schedule 'MaxTicks' must be greater than zero when set.");
-        }
-
-        if (_settings.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.schedule 'BoundedCapacity' must be greater than zero.");
         }
 
         // Compiling the cron up front validates the expression in the constructor.
@@ -75,7 +70,15 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
                 ?? throw new InvalidOperationException(
                     $"timer.schedule could not find the next occurrence for '{_settings.Cron}'.");
             await DelayUntilAsync(dueAt, cancellationToken).ConfigureAwait(false);
-            sequence = EmitTick(sequence, startedAt, dueAt);
+            var nextSequence = sequence + 1;
+            if (!await TryEmitTickAsync(nextSequence, startedAt, dueAt, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                CompleteSchedule(startedAt, sequence);
+                return;
+            }
+
+            sequence = nextSequence;
             if (_settings.MaxTicks.HasValue && sequence >= _settings.MaxTicks.Value)
             {
                 CompleteSchedule(startedAt, sequence);
@@ -95,12 +98,12 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
         }
     }
 
-    private long EmitTick(
-        long currentSequence,
+    private async Task<bool> TryEmitTickAsync(
+        long sequence,
         DateTimeOffset startedAt,
-        DateTimeOffset dueAt)
+        DateTimeOffset dueAt,
+        CancellationToken cancellationToken)
     {
-        var sequence = currentSequence + 1;
         var timestamp = _clock.GetUtcNow();
         var tick = new ScheduleTick
         {
@@ -114,7 +117,11 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
             Drift = timestamp - dueAt
         };
 
-        Emit(FlowMessage.Create(tick));
+        if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
         EmitEvent(new FlowEvent
         {
             Timestamp = timestamp,
@@ -123,7 +130,19 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
             Message = $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
             Attributes = CreateAttributes(tick)
         });
-        return sequence;
+        return true;
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(TimerScheduleSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.schedule 'BoundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = settings.BoundedCapacity };
     }
 
     private void CompleteSchedule(DateTimeOffset startedAt, long sequence)
