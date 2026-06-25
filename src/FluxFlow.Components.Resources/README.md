@@ -59,6 +59,9 @@ Use `ResourceDiagnostics` to:
 
 Metadata and attribute maps are validated as part of descriptors and references;
 null maps are reported as structured invalid-resource diagnostics.
+Null descriptor entries and null reference entries inside helper collections are
+reported or ignored by the relevant diagnostic helpers instead of surfacing
+accidental null-reference failures.
 
 `ResourceName`, resource `Kind`, `DisplayName`, and `Summary` trim surrounding
 whitespace when assigned. This keeps configuration-bound descriptors and

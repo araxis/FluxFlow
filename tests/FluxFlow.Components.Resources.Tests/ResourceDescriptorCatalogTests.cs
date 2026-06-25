@@ -297,6 +297,28 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Descriptor_validation_reports_null_descriptor_entries()
+    {
+        var diagnostics = ResourceDiagnostics.ValidateDescriptors([null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.InvalidResource);
+        diagnostics[0].Severity.ShouldBe(ResourceDiagnosticSeverity.Error);
+        diagnostics[0].Metadata["path"].ShouldBe("resources[0]");
+        diagnostics[0].Message.ShouldContain("Resource descriptor is required.");
+    }
+
+    [Fact]
+    public void Catalog_rejects_null_descriptors_with_structured_diagnostic()
+    {
+        var act = () => new ResourceDescriptorCatalog([null!]);
+
+        var exception = act.ShouldThrow<InvalidOperationException>();
+        exception.Message.ShouldContain(nameof(ResourceDiagnosticCode.InvalidResource));
+        exception.Message.ShouldContain("Resource descriptor is required.");
+    }
+
+    [Fact]
     public void Reference_validation_reports_null_attributes()
     {
         var diagnostics = ResourceDiagnostics.ValidateReference(new ResourceReference
@@ -309,6 +331,31 @@ public sealed class ResourceDescriptorCatalogTests
             diagnostic.Code == ResourceDiagnosticCode.InvalidResource
             && diagnostic.Metadata["path"] == "reference.attributes"
             && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Missing_helper_reports_null_reference_entries()
+    {
+        var diagnostics = await ResourceDiagnostics.FindMissingResourcesAsync(
+            new ResourceDescriptorCatalog([]),
+            [null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.InvalidResource);
+        diagnostics[0].Metadata["path"].ShouldBe("references[0]");
+        diagnostics[0].Message.ShouldContain("Resource reference is required.");
+    }
+
+    [Fact]
+    public void Unused_helper_ignores_null_entries()
+    {
+        var diagnostics = ResourceDiagnostics.FindUnusedResources(
+            [CreateDescriptor("primary", "profile"), null!],
+            [null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.UnusedResource);
+        diagnostics[0].Name.ShouldBe(new ResourceName("primary"));
     }
 
     [Fact]
