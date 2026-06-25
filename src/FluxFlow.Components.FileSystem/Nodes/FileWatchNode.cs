@@ -220,7 +220,7 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File watch bounded capacity must be greater than zero.");
+                "file.watch option 'boundedCapacity' must be greater than zero.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Directory))

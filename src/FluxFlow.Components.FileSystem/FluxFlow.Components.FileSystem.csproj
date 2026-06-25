@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone file system nodes for FluxFlow: file.read and file.write transforms (request in, result out), plus directory.enumerate and file.watch sources. Built on FluxFlow.Nodes with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as standalone nodes over FluxFlow.Nodes: file.read and file.write are FlowNode transforms (FileReadRequest/FileWriteRequest in, FileReadResult/FileWriteResult out), and directory.enumerate and file.watch are FlowSources started with StartAsync. Every message travels as a FlowMessage&lt;T&gt; envelope and the correlation id flows request -&gt; result. The engine registry, module, node factory, ports, component types, design-metadata provider, and JSON option reader are removed; construct each node directly with its options and a TimeProvider. The package depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: file.read, file.write, directory.enumerate, and file.watch now report invalid boundedCapacity with FileSystem option names before runtime/base-node setup. Runtime file-system behavior is unchanged for valid options.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

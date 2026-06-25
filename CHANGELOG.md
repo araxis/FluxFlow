@@ -202,6 +202,17 @@ factory, binds `EventExpectationOptions` from composition configuration, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.FileSystem 3.0.1
+
+Aligns file-system constructor option validation with the standalone node
+family.
+
+- Reports invalid `boundedCapacity` with FileSystem node option names for
+  `file.read`, `file.write`, `directory.enumerate`, and `file.watch`.
+- Ensures `file.read` validates `maxBytes` before base-node setup.
+- Leaves file reading, writing, enumeration, watching, path policy, diagnostics,
+  and error-port behavior unchanged for valid options.
+
 ## FluxFlow.Components.FileSystem 3.0.0
 
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch

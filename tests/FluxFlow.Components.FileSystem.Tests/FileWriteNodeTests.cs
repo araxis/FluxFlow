@@ -242,8 +242,12 @@ public sealed class FileWriteNodeTests
 
     [Fact]
     public void FileWrite_RejectsInvalidBoundedCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new FileWriteNode(new FileWriteOptions { BoundedCapacity = 0 }));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
 
     [Fact]
     public void FileWrite_RejectsUnsupportedDefaultEncoding()

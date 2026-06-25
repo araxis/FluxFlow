@@ -251,7 +251,7 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "Directory enumerate bounded capacity must be greater than zero.");
+                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Directory))

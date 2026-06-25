@@ -170,13 +170,21 @@ public sealed class FileWatchNodeTests
 
     [Fact]
     public void FileWatch_RejectsInvalidBoundedCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new FileWatchNode(new FileWatchOptions { Directory = ".", BoundedCapacity = 0 }));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
 
     [Fact]
     public void FileWatch_RejectsInternalBufferSizeOutsideRange()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new FileWatchNode(new FileWatchOptions { Directory = ".", InternalBufferSize = 1024 }));
+
+        exception.Message.ShouldContain("internalBufferSize");
+    }
 
     [Fact]
     public async Task FileWatch_StartsWithConfiguredInternalBufferSize()

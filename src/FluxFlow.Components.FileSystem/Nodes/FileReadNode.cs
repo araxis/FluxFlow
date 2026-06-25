@@ -26,29 +26,43 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
     public FileReadNode(
         FileReadOptions? options = null,
         TimeProvider? clock = null)
+        : this(ResolveOptions(options), clock, validated: true)
+    {
+    }
+
+    private FileReadNode(
+        FileReadOptions options,
+        TimeProvider? clock,
+        bool validated)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new FileReadOptions()).BoundedCapacity,
+            InputCapacity = options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options ?? new FileReadOptions();
+        _options = options;
         _clock = clock ?? TimeProvider.System;
-        if (_options.BoundedCapacity <= 0)
+    }
+
+    private static FileReadOptions ResolveOptions(FileReadOptions? options)
+    {
+        var resolved = options ?? new FileReadOptions();
+        if (resolved.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File read bounded capacity must be greater than zero.");
+                "file.read option 'boundedCapacity' must be greater than zero.");
         }
 
-        if (_options.MaxBytes is <= 0)
+        if (resolved.MaxBytes is <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File read 'maxBytes' must be greater than zero when set.");
+                "file.read option 'maxBytes' must be greater than zero when set.");
         }
 
-        ValidateDefaultEncoding(_options.DefaultEncoding);
+        ValidateDefaultEncoding(resolved.DefaultEncoding);
+        return resolved;
     }
 
     protected override async Task ProcessAsync(FlowMessage<FileReadRequest> message)

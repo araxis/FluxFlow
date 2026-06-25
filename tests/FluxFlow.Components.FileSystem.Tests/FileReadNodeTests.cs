@@ -311,8 +311,12 @@ public sealed class FileReadNodeTests
 
     [Fact]
     public void FileRead_RejectsInvalidBoundedCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new FileReadNode(new FileReadOptions { BoundedCapacity = 0 }));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
 
     [Fact]
     public void FileRead_RejectsUnsupportedDefaultEncoding()
@@ -324,6 +328,10 @@ public sealed class FileReadNodeTests
 
     [Fact]
     public void FileRead_RejectsInvalidMaxBytes()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new FileReadNode(new FileReadOptions { MaxBytes = 0 }));
+
+        exception.Message.ShouldContain("maxBytes");
+    }
 }

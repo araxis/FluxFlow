@@ -27,22 +27,36 @@ public sealed class FileWriteNode : FlowNode<FileWriteRequest, FileWriteResult>
     public FileWriteNode(
         FileWriteOptions? options = null,
         TimeProvider? clock = null)
+        : this(ResolveOptions(options), clock, validated: true)
+    {
+    }
+
+    private FileWriteNode(
+        FileWriteOptions options,
+        TimeProvider? clock,
+        bool validated)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new FileWriteOptions()).BoundedCapacity,
+            InputCapacity = options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options ?? new FileWriteOptions();
+        _options = options;
         _clock = clock ?? TimeProvider.System;
-        if (_options.BoundedCapacity <= 0)
+    }
+
+    private static FileWriteOptions ResolveOptions(FileWriteOptions? options)
+    {
+        var resolved = options ?? new FileWriteOptions();
+        if (resolved.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File write bounded capacity must be greater than zero.");
+                "file.write option 'boundedCapacity' must be greater than zero.");
         }
 
-        ValidateDefaultEncoding(_options.DefaultEncoding);
+        ValidateDefaultEncoding(resolved.DefaultEncoding);
+        return resolved;
     }
 
     protected override async Task ProcessAsync(FlowMessage<FileWriteRequest> message)
