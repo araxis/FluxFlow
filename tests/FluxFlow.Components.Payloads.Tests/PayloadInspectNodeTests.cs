@@ -241,6 +241,24 @@ public sealed class PayloadInspectNodeTests
     }
 
     [Fact]
+    public void Inspect_RejectsInvalidMaxPreviewBytes()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new PayloadInspectNode(new PayloadInspectOptions { MaxPreviewBytes = 0 }));
+
+        exception.Message.ShouldContain("maxPreviewBytes");
+    }
+
+    [Fact]
+    public void Inspect_RejectsInvalidMaxFormattedChars()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new PayloadInspectNode(new PayloadInspectOptions { MaxFormattedChars = 0 }));
+
+        exception.Message.ShouldContain("maxFormattedChars");
+    }
+
+    [Fact]
     public void Inspect_RejectsInvalidBoundedCapacity()
     {
         var exception = Should.Throw<ArgumentOutOfRangeException>(

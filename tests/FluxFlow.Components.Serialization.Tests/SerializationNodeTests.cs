@@ -273,6 +273,43 @@ public sealed class SerializationNodeTests
         exception.Message.ShouldContain("boundedCapacity");
     }
 
+    [Fact]
+    public void Node_RejectsInvalidMaxInputBytes()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new JsonParseNode(new SerializationNodeOptions { MaxInputBytes = 0 }));
+
+        exception.Message.ShouldContain("maxInputBytes");
+    }
+
+    [Fact]
+    public void Node_RejectsInvalidMaxOutputBytes()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new JsonParseNode(new SerializationNodeOptions { MaxOutputBytes = 0 }));
+
+        exception.Message.ShouldContain("maxOutputBytes");
+    }
+
+    [Fact]
+    public void Node_RejectsEmptyDefaultEncoding()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new JsonParseNode(new SerializationNodeOptions { DefaultEncoding = " " }));
+
+        exception.Message.ShouldContain("defaultEncoding");
+    }
+
+    [Fact]
+    public void Node_RejectsUnsupportedDefaultEncoding()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new JsonParseNode(new SerializationNodeOptions { DefaultEncoding = "missing-encoding" }));
+
+        exception.Message.ShouldContain("defaultEncoding");
+        exception.Message.ShouldContain("not supported");
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
