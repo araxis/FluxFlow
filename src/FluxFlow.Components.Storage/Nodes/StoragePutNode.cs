@@ -107,7 +107,10 @@ public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
                 _options.Collection),
             Key = StorageNodeSupport.ResolveKey("storage.put", input.Key),
             Attributes = StorageNodeSupport.CopyAttributes(input.Attributes),
-            Mode = input.Mode ?? _options.Mode,
+            Mode = StorageNodeSupport.ResolveWriteMode(
+                "storage.put",
+                input.Mode,
+                _options.Mode),
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId),
             ContentType = StorageNodeSupport.Normalize(input.ContentType)
         };

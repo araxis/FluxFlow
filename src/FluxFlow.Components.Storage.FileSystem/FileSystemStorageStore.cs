@@ -54,7 +54,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 existing = null;
             }
 
-            var mode = request.Mode ?? StorageWriteMode.Upsert;
+            var mode = ResolveWriteMode(request.Mode);
             if (mode == StorageWriteMode.Create && existing is not null)
             {
                 throw new InvalidOperationException("File-system storage record already exists.");
@@ -244,6 +244,18 @@ public sealed class FileSystemStorageStore : IStorageStore
         }
 
         return key;
+    }
+
+    private static StorageWriteMode ResolveWriteMode(StorageWriteMode? value)
+    {
+        var mode = value ?? StorageWriteMode.Upsert;
+        if (!Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"File-system storage write mode '{mode}' is not supported.");
+        }
+
+        return mode;
     }
 
     private StoredJsonValue? CreateStoredValue(object? value)

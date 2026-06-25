@@ -114,6 +114,24 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_RejectsUnsupportedWriteMode()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => store.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = "alpha",
+                Value = "one",
+                Mode = (StorageWriteMode)999
+            }));
+
+        exception.Message.ShouldContain("write mode");
+    }
+
+    [Fact]
     public async Task Get_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 2, 3, TimeSpan.Zero);

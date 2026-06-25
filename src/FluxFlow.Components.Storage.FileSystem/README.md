@@ -41,6 +41,7 @@ adapter-specific override.
 - one JSON file per record
 - hashed store, collection, and key paths
 - create, replace, and upsert write modes
+- unsupported write mode values are rejected
 - optimistic version checks through `ExpectedVersion`
 - expiration honored by `storage.get`
 - query by collection, key prefix, attributes, stored time bounds, expiration,

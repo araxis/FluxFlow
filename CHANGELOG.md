@@ -7,6 +7,31 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.6
+
+Hardens per-message storage write-mode validation.
+
+- `StoragePutNode` now reports unsupported `StoragePutRequest.Mode` values as
+  `InvalidRequest` errors.
+- Invalid write-mode messages no longer reach the injected store.
+- Later valid put messages continue processing normally.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.2
+
+Hardens file-system storage write-mode validation.
+
+- Direct `FileSystemStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.2
+
+Hardens SQL-file storage write-mode validation.
+
+- Direct `SqlFileStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
 ## FluxFlow.Components.Storage 3.0.5
 
 Hardens storage node option normalization and validation.

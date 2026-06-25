@@ -139,6 +139,38 @@ public sealed class StoragePutNodeTests
     }
 
     [Fact]
+    public async Task Put_ReportsInvalidRequestForUnsupportedModeAndContinues()
+    {
+        var store = new InMemoryStorageStore();
+        await using var node = new StoragePutNode(store, new StoragePutOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        var bad = FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "bad",
+            Value = "bad",
+            Mode = (StorageWriteMode)999,
+            CorrelationId = "bad-mode"
+        });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "good",
+            Value = "ok"
+        }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.InvalidRequest);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("write mode");
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        result.Payload.Key.ShouldBe("good");
+        store.RecordCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Put_ReportsStoreFailureAsErrorWithCorrelationId()
     {
         var store = new InMemoryStorageStore

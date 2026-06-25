@@ -54,7 +54,8 @@ await using var put = new StoragePutNode(store, new StoragePutOptions
 
 `StoragePutNode` consumes `StoragePutRequest` and emits `StorageResult`.
 Supported modes are `Upsert`, `Create`, and `Replace`. The request can override
-the node mode per item.
+the node mode per item. Unsupported per-message write modes are reported as
+`InvalidRequest` errors and later messages continue processing.
 
 ## Get
 
