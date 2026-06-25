@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.2
+
+Hardens composed node cleanup.
+
+- `ComposedNode.DisposeAsync()` now attempts the descriptor cleanup hook even
+  when the wrapped node disposal path fails.
+- If both node disposal and the descriptor cleanup hook fail, the failures are
+  reported together as an aggregate exception.
+- Adds direct composed-node disposal tests so adapter-owned cleanup hooks remain
+  reliable during build failure cleanup and runtime disposal paths.
+
 ## FluxFlow.Composition.Hosting 1.0.1
 
 Hardens hosted runtime lifecycle transitions.

@@ -27,6 +27,10 @@ ordinal key comparison. A host can still intentionally edit the model before
 validation/build, but caller-owned collections used during construction cannot
 mutate the definition later.
 
+`ComposedNode` disposal always attempts both the node disposal path and the
+optional descriptor cleanup hook. If both fail, the failures are reported
+together so cleanup diagnostics do not hide an adapter-owned resource leak.
+
 ## Fluent Composition
 
 ```csharp
