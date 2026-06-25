@@ -829,23 +829,26 @@ error, or diagnostic patterns.
 Namespace:
 
 ```text
-FluxFlow.Engine.Mapping
+FluxFlow.Mapping
 ```
 
 Main types:
 
 - `IFlowExpressionEngine`
+- `IFlowCompiledExpression<T>`
 - `FlowMapContext`
 - `IFlowMapContextFactory<TInput>`
 - `IFlowPredicate<TInput>`
 - `ExpressionFlowPredicate<TInput>`
 - `DelegateFlowPredicate<TInput>`
 - `IFlowMapper<TInput,TOutput>`
+- `ExpressionFlowMapper<TInput,TOutput>`
 - `DelegateFlowMapper<TInput,TOutput>`
+- `EvaluatingCompiledExpression<T>`
 
-The engine owns only the contracts. It does not ship a concrete expression
-language. Hosts and component packages provide expression engines and context
-factories.
+These contracts live in an engine-free leaf package. The engine and standalone
+component packages consume them, but concrete expression languages, expression
+validation, and context factory registration remain host-owned.
 
 ## Stability Notes
 
