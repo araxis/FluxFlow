@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FluxFlow.Components.Journal\FluxFlow.Components.Journal.csproj" />
-    <ProjectReference Include="..\..\src\FluxFlow.Engine\FluxFlow.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>

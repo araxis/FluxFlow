@@ -1,6 +1,5 @@
 using FluxFlow.Components.Journal.Contracts;
 using FluxFlow.Components.Journal.Stores;
-using FluxFlow.Engine.Components;
 using Shouldly;
 using Xunit;
 
@@ -219,15 +218,14 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
-    public void FromFlowEvent_maps_neutral_engine_event_fields()
+    public void FromEvent_maps_neutral_event_fields()
     {
-        var nodeId = new FlowNodeId(Guid.Parse("11111111-1111-1111-1111-111111111111"));
-        var flowEvent = new FlowEvent
+        var input = new JournalEventInput
         {
             Timestamp = Timestamp(1),
             Type = "item.accepted",
             Source = "source-a",
-            SourceNodeId = nodeId,
+            SourceNodeId = "node-1",
             Subject = "items/1",
             Status = "ok",
             Channel = "items",
@@ -235,22 +233,22 @@ public sealed class InMemoryJournalStoreTests
             PayloadPreview = "preview",
             Attributes = new Dictionary<string, string>
             {
-                [FlowEventJournalRecordMapper.WorkflowIdAttribute] = "wf-1",
-                [FlowEventJournalRecordMapper.WorkflowNameAttribute] = "main",
-                [FlowEventJournalRecordMapper.ComponentIdAttribute] = "component-1",
-                [FlowEventJournalRecordMapper.SeverityAttribute] = "info",
-                [FlowEventJournalRecordMapper.LevelAttribute] = "low",
-                [FlowEventJournalRecordMapper.SummaryAttribute] = "accepted"
+                [JournalRecordMapper.WorkflowIdAttribute] = "wf-1",
+                [JournalRecordMapper.WorkflowNameAttribute] = "main",
+                [JournalRecordMapper.ComponentIdAttribute] = "component-1",
+                [JournalRecordMapper.SeverityAttribute] = "info",
+                [JournalRecordMapper.LevelAttribute] = "low",
+                [JournalRecordMapper.SummaryAttribute] = "accepted"
             }
         };
 
-        var record = FlowEventJournalRecordMapper.FromFlowEvent(flowEvent, "evt-1");
+        var record = JournalRecordMapper.FromEvent(input, "evt-1");
 
         record.Id.ShouldBe("evt-1");
-        record.Timestamp.ShouldBe(flowEvent.Timestamp);
-        record.Type.ShouldBe(flowEvent.Type);
-        record.Source.ShouldBe(flowEvent.Source);
-        record.NodeId.ShouldBe(nodeId.ToString());
+        record.Timestamp.ShouldBe(input.Timestamp);
+        record.Type.ShouldBe(input.Type);
+        record.Source.ShouldBe(input.Source);
+        record.NodeId.ShouldBe("node-1");
         record.ComponentId.ShouldBe("component-1");
         record.WorkflowId.ShouldBe("wf-1");
         record.WorkflowName.ShouldBe("main");
@@ -262,17 +260,28 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
-    public void FromFlowEvent_rejects_blank_record_id()
+    public void FromEvent_uses_node_attribute_when_source_node_id_is_missing()
     {
-        var flowEvent = new FlowEvent
+        var input = new JournalEventInput
         {
             Timestamp = Timestamp(1),
             Type = "item.accepted",
-            Source = "source-a"
+            Attributes = new Dictionary<string, string>
+            {
+                [JournalRecordMapper.NodeIdAttribute] = "node-from-attributes"
+            }
         };
 
+        var record = JournalRecordMapper.FromEvent(input, "evt-1");
+
+        record.NodeId.ShouldBe("node-from-attributes");
+    }
+
+    [Fact]
+    public void FromEvent_rejects_blank_record_id()
+    {
         Should.Throw<ArgumentException>(() =>
-            FlowEventJournalRecordMapper.FromFlowEvent(flowEvent, " "));
+            JournalRecordMapper.FromEvent(new JournalEventInput { Timestamp = Timestamp(1) }, " "));
     }
 
     private static JournalRecord CreateRecord(

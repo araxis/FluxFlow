@@ -6,20 +6,17 @@
     <PackageId>FluxFlow.Components.Journal</PackageId>
     <AssemblyName>FluxFlow.Components.Journal</AssemblyName>
     <RootNamespace>FluxFlow.Components.Journal</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event journal contracts and in-memory store for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;journal;store</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>The in-memory journal store gains an optional retention-options constructor that enforces MaxRecords on append, and duplicate-id detection is O(1).</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking boundary cleanup: Journal no longer references FluxFlow.Engine and exposes neutral JournalEventInput plus JournalRecordMapper for event-to-record mapping.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FluxFlow.Engine\FluxFlow.Engine.csproj" />
-  </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

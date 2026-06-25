@@ -679,8 +679,8 @@ These packages are intentionally not standalone node composition adapters:
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services.
-- `FluxFlow.Components.Journal` provides journal store contracts and
-  in-memory support for hosts.
+- `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
+  record mapping, store contracts, and in-memory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   and is intentionally not covered by composition adapters in this pass.
 - `FluxFlow.Components.Designer` provides engine/composition-neutral design

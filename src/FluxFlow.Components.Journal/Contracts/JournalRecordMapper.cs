@@ -1,8 +1,6 @@
-using FluxFlow.Engine.Components;
-
 namespace FluxFlow.Components.Journal.Contracts;
 
-public static class FlowEventJournalRecordMapper
+public static class JournalRecordMapper
 {
     public const string WorkflowIdAttribute = "workflowId";
     public const string WorkflowNameAttribute = "workflowName";
@@ -12,34 +10,32 @@ public static class FlowEventJournalRecordMapper
     public const string LevelAttribute = "level";
     public const string SummaryAttribute = "summary";
 
-    public static JournalRecord FromFlowEvent(FlowEvent flowEvent, string id)
+    public static JournalRecord FromEvent(JournalEventInput input, string id)
     {
-        ArgumentNullException.ThrowIfNull(flowEvent);
+        ArgumentNullException.ThrowIfNull(input);
         if (string.IsNullOrWhiteSpace(id))
-        {
             throw new ArgumentException("Journal record id is required.", nameof(id));
-        }
 
-        var attributes = CopyAttributes(flowEvent.Attributes);
+        var attributes = CopyAttributes(input.Attributes);
 
         return new JournalRecord
         {
             Id = id.Trim(),
-            Timestamp = flowEvent.Timestamp,
-            Type = flowEvent.Type,
-            Status = flowEvent.Status,
-            Source = flowEvent.Source,
+            Timestamp = input.Timestamp,
+            Type = input.Type,
+            Status = input.Status,
+            Source = input.Source,
             WorkflowId = GetAttribute(attributes, WorkflowIdAttribute),
             WorkflowName = GetAttribute(attributes, WorkflowNameAttribute),
-            NodeId = flowEvent.SourceNodeId?.ToString() ?? GetAttribute(attributes, NodeIdAttribute),
+            NodeId = input.SourceNodeId ?? GetAttribute(attributes, NodeIdAttribute),
             ComponentId = GetAttribute(attributes, ComponentIdAttribute),
-            Subject = flowEvent.Subject,
-            Channel = flowEvent.Channel,
+            Subject = input.Subject,
+            Channel = input.Channel,
             Severity = GetAttribute(attributes, SeverityAttribute),
             Level = GetAttribute(attributes, LevelAttribute),
-            Summary = GetAttribute(attributes, SummaryAttribute) ?? flowEvent.PayloadPreview,
-            PayloadBytes = flowEvent.PayloadBytes,
-            PayloadPreview = flowEvent.PayloadPreview,
+            Summary = GetAttribute(attributes, SummaryAttribute) ?? input.PayloadPreview,
+            PayloadBytes = input.PayloadBytes,
+            PayloadPreview = input.PayloadPreview,
             Attributes = attributes
         };
     }
@@ -48,9 +44,7 @@ public static class FlowEventJournalRecordMapper
     {
         var copy = new Dictionary<string, string>(StringComparer.Ordinal);
         if (attributes is null)
-        {
             return copy;
-        }
 
         foreach (var (key, value) in attributes)
         {

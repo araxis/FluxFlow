@@ -5,6 +5,8 @@ Reusable event journal contracts for FluxFlow hosts.
 ## What It Provides
 
 - `JournalRecord` for normalized runtime event storage.
+- `JournalEventInput` and `JournalRecordMapper` for mapping host event data into
+  journal records without depending on a runtime package.
 - `JournalQuery` and `JournalQueryMatcher` for type, status, source, subject, channel, attribute, time range, and severity matching.
 - `IJournalStore` for host-owned persistence.
 - `InMemoryJournalStore` for local runtime use and focused verification.
@@ -15,9 +17,8 @@ Reusable event journal contracts for FluxFlow hosts.
 ```csharp
 var store = new InMemoryJournalStore();
 
-await store.AppendAsync(new JournalRecord
+var record = JournalRecordMapper.FromEvent(new JournalEventInput
 {
-    Id = "evt-1",
     Timestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
     Type = "job.completed",
     Source = "worker",
@@ -27,7 +28,9 @@ await store.AppendAsync(new JournalRecord
     {
         ["tenant"] = "primary"
     }
-});
+}, "evt-1");
+
+await store.AppendAsync(record);
 
 var result = await store.QueryAsync(new JournalQuery
 {
@@ -45,3 +48,6 @@ var result = await store.QueryAsync(new JournalQuery
 This package does not expose standalone nodes or `FluxFlow.Composition`
 factories. It is a support package for host-owned journal persistence; workflow
 nodes that emit events remain in their owning component packages.
+
+Journal is runtime-neutral. Hosts that use another runtime should adapt runtime
+events into `JournalEventInput` before calling `JournalRecordMapper`.

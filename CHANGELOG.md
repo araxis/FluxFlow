@@ -34,6 +34,16 @@ Hardens configuration resource-option metadata validation.
 - Keeps resource and secret lookup ownership unchanged; this package still only
   normalizes validation reports.
 
+## FluxFlow.Components.Journal 2.0.0
+
+Breaking support-package boundary cleanup.
+
+- Removes the Journal package dependency on `FluxFlow.Engine`.
+- Replaces the engine-specific `FlowEventJournalRecordMapper` API with neutral
+  `JournalEventInput` and `JournalRecordMapper` contracts.
+- Keeps journal records, queries, retention, `IJournalStore`, and
+  `InMemoryJournalStore` behavior unchanged.
+
 ## FluxFlow.Nodes 1.1.0
 
 Adds bounded source-output support for standalone source nodes.
