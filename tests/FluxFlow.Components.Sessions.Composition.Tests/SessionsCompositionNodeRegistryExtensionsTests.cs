@@ -481,11 +481,12 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Theory]
-    [InlineData(SessionsCompositionNodeTypes.Recorder, "boundedCapacity", 0, "InputCapacity")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "boundedCapacity", 0, "bounded capacity")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "startSequence", 0, "start sequence")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "maxMessages", 0, "max messages")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "speedMultiplier", 0, "speed multiplier")]
+    [InlineData(SessionsCompositionNodeTypes.Recorder, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "startSequence", 0, "startSequence")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "maxMessages", 0, "maxMessages")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "fixedIntervalMilliseconds", -1, "fixedIntervalMilliseconds")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "speedMultiplier", 0, "speedMultiplier")]
     [InlineData(SessionsCompositionNodeTypes.Query, "limit", 0, "limit")]
     public async Task Invalid_numeric_configuration_surfaces_factory_diagnostic(
         string nodeType,

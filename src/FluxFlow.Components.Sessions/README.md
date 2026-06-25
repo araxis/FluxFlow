@@ -24,6 +24,11 @@ acceptance while replay pacing remains deterministic. Output remains
 broadcast/latest-wins; use a dedicated durable buffer if replay delivery must
 guarantee no loss.
 
+Session option records normalize optional text and copy tag maps at assignment.
+Invalid capacity, replay range, replay mode, pacing, and query limit values are
+rejected when assigned, so invalid configuration fails during node or factory
+construction.
+
 ## Storage
 
 Storage is injected by the host through `ISessionStore`, passed directly to each node's

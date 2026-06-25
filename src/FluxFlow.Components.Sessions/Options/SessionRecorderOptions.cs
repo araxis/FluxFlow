@@ -2,10 +2,46 @@ namespace FluxFlow.Components.Sessions.Options;
 
 public sealed record SessionRecorderOptions
 {
-    public string? Store { get; init; }
-    public string? SessionId { get; init; }
-    public string? Name { get; init; }
-    public string? Notes { get; init; }
-    public Dictionary<string, string> Tags { get; init; } = [];
-    public int BoundedCapacity { get; init; } = 128;
+    private string? _store;
+    private string? _sessionId;
+    private string? _name;
+    private string? _notes;
+    private Dictionary<string, string> _tags = new(StringComparer.Ordinal);
+    private int _boundedCapacity = 128;
+
+    public string? Store
+    {
+        get => _store;
+        init => _store = SessionOptionValidation.Normalize(value);
+    }
+
+    public string? SessionId
+    {
+        get => _sessionId;
+        init => _sessionId = SessionOptionValidation.Normalize(value);
+    }
+
+    public string? Name
+    {
+        get => _name;
+        init => _name = SessionOptionValidation.Normalize(value);
+    }
+
+    public string? Notes
+    {
+        get => _notes;
+        init => _notes = SessionOptionValidation.Normalize(value);
+    }
+
+    public Dictionary<string, string> Tags
+    {
+        get => _tags;
+        init => _tags = SessionOptionValidation.CopyMap(value);
+    }
+
+    public int BoundedCapacity
+    {
+        get => _boundedCapacity;
+        init => _boundedCapacity = SessionOptionValidation.ValidateBoundedCapacity(value);
+    }
 }

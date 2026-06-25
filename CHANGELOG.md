@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.2
+
+Hardens session option normalization and validation.
+
+- `SessionRecorderOptions`, `SessionReplayOptions`, and `SessionQueryOptions`
+  now trim optional text and copy tag maps with ordinal key comparison.
+- Invalid bounded capacities, query limits, replay ranges, replay modes, and
+  timing values are rejected at option assignment.
+
 ## FluxFlow.Components.Sessions 3.1.1
 
 Hardens session contract normalization.
