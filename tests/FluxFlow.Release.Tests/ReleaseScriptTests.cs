@@ -138,7 +138,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Stable component package boundary.");
+            notes.ShouldContain("Hardens configuration resource-option metadata validation.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
         }

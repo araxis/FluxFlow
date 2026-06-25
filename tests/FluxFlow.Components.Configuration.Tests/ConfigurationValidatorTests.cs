@@ -182,6 +182,47 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public async Task ValidateResourcesAsync_reports_invalid_resource_option_metadata()
+    {
+        var diagnostics = await ConfigurationValidator.ValidateResourcesAsync(
+            new ResourceDescriptorCatalog([]),
+            [
+                new ConfigurationResourceReference
+                {
+                    Path = "connections.primary",
+                    Required = false,
+                    Metadata = null!
+                },
+                new ConfigurationResourceReference
+                {
+                    Path = "connections.secondary",
+                    Required = false,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        [""] = "value",
+                        ["empty"] = ""
+                    }
+                }
+            ]);
+
+        diagnostics.Count.ShouldBe(3);
+        diagnostics.ShouldAllBe(diagnostic => diagnostic.Source == ConfigurationDiagnosticSource.Configuration);
+        diagnostics.ShouldAllBe(diagnostic => diagnostic.Code == "InvalidResourceReference");
+        diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            "connections.primary",
+            "connections.secondary",
+            "connections.secondary"
+        ]);
+        diagnostics.Select(diagnostic => diagnostic.Metadata["referencePath"]).ShouldBe(
+        [
+            "resource.metadata",
+            "resource.metadata",
+            "resource.metadata.empty"
+        ]);
+    }
+
+    [Fact]
     public async Task ValidateSecretsAsync_uses_option_paths()
     {
         var diagnostics = await ConfigurationValidator.ValidateSecretsAsync(

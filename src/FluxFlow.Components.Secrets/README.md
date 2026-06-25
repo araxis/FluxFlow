@@ -93,6 +93,10 @@ Use `SecretDiagnostics` to:
 - find duplicate declarations
 - find references that cannot be resolved
 
+Metadata and attribute maps are validated as part of records, references, and
+option references; null maps are reported as structured invalid-secret
+diagnostics.
+
 Secret declarations are unique by name plus optional version. When multiple
 versions exist, callers should provide `Version` or another narrowing field
 such as `Kind`.

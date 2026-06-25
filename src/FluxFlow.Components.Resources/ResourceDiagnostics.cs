@@ -164,10 +164,16 @@ public static class ResourceDiagnostics
     }
 
     private static void ValidateMap(
-        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, string>? values,
         string path,
         ICollection<ResourceDiagnostic> diagnostics)
     {
+        if (values is null)
+        {
+            diagnostics.Add(Invalid(path, "Map cannot be null."));
+            return;
+        }
+
         foreach (var value in values)
         {
             if (string.IsNullOrWhiteSpace(value.Key))

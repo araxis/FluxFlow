@@ -67,6 +67,9 @@ This package only normalizes validation. Hosts still decide where resources and
 secret values live, how they are secured, when they are resolved, and how
 diagnostics are displayed or logged.
 
+Resource option metadata is validated as configuration input. Null maps, empty
+keys, and empty values are reported as structured configuration diagnostics.
+
 ## Composition
 
 This package does not expose standalone nodes or `FluxFlow.Composition`

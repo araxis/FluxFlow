@@ -128,6 +128,7 @@ public static class ConfigurationValidator
             });
         }
 
+        ValidateMetadata(option.Metadata, option.Path, diagnostics);
         return diagnostics;
     }
 
@@ -168,10 +169,11 @@ public static class ConfigurationValidator
         };
 
     private static IReadOnlyDictionary<string, string> Merge(
-        IReadOnlyDictionary<string, string> metadata,
+        IReadOnlyDictionary<string, string>? metadata,
         string? path)
     {
-        var values = metadata.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var values = metadata?.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+            ?? new Dictionary<string, string>(StringComparer.Ordinal);
         if (values.TryGetValue("path", out var referencePath) && !values.ContainsKey("referencePath"))
             values["referencePath"] = referencePath;
 
@@ -183,4 +185,55 @@ public static class ConfigurationValidator
 
         return values;
     }
+
+    private static void ValidateMetadata(
+        IReadOnlyDictionary<string, string>? metadata,
+        string? optionPath,
+        ICollection<ConfigurationDiagnostic> diagnostics)
+    {
+        if (metadata is null)
+        {
+            diagnostics.Add(InvalidResourceOptionMetadata(
+                optionPath,
+                "resource.metadata",
+                "Resource option metadata cannot be null."));
+            return;
+        }
+
+        foreach (var value in metadata)
+        {
+            if (string.IsNullOrWhiteSpace(value.Key))
+            {
+                diagnostics.Add(InvalidResourceOptionMetadata(
+                    optionPath,
+                    "resource.metadata",
+                    "Resource option metadata keys are required."));
+            }
+
+            if (string.IsNullOrWhiteSpace(value.Value))
+            {
+                diagnostics.Add(InvalidResourceOptionMetadata(
+                    optionPath,
+                    $"resource.metadata.{value.Key}",
+                    "Resource option metadata values are required."));
+            }
+        }
+    }
+
+    private static ConfigurationDiagnostic InvalidResourceOptionMetadata(
+        string? optionPath,
+        string referencePath,
+        string message)
+        => new()
+        {
+            Source = ConfigurationDiagnosticSource.Configuration,
+            Code = "InvalidResourceReference",
+            Severity = ConfigurationDiagnosticSeverity.Error,
+            Message = message,
+            Path = optionPath,
+            Metadata = Merge(new Dictionary<string, string>
+            {
+                ["referencePath"] = referencePath
+            }, optionPath)
+        };
 }

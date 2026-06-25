@@ -670,11 +670,12 @@ and choice lists are valid only on enum options.
 
 These packages are intentionally not standalone node composition adapters:
 
-- `FluxFlow.Components.Configuration` validates resource and secret references.
+- `FluxFlow.Components.Configuration` validates resource and secret references,
+  including resource option metadata diagnostics.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
-  diagnostics.
+  diagnostics, including null-safe metadata and attribute validation.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
-  option helpers, and redaction helpers.
+  option helpers, redaction helpers, and null-safe metadata validation.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services.

@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.2.0
+
+Hardens resource metadata validation for config-bound callers.
+
+- Reports null descriptor metadata and reference attributes as structured
+  `InvalidResource` diagnostics instead of throwing.
+- Keeps resource lookup, duplicate detection, and host-owned resource ownership
+  unchanged.
+
+## FluxFlow.Components.Secrets 1.2.0
+
+Hardens secret metadata validation for config-bound callers.
+
+- Reports null descriptor metadata, reference attributes, and option metadata as
+  structured `InvalidSecret` diagnostics instead of throwing.
+- Keeps secret resolution, redaction, and host-owned secret ownership unchanged.
+
+## FluxFlow.Components.Configuration 1.1.0
+
+Hardens configuration resource-option metadata validation.
+
+- Updates `FluxFlow.Components.Configuration` validation helpers.
+- Reports null, empty-key, and empty-value resource option metadata as
+  structured `InvalidResourceReference` diagnostics.
+- Keeps resource and secret lookup ownership unchanged; this package still only
+  normalizes validation reports.
+
 ## FluxFlow.Nodes 1.1.0
 
 Adds bounded source-output support for standalone source nodes.

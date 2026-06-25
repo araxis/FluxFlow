@@ -154,6 +154,46 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Validation_reports_null_record_metadata_reference_attributes_and_option_metadata()
+    {
+        var recordDiagnostics = SecretDiagnostics.ValidateRecords(
+        [
+            new SecretRecord
+            {
+                Descriptor = new SecretDescriptor
+                {
+                    Name = new SecretName("primary"),
+                    Metadata = null!
+                },
+                Value = new SecretValue("value")
+            }
+        ]);
+        var referenceDiagnostics = SecretDiagnostics.ValidateReference(new SecretReference
+        {
+            Name = new SecretName("primary"),
+            Attributes = null!
+        });
+        var optionDiagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Metadata = null!
+        });
+
+        recordDiagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "secrets[0].descriptor.metadata"
+            && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+        referenceDiagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "reference.attributes"
+            && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+        optionDiagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "option.metadata"
+            && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Redactor_hides_sensitive_values()
     {
         var values = new Dictionary<string, string>

@@ -151,6 +151,39 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Descriptor_validation_reports_null_metadata()
+    {
+        var diagnostics = ResourceDiagnostics.ValidateDescriptors(
+        [
+            new ResourceDescriptor
+            {
+                Name = new ResourceName("primary"),
+                Metadata = null!
+            }
+        ]);
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == ResourceDiagnosticCode.InvalidResource
+            && diagnostic.Metadata["path"] == "resources[0].metadata"
+            && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Reference_validation_reports_null_attributes()
+    {
+        var diagnostics = ResourceDiagnostics.ValidateReference(new ResourceReference
+        {
+            Name = new ResourceName("primary"),
+            Attributes = null!
+        });
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == ResourceDiagnosticCode.InvalidResource
+            && diagnostic.Metadata["path"] == "reference.attributes"
+            && diagnostic.Message.Contains("Map cannot be null.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Reference_attributes_are_preserved()
     {
         var reference = new ResourceReference

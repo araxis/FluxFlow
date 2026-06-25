@@ -202,10 +202,16 @@ public static class SecretDiagnostics
     }
 
     private static void ValidateMap(
-        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, string>? values,
         string path,
         ICollection<SecretDiagnostic> diagnostics)
     {
+        if (values is null)
+        {
+            diagnostics.Add(Invalid(path, "Map cannot be null."));
+            return;
+        }
+
         foreach (var value in values)
         {
             if (string.IsNullOrWhiteSpace(value.Key))
@@ -217,10 +223,11 @@ public static class SecretDiagnostics
     }
 
     private static IReadOnlyDictionary<string, string> AddPath(
-        IReadOnlyDictionary<string, string> metadata,
+        IReadOnlyDictionary<string, string>? metadata,
         string optionPath)
     {
-        var values = metadata.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var values = metadata?.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+            ?? new Dictionary<string, string>(StringComparer.Ordinal);
         if (values.TryGetValue("path", out var referencePath))
             values["referencePath"] = referencePath;
 

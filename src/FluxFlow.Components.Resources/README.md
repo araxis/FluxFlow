@@ -57,6 +57,9 @@ Use `ResourceDiagnostics` to:
 - find missing references
 - find unused descriptors
 
+Metadata and attribute maps are validated as part of descriptors and references;
+null maps are reported as structured invalid-resource diagnostics.
+
 ## Boundaries
 
 This package only defines resource contracts and helper logic. Hosts decide how
