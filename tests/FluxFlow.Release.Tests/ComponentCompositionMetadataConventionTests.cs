@@ -55,6 +55,50 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_is_documented()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var publicApiOverview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
+        var changelog = File.ReadAllText(Path.Combine(root, "CHANGELOG.md"));
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var project = XDocument.Load(projectPath);
+            var version = ReadRequiredProperty(project, "Version", entry.PackageId);
+            var readmePath = Path.Combine(projectDirectory, "README.md");
+            var providerFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*ComponentDesignMetadataProvider.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem();
+            var providerName = Path.GetFileNameWithoutExtension(providerFile);
+
+            File.Exists(readmePath)
+                .ShouldBeTrue($"{entry.PackageId} must include a package README.");
+            var readme = File.ReadAllText(readmePath);
+
+            readme.Contains(entry.PackageId, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} README must name the package.");
+            readme.Contains(providerName, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} README must document {providerName}.");
+            publicApiOverview.Contains(entry.PackageId, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} must be listed in the public API overview.");
+            publicApiOverview.Contains(providerName, StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} public API overview must document {providerName}.");
+            changelog.Contains($"## {entry.PackageId} {version}", StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} {version} must have a changelog entry.");
+        }
+    }
+
+    [Fact]
     public void Component_composition_resource_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -262,6 +306,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (!string.IsNullOrWhiteSpace(packageId))
                 yield return packageId;
         }
+    }
+
+    private static string ReadRequiredProperty(
+        XDocument project,
+        string name,
+        string packageId)
+    {
+        var value = project
+            .Descendants()
+            .Where(element => element.Name.LocalName == name)
+            .Select(element => element.Value.Trim())
+            .FirstOrDefault(value => value.Length > 0);
+
+        string.IsNullOrWhiteSpace(value).ShouldBeFalse($"{packageId} must define {name}.");
+        return value!;
     }
 
     private static string NormalizePath(string path)
