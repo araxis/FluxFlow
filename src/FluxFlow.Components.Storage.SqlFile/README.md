@@ -24,7 +24,7 @@ await using var lease = await options.StoreFactory.OpenAsync(
     new StorageStoreContext
     {
         StoreName = "default",
-        DefaultCollection = "items",
+        Collection = "items",
         Clock = options.Clock
     });
 
@@ -45,7 +45,8 @@ adapter-specific override.
 - expiration honored by `storage.get` and `storage.query`
 - query by collection, key prefix, attributes, stored time bounds, expiration,
   offset, and limit
-- owned store lifetime when created through `UseSqlFileStorage`
+- owned store lifetime when opened through `UseSqlFileStorage`
+- per-open context for store name, default collection, and clock
 
 The adapter is intended for single-machine workflows, service hosts, and desktop
 apps that need a durable local store with stronger coordination than per-record

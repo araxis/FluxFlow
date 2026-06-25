@@ -56,6 +56,17 @@ Fixes context-aware file-system store factory sharing.
 - Corrects file-system storage docs to use `StorageStoreContext.Collection` and
   describe shared factory leases.
 
+## FluxFlow.Components.Storage.SqlFile 3.1.0
+
+Clarifies SQL-file store context scoping and path policy.
+
+- Adds regression coverage for rejecting absolute database paths when
+  `AllowAbsoluteDatabasePath` is disabled.
+- Verifies factory-opened stores keep context collection values ahead of option
+  defaults while returning owned leases.
+- Corrects SQL-file storage docs to use `StorageStoreContext.Collection` and
+  document owned per-open leases.
+
 ## FluxFlow.Nodes 1.1.0
 
 Adds bounded source-output support for standalone source nodes.

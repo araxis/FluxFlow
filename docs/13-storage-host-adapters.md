@@ -124,6 +124,46 @@ opens for the same root, store name, default collection, and clock share the sam
 in-process lock. Hosts can still pass a shared `FileSystemStorageStore` through
 the base storage package when they want to own the lifetime directly.
 
+## SQL File Adapter Package
+
+Package:
+
+```text
+FluxFlow.Components.Storage.SqlFile
+```
+
+Purpose:
+
+- provide a single-file SQL-backed `IStorageStore`
+- use the existing `storage.put`, `storage.get`, `storage.query`, and
+  `storage.delete` nodes
+- keep all host-specific app schema outside the package
+- provide durable local coordination without requiring a server database
+
+Expected public shape:
+
+- `SqlFileStorageStore`
+- `SqlFileStorageStoreOptions`
+- `SqlFileStorageStoreFactory`
+- `UseSqlFileStorage(...)` registration helper
+
+Expected options:
+
+- `databasePath`
+- `storeName`
+- `createDatabase`
+- `createDirectory`
+- `allowAbsoluteDatabasePath`
+- `maxValueBytes`
+- `defaultCollection`
+- `busyTimeoutMilliseconds`
+
+The package uses owned leases from `SqlFileStorageStoreFactory`. Each open
+creates a store bound to the requested `StorageStoreContext`, so store name,
+default collection, and clock are scoped to that lease. Absolute database paths
+are allowed by default for explicit host configuration and can be rejected with
+`AllowAbsoluteDatabasePath = false`.
+
 ## Record Model
 
 The adapter should persist only the neutral storage contracts:

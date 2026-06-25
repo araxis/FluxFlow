@@ -455,7 +455,8 @@ public sealed class SqlFileStorageStoreTests
         using var temp = TempDirectory.Create();
         var factory = new SqlFileStorageStoreFactory(new SqlFileStorageStoreOptions
         {
-            DatabasePath = Path.Combine(temp.Path, "records.db")
+            DatabasePath = Path.Combine(temp.Path, "records.db"),
+            DefaultCollection = "fallback"
         });
 
         await using var lease = await factory.OpenAsync(new StorageStoreContext
@@ -471,6 +472,24 @@ public sealed class SqlFileStorageStoreTests
 
         lease.OwnsStore.ShouldBeTrue();
         saved.Collection.ShouldBe("items");
+    }
+
+    [Fact]
+    public void Options_RejectAbsoluteDatabasePathWhenDisabled()
+    {
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => new SqlFileStorageStore(new SqlFileStorageStoreOptions
+            {
+                DatabasePath = path,
+                AllowAbsoluteDatabasePath = false
+            }));
+
+        exception.Message.ShouldBe(
+            "SQL file storage database path cannot be absolute when absolute paths are disabled.");
+        File.Exists(path).ShouldBeFalse();
     }
 
     [Fact]
