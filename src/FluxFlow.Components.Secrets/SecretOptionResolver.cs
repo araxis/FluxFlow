@@ -62,12 +62,40 @@ public static class SecretOptionResolver
         ArgumentNullException.ThrowIfNull(options);
 
         var results = new List<SecretOptionResolution>();
+        var index = 0;
         foreach (var option in options)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (option is null)
+            {
+                var path = $"options[{index}]";
+                results.Add(SecretOptionResolution.Failed(
+                    new SecretOptionReference
+                    {
+                        OptionPath = path,
+                        Required = false
+                    },
+                    InvalidOptionEntry(path)));
+                index++;
+                continue;
+            }
+
             results.Add(await ResolveAsync(resolver, option, cancellationToken).ConfigureAwait(false));
+            index++;
         }
 
         return results;
     }
+
+    private static SecretDiagnostic InvalidOptionEntry(string path)
+        => new()
+        {
+            Code = SecretDiagnosticCode.InvalidSecret,
+            Severity = SecretDiagnosticSeverity.Error,
+            Message = $"{path}: Secret option reference is required.",
+            Metadata = new Dictionary<string, string>
+            {
+                ["path"] = path
+            }
+        };
 }

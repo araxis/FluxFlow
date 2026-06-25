@@ -126,6 +126,22 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public async Task ResolveAll_returns_failed_result_for_null_option_entries()
+    {
+        var results = await SecretOptionResolver.ResolveAllAsync(
+            new InMemorySecretResolver([]),
+            [null!]);
+
+        results.Count.ShouldBe(1);
+        results[0].OptionPath.ShouldBe("options[0]");
+        results[0].Resolved.ShouldBeFalse();
+        var diagnostic = results[0].Diagnostic.ShouldNotBeNull();
+        diagnostic.Code.ShouldBe(SecretDiagnosticCode.InvalidSecret);
+        diagnostic.Metadata["path"].ShouldBe("options[0]");
+        diagnostic.Message.ShouldContain("Secret option reference is required.");
+    }
+
+    [Fact]
     public async Task ResolveAsync_returns_invalid_option_diagnostic_before_resolving()
     {
         var resolver = new CountingSecretResolver();
