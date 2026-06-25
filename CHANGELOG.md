@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.3
+
+Hardens runtime builder cancellation cleanup.
+
+- `CompositionRuntimeBuilder.BuildAsync()` now disposes partially built nodes
+  and links before rethrowing cancellation or unexpected build exceptions.
+- Factory-thrown `OperationCanceledException` propagates when the build
+  cancellation token is already canceled instead of becoming a factory
+  diagnostic.
+- Adds a regression test proving cancellation after node creation disposes the
+  already-created node.
+
 ## FluxFlow.Composition 1.0.2
 
 Hardens composed node cleanup.

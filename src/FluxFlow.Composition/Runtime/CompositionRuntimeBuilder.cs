@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace FluxFlow.Composition;
 
 public sealed class CompositionRuntimeBuilder
@@ -29,78 +31,91 @@ public sealed class CompositionRuntimeBuilder
         var links = new List<IDisposable>();
         var nodesWithIncomingLinks = new HashSet<RuntimeNodeKey>();
 
-        foreach (var (workflowName, workflow) in definition.Workflows)
+        try
         {
-            foreach (var (nodeName, nodeDefinition) in workflow.Nodes)
+            foreach (var (workflowName, workflow) in definition.Workflows)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var key = new RuntimeNodeKey(workflowName, nodeName);
-                var registration = _registry.Registrations[nodeDefinition.Type];
-
-                ComposedNode descriptor;
-                try
+                foreach (var (nodeName, nodeDefinition) in workflow.Nodes)
                 {
-                    var context = new CompositionNodeFactoryContext(
-                        services,
-                        workflowName,
-                        nodeName,
-                        nodeDefinition);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var key = new RuntimeNodeKey(workflowName, nodeName);
+                    var registration = _registry.Registrations[nodeDefinition.Type];
 
-                    descriptor = await registration.Factory(context).ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    diagnostics.Add(new CompositionDiagnostic
+                    ComposedNode descriptor;
+                    try
                     {
-                        Code = CompositionDiagnosticCode.FactoryFailed,
-                        WorkflowName = workflowName,
-                        NodeName = nodeName,
-                        Exception = exception,
-                        Message = $"Factory for node '{key}' failed: {exception.Message}"
-                    });
-                    continue;
-                }
+                        var context = new CompositionNodeFactoryContext(
+                            services,
+                            workflowName,
+                            nodeName,
+                            nodeDefinition);
 
-                if (descriptor is null)
-                {
-                    diagnostics.Add(new CompositionDiagnostic
+                        descriptor = await registration.Factory(context).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        Code = CompositionDiagnosticCode.FactoryFailed,
-                        WorkflowName = workflowName,
-                        NodeName = nodeName,
-                        Message = $"Factory for node '{key}' returned null."
-                    });
-                    continue;
-                }
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        diagnostics.Add(new CompositionDiagnostic
+                        {
+                            Code = CompositionDiagnosticCode.FactoryFailed,
+                            WorkflowName = workflowName,
+                            NodeName = nodeName,
+                            Exception = exception,
+                            Message = $"Factory for node '{key}' failed: {exception.Message}"
+                        });
+                        continue;
+                    }
 
-                ValidateDescriptorPorts(key, registration, descriptor, diagnostics);
-                nodes.Add(key, new CompositionRuntimeNode(key, nodeDefinition, descriptor));
+                    if (descriptor is null)
+                    {
+                        diagnostics.Add(new CompositionDiagnostic
+                        {
+                            Code = CompositionDiagnosticCode.FactoryFailed,
+                            WorkflowName = workflowName,
+                            NodeName = nodeName,
+                            Message = $"Factory for node '{key}' returned null."
+                        });
+                        continue;
+                    }
+
+                    ValidateDescriptorPorts(key, registration, descriptor, diagnostics);
+                    nodes.Add(key, new CompositionRuntimeNode(key, nodeDefinition, descriptor));
+                }
             }
-        }
 
-        if (diagnostics.Count > 0)
-        {
-            await CleanupAsync(nodes.Values, links, diagnostics).ConfigureAwait(false);
-            return CompositionBuildResult.Failure(diagnostics);
-        }
-
-        foreach (var (workflowName, workflow) in definition.Workflows)
-        {
-            foreach (var linkDefinition in workflow.Links)
+            if (diagnostics.Count > 0)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                LinkNodes(workflowName, linkDefinition, nodes, links, nodesWithIncomingLinks, diagnostics);
+                await CleanupAsync(nodes.Values, links, diagnostics).ConfigureAwait(false);
+                return CompositionBuildResult.Failure(diagnostics);
             }
-        }
 
-        if (diagnostics.Count > 0)
+            foreach (var (workflowName, workflow) in definition.Workflows)
+            {
+                foreach (var linkDefinition in workflow.Links)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    LinkNodes(workflowName, linkDefinition, nodes, links, nodesWithIncomingLinks, diagnostics);
+                }
+            }
+
+            if (diagnostics.Count > 0)
+            {
+                await CleanupAsync(nodes.Values, links, diagnostics).ConfigureAwait(false);
+                return CompositionBuildResult.Failure(diagnostics);
+            }
+
+            return CompositionBuildResult.Success(
+                new CompositionRuntime(nodes.Values.ToArray(), links, nodesWithIncomingLinks));
+        }
+        catch (Exception exception)
         {
-            await CleanupAsync(nodes.Values, links, diagnostics).ConfigureAwait(false);
-            return CompositionBuildResult.Failure(diagnostics);
+            await CleanupAndRethrowAsync(nodes.Values, links, exception, cancellationToken)
+                .ConfigureAwait(false);
+            throw;
         }
-
-        return CompositionBuildResult.Success(
-            new CompositionRuntime(nodes.Values.ToArray(), links, nodesWithIncomingLinks));
     }
 
     private static void ValidateDescriptorPorts(
@@ -283,6 +298,38 @@ public sealed class CompositionRuntimeBuilder
                 });
             }
         }
+    }
+
+    private static async ValueTask CleanupAndRethrowAsync(
+        IEnumerable<CompositionRuntimeNode> nodes,
+        IEnumerable<IDisposable> links,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        var cleanupDiagnostics = new List<CompositionDiagnostic>();
+        await CleanupAsync(nodes, links, cleanupDiagnostics).ConfigureAwait(false);
+
+        var cleanupExceptions = cleanupDiagnostics
+            .Where(static diagnostic => diagnostic.Exception is not null)
+            .Select(static diagnostic => diagnostic.Exception!)
+            .ToArray();
+        if (cleanupExceptions.Length == 0)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+            throw exception;
+        }
+
+        if (exception is OperationCanceledException && cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(
+                "Composition build was canceled, and cleanup failed.",
+                new AggregateException(cleanupExceptions),
+                cancellationToken);
+        }
+
+        throw new AggregateException(
+            "Composition build failed, and cleanup failed.",
+            [exception, .. cleanupExceptions]);
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider
