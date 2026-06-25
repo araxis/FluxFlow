@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.7
+
+Hardens storage get response validation.
+
+- `StorageGetNode` now rejects store records returned for a different
+  collection or key.
+- Mismatched get records are reported as `GetFailed` errors instead of being
+  emitted on `Output` or `Found`.
+
 ## FluxFlow.Components.Storage 3.0.6
 
 Hardens per-message storage write-mode validation.

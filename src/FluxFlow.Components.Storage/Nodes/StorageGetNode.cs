@@ -71,6 +71,11 @@ public sealed class StorageGetNode : FlowNode<StorageGetRequest, StorageResult>
         try
         {
             var record = await _store.GetAsync(request, Stopping).ConfigureAwait(false);
+            if (record is not null)
+            {
+                ValidateRecord(record, request);
+            }
+
             var result = record is null
                 ? CreateMissingResult(request)
                 : StorageNodeSupport.CreateRecordResult(
@@ -144,6 +149,21 @@ public sealed class StorageGetNode : FlowNode<StorageGetRequest, StorageResult>
             CorrelationId = request.CorrelationId,
             Message = "Record was not found."
         };
+
+    private static void ValidateRecord(StorageRecord record, StorageGetRequest request)
+    {
+        if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
+        {
+            throw new InvalidOperationException(
+                "storage.get store returned a record for a different collection.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(record.Key, request.Key))
+        {
+            throw new InvalidOperationException(
+                "storage.get store returned a record for a different key.");
+        }
+    }
 
     private void ReportError(
         int code,
