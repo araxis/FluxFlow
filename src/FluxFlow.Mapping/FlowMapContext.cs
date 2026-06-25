@@ -7,5 +7,18 @@ namespace FluxFlow.Mapping;
 /// </summary>
 public sealed record FlowMapContext
 {
-    public IReadOnlyDictionary<string, object?> Variables { get; init; } = new Dictionary<string, object?>();
+    private IReadOnlyDictionary<string, object?> _variables =
+        new Dictionary<string, object?>(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, object?> Variables
+    {
+        get => _variables;
+        init => _variables = CopyVariables(value);
+    }
+
+    private static IReadOnlyDictionary<string, object?> CopyVariables(
+        IReadOnlyDictionary<string, object?>? variables)
+        => variables is null
+            ? new Dictionary<string, object?>(StringComparer.Ordinal)
+            : new Dictionary<string, object?>(variables, StringComparer.Ordinal);
 }

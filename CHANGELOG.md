@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Mapping 1.0.1
+
+Hardens mapping context variable snapshots.
+
+- `FlowMapContext` now copies assigned variable dictionaries so caller
+  mutations cannot change an existing per-message context.
+- Assigned variables now use ordinal key comparison, keeping expression
+  variable lookup deterministic across hosts.
+- Adds direct `FluxFlow.Mapping` tests for context variable copy semantics.
+
 ## FluxFlow.Components.Expressions 2.0.2
 
 Hardens expression engine registry name normalization.
