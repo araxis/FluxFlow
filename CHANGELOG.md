@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Metrics 3.0.3
+
+Hardens metrics option normalization and validation.
+
+- `MetricsAggregateOptions.GroupByTag` now trims surrounding whitespace and
+  treats blank values as absent.
+- Invalid rate windows, bounded capacities, and group limits are rejected at
+  option assignment.
+
+## FluxFlow.Components.Metrics 3.0.2
+
+Hardens metrics contract normalization.
+
+- `MetricSampleInput`, `MetricSnapshotOutput`, and `MetricGroupSnapshot` now
+  trim optional text values when assigned.
+- Tags, latest samples, and group snapshot maps are copied with ordinal key
+  comparison so later caller mutations do not leak into contracts.
+
 ## FluxFlow.Components.State 3.0.4
 
 Hardens state reducer per-message operation validation.

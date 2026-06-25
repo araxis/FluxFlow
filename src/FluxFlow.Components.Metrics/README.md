@@ -25,6 +25,9 @@ await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
 
 Every message travels as a `FlowMessage<T>` envelope, so the correlation id flows
 from the sample that produced a snapshot through to that snapshot for free.
+Metric contracts trim optional text on assignment. Tag maps, latest samples, and
+group snapshot maps are copied defensively with ordinal key comparison so later
+caller mutations do not change the message or snapshot contracts.
 
 ## Ports
 
@@ -74,9 +77,10 @@ new MetricsAggregateOptions
 };
 ```
 
-`MetricsAggregateOptions` validates at construction: `RateWindowSeconds` must be
-a finite positive value, `BoundedCapacity` must be positive, and `MaxGroups` must
-be zero or greater.
+`MetricsAggregateOptions` normalizes `GroupByTag` when assigned.
+`RateWindowSeconds` must be a finite positive value, `BoundedCapacity` must be
+positive, and `MaxGroups` must be zero or greater; invalid values fail fast as
+argument exceptions.
 
 A `TimeProvider` can be injected for deterministic fallback timestamps. Explicit
 sample timestamps always win; the time provider is used only when

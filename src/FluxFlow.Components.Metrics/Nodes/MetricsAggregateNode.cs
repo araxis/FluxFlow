@@ -67,27 +67,6 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     private static MetricsAggregateOptions ResolveOptions(MetricsAggregateOptions? options)
     {
         var resolved = options ?? new MetricsAggregateOptions();
-        if (!double.IsFinite(resolved.RateWindowSeconds) || resolved.RateWindowSeconds <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "metrics.aggregate option 'rateWindowSeconds' must be a finite value greater than zero.");
-        }
-
-        if (resolved.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "metrics.aggregate option 'boundedCapacity' must be greater than zero.");
-        }
-
-        if (resolved.MaxGroups < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "metrics.aggregate option 'maxGroups' must be zero or greater.");
-        }
-
         return resolved;
     }
 
