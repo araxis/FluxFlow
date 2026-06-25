@@ -662,6 +662,83 @@ public sealed class SessionComponentTests
     }
 
     [Fact]
+    public async Task Query_ReportsStoreSessionOutsideFilterAndContinues()
+    {
+        var store = new TestSessionStore { BypassQueryFilteringOnce = true };
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-1",
+            Name = "beta",
+            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+        });
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-2",
+            Name = "alpha",
+            StartedAt = DateTimeOffset.Parse("2026-01-02T00:00:00Z")
+        });
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { NamePrefix = "alpha" }));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { NamePrefix = "alpha" }));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
+        error.Message.ShouldContain("outside the query filter");
+        error.Message.ShouldContain("namePrefix");
+        result.Payload.Count.ShouldBe(1);
+        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-2");
+    }
+
+    [Fact]
+    public async Task Query_ReportsStoreResultsOverLimitAndContinues()
+    {
+        var store = new TestSessionStore { BypassQueryFilteringOnce = true };
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-1",
+            Name = "alpha",
+            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+        });
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-2",
+            Name = "alpha",
+            StartedAt = DateTimeOffset.Parse("2026-01-02T00:00:00Z")
+        });
+        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest
+        {
+            Name = "alpha",
+            Limit = 1
+        }));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest
+        {
+            Name = "alpha",
+            Limit = 1
+        }));
+        node.Complete();
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
+        error.Message.ShouldContain("more sessions than requested");
+        result.Payload.Count.ShouldBe(1);
+        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-1");
+    }
+
+    [Fact]
     public async Task Query_EmitsStartedEventAtConstruction()
     {
         var store = new TestSessionStore();
@@ -751,6 +828,7 @@ public sealed class SessionComponentTests
         public bool ReturnNullQuerySessionOnce { get; set; }
         public bool ReturnNullReadStreamOnce { get; set; }
         public bool ReturnNullReadRecordOnce { get; set; }
+        public bool BypassQueryFilteringOnce { get; set; }
         public SessionQueryRequest? LastQuery { get; private set; }
 
         public Task<SessionMetadata?> GetSessionAsync(
@@ -867,6 +945,14 @@ public sealed class SessionComponentTests
                 : Metadata is null
                     ? []
                     : [Metadata];
+
+            if (BypassQueryFilteringOnce)
+            {
+                BypassQueryFilteringOnce = false;
+                return Task.FromResult<IReadOnlyList<SessionMetadata>>(
+                    query.Select(CopySession).ToArray());
+            }
+
             if (!string.IsNullOrWhiteSpace(request.Name))
             {
                 query = query.Where(session => StringComparer.Ordinal.Equals(session.Name, request.Name));

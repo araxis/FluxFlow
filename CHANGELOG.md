@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.4
+
+Hardens session query response validation.
+
+- `SessionQueryNode` now validates store-returned sessions against the
+  normalized name, prefix, tag, date range, active/completed, and limit filters.
+- Store results outside the query filter or above the requested limit now emit a
+  `QueryFailed` error instead of being silently emitted or truncated.
+
 ## FluxFlow.Components.Sessions 3.1.3
 
 Hardens session store response validation.

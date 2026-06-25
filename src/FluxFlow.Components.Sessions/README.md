@@ -39,6 +39,9 @@ Stores are expected to honor the non-null parts of `ISessionStore`; when a store
 returns a null session, record, query result, or replay stream where the contract
 requires a value, the node reports a clear session error instead of surfacing an
 ambiguous null-reference failure.
+Query results are also validated against the normalized query request. A store
+that returns sessions outside the requested filters, or more sessions than the
+requested limit, is reported through the query error port.
 
 ```csharp
 ISessionStore store = new MySessionStore(...);
