@@ -56,6 +56,16 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             OutputPort(RoutingCompositionPortNames.Default, "Default", "Input message when no configured route matches.", "TInput", 3),
             OutputPort(RoutingCompositionPortNames.Routed, "Routed", "Input message when route envelope output is enabled.", "TInput", 4)
         ],
+        Resources =
+        [
+            RequiredSelectorResource(
+                RoutingCompositionResourceNames.RouteKeySelector,
+                "Route Key Selector",
+                "Func<TInput,string?>",
+                0,
+                "Required keyed delegate that selects the route key for each input message."),
+            ClockResource(1)
+        ],
         Attributes = new Dictionary<string, string>
         {
             ["dynamicOutputsOption"] = "routeOutputs",
@@ -83,6 +93,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Primary output alias.", "TInput", 1, isPrimary: true)
         ],
+        Resources = [ClockResource(0)],
         Attributes = new Dictionary<string, string>
         {
             ["dynamicOutputsOption"] = "outputs"
@@ -107,7 +118,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true)
-        ]
+        ],
+        Resources = [ClockResource(0)]
     };
 
     private static ComponentDesignMetadata CreateWindowMetadata() => new()
@@ -131,7 +143,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Buffered window.", "FlowWindow<TInput>", 1, isPrimary: true)
-        ]
+        ],
+        Resources = [ClockResource(0)]
     };
 
     private static ComponentDesignMetadata CreateCorrelationMetadata() => new()
@@ -164,6 +177,22 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Correlation match result.", "FlowCorrelationMatch<TInput>", 1, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Matched, "Matched", "Correlation match result alias.", "FlowCorrelationMatch<TInput>", 2),
             OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Correlation timeout result.", "FlowCorrelationTimeout<TInput>", 3)
+        ],
+        Resources =
+        [
+            RequiredSelectorResource(
+                RoutingCompositionResourceNames.KeySelector,
+                "Key Selector",
+                "Func<TInput,string?>",
+                0,
+                "Required keyed delegate that selects the correlation key for each input message."),
+            RequiredSelectorResource(
+                RoutingCompositionResourceNames.SideSelector,
+                "Side Selector",
+                "Func<TInput,string?>",
+                1,
+                "Required keyed delegate that selects request or response side labels."),
+            ClockResource(2)
         ],
         Attributes = new Dictionary<string, string>
         {
@@ -201,10 +230,50 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Joined output result.", "FlowJoinResult<TLeft,TRight>", 2, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Join timeout result.", "FlowJoinTimeout<TLeft,TRight>", 3)
         ],
+        Resources =
+        [
+            RequiredSelectorResource(
+                RoutingCompositionResourceNames.LeftKeySelector,
+                "Left Key Selector",
+                "Func<TLeft,string?>",
+                0,
+                "Required keyed delegate that selects the join key for left messages."),
+            RequiredSelectorResource(
+                RoutingCompositionResourceNames.RightKeySelector,
+                "Right Key Selector",
+                "Func<TRight,string?>",
+                1,
+                "Required keyed delegate that selects the join key for right messages."),
+            ClockResource(2)
+        ],
         Attributes = new Dictionary<string, string>
         {
             ["requiredResources"] = $"{RoutingCompositionResourceNames.LeftKeySelector},{RoutingCompositionResourceNames.RightKeySelector}"
         }
+    };
+
+    private static ResourceDesignMetadata RequiredSelectorResource(
+        string name,
+        string displayName,
+        string valueType,
+        int order,
+        string summary) => new()
+        {
+            Name = name,
+            DisplayName = displayName,
+            Order = order,
+            Summary = summary,
+            ValueType = valueType,
+            IsRequired = true
+        };
+
+    private static ResourceDesignMetadata ClockResource(int order) => new()
+    {
+        Name = RoutingCompositionResourceNames.Clock,
+        DisplayName = "Clock",
+        Order = order,
+        Summary = "Optional keyed clock for deterministic routing timing, timeouts, and diagnostics.",
+        ValueType = nameof(TimeProvider)
     };
 
     private static OptionDesignMetadata EngineOption() => new()

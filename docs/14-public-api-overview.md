@@ -286,8 +286,12 @@ context, and clock resources.
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the three observability composition nodes, including existing option records
-and fixed ports. Expression engines, context factories, selectors, and clocks
-remain host-owned keyed resources.
+fixed ports, and host-owned resource hints. Counter metadata includes the
+conditionally required expression engine plus optional context factory and
+clock resources. Logger metadata includes the dynamic `attribute:{name}`
+selector resource pattern, and metrics metadata includes the optional
+`sizeSelector` and `clock` resources. Expression engines, context factories,
+selectors, and clocks remain host-owned keyed resources.
 
 ## Metrics Composition
 
@@ -343,7 +347,7 @@ optional keyed `TimeProvider` resource through the host.
 the six routing composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata describes built-in ports and option-defined dynamic output surfaces
-while keeping selector delegates and `clock` as host-owned resources.
+plus host-owned resource hints for selector delegates and `clock`.
 
 ## Serialization Composition
 

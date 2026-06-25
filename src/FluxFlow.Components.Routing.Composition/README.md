@@ -63,12 +63,13 @@ the six routing composition nodes. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and built-in ports only. Selector delegates
-such as `routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`,
-and `rightKeySelector` remain host-owned resources and are not exposed as
-editable node options. Switch `routeOutputs` and fork `outputs` are represented
-as configuration options because those dynamic ports are exposed after the
-composition factory binds node options.
+The provider describes node options, built-in ports, and host-owned resource
+hints. Selector delegates such as `routeKeySelector`, `keySelector`,
+`sideSelector`, `leftKeySelector`, and `rightKeySelector` are exposed as
+required resources for the nodes that need them. The optional `clock` resource
+is exposed separately from editable node options. Switch `routeOutputs` and fork
+`outputs` are represented as configuration options because those dynamic ports
+are exposed after the composition factory binds node options.
 
 ## Configuration
 

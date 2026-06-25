@@ -329,6 +329,18 @@ Targets Pulse MQTT `2.0.0`, using explicit broker subscriptions plus local route
 Engine-free standalone rewrite. Logger/counter/metrics are `FlowNode` transforms over the kit.
 Engine glue removed.
 
+## FluxFlow.Components.Observability.Composition 1.2.0
+
+Adds Designer resource metadata for observability composition nodes.
+
+- Describes the counter `engine`, `contextFactory`, and `clock` resources,
+  including the conditional engine requirement for predicate/expression
+  configuration.
+- Describes logger `clock` plus the dynamic `attribute:{name}` selector
+  resource pattern.
+- Describes metrics `sizeSelector` and `clock` resources separately from
+  editable observability node options.
+
 ## FluxFlow.Components.Observability.Composition 1.1.0
 
 Adds package-owned Designer metadata for `flow.counter`, `flow.logger`, and
@@ -432,6 +444,16 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. Switch/Fork/Correlation/Window are `FlowNode`s (multi-output via
 `AddOutput`), Merge fans in to a single Input, and Join is a self-contained two-input node over
 the kit's envelope/error/event primitives. Engine glue removed.
+
+## FluxFlow.Components.Routing.Composition 1.2.0
+
+Adds Designer resource metadata for routing composition nodes.
+
+- Describes selector delegate resources required by `flow.switch`,
+  `flow.correlation`, and `flow.join`.
+- Describes the optional `clock` resource for all routing node factories.
+- Keeps dynamic switch/fork output options as editable configuration because
+  those ports are created after factory option binding.
 
 ## FluxFlow.Components.Routing.Composition 1.1.0
 

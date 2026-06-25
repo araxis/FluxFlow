@@ -2,6 +2,7 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Observability.Composition;
 
@@ -79,7 +80,28 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "TInput",
             "Input message to count.",
             nameof(FlowCounterSnapshot),
-            "Counter snapshot.")
+            "Counter snapshot."),
+        Resources =
+        [
+            Resource(
+                ObservabilityCompositionResourceNames.Engine,
+                "Expression Engine",
+                nameof(IFlowExpressionEngine),
+                0,
+                "Conditionally required keyed expression engine when predicate or expression is configured.",
+                isRequired: false,
+                attributes: new Dictionary<string, string>
+                {
+                    ["requiredWhenAnyOption"] = "predicate,expression"
+                }),
+            Resource(
+                ObservabilityCompositionResourceNames.ContextFactory,
+                "Context Factory",
+                "IFlowMapContextFactory<TInput>",
+                1,
+                "Optional keyed mapping context factory used when evaluating counter predicates."),
+            ClockResource(2)
+        ]
     };
 
     private static ComponentDesignMetadata CreateLoggerMetadata() => new()
@@ -132,7 +154,22 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "TInput",
             "Input message to log.",
             nameof(FlowLogEntry),
-            "Structured log entry.")
+            "Structured log entry."),
+        Resources =
+        [
+            ClockResource(0),
+            Resource(
+                ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
+                "Attribute Selector",
+                "IObservabilityValueSelector<TInput>",
+                1,
+                "Required keyed selector pattern for each configured attributeSelectors entry.",
+                attributes: new Dictionary<string, string>
+                {
+                    ["pattern"] = "true",
+                    ["option"] = "attributeSelectors"
+                })
+        ]
     };
 
     private static ComponentDesignMetadata CreateMetricsMetadata() => new()
@@ -167,8 +204,45 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "TInput",
             "Input message to observe.",
             nameof(FlowMetricSnapshot),
-            "Metric snapshot.")
+            "Metric snapshot."),
+        Resources =
+        [
+            Resource(
+                ObservabilityCompositionResourceNames.SizeSelector,
+                "Size Selector",
+                "IObservabilityValueSelector<TInput>",
+                0,
+                "Optional keyed selector used to calculate message size metrics."),
+            ClockResource(1)
+        ]
     };
+
+    private static ResourceDesignMetadata ClockResource(int order) => new()
+    {
+        Name = ObservabilityCompositionResourceNames.Clock,
+        DisplayName = "Clock",
+        Order = order,
+        Summary = "Optional keyed clock for deterministic observability timestamps and diagnostics.",
+        ValueType = nameof(TimeProvider)
+    };
+
+    private static ResourceDesignMetadata Resource(
+        string name,
+        string displayName,
+        string valueType,
+        int order,
+        string summary,
+        bool isRequired = false,
+        IReadOnlyDictionary<string, string>? attributes = null) => new()
+        {
+            Name = name,
+            DisplayName = displayName,
+            Order = order,
+            Summary = summary,
+            ValueType = valueType,
+            IsRequired = isRequired,
+            Attributes = attributes ?? new Dictionary<string, string>()
+        };
 
     private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
     {

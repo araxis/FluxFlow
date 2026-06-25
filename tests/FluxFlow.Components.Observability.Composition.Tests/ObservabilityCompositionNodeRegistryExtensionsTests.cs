@@ -61,6 +61,38 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
                 option.Name == ObservabilityCompositionResourceNames.ContextFactory ||
                 option.Name.StartsWith("attribute:", StringComparison.Ordinal));
         }
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Counter],
+            [
+                (ObservabilityCompositionResourceNames.Engine, 0, false, nameof(IFlowExpressionEngine)),
+                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<TInput>"),
+                (ObservabilityCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
+        metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Resources
+            .Single(resource => resource.Name == ObservabilityCompositionResourceNames.Engine)
+            .Attributes["requiredWhenAnyOption"]
+            .ShouldBe("predicate,expression");
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Logger],
+            [
+                (ObservabilityCompositionResourceNames.Clock, 0, false, nameof(TimeProvider)),
+                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<TInput>")
+            ]);
+        var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Resources
+            .Single(resource => resource.Name == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        attributeSelector.Attributes["pattern"].ShouldBe("true");
+        attributeSelector.Attributes["option"].ShouldBe("attributeSelectors");
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Metrics],
+            [
+                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, "IObservabilityValueSelector<TInput>"),
+                (ObservabilityCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+            ]);
     }
 
     [Fact]
@@ -600,6 +632,17 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
+    }
+
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType!)).ShouldBe(expected);
     }
 
     private static async Task AssertFactoryDiagnosticAsync(

@@ -101,6 +101,37 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.SideSelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.LeftKeySelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.RightKeySelector);
+
+        var byType = metadata.ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Switch],
+            [
+                (RoutingCompositionResourceNames.RouteKeySelector, 0, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+            ]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Fork],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Merge],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Window],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Correlation],
+            [
+                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Join],
+            [
+                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<TLeft,string?>"),
+                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<TRight,string?>"),
+                (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
     }
 
     [Fact]
@@ -744,6 +775,17 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         {
             option.IsRequired.ShouldBe(isRequired.Value);
         }
+    }
+
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType!)).ShouldBe(expected);
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
