@@ -10,6 +10,8 @@ namespace FluxFlow.Nodes;
 /// </summary>
 public sealed record FlowMessage<T>
 {
+    private IReadOnlyDictionary<string, object?> _headers = FlowMessage.EmptyHeaders;
+
     public FlowMessage(CorrelationId correlationId, T payload)
     {
         CorrelationId = correlationId;
@@ -24,7 +26,11 @@ public sealed record FlowMessage<T>
 
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 
-    public IReadOnlyDictionary<string, object?> Headers { get; init; } = FlowMessage.EmptyHeaders;
+    public IReadOnlyDictionary<string, object?> Headers
+    {
+        get => _headers;
+        init => _headers = FlowMessage.CopyHeaders(value);
+    }
 
     /// <summary>
     /// Produce the next message in the same exchange: a new payload (and a fresh
@@ -38,9 +44,15 @@ public sealed record FlowMessage<T>
 public static class FlowMessage
 {
     internal static readonly IReadOnlyDictionary<string, object?> EmptyHeaders =
-        new Dictionary<string, object?>();
+        new Dictionary<string, object?>(StringComparer.Ordinal);
 
     /// <summary>Mint the first envelope of an exchange (source/trigger nodes).</summary>
     public static FlowMessage<T> Create<T>(T payload, CorrelationId? correlationId = null)
         => new(correlationId ?? CorrelationId.New(), payload);
+
+    internal static IReadOnlyDictionary<string, object?> CopyHeaders(
+        IReadOnlyDictionary<string, object?>? headers)
+        => headers is null
+            ? EmptyHeaders
+            : new Dictionary<string, object?>(headers, StringComparer.Ordinal);
 }

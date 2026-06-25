@@ -10,6 +10,8 @@ Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
 `Headers` bag). It's immutable, so a broadcast can hand the same instance to many
 consumers. Transform the payload with `With`, which keeps the correlation id and
 headers — so correlation flows through a graph with no node copying it by hand.
+Assigned header dictionaries are copied with ordinal key comparison, so later
+caller mutations cannot change an existing envelope.
 
 ```csharp
 var message = FlowMessage.Create("hello");        // mints a CorrelationId

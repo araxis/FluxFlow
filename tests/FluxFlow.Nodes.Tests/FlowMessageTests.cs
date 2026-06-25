@@ -41,6 +41,58 @@ public sealed class FlowMessageTests
     }
 
     [Fact]
+    public void Headers_AreCopiedOnAssignment()
+    {
+        var headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["kind"] = "original"
+        };
+
+        var message = FlowMessage.Create("payload") with
+        {
+            Headers = headers
+        };
+
+        headers["kind"] = "changed";
+        headers["new"] = "later";
+
+        message.Headers["kind"].ShouldBe("original");
+        message.Headers.ContainsKey("new").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Headers_UseOrdinalKeysAfterAssignment()
+    {
+        var message = FlowMessage.Create("payload") with
+        {
+            Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Kind"] = "event"
+            }
+        };
+
+        message.Headers.ContainsKey("Kind").ShouldBeTrue();
+        message.Headers.ContainsKey("kind").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void With_CopiesHeadersIntoNextMessage()
+    {
+        var original = FlowMessage.Create(1) with
+        {
+            Headers = new Dictionary<string, object?>
+            {
+                ["kind"] = "source"
+            }
+        };
+
+        var next = original.With("mapped");
+
+        next.Headers.ShouldNotBeSameAs(original.Headers);
+        next.Headers["kind"].ShouldBe("source");
+    }
+
+    [Fact]
     public void Json_RoundTripsCorrelationIdAndPayload()
     {
         var message = FlowMessage.Create("body", new CorrelationId("trace-9"));
