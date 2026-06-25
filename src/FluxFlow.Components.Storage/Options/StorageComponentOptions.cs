@@ -29,7 +29,17 @@ public sealed class StorageComponentOptions
     {
         ArgumentNullException.ThrowIfNull(create);
         return UseStore(
-            (context, _) => ValueTask.FromResult(StorageStoreLease.Shared(create(context))));
+            (context, _) =>
+            {
+                var store = create(context);
+                if (store is null)
+                {
+                    throw new InvalidOperationException(
+                        "Shared storage store factory returned null.");
+                }
+
+                return ValueTask.FromResult(StorageStoreLease.Shared(store));
+            });
     }
 
     public StorageComponentOptions UseSharedStore(IStorageStore store)
@@ -49,10 +59,17 @@ public sealed class StorageComponentOptions
         Func<StorageStoreContext, CancellationToken, ValueTask<StorageStoreLease>> open)
         : IStorageStoreFactory
     {
-        public ValueTask<StorageStoreLease> OpenAsync(
+        public async ValueTask<StorageStoreLease> OpenAsync(
             StorageStoreContext context,
             CancellationToken cancellationToken = default)
-            => open(context, cancellationToken);
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var lease = await open(context, cancellationToken).ConfigureAwait(false);
+            return lease ?? throw new InvalidOperationException(
+                "Storage store factory delegate returned a null lease.");
+        }
     }
 
     private sealed class MissingStorageStoreFactory : IStorageStoreFactory

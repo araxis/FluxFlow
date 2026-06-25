@@ -132,7 +132,9 @@ IStorageStore store = (await options.StoreFactory
 `StorageStoreLease.Owned(store)` marks a store the lease should dispose;
 `StorageStoreLease.Shared(store)` marks a host-owned store that must not be
 disposed. The factory receives the store name, default collection, and clock
-through `StorageStoreContext`.
+through `StorageStoreContext`. Delegate-backed factories registered through
+`StorageComponentOptions.UseStore(...)` must return a non-null
+`StorageStoreLease`; shared-store delegates must return a non-null store.
 
 ## Runtime Timing
 

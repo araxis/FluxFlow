@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone storage nodes for FluxFlow: blockified put/get/query/delete over an injected IStorageStore, with broadcast result/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as standalone storage.put/get/query/delete nodes over an injected IStorageStore: request in, result broadcast out, failures on the error port, diagnostics on the event port. Every message travels as a FlowMessage&lt;T&gt; envelope so the correlation id flows request -&gt; result (and onto the Found/NotFound and Records branches). The storage.store resource node and its connect/disconnect lifecycle are removed — the host owns the IStorageStore lifetime and injects the opened store into each node, exactly like the HTTP node over an HttpClient. The engine factory/module/registration/designer-metadata glue is removed; the nodes depend only on FluxFlow.Nodes and run without the engine. The IStorageStore contract, all request/result/record DTOs, options, error codes, and the store factory/lease/context types are unchanged, so the FileSystem and SqlFile adapters keep working.</PackageReleaseNotes>
+    <PackageReleaseNotes>StorageComponentOptions now validates delegate-backed store factories more strictly: null contexts are rejected before delegate invocation, null leases produce a clear InvalidOperationException, and null shared-store delegates fail before nodes receive an unusable store.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

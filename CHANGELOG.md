@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.1
+
+Hardens delegate-backed storage factory registration.
+
+- `StorageComponentOptions.UseStore(...)` now rejects a null context before
+  invoking the host delegate and reports a clear error when the delegate returns
+  a null lease.
+- `UseSharedStore(Func<StorageStoreContext,IStorageStore>)` now reports a clear
+  error when the delegate returns a null store.
+- Keeps store ownership and backend adapter behavior unchanged.
+
 ## FluxFlow.Components.Secrets 1.2.1
 
 Hardens secret option batch resolution contracts.
