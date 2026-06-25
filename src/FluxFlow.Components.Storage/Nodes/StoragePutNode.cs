@@ -58,6 +58,12 @@ public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
         try
         {
             var record = await _store.PutAsync(request, Stopping).ConfigureAwait(false);
+            if (record is null)
+            {
+                throw new InvalidOperationException(
+                    "storage.put store returned a null record.");
+            }
+
             ValidateRecord(record, request);
             var result = StorageNodeSupport.CreateRecordResult(
                 "put",

@@ -198,6 +198,27 @@ public sealed class StoragePutNodeTests
     }
 
     [Fact]
+    public async Task Put_ReportsNullStoreRecordAsError()
+    {
+        await using var node = new StoragePutNode(
+            new NullPutStore(),
+            new StoragePutOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "a",
+            Value = "one"
+        }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.PutFailed);
+        error.Message.ShouldContain("null record");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Put_EmitsStoredEventThenFailedEvent()
     {
         var store = new InMemoryStorageStore();
@@ -258,4 +279,27 @@ public sealed class StoragePutNodeTests
     [Fact]
     public void Put_RejectsNullStore()
         => Should.Throw<ArgumentNullException>(() => new StoragePutNode(null!));
+
+    private sealed class NullPutStore : IStorageStore
+    {
+        public Task<StorageRecord> PutAsync(
+            StoragePutRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<StorageRecord>(null!);
+
+        public Task<StorageRecord?> GetAsync(
+            StorageGetRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageResult> DeleteAsync(
+            StorageDeleteRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
 }

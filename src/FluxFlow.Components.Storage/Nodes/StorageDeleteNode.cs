@@ -59,6 +59,12 @@ public sealed class StorageDeleteNode : FlowNode<StorageDeleteRequest, StorageRe
         try
         {
             var result = await _store.DeleteAsync(request, Stopping).ConfigureAwait(false);
+            if (result is null)
+            {
+                throw new InvalidOperationException(
+                    "storage.delete store returned a null result.");
+            }
+
             ValidateResult(result, request);
 
             if (result.Found || _options.EmitMissingAsResult)

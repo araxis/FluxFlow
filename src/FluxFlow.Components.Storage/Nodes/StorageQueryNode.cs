@@ -127,10 +127,16 @@ public sealed class StorageQueryNode : FlowNode<StorageQueryRequest, StorageQuer
         };
 
     private static StorageRecord[] ValidateAndCopyRecords(
-        IReadOnlyList<StorageRecord> records,
+        IReadOnlyList<StorageRecord>? records,
         StorageQueryRequest request,
         DateTimeOffset now)
     {
+        if (records is null)
+        {
+            throw new InvalidOperationException(
+                "storage.query store returned a null record collection.");
+        }
+
         if (records.Count > request.Limit!.Value)
         {
             throw new InvalidOperationException(
@@ -143,10 +149,16 @@ public sealed class StorageQueryNode : FlowNode<StorageQueryRequest, StorageQuer
     }
 
     private static StorageRecord ValidateAndCopyRecord(
-        StorageRecord record,
+        StorageRecord? record,
         StorageQueryRequest request,
         DateTimeOffset now)
     {
+        if (record is null)
+        {
+            throw new InvalidOperationException(
+                "storage.query store returned a null record.");
+        }
+
         if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
         {
             throw new InvalidOperationException(

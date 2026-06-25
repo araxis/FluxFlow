@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.9
+
+Hardens storage store non-null result handling.
+
+- `StoragePutNode`, `StorageQueryNode`, and `StorageDeleteNode` now report clear
+  operation failures when an injected store returns a null result where the
+  `IStorageStore` contract requires a value.
+- `StorageQueryNode` now also reports null records inside returned query
+  collections as `QueryFailed` errors.
+
 ## FluxFlow.Components.Storage 3.0.8
 
 Hardens storage query response validation.

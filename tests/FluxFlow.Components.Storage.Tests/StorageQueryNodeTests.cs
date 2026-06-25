@@ -226,6 +226,40 @@ public sealed class StorageQueryNodeTests
     }
 
     [Fact]
+    public async Task Query_ReportsNullStoreRecordCollectionAsError()
+    {
+        var store = new StaticQueryStore(null);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null record collection");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Query_ReportsNullStoreRecordAsError()
+    {
+        var store = new StaticQueryStore([null!]);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var records = StorageTestSink.Link(node.Records);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null record");
+        output.TryReceive(out _).ShouldBeFalse();
+        records.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Query_EmitsCompletedEvent()
     {
         var store = new InMemoryStorageStore();
@@ -247,7 +281,7 @@ public sealed class StorageQueryNodeTests
     private static async Task Seed(InMemoryStorageStore store, string collection, string key, object value)
         => await store.PutAsync(new StoragePutRequest { Collection = collection, Key = key, Value = value });
 
-    private sealed class StaticQueryStore(IReadOnlyList<StorageRecord> records) : IStorageStore
+    private sealed class StaticQueryStore(IReadOnlyList<StorageRecord>? records) : IStorageStore
     {
         public Task<StorageRecord> PutAsync(
             StoragePutRequest request,
@@ -262,7 +296,7 @@ public sealed class StorageQueryNodeTests
         public Task<IReadOnlyList<StorageRecord>> QueryAsync(
             StorageQueryRequest request,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(records);
+            => Task.FromResult(records!);
 
         public Task<StorageResult> DeleteAsync(
             StorageDeleteRequest request,
