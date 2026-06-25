@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone metrics-aggregation node for FluxFlow: a blockified aggregator (metric samples in, rolling snapshots out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: invalid rateWindowSeconds, boundedCapacity, and maxGroups now report ArgumentOutOfRangeException with metrics option names. Runtime aggregation behavior is unchanged for valid options.</PackageReleaseNotes>
+    <PackageReleaseNotes>Metrics contracts now trim optional text and defensively copy tags, latest samples, and group snapshots with ordinal key comparison.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -2,7 +2,14 @@ namespace FluxFlow.Components.Metrics.Contracts;
 
 public sealed record MetricGroupSnapshot
 {
-    public required string Group { get; init; }
+    private string _group = string.Empty;
+
+    public required string Group
+    {
+        get => _group;
+        init => _group = MetricsContractNormalization.NormalizeRequired(value);
+    }
+
     public required long Count { get; init; }
     public long ValueCount { get; init; }
     public double? TotalValue { get; init; }
