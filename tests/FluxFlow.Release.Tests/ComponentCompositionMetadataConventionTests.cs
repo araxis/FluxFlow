@@ -112,6 +112,72 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         }
     }
 
+    [Fact]
+    public void Component_composition_bound_options_are_described_or_explicitly_omitted()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var sourceRoot = Path.Combine(root, "src");
+        var sourceFiles = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .ToArray();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var providerFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*ComponentDesignMetadataProvider.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem();
+            var providerContent = File.ReadAllText(providerFile);
+            var boundOptionTypes = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(File.ReadAllText)
+                .SelectMany(content => BindConfigurationRegex()
+                    .Matches(content)
+                    .Select(match => match.Groups["type"].Value.Trim()))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var optionType in boundOptionTypes)
+            {
+                var optionTypeFile = sourceFiles
+                    .SingleOrDefault(file =>
+                        string.Equals(
+                            Path.GetFileNameWithoutExtension(file),
+                            optionType,
+                            StringComparison.Ordinal));
+                optionTypeFile.ShouldNotBeNull(
+                    $"{entry.PackageId} binds unknown option type '{optionType}'.");
+
+                var optionNames = OptionPropertyRegex()
+                    .Matches(File.ReadAllText(optionTypeFile))
+                    .Select(match => ToConfigurationKey(match.Groups["name"].Value))
+                    .ToArray();
+
+                optionNames.ShouldNotBeEmpty(
+                    $"{entry.PackageId} option type '{optionType}' should expose configuration properties.");
+
+                foreach (var optionName in optionNames)
+                {
+                    ProviderMentionsOption(providerContent, optionName)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} must describe bound option '{optionName}' from '{optionType}' or declare it in omittedOptions.");
+                }
+            }
+        }
+    }
+
     private static bool IsComponentCompositionPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal)
             && entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal);
@@ -145,6 +211,22 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
 
+    private static bool ProviderMentionsOption(
+        string providerContent,
+        string optionName)
+        => providerContent.Contains(
+            $"\"{optionName}\"",
+            StringComparison.Ordinal);
+
+    private static string ToConfigurationKey(string propertyName)
+        => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
+
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex ResourceConstantRegex();
+
+    [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
+    private static partial Regex BindConfigurationRegex();
+
+    [GeneratedRegex(@"public\s+(?:required\s+)?[^\r\n{]+\s+(?<name>\w+)\s*\{\s*get;\s*init;\s*\}")]
+    private static partial Regex OptionPropertyRegex();
 }

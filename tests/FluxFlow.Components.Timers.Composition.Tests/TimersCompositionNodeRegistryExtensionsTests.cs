@@ -121,6 +121,9 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         metadata[TimersCompositionNodeTypes.Schedule].Options
             .Select(option => option.Name)
             .ShouldNotContain("timeZone");
+        metadata[TimersCompositionNodeTypes.Schedule]
+            .Attributes["omittedOptions"]
+            .ShouldBe("timeZone");
         AssertOptions(
             metadata[TimersCompositionNodeTypes.Delay],
             [

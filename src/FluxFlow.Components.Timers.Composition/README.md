@@ -55,8 +55,9 @@ views, or generated documentation.
 The provider describes node options, ports, and a resource hint for the
 optional `clock` resource. The clock remains a host-owned composition resource
 and is not exposed as an editable node option. Schedule metadata covers
-cron/default UTC composition behavior; this package still does not add time
-zone id conversion.
+cron/default UTC composition behavior. It declares `timeZone` as an omitted
+editable option because `TimerScheduleSettings.TimeZone` requires typed
+configuration and this package still does not add time-zone id conversion.
 
 ## Configuration
 

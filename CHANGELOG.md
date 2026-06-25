@@ -644,6 +644,17 @@ Engine-free standalone rewrite. Interval/schedule are `FlowSource`s; delay/throt
 arrival burst semantics; debounce flushes its pending item via the drain hook. Engine glue
 removed.
 
+## FluxFlow.Components.Timers.Composition 1.3.0
+
+Adds explicit Designer metadata for the intentionally omitted schedule
+`timeZone` option.
+
+- Marks `timeZone` as omitted from editable schedule metadata because
+  `TimerScheduleSettings.TimeZone` requires typed `TimeZoneInfo`
+  configuration.
+- Keeps runtime behavior unchanged; the composition adapter still does not add
+  time-zone id conversion.
+
 ## FluxFlow.Components.Timers.Composition 1.2.0
 
 Adds Designer resource metadata for timer composition nodes.

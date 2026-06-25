@@ -89,7 +89,12 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         Ports =
         [
             OutputPort(nameof(ScheduleTick), "Schedule tick message.", isPrimary: true)
-        ]
+        ],
+        Attributes = new Dictionary<string, string>
+        {
+            ["omittedOptions"] = "timeZone",
+            ["omittedOptionsReason"] = "TimerScheduleSettings.TimeZone requires typed configuration; this adapter does not add time-zone id conversion."
+        }
     };
 
     private static ComponentDesignMetadata CreateDelayMetadata() => new()

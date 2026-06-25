@@ -231,7 +231,8 @@ the five timer composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes editable options, fixed ports, and a resource hint for the
 optional `clock` resource. It does not add schedule time-zone string
-conversion.
+conversion; schedule metadata declares `timeZone` as an omitted editable option
+because that setting requires typed `TimeZoneInfo` configuration.
 
 ## Sources Composition
 
