@@ -6,8 +6,7 @@ namespace FluxFlow.Components.Storage.FileSystem;
 public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
 {
     private readonly FileSystemStorageStoreOptions _options;
-    private readonly ConcurrentDictionary<string, FileSystemStorageStore> _stores =
-        new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<StoreKey, FileSystemStorageStore> _stores = [];
 
     public FileSystemStorageStoreFactory(FileSystemStorageStoreOptions options)
     {
@@ -28,6 +27,16 @@ public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
         return ValueTask.FromResult(StorageStoreLease.Shared(store));
     }
 
-    private static string CreateStoreKey(FileSystemStorageStoreSettings settings)
-        => $"{settings.RootDirectory.ToUpperInvariant()}\n{settings.StoreName}";
+    private static StoreKey CreateStoreKey(FileSystemStorageStoreSettings settings)
+        => new(
+            settings.RootDirectory.ToUpperInvariant(),
+            settings.StoreName,
+            settings.DefaultCollection,
+            settings.Clock);
+
+    private sealed record StoreKey(
+        string RootDirectory,
+        string StoreName,
+        string? DefaultCollection,
+        TimeProvider Clock);
 }

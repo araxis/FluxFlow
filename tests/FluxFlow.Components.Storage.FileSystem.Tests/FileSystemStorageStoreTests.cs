@@ -362,6 +362,80 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Factory_DoesNotShareContextDefaultCollections()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+
+        await using var first = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        });
+        await using var second = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "orders"
+        });
+        await first.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+        await second.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "second"
+        });
+
+        var firstLoaded = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+        var secondLoaded = await second.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+
+        firstLoaded.ShouldNotBeNull();
+        firstLoaded.Collection.ShouldBe("items");
+        firstLoaded.Value.ShouldBe("first");
+        secondLoaded.ShouldNotBeNull();
+        secondLoaded.Collection.ShouldBe("orders");
+        secondLoaded.Value.ShouldBe("second");
+    }
+
+    [Fact]
+    public async Task Factory_SharesSameContextDefaultCollection()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        await first.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        var loaded = await second.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+
+        loaded.ShouldNotBeNull();
+        loaded.Collection.ShouldBe("items");
+        loaded.Value.ShouldBe("first");
+    }
+
+    [Fact]
     public async Task Factory_SerializesVersionedPutsAcrossLeases()
     {
         using var temp = TempDirectory.Create();

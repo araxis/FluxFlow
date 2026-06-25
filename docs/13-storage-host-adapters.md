@@ -119,9 +119,10 @@ Expected options:
 - `defaultCollection`
 - `flushOnWrite`
 
-The package uses `StorageStoreLease.Owned(...)` when it creates the store. Hosts
-can still pass a shared `FileSystemStorageStore` through the base storage package
-when they want to own the lifetime.
+The package uses shared leases from `FileSystemStorageStoreFactory` so multiple
+opens for the same root, store name, default collection, and clock share the same
+in-process lock. Hosts can still pass a shared `FileSystemStorageStore` through
+the base storage package when they want to own the lifetime directly.
 
 ## Record Model
 

@@ -24,7 +24,7 @@ await using var lease = await options.StoreFactory.OpenAsync(
     new StorageStoreContext
     {
         StoreName = "default",
-        DefaultCollection = "items",
+        Collection = "items",
         Clock = options.Clock
     });
 
@@ -46,7 +46,8 @@ adapter-specific override.
 - query by collection, key prefix, attributes, stored time bounds, expiration,
   offset, and limit
 - best-effort atomic writes through a temporary file then replace
-- owned store lifetime when created through `UseFileSystemStorage`
+- shared store leases when opened through `UseFileSystemStorage`; the factory
+  caches stores by root, store name, default collection, and clock
 
 The adapter is intended for single-machine workflows, samples, tests, and simple desktop
 or service hosts. It does not claim cross-process write coordination in this

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.FileSystem</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt against FluxFlow.Components.Storage 3.0.0 as a file-system IStorageStore backend. The package remains a backend adapter consumed by host-owned store registration, not a workflow node composition package.</PackageReleaseNotes>
+    <PackageReleaseNotes>Fixes file-system store factory sharing so context default collections and clocks are isolated in the shared-store cache key.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

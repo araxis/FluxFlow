@@ -44,6 +44,18 @@ Breaking support-package boundary cleanup.
 - Keeps journal records, queries, retention, `IJournalStore`, and
   `InMemoryJournalStore` behavior unchanged.
 
+## FluxFlow.Components.Storage.FileSystem 3.1.0
+
+Fixes context-aware file-system store factory sharing.
+
+- Includes default collection and clock identity in the shared store cache key,
+  preventing later leases for the same root and store name from inheriting the
+  first opened context defaults.
+- Keeps the shared-lease model for same-context opens so in-process optimistic
+  concurrency remains coordinated by one store instance.
+- Corrects file-system storage docs to use `StorageStoreContext.Collection` and
+  describe shared factory leases.
+
 ## FluxFlow.Nodes 1.1.0
 
 Adds bounded source-output support for standalone source nodes.
