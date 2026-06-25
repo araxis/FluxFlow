@@ -68,6 +68,25 @@ public sealed class FlowExpressionEngineRegistryTests
     }
 
     [Fact]
+    public void Resolve_ProvidesNormalizedNameToResolver()
+    {
+        var engine = new TestExpressionEngine("custom");
+        string? capturedName = "unset";
+        var registry = new FlowExpressionEngineRegistry("Mapping")
+            .UseResolver(name =>
+            {
+                capturedName = name;
+                return engine;
+            });
+
+        registry.Resolve(" custom ").ShouldBeSameAs(engine);
+        capturedName.ShouldBe("custom");
+
+        registry.Resolve(" ").ShouldBeSameAs(engine);
+        capturedName.ShouldBeNull();
+    }
+
+    [Fact]
     public void Resolve_RejectsMissingDefaultEngine()
     {
         var registry = new FlowExpressionEngineRegistry("Mapping");
@@ -84,6 +103,17 @@ public sealed class FlowExpressionEngineRegistryTests
             .Use(new TestExpressionEngine("primary"));
 
         var exception = Should.Throw<InvalidOperationException>(() => registry.Resolve("other"));
+
+        exception.Message.ShouldContain("Mapping expression engine 'other' is not registered");
+    }
+
+    [Fact]
+    public void Resolve_UsesNormalizedNameInUnknownEngineError()
+    {
+        var registry = new FlowExpressionEngineRegistry("Mapping")
+            .Use(new TestExpressionEngine("primary"));
+
+        var exception = Should.Throw<InvalidOperationException>(() => registry.Resolve(" other "));
 
         exception.Message.ShouldContain("Mapping expression engine 'other' is not registered");
     }
