@@ -45,4 +45,100 @@ public sealed class CompositionDefinitionBuilderTests
 
         exception.Message.ShouldContain("already defined");
     }
+
+    [Fact]
+    public void Definition_collections_are_copied_on_assignment()
+    {
+        var sourceNode = new NodeDefinition
+        {
+            Type = TestNodeTypes.Source
+        };
+        var workflow = new WorkflowDefinition
+        {
+            Nodes = new Dictionary<string, NodeDefinition>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["source"] = sourceNode
+            }
+        };
+        var workflows = new Dictionary<string, WorkflowDefinition>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["main"] = workflow
+        };
+
+        var definition = new CompositionDefinition
+        {
+            Workflows = workflows
+        };
+
+        workflows["other"] = new WorkflowDefinition();
+
+        definition.Workflows.ContainsKey("main").ShouldBeTrue();
+        definition.Workflows.ContainsKey("MAIN").ShouldBeFalse();
+        definition.Workflows.ContainsKey("other").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Workflow_collections_are_copied_on_assignment()
+    {
+        var nodes = new Dictionary<string, NodeDefinition>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["source"] = new NodeDefinition { Type = TestNodeTypes.Source }
+        };
+        var links = new List<LinkDefinition>
+        {
+            new()
+            {
+                From = new PortReference { Node = "source", Port = "Output" },
+                To = new PortReference { Node = "sink", Port = "Input" }
+            }
+        };
+
+        var workflow = new WorkflowDefinition
+        {
+            Nodes = nodes,
+            Links = links
+        };
+
+        nodes["sink"] = new NodeDefinition { Type = TestNodeTypes.Sink };
+        links.Add(new LinkDefinition
+        {
+            From = new PortReference { Node = "source", Port = "Other" },
+            To = new PortReference { Node = "sink", Port = "Other" }
+        });
+
+        workflow.Nodes.ContainsKey("source").ShouldBeTrue();
+        workflow.Nodes.ContainsKey("SOURCE").ShouldBeFalse();
+        workflow.Nodes.ContainsKey("sink").ShouldBeFalse();
+        workflow.Links.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Node_collections_are_copied_on_assignment()
+    {
+        var configuration = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["messages"] = JsonSerializer.SerializeToElement(new[] { "one" })
+        };
+        var resources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["store"] = "primary"
+        };
+
+        var node = new NodeDefinition
+        {
+            Type = TestNodeTypes.Source,
+            Configuration = configuration,
+            Resources = resources
+        };
+
+        configuration["extra"] = JsonSerializer.SerializeToElement(true);
+        resources["clock"] = "test-clock";
+
+        node.Configuration.ContainsKey("messages").ShouldBeTrue();
+        node.Configuration.ContainsKey("MESSAGES").ShouldBeFalse();
+        node.Configuration.ContainsKey("extra").ShouldBeFalse();
+        node.Resources.ContainsKey("store").ShouldBeTrue();
+        node.Resources.ContainsKey("STORE").ShouldBeFalse();
+        node.Resources.ContainsKey("clock").ShouldBeFalse();
+    }
 }

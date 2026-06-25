@@ -68,7 +68,9 @@ Main types:
 - `ICompositionReloadPlanner`
 
 Use these types when the host wants direct standalone-node composition from
-fluent C# or `IConfiguration` JSON without depending on the engine.
+fluent C# or `IConfiguration` JSON without depending on the engine. Definition
+DTO collection properties copy assigned dictionaries and lists with ordinal key
+comparison so caller-owned collections cannot mutate a built definition.
 
 ## Composition Hosting
 
