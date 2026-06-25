@@ -48,7 +48,8 @@ adapter-specific override.
   offset, and limit
 - best-effort atomic writes through a temporary file then replace
 - shared store leases when opened through `UseFileSystemStorage`; the factory
-  caches stores by root, store name, default collection, and clock
+  caches stores by root, store name, default collection, and clock, comparing
+  root paths with the operating system's path case-sensitivity
 
 The adapter is intended for single-machine workflows, samples, tests, and simple desktop
 or service hosts. It does not claim cross-process write coordination in this
@@ -66,6 +67,10 @@ first version.
 | `DefaultCollection` | Optional fallback collection. |
 | `FlushOnWrite` | Flushes file contents before replacing the record file. |
 | `Clock` | Optional direct-store time source override. |
+
+`RootDirectory`, `StoreName`, and `DefaultCollection` trim surrounding
+whitespace when assigned. Blank store names and default collections are treated
+as absent. `MaxValueBytes` must be greater than zero.
 
 The package persists only neutral `StorageRecord` data. Hosts that need exact
 payload shaping should compose serialization or payload nodes before storage.

@@ -1,12 +1,14 @@
 using FluxFlow.Components.Storage.Contracts;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace FluxFlow.Components.Storage.FileSystem;
 
 public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
 {
     private readonly FileSystemStorageStoreOptions _options;
-    private readonly ConcurrentDictionary<StoreKey, FileSystemStorageStore> _stores = [];
+    private readonly ConcurrentDictionary<StoreKey, FileSystemStorageStore> _stores =
+        new(StoreKeyComparer.Instance);
 
     public FileSystemStorageStoreFactory(FileSystemStorageStoreOptions options)
     {
@@ -29,7 +31,7 @@ public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
 
     private static StoreKey CreateStoreKey(FileSystemStorageStoreSettings settings)
         => new(
-            settings.RootDirectory.ToUpperInvariant(),
+            settings.RootDirectory,
             settings.StoreName,
             settings.DefaultCollection,
             settings.Clock);
@@ -39,4 +41,42 @@ public sealed class FileSystemStorageStoreFactory : IStorageStoreFactory
         string StoreName,
         string? DefaultCollection,
         TimeProvider Clock);
+
+    private sealed class StoreKeyComparer : IEqualityComparer<StoreKey>
+    {
+        public static StoreKeyComparer Instance { get; } = new();
+
+        private static readonly StringComparer RootDirectoryComparer =
+            OperatingSystem.IsWindows()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal;
+
+        private StoreKeyComparer()
+        {
+        }
+
+        public bool Equals(StoreKey? x, StoreKey? y)
+        {
+            if (ReferenceEquals(x, y))
+                return true;
+
+            if (x is null || y is null)
+                return false;
+
+            return RootDirectoryComparer.Equals(x.RootDirectory, y.RootDirectory) &&
+                   StringComparer.Ordinal.Equals(x.StoreName, y.StoreName) &&
+                   StringComparer.Ordinal.Equals(x.DefaultCollection, y.DefaultCollection) &&
+                   ReferenceEquals(x.Clock, y.Clock);
+        }
+
+        public int GetHashCode(StoreKey obj)
+        {
+            var hash = new HashCode();
+            hash.Add(obj.RootDirectory, RootDirectoryComparer);
+            hash.Add(obj.StoreName, StringComparer.Ordinal);
+            hash.Add(obj.DefaultCollection, StringComparer.Ordinal);
+            hash.Add(RuntimeHelpers.GetHashCode(obj.Clock));
+            return hash.ToHashCode();
+        }
+    }
 }
