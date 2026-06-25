@@ -100,6 +100,15 @@ Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node i
 to Result/Passed/Failed ports via `AddOutput`; correlation flows on `FlowMessage`. The engine
 factory/module/registration/design-metadata glue is removed.
 
+## FluxFlow.Components.Assertions.Composition 1.2.0
+
+Adds Designer resource metadata for `flow.assert`.
+
+- Describes the required `engine` resource separately from editable assertion
+  options.
+- Describes optional `contextFactory` and `clock` resources for host-owned
+  context customization and deterministic diagnostics.
+
 ## FluxFlow.Components.Assertions.Composition 1.1.0
 
 Adds package-owned Designer metadata for the `flow.assert` composition node.
@@ -119,6 +128,15 @@ resources through `FluxFlow.Composition.Hosting`.
 Engine-free standalone rewrite. Filter and When are `FlowNode`s over the kit (When fans out to
 WhenTrue/WhenFalse via `AddOutput`); the predicate compiles once at construction against an
 injected expression engine (from FluxFlow.Mapping). Engine glue removed.
+
+## FluxFlow.Components.Control.Composition 1.2.0
+
+Adds Designer resource metadata for `flow.filter` and `flow.when`.
+
+- Describes the required `engine` resource separately from editable control
+  options.
+- Describes optional `contextFactory` and `clock` resources for host-owned
+  context customization and deterministic diagnostics.
 
 ## FluxFlow.Components.Control.Composition 1.1.0
 

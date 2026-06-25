@@ -2,6 +2,7 @@ using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
 
@@ -98,6 +99,34 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 DisplayName = "Emit Failed Input",
                 DefaultValue = true,
                 HelperText = "Emit failing input messages on the Failed output."
+            }
+        ],
+        Resources =
+        [
+            new ResourceDesignMetadata
+            {
+                Name = AssertionsCompositionResourceNames.Engine,
+                DisplayName = "Engine",
+                Order = 0,
+                Summary = "Keyed expression engine used to evaluate assertion expressions.",
+                ValueType = nameof(IFlowExpressionEngine),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = AssertionsCompositionResourceNames.ContextFactory,
+                DisplayName = "Context Factory",
+                Order = 1,
+                Summary = "Optional keyed input context factory for custom expression variables.",
+                ValueType = "IFlowMapContextFactory<TInput>"
+            },
+            new ResourceDesignMetadata
+            {
+                Name = AssertionsCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 2,
+                Summary = "Optional keyed clock for deterministic assertion results and diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ],
         Ports =

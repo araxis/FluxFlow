@@ -1,6 +1,7 @@
 using FluxFlow.Components.Control.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Control.Composition;
 
@@ -23,6 +24,7 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
         PreferredNodeName = "filter",
         SuggestedEditorWidth = 420,
         Options = CreateExpressionOptions(),
+        Resources = CreateExpressionResources(),
         Ports =
         [
             new PortDesignMetadata
@@ -60,6 +62,7 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
         PreferredNodeName = "when",
         SuggestedEditorWidth = 420,
         Options = CreateExpressionOptions(),
+        Resources = CreateExpressionResources(),
         Ports =
         [
             new PortDesignMetadata
@@ -159,6 +162,36 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 DefaultValue = 128,
                 Min = 1,
                 HelperText = "Maximum queued input messages."
+            }
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> CreateExpressionResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = ControlCompositionResourceNames.Engine,
+                DisplayName = "Engine",
+                Order = 0,
+                Summary = "Keyed expression engine used to evaluate control expressions.",
+                ValueType = nameof(IFlowExpressionEngine),
+                IsRequired = true
+            },
+            new ResourceDesignMetadata
+            {
+                Name = ControlCompositionResourceNames.ContextFactory,
+                DisplayName = "Context Factory",
+                Order = 1,
+                Summary = "Optional keyed input context factory for custom expression variables.",
+                ValueType = "IFlowMapContextFactory<TInput>"
+            },
+            new ResourceDesignMetadata
+            {
+                Name = ControlCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 2,
+                Summary = "Optional keyed clock for deterministic diagnostics.",
+                ValueType = nameof(TimeProvider)
             }
         ];
 }

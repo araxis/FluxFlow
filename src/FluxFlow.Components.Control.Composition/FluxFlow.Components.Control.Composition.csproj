@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Control.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Control.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone control nodes over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;control;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for the flow.filter and flow.when composition nodes while keeping control runtime behavior and host-owned resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds Designer resource metadata for flow.filter and flow.when host-owned expression engine, context factory, and clock resources.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
