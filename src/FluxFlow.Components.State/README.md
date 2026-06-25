@@ -46,9 +46,9 @@ message. `StateReducerNode` consumes `StateReducerInput` and emits
 If `KeyExpression` is set, it resolves the state key from the same expression
 context. Otherwise the node uses `StateReducerInput.Key`.
 
-`StateReducerOptions` validates at construction: a missing `Reducer`, an empty
-`KeyExpression`, a non-positive `BoundedCapacity`, or a negative `MaxKeys` fails
-fast as an argument exception.
+`StateReducerOptions` trims diagnostic text fields when assigned. A missing
+`Reducer`, an empty `KeyExpression`, a non-positive `BoundedCapacity`, or a
+negative `MaxKeys` fails fast as an argument exception.
 
 ## Operations
 
