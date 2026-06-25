@@ -49,15 +49,29 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateOptions(
-        IReadOnlyList<OptionDesignMetadata> options,
+        IReadOnlyList<OptionDesignMetadata>? options,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (options is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                nameof(ComponentDesignMetadata.Options),
+                "Options collection is required."));
+            return;
+        }
+
         var names = new HashSet<string>(StringComparer.Ordinal);
 
         for (var index = 0; index < options.Count; index++)
         {
             var option = options[index];
             var path = $"{nameof(ComponentDesignMetadata.Options)}[{index}]";
+
+            if (option is null)
+            {
+                errors.Add(new DesignerMetadataValidationError(path, "Option metadata is required."));
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(option.Name))
             {
@@ -77,8 +91,18 @@ public static class ComponentDesignMetadataValidator
 
             ValidateOptionalText(option.DisplayName, $"{path}.{nameof(OptionDesignMetadata.DisplayName)}", errors);
             ValidateOptionalText(option.HelperText, $"{path}.{nameof(OptionDesignMetadata.HelperText)}", errors);
-            ValidateChoiceUsage(option, path, errors);
-            ValidateChoices(option.Choices, path, errors);
+            if (option.Choices is null)
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(OptionDesignMetadata.Choices)}",
+                    "Choices collection is required."));
+            }
+            else
+            {
+                ValidateChoiceUsage(option, path, errors);
+                ValidateChoices(option.Choices, path, errors);
+            }
+
             ValidateAttributes(option.Attributes, $"{path}.{nameof(OptionDesignMetadata.Attributes)}", errors);
         }
     }
@@ -111,16 +135,30 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateChoices(
-        IReadOnlyList<OptionChoiceMetadata> choices,
+        IReadOnlyList<OptionChoiceMetadata>? choices,
         string optionPath,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (choices is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                $"{optionPath}.{nameof(OptionDesignMetadata.Choices)}",
+                "Choices collection is required."));
+            return;
+        }
+
         var values = new HashSet<string>(StringComparer.Ordinal);
 
         for (var index = 0; index < choices.Count; index++)
         {
             var choice = choices[index];
             var path = $"{optionPath}.{nameof(OptionDesignMetadata.Choices)}[{index}]";
+
+            if (choice is null)
+            {
+                errors.Add(new DesignerMetadataValidationError(path, "Choice metadata is required."));
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(choice.Value))
             {
@@ -138,15 +176,29 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateResources(
-        IReadOnlyList<ResourceDesignMetadata> resources,
+        IReadOnlyList<ResourceDesignMetadata>? resources,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (resources is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                nameof(ComponentDesignMetadata.Resources),
+                "Resources collection is required."));
+            return;
+        }
+
         var names = new HashSet<string>(StringComparer.Ordinal);
 
         for (var index = 0; index < resources.Count; index++)
         {
             var resource = resources[index];
             var path = $"{nameof(ComponentDesignMetadata.Resources)}[{index}]";
+
+            if (resource is null)
+            {
+                errors.Add(new DesignerMetadataValidationError(path, "Resource metadata is required."));
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(resource.Name))
             {
@@ -165,15 +217,29 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidatePorts(
-        IReadOnlyList<PortDesignMetadata> ports,
+        IReadOnlyList<PortDesignMetadata>? ports,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (ports is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                nameof(ComponentDesignMetadata.Ports),
+                "Ports collection is required."));
+            return;
+        }
+
         var names = new HashSet<(PortDirection Direction, string Name)>();
 
         for (var index = 0; index < ports.Count; index++)
         {
             var port = ports[index];
             var path = $"{nameof(ComponentDesignMetadata.Ports)}[{index}]";
+
+            if (port is null)
+            {
+                errors.Add(new DesignerMetadataValidationError(path, "Port metadata is required."));
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(port.Name.Value))
             {
@@ -199,10 +265,16 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateAttributes(
-        IReadOnlyDictionary<string, string> attributes,
+        IReadOnlyDictionary<string, string>? attributes,
         string path,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (attributes is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(path, "Attributes collection is required."));
+            return;
+        }
+
         foreach (var attribute in attributes)
         {
             if (string.IsNullOrWhiteSpace(attribute.Key))

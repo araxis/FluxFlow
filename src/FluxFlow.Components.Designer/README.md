@@ -25,6 +25,11 @@ component without depending on a specific rendering framework.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
 
+`ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
+options and ports, invalid choices, invalid resources, invalid attributes, and
+null-bound metadata collections as validation errors before metadata is
+registered.
+
 ## Option Kinds
 
 The option kind contract supports:

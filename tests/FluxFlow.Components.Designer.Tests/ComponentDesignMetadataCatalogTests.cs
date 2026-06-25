@@ -117,6 +117,91 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_null_top_level_collections()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options = null!,
+            Resources = null!,
+            Ports = null!,
+            Attributes = null!
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error => error.Path == nameof(ComponentDesignMetadata.Options));
+        errors.ShouldContain(error => error.Path == nameof(ComponentDesignMetadata.Resources));
+        errors.ShouldContain(error => error.Path == nameof(ComponentDesignMetadata.Ports));
+        errors.ShouldContain(error => error.Path == nameof(ComponentDesignMetadata.Attributes));
+    }
+
+    [Fact]
+    public void Validator_reports_null_nested_collection_items()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                null!,
+                new OptionDesignMetadata
+                {
+                    Name = "mode",
+                    Kind = OptionValueKind.Enum,
+                    Choices = null!,
+                    Attributes = null!
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "level",
+                    Kind = OptionValueKind.Enum,
+                    Choices =
+                    [
+                        null!,
+                        new OptionChoiceMetadata
+                        {
+                            Value = "strict",
+                            Attributes = null!
+                        }
+                    ]
+                }
+            ],
+            Resources =
+            [
+                null!,
+                new ResourceDesignMetadata
+                {
+                    Name = "engine",
+                    Attributes = null!
+                }
+            ],
+            Ports =
+            [
+                null!,
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Input"),
+                    Direction = PortDirection.Input,
+                    Attributes = null!
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0]");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[1].{nameof(OptionDesignMetadata.Choices)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[1].{nameof(OptionDesignMetadata.Attributes)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[2].{nameof(OptionDesignMetadata.Choices)}[0]");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[2].{nameof(OptionDesignMetadata.Choices)}[1].{nameof(OptionChoiceMetadata.Attributes)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Resources)}[0]");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Resources)}[1].{nameof(ResourceDesignMetadata.Attributes)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[0]");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[1].{nameof(PortDesignMetadata.Attributes)}");
+    }
+
+    [Fact]
     public void Validator_reports_enum_option_without_choices()
     {
         var metadata = new ComponentDesignMetadata

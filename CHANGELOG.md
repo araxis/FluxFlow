@@ -26,6 +26,16 @@ Fixes named-only expression engine registration.
 - Existing default engines remain unchanged when later named-only engines are
   registered.
 
+## FluxFlow.Components.Designer 2.2.1
+
+Hardens component design metadata validation for config-bound callers.
+
+- Reports null top-level option, resource, port, and attribute collections as
+  validation diagnostics instead of throwing.
+- Reports null nested option choices, attributes, and list entries as validation
+  diagnostics.
+- Keeps the Designer contracts engine/composition neutral.
+
 ## FluxFlow.Components.Secrets 1.2.0
 
 Hardens secret metadata validation for config-bound callers.
