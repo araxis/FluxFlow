@@ -1,10 +1,11 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
 using Xunit;
 
 namespace FluxFlow.Release.Tests;
 
-public sealed class ComponentCompositionMetadataConventionTests
+public sealed partial class ComponentCompositionMetadataConventionTests
 {
     [Fact]
     public void Component_composition_packages_ship_designer_metadata_providers()
@@ -53,6 +54,64 @@ public sealed class ComponentCompositionMetadataConventionTests
         }
     }
 
+    [Fact]
+    public void Component_composition_resource_names_are_exposed_by_designer_metadata()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var resourceNamesFiles = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionResourceNames.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
+                1,
+                $"{entry.PackageId} must keep resource-name constants in one file.");
+
+            if (resourceNamesFiles.Length == 0)
+                continue;
+
+            var providerFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*ComponentDesignMetadataProvider.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem();
+            var providerContent = File.ReadAllText(providerFile);
+            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
+            var resourceConstants = ResourceConstantRegex()
+                .Matches(File.ReadAllText(resourceNamesFiles[0]))
+                .Select(match => match.Groups["name"].Value)
+                .ToArray();
+
+            resourceConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} resource-name file should expose at least one resource constant.");
+            providerContent.Contains(
+                    "ResourceDesignMetadata",
+                    StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} provider must expose Designer resource metadata.");
+
+            foreach (var resourceConstant in resourceConstants)
+            {
+                var resourceReference = $"{resourceTypeName}.{resourceConstant}";
+                providerContent.Contains(resourceReference, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} provider must expose resource '{resourceReference}'.");
+            }
+        }
+    }
+
     private static bool IsComponentCompositionPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal)
             && entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal);
@@ -85,4 +144,7 @@ public sealed class ComponentCompositionMetadataConventionTests
         => path
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
+
+    [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
+    private static partial Regex ResourceConstantRegex();
 }
