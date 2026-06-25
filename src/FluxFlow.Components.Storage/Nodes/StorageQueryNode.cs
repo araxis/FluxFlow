@@ -66,10 +66,10 @@ public sealed class StorageQueryNode : FlowNode<StorageQueryRequest, StorageQuer
         try
         {
             var records = await _store.QueryAsync(request, Stopping).ConfigureAwait(false);
-            var copiedRecords = records
-                .Select(record => ValidateAndCopyRecord(record, request))
-                .Take(request.Limit!.Value)
-                .ToArray();
+            var copiedRecords = ValidateAndCopyRecords(
+                records,
+                request,
+                _clock.GetUtcNow());
 
             // Carry the correlation id forward onto the result and each record.
             Emit(message.With(CreateResult(request, copiedRecords)));
@@ -126,14 +126,37 @@ public sealed class StorageQueryNode : FlowNode<StorageQueryRequest, StorageQuer
             CorrelationId = request.CorrelationId
         };
 
+    private static StorageRecord[] ValidateAndCopyRecords(
+        IReadOnlyList<StorageRecord> records,
+        StorageQueryRequest request,
+        DateTimeOffset now)
+    {
+        if (records.Count > request.Limit!.Value)
+        {
+            throw new InvalidOperationException(
+                "storage.query store returned more records than the requested limit.");
+        }
+
+        return records
+            .Select(record => ValidateAndCopyRecord(record, request, now))
+            .ToArray();
+    }
+
     private static StorageRecord ValidateAndCopyRecord(
         StorageRecord record,
-        StorageQueryRequest request)
+        StorageQueryRequest request,
+        DateTimeOffset now)
     {
         if (!StringComparer.Ordinal.Equals(record.Collection, request.Collection))
         {
             throw new InvalidOperationException(
                 "storage.query store returned a record for a different collection.");
+        }
+
+        if (!StorageQueryMatcher.IsMatch(record, request, now))
+        {
+            throw new InvalidOperationException(
+                "storage.query store returned a record that does not match the query.");
         }
 
         return StorageNodeSupport.CopyRecord(record);

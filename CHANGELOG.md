@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.8
+
+Hardens storage query response validation.
+
+- `StorageQueryNode` now rejects store query results that contain records outside
+  the normalized query filter.
+- Stores that return more records than the requested limit are now reported as
+  `QueryFailed` errors instead of being silently truncated.
+
 ## FluxFlow.Components.Storage 3.0.7
 
 Hardens storage get response validation.

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>3.0.7</Version>
+    <Version>3.0.8</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone storage nodes for FluxFlow: blockified put/get/query/delete over an injected IStorageStore, with broadcast result/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>StorageGetNode now rejects store records returned for a different collection or key and reports them as get failures.</PackageReleaseNotes>
+    <PackageReleaseNotes>StorageQueryNode now rejects store query results that exceed the requested limit or contain records outside the requested filter.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
