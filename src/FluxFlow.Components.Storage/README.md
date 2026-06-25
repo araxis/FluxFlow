@@ -174,6 +174,13 @@ Core contracts:
 `StorageRecord.Value` is `object?`: hosts own serialization and can compose this
 package with serialization or payload components before storage.
 
+Request contracts trim optional text fields such as collection, key prefix,
+content type, and correlation id, treating blank values as absent. Attribute
+dictionaries are copied on assignment, use ordinal key comparison, and treat
+null as empty. Nodes and stores still own required collection/key validation so
+invalid workflow messages surface as normal storage errors instead of
+constructor failures.
+
 ## Composition
 
 Building a workflow, reading config, creating nodes, and linking them is a

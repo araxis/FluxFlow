@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.3
+
+Hardens storage request contract normalization.
+
+- `StoragePutRequest`, `StorageGetRequest`, `StorageQueryRequest`, and
+  `StorageDeleteRequest` now trim optional text fields when assigned.
+- Blank optional collection, key-prefix, content-type, and correlation values
+  are treated as absent.
+- Request attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- Keeps required collection/key validation in nodes and stores so invalid
+  workflow messages still surface as storage errors.
+
 ## FluxFlow.Components.Storage 3.0.2
 
 Hardens storage store context normalization.
