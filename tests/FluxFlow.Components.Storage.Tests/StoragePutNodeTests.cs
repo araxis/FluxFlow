@@ -139,6 +139,38 @@ public sealed class StoragePutNodeTests
     }
 
     [Fact]
+    public async Task Put_ReportsInvalidRequestForUnsupportedModeAndContinues()
+    {
+        var store = new InMemoryStorageStore();
+        await using var node = new StoragePutNode(store, new StoragePutOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        var bad = FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "bad",
+            Value = "bad",
+            Mode = (StorageWriteMode)999,
+            CorrelationId = "bad-mode"
+        });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "good",
+            Value = "ok"
+        }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.InvalidRequest);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("write mode");
+
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        result.Payload.Key.ShouldBe("good");
+        store.RecordCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Put_ReportsStoreFailureAsErrorWithCorrelationId()
     {
         var store = new InMemoryStorageStore
@@ -162,6 +194,27 @@ public sealed class StoragePutNodeTests
         error.Context.ShouldContain("collection=items");
         error.Context.ShouldContain("key=a");
         error.Context.ShouldContain("correlationId=c-9");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Put_ReportsNullStoreRecordAsError()
+    {
+        await using var node = new StoragePutNode(
+            new NullPutStore(),
+            new StoragePutOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StoragePutRequest
+        {
+            Key = "a",
+            Value = "one"
+        }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.PutFailed);
+        error.Message.ShouldContain("null record");
         output.TryReceive(out _).ShouldBeFalse();
     }
 
@@ -226,4 +279,27 @@ public sealed class StoragePutNodeTests
     [Fact]
     public void Put_RejectsNullStore()
         => Should.Throw<ArgumentNullException>(() => new StoragePutNode(null!));
+
+    private sealed class NullPutStore : IStorageStore
+    {
+        public Task<StorageRecord> PutAsync(
+            StoragePutRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<StorageRecord>(null!);
+
+        public Task<StorageRecord?> GetAsync(
+            StorageGetRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageResult> DeleteAsync(
+            StorageDeleteRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
 }

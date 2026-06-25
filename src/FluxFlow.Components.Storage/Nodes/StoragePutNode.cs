@@ -58,6 +58,12 @@ public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
         try
         {
             var record = await _store.PutAsync(request, Stopping).ConfigureAwait(false);
+            if (record is null)
+            {
+                throw new InvalidOperationException(
+                    "storage.put store returned a null record.");
+            }
+
             ValidateRecord(record, request);
             var result = StorageNodeSupport.CreateRecordResult(
                 "put",
@@ -107,7 +113,10 @@ public sealed class StoragePutNode : FlowNode<StoragePutRequest, StorageResult>
                 _options.Collection),
             Key = StorageNodeSupport.ResolveKey("storage.put", input.Key),
             Attributes = StorageNodeSupport.CopyAttributes(input.Attributes),
-            Mode = input.Mode ?? _options.Mode,
+            Mode = StorageNodeSupport.ResolveWriteMode(
+                "storage.put",
+                input.Mode,
+                _options.Mode),
             CorrelationId = StorageNodeSupport.Normalize(input.CorrelationId),
             ContentType = StorageNodeSupport.Normalize(input.ContentType)
         };

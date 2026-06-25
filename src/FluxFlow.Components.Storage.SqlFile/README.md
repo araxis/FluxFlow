@@ -41,6 +41,7 @@ adapter-specific override.
 - one record table per database file
 - store, collection, and key primary key
 - create, replace, and upsert write modes
+- unsupported write mode values are rejected
 - optimistic version checks through `ExpectedVersion`
 - expiration honored by `storage.get` and `storage.query`
 - query by collection, key prefix, attributes, stored time bounds, expiration,

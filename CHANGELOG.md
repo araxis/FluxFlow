@@ -7,6 +7,96 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 3.0.9
+
+Hardens storage store non-null result handling.
+
+- `StoragePutNode`, `StorageQueryNode`, and `StorageDeleteNode` now report clear
+  operation failures when an injected store returns a null result where the
+  `IStorageStore` contract requires a value.
+- `StorageQueryNode` now also reports null records inside returned query
+  collections as `QueryFailed` errors.
+
+## FluxFlow.Components.Storage 3.0.8
+
+Hardens storage query response validation.
+
+- `StorageQueryNode` now rejects store query results that contain records outside
+  the normalized query filter.
+- Stores that return more records than the requested limit are now reported as
+  `QueryFailed` errors instead of being silently truncated.
+
+## FluxFlow.Components.Storage 3.0.7
+
+Hardens storage get response validation.
+
+- `StorageGetNode` now rejects store records returned for a different
+  collection or key.
+- Mismatched get records are reported as `GetFailed` errors instead of being
+  emitted on `Output` or `Found`.
+
+## FluxFlow.Components.Storage 3.0.6
+
+Hardens per-message storage write-mode validation.
+
+- `StoragePutNode` now reports unsupported `StoragePutRequest.Mode` values as
+  `InvalidRequest` errors.
+- Invalid write-mode messages no longer reach the injected store.
+- Later valid put messages continue processing normally.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.2
+
+Hardens file-system storage write-mode validation.
+
+- Direct `FileSystemStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.2
+
+Hardens SQL-file storage write-mode validation.
+
+- Direct `SqlFileStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
+## FluxFlow.Components.Storage 3.0.5
+
+Hardens storage node option normalization and validation.
+
+- `StoragePutOptions`, `StorageGetOptions`, `StorageQueryOptions`, and
+  `StorageDeleteOptions` now trim default collections when assigned.
+- Blank default collections are treated as absent.
+- Non-positive bounded capacities are rejected at option assignment.
+- `StorageQueryOptions` now rejects negative offsets and non-positive limits.
+- `StoragePutOptions` now rejects unsupported write-mode values.
+
+## FluxFlow.Components.Storage 3.0.4
+
+Hardens storage output contract normalization.
+
+- `StorageRecord`, `StorageResult`, and `StorageQueryResult` now trim textual
+  identity and diagnostic fields when assigned.
+- Blank optional content-type, message, and correlation values are treated as
+  absent.
+- Output attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- `StorageQueryResult.Records` now copies assigned record lists so later caller
+  mutations do not change the result.
+
+## FluxFlow.Components.Storage 3.0.3
+
+Hardens storage request contract normalization.
+
+- `StoragePutRequest`, `StorageGetRequest`, `StorageQueryRequest`, and
+  `StorageDeleteRequest` now trim optional text fields when assigned.
+- Blank optional collection, key-prefix, content-type, and correlation values
+  are treated as absent.
+- Request attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- Keeps required collection/key validation in nodes and stores so invalid
+  workflow messages still surface as storage errors.
+
 ## FluxFlow.Components.Storage 3.0.2
 
 Hardens storage store context normalization.

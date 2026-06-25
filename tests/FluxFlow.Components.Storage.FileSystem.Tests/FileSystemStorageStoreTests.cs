@@ -114,6 +114,24 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_RejectsUnsupportedWriteMode()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => store.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = "alpha",
+                Value = "one",
+                Mode = (StorageWriteMode)999
+            }));
+
+        exception.Message.ShouldContain("write mode");
+    }
+
+    [Fact]
     public async Task Get_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 2, 3, TimeSpan.Zero);
@@ -326,6 +344,27 @@ public sealed class FileSystemStorageStoreTests
         });
 
         records.ShouldHaveSingleItem().Key.ShouldBe("a-2");
+    }
+
+    [Fact]
+    public async Task Query_RejectsInvalidPaging()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        var offset = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Offset = -1
+        }));
+        var limit = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Limit = 0
+        }));
+
+        offset.Message.ShouldContain("offset");
+        limit.Message.ShouldContain("limit");
     }
 
     [Fact]

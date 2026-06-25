@@ -163,6 +163,103 @@ public sealed class StorageQueryNodeTests
     }
 
     [Fact]
+    public async Task Query_ReportsStoreRecordOutsideFilterAsError()
+    {
+        var store = new StaticQueryStore([
+            new StorageRecord
+            {
+                Collection = "items",
+                Key = "order:1",
+                Value = "wrong",
+                StoredAt = DateTimeOffset.UtcNow
+            }
+        ]);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var records = StorageTestSink.Link(node.Records);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        var request = FlowMessage.Create(new StorageQueryRequest
+        {
+            KeyPrefix = "user:",
+            CorrelationId = "q-mismatch"
+        });
+        await node.Input.SendAsync(request);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.CorrelationId.ShouldBe(request.CorrelationId);
+        error.Message.ShouldContain("does not match");
+        output.TryReceive(out _).ShouldBeFalse();
+        records.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Query_ReportsStoreLimitOverrunAsError()
+    {
+        var store = new StaticQueryStore([
+            new StorageRecord
+            {
+                Collection = "items",
+                Key = "a",
+                Value = "one",
+                StoredAt = DateTimeOffset.UtcNow
+            },
+            new StorageRecord
+            {
+                Collection = "items",
+                Key = "b",
+                Value = "two",
+                StoredAt = DateTimeOffset.UtcNow
+            }
+        ]);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest { Limit = 1 }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.Message.ShouldContain("requested limit");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Query_ReportsNullStoreRecordCollectionAsError()
+    {
+        var store = new StaticQueryStore(null);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null record collection");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Query_ReportsNullStoreRecordAsError()
+    {
+        var store = new StaticQueryStore([null!]);
+        await using var node = new StorageQueryNode(store, new StorageQueryOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var records = StorageTestSink.Link(node.Records);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageQueryRequest()));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.QueryFailed);
+        error.Message.ShouldContain("null record");
+        output.TryReceive(out _).ShouldBeFalse();
+        records.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Query_EmitsCompletedEvent()
     {
         var store = new InMemoryStorageStore();
@@ -183,4 +280,27 @@ public sealed class StorageQueryNodeTests
 
     private static async Task Seed(InMemoryStorageStore store, string collection, string key, object value)
         => await store.PutAsync(new StoragePutRequest { Collection = collection, Key = key, Value = value });
+
+    private sealed class StaticQueryStore(IReadOnlyList<StorageRecord>? records) : IStorageStore
+    {
+        public Task<StorageRecord> PutAsync(
+            StoragePutRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageRecord?> GetAsync(
+            StorageGetRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(records!);
+
+        public Task<StorageResult> DeleteAsync(
+            StorageDeleteRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
 }

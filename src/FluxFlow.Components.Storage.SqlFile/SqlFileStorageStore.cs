@@ -35,7 +35,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
         var collection = ResolveCollection(request.Collection);
         var key = ResolveKey(request.Key);
-        var mode = request.Mode ?? StorageWriteMode.Upsert;
+        var mode = ResolveWriteMode(request.Mode);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -562,6 +562,18 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         }
 
         return key;
+    }
+
+    private static StorageWriteMode ResolveWriteMode(StorageWriteMode? value)
+    {
+        var mode = value ?? StorageWriteMode.Upsert;
+        if (!Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"SQL file storage write mode '{mode}' is not supported.");
+        }
+
+        return mode;
     }
 
     private bool IsExpired(StorageRecord record, bool? includeExpired)

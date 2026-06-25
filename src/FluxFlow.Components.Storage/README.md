@@ -54,7 +54,8 @@ await using var put = new StoragePutNode(store, new StoragePutOptions
 
 `StoragePutNode` consumes `StoragePutRequest` and emits `StorageResult`.
 Supported modes are `Upsert`, `Create`, and `Replace`. The request can override
-the node mode per item.
+the node mode per item. Unsupported per-message write modes are reported as
+`InvalidRequest` errors and later messages continue processing.
 
 ## Get
 
@@ -173,6 +174,23 @@ Core contracts:
 
 `StorageRecord.Value` is `object?`: hosts own serialization and can compose this
 package with serialization or payload components before storage.
+
+Request contracts trim optional text fields such as collection, key prefix,
+content type, and correlation id, treating blank values as absent. Attribute
+dictionaries are copied on assignment, use ordinal key comparison, and treat
+null as empty. Nodes and stores still own required collection/key validation so
+invalid workflow messages surface as normal storage errors instead of
+constructor failures.
+
+Output contracts follow the same rule: records and results trim textual
+identity/diagnostic fields, normalize blank optional values to absent, copy
+attribute dictionaries with ordinal key comparison, and copy query result record
+lists on assignment.
+
+Node option records trim default collection names and treat blank collections as
+absent. Invalid capacities, query paging values, and write modes are rejected
+when options are assigned so direct-code and configuration-bound callers fail at
+the component boundary.
 
 ## Composition
 

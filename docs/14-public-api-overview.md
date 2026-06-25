@@ -689,12 +689,15 @@ These packages are intentionally not standalone node composition adapters:
   composition adapters in this pass.
 - `FluxFlow.Components.Storage` provides storage nodes and host-owned store
   contracts, including normalized `StorageStoreContext` values for backend
-  factories.
+  factories plus normalized request, record, and result text for config-bound
+  callers. Storage node options normalize default collections and fail fast for
+  invalid capacity, query paging, and write mode values.
 - `FluxFlow.Components.Designer` provides engine/composition-neutral design
   metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and
   `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
-  backend factories consumed by host-owned storage registration.
+  backend factories consumed by host-owned storage registration, including
+  direct rejection of unsupported storage write modes.
 
 Composition hosts consume these packages indirectly through adapter-owned
 resources or host setup. They should not add `FluxFlow.Composition` node
