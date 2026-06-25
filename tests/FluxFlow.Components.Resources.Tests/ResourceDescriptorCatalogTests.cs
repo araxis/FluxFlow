@@ -64,11 +64,51 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Resource_name_trims_surrounding_whitespace()
+    {
+        var name = new ResourceName("  primary  ");
+
+        name.Value.ShouldBe("primary");
+        name.ToString().ShouldBe("primary");
+        name.ShouldBe(new ResourceName("primary"));
+    }
+
+    [Fact]
+    public async Task Lookup_matches_trimmed_resource_names()
+    {
+        var descriptor = CreateDescriptor(" primary-profile ", "profile");
+        var catalog = new ResourceDescriptorCatalog([descriptor]);
+
+        var result = await catalog.LookupAsync(new ResourceReference
+        {
+            Name = new ResourceName("primary-profile"),
+            Kind = "profile"
+        });
+
+        result.Found.ShouldBeTrue();
+        result.Descriptor.ShouldBeSameAs(descriptor);
+    }
+
+    [Fact]
     public void Duplicate_helper_reports_duplicate_names()
     {
         var diagnostics = ResourceDiagnostics.FindDuplicateResources(
         [
             CreateDescriptor("primary", "profile"),
+            CreateDescriptor("primary", "credential")
+        ]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.DuplicateResource);
+        diagnostics[0].Name.ShouldBe(new ResourceName("primary"));
+    }
+
+    [Fact]
+    public void Duplicate_helper_reports_duplicate_names_after_trimming()
+    {
+        var diagnostics = ResourceDiagnostics.FindDuplicateResources(
+        [
+            CreateDescriptor(" primary ", "profile"),
             CreateDescriptor("primary", "credential")
         ]);
 

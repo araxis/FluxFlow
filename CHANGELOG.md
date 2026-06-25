@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.2
+
+Hardens secret name handling for config-bound callers.
+
+- `SecretName` now trims surrounding whitespace at construction.
+- Secret records and references whose names differ only by padding now resolve
+  to the same logical name.
+- Duplicate secret detection now catches padded forms of the same name.
+- Keeps secret values, versions, kinds, redaction, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.1
+
+Hardens resource name handling for config-bound callers.
+
+- `ResourceName` now trims surrounding whitespace at construction.
+- Resource descriptors and references whose names differ only by padding now
+  resolve to the same logical name.
+- Duplicate resource detection now catches padded forms of the same name.
+- Keeps resource kinds, metadata, attributes, and host-owned resource ownership
+  unchanged.
+
 ## FluxFlow.Components.Storage.FileSystem 3.1.1
 
 Hardens file-system storage attribute handling.

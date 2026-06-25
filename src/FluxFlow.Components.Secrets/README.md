@@ -97,6 +97,10 @@ Metadata and attribute maps are validated as part of records, references, and
 option references; null maps are reported as structured invalid-secret
 diagnostics.
 
+`SecretName` trims surrounding whitespace when constructed. This keeps
+configuration-bound records and references matching the same logical name and
+makes duplicate detection catch names that differ only by padding.
+
 Secret declarations are unique by name plus optional version. When multiple
 versions exist, callers should provide `Version` or another narrowing field
 such as `Kind`.

@@ -28,6 +28,35 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Secret_name_trims_surrounding_whitespace()
+    {
+        var name = new SecretName("  primary-token  ");
+
+        name.Value.ShouldBe("primary-token");
+        name.ToString().ShouldBe("primary-token");
+        name.ShouldBe(new SecretName("primary-token"));
+    }
+
+    [Fact]
+    public async Task Resolver_matches_trimmed_secret_names()
+    {
+        var resolver = new InMemorySecretResolver(
+        [
+            CreateRecord(" primary-token ", "runtime-value", kind: "profile")
+        ]);
+
+        var result = await resolver.ResolveAsync(new SecretReference
+        {
+            Name = new SecretName("primary-token"),
+            Kind = "profile"
+        });
+
+        result.Resolved.ShouldBeTrue();
+        result.Value.ShouldNotBeNull();
+        result.Value.Reveal().ShouldBe("runtime-value");
+    }
+
+    [Fact]
     public async Task Resolver_returns_missing_diagnostic_for_unknown_reference()
     {
         var resolver = new InMemorySecretResolver([CreateRecord("primary-token", "runtime-value")]);
@@ -125,6 +154,19 @@ public sealed class SecretResolverTests
         var act = () => new InMemorySecretResolver(
         [
             CreateRecord("primary", "one", version: "v1"),
+            CreateRecord("primary", "two", version: "v1")
+        ]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain(nameof(SecretDiagnosticCode.DuplicateSecret));
+    }
+
+    [Fact]
+    public void Resolver_rejects_duplicate_records_after_trimming_names()
+    {
+        var act = () => new InMemorySecretResolver(
+        [
+            CreateRecord(" primary ", "one", version: "v1"),
             CreateRecord("primary", "two", version: "v1")
         ]);
 
