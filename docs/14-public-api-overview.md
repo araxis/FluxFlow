@@ -30,8 +30,9 @@ Main types:
 
 Use these types to author standalone nodes directly. `FlowNodeOptions`
 configures bounded transform intake. `FlowSourceOptions` lets source nodes opt
-into bounded output and awaitable emission while sources that do not pass
-options keep the original unbounded broadcast behavior.
+into bounded broadcast output and awaitable output-block acceptance while
+sources that do not pass options keep the original unbounded broadcast
+behavior.
 
 ## Composition
 

@@ -21,8 +21,8 @@ failed) surface on the `Events` port using `SourceDiagnosticNames`; failures
 surface a `FlowError` on the `Errors` port.
 
 `BoundedCapacity` configures the source output capacity. Generated and sequence
-loops await output delivery, so the source output block can apply backpressure
-when its configured capacity is full.
+loops await source output acceptance. Output remains broadcast/latest-wins; use
+a dedicated durable buffer if a workflow edge must guarantee no loss.
 
 ## Generated
 

@@ -26,6 +26,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
         IMqttTriggerSource triggerSource,
         MqttTriggerOptions? options = null,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
         _triggerSource = triggerSource ?? throw new ArgumentNullException(nameof(triggerSource));
         _options = options ?? new MqttTriggerOptions();
@@ -199,7 +200,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 return;
             }
 
-            if (!Emit(envelope))
+            if (!await EmitAsync(envelope, cancellationToken).ConfigureAwait(false))
             {
                 tracker.TryRemove(envelope.CorrelationId, out _);
                 var exception = new InvalidOperationException("MQTT trigger output is not accepting messages.");
@@ -222,7 +223,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
             return;
         }
 
-        if (!Emit(envelope))
+        if (!await EmitAsync(envelope, cancellationToken).ConfigureAwait(false))
         {
             var exception = new InvalidOperationException("MQTT trigger output is not accepting messages.");
             ReportTriggerError(
@@ -580,6 +581,20 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 "Acknowledging on successful response requires MQTT trigger request/reply mode.",
                 nameof(options));
         }
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(MqttTriggerOptions? options)
+    {
+        options ??= new MqttTriggerOptions();
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.BoundedCapacity,
+                "MQTT trigger bounded capacity must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private static TimeSpan CreateSweepInterval(TimeSpan timeout)

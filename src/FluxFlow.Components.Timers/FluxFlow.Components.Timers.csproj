@@ -11,7 +11,7 @@
     <Description>Standalone timer nodes for FluxFlow: interval and cron-schedule sources plus delay, throttle, and debounce transforms over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;timers</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires timer.interval and timer.schedule boundedCapacity into FluxFlow.Nodes bounded source output. Timer source loops now await bounded source output capacity while transform timer nodes keep their existing bounded input behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Wires timer.interval and timer.schedule boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Timer source loops now await output-block acceptance while transform timer nodes keep their existing bounded input behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

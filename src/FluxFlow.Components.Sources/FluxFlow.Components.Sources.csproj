@@ -11,7 +11,7 @@
     <Description>Standalone deterministic source nodes for FluxFlow: generated and sequence emitters built as FlowSource&lt;T&gt; over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires source.generated and source.sequence boundedCapacity into FluxFlow.Nodes bounded source output. Loop-driven source emission now awaits bounded source output capacity while preserving existing correlation, timing, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Wires source.generated and source.sequence boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Loop-driven source emission now awaits output-block acceptance while preserving existing correlation, timing, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

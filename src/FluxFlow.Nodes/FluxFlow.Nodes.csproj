@@ -13,7 +13,7 @@
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds FlowSourceOptions and awaitable FlowSource emission so source nodes can opt into bounded source output capacity while preserving existing unbounded source behavior by default.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds FlowSourceOptions and awaitable FlowSource emission so source nodes can opt into bounded broadcast output acceptance while preserving existing unbounded source behavior by default.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

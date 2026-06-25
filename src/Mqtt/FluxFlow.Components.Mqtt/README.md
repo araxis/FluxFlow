@@ -122,6 +122,12 @@ implementation-supplied correlation id when present. The subscription is dispose
 when the source stops. Reconnect and resubscribe behavior belongs inside the supplied
 `IMqttTriggerSource` or concrete client adapter.
 
+`MqttTriggerOptions.BoundedCapacity` configures bounded broadcast source output.
+Trigger receive processing awaits output-block acceptance before `OnEmit`
+acknowledgement, while output still follows the kit's broadcast/latest-wins
+semantics. In request/reply mode, the same capacity also bounds the `Responses`
+target.
+
 For request/reply handling, configure the trigger and post the graph response back to
 `Responses` with the same correlation id:
 

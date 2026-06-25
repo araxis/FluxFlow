@@ -12,8 +12,8 @@ packages debut at 1.0.0.
 Adds bounded source-output support for standalone source nodes.
 
 - Adds `FlowSourceOptions` with explicit output capacity configuration.
-- Adds awaitable `FlowSource<TOutput>` emission so source loops can honor
-  bounded source output capacity.
+- Adds awaitable `FlowSource<TOutput>` emission so source loops can await
+  bounded broadcast output acceptance.
 - Keeps existing source behavior unbounded by default for sources that do not
   pass `FlowSourceOptions`.
 - Updates loop-driven source components to wire their existing
@@ -25,8 +25,9 @@ Wires source bounded-capacity options into the shared source-output contract.
 
 - `source.generated` and `source.sequence` now pass `boundedCapacity` to
   `FluxFlow.Nodes` source output configuration.
-- Loop-driven source emission awaits output delivery so the source output block
-  can apply backpressure when its configured capacity is full.
+- Loop-driven source emission awaits bounded broadcast output acceptance.
+- Output remains broadcast/latest-wins; use a dedicated durable buffer when a
+  workflow edge must guarantee no loss.
 - Keeps item materialization, timing, fresh correlation ids, diagnostics, and
   standalone construction behavior unchanged.
 
@@ -37,8 +38,9 @@ contract.
 
 - `timer.interval` and `timer.schedule` now pass `boundedCapacity` to
   `FluxFlow.Nodes` source output configuration.
-- Timer source loops await tick delivery so the source output block can apply
-  backpressure when its configured capacity is full.
+- Timer source loops await bounded broadcast output acceptance.
+- Output remains broadcast/latest-wins; use a dedicated durable buffer when a
+  workflow edge must guarantee no loss.
 - Transform timer nodes keep their existing bounded input behavior.
 
 ## FluxFlow.Components.FileSystem 3.1.0
@@ -48,8 +50,9 @@ contract.
 
 - `directory.enumerate` and `file.watch` now pass `boundedCapacity` to
   `FluxFlow.Nodes` source output configuration.
-- Directory enumeration awaits output delivery so the source output block can
-  apply backpressure when its configured capacity is full.
+- Directory enumeration awaits bounded broadcast output acceptance.
+- Source outputs remain broadcast/latest-wins; use a dedicated durable buffer
+  when a workflow edge must guarantee no loss.
 - File watching keeps nonblocking watcher callbacks while using the configured
   bounded source output.
 
@@ -60,8 +63,21 @@ contract.
 
 - `session.replay` now passes `boundedCapacity` to `FluxFlow.Nodes` source
   output configuration.
-- Replay awaits output capacity while preserving store ownership, replay
-  pacing, correlation, diagnostics, and standalone construction behavior.
+- Replay awaits bounded broadcast output acceptance while preserving store
+  ownership, replay pacing, correlation, diagnostics, and standalone
+  construction behavior.
+
+## FluxFlow.Components.Mqtt 4.1.0
+
+Wires MQTT trigger bounded-capacity options into the shared source-output
+contract.
+
+- `mqtt.trigger` now passes `boundedCapacity` to `FluxFlow.Nodes` bounded
+  broadcast source output.
+- Trigger receive processing awaits output-block acceptance before
+  `OnEmit` acknowledgement.
+- The same `boundedCapacity` option continues to bound the request/reply
+  `Responses` target capacity.
 
 ## FluxFlow.Components.Designer 2.2.0
 

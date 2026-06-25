@@ -19,9 +19,10 @@ fresh correlation id per record. Domain failures surface on the broadcast `Error
 processing later messages; diagnostics go to `Events` (`FlowEvent`).
 
 `BoundedCapacity` configures bounded input capacity for recorder/query nodes and
-bounded source output capacity for replay. Replay awaits output delivery, so
-the source output block can apply backpressure when its configured capacity is
-full while replay pacing remains deterministic.
+bounded source output capacity for replay. Replay awaits source output
+acceptance while replay pacing remains deterministic. Output remains
+broadcast/latest-wins; use a dedicated durable buffer if replay delivery must
+guarantee no loss.
 
 ## Storage
 

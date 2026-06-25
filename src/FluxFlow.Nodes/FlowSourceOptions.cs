@@ -12,9 +12,9 @@ public sealed record FlowSourceOptions
     public const int UnboundedOutputCapacity = -1;
 
     /// <summary>
-    /// Maximum number of output messages the source output can hold before
-    /// <see cref="FlowSource{TOutput}"/> emission waits. Use
-    /// <see cref="UnboundedOutputCapacity"/> for unbounded output.
+    /// Configures the underlying source broadcast output block capacity. Use
+    /// <see cref="UnboundedOutputCapacity"/> for unbounded output. Broadcast output
+    /// remains latest-wins; this is not a durable queue or no-loss delivery guarantee.
     /// </summary>
     public int OutputCapacity { get; init; } = UnboundedOutputCapacity;
 }

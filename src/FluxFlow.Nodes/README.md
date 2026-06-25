@@ -51,12 +51,14 @@ killing the pump. `Complete()` drains the input and completes the outputs;
 
 ## Design notes
 
-- **Transform outputs are broadcast** (latest-wins, no backpressure): a consumer
-  that keeps up sees every message; one that falls badly behind may miss some.
-  That is the deliberate trade for simplicity.
-- **Sources can opt into bounded output** with `FlowSourceOptions.OutputCapacity`
-  and `EmitAsync`. Source loops should await `EmitAsync` when they expose a
-  capacity option; callback-driven sources can keep using nonblocking `Emit`.
+- **Outputs are broadcast** (latest-wins): a consumer that keeps up sees every
+  message; one that falls badly behind may miss some. That is the deliberate
+  trade for simplicity.
+- **Sources can opt into bounded broadcast output** with
+  `FlowSourceOptions.OutputCapacity` and `EmitAsync`. Source loops should await
+  `EmitAsync` when they expose a capacity option, but this is still broadcast
+  output, not a durable queue or no-loss delivery guarantee. Callback-driven
+  sources can keep using nonblocking `Emit`.
 - **Inputs are a bounded buffer**, so a node throttles its own intake.
 - The kit owns no domain logic and no engine concepts — just the plumbing every
   node shares.

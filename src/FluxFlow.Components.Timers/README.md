@@ -25,9 +25,10 @@ tick contracts only — hosts decide whether ticks drive polling, health checks,
 metrics, file work, message publishing, or other activity.
 
 For interval and schedule sources, `BoundedCapacity` configures source output
-capacity. Tick loops await output delivery, so the source output block can apply
-backpressure when its configured capacity is full. Delay, throttle, and debounce
-keep using `BoundedCapacity` as their bounded input capacity.
+capacity. Tick loops await source output acceptance. Output remains
+broadcast/latest-wins; use a dedicated durable buffer if a workflow edge must
+guarantee no loss. Delay, throttle, and debounce keep using `BoundedCapacity`
+as their bounded input capacity.
 
 ## Interval
 

@@ -11,7 +11,7 @@
     <Description>Standalone file system nodes for FluxFlow: file.read and file.write transforms (request in, result out), plus directory.enumerate and file.watch sources. Built on FluxFlow.Nodes with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires directory.enumerate and file.watch boundedCapacity into FluxFlow.Nodes bounded source output. Directory enumeration now awaits bounded source output capacity; file watch keeps nonblocking watcher callbacks while using the configured bounded source output.</PackageReleaseNotes>
+    <PackageReleaseNotes>Wires directory.enumerate and file.watch boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Directory enumeration now awaits output-block acceptance; file watch keeps nonblocking watcher callbacks while using the configured bounded source output.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -11,7 +11,7 @@
     <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires session.replay boundedCapacity into FluxFlow.Nodes bounded source output. Replay now awaits bounded source output capacity while preserving store ownership, replay pacing, correlation, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Wires session.replay boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Replay now awaits output-block acceptance while preserving store ownership, replay pacing, correlation, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

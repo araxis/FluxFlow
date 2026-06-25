@@ -301,6 +301,17 @@ public sealed class MqttTriggerNodeTests
                 Acknowledgement = (MqttTriggerAcknowledgement)99
             }));
 
+    [Fact]
+    public void TriggerNode_RejectsInvalidBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(() => new MqttTriggerNode(
+            new RecordingMqttClientAdapter(),
+            new MqttTriggerOptions
+            {
+                TopicFilter = "devices/+",
+                BoundedCapacity = 0
+            }))
+        .Message.ShouldContain("bounded capacity");
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
