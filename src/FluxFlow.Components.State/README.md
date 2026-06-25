@@ -15,6 +15,10 @@ is broadcast on `Output` as `FlowMessage<StateReducerResult>` carrying the same
 correlation id as the input. State updates are serial, so each key observes
 deterministic, ordered changes.
 
+State reducer contracts trim key text on assignment. `StateReducerInput`
+defensively copies `Variables` with ordinal key comparison so later caller
+mutations do not change the message seen by the node.
+
 ```csharp
 await using var node = new StateReducerNode(
     new StateReducerOptions
@@ -42,9 +46,9 @@ message. `StateReducerNode` consumes `StateReducerInput` and emits
 If `KeyExpression` is set, it resolves the state key from the same expression
 context. Otherwise the node uses `StateReducerInput.Key`.
 
-`StateReducerOptions` validates at construction: a missing `Reducer`, an empty
-`KeyExpression`, a non-positive `BoundedCapacity`, or a negative `MaxKeys` fails
-fast as an argument exception.
+`StateReducerOptions` trims diagnostic text fields when assigned. A missing
+`Reducer`, an empty `KeyExpression`, a non-positive `BoundedCapacity`, or a
+negative `MaxKeys` fails fast as an argument exception.
 
 ## Operations
 
@@ -62,6 +66,8 @@ node keeps processing later messages. Per-operation notes
 (`state.reducer.updated`/`reset`/`cleared`), reducer failures, and key-limit
 warnings flow on the `Events` port (also carrying the correlation id where one is
 available).
+Unsupported per-message operations are reported as `InvalidMessage` errors and
+later valid messages continue through the node.
 
 ## Runtime timing
 

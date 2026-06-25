@@ -69,7 +69,8 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
                 StateReducerOperation.Reduce => Reduce(key, input),
                 StateReducerOperation.Reset => Reset(key, input),
                 StateReducerOperation.Clear => Clear(key, input),
-                _ => throw new InvalidOperationException(
+                _ => throw new StateReducerException(
+                    StateErrorCodes.InvalidMessage,
                     $"state.reducer operation '{input.Operation}' is not supported.")
             };
 

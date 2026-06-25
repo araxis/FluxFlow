@@ -7,6 +7,30 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.State 3.0.4
+
+Hardens state reducer per-message operation validation.
+
+- Unsupported `StateReducerInput.Operation` values now emit `InvalidMessage`
+  errors instead of generic reducer failures.
+- Later valid messages continue processing after an unsupported operation.
+
+## FluxFlow.Components.State 3.0.3
+
+Hardens state reducer option normalization and validation.
+
+- `StateReducerOptions` now trims diagnostic text fields when assigned.
+- Missing reducers, empty key expressions, non-positive bounded capacities, and
+  negative max-key values are rejected at option assignment.
+
+## FluxFlow.Components.State 3.0.2
+
+Hardens state reducer contract normalization.
+
+- `StateReducerInput` and `StateReducerResult` now trim key text when assigned.
+- `StateReducerInput.Variables` is copied with ordinal key comparison so later
+  caller mutations do not leak into the message contract.
+
 ## FluxFlow.Components.Sessions 3.1.4
 
 Hardens session query response validation.

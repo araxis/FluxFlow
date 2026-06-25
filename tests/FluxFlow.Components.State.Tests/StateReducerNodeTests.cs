@@ -207,6 +207,34 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
+    public async Task Reducer_ReportsUnsupportedOperationAsInvalidMessageAndContinues()
+    {
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count" },
+            new SampleExpressionEngine());
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        var bad = FlowMessage.Create(new StateReducerInput
+        {
+            Key = "a",
+            Operation = (StateReducerOperation)999
+        });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Code.ShouldBe(StateErrorCodes.InvalidMessage);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("not supported");
+        result.Payload.Key.ShouldBe("a");
+        result.Payload.Version.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Reducer_RespectsMaxKeyLimit()
     {
         await using var node = new StateReducerNode(
