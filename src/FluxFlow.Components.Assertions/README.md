@@ -40,8 +40,8 @@ await node.Input.SendAsync(FlowMessage.Create(new AppMessage(score: 12)));
 ```
 
 `AssertionOptions` validates at construction: a missing `Expression`, an empty
-`InputType`, or a non-positive `BoundedCapacity` throws
-`InvalidOperationException` — configuration mistakes fail fast.
+`InputType`, or a non-positive `BoundedCapacity` fails fast as an argument
+exception.
 
 ## Mapping context
 

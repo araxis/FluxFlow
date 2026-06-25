@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone expression-driven assertion node for FluxFlow: an input in, a FlowAssertionResult broadcast out, with the original input fanned to Passed/Failed ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone flow.assert node over a pre-compiled boolean expression: input in, assertion result broadcast out, original input fanned to the Passed/Failed ports, evaluation failures on the error port — all carrying the message correlation id. The engine factory, module, registration extensions, design-metadata provider, definition-options reader, and the engine/context-factory registry layer are removed; the node takes its options, an IFlowExpressionEngine, an optional IFlowMapContextFactory, and a TimeProvider directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: missing expression and empty inputType now report ArgumentException, while non-positive boundedCapacity reports ArgumentOutOfRangeException. Runtime assertion behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -93,6 +93,16 @@ timeout core for transport nodes that own their own ports and acknowledgement po
 `RequestReplyCoordinator<TRequest, TResponse>` now uses the tracker internally without changing
 its public coordinator behavior.
 
+## FluxFlow.Components.Assertions 3.0.1
+
+Aligns assertion node constructor option validation with the standalone node
+family.
+
+- Reports missing `expression` and empty `inputType` as `ArgumentException`.
+- Reports non-positive `boundedCapacity` as `ArgumentOutOfRangeException`.
+- Leaves runtime assertion evaluation, routing, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Assertions 3.0.0
 
 Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node is a

@@ -181,17 +181,19 @@ public sealed class FlowAssertionComponent<TInput> : FlowNode<TInput, FlowAssert
 
         if (string.IsNullOrWhiteSpace(options.Expression))
         {
-            throw new InvalidOperationException("flow.assert requires configuration value 'expression'.");
+            throw new ArgumentException("flow.assert requires configuration value 'expression'.", nameof(options));
         }
 
         if (string.IsNullOrWhiteSpace(options.InputType))
         {
-            throw new InvalidOperationException("flow.assert option 'inputType' cannot be empty.");
+            throw new ArgumentException("flow.assert option 'inputType' cannot be empty.", nameof(options));
         }
 
         if (options.BoundedCapacity <= 0)
         {
-            throw new InvalidOperationException("flow.assert option 'boundedCapacity' must be greater than zero.");
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.assert option 'boundedCapacity' must be greater than zero.");
         }
 
         return options;
