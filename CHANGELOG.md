@@ -79,6 +79,56 @@ contract.
 - The same `boundedCapacity` option continues to bound the request/reply
   `Responses` target capacity.
 
+## FluxFlow.Components.Mqtt.Composition 1.3.0
+
+Aligns MQTT trigger composition packaging with the `FluxFlow.Components.Mqtt`
+4.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated trigger behavior for hosts using `mqtt.trigger` through
+  `FluxFlow.Composition`.
+
+## FluxFlow.Components.Sources.Composition 1.3.0
+
+Aligns source composition packaging with the `FluxFlow.Components.Sources`
+3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated `source.generated` and `source.sequence` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.Timers.Composition 1.4.0
+
+Aligns timer composition packaging with the `FluxFlow.Components.Timers` 3.1.0
+bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated `timer.interval` and `timer.schedule` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.FileSystem.Composition 1.3.0
+
+Aligns file-system composition packaging with the
+`FluxFlow.Components.FileSystem` 3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, path policy, and
+  Designer metadata unchanged.
+- Packages the updated `directory.enumerate` and `file.watch` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.Sessions.Composition 1.3.0
+
+Aligns sessions composition packaging with the `FluxFlow.Components.Sessions`
+3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, store ownership, and
+  Designer metadata unchanged.
+- Packages the updated `session.replay` source-output capacity behavior for
+  composition hosts.
+
 ## FluxFlow.Components.Designer 2.2.0
 
 Adds neutral resource metadata contracts for package-owned design metadata.
