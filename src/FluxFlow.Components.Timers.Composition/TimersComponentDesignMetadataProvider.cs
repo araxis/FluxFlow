@@ -55,6 +55,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             MaxTicksOption(),
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports =
         [
             OutputPort(nameof(TimerTick), "Timer tick message.", isPrimary: true)
@@ -84,6 +85,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             MaxTicksOption(),
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports =
         [
             OutputPort(nameof(ScheduleTick), "Schedule tick message.", isPrimary: true)
@@ -112,6 +114,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             },
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports = TransformPorts()
     };
 
@@ -145,6 +148,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             },
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports = TransformPorts()
     };
 
@@ -170,6 +174,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             },
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports = TransformPorts()
     };
 
@@ -200,6 +205,19 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         Min = 1,
         HelperText = "Maximum queued messages."
     };
+
+    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = TimersCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic timer scheduling and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ];
 
     private static IReadOnlyList<PortDesignMetadata> TransformPorts()
         =>

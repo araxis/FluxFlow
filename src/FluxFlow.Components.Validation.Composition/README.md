@@ -93,5 +93,6 @@ the `json.schema-validator` composition node. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and ports only. Runtime resources such as
-`selector` and `clock` remain host-owned composition resources.
+The provider describes node options, ports, and resource hints for the optional
+`selector` and `clock` resources. These resources remain host-owned
+composition resources and are not exposed as editable node options.

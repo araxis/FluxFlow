@@ -84,6 +84,14 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             .ShouldNotContain(ValidationCompositionResourceNames.Selector);
         metadata.Options.Select(option => option.Name)
             .ShouldNotContain(ValidationCompositionResourceNames.Clock);
+        metadata.Resources.Select(resource => (
+            resource.Name,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType)).ShouldBe([
+            (ValidationCompositionResourceNames.Selector, 0, false, "IJsonSchemaValueSelector<TInput>"),
+            (ValidationCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
     }
 
     [Fact]

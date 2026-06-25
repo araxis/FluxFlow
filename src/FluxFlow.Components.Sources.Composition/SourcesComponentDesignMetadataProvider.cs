@@ -60,6 +60,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 "Delay between emitted items."),
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports =
         [
             OutputPort("TOutput", "Generated source item.", isPrimary: true)
@@ -113,6 +114,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 "Delay between emitted items."),
             BoundedCapacityOption()
         ],
+        Resources = ClockResources(),
         Ports =
         [
             OutputPort(nameof(SourceSequenceItem), "Sequence source item.", isPrimary: true)
@@ -159,6 +161,19 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
         Min = 1,
         HelperText = "Maximum queued source messages."
     };
+
+    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
+        =>
+        [
+            new ResourceDesignMetadata
+            {
+                Name = SourcesCompositionResourceNames.Clock,
+                DisplayName = "Clock",
+                Order = 0,
+                Summary = "Optional keyed clock for deterministic source timing and diagnostics.",
+                ValueType = nameof(TimeProvider)
+            }
+        ];
 
     private static PortDesignMetadata OutputPort(
         string valueType,

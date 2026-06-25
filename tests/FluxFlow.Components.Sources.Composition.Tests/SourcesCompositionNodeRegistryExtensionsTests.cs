@@ -59,6 +59,10 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         metadata.SelectMany(item => item.Options)
             .Select(option => option.Name)
             .ShouldNotContain(SourcesCompositionResourceNames.Clock);
+        foreach (var item in metadata)
+        {
+            AssertClockResource(item);
+        }
     }
 
     [Fact]
@@ -353,6 +357,17 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             port.ValueType)).ShouldBe([
             (SourcesCompositionPortNames.Output, PortDirection.Output, 0, true, outputType)
         ]);
+    }
+
+    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    {
+        var resource = metadata.Resources.ShouldHaveSingleItem();
+
+        resource.Name.ShouldBe(SourcesCompositionResourceNames.Clock);
+        resource.DisplayName.ShouldBe("Clock");
+        resource.Order.ShouldBe(0);
+        resource.IsRequired.ShouldBeFalse();
+        resource.ValueType.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertOptions(

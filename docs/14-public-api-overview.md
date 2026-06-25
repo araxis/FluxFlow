@@ -200,6 +200,8 @@ resources through the host.
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `json.schema-validator` composition node so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
+The metadata includes editable options, fixed ports, and resource hints for the
+optional `selector` and `clock` resources.
 
 ## Timers Composition
 
@@ -227,8 +229,9 @@ settings and resolve optional keyed `TimeProvider` resources through the host.
 `TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the five timer composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata keeps `clock` as a host-owned resource and does not add schedule
-time-zone string conversion.
+metadata includes editable options, fixed ports, and a resource hint for the
+optional `clock` resource. It does not add schedule time-zone string
+conversion.
 
 ## Sources Composition
 
@@ -255,8 +258,8 @@ optional keyed `TimeProvider` resources through the host.
 `SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
 generated and sequence source composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata includes inline generated `items` as JSON node configuration while
-keeping `clock` as a host-owned resource.
+The metadata includes inline generated `items` as JSON node configuration,
+fixed output ports, and a resource hint for the optional `clock` resource.
 
 ## Observability Composition
 
