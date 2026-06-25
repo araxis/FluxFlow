@@ -89,6 +89,12 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             .ShouldNotContain(AssertionsCompositionResourceNames.ContextFactory);
         metadata.Options.Select(option => option.Name)
             .ShouldNotContain(AssertionsCompositionResourceNames.Clock);
+        AssertResources(
+            metadata,
+            (AssertionsCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
+            (AssertionsCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<TInput>"),
+            (AssertionsCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+        );
     }
 
     [Fact]
@@ -123,6 +129,22 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull();
         metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
+    }
+
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        params (string Name, int Order, bool IsRequired, string ValueType)[] expected)
+    {
+        metadata.Resources.Count.ShouldBe(expected.Length);
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            var resource = metadata.Resources[index];
+            resource.Name.ShouldBe(expected[index].Name);
+            resource.Order.ShouldBe(expected[index].Order);
+            resource.IsRequired.ShouldBe(expected[index].IsRequired);
+            resource.ValueType.ShouldBe(expected[index].ValueType);
+        }
     }
 
     [Fact]

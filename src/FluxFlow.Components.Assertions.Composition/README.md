@@ -80,5 +80,7 @@ the `flow.assert` composition node. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and ports only. Runtime resources such as
-`engine`, `contextFactory`, and `clock` remain host-owned composition resources.
+The provider describes editable options, host-owned resources, and ports.
+`engine` is required; `contextFactory` and `clock` are optional. Resource
+metadata is descriptive only, so hosts still own keyed service registration,
+selection, lifetime, and disposal.
