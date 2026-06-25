@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.5
+
+Hardens secret collection diagnostics.
+
+- Null secret records are now reported as structured `InvalidSecret`
+  diagnostics at their collection index.
+- Unresolved-secret and option-resolution batch helpers now tolerate null
+  reference or option entries and return structured failed diagnostics.
+- Duplicate-secret checks now ignore null entries instead of surfacing
+  accidental null-reference failures.
+
 ## FluxFlow.Components.Resources 1.2.4
 
 Hardens resource collection diagnostics.

@@ -96,6 +96,9 @@ Use `SecretDiagnostics` to:
 Metadata and attribute maps are validated as part of records, references, and
 option references; null maps are reported as structured invalid-secret
 diagnostics.
+Null record entries, null reference entries, and null option entries inside
+batch helpers are reported as structured invalid-secret diagnostics instead of
+surfacing accidental null-reference failures.
 
 `SecretName`, secret `Version`, `Kind`, `DisplayName`, `Summary`, and secret
 option paths trim surrounding whitespace when assigned. This keeps

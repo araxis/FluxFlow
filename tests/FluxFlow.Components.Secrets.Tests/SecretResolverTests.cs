@@ -288,6 +288,40 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Validation_reports_null_record_entries()
+    {
+        var diagnostics = SecretDiagnostics.ValidateRecords([null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(SecretDiagnosticCode.InvalidSecret);
+        diagnostics[0].Severity.ShouldBe(SecretDiagnosticSeverity.Error);
+        diagnostics[0].Metadata["path"].ShouldBe("secrets[0]");
+        diagnostics[0].Message.ShouldContain("Secret record is required.");
+    }
+
+    [Fact]
+    public void Resolver_rejects_null_records_with_structured_diagnostic()
+    {
+        var act = () => new InMemorySecretResolver([null!]);
+
+        var exception = act.ShouldThrow<InvalidOperationException>();
+        exception.Message.ShouldContain(nameof(SecretDiagnosticCode.InvalidSecret));
+        exception.Message.ShouldContain("Secret record is required.");
+    }
+
+    [Fact]
+    public void Duplicate_helper_ignores_null_records()
+    {
+        var diagnostics = SecretDiagnostics.FindDuplicateSecrets(
+        [
+            null!,
+            CreateRecord("primary", "one")
+        ]);
+
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Validation_reports_invalid_reference_fields()
     {
         var diagnostics = SecretDiagnostics.ValidateReference(new SecretReference
@@ -456,6 +490,19 @@ public sealed class SecretResolverTests
             SecretDiagnosticCode.KindMismatch,
             SecretDiagnosticCode.MissingSecret
         ]);
+    }
+
+    [Fact]
+    public async Task Unresolved_helper_reports_null_reference_entries()
+    {
+        var diagnostics = await SecretDiagnostics.FindUnresolvedSecretsAsync(
+            new InMemorySecretResolver([]),
+            [null!]);
+
+        diagnostics.Count.ShouldBe(1);
+        diagnostics[0].Code.ShouldBe(SecretDiagnosticCode.InvalidSecret);
+        diagnostics[0].Metadata["path"].ShouldBe("references[0]");
+        diagnostics[0].Message.ShouldContain("Secret reference is required.");
     }
 
     private static SecretRecord CreateRecord(
