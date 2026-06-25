@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Expectations</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone event-expectation node for FluxFlow: post ProjectionEvent values, watch for a matching event (expect) or its absence (guard), and broadcast one EventExpectationResult with error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone event-expectation node over the FluxFlow.Nodes kit: post FlowMessage&lt;ProjectionEvent&gt; in, one FlowMessage&lt;EventExpectationResult&gt; broadcast out, failures on the error port, diagnostics on the event port. The node resolves on the first of a matching event, a timeout armed over the injected TimeProvider, or input completion via CompleteWithResultAsync. The engine glue (node factory, module, registration extensions, component-type/port constants, JSON options reader, component-options/clock holder, and design-metadata provider) is removed; the node depends only on FluxFlow.Nodes and the shared FluxFlow.Components.Projections contracts (ProjectionEvent, EventFilter), and runs without the engine. ProjectionEvent replaces the engine FlowEvent as the standalone input contract; correlation flows event -&gt; result via the envelope.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: invalid timeoutMilliseconds, maxObservedEvents, maxPreviewChars, and boundedCapacity now report ArgumentOutOfRangeException with expectation option names. Runtime expectation behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

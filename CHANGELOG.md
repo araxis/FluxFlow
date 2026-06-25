@@ -162,6 +162,17 @@ factories, binds `ControlExpressionOptions` from composition configuration, and
 resolves keyed `IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and
 `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Expectations 3.0.1
+
+Aligns event expectation constructor option validation with the standalone node
+family.
+
+- Reports invalid `timeoutMilliseconds`, `maxObservedEvents`,
+  `maxPreviewChars`, and `boundedCapacity` as
+  `ArgumentOutOfRangeException`.
+- Leaves expectation matching, timeout resolution, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Expectations 3.0.0
 
 Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic

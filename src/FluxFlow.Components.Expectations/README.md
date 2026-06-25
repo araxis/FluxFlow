@@ -36,6 +36,10 @@ satisfied when none arrives. The node resolves on the first of three triggers:
 - a configured timeout (armed over the injected `TimeProvider`),
 - input completion via `CompleteWithResultAsync()`.
 
+`EventExpectationOptions` validates at construction: non-positive
+`TimeoutMilliseconds`, negative `MaxObservedEvents`, negative `MaxPreviewChars`,
+or non-positive `BoundedCapacity` fails fast as an argument exception.
+
 ## Ports
 
 | Port | Block | Purpose |

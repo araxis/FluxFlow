@@ -289,15 +289,51 @@ public sealed class EventExpectationNodeTests
     }
 
     [Fact]
-    public void Expectation_RejectsInvalidOptions()
+    public void Expectation_RejectsInvalidTimeout()
     {
-        var exception = Should.Throw<InvalidOperationException>(
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new EventExpectationNode(new EventExpectationOptions
             {
                 TimeoutMilliseconds = 0
             }));
 
         exception.Message.ShouldContain("timeoutMilliseconds");
+    }
+
+    [Fact]
+    public void Expectation_RejectsInvalidObservedEventLimit()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new EventExpectationNode(new EventExpectationOptions
+            {
+                MaxObservedEvents = -1
+            }));
+
+        exception.Message.ShouldContain("maxObservedEvents");
+    }
+
+    [Fact]
+    public void Expectation_RejectsInvalidPreviewLimit()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new EventExpectationNode(new EventExpectationOptions
+            {
+                MaxPreviewChars = -1
+            }));
+
+        exception.Message.ShouldContain("maxPreviewChars");
+    }
+
+    [Fact]
+    public void Expectation_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new EventExpectationNode(new EventExpectationOptions
+            {
+                BoundedCapacity = 0
+            }));
+
+        exception.Message.ShouldContain("boundedCapacity");
     }
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
