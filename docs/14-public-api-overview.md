@@ -704,7 +704,8 @@ These packages are intentionally not standalone node composition adapters:
 
 - `FluxFlow.Components.Configuration` validates resource and secret references,
   including trimmed resource option paths and resource option metadata
-  diagnostics with normalized valid metadata maps.
+  diagnostics with normalized valid metadata maps and request collection
+  snapshotting.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including trimmed resource names, kinds, display text, and
   null-safe normalized metadata and attribute validation plus defensive

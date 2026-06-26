@@ -73,6 +73,10 @@ Null request-level resource/secret collections and null validation entries are
 also reported as structured configuration diagnostics, which keeps
 configuration-file binding issues in the validation report instead of surfacing
 as normalization exceptions.
+`ConfigurationValidationRequest` copies assigned resource and secret
+collections, so later caller list mutations do not change what a constructed
+request represents. Null collection assignments are preserved for structured
+request diagnostics.
 
 Resource option paths trim surrounding whitespace when assigned, matching the
 secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and

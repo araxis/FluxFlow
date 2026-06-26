@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.1.5
+
+Hardens configuration validation request contracts.
+
+- `ConfigurationValidationRequest` now copies assigned resource and secret
+  collections so caller list mutations cannot change what a constructed request
+  represents.
+- Updates `FluxFlow.Components.Configuration` request contracts without changing
+  validation ownership.
+- Null resource and secret collection assignments are still preserved so
+  `ConfigurationValidator.ValidateAsync` can report structured invalid request
+  diagnostics.
+
 ## FluxFlow.Components.Secrets 1.2.6
 
 Hardens secret diagnostic metadata handling.
