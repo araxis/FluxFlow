@@ -7,6 +7,12 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.0
+
+Breaking: keyed client DI registration no longer starts the client with the host
+by default. Set `StartWithHost = true` when the host should start and stop the
+client session.
+
 ## FluxFlow.Components.Designer 2.2.8
 
 Hardens component design metadata module construction.

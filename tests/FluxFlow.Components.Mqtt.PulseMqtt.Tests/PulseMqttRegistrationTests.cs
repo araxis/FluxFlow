@@ -10,7 +10,7 @@ namespace FluxFlow.Components.Mqtt.PulseMqtt.Tests;
 public sealed class PulseMqttRegistrationTests
 {
     [Fact]
-    public async Task AddFluxFlowMqttClient_RegistersKeyedClientContracts()
+    public async Task AddFluxFlowMqttClient_RegistersKeyedClientContractsWithoutHostedLifetimeByDefault()
     {
         var services = new ServiceCollection();
         services.AddFluxFlowMqttClient(
@@ -19,8 +19,7 @@ public sealed class PulseMqttRegistrationTests
             {
                 Host = "localhost",
                 AllowOfflinePublishQueue = true
-            },
-            new MqttClientRegistrationOptions { StartWithHost = false });
+            });
 
         await using var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredKeyedService<PulseMqttClient>("primary");
