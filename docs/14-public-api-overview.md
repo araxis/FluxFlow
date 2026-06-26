@@ -775,7 +775,9 @@ These packages are intentionally not standalone node composition adapters:
   fluent `InMemorySecretResolverBuilder` for local secret record authoring.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
-  services, including deterministic most-specific context factory lookup.
+  services, deterministic most-specific context factory lookup, and keyed DI
+  registration helpers for host-owned expression engines and typed map context
+  factories.
 - `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
   fluent event input authoring, record mapping, store contracts, store
   factory/context/lease helpers, keyed DI registration helpers, retention
