@@ -278,6 +278,47 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_registry_extension_methods_are_documented()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var publicApiOverview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var readmePath = Path.Combine(projectDirectory, "README.md");
+            File.Exists(readmePath)
+                .ShouldBeTrue($"{entry.PackageId} must include a package README.");
+
+            var readme = File.ReadAllText(readmePath);
+            var project = XDocument.Load(projectPath);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var registryMethods = ReadRegistryMethods(assembly, entry.PackageId)
+                .Select(method => method.Name)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            registryMethods.ShouldNotBeEmpty(
+                $"{entry.PackageId} must expose at least one registry extension method.");
+
+            foreach (var registryMethod in registryMethods)
+            {
+                readme.Contains(registryMethod, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} README must document registry method {registryMethod}.");
+                publicApiOverview.Contains(registryMethod, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} public API overview entry must document registry method {registryMethod}.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_is_documented()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
