@@ -23,6 +23,26 @@ public sealed class ComponentPackageBoundaryTests
         "*ComponentDesignMetadataProvider.cs"
     ];
 
+    private static readonly string[] SupportOnlyComponentPackageIds =
+    [
+        "FluxFlow.Components.Configuration",
+        "FluxFlow.Components.Expressions",
+        "FluxFlow.Components.Journal",
+        "FluxFlow.Components.Resources",
+        "FluxFlow.Components.Secrets",
+        "FluxFlow.Components.Storage.FileSystem",
+        "FluxFlow.Components.Storage.SqlFile"
+    ];
+
+    private static readonly string[] ForbiddenSupportOnlyReferences =
+    [
+        "FluxFlow.Nodes",
+        "FluxFlow.Engine",
+        "FluxFlow.Composition",
+        "FluxFlow.Composition.Hosting",
+        "FluxFlow.Components.Designer"
+    ];
+
     [Fact]
     public void Non_composition_component_packages_stay_free_of_composition_designer_and_engine_references()
     {
@@ -32,7 +52,7 @@ public sealed class ComponentPackageBoundaryTests
         {
             var project = XDocument.Load(ReadProjectPath(root, entry));
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var referencedPackageIds = ReadReferencedPackageIds(project, projectDirectory)
+            var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
                 .ToArray();
 
             foreach (var forbiddenReference in ForbiddenNonCompositionReferences)
@@ -41,6 +61,51 @@ public sealed class ComponentPackageBoundaryTests
                     forbiddenReference,
                     $"{entry.PackageId} must keep composition, Designer, and engine dependencies in optional adapter packages.");
             }
+        }
+    }
+
+    [Fact]
+    public void Support_only_component_packages_stay_free_of_node_runtime_references()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entriesByPackageId = PackageManifest
+            .Read(root)
+            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
+
+        foreach (var packageId in SupportOnlyComponentPackageIds)
+        {
+            entriesByPackageId.ContainsKey(packageId)
+                .ShouldBeTrue($"{packageId} must stay listed in the package manifest.");
+        }
+
+        foreach (var packageId in SupportOnlyComponentPackageIds.Order(StringComparer.Ordinal))
+        {
+            var entry = entriesByPackageId[packageId];
+            var project = XDocument.Load(ReadProjectPath(root, entry));
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var referencedPackageIds = ReadAllReferencedPackageIds(project, projectDirectory)
+                .ToArray();
+
+            foreach (var forbiddenReference in ForbiddenSupportOnlyReferences)
+            {
+                referencedPackageIds.ShouldNotContain(
+                    forbiddenReference,
+                    $"{entry.PackageId} must stay a support package; node runtimes belong in normal component packages or optional adapters.");
+            }
+
+            var nodeFiles = Directory
+                .EnumerateFiles(projectDirectory, "*Node.cs", SearchOption.AllDirectories)
+                .Select(file => Path.GetRelativePath(projectDirectory, file))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            var nodeDirectories = Directory
+                .EnumerateDirectories(projectDirectory, "Nodes", SearchOption.AllDirectories)
+                .Select(directory => Path.GetRelativePath(projectDirectory, directory))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            nodeFiles.ShouldBeEmpty($"{entry.PackageId} must not ship node classes.");
+            nodeDirectories.ShouldBeEmpty($"{entry.PackageId} must not ship a Nodes folder.");
         }
     }
 
@@ -142,6 +207,18 @@ public sealed class ComponentPackageBoundaryTests
                 referencedProjectPath);
         }
     }
+
+    private static IEnumerable<string> ReadAllReferencedPackageIds(
+        XDocument project,
+        string projectDirectory)
+        => ReadReferencedPackageIds(project, projectDirectory)
+            .Concat(ReadPackageReferenceIds(project));
+
+    private static IEnumerable<string> ReadPackageReferenceIds(XDocument project)
+        => project
+            .Descendants("PackageReference")
+            .Select(reference => reference.Attribute("Include")?.Value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))!;
 
     private static string ReadRequiredProperty(
         XDocument project,
