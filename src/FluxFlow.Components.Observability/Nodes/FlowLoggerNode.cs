@@ -32,20 +32,18 @@ public sealed class FlowLoggerNode<TInput> : FlowNode<TInput, FlowLogEntry>
         FlowLoggerOptions options,
         IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>>? attributeSelectors = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), attributeSelectors, clock)
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "Logger bounded capacity must be greater than zero.");
-        }
+    }
 
-        _options = options;
-        _level = options.ResolveLevel();
+    private FlowLoggerNode(
+        ValidatedOptions options,
+        IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>>? attributeSelectors,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.LoggerOptions;
+        _level = options.Level;
         _attributeSelectors = attributeSelectors
             ?? new Dictionary<string, IObservabilityValueSelector<TInput>>(StringComparer.Ordinal);
         _clock = clock ?? TimeProvider.System;
@@ -162,5 +160,37 @@ public sealed class FlowLoggerNode<TInput> : FlowNode<TInput, FlowLogEntry>
         };
 
         return string.Join("; ", values);
+    }
+
+    private static ValidatedOptions ValidateOptions(FlowLoggerOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.logger option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.logger option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(FlowLoggerOptions loggerOptions)
+    {
+        public FlowLoggerOptions LoggerOptions { get; } = loggerOptions;
+
+        public FlowLogLevel Level { get; } = loggerOptions.ResolveLevel();
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = loggerOptions.BoundedCapacity
+        };
     }
 }

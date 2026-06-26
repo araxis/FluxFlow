@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Observability 3.0.1
+
+Aligns observability node constructor option validation with the standalone
+node conventions.
+
+- `FlowCounterNode<TInput>`, `FlowLoggerNode<TInput>`, and
+  `FlowMetricsNode<TInput>` now validate options before the base node pipeline
+  is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  observability-specific construction errors.
+- Logger level validation remains fail-fast during construction.
+
+## FluxFlow.Components.Observability.Composition 1.2.1
+
+Hardens config-bound observability option diagnostics.
+
+- Invalid observability options now fail during composition build through the
+  `flow.counter`, `flow.logger`, and `flow.metrics` factories.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
 ## FluxFlow.Components.Control 3.0.1
 
 Aligns control node constructor option validation with the standalone node

@@ -164,6 +164,18 @@ public sealed class FlowCounterNodeTests
     public void Constructor_RequiresOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowCounterNode<string>(null!));
 
+    [Fact]
+    public void Constructor_RequiresNonEmptyInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowCounterNode<string>(
+                new FlowCounterOptions { InputType = " " }));
+
+    [Fact]
+    public void Constructor_RequiresPositiveBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowCounterNode<string>(
+                new FlowCounterOptions { BoundedCapacity = 0 }));
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

@@ -33,19 +33,17 @@ public sealed class FlowMetricsNode<TInput> : FlowNode<TInput, FlowMetricSnapsho
         FlowMetricsOptions options,
         IObservabilityValueSelector<TInput>? sizeSelector = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), sizeSelector, clock)
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "Metrics bounded capacity must be greater than zero.");
-        }
+    }
 
-        _options = options;
+    private FlowMetricsNode(
+        ValidatedOptions options,
+        IObservabilityValueSelector<TInput>? sizeSelector,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.MetricsOptions;
         _sizeSelector = sizeSelector;
         _clock = clock ?? TimeProvider.System;
         _nodeContext = new ObservabilityNodeContext
@@ -183,5 +181,35 @@ public sealed class FlowMetricsNode<TInput> : FlowNode<TInput, FlowMetricSnapsho
     {
         var seconds = (observedAt - firstObservedAt).TotalSeconds;
         return seconds <= 0 ? count : count / seconds;
+    }
+
+    private static ValidatedOptions ValidateOptions(FlowMetricsOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.metrics option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.metrics option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(FlowMetricsOptions metricsOptions)
+    {
+        public FlowMetricsOptions MetricsOptions { get; } = metricsOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = metricsOptions.BoundedCapacity
+        };
     }
 }

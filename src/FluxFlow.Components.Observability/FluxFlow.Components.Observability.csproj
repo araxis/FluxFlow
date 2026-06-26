@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone observer nodes for FluxFlow (counter, logger, metrics) built on the FluxFlow.Nodes kit: an input in, a snapshot or log entry broadcast out — all carrying the message correlation id. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt the counter, logger, and metrics nodes as standalone FlowNode&lt;TInput, TOutput&gt; processors over the FluxFlow.Nodes kit: input in, a FlowCounterSnapshot / FlowLogEntry / FlowMetricSnapshot broadcast out, failures on the error port and diagnostics on the events port — all carrying the message correlation id. The engine factory, module, registration extensions, design-metadata provider, component-type/port constants, the definition-options reader, and the type/selector/expression-engine/context-factory resolution layer are removed; each node takes its options record (and, for the counter, an IFlowExpressionEngine and optional IFlowMapContextFactory from FluxFlow.Mapping) plus an optional TimeProvider directly, and depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns observability constructor option validation with standalone node conventions: counter, logger, and metrics nodes now reject empty inputType and non-positive boundedCapacity values before the node pipeline is created, while logger level validation remains fail-fast.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

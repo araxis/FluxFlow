@@ -584,6 +584,36 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             "level");
     }
 
+    [Fact]
+    public async Task Invalid_counter_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Counter,
+            registry => registry.RegisterCounter<TestMessage>(),
+            node => node.Configure("boundedCapacity", 0),
+            "boundedCapacity");
+    }
+
+    [Fact]
+    public async Task Invalid_logger_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Logger,
+            registry => registry.RegisterLogger<TestMessage>(),
+            node => node.Configure("inputType", " "),
+            "inputType");
+    }
+
+    [Fact]
+    public async Task Invalid_metrics_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Metrics,
+            registry => registry.RegisterMetrics<TestMessage>(),
+            node => node.Configure("boundedCapacity", 0),
+            "boundedCapacity");
+    }
+
     private static void AssertMetadata<TOutput>(
         CompositionNodeRegistry registry,
         string nodeType)

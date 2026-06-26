@@ -327,7 +327,8 @@ Use `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
 `FluxFlow.Components.Observability.Composition` package when a composition host
 wants counter, logger, or metrics node factories. The factories bind existing
 observability options and resolve host-owned keyed expression, selector,
-context, and clock resources.
+context, and clock resources. Invalid observability options fail during build
+as factory diagnostics when the host is configured to collect build failures.
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the three observability composition nodes, including existing option records
