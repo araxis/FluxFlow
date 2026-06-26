@@ -18,7 +18,13 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
         IconKey = "shield-check",
         PreferredNodeName = "validate",
         SuggestedEditorWidth = 460,
-        Options =
+        Options = JsonSchemaValidatorOptionsMetadata(),
+        Resources = JsonSchemaValidatorResources(),
+        Ports = JsonSchemaValidatorPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> JsonSchemaValidatorOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -73,8 +79,10 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 Min = 1,
                 HelperText = "Maximum queued input messages."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> JsonSchemaValidatorResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -92,8 +100,10 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 Summary = "Optional keyed clock for deterministic validation results and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> JsonSchemaValidatorPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -137,6 +147,5 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 Summary = "Original input when validation fails.",
                 ValueType = "TInput"
             }
-        ]
-    };
+        ];
 }
