@@ -82,30 +82,34 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
             Resources = ClockResources(),
             Ports =
             [
-                new PortDesignMetadata
-                {
-                    Name = new ComponentPortName(SerializationCompositionPortNames.Input),
-                    Direction = PortDirection.Input,
-                    DisplayName = "Input",
-                    Group = "Messages",
-                    Order = 0,
-                    Summary = "Serialization request message.",
-                    ValueType = inputType,
-                    IsPrimary = true
-                },
-                new PortDesignMetadata
-                {
-                    Name = new ComponentPortName(SerializationCompositionPortNames.Output),
-                    Direction = PortDirection.Output,
-                    DisplayName = "Output",
-                    Group = "Results",
-                    Order = 1,
-                    Summary = "Serialization result message.",
-                    ValueType = outputType,
-                    IsPrimary = true
-                }
+                InputPort(inputType),
+                OutputPort(outputType)
             ]
         };
+
+    private static PortDesignMetadata InputPort(string valueType) => new()
+    {
+        Name = new ComponentPortName(SerializationCompositionPortNames.Input),
+        Direction = PortDirection.Input,
+        DisplayName = "Input",
+        Group = "Messages",
+        Order = 0,
+        Summary = "Serialization request message.",
+        ValueType = valueType,
+        IsPrimary = true
+    };
+
+    private static PortDesignMetadata OutputPort(string valueType) => new()
+    {
+        Name = new ComponentPortName(SerializationCompositionPortNames.Output),
+        Direction = PortDirection.Output,
+        DisplayName = "Output",
+        Group = "Results",
+        Order = 1,
+        Summary = "Serialization result message.",
+        ValueType = valueType,
+        IsPrimary = true
+    };
 
     private static IReadOnlyList<OptionDesignMetadata> SharedOptions()
         =>
