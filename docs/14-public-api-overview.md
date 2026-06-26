@@ -711,7 +711,8 @@ These packages are intentionally not standalone node composition adapters:
   diagnostic metadata copying.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
-  option paths, and null-safe normalized metadata validation.
+  option paths, null-safe normalized metadata validation, and defensive
+  diagnostic metadata copying.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services.

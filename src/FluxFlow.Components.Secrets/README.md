@@ -99,6 +99,8 @@ diagnostics.
 Null record entries, null reference entries, and null option entries inside
 batch helpers are reported as structured invalid-secret diagnostics instead of
 surfacing accidental null-reference failures.
+`SecretDiagnostic` copies assigned metadata, treats null diagnostic metadata as
+empty, and formats without exposing metadata values.
 
 `SecretName`, secret `Version`, `Kind`, `DisplayName`, `Summary`, and secret
 option paths trim surrounding whitespace when assigned. This keeps
