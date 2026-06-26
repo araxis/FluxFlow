@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.5.0
+
+Adds keyed resource registration helpers.
+
+- Adds `AddFluxFlowResourceLookup(...)` for registering host-owned
+  `IResourceLookup` services in keyed DI.
+- Adds `AddFluxFlowResourceDescriptorProvider(...)` for registering host-owned
+  `IResourceDescriptorProvider` services in keyed DI.
+- Registers keyed resource lookups as descriptor providers under the same key
+  so metadata-only consumers can reuse lookup-backed catalogs.
+
 ## FluxFlow.Components.Expressions 2.1.0
 
 Adds keyed expression service registration helpers.

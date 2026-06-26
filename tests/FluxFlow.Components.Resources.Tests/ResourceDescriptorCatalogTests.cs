@@ -1,4 +1,5 @@
 using FluxFlow.Components.Resources.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -89,6 +90,131 @@ public sealed class ResourceDescriptorCatalogTests
         descriptor.Name.ShouldBe(new ResourceName("primary"));
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Profile");
+    }
+
+    [Fact]
+    public async Task Service_registration_registers_keyed_lookup_and_descriptor_provider_alias()
+    {
+        var catalog = new ResourceDescriptorCatalogBuilder()
+            .Add("primary", kind: "profile")
+            .BuildCatalog();
+        var services = new ServiceCollection()
+            .AddFluxFlowResourceLookup("resources", catalog);
+
+        using var provider = services.BuildServiceProvider();
+        var lookup = provider.GetRequiredKeyedService<IResourceLookup>("resources");
+        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources");
+        var result = await lookup.LookupAsync(new ResourceReference
+        {
+            Name = new ResourceName("primary"),
+            Kind = "profile"
+        });
+
+        lookup.ShouldBeSameAs(catalog);
+        descriptors.ShouldBeSameAs(catalog);
+        result.Found.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Service_registration_registers_keyed_descriptor_provider()
+    {
+        var descriptor = CreateDescriptor("primary", "profile");
+        var descriptorProvider = new StaticResourceDescriptorProvider([descriptor]);
+        var services = new ServiceCollection()
+            .AddFluxFlowResourceDescriptorProvider("resources", descriptorProvider);
+
+        using var provider = services.BuildServiceProvider();
+        var resolved = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources");
+
+        resolved.ShouldBeSameAs(descriptorProvider);
+        resolved.GetResources().ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
+    }
+
+    [Fact]
+    public void Service_registration_passes_provider_to_factories()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(new ResourceRegistrationDependency("primary"));
+        services
+            .AddFluxFlowResourceLookup(
+                "lookup",
+                provider => new ResourceDescriptorCatalogBuilder()
+                    .Add(provider.GetRequiredService<ResourceRegistrationDependency>().Name, kind: "profile")
+                    .BuildCatalog())
+            .AddFluxFlowResourceDescriptorProvider(
+                "provider",
+                provider => new StaticResourceDescriptorProvider(
+                [
+                    CreateDescriptor(
+                        provider.GetRequiredService<ResourceRegistrationDependency>().Name,
+                        "profile")
+                ]));
+
+        using var provider = services.BuildServiceProvider();
+        var lookup = provider.GetRequiredKeyedService<IResourceLookup>("lookup");
+        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("provider")
+            .GetResources();
+
+        lookup.GetResources().ShouldHaveSingleItem().Name.ShouldBe(new ResourceName("primary"));
+        descriptors.ShouldHaveSingleItem().Name.ShouldBe(new ResourceName("primary"));
+    }
+
+    [Fact]
+    public void Service_registration_rejects_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+        var lookup = new ResourceDescriptorCatalog([]);
+        var descriptorProvider = new StaticResourceDescriptorProvider([]);
+
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(null!, "resources", lookup))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceLookup(" ", lookup))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowResourceLookup("resources", (IResourceLookup)null!))
+            .ParamName.ShouldBe("lookup");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowResourceLookup("resources", (Func<IServiceProvider, IResourceLookup>)null!))
+            .ParamName.ShouldBe("lookupFactory");
+
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceServiceCollectionExtensions.AddFluxFlowResourceDescriptorProvider(
+                null!,
+                "resources",
+                descriptorProvider))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceDescriptorProvider(" ", descriptorProvider))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowResourceDescriptorProvider(
+                "resources",
+                (IResourceDescriptorProvider)null!))
+            .ParamName.ShouldBe("descriptorProvider");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowResourceDescriptorProvider(
+                "resources",
+                (Func<IServiceProvider, IResourceDescriptorProvider>)null!))
+            .ParamName.ShouldBe("descriptorProviderFactory");
+    }
+
+    [Fact]
+    public void Service_registration_rejects_null_factory_results()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowResourceLookup("lookup", _ => null!)
+            .AddFluxFlowResourceDescriptorProvider("provider", _ => null!);
+
+        using var provider = services.BuildServiceProvider();
+
+        Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IResourceLookup>("lookup"))
+            .Message.ShouldContain("Resource lookup factory returned null.");
+        Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IResourceDescriptorProvider>("provider"))
+            .Message.ShouldContain("Resource descriptor provider factory returned null.");
     }
 
     [Fact]
@@ -545,4 +671,12 @@ public sealed class ResourceDescriptorCatalogTests
             ["owner"] = "runtime"
         }
     };
+
+    private sealed record ResourceRegistrationDependency(string Name);
+
+    private sealed class StaticResourceDescriptorProvider(
+        IReadOnlyCollection<ResourceDescriptor> descriptors) : IResourceDescriptorProvider
+    {
+        public IReadOnlyCollection<ResourceDescriptor> GetResources() => descriptors;
+    }
 }

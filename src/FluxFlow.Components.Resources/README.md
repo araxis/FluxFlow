@@ -16,6 +16,8 @@ component packages to a concrete owner or lifecycle model.
   declared resources.
 - `IResourceLookup`: a small lookup abstraction hosts can back with their own
   resource lifecycle; it also exposes declared descriptors.
+- `ResourceServiceCollectionExtensions`: keyed DI registration helpers for
+  host-owned lookups and descriptor providers.
 - `ResourceDescriptorCatalogBuilder`: a fluent helper that creates
   `ResourceDescriptor` snapshots or a validated `ResourceDescriptorCatalog`.
 - `ResourceLookupResult`: lookup outcome plus a structured diagnostic when a
@@ -111,6 +113,20 @@ resources are created, secured, refreshed, shared, disposed, and displayed.
 lookup call sites that resolve a specific `ResourceReference`.
 `ResourceDescriptorCatalogBuilder` is only an authoring helper over the same
 descriptor and catalog contracts; it does not create or own concrete resources.
+
+Hosts using keyed DI can register resource lookups and descriptor providers
+directly:
+
+```csharp
+services
+    .AddFluxFlowResourceLookup("resources", catalog)
+    .AddFluxFlowResourceDescriptorProvider("declared-resources", descriptorProvider);
+```
+
+Registering an `IResourceLookup` also exposes it as an
+`IResourceDescriptorProvider` with the same key. These helpers only register
+already-owned services; they do not create clients, stores, secrets, or
+composition node factories.
 
 ## Composition
 
