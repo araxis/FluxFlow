@@ -7,6 +7,27 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Control 3.0.1
+
+Aligns control node constructor option validation with the standalone node
+conventions.
+
+- Expression-backed `FilterNode<TInput>` and `WhenNode<TInput>` constructors
+  now require a non-empty `Expression`.
+- All control node constructors now reject blank `InputType` and non-positive
+  `BoundedCapacity` values before the node pipeline is created.
+- Compiled-predicate constructors remain available without an expression.
+
+## FluxFlow.Components.Control.Composition 1.2.1
+
+Hardens config-bound control option diagnostics.
+
+- Invalid `ControlExpressionOptions` values now fail during composition build
+  through the `flow.filter` and `flow.when` factories.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
 ## FluxFlow.Components.Mapping 3.0.1
 
 Hardens mapper option validation.

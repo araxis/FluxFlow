@@ -192,6 +192,34 @@ public sealed class FilterNodeTests
                 new ControlExpressionOptions { Expression = "  " },
                 new RecordingExpressionEngine()));
 
+    [Fact]
+    public void Constructor_WithCompiledPredicate_DoesNotRequireExpression()
+        => Should.NotThrow(() => new FilterNode<int>(
+            new ControlExpressionOptions(),
+            new DelegateFlowPredicate<int>(_ => true)));
+
+    [Fact]
+    public void Constructor_RequiresNonEmptyInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FilterNode<int>(
+                new ControlExpressionOptions
+                {
+                    Expression = "pass",
+                    InputType = " "
+                },
+                new RecordingExpressionEngine()));
+
+    [Fact]
+    public void Constructor_RequiresPositiveBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FilterNode<int>(
+                new ControlExpressionOptions
+                {
+                    Expression = "pass",
+                    BoundedCapacity = 0
+                },
+                new RecordingExpressionEngine()));
+
     private static ControlExpressionOptions Options(
         string expression,
         string? expressionId = null,
