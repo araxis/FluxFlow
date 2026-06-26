@@ -87,6 +87,46 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Validation_request_copies_collections_and_preserves_null_assignments()
+    {
+        var resources = new List<ConfigurationResourceReference>
+        {
+            new()
+            {
+                Path = "connections.primary",
+                Required = false
+            }
+        };
+        var secrets = new List<SecretOptionReference>
+        {
+            new()
+            {
+                OptionPath = "connections.primary.credential",
+                Required = false
+            }
+        };
+
+        var request = new ConfigurationValidationRequest
+        {
+            Resources = resources,
+            Secrets = secrets
+        };
+        var nullRequest = new ConfigurationValidationRequest
+        {
+            Resources = null!,
+            Secrets = null!
+        };
+
+        resources.Clear();
+        secrets.Clear();
+
+        request.Resources.Count.ShouldBe(1);
+        request.Secrets.Count.ShouldBe(1);
+        ((object?)nullRequest.Resources).ShouldBeNull();
+        ((object?)nullRequest.Secrets).ShouldBeNull();
+    }
+
+    [Fact]
     public async Task ValidateAsync_returns_empty_report_for_valid_references()
     {
         var resourceLookup = new ResourceDescriptorCatalog(

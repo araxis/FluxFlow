@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.1.4</Version>
+    <Version>1.1.5</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Configuration diagnostics and validation reports now normalize text fields and copy assigned metadata and diagnostic collections so caller mutations cannot change report contents.</PackageReleaseNotes>
+    <PackageReleaseNotes>Configuration validation requests now copy assigned resource and secret collections while preserving null collection assignments for structured validation diagnostics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
