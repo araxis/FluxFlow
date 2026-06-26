@@ -33,34 +33,20 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
         SessionQueryOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : this(ResolveArguments(options, store), clock)
+    {
+    }
+
+    private SessionQueryNode(
+        ResolvedSessionQueryArguments resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+            InputCapacity = resolved.Options.BoundedCapacity
         })
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.query bounded capacity must be greater than zero.");
-        }
-
-        if (options.Limit <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.query limit must be greater than zero.");
-        }
-
-        if (!options.IncludeActive && !options.IncludeCompleted)
-        {
-            throw new ArgumentException(
-                "session.query must include active sessions, completed sessions, or both.",
-                nameof(options));
-        }
-
-        _options = options;
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
         _sessions = AddOutput<FlowMessage<SessionMetadata>>();
 
@@ -414,4 +400,39 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ResolvedSessionQueryArguments ResolveArguments(
+        SessionQueryOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.query bounded capacity must be greater than zero.");
+        }
+
+        if (options.Limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.query limit must be greater than zero.");
+        }
+
+        if (!options.IncludeActive && !options.IncludeCompleted)
+        {
+            throw new ArgumentException(
+                "session.query must include active sessions, completed sessions, or both.",
+                nameof(options));
+        }
+
+        return new ResolvedSessionQueryArguments(options, store);
+    }
+
+    private sealed record ResolvedSessionQueryArguments(
+        SessionQueryOptions Options,
+        ISessionStore Store);
 }

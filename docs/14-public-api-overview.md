@@ -568,6 +568,9 @@ Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 session node factories. The factories bind existing session options, resolve a
 required keyed `ISessionStore`, and can resolve an optional keyed
 `TimeProvider` resource through the host.
+Invalid session option values fail during composition build through the factory
+path, so hosts that collect build diagnostics receive `FactoryFailed` entries
+instead of a partially created runtime.
 
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the three session composition nodes, including existing session options and fixed
