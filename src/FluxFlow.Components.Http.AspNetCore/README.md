@@ -27,6 +27,8 @@ graph and starts consuming) and disposes it on shutdown.
 The registration validates the service collection, trigger name, and graph
 configuration delegate. Trigger source capacity comes from `RequestReplyOptions`
 and must be greater than zero.
+`MapFluxFlowTrigger` validates the endpoint builder, route pattern, trigger name
+or direct coordinator before handing the route to framework routing.
 
 ## Composition
 

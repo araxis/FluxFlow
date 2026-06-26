@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http.AspNetCore 1.0.2
+
+Hardens HTTP trigger endpoint authoring.
+
+- `MapFluxFlowTrigger(...)` now rejects blank route patterns for keyed trigger
+  and direct coordinator overloads before delegating to framework routing.
+- Documents the HTTP trigger adapter in the public API overview.
+
 ## FluxFlow.Components.Designer 2.3.1
 
 Improves fluent Designer metadata authoring.
