@@ -214,6 +214,12 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             // Output closed (shutdown) before the request reached the graph.
             await SafeFailAsync(removed, new InvalidOperationException(
                 "The request/reply bridge is shutting down.")).ConfigureAwait(false);
+            return;
+        }
+
+        if (accepted)
+        {
+            EmitEvent(RequestReplyEvents.Published, id);
         }
     }
 
