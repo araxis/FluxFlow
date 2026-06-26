@@ -25,6 +25,16 @@ Adds fluent configuration validation request building.
 - Keeps resource lookup, secret resolution, ownership, and validation behavior
   unchanged.
 
+## FluxFlow.Components.Resources 1.3.0
+
+Adds fluent resource descriptor catalog building.
+
+- Adds `ResourceDescriptorCatalogBuilder` to
+  `FluxFlow.Components.Resources` for declaring resource descriptors with the
+  existing descriptor and catalog contracts.
+- Keeps resource creation, lifecycle, lookup ownership, and diagnostic
+  validation behavior unchanged.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

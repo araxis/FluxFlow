@@ -14,6 +14,8 @@ component packages to a concrete owner or lifecycle model.
   and metadata.
 - `IResourceLookup`: a small lookup abstraction hosts can back with their own
   resource lifecycle.
+- `ResourceDescriptorCatalogBuilder`: a fluent helper that creates
+  `ResourceDescriptor` snapshots or a validated `ResourceDescriptorCatalog`.
 - `ResourceLookupResult`: lookup outcome plus a structured diagnostic when a
   resource cannot be used.
 - `ResourceDiagnostic`: stable diagnostics for missing, duplicate, unused, kind
@@ -48,6 +50,22 @@ var result = await catalog.LookupAsync(new ResourceReference
 Console.WriteLine(result.Found);
 ```
 
+Fluent descriptor construction is available when code wants the same descriptor
+shape with less object setup:
+
+```csharp
+var catalog = new ResourceDescriptorCatalogBuilder()
+    .Add(
+        "primary-profile",
+        kind: "profile",
+        displayName: "Primary Profile",
+        metadata: new Dictionary<string, string>
+        {
+            ["owner"] = "runtime"
+        })
+    .BuildCatalog();
+```
+
 ## Diagnostics
 
 Use `ResourceDiagnostics` to:
@@ -79,6 +97,8 @@ invalid-resource diagnostics.
 
 This package only defines resource contracts and helper logic. Hosts decide how
 resources are created, secured, refreshed, shared, disposed, and displayed.
+`ResourceDescriptorCatalogBuilder` is only an authoring helper over the same
+descriptor and catalog contracts; it does not create or own concrete resources.
 
 ## Composition
 

@@ -7,6 +7,102 @@ namespace FluxFlow.Components.Resources.Tests;
 public sealed class ResourceDescriptorCatalogTests
 {
     [Fact]
+    public async Task Catalog_builder_creates_normalized_descriptor_and_lookup_catalog()
+    {
+        var catalog = new ResourceDescriptorCatalogBuilder()
+            .Add(
+                " primary-profile ",
+                kind: " profile ",
+                displayName: " Primary Profile ",
+                summary: " Runtime profile. ",
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .BuildCatalog();
+
+        var descriptor = catalog.GetResources().ShouldHaveSingleItem();
+        descriptor.Name.ShouldBe(new ResourceName("primary-profile"));
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary Profile");
+        descriptor.Summary.ShouldBe("Runtime profile.");
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+
+        var result = await catalog.LookupAsync(new ResourceReference
+        {
+            Name = new ResourceName("primary-profile"),
+            Kind = "profile"
+        });
+
+        result.Found.ShouldBeTrue();
+        result.Descriptor.ShouldBeSameAs(descriptor);
+    }
+
+    [Fact]
+    public void Catalog_builder_accepts_existing_descriptors_and_snapshots_build_results()
+    {
+        var builder = new ResourceDescriptorCatalogBuilder()
+            .Add(CreateDescriptor("primary", "profile"));
+
+        var descriptors = builder.BuildDescriptors();
+        builder.Add(CreateDescriptor("secondary", "profile"));
+
+        descriptors.Count.ShouldBe(1);
+        descriptors[0].Name.ShouldBe(new ResourceName("primary"));
+        builder.BuildDescriptors().Select(descriptor => descriptor.Name).ShouldBe(
+        [
+            new ResourceName("primary"),
+            new ResourceName("secondary")
+        ]);
+    }
+
+    [Fact]
+    public void Catalog_builder_add_range_preserves_order()
+    {
+        var descriptors = new ResourceDescriptorCatalogBuilder()
+            .AddRange(
+            [
+                CreateDescriptor("first", "profile"),
+                CreateDescriptor("second", "profile")
+            ])
+            .BuildDescriptors();
+
+        descriptors.Select(descriptor => descriptor.Name).ShouldBe(
+        [
+            new ResourceName("first"),
+            new ResourceName("second")
+        ]);
+    }
+
+    [Fact]
+    public void Catalog_builder_uses_existing_catalog_validation()
+    {
+        var builder = new ResourceDescriptorCatalogBuilder()
+            .Add(CreateDescriptor("primary", "profile"))
+            .Add(CreateDescriptor("primary", "credential"));
+
+        var exception = Should.Throw<InvalidOperationException>(() => builder.BuildCatalog());
+
+        exception.Message.ShouldContain(nameof(ResourceDiagnosticCode.DuplicateResource));
+    }
+
+    [Fact]
+    public void Catalog_builder_rejects_null_existing_descriptors()
+    {
+        var builder = new ResourceDescriptorCatalogBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.Add((ResourceDescriptor)null!));
+    }
+
+    [Fact]
+    public void Catalog_builder_rejects_null_descriptor_ranges()
+    {
+        var builder = new ResourceDescriptorCatalogBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.AddRange(null!));
+    }
+
+    [Fact]
     public async Task Lookup_returns_descriptor_for_matching_reference()
     {
         var descriptor = CreateDescriptor("primary-profile", "profile");
