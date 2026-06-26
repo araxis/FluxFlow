@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>3.1.0</Version>
+    <Version>3.1.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone file system nodes for FluxFlow: file.read and file.write transforms (request in, result out), plus directory.enumerate and file.watch sources. Built on FluxFlow.Nodes with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires directory.enumerate and file.watch boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Directory enumeration now awaits output-block acceptance; file watch keeps nonblocking watcher callbacks while using the configured bounded source output.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns FileSystem construction validation with the standalone node conventions. Directory enumeration and file watching now validate all construction options before source pipelines are created; read/write constructors keep the same fail-fast option behavior with simpler constructor paths.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

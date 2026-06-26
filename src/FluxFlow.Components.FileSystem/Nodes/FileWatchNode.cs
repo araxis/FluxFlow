@@ -30,12 +30,18 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
     public FileWatchNode(
         FileWatchOptions options,
         TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : this(ResolveOptions(options), clock)
     {
-        _options = options;
+    }
+
+    private FileWatchNode(
+        ResolvedFileWatchOptions resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
-        ValidateOptions(_options);
-        _notifyFilters = FileWatchNotifyFilters.Resolve(_options);
+        _notifyFilters = resolved.NotifyFilters;
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -223,8 +229,17 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
             Exception = exception
         });
 
-    private static void ValidateOptions(FileWatchOptions options)
+    private static ResolvedFileWatchOptions ResolveOptions(FileWatchOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "file.watch option 'boundedCapacity' must be greater than zero.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.Directory))
         {
             throw new ArgumentException(
@@ -245,20 +260,13 @@ public sealed class FileWatchNode : FlowSource<FileWatchEvent>
                 nameof(options),
                 "file.watch option 'internalBufferSize' must be between 4096 and 65536 bytes when set.");
         }
+
+        return new ResolvedFileWatchOptions(options, FileWatchNotifyFilters.Resolve(options));
     }
 
-    private static FlowSourceOptions BuildSourceOptions(FileWatchOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "file.watch option 'boundedCapacity' must be greater than zero.");
-        }
-
-        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
-    }
+    private sealed record ResolvedFileWatchOptions(
+        FileWatchOptions Options,
+        NotifyFilters NotifyFilters);
 
     private Dictionary<string, object?> CreateAttributes(string? resolvedDirectory = null)
     {

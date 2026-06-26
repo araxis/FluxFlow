@@ -7,6 +7,27 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.FileSystem 3.1.1
+
+Aligns FileSystem constructor option validation with the standalone node
+conventions.
+
+- `DirectoryEnumerateNode` and `FileWatchNode` now validate all construction
+  options before their source pipelines are created.
+- `FileReadNode` and `FileWriteNode` keep their existing fail-fast option
+  behavior with simpler constructor paths.
+- Runtime path-policy handling, file IO behavior, source lifecycle, events,
+  errors, and correlation propagation are unchanged.
+
+## FluxFlow.Components.FileSystem.Composition 1.3.1
+
+Hardens config-bound FileSystem option diagnostics.
+
+- Invalid read/write/default-encoding, directory enumeration, and file-watch
+  options now fail during composition build through the matching factories.
+- Adds hosted composition coverage proving invalid option values surface as
+  factory diagnostics when build failures are configured as diagnostics.
+
 ## FluxFlow.Components.Timers 3.1.1
 
 Aligns timer transform constructor option validation with the standalone node
