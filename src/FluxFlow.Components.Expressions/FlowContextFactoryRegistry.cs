@@ -32,44 +32,30 @@ public sealed class FlowContextFactoryRegistry<TFactory>
         ArgumentNullException.ThrowIfNull(inputType);
 
         if (_factories.TryGetValue(inputType, out var exact))
-        {
             return exact;
-        }
 
-        Type? bestType = null;
-        TFactory? bestFactory = null;
+        var matches = _factories
+            .Where(candidate => candidate.Key.IsAssignableFrom(inputType))
+            .ToArray();
 
-        foreach (var (candidateType, factory) in _factories)
-        {
-            if (!candidateType.IsAssignableFrom(inputType))
-            {
-                continue;
-            }
-
-            if (bestType is null || bestType.IsAssignableFrom(candidateType))
-            {
-                bestType = candidateType;
-                bestFactory = factory;
-            }
-        }
-
-        if (bestType is null)
-        {
+        if (matches.Length == 0)
             return _defaultFactory;
-        }
 
-        foreach (var (candidateType, _) in _factories)
-        {
-            if (candidateType.IsAssignableFrom(inputType) &&
-                !candidateType.IsAssignableFrom(bestType))
-            {
-                throw new InvalidOperationException(
-                    $"Context factory resolution for input type '{inputType}' is ambiguous: " +
-                    $"registrations for '{bestType}' and '{candidateType}' both match and neither is more specific. " +
-                    $"Register a context factory for '{inputType}' to disambiguate.");
-            }
-        }
+        var bestMatches = matches
+            .Where(candidate => matches.All(other =>
+                candidate.Key == other.Key || other.Key.IsAssignableFrom(candidate.Key)))
+            .ToArray();
 
-        return bestFactory!;
+        if (bestMatches.Length == 1)
+            return bestMatches[0].Value;
+
+        var candidateNames = matches
+            .Select(candidate => candidate.Key.FullName ?? candidate.Key.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        throw new InvalidOperationException(
+            $"Context factory resolution for input type '{inputType}' is ambiguous: " +
+            $"registrations for {string.Join(", ", candidateNames)} match and no single registration is more specific. " +
+            $"Register a context factory for '{inputType}' to disambiguate.");
     }
 }

@@ -16,6 +16,11 @@ Use `Use(engine, useAsDefault: false)` for a named-only engine that should be
 resolved explicitly by name but not become the fallback engine for empty names.
 Engine names are trimmed for registration and lookup. Blank lookup names are
 treated as the default engine, including when a custom resolver is configured.
+Context factory lookup prefers exact registrations, then a single most-specific
+assignable registration, then the default factory. If multiple assignable
+registrations match and no single registration is more specific than all others,
+lookup fails with a deterministic ambiguity diagnostic that lists the matching
+registration types.
 
 The package is intended for component package authors. Application code usually
 uses higher-level registration methods from packages such as Mapping, Control,

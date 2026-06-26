@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expressions 2.0.3
+
+Hardens context factory registry resolution.
+
+- `FlowContextFactoryRegistry<TFactory>` now evaluates matching registrations
+  as one set and returns the single most specific registration when one exists.
+- Ambiguous context factory matches now produce deterministic diagnostics that
+  list the matching registration types.
+- Adds explicit public guardrail coverage for null default factories,
+  registrations, and lookup input types.
+
 ## FluxFlow.Components.Configuration 1.1.5
 
 Hardens configuration validation request contracts.

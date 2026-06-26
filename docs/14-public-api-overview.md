@@ -716,7 +716,7 @@ These packages are intentionally not standalone node composition adapters:
   diagnostic metadata copying.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
-  services.
+  services, including deterministic most-specific context factory lookup.
 - `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
   record mapping, store contracts, and in-memory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
