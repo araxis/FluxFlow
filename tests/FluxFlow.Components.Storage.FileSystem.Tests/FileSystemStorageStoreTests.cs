@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
@@ -509,6 +510,33 @@ public sealed class FileSystemStorageStoreTests
         });
 
         lease.OwnsStore.ShouldBeFalse();
+        saved.Collection.ShouldBe("items");
+        Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Service_registration_can_register_keyed_store_directly()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path,
+                    DefaultCollection = "items"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredKeyedService<IStorageStore>("items-store");
+
+        var saved = await store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
         saved.Collection.ShouldBe("items");
         Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();

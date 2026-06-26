@@ -39,6 +39,20 @@ adapter-specific override.
 Hosts that use keyed resources can register the backend factory directly:
 
 ```csharp
+services.AddFluxFlowSqlFileStorageStore(
+    "items-store",
+    new SqlFileStorageStoreOptions
+    {
+        DatabasePath = "data/storage.db",
+        DefaultCollection = "items"
+    });
+```
+
+This registers a keyed `IStorageStore` for hosts that want a fixed opened store
+owned by DI. Hosts that need per-open context or a factory resource can register
+the backend factory instead:
+
+```csharp
 services.AddFluxFlowSqlFileStorageStoreFactory(
     "items-store",
     new SqlFileStorageStoreOptions
@@ -49,8 +63,9 @@ services.AddFluxFlowSqlFileStorageStoreFactory(
 ```
 
 This registers a keyed `IStorageStoreFactory`. Storage composition can reference
-the same key through the `store` resource and will open and release leases as
-part of composed node lifetime.
+either key through the `store` resource. Direct keyed stores are treated as
+shared host-owned stores; keyed factories are opened and released as part of
+composed node lifetime.
 
 ## Behavior
 
@@ -102,5 +117,5 @@ Invalid query paging and stored time ranges where `StoredFrom` is later than
 This package does not expose `FluxFlow.Composition` node factories. Use
 `FluxFlow.Components.Storage.Composition` for `storage.put`, `storage.get`,
 `storage.query`, and `storage.delete`; register either an opened
-`IStorageStore` or this package's keyed `IStorageStoreFactory` as a host-owned
-resource for those factories.
+keyed `IStorageStore` or this package's keyed `IStorageStoreFactory` as a
+host-owned resource for those factories.
