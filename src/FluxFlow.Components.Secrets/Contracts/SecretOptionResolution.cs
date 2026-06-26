@@ -20,7 +20,11 @@ public sealed record SecretOptionResolution
     public static SecretOptionResolution FromResult(
         SecretOptionReference option,
         SecretResolveResult result)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        ArgumentNullException.ThrowIfNull(result);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference,
@@ -28,23 +32,33 @@ public sealed record SecretOptionResolution
             Value = result.Value,
             Diagnostic = result.Diagnostic
         };
+    }
 
     public static SecretOptionResolution NotProvidedResult(SecretOptionReference option)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference
         };
+    }
 
     public static SecretOptionResolution Failed(
         SecretOptionReference option,
         SecretDiagnostic diagnostic)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        ArgumentNullException.ThrowIfNull(diagnostic);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference,
             Diagnostic = diagnostic
         };
+    }
 
     public override string ToString()
     {

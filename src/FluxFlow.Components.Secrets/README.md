@@ -33,6 +33,9 @@ is controlled, how values are refreshed, and how ownership is handled.
 `SecretResolveResult` factory helpers reject null references, descriptors, values,
 match collections, and blank diagnostic messages at the public boundary so
 invalid resolution outcomes fail with clear argument names.
+`SecretOptionResolution` factory helpers reject null option references,
+resolution results, and diagnostics at the same boundary so option-level
+outcomes fail with clear argument names.
 
 ## Example
 
