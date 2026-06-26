@@ -144,18 +144,30 @@ public static class ComponentDesignMetadataValidator
                 ValidateDefaultValueType<string>(option.DefaultValue, defaultValuePath, option.Kind, errors);
                 break;
             case OptionValueKind.Number:
-                if (!IsNumericDefaultValue(option.DefaultValue))
+                if (!TryReadNumericDefaultValue(option.DefaultValue, out var numericDefaultValue))
                 {
                     errors.Add(new DesignerMetadataValidationError(
                         defaultValuePath,
                         $"Default value for {option.Kind} options must be numeric."));
+                    break;
                 }
 
+                ValidateDefaultValueRange(option, numericDefaultValue, defaultValuePath, errors);
                 break;
             case OptionValueKind.Boolean:
                 ValidateDefaultValueType<bool>(option.DefaultValue, defaultValuePath, option.Kind, errors);
                 break;
             case OptionValueKind.Duration:
+                if (option.DefaultValue is TimeSpan durationDefaultValue)
+                {
+                    ValidateDefaultValueRange(
+                        option,
+                        durationDefaultValue.TotalSeconds,
+                        defaultValuePath,
+                        errors);
+                    break;
+                }
+
                 ValidateDefaultValueType<TimeSpan>(option.DefaultValue, defaultValuePath, option.Kind, errors);
                 break;
             case OptionValueKind.Enum:
@@ -211,12 +223,53 @@ public static class ComponentDesignMetadataValidator
             "Default value for enum options must match one of the option choices."));
     }
 
-    private static bool IsNumericDefaultValue(object value)
-        => value is byte or sbyte
+    private static bool TryReadNumericDefaultValue(
+        object value,
+        out double numericValue)
+    {
+        numericValue = value switch
+        {
+            byte typedValue => typedValue,
+            sbyte typedValue => typedValue,
+            short typedValue => typedValue,
+            ushort typedValue => typedValue,
+            int typedValue => typedValue,
+            uint typedValue => typedValue,
+            long typedValue => typedValue,
+            ulong typedValue => typedValue,
+            float typedValue => typedValue,
+            double typedValue => typedValue,
+            decimal typedValue => (double)typedValue,
+            _ => 0
+        };
+
+        return value is byte or sbyte
             or short or ushort
             or int or uint
             or long or ulong
             or float or double or decimal;
+    }
+
+    private static void ValidateDefaultValueRange(
+        OptionDesignMetadata option,
+        double defaultValue,
+        string defaultValuePath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        if (option.Min is { } min && defaultValue < min)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                defaultValuePath,
+                "Default value cannot be less than the option minimum."));
+        }
+
+        if (option.Max is { } max && defaultValue > max)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                defaultValuePath,
+                "Default value cannot be greater than the option maximum."));
+        }
+    }
 
     private static void ValidateChoiceUsage(
         OptionDesignMetadata option,

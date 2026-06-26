@@ -404,6 +404,61 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_number_and_duration_default_values_outside_range()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "belowMin",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = 0,
+                    Min = 1
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "aboveMax",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = 11,
+                    Max = 10
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "durationBelowMin",
+                    Kind = OptionValueKind.Duration,
+                    DefaultValue = TimeSpan.FromMilliseconds(500),
+                    Min = 1
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "durationAboveMax",
+                    Kind = OptionValueKind.Duration,
+                    DefaultValue = TimeSpan.FromSeconds(2),
+                    Max = 1
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("minimum", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[1].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("maximum", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[2].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("minimum", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[3].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("maximum", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_accepts_option_default_values_that_match_kind()
     {
         var metadata = new ComponentDesignMetadata
