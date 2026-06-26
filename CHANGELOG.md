@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.RequestReply 1.1.3
+
+Hardens request/reply option contracts.
+
+- `RequestReplyOptions` now rejects unsupported modes, non-positive capacity,
+  non-positive timeout, and non-positive sweep interval values when assigned.
+- `CorrelatedRequestTrackerOptions` now rejects non-positive timeout and sweep
+  interval values when assigned.
+- Adds direct option contract tests while keeping coordinator and tracker
+  constructor validation as defensive guardrails.
+
 ## FluxFlow.Components.Journal 2.0.3
 
 Hardens journal retention option contracts.

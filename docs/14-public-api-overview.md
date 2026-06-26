@@ -727,8 +727,8 @@ These packages are intentionally not standalone node composition adapters:
   record mapping, store contracts, retention option validation, and in-memory
   support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
-  with fail-fast option validation, and is intentionally not covered by
-  composition adapters in this pass.
+  with self-validating request/reply and tracker option contracts, and is
+  intentionally not covered by composition adapters in this pass.
 - `FluxFlow.Components.Storage` provides storage nodes and host-owned store
   contracts, including normalized `StorageStoreContext` values for backend
   factories plus normalized request, record, and result text for config-bound

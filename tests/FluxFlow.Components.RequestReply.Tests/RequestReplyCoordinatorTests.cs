@@ -189,6 +189,27 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public void RequestReplyOptions_reject_invalid_values_when_assigned()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Mode = (RequestReplyMode)999
+        }).Message.ShouldContain("mode", Case.Insensitive);
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Capacity = 0
+        }).Message.ShouldContain("Capacity");
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Timeout = TimeSpan.Zero
+        }).Message.ShouldContain("Timeout");
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            SweepInterval = TimeSpan.Zero
+        }).Message.ShouldContain("Sweep interval");
+    }
+
+    [Fact]
     public async Task FireAndForget_PublishesThenAcknowledges_WithoutHoldingInFlight()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>(
