@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.1.4
+
+Hardens file-system storage query expiration filtering.
+
+- `FileSystemStorageStore.QueryAsync()` now captures one clock timestamp per
+  query and uses it for every record match.
+- Adds deterministic coverage with an advancing clock so one query cannot split
+  near-expiration records across multiple effective timestamps.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.4
+
+Hardens SQL-file storage query expiration filtering.
+
+- `SqlFileStorageStore.QueryAsync()` now captures one clock timestamp per query
+  and uses it for both SQL-side expiration filtering and in-memory matching.
+- Adds deterministic coverage with an advancing clock so database filtering and
+  attribute-aware in-memory filtering stay aligned.
+
 ## FluxFlow.Composition.Hosting 1.0.2
 
 Hardens hosted resource reference lookup.

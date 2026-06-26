@@ -368,6 +368,42 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Query_UsesSingleClockTimestampForExpirationFiltering()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 6, 4, 5, TimeSpan.Zero);
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+        await using (var writer = CreateStore(path, new FakeTimeProvider(now)))
+        {
+            await writer.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = "alpha",
+                Value = "first",
+                ExpiresAt = now.AddSeconds(1)
+            });
+            await writer.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = "beta",
+                Value = "second",
+                ExpiresAt = now.AddSeconds(1)
+            });
+        }
+
+        await using var reader = CreateStore(
+            path,
+            new AdvancingTimeProvider(now, TimeSpan.FromSeconds(2)));
+
+        var records = await reader.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items"
+        });
+
+        records.Select(record => record.Key).ShouldBe(["alpha", "beta"]);
+    }
+
+    [Fact]
     public async Task Query_HonorsOffset()
     {
         using var temp = TempDirectory.Create();
@@ -756,7 +792,7 @@ public sealed class SqlFileStorageStoreTests
 
     private static SqlFileStorageStore CreateStore(
         string databasePath,
-        FakeTimeProvider? clock = null)
+        TimeProvider? clock = null)
         => new(new SqlFileStorageStoreOptions
         {
             DatabasePath = databasePath,
@@ -769,6 +805,20 @@ public sealed class SqlFileStorageStoreTests
             StoreName = "tenant-a",
             Collection = "items"
         };
+
+    private sealed class AdvancingTimeProvider(
+        DateTimeOffset start,
+        TimeSpan step) : TimeProvider
+    {
+        private DateTimeOffset _current = start;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var current = _current;
+            _current = _current.Add(step);
+            return current;
+        }
+    }
 
 }
 

@@ -142,6 +142,7 @@ public sealed class FileSystemStorageStore : IStorageStore
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var now = _settings.Clock.GetUtcNow();
             var directory = GetCollectionPath(collection);
             if (!Directory.Exists(directory))
             {
@@ -168,7 +169,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 }
 
                 if (record is null ||
-                    !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
+                    !StorageQueryMatcher.IsMatch(record, query, now))
                 {
                     continue;
                 }

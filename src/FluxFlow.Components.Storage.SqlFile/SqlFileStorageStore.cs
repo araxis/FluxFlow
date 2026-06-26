@@ -171,17 +171,19 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             await using var connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             ApplyBusyTimeout(connection);
+            var now = _settings.Clock.GetUtcNow();
 
             var records = await ReadCollectionAsync(
                     connection,
                     collection,
                     query,
                     pagingPushedDown,
+                    now,
                     cancellationToken)
                 .ConfigureAwait(false);
 
             var matches = records
-                .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
+                .Where(record => StorageQueryMatcher.IsMatch(record, query, now))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal);
             var page = pagingPushedDown
@@ -409,6 +411,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         string collection,
         StorageQueryRequest request,
         bool pagingPushedDown,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -453,7 +456,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         if (request.IncludeExpired != true)
         {
             text.AppendLine("  AND (expires_at_ms IS NULL OR expires_at_ms > $nowMs)");
-            Add(command, "$nowMs", _settings.Clock.GetUtcNow().ToUnixTimeMilliseconds());
+            Add(command, "$nowMs", now.ToUnixTimeMilliseconds());
         }
 
         text.AppendLine("ORDER BY stored_at_ms, record_key");
