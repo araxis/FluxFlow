@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Storage.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Composition</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone storage nodes over host-owned keyed stores or store factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Storage composition can now resolve the required store resource from either a keyed IStorageStore or a keyed IStorageStoreFactory, opening factory leases at build time and disposing them with composed nodes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Storage Designer metadata is now authored through the shared validated metadata builder while preserving existing storage composition options, resources, ports, and store-factory behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -572,7 +572,8 @@ stores remain host-owned.
 the four storage composition nodes, including existing storage options and fixed
 ports, plus resource hints for the required `store` resource and optional
 `clock` resource. The `store` resource may point at either a keyed
-`IStorageStore` or keyed `IStorageStoreFactory`.
+`IStorageStore` or keyed `IStorageStoreFactory`. The provider authors that
+metadata through the shared validated Designer metadata builder.
 
 ## Sessions Composition
 

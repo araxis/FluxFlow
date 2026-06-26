@@ -205,6 +205,17 @@ Uses the shared Designer metadata builder for state reducer metadata.
 - Preserves existing state reducer options, engine and clock resources, fixed
   ports, validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Storage.Composition 1.3.1
+
+Uses the shared Designer metadata builder for storage metadata.
+
+- Refactors `StorageComponentDesignMetadataProvider` to author `storage.put`,
+  `storage.get`, `storage.query`, and `storage.delete` metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing storage options, resource hints, fixed ports, validation,
+  catalog loading, direct store and store-factory resources, and runtime
+  composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

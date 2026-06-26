@@ -83,3 +83,5 @@ and fixed ports, plus resource hints for the required `store` and optional
 `clock` resources. Concrete `IStorageStore` instances, `IStorageStoreFactory`
 registrations, and optional keyed `TimeProvider` clocks remain host-owned
 resources and are not modeled as editable node options.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
