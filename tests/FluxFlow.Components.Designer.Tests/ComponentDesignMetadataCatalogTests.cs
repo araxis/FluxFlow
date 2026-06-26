@@ -368,6 +368,84 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_invalid_resource_and_port_orders()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Resources =
+            [
+                new ResourceDesignMetadata
+                {
+                    Name = "engine",
+                    Order = -1
+                },
+                new ResourceDesignMetadata
+                {
+                    Name = "clock",
+                    Order = 0
+                },
+                new ResourceDesignMetadata
+                {
+                    Name = "store",
+                    Order = 0
+                }
+            ],
+            Ports =
+            [
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Input"),
+                    Direction = PortDirection.Input,
+                    Order = -1
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("AlternativeInput"),
+                    Direction = PortDirection.Input,
+                    Order = 0
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("AnotherInput"),
+                    Direction = PortDirection.Input,
+                    Order = 0
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Output"),
+                    Direction = PortDirection.Output,
+                    Order = 0
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("AlternativeOutput"),
+                    Direction = PortDirection.Output,
+                    Order = 0
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Resources)}[0].{nameof(ResourceDesignMetadata.Order)}" &&
+            error.Message.Contains("negative", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Resources)}[2].{nameof(ResourceDesignMetadata.Order)}" &&
+            error.Message.Contains("already used", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[0].{nameof(PortDesignMetadata.Order)}" &&
+            error.Message.Contains("negative", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[2].{nameof(PortDesignMetadata.Order)}" &&
+            error.Message.Contains("Input", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[4].{nameof(PortDesignMetadata.Order)}" &&
+            error.Message.Contains("Output", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_reports_enum_option_without_choices()
     {
         var metadata = new ComponentDesignMetadata

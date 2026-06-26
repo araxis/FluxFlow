@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.6
+
+Hardens component design metadata ordering validation.
+
+- `ComponentDesignMetadataValidator` now reports negative or duplicate resource
+  order values.
+- Port order values must now be non-negative and unique within each port
+  direction.
+- Adds validator coverage for invalid resource and port order metadata.
+
 ## FluxFlow.Components.Designer 2.2.5
 
 Hardens component design metadata enum validation.
