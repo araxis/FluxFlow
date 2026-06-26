@@ -623,6 +623,39 @@ public sealed class SecretResolverTests
         redacted["custom"].ShouldBe(SecretRedactor.RedactedText);
     }
 
+    [Fact]
+    public void Redactor_normalizes_protected_keys()
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["custom"] = "hidden",
+            ["displayName"] = "Primary"
+        };
+
+        var redacted = SecretRedactor.RedactValues(values, [" custom ", " ", null!]);
+
+        redacted["custom"].ShouldBe(SecretRedactor.RedactedText);
+        redacted["displayName"].ShouldBe("Primary");
+    }
+
+    [Fact]
+    public void Redactor_snapshots_redacted_values()
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["token"] = "secret-value",
+            ["name"] = "primary"
+        };
+
+        var redacted = SecretRedactor.RedactValues(values);
+
+        values["token"] = "changed";
+        values["name"] = "changed";
+
+        redacted["token"].ShouldBe(SecretRedactor.RedactedText);
+        redacted["name"].ShouldBe("primary");
+    }
+
     [Theory]
     [InlineData("dbPwd")]
     [InlineData("PassPhrase")]
