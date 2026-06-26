@@ -13,114 +13,92 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateClientMetadata()];
 
-    private static ComponentDesignMetadata CreateClientMetadata() => new()
+    private static ComponentDesignMetadata CreateClientMetadata()
     {
-        Type = new ComponentType(HttpCompositionNodeTypes.Client),
-        DisplayName = "HTTP Client",
-        Category = "HTTP",
-        Summary = "Sends HTTP request messages through a host-owned HttpClient and emits response messages.",
-        IconKey = "send",
-        PreferredNodeName = "httpClient",
-        SuggestedEditorWidth = 420,
-        Options = ClientOptionsMetadata(),
-        Resources = ClientResources(),
-        Ports = ClientPorts()
-    };
+        var builder = new ComponentDesignMetadataBuilder(HttpCompositionNodeTypes.Client)
+            .WithDisplay(
+                displayName: "HTTP Client",
+                category: "HTTP",
+                summary: "Sends HTTP request messages through a host-owned HttpClient and emits response messages.",
+                iconKey: "send",
+                preferredNodeName: "httpClient",
+                suggestedEditorWidth: 420);
 
-    private static IReadOnlyList<OptionDesignMetadata> ClientOptionsMetadata()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = Defaults.BoundedCapacity,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxResponseBodyBytes",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Response Body Bytes",
-                DefaultValue = Defaults.MaxResponseBodyBytes,
-                Min = 1,
-                HelperText = "Maximum response body bytes read before truncating."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "treatNonSuccessStatusAsError",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Treat Non-Success Status As Error",
-                DefaultValue = Defaults.TreatNonSuccessStatusAsError,
-                HelperText = "Emit non-2xx HTTP responses through Errors instead of Output."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxDegreeOfParallelism",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Degree Of Parallelism",
-                DefaultValue = Defaults.MaxDegreeOfParallelism,
-                Min = 1,
-                HelperText = "Maximum concurrent HTTP sends handled by the node."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "defaultTimeoutMilliseconds",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Default Timeout Milliseconds",
-                Min = 1,
-                HelperText = "Optional per-request timeout used when the input message omits one."
-            }
-        ];
+        AddClientOptions(builder);
+        AddClientResources(builder);
+        AddClientPorts(builder);
 
-    private static IReadOnlyList<ResourceDesignMetadata> ClientResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = HttpCompositionResourceNames.Client,
-                DisplayName = "Client",
-                Order = 0,
-                Summary = "Keyed HttpClient used to send request messages.",
-                ValueType = nameof(HttpClient),
-                IsRequired = true
-            },
-            new ResourceDesignMetadata
-            {
-                Name = HttpCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 1,
-                Summary = "Optional keyed clock for deterministic request timeouts and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+        return builder.Build();
+    }
 
-    private static IReadOnlyList<PortDesignMetadata> ClientPorts()
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(HttpCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "HTTP request message.",
-                ValueType = nameof(HttpRequestInput),
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(HttpCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = "HTTP response message.",
-                ValueType = nameof(HttpResponseOutput),
-                IsPrimary = true
-            }
-        ];
+    private static void AddClientOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: Defaults.BoundedCapacity,
+                min: 1)
+            .AddOption(
+                "maxResponseBodyBytes",
+                OptionValueKind.Number,
+                displayName: "Max Response Body Bytes",
+                helperText: "Maximum response body bytes read before truncating.",
+                defaultValue: Defaults.MaxResponseBodyBytes,
+                min: 1)
+            .AddOption(
+                "treatNonSuccessStatusAsError",
+                OptionValueKind.Boolean,
+                displayName: "Treat Non-Success Status As Error",
+                helperText: "Emit non-2xx HTTP responses through Errors instead of Output.",
+                defaultValue: Defaults.TreatNonSuccessStatusAsError)
+            .AddOption(
+                "maxDegreeOfParallelism",
+                OptionValueKind.Number,
+                displayName: "Max Degree Of Parallelism",
+                helperText: "Maximum concurrent HTTP sends handled by the node.",
+                defaultValue: Defaults.MaxDegreeOfParallelism,
+                min: 1)
+            .AddOption(
+                "defaultTimeoutMilliseconds",
+                OptionValueKind.Number,
+                displayName: "Default Timeout Milliseconds",
+                helperText: "Optional per-request timeout used when the input message omits one.",
+                min: 1);
+
+    private static void AddClientResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                HttpCompositionResourceNames.Client,
+                displayName: "Client",
+                order: 0,
+                summary: "Keyed HttpClient used to send request messages.",
+                valueType: nameof(HttpClient),
+                isRequired: true)
+            .AddResource(
+                HttpCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic request timeouts and diagnostics.",
+                valueType: nameof(TimeProvider));
+
+    private static void AddClientPorts(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddInputPort(
+                HttpCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "HTTP request message.",
+                valueType: nameof(HttpRequestInput),
+                isPrimary: true)
+            .AddOutputPort(
+                HttpCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "HTTP response message.",
+                valueType: nameof(HttpResponseOutput),
+                isPrimary: true);
 }

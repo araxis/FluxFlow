@@ -121,6 +121,15 @@ Uses the shared Designer metadata builder for serialization metadata.
 - Preserves existing serialization options, clock resources, fixed ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Http.Composition 1.2.2
+
+Uses the shared Designer metadata builder for HTTP client metadata.
+
+- Refactors `HttpComponentDesignMetadataProvider` to author `http.client`
+  metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing HTTP client options, client and clock resources, fixed
+  ports, validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
