@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Journal</PackageId>
     <AssemblyName>FluxFlow.Components.Journal</AssemblyName>
     <RootNamespace>FluxFlow.Components.Journal</RootNamespace>
-    <Version>2.3.3</Version>
+    <Version>2.3.4</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event journal contracts and in-memory store for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;journal;store</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens keyed journal store registration helper argument validation ordering for direct store and store-factory overloads.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens JournalQueryResult record collection guardrails by rejecting null record entries at the public result boundary.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

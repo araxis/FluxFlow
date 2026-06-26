@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.3.4
+
+Hardens journal query result guardrails.
+
+- `JournalQueryResult` now rejects null record entries when assigning query
+  result record collections.
+- Null query result record collections still produce empty result lists,
+  preserving the existing optional assignment behavior.
+- Adds regression coverage for invalid query result record entries.
+
 ## FluxFlow.Components.Configuration 1.4.4
 
 Hardens configuration validation report guardrails.
