@@ -109,7 +109,7 @@ public sealed class NodeDefinitionBuilder
 
     internal NodeDefinitionBuilder(string type)
     {
-        Type = type;
+        Type = type.Trim();
         _serializerOptions = CompositionDefinitionJson.CreateSerializerOptions();
     }
 

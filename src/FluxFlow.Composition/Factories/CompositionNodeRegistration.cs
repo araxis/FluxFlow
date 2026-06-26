@@ -10,7 +10,7 @@ public sealed class CompositionNodeRegistration
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         Factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        Type = type;
+        Type = type.Trim();
         Inputs = ToPortDictionary(inputs);
         Outputs = ToPortDictionary(outputs);
     }

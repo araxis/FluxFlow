@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.8
+
+Normalizes composition registration identifiers.
+
+- `CompositionNodeRegistration` now trims node type identifiers before
+  registration.
+- `CompositionPortMetadata` now trims port names before metadata dictionaries are
+  built, so duplicate checks use normalized names.
+- `NodeDefinition.Type` and fluent node type assignment now trim node type
+  values so configuration-bound types match registered adapter types.
+
 ## FluxFlow.Composition.Hosting 1.0.5
 
 Adds explicit node-registry contributor registration.

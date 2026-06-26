@@ -6,7 +6,7 @@ public sealed record CompositionPortMetadata
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        Name = name;
+        Name = name.Trim();
         MessageType = messageType ?? throw new ArgumentNullException(nameof(messageType));
     }
 

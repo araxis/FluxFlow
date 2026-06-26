@@ -27,7 +27,7 @@ public sealed class CompositionConfigurationLoaderTests
                       }
                     },
                     "sink": {
-                      "type": "test.sink"
+                      "type": " test.sink "
                     }
                   },
                   "links": [
@@ -49,6 +49,7 @@ public sealed class CompositionConfigurationLoaderTests
         definition.Workflows.ContainsKey("main").ShouldBeTrue();
         var workflow = definition.Workflows["main"];
         workflow.Nodes["source"].Type.ShouldBe(TestNodeTypes.Source);
+        workflow.Nodes["sink"].Type.ShouldBe(TestNodeTypes.Sink);
         workflow.Nodes["source"].Resources["store"].ShouldBe("primary-store");
         workflow.Nodes["source"].Configuration["messages"].GetArrayLength().ShouldBe(2);
         workflow.Links.ShouldHaveSingleItem();

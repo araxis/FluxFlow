@@ -24,5 +24,8 @@ public sealed class CompositionNodeRegistry
         => Register(new CompositionNodeRegistration(type, factory, inputs, outputs));
 
     public bool TryGetRegistration(string type, out CompositionNodeRegistration registration)
-        => _registrations.TryGetValue(type, out registration!);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
+        return _registrations.TryGetValue(type.Trim(), out registration!);
+    }
 }

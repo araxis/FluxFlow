@@ -75,6 +75,9 @@ DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.
 Node and port references trim assigned segments and reject empty dotted segments
 when parsed from fluent or configuration link strings.
+Node definition types, node registration types, and composition port metadata
+names are trimmed at the public boundary so configuration and adapter
+registrations agree on stable identifiers.
 `ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
 independently, and reports both failures together when both paths fail.
 Runtime builder cancellation disposes partially built nodes and links before
