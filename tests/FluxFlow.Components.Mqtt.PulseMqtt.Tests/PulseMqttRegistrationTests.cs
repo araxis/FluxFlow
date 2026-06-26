@@ -120,4 +120,38 @@ public sealed class PulseMqttRegistrationTests
 
         exception.Message.ShouldBe("MQTT client options factory returned null.");
     }
+
+    [Fact]
+    public void PulseMqttClientOptions_snapshots_user_properties()
+    {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "alpha"
+        };
+
+        var options = new PulseMqttClientOptions
+        {
+            Host = "localhost",
+            UserProperties = userProperties
+        };
+
+        userProperties["tenant"] = "changed";
+        userProperties["extra"] = "ignored";
+
+        options.UserProperties.Count.ShouldBe(1);
+        options.UserProperties["tenant"].ShouldBe("alpha");
+        options.UserProperties.ContainsKey("extra").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void PulseMqttClientOptions_treats_null_user_properties_as_empty()
+    {
+        var options = new PulseMqttClientOptions
+        {
+            Host = "localhost",
+            UserProperties = null!
+        };
+
+        options.UserProperties.ShouldBeEmpty();
+    }
 }

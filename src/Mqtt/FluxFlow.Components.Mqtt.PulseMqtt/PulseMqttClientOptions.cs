@@ -7,6 +7,9 @@ namespace FluxFlow.Components.Mqtt.PulseMqtt;
 
 public sealed record PulseMqttClientOptions
 {
+    private IReadOnlyDictionary<string, string> _userProperties =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public string? Host { get; init; }
 
     public int Port { get; init; } = 1883;
@@ -43,9 +46,19 @@ public sealed record PulseMqttClientOptions
 
     public ISessionStore? SessionStore { get; init; }
 
-    public Dictionary<string, string> UserProperties { get; init; } = [];
+    public IReadOnlyDictionary<string, string> UserProperties
+    {
+        get => _userProperties;
+        init => _userProperties = CopyUserProperties(value);
+    }
 
     public PulseMqttLastWillOptions? LastWill { get; init; }
+
+    private static IReadOnlyDictionary<string, string> CopyUserProperties(
+        IReadOnlyDictionary<string, string>? values)
+        => values is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(values, StringComparer.Ordinal);
 }
 
 public sealed record PulseMqttLastWillOptions
