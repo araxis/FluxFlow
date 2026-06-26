@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.7
+
+Hardens composition definition validation for malformed mutable DTO entries.
+
+- `CompositionValidator` now reports `InvalidDefinition` diagnostics for null
+  workflows, nodes, links, or link endpoints instead of dereferencing them.
+- Adds regression coverage for hand-built malformed definition models.
+
 ## FluxFlow.Composition 1.0.6
 
 Restores explicit composition port metadata deconstruction.

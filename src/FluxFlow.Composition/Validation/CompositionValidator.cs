@@ -23,6 +23,17 @@ public sealed class CompositionValidator
         foreach (var (workflowName, workflow) in definition.Workflows)
         {
             ValidateWorkflowName(workflowName, diagnostics);
+            if (workflow is null)
+            {
+                diagnostics.Add(new CompositionDiagnostic
+                {
+                    Code = CompositionDiagnosticCode.InvalidDefinition,
+                    WorkflowName = workflowName,
+                    Message = $"Workflow '{workflowName}' is null."
+                });
+                continue;
+            }
+
             ValidateWorkflow(workflowName, workflow, definition, registry, diagnostics);
         }
 
@@ -62,12 +73,35 @@ public sealed class CompositionValidator
 
         foreach (var (nodeName, node) in workflow.Nodes)
         {
+            if (node is null)
+            {
+                diagnostics.Add(new CompositionDiagnostic
+                {
+                    Code = CompositionDiagnosticCode.InvalidDefinition,
+                    WorkflowName = workflowName,
+                    NodeName = nodeName,
+                    Message = $"Node '{workflowName}.{nodeName}' is null."
+                });
+                continue;
+            }
+
             ValidateNode(workflowName, nodeName, node, registry, diagnostics);
         }
 
         var seenLinks = new HashSet<string>(StringComparer.Ordinal);
         foreach (var link in workflow.Links)
         {
+            if (link is null)
+            {
+                diagnostics.Add(new CompositionDiagnostic
+                {
+                    Code = CompositionDiagnosticCode.InvalidDefinition,
+                    WorkflowName = workflowName,
+                    Message = $"Workflow '{workflowName}' contains a null link."
+                });
+                continue;
+            }
+
             ValidateLink(workflowName, link, definition, registry, diagnostics, seenLinks);
         }
     }
@@ -121,6 +155,18 @@ public sealed class CompositionValidator
         List<CompositionDiagnostic> diagnostics,
         HashSet<string> seenLinks)
     {
+        if (link.From is null || link.To is null)
+        {
+            diagnostics.Add(new CompositionDiagnostic
+            {
+                Code = CompositionDiagnosticCode.InvalidDefinition,
+                WorkflowName = workflowName,
+                Link = link,
+                Message = $"Workflow '{workflowName}' contains a link with a null endpoint."
+            });
+            return;
+        }
+
         var from = link.From.ResolveWorkflow(workflowName);
         var to = link.To.ResolveWorkflow(workflowName);
         var linkKey = $"{from}->{to}";

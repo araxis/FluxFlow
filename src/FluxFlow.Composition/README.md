@@ -32,6 +32,9 @@ Composition port metadata rejects null or blank port names and null message
 types at the registration boundary. Node registrations also reject null port
 metadata entries before validation/build. `CompositionPortMetadata` also
 supports deconstruction for callers that prefer tuple-style reads.
+If mutable DTO collections are hand-built with null workflow, node, link, or
+link endpoint entries, validation reports `InvalidDefinition` diagnostics
+instead of throwing while walking the model.
 
 `ComposedNode` disposal always attempts both the node disposal path and the
 optional descriptor cleanup hook. If both fail, the failures are reported
