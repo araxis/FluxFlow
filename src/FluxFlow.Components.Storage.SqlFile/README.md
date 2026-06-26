@@ -46,6 +46,8 @@ adapter-specific override.
 - expiration honored by `storage.get` and `storage.query`
 - query by collection, key prefix, attributes, stored time bounds, expiration,
   offset, and limit
+- query expiration checks use one captured clock timestamp for database and
+  in-memory filtering
 - owned store lifetime when opened through `UseSqlFileStorage`
 - per-open context for store name, default collection, and clock
 

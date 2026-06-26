@@ -46,6 +46,7 @@ adapter-specific override.
 - expiration honored by `storage.get`
 - query by collection, key prefix, attributes, stored time bounds, expiration,
   offset, and limit
+- query expiration checks use one captured clock timestamp per query
 - best-effort atomic writes through a temporary file then replace
 - shared store leases when opened through `UseFileSystemStorage`; the factory
   caches stores by root, store name, default collection, and clock, comparing
