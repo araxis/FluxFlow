@@ -257,8 +257,8 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 Name = StorageCompositionResourceNames.Store,
                 DisplayName = "Store",
                 Order = 0,
-                Summary = "Required keyed storage store used for put, get, query, and delete operations.",
-                ValueType = nameof(IStorageStore),
+                Summary = "Required keyed storage store or store factory used for put, get, query, and delete operations.",
+                ValueType = $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
                 IsRequired = true
             },
             new ResourceDesignMetadata

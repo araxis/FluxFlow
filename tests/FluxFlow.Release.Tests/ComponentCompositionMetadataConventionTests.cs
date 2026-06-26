@@ -2115,7 +2115,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 continue;
 
             var registryMethodContent = ReadContainingRegistryMethod(registryContent, helperIndex);
-            if (registryMethodContent.Contains(".GetRequiredResource<", StringComparison.Ordinal))
+            if (registryMethodContent.Contains(".GetRequiredResource<", StringComparison.Ordinal) ||
+                registryMethodContent.Contains(".GetRequiredResourceKey(", StringComparison.Ordinal))
                 usage = usage with { UsesRequiredLookup = true };
             if (registryMethodContent.Contains(".GetResource<", StringComparison.Ordinal))
                 usage = usage with { UsesOptionalLookup = true };
@@ -2309,7 +2310,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"public\s+static\s+string\s+(?<name>\w+)\s*\(")]
     private static partial Regex PublicStaticStringMethodRegex();
 
-    [GeneratedRegex(@"\.Get(?<required>Required)?Resource\s*<[^;]+?;", RegexOptions.Singleline)]
+    [GeneratedRegex(@"\.Get(?<required>Required)?Resource(?:\s*<[^;]+?>|Key)\s*\([^;]+?;", RegexOptions.Singleline)]
     private static partial Regex ResourceLookupRegex();
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
@@ -2324,10 +2325,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>\w+)")]
     private static partial Regex RegistryRegistrationReferenceRegex();
 
-    [GeneratedRegex(@"private\s+static\s+ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    [GeneratedRegex(@"private\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();
 
-    [GeneratedRegex(@"private\s+static\s+ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
+    [GeneratedRegex(@"private\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryExpressionMethodRegex();
 
     [GeneratedRegex(@"(?<name>\w+)(?:<[^>]+>)?\s*\(")]

@@ -36,6 +36,22 @@ records should share a deterministic time source. `SqlFileStorageStore` also
 accepts `SqlFileStorageStoreOptions.Clock` for direct store use or an
 adapter-specific override.
 
+Hosts that use keyed resources can register the backend factory directly:
+
+```csharp
+services.AddFluxFlowSqlFileStorageStoreFactory(
+    "items-store",
+    new SqlFileStorageStoreOptions
+    {
+        DatabasePath = "data/storage.db",
+        DefaultCollection = "items"
+    });
+```
+
+This registers a keyed `IStorageStoreFactory`. Storage composition can reference
+the same key through the `store` resource and will open and release leases as
+part of composed node lifetime.
+
 ## Behavior
 
 - one record table per database file
@@ -85,5 +101,6 @@ Invalid query paging and stored time ranges where `StoredFrom` is later than
 
 This package does not expose `FluxFlow.Composition` node factories. Use
 `FluxFlow.Components.Storage.Composition` for `storage.put`, `storage.get`,
-`storage.query`, and `storage.delete`; register the opened `IStorageStore` as a
-host-owned keyed resource for those factories.
+`storage.query`, and `storage.delete`; register either an opened
+`IStorageStore` or this package's keyed `IStorageStoreFactory` as a host-owned
+resource for those factories.

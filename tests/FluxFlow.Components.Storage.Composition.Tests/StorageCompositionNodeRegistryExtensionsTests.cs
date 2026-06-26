@@ -269,6 +269,44 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public async Task Hosted_put_can_resolve_store_factory_resource_and_dispose_owned_lease()
+    {
+        var store = new InMemoryStorageStore();
+        var factory = new RecordingStorageStoreFactory(store);
+
+        await WithNodeAsync(
+            StorageCompositionNodeTypes.Put,
+            async descriptor =>
+            {
+                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
+                    .ShouldBeOfType<CompositionInputPort<StoragePutRequest>>();
+                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
+                    .ShouldBeOfType<CompositionOutputPort<StorageResult>>();
+                var results = Link(output.Source);
+                var message = FlowMessage.Create(
+                    new StoragePutRequest { Key = "a", Value = "one" },
+                    new CorrelationId("factory-put"));
+
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+
+                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                result.CorrelationId.ShouldBe(message.CorrelationId);
+                result.Payload.Collection.ShouldBe("items");
+                result.Payload.Key.ShouldBe("a");
+            },
+            node => node
+                .Resource(StorageCompositionResourceNames.Store, "factory")
+                .Configure("collection", "items"),
+            services => services.AddKeyedSingleton<IStorageStoreFactory>("factory", factory));
+
+        factory.OpenCount.ShouldBe(1);
+        factory.Context.ShouldNotBeNull();
+        factory.Context.StoreName.ShouldBe("factory");
+        factory.Context.Collection.ShouldBe("items");
+        store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Hosted_get_emits_output_found_and_not_found_branches()
     {
         var store = new InMemoryStorageStore();
@@ -677,7 +715,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([
-            (StorageCompositionResourceNames.Store, 0, true, nameof(IStorageStore)),
+            (StorageCompositionResourceNames.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
             (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
@@ -707,12 +745,13 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             Value = value
         });
 
-    private sealed class InMemoryStorageStore : IStorageStore
+    private sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         private readonly object _gate = new();
         private readonly Dictionary<(string Collection, string Key), StorageRecord> _records = [];
 
         public int FailuresRemaining { get; set; }
+        public int DisposeCount { get; private set; }
         public int RecordCount
         {
             get
@@ -870,5 +909,27 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             => source is null
                 ? []
                 : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingStorageStoreFactory(IStorageStore store) : IStorageStoreFactory
+    {
+        public int OpenCount { get; private set; }
+        public StorageStoreContext? Context { get; private set; }
+
+        public ValueTask<StorageStoreLease> OpenAsync(
+            StorageStoreContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            OpenCount++;
+            Context = context;
+            return ValueTask.FromResult(StorageStoreLease.Owned(store));
+        }
     }
 }
