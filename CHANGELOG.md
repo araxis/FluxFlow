@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.4.0
+
+Adds resource descriptor provider separation.
+
+- Adds `IResourceDescriptorProvider` to `FluxFlow.Components.Resources` for
+  consumers that only need declared `ResourceDescriptor` metadata.
+- Keeps `IResourceLookup` compatible while making descriptor enumeration a
+  named resource capability.
+
 ## FluxFlow.Components.Secrets 1.4.0
 
 Adds optional secret descriptor enumeration.

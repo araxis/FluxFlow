@@ -75,6 +75,23 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Catalog_exposes_descriptors_through_descriptor_provider_contract()
+    {
+        IResourceDescriptorProvider provider = new ResourceDescriptorCatalogBuilder()
+            .Add(
+                "primary",
+                kind: "profile",
+                displayName: "Primary Profile")
+            .BuildCatalog();
+
+        var descriptor = provider.GetResources().ShouldHaveSingleItem();
+
+        descriptor.Name.ShouldBe(new ResourceName("primary"));
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary Profile");
+    }
+
+    [Fact]
     public void Catalog_builder_uses_existing_catalog_validation()
     {
         var builder = new ResourceDescriptorCatalogBuilder()
