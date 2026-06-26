@@ -724,7 +724,9 @@ Use `RegisterMqttNodes()` from the optional
 `FluxFlow.Components.Mqtt.Composition` package when a composition host wants
 `mqtt.publish` and `mqtt.trigger` node factories. The factories resolve keyed
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
-the host still own broker/client registration.
+the host still own broker/client registration. MQTT adapter registration
+helpers reject invalid service/key/options arguments and null options factory
+results before creating keyed client sessions.
 
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
 MQTT publish and trigger composition nodes, including existing options, fixed
