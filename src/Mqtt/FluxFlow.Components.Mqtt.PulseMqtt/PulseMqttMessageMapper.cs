@@ -123,7 +123,10 @@ internal static class PulseMqttMessageMapper
     }
 
     public static ReadOnlyMemory<byte> ToUtf8Memory(string value)
-        => Encoding.UTF8.GetBytes(value);
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return Encoding.UTF8.GetBytes(value);
+    }
 
     private static ReadOnlyMemory<byte>? ToCorrelationData(string? correlationId)
         => string.IsNullOrWhiteSpace(correlationId)

@@ -74,6 +74,12 @@ public sealed class MqttNetMessageMapperTests
         received.UserProperties["source"].ShouldBe("sensor");
     }
 
+    [Fact]
+    public void ToUtf8Memory_rejects_null_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            MqttNetMessageMapper.ToUtf8Memory(null!))
+            .ParamName.ShouldBe("value");
+
     private static byte[] ToArray(ReadOnlySequence<byte> payload)
     {
         if (payload.IsSingleSegment)
