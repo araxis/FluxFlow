@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Mapping</PackageId>
     <AssemblyName>FluxFlow.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Mapping</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Engine-free expression/mapping abstraction for FluxFlow: IFlowExpressionEngine, IFlowMapper, IFlowPredicate, FlowMapContext, and the expression/delegate mapper+predicate adapters. A leaf package referenced by nodes and the engine alike.</Description>
     <PackageTags>workflow;dataflow;mapping;expressions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>FlowMapContext now snapshots assigned variables with ordinal key comparison so caller dictionary mutations cannot change a per-message mapping context.</PackageReleaseNotes>
+    <PackageReleaseNotes>Expression mapper and predicate adapters now fail fast when engines return null compiled expressions, with direct adapter guardrail coverage.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
