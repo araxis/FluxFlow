@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.FileSystem</RootNamespace>
-    <Version>3.2.0</Version>
+    <Version>3.3.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds AddFluxFlowFileSystemStorageStoreFactory for keyed IStorageStoreFactory registration in composition and resource hosts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds AddFluxFlowFileSystemStorageStore for direct keyed IStorageStore registration alongside the existing keyed store-factory registration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -1,4 +1,5 @@
 using FluxFlow.Components.Storage.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
@@ -629,6 +630,33 @@ public sealed class SqlFileStorageStoreTests
 
         lease.OwnsStore.ShouldBeTrue();
         saved.Collection.ShouldBe("items");
+    }
+
+    [Fact]
+    public async Task Service_registration_can_register_keyed_store_directly()
+    {
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+        var services = new ServiceCollection()
+            .AddFluxFlowSqlFileStorageStore(
+                "items-store",
+                new SqlFileStorageStoreOptions
+                {
+                    DatabasePath = path,
+                    DefaultCollection = "items"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredKeyedService<IStorageStore>("items-store");
+
+        var saved = await store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        saved.Collection.ShouldBe("items");
+        File.Exists(path).ShouldBeTrue();
     }
 
     [Fact]

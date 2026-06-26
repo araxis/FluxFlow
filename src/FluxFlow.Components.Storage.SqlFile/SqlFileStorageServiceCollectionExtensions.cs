@@ -5,6 +5,31 @@ namespace FluxFlow.Components.Storage.SqlFile;
 
 public static class SqlFileStorageServiceCollectionExtensions
 {
+    public static IServiceCollection AddFluxFlowSqlFileStorageStore(
+        this IServiceCollection services,
+        string name,
+        SqlFileStorageStoreOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return services.AddFluxFlowSqlFileStorageStore(name, _ => options);
+    }
+
+    public static IServiceCollection AddFluxFlowSqlFileStorageStore(
+        this IServiceCollection services,
+        string name,
+        Func<IServiceProvider, SqlFileStorageStoreOptions> optionsFactory)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(optionsFactory);
+
+        services.AddKeyedSingleton<IStorageStore>(
+            name,
+            (provider, _) => new SqlFileStorageStore(optionsFactory(provider)));
+
+        return services;
+    }
+
     public static IServiceCollection AddFluxFlowSqlFileStorageStoreFactory(
         this IServiceCollection services,
         string name,

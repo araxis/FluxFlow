@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.3.0
+
+Adds direct keyed file-system storage store registration.
+
+- Adds `AddFluxFlowFileSystemStorageStore(...)` for registering a keyed
+  `IStorageStore` directly in composition and resource hosts.
+- Keeps `AddFluxFlowFileSystemStorageStoreFactory(...)` for factory-backed
+  store leases and shared file-system store caching.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.0
+
+Adds direct keyed SQL-file storage store registration.
+
+- Adds `AddFluxFlowSqlFileStorageStore(...)` for registering a keyed
+  `IStorageStore` directly in composition and resource hosts.
+- Keeps `AddFluxFlowSqlFileStorageStoreFactory(...)` for factory-backed owned
+  store leases.
+
 ## FluxFlow.Components.Resources 1.4.0
 
 Adds resource descriptor provider separation.
