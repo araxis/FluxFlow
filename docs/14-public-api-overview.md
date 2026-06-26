@@ -139,6 +139,29 @@ resource. `HttpClient` instances and clocks remain host-owned keyed resources.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
 
+## HTTP Trigger Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Http.AspNetCore
+```
+
+Main types:
+
+- `FluxFlowHttpTriggerServiceCollectionExtensions`
+- `FluxFlowTriggerEndpointExtensions`
+- `HttpRequestContext`
+- `HttpTriggerNode`
+- `HttpTriggerSource`
+
+Use `AddFluxFlowHttpTrigger(...)` and `MapFluxFlowTrigger(...)` when a web host
+wants an inbound HTTP endpoint to feed a request/reply graph.
+The adapter owns endpoint glue, keyed trigger source/node registration, and
+hosted trigger lifetime. `MapFluxFlowTrigger(...)` rejects missing route
+patterns before delegating to framework routing, and validates the keyed trigger
+name or direct coordinator argument at the package boundary.
+
 ## Mapping Composition
 
 Namespace:

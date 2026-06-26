@@ -4,6 +4,7 @@ using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -125,6 +126,31 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public async Task MapFluxFlowTrigger_RejectsInvalidEndpointArguments()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
+        var routeBuilder = new TestEndpointRouteBuilder(provider);
+
+        var endpointsException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowTriggerEndpointExtensions.MapFluxFlowTrigger(null!, "/echo", "echo"));
+        var keyedPatternException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger(" ", "echo"));
+        var keyedNameException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger("/echo", " "));
+        var directPatternException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger(" ", bridge));
+        var coordinatorException = Should.Throw<ArgumentNullException>(() =>
+            routeBuilder.MapFluxFlowTrigger("/echo", (RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>)null!));
+
+        endpointsException.ParamName.ShouldBe("endpoints");
+        keyedPatternException.ParamName.ShouldBe("pattern");
+        keyedNameException.ParamName.ShouldBe("name");
+        directPatternException.ParamName.ShouldBe("pattern");
+        coordinatorException.ParamName.ShouldBe("coordinator");
+    }
+
+    [Fact]
     public async Task AddFluxFlowHttpTrigger_RegistersKeyedSourceNodeAndHostedLifetime()
     {
         var services = new ServiceCollection();
@@ -189,4 +215,13 @@ public sealed class HttpTriggerEndpointTests
                     app.UseEndpoints(endpoints => endpoints.MapFluxFlowTrigger("/echo", bridge));
                 }))
             .StartAsync();
+
+    private sealed class TestEndpointRouteBuilder(IServiceProvider serviceProvider) : IEndpointRouteBuilder
+    {
+        public IServiceProvider ServiceProvider { get; } = serviceProvider;
+
+        public ICollection<EndpointDataSource> DataSources { get; } = [];
+
+        public IApplicationBuilder CreateApplicationBuilder() => new ApplicationBuilder(ServiceProvider);
+    }
 }
