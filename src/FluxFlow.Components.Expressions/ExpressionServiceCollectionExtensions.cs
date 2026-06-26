@@ -23,8 +23,9 @@ public static class ExpressionServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(engineFactory);
 
+        var normalizedName = name.Trim();
         services.AddKeyedSingleton<IFlowExpressionEngine>(
-            name,
+            normalizedName,
             (provider, _) => engineFactory(provider)
                 ?? throw new InvalidOperationException("Expression engine factory returned null."));
 
@@ -49,8 +50,9 @@ public static class ExpressionServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(contextFactory);
 
+        var normalizedName = name.Trim();
         services.AddKeyedSingleton<IFlowMapContextFactory<TInput>>(
-            name,
+            normalizedName,
             (provider, _) => contextFactory(provider)
                 ?? throw new InvalidOperationException("Map context factory provider returned null."));
 

@@ -27,6 +27,23 @@ public sealed class ExpressionServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void Service_registration_trims_keyed_names()
+    {
+        var engine = new TestExpressionEngine("primary");
+        var contextFactory = new TestContextFactory();
+        var services = new ServiceCollection()
+            .AddFluxFlowExpressionEngine(" engine ", engine)
+            .AddFluxFlowMapContextFactory<InputMessage>(" context ", contextFactory);
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IFlowExpressionEngine>("engine")
+            .ShouldBeSameAs(engine);
+        provider.GetRequiredKeyedService<IFlowMapContextFactory<InputMessage>>("context")
+            .ShouldBeSameAs(contextFactory);
+    }
+
+    [Fact]
     public void Service_registration_passes_provider_to_factories()
     {
         var services = new ServiceCollection();

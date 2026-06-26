@@ -42,6 +42,9 @@ services
 These helpers only register already-owned services. They do not select an
 expression language, compile expressions, scan assemblies, or create node
 factories.
+Keyed DI helper names are trimmed before registration so padded configuration
+values resolve to the same expression engine or context factory key as direct
+code registrations.
 
 ## Composition
 
