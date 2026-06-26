@@ -442,6 +442,9 @@ public sealed class ConfigurationValidatorTests
             builder.AddResource(null!, "primary"))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
+            builder.AddResource(null!, (string)null!))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentNullException>(() =>
             builder.AddResource(null!, new ResourceReference
             {
                 Name = new ResourceName("primary")
@@ -451,7 +454,13 @@ public sealed class ConfigurationValidatorTests
             builder.AddOptionalResource(null!))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
+            builder.AddResource("connections.primary", (string)null!))
+            .ParamName.ShouldBe("resourceName");
+        Should.Throw<ArgumentNullException>(() =>
             builder.AddSecret(null!, "primary"))
+            .ParamName.ShouldBe("optionPath");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddSecret(null!, (string)null!))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentNullException>(() =>
             builder.AddSecret(null!, new SecretReference
@@ -462,6 +471,9 @@ public sealed class ConfigurationValidatorTests
         Should.Throw<ArgumentNullException>(() =>
             builder.AddOptionalSecret(null!))
             .ParamName.ShouldBe("optionPath");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddSecret("connections.primary.credential", (string)null!))
+            .ParamName.ShouldBe("secretName");
     }
 
     [Fact]

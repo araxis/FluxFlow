@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.4.3
+
+Hardens fluent configuration validation request builder contracts.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- Fluent resource and secret overloads now validate option paths before
+  constructing resource or secret references.
+- Adds regression coverage for mixed invalid path/name arguments.
+
 ## FluxFlow.Components.Journal 2.3.3
 
 Hardens keyed journal store registration helper validation.

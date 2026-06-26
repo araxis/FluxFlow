@@ -115,9 +115,9 @@ request represents. Null collection assignments are preserved for structured
 request diagnostics.
 `ConfigurationValidationRequestBuilder` is only an authoring helper over these
 same DTOs. It rejects null resource paths and secret option paths immediately,
-while blank paths are still represented in the DTOs and reported later as
-structured validation diagnostics. It does not own resource lookup, secret
-resolution, or validation policy.
+before constructing resource or secret references. Blank paths are still
+represented in the DTOs and reported later as structured validation diagnostics.
+It does not own resource lookup, secret resolution, or validation policy.
 Descriptor-only validation uses host-owned resource and secret descriptor
 providers. It checks declaration presence, kind mismatches, ambiguous secret
 versions, and invalid descriptor provider output, but it does not open
