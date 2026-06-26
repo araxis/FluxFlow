@@ -130,6 +130,8 @@ validation views, and generated documentation without duplicating package
 descriptors.
 Providers must return a non-null metadata collection; catalog loading reports a
 clear provider error when that contract is violated.
+`ComponentDesignMetadataModule` is a small provider helper that validates,
+rejects duplicate component types, and snapshots the metadata it receives.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

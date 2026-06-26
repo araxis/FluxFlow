@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.8
+
+Hardens component design metadata module construction.
+
+- `ComponentDesignMetadataModule` now validates, rejects duplicate component
+  types, and stores defensive snapshots of supplied metadata.
+- Adds module coverage for snapshotting and duplicate component type rejection.
+
 ## FluxFlow.Components.Designer 2.2.7
 
 Hardens component design metadata provider catalog loading.

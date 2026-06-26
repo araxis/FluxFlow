@@ -132,6 +132,51 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void MetadataModule_validates_and_snapshots_metadata()
+    {
+        var attributes = new Dictionary<string, string>
+        {
+            ["shape"] = "transform"
+        };
+        var optionAttributes = new Dictionary<string, string>
+        {
+            ["scope"] = "editable"
+        };
+        var metadata = CreateMetadata("sample.module") with
+        {
+            Attributes = attributes,
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "expression",
+                    Kind = OptionValueKind.Expression,
+                    Attributes = optionAttributes
+                }
+            ]
+        };
+
+        var module = new ComponentDesignMetadataModule([metadata]);
+        attributes["shape"] = "changed";
+        optionAttributes["scope"] = "changed";
+
+        var stored = module.GetMetadata().ShouldHaveSingleItem();
+
+        stored.ShouldNotBeSameAs(metadata);
+        stored.Attributes["shape"].ShouldBe("transform");
+        stored.Options.ShouldHaveSingleItem().Attributes["scope"].ShouldBe("editable");
+    }
+
+    [Fact]
+    public void MetadataModule_rejects_duplicate_component_types()
+    {
+        var act = () => new ComponentDesignMetadataModule([CreateMetadata(), CreateMetadata()]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain("already registered");
+    }
+
+    [Fact]
     public void FromProviders_rejects_null_provider_metadata_collection()
     {
         var provider = new NullMetadataProvider();
