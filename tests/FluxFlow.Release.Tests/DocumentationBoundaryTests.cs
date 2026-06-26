@@ -62,6 +62,34 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Validation_docs_keep_composition_validation_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "07-validation-and-errors.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_400)];
+
+        defaultSection.Contains("CompositionValidator", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should lead with composition validation.");
+        defaultSection.Contains("CompositionRuntimeBuilder", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should show the composition build API before optional engine APIs.");
+        defaultSection.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
+            .ShouldBeFalse("validation docs must not lead with the optional engine build API.");
+        defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
+            .ShouldBeFalse("validation docs must not lead with the optional engine host.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Errors", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "validation docs should keep engine errors in an explicitly optional section.");
+
+        var engineBuilderIndex = text.IndexOf("ApplicationRuntimeBuilder", StringComparison.Ordinal);
+        engineBuilderIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "ApplicationRuntimeBuilder should only appear after the optional engine errors heading.");
+    }
+
+    [Fact]
     public void Current_docs_keep_mapping_contracts_out_of_engine_namespace()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
