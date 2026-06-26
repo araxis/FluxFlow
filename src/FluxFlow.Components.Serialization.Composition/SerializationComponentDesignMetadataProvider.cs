@@ -80,12 +80,17 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
             SuggestedEditorWidth = 420,
             Options = SharedOptions(),
             Resources = ClockResources(),
-            Ports =
-            [
-                InputPort(inputType),
-                OutputPort(outputType)
-            ]
+            Ports = SerializationPorts(inputType, outputType)
         };
+
+    private static IReadOnlyList<PortDesignMetadata> SerializationPorts(
+        string inputType,
+        string outputType)
+        =>
+        [
+            InputPort(inputType),
+            OutputPort(outputType)
+        ];
 
     private static PortDesignMetadata InputPort(string valueType) => new()
     {
