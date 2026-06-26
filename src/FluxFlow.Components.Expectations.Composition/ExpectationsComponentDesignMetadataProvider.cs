@@ -23,7 +23,13 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
         IconKey = "badge-check",
         PreferredNodeName = "expectEvent",
         SuggestedEditorWidth = 460,
-        Options =
+        Options = EventExpectationOptionsMetadata(),
+        Resources = EventExpectationResources(),
+        Ports = EventExpectationPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> EventExpectationOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -88,8 +94,10 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 Min = 1,
                 HelperText = "Maximum queued input messages."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> EventExpectationResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -99,8 +107,10 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 Summary = "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> EventExpectationPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -124,8 +134,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 ValueType = nameof(EventExpectationResult),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 
     private static OptionChoiceMetadata KindChoice(
         EventExpectationNodeKind kind,
