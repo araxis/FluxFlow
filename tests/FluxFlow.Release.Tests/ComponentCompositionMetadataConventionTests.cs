@@ -363,6 +363,60 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_port_names_are_used_by_registry_extensions()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var portNamesFiles = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionPortNames.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            portNamesFiles.Length.ShouldBeLessThanOrEqualTo(
+                1,
+                $"{entry.PackageId} must keep port-name constants in one file.");
+
+            if (portNamesFiles.Length == 0)
+                continue;
+
+            var registryFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryContent = File.ReadAllText(registryFile);
+            var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
+            var portConstants = PublicStringConstantRegex()
+                .Matches(File.ReadAllText(portNamesFiles[0]))
+                .Select(match => match.Groups["name"].Value)
+                .ToArray();
+
+            portConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} port-name file should expose at least one port constant.");
+
+            foreach (var portConstant in portConstants)
+            {
+                var portReference = $"{portTypeName}.{portConstant}";
+                registryContent.Contains(portReference, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} registry extensions must expose port '{portReference}'.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_bound_options_are_described_or_explicitly_omitted()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
