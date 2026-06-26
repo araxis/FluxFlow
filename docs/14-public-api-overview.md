@@ -737,8 +737,9 @@ These packages are intentionally not standalone node composition adapters:
   same validation DTOs.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including trimmed resource names, kinds, display text, and
-  null-safe normalized metadata and attribute validation plus defensive
-  diagnostic metadata copying.
+  null-safe normalized metadata and attribute validation, defensive diagnostic
+  metadata copying, and a fluent `ResourceDescriptorCatalogBuilder` over the
+  existing descriptor/catalog contracts.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
   option paths, null-safe normalized metadata validation, and defensive
