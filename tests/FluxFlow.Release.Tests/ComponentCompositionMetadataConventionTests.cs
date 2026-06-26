@@ -1,5 +1,7 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using FluxFlow.Components.Designer;
 using Shouldly;
 using Xunit;
 
@@ -51,6 +53,62 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             referencedPackageIds.ShouldNotContain(
                 "FluxFlow.Engine",
                 $"{entry.PackageId} must stay engine-free.");
+        }
+    }
+
+    [Fact]
+    public void Component_composition_designer_metadata_providers_validate_at_runtime()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var project = XDocument.Load(projectPath);
+            var assemblyName = ReadOptionalProperty(project, "AssemblyName") ?? entry.PackageId;
+            var assembly = Assembly.Load(new AssemblyName(assemblyName));
+            var providerTypes = assembly
+                .GetTypes()
+                .Where(type =>
+                    type is { IsAbstract: false, IsClass: true } &&
+                    typeof(IComponentDesignMetadataProvider).IsAssignableFrom(type))
+                .OrderBy(type => type.FullName, StringComparer.Ordinal)
+                .ToArray();
+
+            providerTypes.Length.ShouldBe(
+                1,
+                $"{entry.PackageId} must expose exactly one runtime-loadable Designer metadata provider.");
+
+            var providerType = providerTypes[0];
+            providerType.GetConstructor(Type.EmptyTypes)
+                .ShouldNotBeNull($"{entry.PackageId} provider must have a public parameterless constructor.");
+
+            var provider = (IComponentDesignMetadataProvider)Activator.CreateInstance(providerType).ShouldNotBeNull();
+            var metadata = provider.GetMetadata();
+
+            metadata.Count.ShouldBeGreaterThan(
+                0,
+                $"{entry.PackageId} provider must return at least one metadata entry.");
+
+            foreach (var item in metadata)
+            {
+                var errors = ComponentDesignMetadataValidator.Validate(item);
+                errors.ShouldBeEmpty(
+                    $"{entry.PackageId} provider emitted invalid metadata for '{item.Type}'.");
+            }
+
+            var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+            foreach (var item in metadata)
+            {
+                catalog.TryGet(item.Type, out _)
+                    .ShouldBeTrue($"{entry.PackageId} catalog must contain provider metadata for '{item.Type}'.");
+            }
         }
     }
 
@@ -446,6 +504,15 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string.IsNullOrWhiteSpace(value).ShouldBeFalse($"{packageId} must define {name}.");
         return value!;
     }
+
+    private static string? ReadOptionalProperty(
+        XDocument project,
+        string name)
+        => project
+            .Descendants()
+            .Where(element => element.Name.LocalName == name)
+            .Select(element => element.Value.Trim())
+            .FirstOrDefault(value => value.Length > 0);
 
     private static string NormalizePath(string path)
         => path
