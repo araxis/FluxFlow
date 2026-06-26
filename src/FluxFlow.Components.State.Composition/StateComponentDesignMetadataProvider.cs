@@ -22,7 +22,13 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
         IconKey = "database-zap",
         PreferredNodeName = "stateReducer",
         SuggestedEditorWidth = 460,
-        Options =
+        Options = ReducerOptionsMetadata(),
+        Resources = ReducerResources(),
+        Ports = ReducerPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> ReducerOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -85,8 +91,10 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 Min = 0,
                 HelperText = "Maximum number of keys to track. Zero rejects new keys."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> ReducerResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -105,8 +113,10 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 Summary = "Optional keyed clock for deterministic state reducer results and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> ReducerPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -130,6 +140,5 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 ValueType = nameof(StateReducerResult),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 }
