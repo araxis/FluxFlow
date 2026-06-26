@@ -192,6 +192,27 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_providers_use_named_collection_helpers()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
+            var providerContent = File.ReadAllText(providerFile);
+            var inlineCollectionAssignments = InlineMetadataCollectionAssignmentRegex()
+                .Matches(providerContent)
+                .Select(match => match.Groups["property"].Value)
+                .ToArray();
+
+            inlineCollectionAssignments.ShouldBeEmpty(
+                $"{entry.PackageId} provider must assign Options, Resources, and Ports through named helpers or variables instead of inline collection expressions.");
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_ordering_is_stable()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1670,4 +1691,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"Nullable<(?<type>[^>]+)>")]
     private static partial Regex NullableTypeRegex();
+
+    [GeneratedRegex(@"\b(?<property>Options|Resources|Ports)\s*=\s*\[")]
+    private static partial Regex InlineMetadataCollectionAssignmentRegex();
 }
