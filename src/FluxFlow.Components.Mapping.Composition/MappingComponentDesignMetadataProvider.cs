@@ -20,7 +20,13 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
         IconKey = "map",
         PreferredNodeName = "map",
         SuggestedEditorWidth = 420,
-        Options =
+        Options = MapperOptionsMetadata(),
+        Resources = MapperResources(),
+        Ports = MapperPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> MapperOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -83,8 +89,10 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 Min = 1,
                 HelperText = "Maximum queued input messages."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> MapperResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -111,8 +119,10 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 Summary = "Optional keyed clock for deterministic mapper diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> MapperPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -146,6 +156,5 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 Summary = "Original input message when mapping fails.",
                 ValueType = "TInput"
             }
-        ]
-    };
+        ];
 }
