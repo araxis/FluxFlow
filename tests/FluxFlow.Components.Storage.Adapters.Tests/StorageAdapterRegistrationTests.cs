@@ -122,6 +122,85 @@ public sealed class StorageAdapterRegistrationTests
         databaseRecord.Value.ShouldBe("database");
     }
 
+    [Fact]
+    public async Task StringRegistrationHelpersConfigureBackendFactories()
+    {
+        using var workspace = TempWorkspace.Create();
+        var fileOptions = new StorageComponentOptions()
+            .UseFileSystemStorage(workspace.CreateDirectory("files"));
+        var databaseOptions = new StorageComponentOptions()
+            .UseSqlFileStorage(workspace.CreateFilePath("sql", "records.db"));
+
+        await using var fileLease = await fileOptions.StoreFactory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "primary",
+            Collection = "records"
+        });
+        await using var databaseLease = await databaseOptions.StoreFactory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "primary",
+            Collection = "records"
+        });
+
+        var fileRecord = await fileLease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "file"
+        });
+        var databaseRecord = await databaseLease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "database"
+        });
+
+        fileLease.OwnsStore.ShouldBeFalse();
+        databaseLease.OwnsStore.ShouldBeTrue();
+        fileRecord.Collection.ShouldBe("records");
+        fileRecord.Value.ShouldBe("file");
+        databaseRecord.Collection.ShouldBe("records");
+        databaseRecord.Value.ShouldBe("database");
+    }
+
+    [Fact]
+    public void RegistrationHelpersRejectInvalidArguments()
+    {
+        var options = new StorageComponentOptions();
+        var fileSystemOptions = new FileSystemStorageStoreOptions
+        {
+            RootDirectory = "data/files"
+        };
+        var sqlFileOptions = new SqlFileStorageStoreOptions
+        {
+            DatabasePath = "data/records.db"
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
+            FileSystemStorageRegistrationExtensions.UseFileSystemStorage(null!, fileSystemOptions))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            options.UseFileSystemStorage((string)null!))
+            .ParamName.ShouldBe("rootDirectory");
+        Should.Throw<ArgumentException>(() =>
+            options.UseFileSystemStorage(" "))
+            .ParamName.ShouldBe("rootDirectory");
+        Should.Throw<ArgumentNullException>(() =>
+            options.UseFileSystemStorage((FileSystemStorageStoreOptions)null!))
+            .ParamName.ShouldBe("fileSystemOptions");
+
+        Should.Throw<ArgumentNullException>(() =>
+            SqlFileStorageRegistrationExtensions.UseSqlFileStorage(null!, sqlFileOptions))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            options.UseSqlFileStorage((string)null!))
+            .ParamName.ShouldBe("databasePath");
+        Should.Throw<ArgumentException>(() =>
+            options.UseSqlFileStorage(" "))
+            .ParamName.ShouldBe("databasePath");
+        Should.Throw<ArgumentNullException>(() =>
+            options.UseSqlFileStorage((SqlFileStorageStoreOptions)null!))
+            .ParamName.ShouldBe("sqlFileOptions");
+    }
+
     private sealed class TempWorkspace : IDisposable
     {
         private readonly string _root;

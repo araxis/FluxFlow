@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>3.3.2</Version>
+    <Version>3.3.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Documents and verifies the full keyed storage backend registration argument contract, including service collection, key name, options, options factory, and null factory-result failures.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens storage adapter registration helpers by rejecting null or blank SQL file database paths before backend factory creation.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

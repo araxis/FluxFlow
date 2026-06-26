@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.3.3
+
+Hardens file-system storage adapter registration helpers.
+
+- `UseFileSystemStorage(string rootDirectory)` now rejects null or blank root
+  directories before creating the backend store factory.
+- Adds adapter-registration coverage for the string helper path and invalid
+  registration arguments.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.3
+
+Hardens SQL-file storage adapter registration helpers.
+
+- `UseSqlFileStorage(string databasePath)` now rejects null or blank database
+  paths before creating the backend store factory.
+- Adds adapter-registration coverage for the string helper path and invalid
+  registration arguments.
+
 ## FluxFlow.Components.Configuration 1.4.2
 
 Documents and verifies Configuration validator argument contracts.
