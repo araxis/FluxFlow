@@ -72,4 +72,10 @@ public sealed class PulseMqttMessageMapperTests
         received.CorrelationData.ShouldBe(Encoding.UTF8.GetBytes("corr-2"));
         received.UserProperties["source"].ShouldBe("sensor");
     }
+
+    [Fact]
+    public void ToUtf8Memory_rejects_null_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            PulseMqttMessageMapper.ToUtf8Memory(null!))
+            .ParamName.ShouldBe("value");
 }

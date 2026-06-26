@@ -48,6 +48,10 @@ When the MQTT client is disconnected, publish and subscribe throw
 `MqttClientUnavailableException`, which the core nodes translate into their
 not-connected diagnostics.
 
+Mapper helpers reject null text before encoding MQTT credentials, correlation
+data, and user properties so malformed adapter input fails with clear argument
+names.
+
 ## Dependency Injection
 
 Register a named client session when the host wants DI-owned lifetime and keyed

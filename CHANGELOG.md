@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.3
+
+Hardens MQTTnet mapper text encoding guardrails.
+
+- `MqttNetMessageMapper.ToUtf8Memory` now rejects null values with an explicit
+  `value` argument exception before encoding MQTT credentials, correlation
+  data, or user properties.
+- Adds regression coverage for invalid mapper text input.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.3
+
+Hardens Pulse MQTT mapper text encoding guardrails.
+
+- `PulseMqttMessageMapper.ToUtf8Memory` now rejects null values with an
+  explicit `value` argument exception before encoding MQTT credentials,
+  correlation data, or user properties.
+- Adds regression coverage for invalid mapper text input.
+
 ## FluxFlow.Components.Secrets 1.5.3
 
 Hardens secret option resolution factory guardrails.

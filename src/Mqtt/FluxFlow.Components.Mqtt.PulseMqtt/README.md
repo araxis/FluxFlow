@@ -52,6 +52,10 @@ By default, FluxFlow publish semantics stay strict: publishing while disconnecte
 throws `MqttClientUnavailableException`. Set
 `AllowOfflinePublishQueue = true` to opt into Pulse MQTT's offline publish queue.
 
+Mapper helpers reject null text before encoding MQTT credentials, correlation
+data, and user properties so malformed adapter input fails with clear argument
+names.
+
 ## Dependency Injection
 
 Register a named client session when the host wants DI-owned lifetime and keyed
