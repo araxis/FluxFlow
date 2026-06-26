@@ -22,187 +22,214 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         ];
 
     private static ComponentDesignMetadata CreatePutMetadata()
-        => CreateStorageMetadata(
+    {
+        var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Put,
             "Storage Put",
             "Stores or updates a record through a host-owned storage store.",
             "database-plus",
-            "putRecord",
-            [
-                CollectionOption(),
-                new OptionDesignMetadata
-                {
-                    Name = "mode",
-                    Kind = OptionValueKind.Enum,
-                    DisplayName = "Mode",
-                    DefaultValue = PutDefaults.Mode.ToString(),
-                    HelperText = "Write behavior when a record already exists or is missing.",
-                    Choices = WriteModeChoices()
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitStoredRecord",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Stored Record",
-                    DefaultValue = PutDefaults.EmitStoredRecord,
-                    HelperText = "Include the stored record in the output result."
-                },
-                BoundedCapacityOption(PutDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                nameof(StoragePutRequest),
-                "Storage put request.",
-                nameof(StorageResult),
-                "Storage put result."));
+            "putRecord");
+
+        builder
+            .AddOption(CollectionOption())
+            .AddOption(
+                "mode",
+                OptionValueKind.Enum,
+                displayName: "Mode",
+                helperText: "Write behavior when a record already exists or is missing.",
+                defaultValue: PutDefaults.Mode.ToString(),
+                choices: WriteModeChoices())
+            .AddOption(
+                "emitStoredRecord",
+                OptionValueKind.Boolean,
+                displayName: "Emit Stored Record",
+                helperText: "Include the stored record in the output result.",
+                defaultValue: PutDefaults.EmitStoredRecord)
+            .AddOption(BoundedCapacityOption(PutDefaults.BoundedCapacity));
+
+        AddTransformPorts(
+            builder,
+            nameof(StoragePutRequest),
+            "Storage put request.",
+            nameof(StorageResult),
+            "Storage put result.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateGetMetadata()
-        => CreateStorageMetadata(
+    {
+        var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Get,
             "Storage Get",
             "Reads a record and routes found or missing results.",
             "database-search",
-            "getRecord",
-            [
-                CollectionOption(),
-                IncludeExpiredOption(GetDefaults.IncludeExpired),
-                BoundedCapacityOption(GetDefaults.BoundedCapacity)
-            ],
-            [
-                InputPort(nameof(StorageGetRequest), "Storage get request."),
-                OutputPort(
-                    StorageCompositionPortNames.Output,
-                    "Output",
-                    "Results",
-                    1,
-                    nameof(StorageResult),
-                    "Storage get result.",
-                    isPrimary: true),
-                OutputPort(
-                    StorageCompositionPortNames.Found,
-                    "Found",
-                    "Branches",
-                    2,
-                    nameof(StorageResult),
-                    "Storage result when the record exists."),
-                OutputPort(
-                    StorageCompositionPortNames.NotFound,
-                    "Not Found",
-                    "Branches",
-                    3,
-                    nameof(StorageResult),
-                    "Storage result when the record is missing.")
-            ]);
+            "getRecord");
+
+        builder
+            .AddOption(CollectionOption())
+            .AddOption(IncludeExpiredOption(GetDefaults.IncludeExpired))
+            .AddOption(BoundedCapacityOption(GetDefaults.BoundedCapacity));
+
+        builder
+            .AddInputPort(
+                StorageCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Storage get request.",
+                valueType: nameof(StorageGetRequest),
+                isPrimary: true)
+            .AddOutputPort(
+                StorageCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Storage get result.",
+                valueType: nameof(StorageResult),
+                isPrimary: true)
+            .AddOutputPort(
+                StorageCompositionPortNames.Found,
+                displayName: "Found",
+                group: "Branches",
+                order: 2,
+                summary: "Storage result when the record exists.",
+                valueType: nameof(StorageResult))
+            .AddOutputPort(
+                StorageCompositionPortNames.NotFound,
+                displayName: "Not Found",
+                group: "Branches",
+                order: 3,
+                summary: "Storage result when the record is missing.",
+                valueType: nameof(StorageResult));
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateQueryMetadata()
-        => CreateStorageMetadata(
+    {
+        var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Query,
             "Storage Query",
             "Queries records and can fan matched records to a separate output.",
             "database",
-            "queryRecords",
-            [
-                CollectionOption(),
-                IncludeExpiredOption(QueryDefaults.IncludeExpired),
-                new OptionDesignMetadata
-                {
-                    Name = "offset",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Offset",
-                    DefaultValue = QueryDefaults.Offset,
-                    Min = 0,
-                    HelperText = "Number of matched records to skip."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "limit",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Limit",
-                    DefaultValue = QueryDefaults.Limit,
-                    Min = 1,
-                    HelperText = "Maximum number of records to return."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitRecordsInResult",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Records In Result",
-                    DefaultValue = QueryDefaults.EmitRecordsInResult,
-                    HelperText = "Include matched records in the query result payload."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitRecordOutputs",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Record Outputs",
-                    DefaultValue = QueryDefaults.EmitRecordOutputs,
-                    HelperText = "Fan each matched record to the Records output."
-                },
-                BoundedCapacityOption(QueryDefaults.BoundedCapacity)
-            ],
-            [
-                InputPort(nameof(StorageQueryRequest), "Storage query request."),
-                OutputPort(
-                    StorageCompositionPortNames.Output,
-                    "Output",
-                    "Results",
-                    1,
-                    nameof(StorageQueryResult),
-                    "Storage query result.",
-                    isPrimary: true),
-                OutputPort(
-                    StorageCompositionPortNames.Records,
-                    "Records",
-                    "Records",
-                    2,
-                    nameof(StorageRecord),
-                    "Matched storage record.")
-            ]);
+            "queryRecords");
+
+        builder
+            .AddOption(CollectionOption())
+            .AddOption(IncludeExpiredOption(QueryDefaults.IncludeExpired))
+            .AddOption(
+                "offset",
+                OptionValueKind.Number,
+                displayName: "Offset",
+                helperText: "Number of matched records to skip.",
+                defaultValue: QueryDefaults.Offset,
+                min: 0)
+            .AddOption(
+                "limit",
+                OptionValueKind.Number,
+                displayName: "Limit",
+                helperText: "Maximum number of records to return.",
+                defaultValue: QueryDefaults.Limit,
+                min: 1)
+            .AddOption(
+                "emitRecordsInResult",
+                OptionValueKind.Boolean,
+                displayName: "Emit Records In Result",
+                helperText: "Include matched records in the query result payload.",
+                defaultValue: QueryDefaults.EmitRecordsInResult)
+            .AddOption(
+                "emitRecordOutputs",
+                OptionValueKind.Boolean,
+                displayName: "Emit Record Outputs",
+                helperText: "Fan each matched record to the Records output.",
+                defaultValue: QueryDefaults.EmitRecordOutputs)
+            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
+
+        builder
+            .AddInputPort(
+                StorageCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Storage query request.",
+                valueType: nameof(StorageQueryRequest),
+                isPrimary: true)
+            .AddOutputPort(
+                StorageCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Storage query result.",
+                valueType: nameof(StorageQueryResult),
+                isPrimary: true)
+            .AddOutputPort(
+                StorageCompositionPortNames.Records,
+                displayName: "Records",
+                group: "Records",
+                order: 2,
+                summary: "Matched storage record.",
+                valueType: nameof(StorageRecord));
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateDeleteMetadata()
-        => CreateStorageMetadata(
+    {
+        var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Delete,
             "Storage Delete",
             "Deletes a record through a host-owned storage store.",
             "database-x",
-            "deleteRecord",
-            [
-                CollectionOption(),
-                new OptionDesignMetadata
-                {
-                    Name = "emitMissingAsResult",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Missing As Result",
-                    DefaultValue = DeleteDefaults.EmitMissingAsResult,
-                    HelperText = "Emit a normal output result when the record is missing."
-                },
-                BoundedCapacityOption(DeleteDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                nameof(StorageDeleteRequest),
-                "Storage delete request.",
-                nameof(StorageResult),
-                "Storage delete result."));
+            "deleteRecord");
 
-    private static ComponentDesignMetadata CreateStorageMetadata(
+        builder
+            .AddOption(CollectionOption())
+            .AddOption(
+                "emitMissingAsResult",
+                OptionValueKind.Boolean,
+                displayName: "Emit Missing As Result",
+                helperText: "Emit a normal output result when the record is missing.",
+                defaultValue: DeleteDefaults.EmitMissingAsResult)
+            .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity));
+
+        AddTransformPorts(
+            builder,
+            nameof(StorageDeleteRequest),
+            "Storage delete request.",
+            nameof(StorageResult),
+            "Storage delete result.");
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadataBuilder CreateStorageMetadataBuilder(
         string type,
         string displayName,
         string summary,
         string iconKey,
-        string preferredNodeName,
-        IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Storage",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 460,
-            Options = options,
-            Resources = StorageResources(),
-            Ports = ports
-        };
+        string preferredNodeName)
+        => new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Storage",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 460)
+            .AddResource(
+                StorageCompositionResourceNames.Store,
+                displayName: "Store",
+                order: 0,
+                summary: "Required keyed storage store or store factory used for put, get, query, and delete operations.",
+                valueType: $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
+                isRequired: true)
+            .AddResource(
+                StorageCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic storage diagnostics and timestamps.",
+                valueType: nameof(TimeProvider));
 
     private static OptionDesignMetadata CollectionOption() => new()
     {
@@ -249,76 +276,27 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             HelperText = helperText
         };
 
-    private static IReadOnlyList<ResourceDesignMetadata> StorageResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = StorageCompositionResourceNames.Store,
-                DisplayName = "Store",
-                Order = 0,
-                Summary = "Required keyed storage store or store factory used for put, get, query, and delete operations.",
-                ValueType = $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
-                IsRequired = true
-            },
-            new ResourceDesignMetadata
-            {
-                Name = StorageCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 1,
-                Summary = "Optional keyed clock for deterministic storage diagnostics and timestamps.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
-
-    private static IReadOnlyList<PortDesignMetadata> TransformPorts(
+    private static void AddTransformPorts(
+        ComponentDesignMetadataBuilder builder,
         string inputType,
         string inputSummary,
         string outputType,
         string outputSummary)
-        =>
-        [
-            InputPort(inputType, inputSummary),
-            OutputPort(
-                StorageCompositionPortNames.Output,
-                "Output",
-                "Results",
-                1,
-                outputType,
-                outputSummary,
+        => builder
+            .AddInputPort(
+                StorageCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: inputSummary,
+                valueType: inputType,
                 isPrimary: true)
-        ];
-
-    private static PortDesignMetadata InputPort(
-        string valueType,
-        string summary) => new()
-        {
-            Name = new ComponentPortName(StorageCompositionPortNames.Input),
-            Direction = PortDirection.Input,
-            DisplayName = "Input",
-            Group = "Messages",
-            Order = 0,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = true
-        };
-
-    private static PortDesignMetadata OutputPort(
-        string name,
-        string displayName,
-        string group,
-        int order,
-        string valueType,
-        string summary,
-        bool isPrimary = false) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Output,
-            DisplayName = displayName,
-            Group = group,
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+            .AddOutputPort(
+                StorageCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: outputSummary,
+                valueType: outputType,
+                isPrimary: true);
 }
