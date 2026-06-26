@@ -81,6 +81,8 @@ as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
 The registration helpers reject null service collections, blank keys, null
 direct options, null options factories, and null options factory results before
 creating the keyed client session.
+Keyed DI helper names are trimmed before registration, so configuration-bound
+client names with surrounding whitespace resolve to the same logical client.
 
 By default, the registration leaves connection lifetime to the composition
 layer. Set `ConnectWithHost = true` when the host should call `ConnectAsync`

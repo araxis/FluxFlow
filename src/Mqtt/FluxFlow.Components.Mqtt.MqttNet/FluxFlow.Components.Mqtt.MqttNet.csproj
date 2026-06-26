@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.MqttNet</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.MqttNet</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.MqttNet</RootNamespace>
-    <Version>1.1.6</Version>
+    <Version>1.1.7</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>MQTTnet-backed adapter for FluxFlow MQTT components. Owns MQTT client creation, connection, Last Will setup, publish, trigger subscriptions, acknowledgement, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;mqttnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens MQTT adapter payload ownership by snapshotting Last Will payload arrays and copying publish/Last Will payloads before concrete client handoff.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens keyed MQTTnet adapter registration by trimming client names before DI registration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

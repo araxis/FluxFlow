@@ -32,6 +32,26 @@ public sealed class PulseMqttRegistrationTests
     }
 
     [Fact]
+    public async Task AddFluxFlowMqttClient_TrimsKeyedClientNames()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            " primary ",
+            new PulseMqttClientOptions
+            {
+                Host = "localhost",
+                AllowOfflinePublishQueue = true
+            });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredKeyedService<PulseMqttClient>("primary");
+
+        provider.GetRequiredKeyedService<IMqttPublisher>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttTriggerSource>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttClientHealthSource>("primary").ShouldBeSameAs(client);
+    }
+
+    [Fact]
     public async Task AddFluxFlowMqttClient_CanStartAndStopWithHostedLifetime()
     {
         await using var broker = new PulseMqttTestBroker();

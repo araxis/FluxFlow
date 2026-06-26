@@ -26,6 +26,22 @@ public sealed class MqttNetRegistrationTests
     }
 
     [Fact]
+    public async Task AddFluxFlowMqttClient_TrimsKeyedClientNames()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            " primary ",
+            new MqttNetClientOptions { Host = "localhost" });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredKeyedService<MqttNetClient>("primary");
+
+        provider.GetRequiredKeyedService<IMqttPublisher>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttTriggerSource>("primary").ShouldBeSameAs(client);
+        provider.GetRequiredKeyedService<IMqttClientHealthSource>("primary").ShouldBeSameAs(client);
+    }
+
+    [Fact]
     public async Task AddFluxFlowMqttClient_DoesNotRegisterHostedLifetimeByDefault()
     {
         var services = new ServiceCollection();

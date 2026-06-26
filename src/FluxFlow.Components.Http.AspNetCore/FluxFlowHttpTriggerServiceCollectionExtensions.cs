@@ -23,15 +23,17 @@ public static class FluxFlowHttpTriggerServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddKeyedSingleton(name, (_, _) => new HttpTriggerSource(options?.Capacity ?? 128));
-        services.AddKeyedSingleton(name, (provider, key) =>
+        var normalizedName = name.Trim();
+
+        services.AddKeyedSingleton(normalizedName, (_, _) => new HttpTriggerSource(options?.Capacity ?? 128));
+        services.AddKeyedSingleton(normalizedName, (provider, key) =>
         {
             var source = provider.GetRequiredKeyedService<HttpTriggerSource>(key!);
             var node = new HttpTriggerNode(source.Requests, options);
             configure(node);
             return node;
         });
-        services.AddSingleton<IHostedService>(provider => new HttpTriggerLifetime(provider, name));
+        services.AddSingleton<IHostedService>(provider => new HttpTriggerLifetime(provider, normalizedName));
         return services;
     }
 
