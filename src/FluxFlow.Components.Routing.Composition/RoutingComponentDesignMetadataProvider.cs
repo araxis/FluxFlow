@@ -17,16 +17,39 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             CreateJoinMetadata()
         ];
 
-    private static ComponentDesignMetadata CreateSwitchMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Switch),
-        DisplayName = "Switch",
-        Category = "Routing",
-        Summary = "Routes input messages by a host-provided route key selector.",
-        IconKey = "route",
-        PreferredNodeName = "switch",
-        SuggestedEditorWidth = 460,
-        Options =
+    private static ComponentDesignMetadata RoutingMetadata(
+        string type,
+        string displayName,
+        string summary,
+        string iconKey,
+        string preferredNodeName,
+        int suggestedEditorWidth,
+        IReadOnlyList<OptionDesignMetadata> options,
+        IReadOnlyList<PortDesignMetadata> ports,
+        IReadOnlyList<ResourceDesignMetadata> resources,
+        IReadOnlyDictionary<string, string>? attributes = null) => new()
+        {
+            Type = new ComponentType(type),
+            DisplayName = displayName,
+            Category = "Routing",
+            Summary = summary,
+            IconKey = iconKey,
+            PreferredNodeName = preferredNodeName,
+            SuggestedEditorWidth = suggestedEditorWidth,
+            Options = options,
+            Ports = ports,
+            Resources = resources,
+            Attributes = attributes ?? new Dictionary<string, string>()
+        };
+
+    private static ComponentDesignMetadata CreateSwitchMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Switch,
+            "Switch",
+            "Routes input messages by a host-provided route key selector.",
+            "route",
+            "switch",
+            460,
         [
             EngineOption(),
             ExpressionOption("expression", "Expression", "Diagnostic expression metadata; route selection uses the routeKeySelector resource."),
@@ -48,7 +71,6 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             BoolOption("emitRouteEnvelope", "Emit Route Envelope", false, "Emit routed messages on the Routed output."),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Primary routed output.", "TInput", 1, isPrimary: true),
@@ -56,7 +78,6 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             OutputPort(RoutingCompositionPortNames.Default, "Default", "Input message when no configured route matches.", "TInput", 3),
             OutputPort(RoutingCompositionPortNames.Routed, "Routed", "Input message when route envelope output is enabled.", "TInput", 4)
         ],
-        Resources =
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.RouteKeySelector,
@@ -66,72 +87,61 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 "Required keyed delegate that selects the route key for each input message."),
             ClockResource(1)
         ],
-        Attributes = new Dictionary<string, string>
+        new Dictionary<string, string>
         {
             ["dynamicOutputsOption"] = "routeOutputs",
             ["requiredResource"] = RoutingCompositionResourceNames.RouteKeySelector
-        }
-    };
+        });
 
-    private static ComponentDesignMetadata CreateForkMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Fork),
-        DisplayName = "Fork",
-        Category = "Routing",
-        Summary = "Fans each input message out to configured output ports.",
-        IconKey = "git-fork",
-        PreferredNodeName = "fork",
-        SuggestedEditorWidth = 420,
-        Options =
+    private static ComponentDesignMetadata CreateForkMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Fork,
+            "Fork",
+            "Fans each input message out to configured output ports.",
+            "git-fork",
+            "fork",
+            420,
         [
             InputTypeOption("inputType"),
             JsonOption("outputs", "Outputs", "Required dynamic output port names.", isRequired: true),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Primary output alias.", "TInput", 1, isPrimary: true)
         ],
-        Resources = [ClockResource(0)],
-        Attributes = new Dictionary<string, string>
+        [ClockResource(0)],
+        new Dictionary<string, string>
         {
             ["dynamicOutputsOption"] = "outputs"
-        }
-    };
+        });
 
-    private static ComponentDesignMetadata CreateMergeMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Merge),
-        DisplayName = "Merge",
-        Category = "Routing",
-        Summary = "Merges messages of the same input type into one output stream.",
-        IconKey = "merge",
-        PreferredNodeName = "merge",
-        SuggestedEditorWidth = 400,
-        Options =
+    private static ComponentDesignMetadata CreateMergeMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Merge,
+            "Merge",
+            "Merges messages of the same input type into one output stream.",
+            "merge",
+            "merge",
+            400,
         [
             InputTypeOption("inputType"),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true)
         ],
-        Resources = [ClockResource(0)]
-    };
+        [ClockResource(0)]);
 
-    private static ComponentDesignMetadata CreateWindowMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Window),
-        DisplayName = "Window",
-        Category = "Routing",
-        Summary = "Buffers input messages into count- or time-based windows.",
-        IconKey = "panel-top",
-        PreferredNodeName = "window",
-        SuggestedEditorWidth = 420,
-        Options =
+    private static ComponentDesignMetadata CreateWindowMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Window,
+            "Window",
+            "Buffers input messages into count- or time-based windows.",
+            "panel-top",
+            "window",
+            420,
         [
             InputTypeOption("inputType"),
             NumberOption("maxItems", "Max Items", 0, 0, "Maximum buffered item count; set timeMilliseconds when zero."),
@@ -139,24 +149,20 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             BoolOption("emitPartialOnCompletion", "Emit Partial On Completion", true, "Emit a partial window when input completes."),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Buffered window.", "FlowWindow<TInput>", 1, isPrimary: true)
         ],
-        Resources = [ClockResource(0)]
-    };
+        [ClockResource(0)]);
 
-    private static ComponentDesignMetadata CreateCorrelationMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Correlation),
-        DisplayName = "Correlation",
-        Category = "Routing",
-        Summary = "Pairs related request and response messages by host-provided key and side selectors.",
-        IconKey = "link",
-        PreferredNodeName = "correlate",
-        SuggestedEditorWidth = 460,
-        Options =
+    private static ComponentDesignMetadata CreateCorrelationMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Correlation,
+            "Correlation",
+            "Pairs related request and response messages by host-provided key and side selectors.",
+            "link",
+            "correlate",
+            460,
         [
             EngineOption(),
             ExpressionOption("keyExpression", "Key Expression", "Diagnostic key expression metadata; key selection uses the keySelector resource."),
@@ -171,14 +177,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             NumberOption("maxPending", "Max Pending", 1_024, 1, "Maximum pending correlation keys."),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Input, "Input", "Input request or response message.", "TInput", 0, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Correlation match result.", "FlowCorrelationMatch<TInput>", 1, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Matched, "Matched", "Correlation match result alias.", "FlowCorrelationMatch<TInput>", 2),
             OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Correlation timeout result.", "FlowCorrelationTimeout<TInput>", 3)
         ],
-        Resources =
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.KeySelector,
@@ -194,22 +198,19 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 "Required keyed delegate that selects request or response side labels."),
             ClockResource(2)
         ],
-        Attributes = new Dictionary<string, string>
+        new Dictionary<string, string>
         {
             ["requiredResources"] = $"{RoutingCompositionResourceNames.KeySelector},{RoutingCompositionResourceNames.SideSelector}"
-        }
-    };
+        });
 
-    private static ComponentDesignMetadata CreateJoinMetadata() => new()
-    {
-        Type = new ComponentType(RoutingCompositionNodeTypes.Join),
-        DisplayName = "Join",
-        Category = "Routing",
-        Summary = "Joins left and right messages by host-provided key selectors.",
-        IconKey = "combine",
-        PreferredNodeName = "join",
-        SuggestedEditorWidth = 460,
-        Options =
+    private static ComponentDesignMetadata CreateJoinMetadata()
+        => RoutingMetadata(
+            RoutingCompositionNodeTypes.Join,
+            "Join",
+            "Joins left and right messages by host-provided key selectors.",
+            "combine",
+            "join",
+            460,
         [
             EngineOption(),
             ExpressionOption("leftKeyExpression", "Left Key Expression", "Diagnostic left key expression metadata; left keys use the leftKeySelector resource."),
@@ -223,14 +224,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             NumberOption("maxPending", "Max Pending", 1_024, 1, "Maximum pending join keys."),
             BoundedCapacityOption()
         ],
-        Ports =
         [
             InputPort(RoutingCompositionPortNames.Left, "Left", "Left input message.", "TLeft", 0, isPrimary: true),
             InputPort(RoutingCompositionPortNames.Right, "Right", "Right input message.", "TRight", 1),
             OutputPort(RoutingCompositionPortNames.Output, "Output", "Joined output result.", "FlowJoinResult<TLeft,TRight>", 2, isPrimary: true),
             OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Join timeout result.", "FlowJoinTimeout<TLeft,TRight>", 3)
         ],
-        Resources =
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.LeftKeySelector,
@@ -246,11 +245,10 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
                 "Required keyed delegate that selects the join key for right messages."),
             ClockResource(2)
         ],
-        Attributes = new Dictionary<string, string>
+        new Dictionary<string, string>
         {
             ["requiredResources"] = $"{RoutingCompositionResourceNames.LeftKeySelector},{RoutingCompositionResourceNames.RightKeySelector}"
-        }
-    };
+        });
 
     private static ResourceDesignMetadata RequiredSelectorResource(
         string name,
