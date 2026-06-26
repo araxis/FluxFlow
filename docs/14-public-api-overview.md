@@ -796,7 +796,10 @@ These packages are intentionally not standalone node composition adapters:
   config-bound paths for structured validation diagnostics. It supports both
   runtime validation through `IResourceLookup`/`ISecretResolver` and
   descriptor-only validation through `IResourceDescriptorProvider` and
-  `ISecretDescriptorProvider`.
+  `ISecretDescriptorProvider`. Public validator entry points reject null
+  collaborator services, requests, and reference collections at the package
+  boundary while preserving request-owned null collections as structured
+  diagnostics.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including descriptor-provider separation, trimmed resource
   names, kinds, display text, and null-safe normalized metadata and attribute

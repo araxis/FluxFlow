@@ -98,6 +98,11 @@ This package only normalizes validation. Hosts still decide where resources and
 secret values live, how they are secured, when they are resolved, and how
 diagnostics are displayed or logged.
 
+The public `ConfigurationValidator` entry points reject null resource lookups,
+secret resolvers, descriptor providers, validation requests, and reference
+collections at the package boundary. Config-bound null resource/secret
+collections inside a request are still reported as structured diagnostics.
+
 Resource option metadata is validated as configuration input. Null maps, empty
 keys, and empty values are reported as structured configuration diagnostics.
 Null request-level resource/secret collections and null validation entries are

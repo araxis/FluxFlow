@@ -284,6 +284,70 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public async Task Validator_entry_points_reject_null_collaborators()
+    {
+        var resourceLookup = new ResourceDescriptorCatalog([]);
+        var secretResolver = new InMemorySecretResolver([]);
+        var resourceDescriptors = new StaticResourceDescriptorProvider([]);
+        var secretDescriptors = new StaticSecretDescriptorProvider([]);
+        var request = new ConfigurationValidationRequest();
+
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateAsync(null!, secretResolver, request).AsTask()))
+            .ParamName.ShouldBe("resourceLookup");
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateAsync(resourceLookup, null!, request).AsTask()))
+            .ParamName.ShouldBe("secretResolver");
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateAsync(resourceLookup, secretResolver, null!).AsTask()))
+            .ParamName.ShouldBe("request");
+
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredReferences(null!, secretDescriptors, request))
+            .ParamName.ShouldBe("resourceDescriptorProvider");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredReferences(resourceDescriptors, null!, request))
+            .ParamName.ShouldBe("secretDescriptorProvider");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredReferences(resourceDescriptors, secretDescriptors, null!))
+            .ParamName.ShouldBe("request");
+
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateResourcesAsync(null!, []).AsTask()))
+            .ParamName.ShouldBe("lookup");
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateResourcesAsync(
+                resourceLookup,
+                (IEnumerable<ConfigurationResourceReference>)null!).AsTask()))
+            .ParamName.ShouldBe("references");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredResources(null!, []))
+            .ParamName.ShouldBe("descriptorProvider");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredResources(
+                resourceDescriptors,
+                (IEnumerable<ConfigurationResourceReference>)null!))
+            .ParamName.ShouldBe("references");
+
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateSecretsAsync(null!, []).AsTask()))
+            .ParamName.ShouldBe("resolver");
+        (await Should.ThrowAsync<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateSecretsAsync(
+                secretResolver,
+                (IEnumerable<SecretOptionReference>)null!).AsTask()))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredSecrets(null!, []))
+            .ParamName.ShouldBe("descriptorProvider");
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidator.ValidateDeclaredSecrets(
+                secretDescriptors,
+                (IEnumerable<SecretOptionReference>)null!))
+            .ParamName.ShouldBe("options");
+    }
+
+    [Fact]
     public void ValidateDeclaredResources_reports_descriptor_provider_diagnostics()
     {
         var diagnostics = ConfigurationValidator.ValidateDeclaredResources(

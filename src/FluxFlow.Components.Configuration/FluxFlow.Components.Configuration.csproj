@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.4.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens fluent configuration validation request authoring by rejecting null resource and secret option paths while preserving blank-path diagnostics for config-bound data.</PackageReleaseNotes>
+    <PackageReleaseNotes>Documents and verifies ConfigurationValidator public entry-point argument contracts for null lookups, resolvers, descriptor providers, validation requests, and reference collections.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
