@@ -150,6 +150,15 @@ Uses the shared Designer metadata builder for payload inspection metadata.
 - Preserves existing payload inspection options, clock resources, fixed ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Observability.Composition 1.2.2
+
+Uses the shared Designer metadata builder for observability metadata.
+
+- Refactors `ObservabilityComponentDesignMetadataProvider` to author counter,
+  logger, and metrics metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing observability options, resources, fixed ports, validation,
+  catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

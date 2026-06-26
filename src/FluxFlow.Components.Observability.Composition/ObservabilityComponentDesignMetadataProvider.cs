@@ -21,235 +21,221 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         ];
 
     private static ComponentDesignMetadata CreateCounterMetadata()
-        => CreateObservabilityMetadata(
+    {
+        var builder = CreateObservabilityMetadataBuilder(
             ObservabilityCompositionNodeTypes.Counter,
             "Counter",
             "Counts accepted input messages and emits counter snapshots.",
             "hash",
-            "count",
-            [
-                InputTypeOption(CounterDefaults.InputType),
-                new OptionDesignMetadata
-                {
-                    Name = "name",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Name",
-                    HelperText = "Optional counter name included in snapshots and diagnostics."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "engine",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Engine",
-                    HelperText = "Diagnostic engine metadata; composition DI selection uses the engine resource."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "predicate",
-                    Kind = OptionValueKind.Expression,
-                    DisplayName = "Predicate",
-                    HelperText = "Optional boolean expression used to accept or reject inputs."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "expression",
-                    Kind = OptionValueKind.Expression,
-                    DisplayName = "Expression",
-                    HelperText = "Compatibility alias used when predicate is not configured."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "expressionId",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Expression ID",
-                    HelperText = "Optional diagnostic identifier emitted with counter diagnostics."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "expressionName",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Expression Name",
-                    HelperText = "Optional diagnostic name emitted with counter diagnostics."
-                },
-                BoundedCapacityOption(CounterDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                "TInput",
-                "Input message to count.",
-                nameof(FlowCounterSnapshot),
-                "Counter snapshot."),
-            [
-                Resource(
-                    ObservabilityCompositionResourceNames.Engine,
-                    "Expression Engine",
-                    nameof(IFlowExpressionEngine),
-                    0,
-                    "Conditionally required keyed expression engine when predicate or expression is configured.",
-                    isRequired: false,
-                    attributes: new Dictionary<string, string>
-                    {
-                        ["requiredWhenAnyOption"] = "predicate,expression"
-                    }),
-                Resource(
-                    ObservabilityCompositionResourceNames.ContextFactory,
-                    "Context Factory",
-                    "IFlowMapContextFactory<TInput>",
-                    1,
-                    "Optional keyed mapping context factory used when evaluating counter predicates."),
-                ClockResource(2)
-            ]);
+            "count");
+
+        AddCounterOptions(builder);
+        AddCounterResources(builder);
+        AddTransformPorts(
+            builder,
+            "TInput",
+            "Input message to count.",
+            nameof(FlowCounterSnapshot),
+            "Counter snapshot.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateLoggerMetadata()
-        => CreateObservabilityMetadata(
+    {
+        var builder = CreateObservabilityMetadataBuilder(
             ObservabilityCompositionNodeTypes.Logger,
             "Logger",
             "Renders structured log entries from input messages.",
             "list",
-            "log",
-            [
-                InputTypeOption(LoggerDefaults.InputType),
-                new OptionDesignMetadata
-                {
-                    Name = "level",
-                    Kind = OptionValueKind.Enum,
-                    DisplayName = "Level",
-                    DefaultValue = LoggerDefaults.Level,
-                    HelperText = "Log level applied to emitted entries.",
-                    Choices = LogLevelChoices()
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "category",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Category",
-                    DefaultValue = LoggerDefaults.Category,
-                    HelperText = "Log category included in emitted entries."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "messageTemplate",
-                    Kind = OptionValueKind.MultilineText,
-                    DisplayName = "Message Template",
-                    HelperText = "Template rendered with selected attributes, inputType, category, level, sequence, and input."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "attributeSelectors",
-                    Kind = OptionValueKind.Json,
-                    DisplayName = "Attribute Selectors",
-                    DefaultValue = LoggerDefaults.AttributeSelectors,
-                    HelperText = "Array of selector names resolved from host-owned attribute:{name} resources."
-                },
-                BoundedCapacityOption(LoggerDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                "TInput",
-                "Input message to log.",
-                nameof(FlowLogEntry),
-                "Structured log entry."),
-            [
-                ClockResource(0),
-                Resource(
-                    ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
-                    "Attribute Selector",
-                    "IObservabilityValueSelector<TInput>",
-                    1,
-                    "Required keyed selector pattern for each configured attributeSelectors entry.",
-                    attributes: new Dictionary<string, string>
-                    {
-                        ["pattern"] = "true",
-                        ["option"] = "attributeSelectors"
-                    })
-            ]);
+            "log");
+
+        AddLoggerOptions(builder);
+        AddLoggerResources(builder);
+        AddTransformPorts(
+            builder,
+            "TInput",
+            "Input message to log.",
+            nameof(FlowLogEntry),
+            "Structured log entry.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateMetricsMetadata()
-        => CreateObservabilityMetadata(
+    {
+        var builder = CreateObservabilityMetadataBuilder(
             ObservabilityCompositionNodeTypes.Metrics,
             "Metrics",
             "Tracks count, rate, timestamp, and optional size snapshots for inputs.",
             "activity",
-            "observeMetrics",
-            [
-                InputTypeOption(MetricsDefaults.InputType),
-                new OptionDesignMetadata
-                {
-                    Name = "name",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Name",
-                    HelperText = "Optional metric name included in snapshots and diagnostics."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "sizeSelector",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Size Selector",
-                    HelperText = "Diagnostic selector metadata; composition DI selection uses the sizeSelector resource."
-                },
-                BoundedCapacityOption(MetricsDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                "TInput",
-                "Input message to observe.",
-                nameof(FlowMetricSnapshot),
-                "Metric snapshot."),
-            [
-                Resource(
-                    ObservabilityCompositionResourceNames.SizeSelector,
-                    "Size Selector",
-                    "IObservabilityValueSelector<TInput>",
-                    0,
-                    "Optional keyed selector used to calculate message size metrics."),
-                ClockResource(1)
-            ]);
+            "observeMetrics");
 
-    private static ComponentDesignMetadata CreateObservabilityMetadata(
+        AddMetricsOptions(builder);
+        AddMetricsResources(builder);
+        AddTransformPorts(
+            builder,
+            "TInput",
+            "Input message to observe.",
+            nameof(FlowMetricSnapshot),
+            "Metric snapshot.");
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadataBuilder CreateObservabilityMetadataBuilder(
         string type,
         string displayName,
         string summary,
         string iconKey,
-        string preferredNodeName,
-        IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports,
-        IReadOnlyList<ResourceDesignMetadata> resources) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Observability",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 460,
-            Options = options,
-            Ports = ports,
-            Resources = resources
-        };
+        string preferredNodeName)
+        => new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Observability",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 460);
 
-    private static ResourceDesignMetadata ClockResource(int order) => new()
-    {
-        Name = ObservabilityCompositionResourceNames.Clock,
-        DisplayName = "Clock",
-        Order = order,
-        Summary = "Optional keyed clock for deterministic observability timestamps and diagnostics.",
-        ValueType = nameof(TimeProvider)
-    };
+    private static void AddCounterOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(InputTypeOption(CounterDefaults.InputType))
+            .AddOption(
+                "name",
+                OptionValueKind.Text,
+                displayName: "Name",
+                helperText: "Optional counter name included in snapshots and diagnostics.")
+            .AddOption(
+                "engine",
+                OptionValueKind.Text,
+                displayName: "Engine",
+                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.")
+            .AddOption(
+                "predicate",
+                OptionValueKind.Expression,
+                displayName: "Predicate",
+                helperText: "Optional boolean expression used to accept or reject inputs.")
+            .AddOption(
+                "expression",
+                OptionValueKind.Expression,
+                displayName: "Expression",
+                helperText: "Compatibility alias used when predicate is not configured.")
+            .AddOption(
+                "expressionId",
+                OptionValueKind.Text,
+                displayName: "Expression ID",
+                helperText: "Optional diagnostic identifier emitted with counter diagnostics.")
+            .AddOption(
+                "expressionName",
+                OptionValueKind.Text,
+                displayName: "Expression Name",
+                helperText: "Optional diagnostic name emitted with counter diagnostics.")
+            .AddOption(BoundedCapacityOption(CounterDefaults.BoundedCapacity));
 
-    private static ResourceDesignMetadata Resource(
-        string name,
-        string displayName,
-        string valueType,
-        int order,
-        string summary,
-        bool isRequired = false,
-        IReadOnlyDictionary<string, string>? attributes = null) => new()
-        {
-            Name = name,
-            DisplayName = displayName,
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsRequired = isRequired,
-            Attributes = attributes ?? new Dictionary<string, string>()
-        };
+    private static void AddLoggerOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(InputTypeOption(LoggerDefaults.InputType))
+            .AddOption(
+                "level",
+                OptionValueKind.Enum,
+                displayName: "Level",
+                helperText: "Log level applied to emitted entries.",
+                defaultValue: LoggerDefaults.Level,
+                choices: LogLevelChoices())
+            .AddOption(
+                "category",
+                OptionValueKind.Text,
+                displayName: "Category",
+                helperText: "Log category included in emitted entries.",
+                defaultValue: LoggerDefaults.Category)
+            .AddOption(
+                "messageTemplate",
+                OptionValueKind.MultilineText,
+                displayName: "Message Template",
+                helperText: "Template rendered with selected attributes, inputType, category, level, sequence, and input.")
+            .AddOption(
+                "attributeSelectors",
+                OptionValueKind.Json,
+                displayName: "Attribute Selectors",
+                helperText: "Array of selector names resolved from host-owned attribute:{name} resources.",
+                defaultValue: LoggerDefaults.AttributeSelectors)
+            .AddOption(BoundedCapacityOption(LoggerDefaults.BoundedCapacity));
+
+    private static void AddMetricsOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(InputTypeOption(MetricsDefaults.InputType))
+            .AddOption(
+                "name",
+                OptionValueKind.Text,
+                displayName: "Name",
+                helperText: "Optional metric name included in snapshots and diagnostics.")
+            .AddOption(
+                "sizeSelector",
+                OptionValueKind.Text,
+                displayName: "Size Selector",
+                helperText: "Diagnostic selector metadata; composition DI selection uses the sizeSelector resource.")
+            .AddOption(BoundedCapacityOption(MetricsDefaults.BoundedCapacity));
+
+    private static void AddCounterResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                ObservabilityCompositionResourceNames.Engine,
+                displayName: "Expression Engine",
+                order: 0,
+                summary: "Conditionally required keyed expression engine when predicate or expression is configured.",
+                valueType: nameof(IFlowExpressionEngine),
+                attributes: new Dictionary<string, string>
+                {
+                    ["requiredWhenAnyOption"] = "predicate,expression"
+                })
+            .AddResource(
+                ObservabilityCompositionResourceNames.ContextFactory,
+                displayName: "Context Factory",
+                order: 1,
+                summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
+                valueType: "IFlowMapContextFactory<TInput>")
+            .AddResource(
+                ObservabilityCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 2,
+                summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
+                valueType: nameof(TimeProvider));
+
+    private static void AddLoggerResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                ObservabilityCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 0,
+                summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
+                valueType: nameof(TimeProvider))
+            .AddResource(
+                ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
+                displayName: "Attribute Selector",
+                order: 1,
+                summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
+                valueType: "IObservabilityValueSelector<TInput>",
+                attributes: new Dictionary<string, string>
+                {
+                    ["pattern"] = "true",
+                    ["option"] = "attributeSelectors"
+                });
+
+    private static void AddMetricsResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                ObservabilityCompositionResourceNames.SizeSelector,
+                displayName: "Size Selector",
+                order: 0,
+                summary: "Optional keyed selector used to calculate message size metrics.",
+                valueType: "IObservabilityValueSelector<TInput>")
+            .AddResource(
+                ObservabilityCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
+                valueType: nameof(TimeProvider));
 
     private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
     {
@@ -287,34 +273,27 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         DisplayName = level.ToString()
     };
 
-    private static IReadOnlyList<PortDesignMetadata> TransformPorts(
+    private static void AddTransformPorts(
+        ComponentDesignMetadataBuilder builder,
         string inputType,
         string inputSummary,
         string outputType,
         string outputSummary)
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ObservabilityCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = inputSummary,
-                ValueType = inputType,
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ObservabilityCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = outputSummary,
-                ValueType = outputType,
-                IsPrimary = true
-            }
-        ];
+        => builder
+            .AddInputPort(
+                ObservabilityCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: inputSummary,
+                valueType: inputType,
+                isPrimary: true)
+            .AddOutputPort(
+                ObservabilityCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: outputSummary,
+                valueType: outputType,
+                isPrimary: true);
 }
