@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Nodes</PackageId>
     <AssemblyName>FluxFlow.Nodes</AssemblyName>
     <RootNamespace>FluxFlow.Nodes</RootNamespace>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Minimal base for FluxFlow nodes: a self-contained TPL Dataflow processor with a buffered input and broadcast output/error/event ports. Nodes built on it run standalone — no engine required.</Description>
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>FlowMessage headers and FlowEvent attributes now snapshot assigned dictionaries with ordinal key comparison so broadcast envelopes and diagnostics stay stable after creation.</PackageReleaseNotes>
+    <PackageReleaseNotes>FlowNodeOptions and FlowSourceOptions now reject invalid capacities on assignment, with direct option contract coverage.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

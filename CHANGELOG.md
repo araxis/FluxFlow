@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Nodes 1.1.2
+
+Hardens node option validation.
+
+- `FlowNodeOptions` now rejects non-positive input capacity and
+  max-degree-of-parallelism values when assigned.
+- `FlowSourceOptions` now rejects invalid output capacity values when assigned,
+  while still allowing `UnboundedOutputCapacity`.
+- Adds direct option contract tests for default values, valid source output
+  capacity choices, and invalid capacity assignments.
+
 ## FluxFlow.Mapping 1.0.2
 
 Hardens mapping adapter guardrails.

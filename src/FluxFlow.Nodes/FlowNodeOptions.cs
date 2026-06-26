@@ -6,7 +6,34 @@ namespace FluxFlow.Nodes;
 /// </summary>
 public sealed record FlowNodeOptions
 {
-    public int InputCapacity { get; init; } = 128;
+    private int _inputCapacity = 128;
+    private int _maxDegreeOfParallelism = 1;
 
-    public int MaxDegreeOfParallelism { get; init; } = 1;
+    public int InputCapacity
+    {
+        get => _inputCapacity;
+        init
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(InputCapacity),
+                    "InputCapacity must be greater than zero.");
+
+            _inputCapacity = value;
+        }
+    }
+
+    public int MaxDegreeOfParallelism
+    {
+        get => _maxDegreeOfParallelism;
+        init
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(MaxDegreeOfParallelism),
+                    "MaxDegreeOfParallelism must be greater than zero.");
+
+            _maxDegreeOfParallelism = value;
+        }
+    }
 }
