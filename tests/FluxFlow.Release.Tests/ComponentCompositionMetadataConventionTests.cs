@@ -192,6 +192,38 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_ordering_is_stable()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                AssertStableMetadataOrder(
+                    metadata.Resources.Select(resource => (resource.Name, resource.Order)),
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' resources");
+                AssertStableMetadataOrder(
+                    metadata.Ports
+                        .Where(port => port.Direction == PortDirection.Input)
+                        .Select(port => (port.Name.ToString(), port.Order)),
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' input ports");
+                AssertStableMetadataOrder(
+                    metadata.Ports
+                        .Where(port => port.Direction == PortDirection.Output)
+                        .Select(port => (port.Name.ToString(), port.Order)),
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' output ports");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_matches_default_registry_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1220,6 +1252,38 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string? value,
         string message)
         => string.IsNullOrWhiteSpace(value).ShouldBeFalse(message);
+
+    private static void AssertStableMetadataOrder(
+        IEnumerable<(string Name, int Order)> items,
+        string scope)
+    {
+        var metadataItems = items.ToArray();
+
+        foreach (var item in metadataItems)
+        {
+            item.Order.ShouldBeGreaterThan(
+                -1,
+                $"{scope} item '{item.Name}' must not use a negative order.");
+        }
+
+        var duplicateOrders = metadataItems
+            .GroupBy(item => item.Order)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        duplicateOrders.ShouldBeEmpty(
+            $"{scope} must not reuse order values: {string.Join(", ", duplicateOrders)}.");
+
+        metadataItems
+            .Select(item => item.Name)
+            .ShouldBe(
+                metadataItems
+                    .OrderBy(item => item.Order)
+                    .Select(item => item.Name)
+                    .ToArray(),
+                $"{scope} must be declared in ascending order.");
+    }
 
     private static void AssertConcretePortValueType(
         string packageId,
