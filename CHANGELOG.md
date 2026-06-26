@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.5.4
+
+Hardens secret redaction guardrails.
+
+- `SecretRedactor.RedactValues(...)` now trims explicit protected keys before
+  matching them.
+- Blank and null protected key entries are ignored.
+- Adds regression coverage for protected-key normalization and redacted map
+  snapshot behavior.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.6
 
 Hardens MQTT adapter payload ownership.

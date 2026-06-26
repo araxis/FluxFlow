@@ -158,6 +158,10 @@ configuration-bound records and references matching the same logical name,
 version, and kind, and makes duplicate detection catch declarations that differ
 only by padding.
 
+`SecretRedactor.RedactValues(...)` copies the input map and normalizes explicit
+protected keys before matching them, so caller-owned maps and padded protected
+key configuration cannot change redaction results after the call.
+
 Valid metadata, attribute, and option metadata maps trim surrounding whitespace
 from keys and values when assigned. Maps with null values, blank keys or values,
 or duplicate keys after trimming are preserved so `SecretDiagnostics` can report
