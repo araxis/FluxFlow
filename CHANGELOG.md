@@ -83,6 +83,15 @@ Uses the shared Designer metadata builder for assertion metadata.
 - Preserves existing assertion options, resources, ports, validation, catalog
   loading, and runtime composition behavior.
 
+## FluxFlow.Components.Validation.Composition 1.2.2
+
+Uses the shared Designer metadata builder for validation metadata.
+
+- Refactors `ValidationComponentDesignMetadataProvider` to author
+  `json.schema-validator` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing JSON schema validator options, resources, ports,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

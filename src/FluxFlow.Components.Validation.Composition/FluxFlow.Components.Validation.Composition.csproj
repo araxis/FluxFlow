@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>1.2.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone JSON schema validator nodes over host-owned keyed selector and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Documents and tests validation option diagnostics through composition build failures for invalid config-bound inputType and boundedCapacity values.</PackageReleaseNotes>
+    <PackageReleaseNotes>Refactors the validation Designer metadata provider through the shared component design metadata builder while preserving the same public JSON schema validator metadata.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
