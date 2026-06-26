@@ -1,9 +1,13 @@
 # Component Composition
 
-Component packages are meant to be composed by an application host. The engine
-is only one optional runtime path. The default path is direct standalone-node
-composition; packages provide reusable node behavior, and the host adapts
-resources, storage, expressions, and app-specific models.
+Component packages are meant to be composed by an application host. The default
+path is direct standalone-node composition through `FluxFlow.Composition`.
+Packages provide reusable node behavior, optional composition adapters, and
+optional design metadata; the host adapts host-owned resources, storage,
+expressions, and app-specific models. The older engine runtime remains an
+optional path for hosts that intentionally choose it.
+When a host persists a richer workspace, project executable workflows into
+`CompositionDefinition` before validation and build.
 
 ## Recommended Path
 
@@ -44,7 +48,8 @@ The host should own:
 - concrete clients and storage implementations
 - expression engine registration
 - app-specific input/output models
-- workspace projection into `ApplicationDefinition`
+- workspace projection into `CompositionDefinition`
+- composition definition loading, versioning, and app-specific validation
 - dashboard, designer, and activity projection
 - renderer-specific palette layout, localization, and design-system behavior
 - source and sink nodes that are still product-specific
@@ -85,10 +90,12 @@ A component package should own:
 Packages should not own:
 
 - app workspace models
+- app composition file formats
 - dashboard layout or UI projection
 - product-specific names, scenarios, or storage paths
 - concrete external clients when a host adapter is reasonable
 - assumptions about how another app names sections or resources
+- global discovery, reflection scanning, or host-level orchestration
 
 ## Design Metadata Composition
 
@@ -246,7 +253,7 @@ Keep the behavior in the host when:
 
 ## Release Impact
 
-Adding a component package should not require an engine release unless the
-engine contract itself changes. A package can move independently when it only
-adds nodes, contracts, options, design metadata providers, tests, and docs under
-its own project.
+Adding a component package should not require a core runtime release unless a
+shared contract actually changes. A package can move independently when it only
+adds nodes, contracts, options, composition adapters, design metadata providers,
+tests, and docs under its own project.

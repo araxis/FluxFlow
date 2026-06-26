@@ -198,6 +198,26 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Component_composition_docs_keep_standalone_composition_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "12-component-composition.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 2_000)];
+
+        defaultSection.Contains("direct standalone-node composition", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should lead with standalone-node composition.");
+        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should keep host workspace projection composition-first.");
+        defaultSection.Contains("host-owned resources", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should keep adapter resources host-owned.");
+        text.Contains("ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeFalse("component composition docs should not recommend engine definitions as the component default.");
+        text.Contains("IFlowNodeModule", StringComparison.Ordinal)
+            .ShouldBeFalse("component composition docs should not imply engine modules are required for component packages.");
+    }
+
+    [Fact]
     public void Current_docs_keep_mapping_contracts_out_of_engine_namespace()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
