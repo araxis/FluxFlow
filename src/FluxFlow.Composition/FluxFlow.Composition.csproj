@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional standalone-first FluxFlow composition layer for building linked node workflows from fluent C# or Microsoft.Extensions.Configuration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Hardens node and port reference parsing by rejecting empty dotted segments and normalizing assigned reference parts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens composition port metadata and node registration guardrails for null port entries, blank port names, and null message types.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

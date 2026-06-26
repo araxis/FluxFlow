@@ -32,6 +32,7 @@ public sealed class CompositionNodeRegistration
 
         foreach (var port in ports)
         {
+            ArgumentNullException.ThrowIfNull(port);
             ArgumentException.ThrowIfNullOrWhiteSpace(port.Name);
             if (!result.TryAdd(port.Name, port))
                 throw new ArgumentException($"Duplicate port name '{port.Name}'.", nameof(ports));
