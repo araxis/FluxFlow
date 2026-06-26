@@ -202,6 +202,51 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_node_types_are_used_by_registry_extensions()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var nodeTypesFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeTypes.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep node-type constants in one file.");
+            var registryFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryContent = File.ReadAllText(registryFile);
+            var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
+            var nodeTypeConstants = PublicStringConstantRegex()
+                .Matches(File.ReadAllText(nodeTypesFile))
+                .Select(match => match.Groups["name"].Value)
+                .ToArray();
+
+            nodeTypeConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} node-type file should expose at least one node type constant.");
+
+            foreach (var nodeTypeConstant in nodeTypeConstants)
+            {
+                var nodeTypeReference = $"{nodeTypeName}.{nodeTypeConstant}";
+                registryContent.Contains(nodeTypeReference, StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} registry extensions must register node type '{nodeTypeReference}'.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_resource_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
