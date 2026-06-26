@@ -9,7 +9,10 @@ public static class SecretServiceCollectionExtensions
         string name,
         ISecretResolver resolver)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(resolver);
+
         return services.AddFluxFlowSecretResolver(name, _ => resolver);
     }
 
@@ -35,7 +38,10 @@ public static class SecretServiceCollectionExtensions
         string name,
         ISecretDescriptorProvider descriptorProvider)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(descriptorProvider);
+
         return services.AddFluxFlowSecretDescriptorProvider(name, _ => descriptorProvider);
     }
 
