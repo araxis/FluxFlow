@@ -7,6 +7,22 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.1
+
+Hardens adapter-local MQTT client DI registration.
+
+- Rejects null direct `MqttNetClientOptions` registrations immediately.
+- Reports a clear registration error when an options factory returns null
+  before the keyed client session is created.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.1
+
+Hardens adapter-local MQTT client DI registration.
+
+- Rejects null direct `PulseMqttClientOptions` registrations immediately.
+- Reports a clear registration error when an options factory returns null
+  before the keyed client session is created.
+
 ## FluxFlow.Components.Resources 1.5.0
 
 Adds keyed resource registration helpers.

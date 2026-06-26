@@ -14,12 +14,16 @@ public static class FluxFlowMqttServiceCollectionExtensions
         MqttClientRegistrationOptions? registrationOptions = null,
         TimeProvider? clock = null,
         MqttClientFactory? factory = null)
-        => services.AddFluxFlowMqttClient(
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        return services.AddFluxFlowMqttClient(
             name,
             _ => options,
             registrationOptions,
             _ => clock,
             _ => factory);
+    }
 
     public static IServiceCollection AddFluxFlowMqttClient(
         this IServiceCollection services,
@@ -36,7 +40,9 @@ public static class FluxFlowMqttServiceCollectionExtensions
         var lifecycle = registrationOptions ?? new MqttClientRegistrationOptions();
 
         services.AddKeyedSingleton(name, (provider, _) => new MqttNetClientRegistrationState(
-            optionsFactory(provider),
+            optionsFactory(provider)
+                ?? throw new InvalidOperationException(
+                    "MQTT client options factory returned null."),
             clockFactory?.Invoke(provider),
             factory?.Invoke(provider)));
 

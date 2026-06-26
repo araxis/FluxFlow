@@ -55,6 +55,34 @@ public sealed class MqttNetRegistrationTests
     }
 
     [Fact]
+    public void AddFluxFlowMqttClient_RejectsNullOptions()
+    {
+        var services = new ServiceCollection();
+
+        var exception = Should.Throw<ArgumentNullException>(() => services.AddFluxFlowMqttClient(
+            "primary",
+            (MqttNetClientOptions)null!));
+
+        exception.ParamName.ShouldBe("options");
+    }
+
+    [Fact]
+    public async Task AddFluxFlowMqttClient_RejectsNullOptionsFactoryResult()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowMqttClient(
+            "primary",
+            static _ => null!);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var exception = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<MqttNetClient>("primary"));
+
+        exception.Message.ShouldBe("MQTT client options factory returned null.");
+    }
+
+    [Fact]
     public async Task AddFluxFlowMqttClient_UsesServiceProviderFactories()
     {
         var services = new ServiceCollection();
