@@ -543,6 +543,39 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Service_registration_can_register_keyed_store_factory()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path,
+                    DefaultCollection = "fallback"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory");
+        await using var lease = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        });
+
+        var saved = await lease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        lease.OwnsStore.ShouldBeFalse();
+        saved.Collection.ShouldBe("items");
+        Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
     public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();
