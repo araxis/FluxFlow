@@ -703,26 +703,39 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (portNamesFiles.Length == 0)
                 continue;
 
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataPorts = provider
+                .GetMetadata()
+                .SelectMany(metadata => metadata.Ports)
+                .ToArray();
             var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
-            var portConstants = PublicStringConstantRegex()
+            var portConstants = PublicStringConstantWithValueRegex()
                 .Matches(File.ReadAllText(portNamesFiles[0]))
-                .Select(match => match.Groups["name"].Value)
+                .Select(match => new PortConstant(
+                    match.Groups["name"].Value,
+                    match.Groups["value"].Value))
                 .ToArray();
 
             portConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} port-name file should expose at least one port constant.");
-            providerContent.Contains(
-                    "PortDesignMetadata",
-                    StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} provider must expose Designer port metadata.");
+            metadataPorts.ShouldNotBeEmpty(
+                $"{entry.PackageId} provider must expose Designer port metadata.");
 
             foreach (var portConstant in portConstants)
             {
-                var portReference = $"{portTypeName}.{portConstant}";
+                var portReference = $"{portTypeName}.{portConstant.Name}";
                 providerContent.Contains(portReference, StringComparison.Ordinal)
                     .ShouldBeTrue($"{entry.PackageId} provider must expose port '{portReference}'.");
+                metadataPorts.Any(metadata => string.Equals(
+                        metadata.Name.Value,
+                        portConstant.Value,
+                        StringComparison.Ordinal))
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} Designer metadata must expose port '{portConstant.Value}'.");
             }
         }
     }
@@ -2266,6 +2279,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private sealed record RegistryMessageB(string Value);
 
     private sealed record ResourceConstant(string Name, string Value);
+
+    private sealed record PortConstant(string Name, string Value);
 
     private sealed record EnumOptionProperty(
         string Name,
