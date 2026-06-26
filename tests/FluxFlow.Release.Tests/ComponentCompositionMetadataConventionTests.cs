@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using FluxFlow.Components.Designer;
+using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Composition;
 using Shouldly;
 using Xunit;
 
@@ -70,25 +72,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         {
             var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
             var project = XDocument.Load(projectPath);
-            var assemblyName = ReadOptionalProperty(project, "AssemblyName") ?? entry.PackageId;
-            var assembly = Assembly.Load(new AssemblyName(assemblyName));
-            var providerTypes = assembly
-                .GetTypes()
-                .Where(type =>
-                    type is { IsAbstract: false, IsClass: true } &&
-                    typeof(IComponentDesignMetadataProvider).IsAssignableFrom(type))
-                .OrderBy(type => type.FullName, StringComparer.Ordinal)
-                .ToArray();
-
-            providerTypes.Length.ShouldBe(
-                1,
-                $"{entry.PackageId} must expose exactly one runtime-loadable Designer metadata provider.");
-
-            var providerType = providerTypes[0];
-            providerType.GetConstructor(Type.EmptyTypes)
-                .ShouldNotBeNull($"{entry.PackageId} provider must have a public parameterless constructor.");
-
-            var provider = (IComponentDesignMetadataProvider)Activator.CreateInstance(providerType).ShouldNotBeNull();
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
             var metadata = provider.GetMetadata();
 
             metadata.Count.ShouldBeGreaterThan(
@@ -108,6 +93,58 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 catalog.TryGet(item.Type, out _)
                     .ShouldBeTrue($"{entry.PackageId} catalog must contain provider metadata for '{item.Type}'.");
+            }
+        }
+    }
+
+    [Fact]
+    public void Component_composition_designer_metadata_matches_default_registry_metadata()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var project = XDocument.Load(projectPath);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataByType = provider
+                .GetMetadata()
+                .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
+            var registry = BuildDefaultRegistry(assembly, entry.PackageId);
+
+            registry.Registrations.Keys
+                .Order(StringComparer.Ordinal)
+                .ShouldBe(
+                    metadataByType.Keys.Order(StringComparer.Ordinal),
+                    $"{entry.PackageId} Designer metadata node types must match default registry registrations.");
+
+            foreach (var (nodeType, registration) in registry.Registrations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var metadata = metadataByType[nodeType];
+
+                foreach (var input in registration.Inputs.Keys.Order(StringComparer.Ordinal))
+                {
+                    metadata.Ports.Any(port =>
+                            port.Direction == PortDirection.Input &&
+                            string.Equals(port.Name.ToString(), input, StringComparison.Ordinal))
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose input port '{input}'.");
+                }
+
+                foreach (var output in registration.Outputs.Keys.Order(StringComparer.Ordinal))
+                {
+                    metadata.Ports.Any(port =>
+                            port.Direction == PortDirection.Output &&
+                            string.Equals(port.Name.ToString(), output, StringComparison.Ordinal))
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose output port '{output}'.");
+                }
             }
         }
     }
@@ -672,6 +709,103 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .Select(element => element.Value.Trim())
             .FirstOrDefault(value => value.Length > 0);
 
+    private static Assembly LoadPackageAssembly(
+        XDocument project,
+        string packageId)
+    {
+        var assemblyName = ReadOptionalProperty(project, "AssemblyName") ?? packageId;
+        return Assembly.Load(new AssemblyName(assemblyName));
+    }
+
+    private static IComponentDesignMetadataProvider CreateSingleMetadataProvider(
+        Assembly assembly,
+        string packageId)
+    {
+        var providerTypes = assembly
+            .GetTypes()
+            .Where(type =>
+                type is { IsAbstract: false, IsClass: true } &&
+                typeof(IComponentDesignMetadataProvider).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        providerTypes.Length.ShouldBe(
+            1,
+            $"{packageId} must expose exactly one runtime-loadable Designer metadata provider.");
+
+        var providerType = providerTypes[0];
+        providerType.GetConstructor(Type.EmptyTypes)
+            .ShouldNotBeNull($"{packageId} provider must have a public parameterless constructor.");
+
+        return (IComponentDesignMetadataProvider)Activator.CreateInstance(providerType).ShouldNotBeNull();
+    }
+
+    private static CompositionNodeRegistry BuildDefaultRegistry(
+        Assembly assembly,
+        string packageId)
+    {
+        var registry = new CompositionNodeRegistry();
+        var registryMethods = assembly
+            .GetTypes()
+            .Where(type => type is { IsAbstract: true, IsSealed: true } &&
+                type.Name.EndsWith("CompositionNodeRegistryExtensions", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+            .Where(method =>
+                method.ReturnType == typeof(CompositionNodeRegistry) &&
+                method.GetParameters() is [{ ParameterType: var firstParameter }, ..] &&
+                firstParameter == typeof(CompositionNodeRegistry))
+            .OrderBy(method => method.DeclaringType?.FullName, StringComparer.Ordinal)
+            .ThenBy(method => method.MetadataToken)
+            .ToArray();
+
+        registryMethods.ShouldNotBeEmpty($"{packageId} must expose registry extension methods.");
+
+        foreach (var method in registryMethods)
+        {
+            InvokeRegistryMethod(method, registry, packageId);
+        }
+
+        return registry;
+    }
+
+    private static void InvokeRegistryMethod(
+        MethodInfo method,
+        CompositionNodeRegistry registry,
+        string packageId)
+    {
+        var executableMethod = method;
+        if (method.IsGenericMethodDefinition)
+        {
+            method.GetGenericArguments().Length
+                .ShouldBeLessThanOrEqualTo(
+                    RegistryGenericArgumentTypes.Length,
+                    $"{packageId} registry method '{method.Name}' has more generic arguments than the release convention test supports.");
+
+            var genericTypes = method
+                .GetGenericArguments()
+                .Select((_, index) => RegistryGenericArgumentTypes[index])
+                .ToArray();
+            executableMethod = method.MakeGenericMethod(genericTypes);
+        }
+
+        var arguments = executableMethod
+            .GetParameters()
+            .Select(parameter =>
+            {
+                if (parameter.ParameterType == typeof(CompositionNodeRegistry))
+                    return registry;
+
+                if (parameter.HasDefaultValue)
+                    return parameter.DefaultValue;
+
+                throw new InvalidOperationException(
+                    $"{packageId} registry method '{method.Name}' has unsupported required parameter '{parameter.Name}'.");
+            })
+            .ToArray();
+
+        executableMethod.Invoke(null, arguments);
+    }
+
     private static string NormalizePath(string path)
         => path
             .Replace('/', Path.DirectorySeparatorChar)
@@ -787,6 +921,16 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var lastDotIndex = type.LastIndexOf('.');
         return lastDotIndex >= 0 ? type[(lastDotIndex + 1)..] : type;
     }
+
+    private sealed record RegistryMessageA(string Value);
+
+    private sealed record RegistryMessageB(string Value);
+
+    private static readonly Type[] RegistryGenericArgumentTypes =
+    [
+        typeof(RegistryMessageA),
+        typeof(RegistryMessageB)
+    ];
 
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex PublicStringConstantRegex();
