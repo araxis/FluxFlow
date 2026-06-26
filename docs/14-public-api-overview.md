@@ -122,7 +122,9 @@ Main types:
 Use `RegisterHttpNodes()` from the optional
 `FluxFlow.Components.Http.Composition` package when a composition host wants an
 `http.client` node factory. The factory resolves a keyed `HttpClient` resource;
-the host still owns client lifetime and transport policy.
+the host still owns client lifetime and transport policy. Invalid numeric
+`HttpClientNodeOptions` values fail during build as factory diagnostics when the
+host is configured to collect build failures.
 
 `HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for the
 HTTP client composition node, including existing options, fixed ports, and

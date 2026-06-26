@@ -30,14 +30,18 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         HttpClient httpClient,
         HttpClientNodeOptions? options = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? HttpClientNodeOptions.Default).BoundedCapacity,
-            MaxDegreeOfParallelism = (options ?? HttpClientNodeOptions.Default).MaxDegreeOfParallelism
-        })
+        : this(httpClient, ValidateOptions(options), clock)
+    {
+    }
+
+    private HttpClientNode(
+        HttpClient httpClient,
+        ValidatedOptions options,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options = options ?? HttpClientNodeOptions.Default;
+        _options = options.HttpClientOptions;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -342,6 +346,35 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
 
     private long Elapsed(DateTimeOffset startedAt)
         => Math.Max(0, (long)(_clock.GetUtcNow() - startedAt).TotalMilliseconds);
+
+    private static ValidatedOptions ValidateOptions(HttpClientNodeOptions? options)
+    {
+        options ??= HttpClientNodeOptions.Default;
+        if (options.BoundedCapacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "BoundedCapacity must be greater than zero.");
+
+        if (options.MaxResponseBodyBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "MaxResponseBodyBytes must be greater than zero.");
+
+        if (options.MaxDegreeOfParallelism <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "MaxDegreeOfParallelism must be greater than zero.");
+
+        if (options.DefaultTimeoutMilliseconds is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), "DefaultTimeoutMilliseconds must be greater than zero when specified.");
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(HttpClientNodeOptions httpClientOptions)
+    {
+        public HttpClientNodeOptions HttpClientOptions { get; } = httpClientOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = httpClientOptions.BoundedCapacity,
+            MaxDegreeOfParallelism = httpClientOptions.MaxDegreeOfParallelism
+        };
+    }
 
     private sealed class InvalidUrlException(string message) : Exception(message);
 }

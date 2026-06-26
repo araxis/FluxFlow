@@ -209,6 +209,36 @@ public sealed class HttpClientNodeTests
     public void Constructor_RequiresHttpClient()
         => Should.Throw<ArgumentNullException>(() => new HttpClientNode(null!));
 
+    [Fact]
+    public void Constructor_RejectsInvalidOptions()
+    {
+        AssertInvalidOptions(
+            new HttpClientNodeOptions { BoundedCapacity = 0 },
+            "BoundedCapacity");
+        AssertInvalidOptions(
+            new HttpClientNodeOptions { MaxResponseBodyBytes = 0 },
+            "MaxResponseBodyBytes");
+        AssertInvalidOptions(
+            new HttpClientNodeOptions { MaxDegreeOfParallelism = 0 },
+            "MaxDegreeOfParallelism");
+        AssertInvalidOptions(
+            new HttpClientNodeOptions { DefaultTimeoutMilliseconds = 0 },
+            "DefaultTimeoutMilliseconds");
+    }
+
+    private static void AssertInvalidOptions(
+        HttpClientNodeOptions options,
+        string expectedMessage)
+    {
+        using var client = new HttpClient(new StubHandler((_, _) =>
+            Respond(HttpStatusCode.OK, "", null)));
+
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new HttpClientNode(client, options));
+
+        exception.Message.ShouldContain(expectedMessage);
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

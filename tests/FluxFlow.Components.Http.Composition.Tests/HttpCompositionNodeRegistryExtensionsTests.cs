@@ -273,6 +273,46 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
                 StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("boundedCapacity", 0, "BoundedCapacity")]
+    [InlineData("maxResponseBodyBytes", 0, "MaxResponseBodyBytes")]
+    [InlineData("maxDegreeOfParallelism", 0, "MaxDegreeOfParallelism")]
+    [InlineData("defaultTimeoutMilliseconds", 0, "DefaultTimeoutMilliseconds")]
+    public async Task Invalid_client_options_surface_factory_diagnostic(
+        string optionName,
+        int optionValue,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton(
+            "primary",
+            (_, _) => new HttpClient(new RecordingHandler(
+                (_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"))));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "api",
+                    HttpCompositionNodeTypes.Client,
+                    node => node
+                        .Resource(HttpCompositionResourceNames.Client, "primary")
+                        .Configure(optionName, optionValue)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterHttpNodes())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
+    }
+
     private static ComponentDesignMetadata GetClientDesignMetadata()
         => new HttpComponentDesignMetadataProvider()
             .GetMetadata()

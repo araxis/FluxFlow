@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http 3.0.1
+
+Hardens HTTP client node option validation.
+
+- `HttpClientNode` now rejects non-positive `BoundedCapacity`,
+  `MaxResponseBodyBytes`, and `MaxDegreeOfParallelism` during construction.
+- `DefaultTimeoutMilliseconds`, when configured, must now be greater than zero.
+- Adds direct standalone node tests for invalid option values.
+
+## FluxFlow.Components.Http.Composition 1.2.1
+
+Hardens config-bound HTTP client option diagnostics.
+
+- Invalid numeric `HttpClientNodeOptions` values now fail during composition
+  build through the `http.client` factory.
+- Adds hosted composition tests proving invalid config surfaces as factory
+  diagnostics when build failures are configured as diagnostics.
+
 ## FluxFlow.Composition 1.0.3
 
 Hardens runtime builder cancellation cleanup.

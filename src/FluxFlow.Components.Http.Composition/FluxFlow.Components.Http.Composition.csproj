@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Http.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Http.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone HTTP client node over host-owned keyed HttpClient resources.</Description>
     <PackageTags>workflow;dataflow;components;http;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for the http.client host-owned client and clock resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Documents and tests HTTP client option validation through composition build diagnostics for invalid config-bound numeric options.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
