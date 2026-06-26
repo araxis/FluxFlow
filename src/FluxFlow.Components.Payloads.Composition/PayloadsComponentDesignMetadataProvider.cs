@@ -21,7 +21,13 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
         IconKey = "scan-search",
         PreferredNodeName = "inspect",
         SuggestedEditorWidth = 420,
-        Options =
+        Options = PayloadInspectOptionsMetadata(),
+        Resources = PayloadInspectResources(),
+        Ports = PayloadInspectPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> PayloadInspectOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -83,8 +89,10 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 Min = 1,
                 HelperText = "Maximum queued input messages."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> PayloadInspectResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -94,8 +102,10 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 Summary = "Optional keyed clock for deterministic payload inspection results and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> PayloadInspectPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -119,6 +129,5 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 ValueType = nameof(PayloadInspectionResult),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 }
