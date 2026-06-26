@@ -20,7 +20,13 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
         IconKey = "check-circle",
         PreferredNodeName = "assert",
         SuggestedEditorWidth = 420,
-        Options =
+        Options = AssertionOptionsMetadata(),
+        Resources = AssertionResources(),
+        Ports = AssertionPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> AssertionOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -100,8 +106,10 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 DefaultValue = true,
                 HelperText = "Emit failing input messages on the Failed output."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> AssertionResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -128,8 +136,10 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 Summary = "Optional keyed clock for deterministic assertion results and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> AssertionPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -173,6 +183,5 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 Summary = "Original input when the assertion fails.",
                 ValueType = "TInput"
             }
-        ]
-    };
+        ];
 }
