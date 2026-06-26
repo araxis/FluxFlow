@@ -44,6 +44,39 @@ public sealed class MqttNetMessageMapperTests
     }
 
     [Fact]
+    public void ToApplicationMessage_treats_null_user_property_maps_as_empty()
+    {
+        var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1],
+            Properties = new MqttPublishProperties
+            {
+                UserProperties = null!
+            }
+        });
+
+        (message.UserProperties?.Count ?? 0).ShouldBe(0);
+    }
+
+    [Fact]
+    public void ToApplicationMessage_rejects_null_named_user_property_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+            {
+                Topic = "devices/a",
+                Payload = [1],
+                Properties = new MqttPublishProperties
+                {
+                    UserProperties =
+                    {
+                        ["tenant"] = null!
+                    }
+                }
+            }))
+            .ParamName.ShouldBe("value");
+
+    [Fact]
     public void ToReceivedMessage_MapsApplicationMessageMetadata()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-20T12:00:00+00:00");

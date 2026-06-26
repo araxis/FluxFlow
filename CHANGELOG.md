@@ -7,6 +7,25 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.4
+
+Hardens MQTT adapter user-property mapping.
+
+- Outbound publish mapping now treats null user-property maps as empty instead
+  of dereferencing them.
+- Named user properties with null values now fail with an explicit `value`
+  argument exception.
+- Adds regression coverage for optional maps and malformed values.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.4
+
+Hardens MQTT adapter user-property mapping.
+
+- Outbound publish mapping continues to treat null user-property maps as empty.
+- Named user properties with null values now fail with an explicit `value`
+  argument exception.
+- Adds regression coverage for optional maps and malformed values.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.3
 
 Hardens MQTTnet mapper text encoding guardrails.
