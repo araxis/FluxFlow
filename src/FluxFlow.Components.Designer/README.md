@@ -26,9 +26,9 @@ component without depending on a specific rendering framework.
   more providers.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
-options and ports, invalid choices, invalid resources, invalid attributes, and
-null-bound metadata collections as validation errors before metadata is
-registered.
+options and ports, invalid option defaults, invalid min/max usage, invalid
+choices, invalid resources, invalid attributes, and null-bound metadata
+collections as validation errors before metadata is registered.
 `ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
 including nested choices and attribute maps, so later mutations to
 provider-owned collections do not change the catalog.
@@ -50,6 +50,10 @@ The option kind contract supports:
 Enum options must provide at least one choice. Choice lists are reserved for
 enum options; non-enum options should use their value kind plus optional
 constraints such as `Min` and `Max`.
+Default values should match the option kind: text-like options use strings,
+numbers use numeric values, booleans use `bool`, durations use `TimeSpan`, and
+enum defaults use either a choice value string or an enum value whose name
+matches a choice. `Min` and `Max` apply only to number and duration options.
 
 ## Resource Metadata
 
