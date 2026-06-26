@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.4.4
+
+Hardens configuration validation report guardrails.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- `ConfigurationValidationReport` now rejects null diagnostic entries when
+  assigning diagnostics or building reports from diagnostic sequences.
+- Null diagnostic collections still produce empty reports, preserving the
+  existing optional assignment behavior.
+- Adds regression coverage for invalid report diagnostic entries.
+
 ## FluxFlow.Components.Resources 1.5.2
 
 Hardens resource lookup result factory guardrails.

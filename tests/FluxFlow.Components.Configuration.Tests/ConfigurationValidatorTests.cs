@@ -584,6 +584,21 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Validation_report_rejects_null_diagnostic_entries()
+    {
+        Should.Throw<ArgumentNullException>(() =>
+            ConfigurationValidationReport.FromDiagnostics([null!]))
+            .ParamName.ShouldBe("diagnostics");
+
+        Should.Throw<ArgumentNullException>(() =>
+            new ConfigurationValidationReport
+            {
+                Diagnostics = [null!]
+            })
+            .ParamName.ShouldBe("Diagnostics");
+    }
+
+    [Fact]
     public void Validation_request_copies_collections_and_preserves_null_assignments()
     {
         var resources = new List<ConfigurationResourceReference>

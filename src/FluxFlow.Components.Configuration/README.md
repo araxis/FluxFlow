@@ -132,7 +132,9 @@ metadata therefore report the normalized option path.
 
 Configuration diagnostics trim textual fields when assigned. Diagnostic
 metadata and validation report diagnostic collections are copied on assignment,
-so later caller mutations do not change an already-created report.
+so later caller mutations do not change an already-created report. Null report
+diagnostic collections become empty reports, while null diagnostic entries are
+rejected at the public boundary.
 
 Valid resource option metadata maps trim surrounding whitespace from keys and
 values when assigned. Null maps, blank keys or values, and duplicate keys after

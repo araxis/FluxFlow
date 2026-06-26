@@ -7,7 +7,9 @@ public sealed record ConfigurationValidationReport
     public IReadOnlyList<ConfigurationDiagnostic> Diagnostics
     {
         get => _diagnostics;
-        init => _diagnostics = value?.ToArray() ?? [];
+        init => _diagnostics = value is null
+            ? []
+            : SnapshotDiagnostics(value, nameof(Diagnostics));
     }
 
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == ConfigurationDiagnosticSeverity.Error);
@@ -21,7 +23,23 @@ public sealed record ConfigurationValidationReport
         ArgumentNullException.ThrowIfNull(diagnostics);
         return new ConfigurationValidationReport
         {
-            Diagnostics = diagnostics.ToArray()
+            Diagnostics = SnapshotDiagnostics(diagnostics, nameof(diagnostics))
         };
+    }
+
+    private static IReadOnlyList<ConfigurationDiagnostic> SnapshotDiagnostics(
+        IEnumerable<ConfigurationDiagnostic> diagnostics,
+        string argumentName)
+    {
+        var snapshot = diagnostics.ToArray();
+
+        if (Array.Exists(snapshot, diagnostic => diagnostic is null))
+        {
+            throw new ArgumentNullException(
+                argumentName,
+                "Configuration validation reports cannot contain null diagnostics.");
+        }
+
+        return snapshot;
     }
 }
