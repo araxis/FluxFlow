@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http.AspNetCore 1.0.3
+
+Hardens HTTP trigger shutdown.
+
+- The hosted trigger lifetime now completes the keyed request source during
+  stop, so late endpoint submissions are rejected instead of accepted into an
+  inactive trigger.
+- Adds regression coverage for keyed source shutdown through
+  `AddFluxFlowHttpTrigger(...)`.
+
 ## FluxFlow.Components.Expressions 2.1.1
 
 Documents and verifies expression engine registry argument contracts.
