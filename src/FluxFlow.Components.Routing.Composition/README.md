@@ -70,6 +70,8 @@ required resources for the nodes that need them. The optional `clock` resource
 is exposed separately from editable node options. Switch `routeOutputs` and fork
 `outputs` are represented as configuration options because those dynamic ports
 are exposed after the composition factory binds node options.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
 
 ## Configuration
 
