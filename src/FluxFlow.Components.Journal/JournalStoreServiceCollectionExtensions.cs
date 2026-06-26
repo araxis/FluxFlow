@@ -26,8 +26,10 @@ public static class JournalStoreServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(storeFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IJournalStore>(
-            name,
+            normalizedName,
             (provider, _) => storeFactory(provider)
                 ?? throw new InvalidOperationException("Journal store provider returned null."));
 
@@ -55,8 +57,10 @@ public static class JournalStoreServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(storeFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IJournalStoreFactory>(
-            name,
+            normalizedName,
             (provider, _) => storeFactory(provider)
                 ?? throw new InvalidOperationException("Journal store factory provider returned null."));
 
