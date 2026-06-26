@@ -51,6 +51,23 @@ public sealed class PackageManifestTests
         missingProjects.ShouldBeEmpty("all source package projects must be listed in the release manifest.");
     }
 
+    [Fact]
+    public void Public_api_overview_mentions_every_manifest_package()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest.Read(root);
+        var overview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
+
+        var missingPackageIds = entries
+            .Where(entry => !overview.Contains(entry.PackageId, StringComparison.Ordinal))
+            .Select(entry => entry.PackageId)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        missingPackageIds.ShouldBeEmpty(
+            "docs/14-public-api-overview.md must mention every shipped package id from eng/packages.json.");
+    }
+
     private static void AssertManifestEntry(string root, string changelog, PackageManifestEntry entry)
     {
         entry.Alias.ShouldSatisfyAllConditions(

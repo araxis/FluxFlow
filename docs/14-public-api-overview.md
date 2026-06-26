@@ -739,6 +739,73 @@ ports, and resource hints for `publisher`, `triggerSource`, and optional
 host-owned. The provider authors that metadata through the shared validated
 Designer metadata builder.
 
+## MQTTnet Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt.MqttNet
+```
+
+Main types:
+
+- `FluxFlowMqttServiceCollectionExtensions`
+- `MqttClientRegistrationOptions`
+- `MqttNetClient`
+- `MqttNetClientOptions`
+- `MqttNetLastWillOptions`
+- `MqttNetMessageMapper`
+- `MqttNetReceivedContext`
+- `MqttNetSubscription`
+- `MqttNetTopicMatcher`
+
+`FluxFlow.Components.Mqtt.MqttNet` is the MQTTnet-backed adapter package for
+the neutral MQTT contracts. `MqttNetClient` implements `IMqttPublisher`,
+`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns MQTTnet client
+creation, broker connection, reconnect behavior, Last Will setup, publish
+mapping, trigger subscriptions, acknowledgement, and health events.
+
+`AddFluxFlowMqttClient()` registers one keyed `MqttNetClient` and exposes the
+same singleton through keyed MQTT publisher, trigger-source, and health-source
+contracts. Registration owns only the adapter client session. Workflow nodes
+are still created through standalone composition, and the host decides whether
+the adapter connects with hosted lifetime through `ConnectWithHost`.
+
+## Pulse MQTT Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt.PulseMqtt
+```
+
+Main types:
+
+- `FluxFlowMqttServiceCollectionExtensions`
+- `MqttClientRegistrationOptions`
+- `PulseMqttClient`
+- `PulseMqttClientOptions`
+- `PulseMqttLastWillOptions`
+- `PulseMqttMessageMapper`
+- `PulseMqttReceivedContext`
+- `PulseMqttSubscription`
+- `RejectingMessageStore`
+
+`FluxFlow.Components.Mqtt.PulseMqtt` is the Pulse MQTT-backed adapter package
+for the neutral MQTT contracts. `PulseMqttClient` implements `IMqttPublisher`,
+`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns Pulse client
+creation, transport configuration, resilient start/stop, broker connection,
+Last Will setup, publish mapping, trigger subscriptions, acknowledgement, and
+health events.
+
+The adapter keeps FluxFlow publish behavior strict by default: publishing while
+disconnected fails unless the host explicitly enables
+`AllowOfflinePublishQueue`. Durable message and session stores are
+adapter-owned options on `PulseMqttClientOptions`, not core MQTT or composition
+features. `AddFluxFlowMqttClient()` registers one keyed client session and can
+optionally add hosted lifecycle through `StartWithHost`; `WaitForConnectedOnStart`
+is only valid with hosted start.
+
 ## Designer Metadata
 
 Namespace:
