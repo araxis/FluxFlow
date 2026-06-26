@@ -116,6 +116,34 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Runtime_docs_keep_composition_lifecycle_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "08-runtime-states.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_600)];
+
+        defaultSection.Contains("CompositionRuntime", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should lead with composition runtime lifecycle.");
+        defaultSection.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should show composition hosting before optional engine state APIs.");
+        defaultSection.Contains("FlowApplicationHostState", StringComparison.Ordinal)
+            .ShouldBeFalse("runtime docs must not lead with optional engine host states.");
+        defaultSection.Contains("ApplicationState", StringComparison.Ordinal)
+            .ShouldBeFalse("runtime docs must not lead with optional engine runtime states.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine States", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "runtime docs should keep engine states in an explicitly optional section.");
+
+        var engineStateIndex = text.IndexOf("FlowApplicationHostState", StringComparison.Ordinal);
+        engineStateIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "FlowApplicationHostState should only appear after the optional engine states heading.");
+    }
+
+    [Fact]
     public void Json_docs_keep_composition_json_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
