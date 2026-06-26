@@ -445,8 +445,11 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
     [Theory]
     [InlineData(StorageCompositionNodeTypes.Put, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageCompositionNodeTypes.Get, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageCompositionNodeTypes.Query, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(StorageCompositionNodeTypes.Query, "limit", 0, "limit")]
     [InlineData(StorageCompositionNodeTypes.Query, "offset", -1, "offset")]
+    [InlineData(StorageCompositionNodeTypes.Delete, "boundedCapacity", 0, "boundedCapacity")]
     public async Task Invalid_configuration_surfaces_factory_diagnostic(
         string nodeType,
         string optionName,

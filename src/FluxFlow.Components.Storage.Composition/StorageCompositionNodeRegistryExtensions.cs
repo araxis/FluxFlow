@@ -106,7 +106,6 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StoragePutOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
         var store = context.GetRequiredResource<IStorageStore>(
             StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
@@ -135,7 +134,6 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageGetOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
         var store = context.GetRequiredResource<IStorageStore>(
             StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
@@ -170,7 +168,6 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageQueryOptions>();
-        ValidateQueryOptions(options);
         var store = context.GetRequiredResource<IStorageStore>(
             StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
@@ -202,7 +199,6 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageDeleteOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
         var store = context.GetRequiredResource<IStorageStore>(
             StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
@@ -225,31 +221,5 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             events: node.Events,
             errors: node.Errors));
-    }
-
-    private static void ValidateQueryOptions(StorageQueryOptions options)
-    {
-        ValidateBoundedCapacity(options.BoundedCapacity);
-
-        if (options.Offset < 0)
-        {
-            throw new InvalidOperationException(
-                "storage.query configuration offset cannot be negative.");
-        }
-
-        if (options.Limit <= 0)
-        {
-            throw new InvalidOperationException(
-                "storage.query configuration limit must be greater than zero.");
-        }
-    }
-
-    private static void ValidateBoundedCapacity(int boundedCapacity)
-    {
-        if (boundedCapacity <= 0)
-        {
-            throw new InvalidOperationException(
-                "boundedCapacity must be greater than zero.");
-        }
     }
 }
