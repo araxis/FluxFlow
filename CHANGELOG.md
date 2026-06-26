@@ -177,6 +177,15 @@ Uses the shared Designer metadata builder for metrics aggregate metadata.
 - Preserves existing metrics aggregate options, clock resources, fixed ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Expectations.Composition 1.2.1
+
+Uses the shared Designer metadata builder for event expectation metadata.
+
+- Refactors `ExpectationsComponentDesignMetadataProvider` to author
+  `event.expectation` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing event expectation options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
