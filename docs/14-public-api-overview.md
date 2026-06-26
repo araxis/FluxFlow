@@ -750,8 +750,9 @@ options.
 caller-owned option, resource, port, choice, and attribute collections cannot
 mutate catalog contents after registration.
 `ComponentDesignMetadataBuilder` is an authoring helper over the same contracts;
-it builds through the validated module path and does not own rendering,
-localization, resource selection, or runtime mapping.
+it supports single and bulk component-level attributes through `AddAttribute`
+and `AddAttributes`, builds through the validated module path, and does not own
+rendering, localization, resource selection, or runtime mapping.
 
 ## Support Packages
 

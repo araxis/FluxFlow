@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.3.1
+
+Improves fluent Designer metadata authoring.
+
+- Adds `ComponentDesignMetadataBuilder.AddAttributes(...)` for bulk
+  component-level attribute authoring.
+- Adds explicit null argument checks for fluent attribute keys and values.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.1
 
 Hardens adapter-local MQTT client DI registration.
