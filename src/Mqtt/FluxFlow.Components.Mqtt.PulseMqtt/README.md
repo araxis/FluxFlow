@@ -58,6 +58,8 @@ names.
 User-property maps are optional: null maps are treated as empty, blank property
 names are ignored, and named properties with null values are rejected with a
 clear `value` argument error.
+`PulseMqttClientOptions.UserProperties` also snapshots assigned dictionaries, so
+caller-owned maps cannot alter CONNECT user properties after options creation.
 
 ## Dependency Injection
 

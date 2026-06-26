@@ -7,6 +7,26 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.5
+
+Hardens MQTT adapter client option user-property snapshots.
+
+- `MqttNetClientOptions.UserProperties` now copies assigned dictionaries with
+  ordinal key comparison.
+- Null assigned maps are treated as empty, preserving optional configuration
+  binding behavior.
+- Adds focused option contract coverage for caller-owned dictionary mutation.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.5
+
+Hardens MQTT adapter client option user-property snapshots.
+
+- `PulseMqttClientOptions.UserProperties` now copies assigned dictionaries with
+  ordinal key comparison.
+- Null assigned maps are treated as empty, preserving optional configuration
+  binding behavior.
+- Adds focused option contract coverage for caller-owned dictionary mutation.
+
 ## FluxFlow.Components.Mqtt 4.1.2
 
 Hardens MQTT contract dictionary snapshots.

@@ -4,6 +4,9 @@ namespace FluxFlow.Components.Mqtt.MqttNet;
 
 public sealed record MqttNetClientOptions
 {
+    private IReadOnlyDictionary<string, string> _userProperties =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public required string Host { get; init; }
 
     public int Port { get; init; } = 1883;
@@ -30,9 +33,19 @@ public sealed record MqttNetClientOptions
 
     public TimeSpan ReconnectDelay { get; init; } = TimeSpan.FromSeconds(5);
 
-    public Dictionary<string, string> UserProperties { get; init; } = [];
+    public IReadOnlyDictionary<string, string> UserProperties
+    {
+        get => _userProperties;
+        init => _userProperties = CopyUserProperties(value);
+    }
 
     public MqttNetLastWillOptions? LastWill { get; init; }
+
+    private static IReadOnlyDictionary<string, string> CopyUserProperties(
+        IReadOnlyDictionary<string, string>? values)
+        => values is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(values, StringComparer.Ordinal);
 }
 
 public sealed record MqttNetLastWillOptions

@@ -807,6 +807,8 @@ same singleton through keyed MQTT publisher, trigger-source, and health-source
 contracts. Registration owns only the adapter client session. Workflow nodes
 are still created through standalone composition, and the host decides whether
 the adapter connects with hosted lifetime through `ConnectWithHost`.
+`MqttNetClientOptions.UserProperties` snapshots assigned dictionaries with
+ordinal key comparison, and treats null maps as empty.
 
 ## Pulse MQTT Adapter
 
@@ -842,6 +844,8 @@ adapter-owned options on `PulseMqttClientOptions`, not core MQTT or composition
 features. `AddFluxFlowMqttClient()` registers one keyed client session and can
 optionally add hosted lifecycle through `StartWithHost`; `WaitForConnectedOnStart`
 is only valid with hosted start.
+`PulseMqttClientOptions.UserProperties` snapshots assigned dictionaries with
+ordinal key comparison, and treats null maps as empty.
 
 ## Designer Metadata
 
