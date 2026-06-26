@@ -417,9 +417,16 @@ public sealed class SqlFileStorageStoreTests
             Collection = "items",
             Limit = 0
         }));
+        var range = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            StoredFrom = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero),
+            StoredTo = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        }));
 
         offset.Message.ShouldContain("offset");
         limit.Message.ShouldContain("limit");
+        range.Message.ShouldContain("storedFrom");
     }
 
     [Fact]
@@ -589,6 +596,100 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Factory_SerializesVersionedPutsAcrossLeases()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new SqlFileStorageStoreFactory(new SqlFileStorageStoreOptions
+        {
+            DatabasePath = Path.Combine(temp.Path, "records.db")
+        });
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        var successes = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(async index =>
+        {
+            var store = index % 2 == 0 ? first.Store : second.Store;
+            while (true)
+            {
+                var current = await store.GetAsync(new StorageGetRequest
+                {
+                    Collection = "items",
+                    Key = "counter"
+                });
+                try
+                {
+                    await store.PutAsync(new StoragePutRequest
+                    {
+                        Collection = "items",
+                        Key = "counter",
+                        Value = index,
+                        ExpectedVersion = current?.Version ?? 0
+                    });
+                    Interlocked.Increment(ref successes);
+                    return;
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }));
+        var final = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "counter"
+        });
+
+        successes.ShouldBe(100);
+        final.ShouldNotBeNull();
+        final.Version.ShouldBe(100);
+    }
+
+    [Fact]
+    public async Task Factory_SerializesCreateModeAcrossLeases()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new SqlFileStorageStoreFactory(new SqlFileStorageStoreOptions
+        {
+            DatabasePath = Path.Combine(temp.Path, "records.db")
+        });
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        var successes = 0;
+        var conflicts = 0;
+
+        await Task.WhenAll(Enumerable.Range(0, 100).Select(async index =>
+        {
+            var store = index % 2 == 0 ? first.Store : second.Store;
+            try
+            {
+                await store.PutAsync(new StoragePutRequest
+                {
+                    Collection = "items",
+                    Key = "singleton",
+                    Value = index,
+                    Mode = StorageWriteMode.Create
+                });
+                Interlocked.Increment(ref successes);
+            }
+            catch (InvalidOperationException)
+            {
+                Interlocked.Increment(ref conflicts);
+            }
+        }));
+        var final = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "singleton"
+        });
+
+        successes.ShouldBe(1);
+        conflicts.ShouldBe(99);
+        final.ShouldNotBeNull();
+        final.Version.ShouldBe(1);
+    }
+
+    [Fact]
     public void Options_NormalizeTextFieldsAndRejectInvalidNumericLimits()
     {
         var options = new SqlFileStorageStoreOptions
@@ -661,6 +762,13 @@ public sealed class SqlFileStorageStoreTests
             DatabasePath = databasePath,
             Clock = clock
         });
+
+    private static StorageStoreContext CreateStoreContext()
+        => new()
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        };
 
 }
 

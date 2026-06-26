@@ -362,9 +362,16 @@ public sealed class FileSystemStorageStoreTests
             Collection = "items",
             Limit = 0
         }));
+        var range = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            StoredFrom = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero),
+            StoredTo = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        }));
 
         offset.Message.ShouldContain("offset");
         limit.Message.ShouldContain("limit");
+        range.Message.ShouldContain("storedFrom");
     }
 
     [Fact]
