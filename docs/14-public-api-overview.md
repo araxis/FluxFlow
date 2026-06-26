@@ -240,6 +240,8 @@ wants closed generic `json.schema-validator` node factories. The factory binds
 `JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
 composition build, and resolves optional keyed typed selector and clock
 resources through the host.
+Invalid validator options fail during build as factory diagnostics when the host
+is configured to collect build failures.
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `json.schema-validator` composition node so hosts can compose palette,

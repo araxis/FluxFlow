@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Validation</PackageId>
     <AssemblyName>FluxFlow.Components.Validation</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone JSON schema validator node for FluxFlow: a value in, a validation result broadcast out, with the original input fanned to Valid/Invalid ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone json.schema-validator node over a pre-compiled JSON schema: input in, validation result broadcast out, original input fanned to the Valid/Invalid ports, failures on the error port — all carrying the message correlation id. The engine factory, module, registration extensions, design-metadata provider, definition-options reader, and the type/selector resolution layer are removed; the node takes its schema, value selector, and TimeProvider directly and depends only on FluxFlow.Nodes (runs without the engine).</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: json.schema-validator now rejects blank inputType and non-positive boundedCapacity values before the node pipeline is created. Runtime validation behavior is unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
