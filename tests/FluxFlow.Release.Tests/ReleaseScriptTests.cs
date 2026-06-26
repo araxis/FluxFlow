@@ -138,7 +138,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Hardens fluent configuration validation request builder contracts.");
+            notes.ShouldContain("Hardens configuration validation report guardrails.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
         }
