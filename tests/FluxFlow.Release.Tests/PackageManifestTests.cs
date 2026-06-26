@@ -68,6 +68,20 @@ public sealed class PackageManifestTests
             "docs/14-public-api-overview.md must mention every shipped package id from eng/packages.json.");
     }
 
+    [Fact]
+    public void Package_versioning_docs_keep_project_files_and_manifest_as_source_of_truth()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "docs", "11-package-versioning.md"));
+
+        text.ShouldContain("Each packable project owns its own `<Version>`.");
+        text.ShouldContain("`eng/packages.json` lists the shipped packages");
+        text.ShouldContain("Packages in this repository move independently.");
+        text.ShouldNotContain("Current stable engine and component release line");
+        text.ShouldNotContain("Current stable pattern");
+        text.ShouldNotContain("FluxFlow.Components.*        1.0.0");
+    }
+
     private static void AssertManifestEntry(string root, string changelog, PackageManifestEntry entry)
     {
         entry.Alias.ShouldSatisfyAllConditions(
