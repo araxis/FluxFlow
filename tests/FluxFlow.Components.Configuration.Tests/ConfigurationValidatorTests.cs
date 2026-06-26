@@ -92,6 +92,48 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Request_builder_accepts_existing_entry_ranges_and_snapshots_build_results()
+    {
+        var resources = new List<ConfigurationResourceReference>
+        {
+            new()
+            {
+                Path = "connections.primary",
+                Required = false
+            }
+        };
+        var secrets = new List<SecretOptionReference>
+        {
+            new()
+            {
+                OptionPath = "connections.primary.credential",
+                Required = false
+            }
+        };
+
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResources(resources)
+            .AddSecrets(secrets)
+            .Build();
+
+        resources.Add(new ConfigurationResourceReference
+        {
+            Path = "connections.secondary",
+            Required = false
+        });
+        secrets.Add(new SecretOptionReference
+        {
+            OptionPath = "connections.secondary.credential",
+            Required = false
+        });
+
+        request.Resources.Count.ShouldBe(1);
+        request.Resources[0].Path.ShouldBe("connections.primary");
+        request.Secrets.Count.ShouldBe(1);
+        request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
+    }
+
+    [Fact]
     public async Task Request_builder_output_validates_through_existing_validator()
     {
         var resourceLookup = new ResourceDescriptorCatalog(
@@ -125,7 +167,11 @@ public sealed class ConfigurationValidatorTests
         var builder = new ConfigurationValidationRequestBuilder();
 
         Should.Throw<ArgumentNullException>(() => builder.AddResource(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddResources(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddResources([null!]));
         Should.Throw<ArgumentNullException>(() => builder.AddSecret(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddSecrets(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddSecrets([null!]));
     }
 
     [Fact]
