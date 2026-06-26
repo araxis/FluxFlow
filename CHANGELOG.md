@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.2.5
+
+Hardens resource diagnostic metadata handling.
+
+- `ResourceDiagnostic` now copies assigned metadata so callers cannot mutate a
+  diagnostic after construction by changing the source dictionary.
+- Null diagnostic metadata assignments now produce an empty metadata map.
+- `ResourceDiagnostic.ToString()` now returns a metadata-safe one-line summary.
+
 ## FluxFlow.Components.Sources 3.1.1
 
 Aligns source constructor validation with the standalone node conventions.

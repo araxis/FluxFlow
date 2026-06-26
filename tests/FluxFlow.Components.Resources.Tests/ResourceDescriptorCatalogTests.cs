@@ -58,6 +58,53 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Diagnostic_metadata_is_copied_and_null_assignments_become_empty()
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["path"] = "resources[0]"
+        };
+
+        var diagnostic = new ResourceDiagnostic
+        {
+            Code = ResourceDiagnosticCode.InvalidResource,
+            Severity = ResourceDiagnosticSeverity.Error,
+            Message = "Invalid resource.",
+            Metadata = metadata
+        };
+        var emptyMetadataDiagnostic = new ResourceDiagnostic
+        {
+            Code = ResourceDiagnosticCode.MissingResource,
+            Severity = ResourceDiagnosticSeverity.Error,
+            Message = "Missing resource.",
+            Metadata = null!
+        };
+
+        metadata["path"] = "changed";
+
+        diagnostic.Metadata["path"].ShouldBe("resources[0]");
+        emptyMetadataDiagnostic.Metadata.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Diagnostic_formatting_omits_metadata_values()
+    {
+        var diagnostic = new ResourceDiagnostic
+        {
+            Code = ResourceDiagnosticCode.InvalidResource,
+            Severity = ResourceDiagnosticSeverity.Error,
+            Message = "Invalid resource.",
+            Metadata = new Dictionary<string, string>
+            {
+                ["accessToken"] = "secret-value"
+            }
+        };
+
+        diagnostic.ToString().ShouldBe("Error InvalidResource: Invalid resource.");
+        diagnostic.ToString().ShouldNotContain("secret-value");
+    }
+
+    [Fact]
     public void Default_resource_name_to_string_returns_empty()
     {
         default(ResourceName).ToString().ShouldBe(string.Empty);

@@ -707,7 +707,8 @@ These packages are intentionally not standalone node composition adapters:
   diagnostics with normalized valid metadata maps.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including trimmed resource names, kinds, display text, and
-  null-safe normalized metadata and attribute validation.
+  null-safe normalized metadata and attribute validation plus defensive
+  diagnostic metadata copying.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
   option paths, and null-safe normalized metadata validation.
