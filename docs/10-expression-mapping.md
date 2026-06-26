@@ -1,143 +1,153 @@
 # Expression Mapping
 
-FluxFlow has two related concepts:
+FluxFlow keeps expression evaluation outside the runtime core. Hosts provide
+expression services, component packages decide where expressions are useful, and
+composition adapters resolve those services as explicit keyed resources.
+For configuration-first workflows, the default mapper composition node is
+`flow.mapper`.
 
-| Concept | Purpose |
-|---------|---------|
-| link condition predicates | decide whether an output item is routed to an input |
-| mapper contracts | help component authors transform values inside nodes |
+## Core Contracts
 
-The engine can use host-provided expressions for link `when` conditions.
-Payload transformation still belongs in nodes and component packages.
-
-## Link Conditions
-
-A link condition is a predicate. If it returns `true`, the item is sent to that
-input. If it returns `false`, that link skips the item.
-
-```json
-{
-  "Input": {
-    "from": "review.Output",
-    "when": "input.Priority == true"
-  }
-}
-```
-
-When the host provides an expression engine, the default link condition context
-exposes the current output item as:
-
-- `input`
-- `value`
-
-Both names reference the same object.
-
-If the resolved `when` value is missing, empty, or whitespace, the link
-receives every item. Node defaults are applied before this check.
-
-## Default Node Condition
-
-`NodeDefinition.When` is a default condition for every link declared on that
-node when the link does not provide its own condition.
-
-```json
-{
-  "type": "sample.priority-sink",
-  "when": "input.Priority == true",
-  "Input": "review.Output"
-}
-```
-
-Per-link conditions override the node default:
-
-```json
-{
-  "type": "sample.sink",
-  "when": "input.Priority == true",
-  "Input": {
-    "from": "review.Output",
-    "when": "input.Total >= 250"
-  }
-}
-```
-
-If a link object sets `when` to `null`, the node default is used.
-
-## Runtime Evaluation
-
-Definition validation checks that `when` is a string or `null`. It does not
-fully evaluate the expression.
-
-Runtime build requires an expression engine when any resolved link condition is
-non-empty. If no expression engine is supplied, build fails with
-`MissingExpressionEngine`. When an expression engine is supplied, the runtime
-evaluates the condition for each item as the output fanout pump delivers values.
-If expression evaluation throws, that is a runtime failure, not a build
-validation failure.
-
-Keep link conditions:
-
-- side-effect free
-- fast
-- deterministic
-- focused on routing, not transformation
-- limited to fields that exist on every expected message
-
-## Host Expression Engine
-
-`IFlowExpressionEngine` is the expression boundary:
+`FluxFlow.Mapping` owns the expression and mapping contracts used by components:
 
 ```csharp
 public interface IFlowExpressionEngine
 {
     string Name { get; }
+
     object? Evaluate(string expression, FlowMapContext context, Type resultType);
+
+    IFlowCompiledExpression<T> Compile<T>(string expression);
 }
 ```
 
-Pass an engine to `ApplicationRuntimeBuilder` when an application uses link
-conditions:
+Engines should compile expressions at build or node construction time when they
+can. Nodes then evaluate the compiled expression per message.
+
+`FlowMapContext` carries named variables:
 
 ```csharp
-var builder = new ApplicationRuntimeBuilder(
-    registry,
-    linkConditionExpressionEngine: new AppExpressionEngine());
+public sealed record FlowMapContext
+{
+    public IReadOnlyDictionary<string, object?> Variables { get; init; }
+}
 ```
 
-For hosted applications, pass the same engine through the host factory:
+Use stable variable names once expressions are persisted in configuration or
+workspace files. Keep variables small and data-shaped; do not put live services,
+mutable state, clients, or secrets into expression context.
+
+## Mapper Node
+
+`FluxFlow.Components.Mapping` provides the standalone
+`FlowMapperNode<TInput,TOutput>`:
 
 ```csharp
-var host = FlowApplicationHost.Create(
-    definition,
-    registry,
-    new AppExpressionEngine());
-```
+var options = new MapperOptions
+{
+    Expression = "input",
+    ExpressionName = "copy",
+    InputType = "app.input",
+    OutputType = "app.output",
+    BoundedCapacity = 128
+};
 
-The runtime asks the engine for a `bool` result when evaluating link conditions.
-
-## Expression Predicates
-
-`ExpressionFlowPredicate<TInput>` adapts an expression engine into an
-`IFlowPredicate<TInput>`.
-
-```csharp
-var predicate = new ExpressionFlowPredicate<ReviewedOrder>(
-    "input.Priority == true",
+await using var node = new FlowMapperNode<AppInput, AppOutput>(
+    options,
     expressionEngine);
+```
 
-if (predicate.IsMatch(order))
+The node compiles `MapperOptions.Expression` during construction. Each incoming
+`FlowMessage<TInput>` is evaluated and emitted as `FlowMessage<TOutput>` on
+`Output` with the original correlation id.
+
+Mapping failures emit a node error, fan the original input to `Failed`, and keep
+processing later messages. `MapperOptions.Engine`, `InputType`, `OutputType`,
+`targetType`, `ExpressionId`, and `ExpressionName` are diagnostic/configuration
+metadata; they do not select CLR types or expression services.
+
+## Composition Mapper
+
+Add `FluxFlow.Components.Mapping.Composition` when a host wants mapper nodes from
+fluent or `IConfiguration` composition definitions:
+
+```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodes(registry =>
+        registry.RegisterMapper<AppInput, AppOutput>());
+```
+
+The default composition node type is `flow.mapper`. It exposes:
+
+| Port | Direction | Message type |
+|------|-----------|--------------|
+| `Input` | input | `TInput` |
+| `Output` | output | `TOutput` |
+| `Failed` | output | `TInput` |
+
+The adapter resolves these resources:
+
+| Resource | Required | Service |
+|----------|----------|---------|
+| `engine` | yes | keyed `IFlowExpressionEngine` |
+| `contextFactory` | no | keyed `IMappingContextFactory` |
+| `clock` | no | keyed `TimeProvider` |
+
+Example configuration:
+
+```json
 {
-    // route or process the order
+  "FluxFlow": {
+    "Composition": {
+      "workflows": {
+        "main": {
+          "nodes": {
+            "map": {
+              "type": "flow.mapper",
+              "resources": {
+                "engine": "default"
+              },
+              "configuration": {
+                "expression": "input",
+                "expressionName": "copy",
+                "inputType": "app.input",
+                "outputType": "app.output",
+                "boundedCapacity": 128
+              }
+            }
+          },
+          "links": []
+        }
+      }
+    }
+  }
 }
 ```
 
-The default predicate context contains `input` and `value`. Use a custom
-`IFlowMapContextFactory<TInput>` when a component needs additional variables.
+Use custom node type strings when one host needs several mapper type pairs:
 
 ```csharp
-public sealed class OrderContextFactory : IFlowMapContextFactory<ReviewedOrder>
+registry
+    .RegisterMapper<HttpInput, StorageInput>("flow.mapper.http-to-storage")
+    .RegisterMapper<StorageResult, ProjectionEvent>("flow.mapper.storage-result");
+```
+
+Closed generic registrations define the actual CLR message types. Option fields
+such as `inputType`, `outputType`, and `targetType` remain portable metadata for
+diagnostics and design tools.
+
+## Context Factories
+
+By default, expression helpers expose the payload as both `input` and `value`.
+Use `IFlowMapContextFactory<TInput>` when a component needs additional variables:
+
+```csharp
+public sealed class OrderContextFactory : IFlowMapContextFactory<OrderInput>
 {
-    public FlowMapContext Create(ReviewedOrder input)
+    public FlowMapContext Create(OrderInput input)
         => new()
         {
             Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -150,9 +160,39 @@ public sealed class OrderContextFactory : IFlowMapContextFactory<ReviewedOrder>
 }
 ```
 
-## Mapper Contracts
+`FlowMapperNode<TInput,TOutput>` accepts an `IMappingContextFactory`. The mapping
+component package provides `TypedMappingContextFactory<TInput>` to adapt strongly
+typed `IFlowMapContextFactory<TInput>` implementations when needed.
 
-`IFlowMapper<TInput,TOutput>` is a small transformation contract:
+In composition, register that adapter as a keyed `contextFactory` resource and
+reference it from the node's `resources` map.
+
+## Predicates And Control Nodes
+
+`ExpressionFlowPredicate<TInput>` adapts an expression engine into an
+`IFlowPredicate<TInput>`:
+
+```csharp
+var predicate = new ExpressionFlowPredicate<OrderInput>(
+    "input.Priority == true",
+    expressionEngine);
+```
+
+Composition does not evaluate expressions on links. Use standalone nodes for
+conditional behavior:
+
+- `flow.filter` to drop rejected messages
+- `flow.when` to split true/false branches
+- `flow.switch` to route by a host-owned selector
+- `flow.mapper` to shape messages before routing
+
+This keeps graph links structural and keeps expression services under host-owned
+DI.
+
+## Direct Mapper Contracts
+
+`IFlowMapper<TInput,TOutput>` is a small transformation contract for component
+authors:
 
 ```csharp
 public interface IFlowMapper<in TInput, out TOutput>
@@ -161,76 +201,66 @@ public interface IFlowMapper<in TInput, out TOutput>
 }
 ```
 
-Use it inside nodes or component packages when a transform should be
-replaceable or configurable.
+Use `DelegateFlowMapper<TInput,TOutput>` when a component needs a simple C#
+mapper:
 
 ```csharp
-var mapper = new DelegateFlowMapper<SampleOrder, ReviewedOrder>(
-    order => new ReviewedOrder(
-        order.Id,
-        order.Customer,
-        order.Total,
-        Priority: order.Total >= 100m));
-```
-
-When the mapper needs variables, use the overload that receives
-`FlowMapContext`:
-
-```csharp
-var mapper = new DelegateFlowMapper<SampleOrder, ReviewedOrder>(
+var mapper = new DelegateFlowMapper<OrderInput, ReviewedOrder>(
     (order, context) =>
     {
         var threshold = (decimal)context.Variables["threshold"]!;
         return new ReviewedOrder(
             order.Id,
-            order.Customer,
             order.Total,
             Priority: order.Total >= threshold);
     });
 ```
 
-The engine does not automatically apply `IFlowMapper<TInput,TOutput>` to graph
-links. Component nodes decide when and how to use mappers.
-
-## Context Variables
-
-`FlowMapContext` carries named variables:
-
-```csharp
-public sealed record FlowMapContext
-{
-    public IReadOnlyDictionary<string, object?> Variables { get; init; }
-}
-```
-
-Recommendations:
-
-- Use `StringComparer.Ordinal` for variable dictionaries.
-- Keep variable names stable once persisted in app/workspace files.
-- Prefer simple values and DTOs for portable expressions.
-- Keep large services and mutable state out of expression context.
-- Validate app-specific expression strings before running important workflows.
+Composition links do not apply `IFlowMapper<TInput,TOutput>` automatically. Nodes
+and adapters decide when mapper contracts are part of their behavior.
 
 ## App Pattern
 
 For application-authored workflows:
 
-1. Validate that every configurable expression is present where required.
-2. Build the runtime with the expression engine selected by the application.
-3. Keep link conditions for routing only.
-4. Put transformations in nodes or package-owned mapper objects.
-5. Emit diagnostics from nodes when expression-driven routing or mapping affects
-   operational behavior.
+1. Register expression engines as host-owned keyed resources.
+2. Register closed generic component factories for each message shape.
+3. Keep expression strings in node options, not in links.
+4. Keep resource selection in node `resources` maps.
+5. Validate app-specific expression presence before runtime build.
+6. Let factory/build diagnostics report missing resources or invalid options.
+
+## Optional Engine Link Conditions
+
+`FluxFlow.Engine` still supports inline link `when` conditions for hosts that
+intentionally use the older `ApplicationDefinition` runtime:
+
+```json
+{
+  "Input": {
+    "from": "review.Output",
+    "when": "input.Priority == true"
+  }
+}
+```
+
+When an engine definition contains a non-empty resolved `when` condition,
+`ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)` must receive an
+`IFlowExpressionEngine`. Otherwise the build fails with
+`MissingExpressionEngine`.
+
+Use this path only for engine-based hosts that need engine-specific conditional
+links. Composition-first hosts should model routing with normal standalone nodes.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---------|-------|
-| item is not delivered | Verify the link condition returns `true` for that item. |
-| build fails with `MissingExpressionEngine` | Pass an `IFlowExpressionEngine` to `ApplicationRuntimeBuilder` or `FlowApplicationHost.Create(...)`, or remove link `when` conditions. |
-| build succeeds but runtime faults | Check condition syntax and message shape at runtime. |
-| expression cannot see data | Use `input` or `value`, or provide a custom context factory. |
-| mapper is not used | Register/use the mapper inside the node; graph links do not apply mappers automatically. |
-| expression is hard to maintain | Move business rules into C# node code and keep the expression as a small routing condition. |
+| composition build reports missing `engine` | Map the node's `engine` resource to a keyed `IFlowExpressionEngine`. |
+| mapper build fails | Check `expression` is present and `boundedCapacity` is greater than zero. |
+| mapped output has the wrong type | Verify the expression returns the closed `TOutput` type registered by the host. |
+| expression cannot see data | Use `input` or `value`, or provide a keyed `contextFactory`. |
+| rejected messages disappear | Link the mapper `Failed` port to an error path or dead-letter node. |
+| routing expression is hard to maintain | Move business rules into C# node code and keep expressions small and data-shaped. |
 
 Next: [Package Versioning](11-package-versioning.md)
