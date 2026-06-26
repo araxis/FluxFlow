@@ -53,6 +53,8 @@ services
 
 The direct registration overloads reject null stores and store factories. The
 provider overloads fail with clear diagnostics if they return null.
+Keyed DI helper names are trimmed before registration, matching the store-name
+normalization used by `SessionStoreContext` and session options.
 
 Stores are expected to honor the non-null parts of `ISessionStore`; when a store
 returns a null session, record, query result, or replay stream where the contract

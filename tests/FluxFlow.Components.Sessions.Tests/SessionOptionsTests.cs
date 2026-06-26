@@ -123,6 +123,21 @@ public sealed class SessionOptionsTests
     }
 
     [Fact]
+    public async Task Service_registration_trims_keyed_store_and_factory_names()
+    {
+        var store = new EmptySessionStore();
+        var factory = new EmptySessionStoreFactory(store);
+        var services = new ServiceCollection()
+            .AddFluxFlowSessionStore(" sessions ", store)
+            .AddFluxFlowSessionStoreFactory(" sessions-factory ", factory);
+
+        await using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<ISessionStore>("sessions").ShouldBeSameAs(store);
+        provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory").ShouldBeSameAs(factory);
+    }
+
+    [Fact]
     public void Service_registration_rejects_null_store_instances()
     {
         var services = new ServiceCollection();

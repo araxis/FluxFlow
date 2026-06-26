@@ -48,6 +48,26 @@ public sealed class SecretServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void Service_registration_trims_keyed_names()
+    {
+        var resolver = new InMemorySecretResolverBuilder()
+            .Add("primary", "runtime-value", kind: "profile")
+            .BuildResolver();
+        var descriptorProvider = new InMemorySecretResolverBuilder()
+            .Add("secondary", "descriptor-value", kind: "profile")
+            .BuildResolver();
+        var services = new ServiceCollection()
+            .AddFluxFlowSecretResolver(" secrets ", resolver)
+            .AddFluxFlowSecretDescriptorProvider(" declared-secrets ", descriptorProvider);
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<ISecretResolver>("secrets").ShouldBeSameAs(resolver);
+        provider.GetRequiredKeyedService<ISecretDescriptorProvider>("declared-secrets")
+            .ShouldBeSameAs(descriptorProvider);
+    }
+
+    [Fact]
     public async Task Service_registration_passes_provider_to_factories()
     {
         var services = new ServiceCollection();

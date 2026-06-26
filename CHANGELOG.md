@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.5.5
+
+Hardens keyed secret service registration.
+
+- `AddFluxFlowSecretResolver(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSecretDescriptorProvider(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving secret services through normalized
+  keys.
+
+## FluxFlow.Components.Sessions 3.3.2
+
+Hardens keyed session store registration.
+
+- `AddFluxFlowSessionStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSessionStoreFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving session stores and factories through
+  normalized keys.
+
 ## FluxFlow.Components.Http.AspNetCore 1.0.4
 
 Hardens keyed HTTP trigger registration.
