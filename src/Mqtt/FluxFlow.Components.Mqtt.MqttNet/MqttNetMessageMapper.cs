@@ -100,6 +100,11 @@ internal static class MqttNetMessageMapper
             builder.WithResponseTopic(properties.ResponseTopic);
         }
 
+        if (properties.UserProperties is null)
+        {
+            return;
+        }
+
         foreach (var (name, value) in properties.UserProperties)
         {
             if (!string.IsNullOrWhiteSpace(name))

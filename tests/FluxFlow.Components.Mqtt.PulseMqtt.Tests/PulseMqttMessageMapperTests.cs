@@ -44,6 +44,39 @@ public sealed class PulseMqttMessageMapperTests
     }
 
     [Fact]
+    public void ToPublishPacket_treats_null_user_property_maps_as_empty()
+    {
+        var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1],
+            Properties = new MqttPublishProperties
+            {
+                UserProperties = null!
+            }
+        });
+
+        packet.UserProperties.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ToPublishPacket_rejects_null_named_user_property_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+            {
+                Topic = "devices/a",
+                Payload = [1],
+                Properties = new MqttPublishProperties
+                {
+                    UserProperties =
+                    {
+                        ["tenant"] = null!
+                    }
+                }
+            }))
+            .ParamName.ShouldBe("value");
+
+    [Fact]
     public void ToReceivedMessage_MapsPacketMetadata()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-20T12:00:00+00:00");

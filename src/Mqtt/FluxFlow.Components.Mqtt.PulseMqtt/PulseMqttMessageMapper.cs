@@ -115,6 +115,7 @@ internal static class PulseMqttMessageMapper
         {
             if (!string.IsNullOrWhiteSpace(name))
             {
+                ArgumentNullException.ThrowIfNull(value);
                 values.Add(new MqttUserProperty(name, value));
             }
         }
