@@ -166,6 +166,23 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public void RetentionOptions_reject_invalid_numeric_values()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new JournalRetentionOptions
+        {
+            MaxRecords = -1
+        });
+        Should.Throw<ArgumentOutOfRangeException>(() => new JournalRetentionOptions
+        {
+            MaxAge = TimeSpan.Zero
+        });
+        Should.Throw<ArgumentOutOfRangeException>(() => new JournalRetentionOptions
+        {
+            MaxAge = TimeSpan.FromMilliseconds(-1)
+        });
+    }
+
+    [Fact]
     public async Task AppendAsync_detects_duplicates_after_retention_and_prune()
     {
         var store = new InMemoryJournalStore(new JournalRetentionOptions
