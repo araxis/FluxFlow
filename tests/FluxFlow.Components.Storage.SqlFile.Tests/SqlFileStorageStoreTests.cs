@@ -660,6 +660,39 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Service_registration_can_register_keyed_store_factory()
+    {
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+        var services = new ServiceCollection()
+            .AddFluxFlowSqlFileStorageStoreFactory(
+                "items-factory",
+                new SqlFileStorageStoreOptions
+                {
+                    DatabasePath = path,
+                    DefaultCollection = "fallback"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory");
+        await using var lease = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        });
+
+        var saved = await lease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        lease.OwnsStore.ShouldBeTrue();
+        saved.Collection.ShouldBe("items");
+        File.Exists(path).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();
