@@ -22,7 +22,13 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
         IconKey = "send",
         PreferredNodeName = "httpClient",
         SuggestedEditorWidth = 420,
-        Options =
+        Options = ClientOptionsMetadata(),
+        Resources = ClientResources(),
+        Ports = ClientPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> ClientOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -67,8 +73,10 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 Min = 1,
                 HelperText = "Optional per-request timeout used when the input message omits one."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> ClientResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -87,8 +95,10 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 Summary = "Optional keyed clock for deterministic request timeouts and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> ClientPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -112,6 +122,5 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 ValueType = nameof(HttpResponseOutput),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 }
