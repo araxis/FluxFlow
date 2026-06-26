@@ -7,6 +7,26 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.3.0
+
+Adds keyed session store registration helpers.
+
+- Adds `AddFluxFlowSessionStore(...)` and
+  `AddFluxFlowSessionStoreFactory(...)` for registering host-owned
+  `ISessionStore` and `ISessionStoreFactory` resources in keyed DI.
+- Keeps concrete store implementation, lifetime, retention, and persistence
+  setup with the host.
+
+## FluxFlow.Components.Journal 2.3.0
+
+Adds keyed journal store registration helpers.
+
+- Adds `AddFluxFlowJournalStore(...)` and
+  `AddFluxFlowJournalStoreFactory(...)` for registering host-owned
+  `IJournalStore` and `IJournalStoreFactory` resources in keyed DI.
+- Keeps event collection, persistence, retention, and store lifetime ownership
+  with hosts.
+
 ## FluxFlow.Components.Storage.FileSystem 3.3.0
 
 Adds direct keyed file-system storage store registration.

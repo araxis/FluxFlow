@@ -42,6 +42,15 @@ Hosts that need explicit open/close ownership can wrap stores with
 `ISessionStoreFactory`, `SessionStoreContext`, and `SessionStoreLease`.
 `SessionComponentOptions` provides direct-code helpers for shared stores,
 factory-backed stores, and a shared clock.
+Hosts using keyed DI can register already-owned direct stores or store
+factories without a composition dependency:
+
+```csharp
+services
+    .AddFluxFlowSessionStore("sessions", store)
+    .AddFluxFlowSessionStoreFactory("session-factory", sessionStoreFactory);
+```
+
 Stores are expected to honor the non-null parts of `ISessionStore`; when a store
 returns a null session, record, query result, or replay stream where the contract
 requires a value, the node reports a clear session error instead of surfacing an
@@ -174,7 +183,7 @@ Use `FluxFlow.Components.Sessions.Composition` when a `FluxFlow.Composition`
 host should register the optional session factories:
 
 ```csharp
-services.AddKeyedSingleton<ISessionStoreFactory>("sessions", sessionStoreFactory);
+services.AddFluxFlowSessionStoreFactory("sessions", sessionStoreFactory);
 
 services
     .AddFluxFlowComposition(configuration)

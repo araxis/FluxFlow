@@ -78,6 +78,15 @@ var options = new JournalComponentOptions()
     .UseClock(TimeProvider.System);
 ```
 
+Hosts using keyed DI can register host-owned direct stores or store factories
+without adding composition behavior:
+
+```csharp
+services
+    .AddFluxFlowJournalStore("journal", store)
+    .AddFluxFlowJournalStoreFactory("journal-factory", factory);
+```
+
 ## Composition
 
 This package does not expose standalone nodes or `FluxFlow.Composition`
