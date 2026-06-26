@@ -34,13 +34,37 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         SessionReplayOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : this(ResolveArguments(options, store), clock)
     {
-        _options = options;
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+    }
+
+    private SessionReplayNode(
+        ResolvedSessionReplayArguments resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
-        _sessionId = Normalize(options.SessionId)
+        _sessionId = resolved.SessionId;
+    }
+
+    private static ResolvedSessionReplayArguments ResolveArguments(
+        SessionReplayOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        var sessionId = Normalize(options.SessionId)
             ?? throw new ArgumentException("session.replay requires a session id.", nameof(options));
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.replay bounded capacity must be greater than zero.");
+        }
 
         if (options.StartSequence is <= 0)
         {
@@ -69,6 +93,8 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
                 nameof(options),
                 "session.replay speed multiplier must be greater than zero.");
         }
+
+        return new ResolvedSessionReplayArguments(options, store, sessionId);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -216,19 +242,6 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
     }
 
-    private static FlowSourceOptions BuildSourceOptions(SessionReplayOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.replay bounded capacity must be greater than zero.");
-        }
-
-        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
-    }
-
     private void ReportReplayError(int code, string message, Exception? exception)
     {
         EmitError(new FlowError
@@ -348,4 +361,9 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record ResolvedSessionReplayArguments(
+        SessionReplayOptions Options,
+        ISessionStore Store,
+        string SessionId);
 }

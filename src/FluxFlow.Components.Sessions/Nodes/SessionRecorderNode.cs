@@ -35,20 +35,20 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
         SessionRecorderOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : this(ResolveArguments(options, store), clock)
+    {
+    }
+
+    private SessionRecorderNode(
+        ResolvedSessionRecorderArguments resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+            InputCapacity = resolved.Options.BoundedCapacity
         })
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.recorder bounded capacity must be greater than zero.");
-        }
-
-        _options = options;
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -332,4 +332,25 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ResolvedSessionRecorderArguments ResolveArguments(
+        SessionRecorderOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.recorder bounded capacity must be greater than zero.");
+        }
+
+        return new ResolvedSessionRecorderArguments(options, store);
+    }
+
+    private sealed record ResolvedSessionRecorderArguments(
+        SessionRecorderOptions Options,
+        ISessionStore Store);
 }

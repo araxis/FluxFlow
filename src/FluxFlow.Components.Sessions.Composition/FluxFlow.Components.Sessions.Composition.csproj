@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone session recording, replay, and query nodes over host-owned keyed session stores.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Aligns session replay composition packaging with bounded source-output capacity support from FluxFlow.Components.Sessions 3.1.0.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens config-bound Sessions option diagnostics. Invalid recorder, replay, and query settings now surface through composition factory diagnostics when build failures are configured as diagnostics.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

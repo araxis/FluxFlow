@@ -66,6 +66,9 @@ for deterministic result, event, error, and replay timing.
 The adapter binds the existing session option records from node configuration.
 The `Store` option remains configuration metadata; the composition adapter
 resolves the concrete `ISessionStore` from the `store` resource.
+Invalid option values fail during composition build through the node factory. If
+build failures are configured as diagnostics, the runtime is not created and the
+host receives a `FactoryFailed` diagnostic with the relevant option name.
 
 ## Design Metadata
 

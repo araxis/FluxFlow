@@ -28,6 +28,9 @@ Session option records normalize optional text and copy tag maps at assignment.
 Invalid capacity, replay range, replay mode, pacing, and query limit values are
 rejected when assigned, so invalid configuration fails during node or factory
 construction.
+Recorder, replay, and query constructors resolve validated options and required
+stores before creating their node/source pipelines, keeping fail-fast option
+errors clear and preventing partially initialized nodes.
 
 ## Storage
 

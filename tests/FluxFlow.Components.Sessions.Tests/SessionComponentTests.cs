@@ -501,6 +501,17 @@ public sealed class SessionComponentTests
                 new SessionReplayOptions { SessionId = "session-1" },
                 null!));
 
+    [Fact]
+    public void Replay_RejectsInvalidCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new SessionReplayNode(
+                new SessionReplayOptions
+                {
+                    SessionId = "session-1",
+                    BoundedCapacity = 0
+                },
+                new TestSessionStore()));
+
     // ---- Query ---------------------------------------------------------------------
 
     [Fact]

@@ -7,6 +7,27 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.1.5
+
+Aligns Sessions constructor validation with the standalone node conventions.
+
+- `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode` now
+  resolve validated options and required stores before their node/source
+  pipelines are created.
+- Replay session id and pacing checks remain fail-fast construction errors.
+- Runtime store ownership, replay pacing, query validation, diagnostics, and
+  correlation propagation are unchanged.
+
+## FluxFlow.Components.Sessions.Composition 1.3.1
+
+Hardens config-bound Sessions option diagnostics.
+
+- Invalid recorder, replay, and query options now fail during composition build
+  through the matching factories.
+- Adds hosted composition coverage proving invalid replay mode and existing
+  numeric/query option failures surface as factory diagnostics when build
+  failures are configured as diagnostics.
+
 ## FluxFlow.Components.FileSystem 3.1.1
 
 Aligns FileSystem constructor option validation with the standalone node

@@ -483,6 +483,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     [Theory]
     [InlineData(SessionsCompositionNodeTypes.Recorder, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(SessionsCompositionNodeTypes.Replay, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "mode", 999, "mode")]
     [InlineData(SessionsCompositionNodeTypes.Replay, "startSequence", 0, "startSequence")]
     [InlineData(SessionsCompositionNodeTypes.Replay, "maxMessages", 0, "maxMessages")]
     [InlineData(SessionsCompositionNodeTypes.Replay, "fixedIntervalMilliseconds", -1, "fixedIntervalMilliseconds")]
