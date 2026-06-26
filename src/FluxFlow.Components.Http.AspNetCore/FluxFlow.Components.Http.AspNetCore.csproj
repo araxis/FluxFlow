@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Http.AspNetCore</PackageId>
     <AssemblyName>FluxFlow.Components.Http.AspNetCore</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http.AspNetCore</RootNamespace>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>ASP.NET Core HTTP trigger adapter for FluxFlow: maps an endpoint's HttpContext onto the request/reply bridge so an inbound request flows into a graph and the correlated response is written back. The only FluxFlow package that references ASP.NET Core.</Description>
     <PackageTags>workflow;dataflow;components;http;trigger;aspnetcore</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Hardens HTTP trigger endpoint authoring: MapFluxFlowTrigger now rejects blank route patterns for keyed and direct coordinator overloads before delegating to framework routing.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens HTTP trigger shutdown: the hosted trigger lifetime now completes the keyed request source on stop so late endpoint submissions are rejected instead of accepted into an inactive trigger.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

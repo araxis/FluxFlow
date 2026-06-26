@@ -40,16 +40,19 @@ public static class FluxFlowHttpTriggerServiceCollectionExtensions
     private sealed class HttpTriggerLifetime(IServiceProvider services, string name)
         : IHostedService, IAsyncDisposable
     {
+        private HttpTriggerSource? _source;
         private HttpTriggerNode? _node;
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            _source = services.GetRequiredKeyedService<HttpTriggerSource>(name);
             _node = services.GetRequiredKeyedService<HttpTriggerNode>(name);
             return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
+            _source?.Complete();
             _node?.Complete();
             return Task.CompletedTask;
         }

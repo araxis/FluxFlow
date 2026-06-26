@@ -160,7 +160,9 @@ wants an inbound HTTP endpoint to feed a request/reply graph.
 The adapter owns endpoint glue, keyed trigger source/node registration, and
 hosted trigger lifetime. `MapFluxFlowTrigger(...)` rejects missing route
 patterns before delegating to framework routing, and validates the keyed trigger
-name or direct coordinator argument at the package boundary.
+name or direct coordinator argument at the package boundary. The hosted lifetime
+completes the keyed request source during stop so endpoint submissions are
+rejected once the trigger is no longer consuming.
 
 ## Mapping Composition
 

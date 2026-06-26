@@ -176,6 +176,28 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public async Task AddFluxFlowHttpTrigger_StopCompletesKeyedSource()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowHttpTrigger("echo", _ => { });
+
+        await using var provider = services.BuildServiceProvider();
+        var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await lifetime.StartAsync(CancellationToken.None);
+        var source = provider.GetRequiredKeyedService<HttpTriggerSource>("echo");
+
+        await lifetime.StopAsync(CancellationToken.None);
+
+        var accepted = await source.SubmitAsync(new FakeRequestContext());
+        accepted.ShouldBeFalse();
+
+        if (lifetime is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public void HttpTriggerSource_RejectsNonPositiveCapacity()
     {
         var exception = Should.Throw<ArgumentOutOfRangeException>(() => new HttpTriggerSource(0));
@@ -223,5 +245,25 @@ public sealed class HttpTriggerEndpointTests
         public ICollection<EndpointDataSource> DataSources { get; } = [];
 
         public IApplicationBuilder CreateApplicationBuilder() => new ApplicationBuilder(ServiceProvider);
+    }
+
+    private sealed class FakeRequestContext : IRequestContext<HttpTriggerRequest, HttpTriggerReply>
+    {
+        public HttpTriggerRequest Request { get; } = new()
+        {
+            Method = "GET",
+            Path = "/echo"
+        };
+
+        public CorrelationId? CorrelationId => null;
+
+        public Task ReplyAsync(HttpTriggerReply response, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task AcknowledgeAsync(CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task FailAsync(Exception error, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }
