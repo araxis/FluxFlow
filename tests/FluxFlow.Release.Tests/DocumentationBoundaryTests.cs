@@ -142,6 +142,34 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Expression_docs_keep_composition_mapping_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "10-expression-mapping.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 2_400)];
+
+        defaultSection.Contains("FluxFlow.Mapping", StringComparison.Ordinal)
+            .ShouldBeTrue("expression docs should lead with standalone mapping contracts.");
+        defaultSection.Contains("flow.mapper", StringComparison.Ordinal)
+            .ShouldBeTrue("expression docs should show composition mapper usage before optional engine APIs.");
+        defaultSection.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
+            .ShouldBeFalse("expression docs must not lead with optional engine build APIs.");
+        defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
+            .ShouldBeFalse("expression docs must not lead with optional engine host APIs.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Link Conditions", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "expression docs should keep engine link conditions in an explicitly optional section.");
+
+        var engineBuilderIndex = text.IndexOf("ApplicationRuntimeBuilder", StringComparison.Ordinal);
+        engineBuilderIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "ApplicationRuntimeBuilder should only appear after the optional engine link condition heading.");
+    }
+
+    [Fact]
     public void Current_docs_keep_mapping_contracts_out_of_engine_namespace()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
