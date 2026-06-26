@@ -103,6 +103,15 @@ Uses the shared Designer metadata builder for timer metadata.
   omitted-option attributes, validation, catalog loading, and runtime
   composition behavior.
 
+## FluxFlow.Components.Sources.Composition 1.3.2
+
+Uses the shared Designer metadata builder for source metadata.
+
+- Refactors `SourcesComponentDesignMetadataProvider` to author generated and
+  sequence source metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing source options, clock resources, output port metadata,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
