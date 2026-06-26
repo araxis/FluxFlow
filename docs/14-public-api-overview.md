@@ -790,7 +790,9 @@ These packages are intentionally not standalone node composition adapters:
   option validation, and named in-memory store factory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   with self-validating request/reply and tracker option contracts, and is
-  intentionally not covered by composition adapters in this pass.
+  intentionally not covered by composition adapters in this pass. Its
+  coordinator reports invalid null request contexts and response messages as
+  diagnostics without stopping later valid messages.
 - `FluxFlow.Components.Storage` provides storage nodes and host-owned store
   contracts, including normalized `StorageStoreContext` values for backend
   factories plus normalized request, record, and result text for config-bound

@@ -80,6 +80,8 @@ public static class RequestReplyErrorCodes
     public const int ReplyFailed = 8002;
     public const int TimedOut = 8003;
     public const int DuplicateCorrelationId = 8004;
+    public const int InvalidRequestContext = 8005;
+    public const int InvalidResponseMessage = 8006;
 }
 
 public static class RequestReplyEvents
@@ -89,4 +91,5 @@ public static class RequestReplyEvents
     public const string Replied = "requestreply.replied";
     public const string TimedOut = "requestreply.timedout";
     public const string Unmatched = "requestreply.unmatched";
+    public const string Invalid = "requestreply.invalid";
 }

@@ -141,6 +141,13 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     private async Task OnIncomingAsync(IRequestContext<TRequest, TResponse> context)
     {
+        if (context is null)
+        {
+            EmitError(RequestReplyErrorCodes.InvalidRequestContext, "Request context is required.", null);
+            EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
+            return;
+        }
+
         var id = context.CorrelationId ?? CorrelationId.New();
 
         if (_options.Mode == RequestReplyMode.FireAndForget)
@@ -212,6 +219,13 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     private async Task OnResponseAsync(FlowMessage<TResponse> message)
     {
+        if (message is null)
+        {
+            EmitError(RequestReplyErrorCodes.InvalidResponseMessage, "Response message is required.", null);
+            EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
+            return;
+        }
+
         if (_tracker is null
             || !await _tracker.TryCompleteAsync(message, _stopping.Token).ConfigureAwait(false))
         {
@@ -286,7 +300,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         }
     }
 
-    private void EmitEvent(string name, CorrelationId id, FlowEventLevel level = FlowEventLevel.Information)
+    private void EmitEvent(string name, CorrelationId? id, FlowEventLevel level = FlowEventLevel.Information)
         => _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -295,7 +309,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             Level = level
         });
 
-    private void EmitError(int code, string message, CorrelationId id, Exception? exception = null)
+    private void EmitError(int code, string message, CorrelationId? id, Exception? exception = null)
         => _errors.Post(new FlowError
         {
             Timestamp = _clock.GetUtcNow(),
