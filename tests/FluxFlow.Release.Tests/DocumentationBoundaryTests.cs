@@ -56,6 +56,26 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Package_authoring_docs_keep_engine_modules_out_of_default_package_shape()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "04-package-authoring.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 2_200)];
+
+        defaultSection.Contains("standalone-node-first", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should lead with standalone packages.");
+        defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should keep node packages on FluxFlow.Nodes.");
+        defaultSection.Contains("CompositionNodeRegistry", StringComparison.Ordinal)
+            .ShouldBeTrue("package authoring docs should show optional composition registration.");
+        text.Contains("IFlowNodeModule", StringComparison.Ordinal)
+            .ShouldBeFalse("package authoring docs should not require engine modules for normal component packages.");
+        text.Contains("optional engine module", StringComparison.Ordinal)
+            .ShouldBeFalse("package authoring docs should not list engine modules as a normal package layer.");
+    }
+
+    [Fact]
     public void Hosting_docs_keep_composition_hosting_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
