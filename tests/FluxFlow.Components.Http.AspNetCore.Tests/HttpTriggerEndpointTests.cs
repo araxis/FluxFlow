@@ -105,6 +105,59 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public void AddFluxFlowHttpTrigger_RejectsInvalidRegistrationArguments()
+    {
+        var services = new ServiceCollection();
+
+        var servicesException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowHttpTriggerServiceCollectionExtensions.AddFluxFlowHttpTrigger(
+                null!,
+                "echo",
+                _ => { }));
+        var nameException = Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowHttpTrigger(" ", _ => { }));
+        var configureException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowHttpTrigger("echo", null!));
+
+        servicesException.ParamName.ShouldBe("services");
+        nameException.ParamName.ShouldBe("name");
+        configureException.ParamName.ShouldBe("configure");
+    }
+
+    [Fact]
+    public async Task AddFluxFlowHttpTrigger_RegistersKeyedSourceNodeAndHostedLifetime()
+    {
+        var services = new ServiceCollection();
+        var configured = false;
+        services.AddFluxFlowHttpTrigger("echo", _ => configured = true);
+
+        await using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<HttpTriggerSource>("echo").ShouldNotBeNull();
+        configured.ShouldBeFalse();
+
+        var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await lifetime.StartAsync(CancellationToken.None);
+
+        configured.ShouldBeTrue();
+        provider.GetRequiredKeyedService<HttpTriggerNode>("echo").ShouldNotBeNull();
+
+        await lifetime.StopAsync(CancellationToken.None);
+        if (lifetime is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public void HttpTriggerSource_RejectsNonPositiveCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(() => new HttpTriggerSource(0));
+
+        exception.ParamName.ShouldBe("capacity");
+    }
+
+    [Fact]
     public async Task FireAndForget_Returns202Accepted_AndPublishesToGraphWithoutWaiting()
     {
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
