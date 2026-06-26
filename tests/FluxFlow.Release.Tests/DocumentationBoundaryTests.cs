@@ -36,6 +36,26 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Node_authoring_docs_keep_standalone_nodes_as_the_default_model()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "03-node-authoring.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_800)];
+
+        defaultSection.Contains("FluxFlow.Nodes", StringComparison.Ordinal)
+            .ShouldBeTrue("node authoring docs should lead with standalone node contracts.");
+        defaultSection.Contains("FlowNode<TInput,TOutput>", StringComparison.Ordinal)
+            .ShouldBeTrue("node authoring docs should show the standalone transform base type.");
+        defaultSection.Contains("FlowSource<TOutput>", StringComparison.Ordinal)
+            .ShouldBeTrue("node authoring docs should show the standalone source base type.");
+        defaultSection.Contains("RuntimeNodeBuilder", StringComparison.Ordinal)
+            .ShouldBeFalse("node authoring docs must not lead with engine runtime factories.");
+        text.Contains("RuntimeNodeFactoryContext", StringComparison.Ordinal)
+            .ShouldBeFalse("node authoring docs should not require engine factory context for normal nodes.");
+    }
+
+    [Fact]
     public void Hosting_docs_keep_composition_hosting_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();

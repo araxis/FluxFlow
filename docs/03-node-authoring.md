@@ -1,123 +1,210 @@
 # Node Authoring
 
-A node is a small runtime object that exposes typed input and output ports.
-Nodes can be written directly with `IFlowNode`, but most component authors should
-start with the helper base classes.
+A node is a small standalone runtime object over TPL Dataflow. The default
+authoring path uses `FluxFlow.Nodes`: construct the node directly, link typed
+ports with `LinkTo`, and pass `FlowMessage<T>` envelopes between nodes. No
+engine, registry, or runtime is required.
 
-## Helper Types
+## Core Types
 
 | Type | Use |
 |------|-----|
-| `FlowNodeBase` | Shared id, completion, errors, and diagnostics |
-| `SourceFlowNode<TOutput>` | Source node with one output |
-| `SinkFlowNode<TInput>` | Sink node with one input |
-| `TransformFlowNode<TInput,TOutput>` | Transform with zero or more outputs per input |
-| `MapFlowNode<TInput,TOutput>` | Transform with exactly one output per input |
-| `EventFlowNodeBase` | Node that emits `FlowEvent` records |
-| `RuntimeNodeBuilder` | Factory helper for declaring ports |
+| `FlowMessage<T>` | Immutable message envelope with payload, correlation id, message id, timestamp, and headers. |
+| `FlowNode<TInput,TOutput>` | Single-input, single-output processor with `Input`, `Output`, `Events`, `Errors`, and `Completion`. |
+| `FlowSource<TOutput>` | Source node with `Output`, `Events`, `Errors`, `Completion`, and `StartAsync()`. |
+| `IFlowNode` | Lifecycle contract for complete, fault, completion, and async disposal. |
+| `IFlowSource` | Marker/lifecycle contract for nodes that must be started to produce data. |
+| `FlowNodeOptions` | Bounded input capacity and processing degree options. |
+| `FlowSourceOptions` | Source output capacity options. |
+
+`FlowMessage<T>.With(...)` creates the next message while preserving correlation
+id and headers:
+
+```csharp
+var input = FlowMessage.Create("hello");
+var output = input.With(input.Payload.ToUpperInvariant());
+```
+
+## Transform Node
+
+Use `FlowNode<TInput,TOutput>` for processors with one input and one primary
+output:
+
+```csharp
+public sealed class UppercaseNode : FlowNode<string, string>
+{
+    public UppercaseNode()
+        : base(new FlowNodeOptions { InputCapacity = 128 })
+    {
+    }
+
+    protected override Task ProcessAsync(FlowMessage<string> message)
+    {
+        Emit(message.With(message.Payload.ToUpperInvariant()));
+        return Task.CompletedTask;
+    }
+}
+```
+
+Direct usage stays simple:
+
+```csharp
+await using var upper = new UppercaseNode();
+var output = new BufferBlock<FlowMessage<string>>();
+
+upper.Output.LinkTo(
+    output,
+    new DataflowLinkOptions { PropagateCompletion = true });
+
+await upper.Input.SendAsync(FlowMessage.Create("alpha"));
+upper.Complete();
+await upper.Completion;
+
+var received = await output.ReceiveAsync();
+```
+
+Throwing from `ProcessAsync` is caught by the base class and surfaced on
+`Errors` with the in-flight correlation id. The node keeps processing later
+messages.
 
 ## Source Node
 
-```csharp
-public sealed class NumberSource : SourceFlowNode<int>
-{
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-    {
-        var node = new NumberSource();
-        return context.CreateNode(node)
-            .Output("Output", node.Output)
-            .Build();
-    }
+Use `FlowSource<TOutput>` when the node starts a stream:
 
-    public override async Task StartAsync(CancellationToken cancellationToken = default)
+```csharp
+public sealed class NumberSource : FlowSource<int>
+{
+    protected override async Task RunAsync(CancellationToken cancellationToken)
     {
         for (var value = 1; value <= 3; value++)
-            await SendOutputAsync(value, cancellationToken);
-
-        CompleteOutput();
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await EmitAsync(FlowMessage.Create(value), cancellationToken);
+        }
     }
 }
 ```
 
-## Map Node
-
-Prefer bounded Dataflow options for nodes that buffer or process data:
+Sources start through `StartAsync()`:
 
 ```csharp
-public sealed class DoubleNode : MapFlowNode<int, int>
+await using var source = new NumberSource();
+var output = new BufferBlock<FlowMessage<int>>();
+
+source.Output.LinkTo(
+    output,
+    new DataflowLinkOptions { PropagateCompletion = true });
+
+await source.StartAsync(cancellationToken);
+await source.Completion;
+```
+
+Composition runtime also starts `IFlowSource` nodes through
+`CompositionRuntime.StartAsync()`.
+
+## Extra Outputs
+
+Nodes that fan out to additional typed ports can call `AddOutput<T>()`:
+
+```csharp
+public sealed class SplitNode : FlowNode<int, int>
 {
-    public DoubleNode()
-        : base(
-            new ExecutionDataflowBlockOptions { BoundedCapacity = 16 },
-            new DataflowBlockOptions { BoundedCapacity = 16 })
+    private readonly BroadcastBlock<FlowMessage<int>> _rejected;
+
+    public SplitNode()
     {
+        _rejected = AddOutput<FlowMessage<int>>();
     }
 
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context)
-    {
-        var node = new DoubleNode();
-        return context.CreateNode(node)
-            .Input("Input", node.Input)
-            .Output("Output", node.Output)
-            .Build();
-    }
+    public ISourceBlock<FlowMessage<int>> Rejected => _rejected;
 
-    protected override ValueTask<int> MapAsync(
-        int input,
-        CancellationToken cancellationToken)
-        => ValueTask.FromResult(input * 2);
+    protected override Task ProcessAsync(FlowMessage<int> message)
+    {
+        if (message.Payload >= 0)
+            Emit(message);
+        else
+            _rejected.Post(message);
+
+        return Task.CompletedTask;
+    }
 }
 ```
 
-## Sink Node
+Extra outputs are completed, faulted, and disposed with the node.
+
+## Events And Errors
+
+Use `FlowEvent` for workflow activity that a host may store, filter, or show as
+history:
 
 ```csharp
-public sealed class CollectNode(List<int> values) : SinkFlowNode<int>
+EmitEvent(new FlowEvent
 {
-    public static RuntimeNode Create(RuntimeNodeFactoryContext context, List<int> values)
-    {
-        var node = new CollectNode(values);
-        return context.CreateNode(node)
-            .Input("Input", node.Input)
-            .Build();
-    }
-
-    protected override ValueTask HandleAsync(
-        int input,
-        CancellationToken cancellationToken)
-    {
-        values.Add(input);
-        return ValueTask.CompletedTask;
-    }
-}
-```
-
-## Errors, Events, And Diagnostics
-
-Use `FlowError` for node failures that should be reported through the error
-stream.
-
-Use `FlowEvent` for workflow activity that the application may store, filter, or
-show as history.
-
-Use `FlowDiagnostic` for health, status, counters, and live monitoring data.
-
-```csharp
-TryEmitDiagnostic(
-    "sample.order.reviewed",
-    message: "Reviewed order.",
-    attributes: new Dictionary<string, object?>
+    Timestamp = DateTimeOffset.UtcNow,
+    CorrelationId = message.CorrelationId,
+    Name = "sample.order.reviewed",
+    Level = FlowEventLevel.Information,
+    Message = "Reviewed order.",
+    Attributes = new Dictionary<string, object?>
     {
         ["priority"] = true
-    });
+    }
+});
 ```
+
+Use `FlowError` for node failures that should be reported through the error
+stream while the node can continue:
+
+```csharp
+EmitError(new FlowError
+{
+    Timestamp = DateTimeOffset.UtcNow,
+    CorrelationId = message.CorrelationId,
+    Code = 1001,
+    Message = "Order review failed.",
+    Exception = exception
+});
+```
+
+Fatal startup or teardown failures should fault the node or source so
+`Completion` exposes the failure.
+
+## Optional Composition Factory
+
+Composition support belongs in an optional adapter package or host registration
+extension. Register node type strings with explicit factories:
+
+```csharp
+public static CompositionNodeRegistry RegisterSampleNodes(
+    this CompositionNodeRegistry registry)
+    => registry.Register(
+        "sample.uppercase",
+        _ =>
+        {
+            var node = new UppercaseNode();
+            return ValueTask.FromResult(ComposedNode.Create(
+                node,
+                inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                events: node.Events,
+                errors: node.Errors));
+        },
+        inputs: [CompositionPorts.Metadata<string>("Input")],
+        outputs: [CompositionPorts.Metadata<string>("Output")]);
+```
+
+Keep reflection scanning, assembly discovery, and host service orchestration out
+of node packages. Hosts and adapter packages own concrete resources and keyed DI.
 
 ## Lifecycle Rules
 
-- Complete output blocks when source work is done.
-- Link node `Completion` to underlying Dataflow block completion.
-- Propagate cancellation tokens through send and process operations.
-- Keep input and output port names stable.
-- Keep configuration parsing inside the node factory or package-owned helpers.
+- Keep input buffers bounded with `FlowNodeOptions`.
+- Propagate cancellation tokens through source loops and external calls.
+- Preserve correlation ids with `message.With(...)`.
+- Complete entry nodes when the host wants the graph to drain.
+- Await `Completion` in tests.
+- Keep port names stable once exposed through composition or persisted config.
+- Release node-owned resources from `OnDisposeAsync()`.
+- Keep app workspace parsing outside reusable node packages.
 
 Next: [Package Authoring](04-package-authoring.md).
