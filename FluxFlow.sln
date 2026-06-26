@@ -247,6 +247,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Mapping.Tests", "t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Mqtt.Adapters.Tests", "tests\FluxFlow.Components.Mqtt.Adapters.Tests\FluxFlow.Components.Mqtt.Adapters.Tests.csproj", "{B43D2E6E-E197-49A9-9577-F8AF9EB903C0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.Components.Storage.Adapters.Tests", "tests\FluxFlow.Components.Storage.Adapters.Tests\FluxFlow.Components.Storage.Adapters.Tests.csproj", "{2F119C97-4FDC-43F3-8C25-906294C1FF0C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1673,6 +1675,18 @@ Global
 		{B43D2E6E-E197-49A9-9577-F8AF9EB903C0}.Release|x64.Build.0 = Release|Any CPU
 		{B43D2E6E-E197-49A9-9577-F8AF9EB903C0}.Release|x86.ActiveCfg = Release|Any CPU
 		{B43D2E6E-E197-49A9-9577-F8AF9EB903C0}.Release|x86.Build.0 = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|x64.Build.0 = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Debug|x86.Build.0 = Debug|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|x64.ActiveCfg = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|x64.Build.0 = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|x86.ActiveCfg = Release|Any CPU
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1794,5 +1808,6 @@ Global
 		{6C92A8D0-0F6F-4BEB-B242-19D04F173694} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{DFDAE3C3-FE5B-43FC-B71D-23E656B5190B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{B43D2E6E-E197-49A9-9577-F8AF9EB903C0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{2F119C97-4FDC-43F3-8C25-906294C1FF0C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
