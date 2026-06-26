@@ -105,6 +105,10 @@ observe a composition runtime. Resource helpers resolve named node resource
 references from keyed DI services; adapter packages still own the resources.
 Resource helper slot names and configured keyed service references are trimmed
 before lookup so configuration whitespace does not change resource identity.
+`CompositionHostingBuilder` supports direct delegate registration through
+`RegisterNodes(...)` and explicit reusable contributor registration through
+`RegisterNodeContributor<TContributor>()` or `RegisterNodeContributor(...)`;
+it does not scan assemblies or discover node factories implicitly.
 Hosted and manual lifecycle calls are idempotent at this boundary, so repeated
 start or stop requests do not start or complete the same runtime more than
 once. A stopped runtime is not restarted by the host.
