@@ -1,4 +1,5 @@
 using FluxFlow.Components.Journal.Contracts;
+using FluxFlow.Components.Journal.Options;
 using FluxFlow.Components.Journal.Stores;
 using Shouldly;
 using Xunit;
@@ -7,6 +8,182 @@ namespace FluxFlow.Components.Journal.Tests;
 
 public sealed class InMemoryJournalStoreTests
 {
+    [Fact]
+    public async Task JournalComponentOptions_requires_explicit_store_registration()
+    {
+        var options = new JournalComponentOptions();
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            options.StoreFactory.OpenAsync(new JournalStoreContext()).AsTask());
+
+        exception.Message.ShouldContain("Register one through JournalComponentOptions");
+    }
+
+    [Fact]
+    public async Task UseStore_rejects_null_context_before_invoking_delegate()
+    {
+        var invoked = false;
+        var options = new JournalComponentOptions()
+            .UseStore(
+                (_, _) =>
+                {
+                    invoked = true;
+                    return ValueTask.FromResult(JournalStoreLease.Shared(new InMemoryJournalStore()));
+                });
+
+        await Should.ThrowAsync<ArgumentNullException>(() =>
+            options.StoreFactory.OpenAsync(null!).AsTask());
+
+        invoked.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task UseStore_rejects_null_lease_from_delegate()
+    {
+        var options = new JournalComponentOptions()
+            .UseStore((_, _) => ValueTask.FromResult<JournalStoreLease>(null!));
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            options.StoreFactory.OpenAsync(new JournalStoreContext()).AsTask());
+
+        exception.Message.ShouldContain("null lease");
+    }
+
+    [Fact]
+    public async Task UseSharedStore_rejects_null_store_from_delegate()
+    {
+        var options = new JournalComponentOptions()
+            .UseSharedStore(_ => null!);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            options.StoreFactory.OpenAsync(new JournalStoreContext()).AsTask());
+
+        exception.Message.ShouldContain("returned null");
+    }
+
+    [Fact]
+    public async Task UseStore_receives_normalized_context_values()
+    {
+        var clock = new FixedTimeProvider(Timestamp(12));
+        JournalStoreContext? observed = null;
+        CancellationToken observedToken = default;
+        var store = new InMemoryJournalStore();
+        var options = new JournalComponentOptions()
+            .UseStore(
+                (context, cancellationToken) =>
+                {
+                    observed = context;
+                    observedToken = cancellationToken;
+                    return ValueTask.FromResult(JournalStoreLease.Shared(store));
+                });
+
+        using var cts = new CancellationTokenSource();
+        await using var lease = await options.StoreFactory.OpenAsync(
+            new JournalStoreContext
+            {
+                StoreName = " named ",
+                Clock = clock
+            },
+            cts.Token);
+
+        lease.Store.ShouldBeSameAs(store);
+        lease.OwnsStore.ShouldBeFalse();
+        observed.ShouldNotBeNull();
+        observed.StoreName.ShouldBe("named");
+        observed.Clock.ShouldBeSameAs(clock);
+        observedToken.ShouldBe(cts.Token);
+    }
+
+    [Fact]
+    public void JournalStoreContext_normalizes_blank_store_name_and_null_clock()
+    {
+        var context = new JournalStoreContext
+        {
+            StoreName = " ",
+            Clock = null!
+        };
+
+        context.StoreName.ShouldBeNull();
+        context.Clock.ShouldBeSameAs(TimeProvider.System);
+    }
+
+    [Fact]
+    public async Task JournalStoreLease_disposes_only_owned_stores_once()
+    {
+        var ownedStore = new DisposableJournalStore();
+        var owned = JournalStoreLease.Owned(ownedStore);
+        var sharedStore = new DisposableJournalStore();
+        var shared = JournalStoreLease.Shared(sharedStore);
+
+        await owned.DisposeAsync();
+        await owned.DisposeAsync();
+        await shared.DisposeAsync();
+
+        ownedStore.DisposeCount.ShouldBe(1);
+        sharedStore.DisposeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task InMemoryJournalStoreFactory_rejects_null_context_before_opening()
+    {
+        var factory = new InMemoryJournalStoreFactory();
+
+        await Should.ThrowAsync<ArgumentNullException>(() =>
+            factory.OpenAsync(null!).AsTask());
+    }
+
+    [Fact]
+    public async Task InMemoryJournalStoreFactory_shares_named_stores_and_separates_other_names()
+    {
+        var factory = new InMemoryJournalStoreFactory();
+
+        await using var alpha1 = await factory.OpenAsync(new JournalStoreContext
+        {
+            StoreName = " alpha "
+        });
+        await using var alpha2 = await factory.OpenAsync(new JournalStoreContext
+        {
+            StoreName = "alpha"
+        });
+        await using var beta = await factory.OpenAsync(new JournalStoreContext
+        {
+            StoreName = "beta"
+        });
+
+        alpha1.OwnsStore.ShouldBeFalse();
+        alpha2.OwnsStore.ShouldBeFalse();
+        beta.OwnsStore.ShouldBeFalse();
+        alpha1.Store.ShouldBeSameAs(alpha2.Store);
+        alpha1.Store.ShouldNotBeSameAs(beta.Store);
+
+        await alpha1.Store.AppendAsync(CreateRecord("alpha-1"));
+
+        var alphaResult = await alpha2.Store.QueryAsync(new JournalQuery());
+        var betaResult = await beta.Store.QueryAsync(new JournalQuery());
+
+        alphaResult.Records.Select(record => record.Id).ShouldBe(["alpha-1"]);
+        betaResult.Records.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task InMemoryJournalStoreFactory_applies_retention_to_created_stores()
+    {
+        var factory = new InMemoryJournalStoreFactory(new JournalRetentionOptions
+        {
+            MaxRecords = 1
+        });
+        await using var lease = await factory.OpenAsync(new JournalStoreContext
+        {
+            StoreName = "retained"
+        });
+
+        await lease.Store.AppendAsync(CreateRecord("1", timestamp: Timestamp(0)));
+        await lease.Store.AppendAsync(CreateRecord("2", timestamp: Timestamp(1)));
+
+        var result = await lease.Store.QueryAsync(new JournalQuery());
+        result.Records.Select(record => record.Id).ShouldBe(["2"]);
+    }
+
     [Fact]
     public async Task QueryAsync_filters_records_by_event_fields_and_attributes()
     {
@@ -586,4 +763,36 @@ public sealed class InMemoryJournalStoreTests
 
     private static DateTimeOffset Timestamp(int minute)
         => new(2026, 1, 1, 0, minute, 0, TimeSpan.Zero);
+
+    private sealed class DisposableJournalStore : IJournalStore, IAsyncDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public ValueTask<JournalAppendResult> AppendAsync(
+            JournalRecord record,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask<JournalQueryResult> QueryAsync(
+            JournalQuery query,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask<JournalPruneResult> PruneAsync(
+            JournalRetentionOptions options,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow()
+            => now;
+    }
 }

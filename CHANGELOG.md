@@ -15,6 +15,15 @@ Adds session store factory support.
   `SessionComponentOptions` for explicit host-owned session store opening and
   lease ownership.
 
+## FluxFlow.Components.Journal 2.1.0
+
+Adds journal store factory support.
+
+- Adds `IJournalStoreFactory`, `JournalStoreContext`, `JournalStoreLease`, and
+  `JournalComponentOptions` for explicit host-owned journal store opening and
+  lease ownership.
+- Adds `InMemoryJournalStoreFactory` for named shared in-memory journal stores.
+
 ## FluxFlow.Components.Sessions.Composition 1.4.0
 
 Adds session resource factory support.
