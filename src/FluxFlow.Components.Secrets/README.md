@@ -30,6 +30,10 @@ is controlled, how values are refreshed, and how ownership is handled.
   kind mismatch, denied, failed, and invalid secret references.
 - `SecretRedactor`: helper for redacting text and sensitive attribute values.
 
+`SecretResolveResult` factory helpers reject null references, descriptors, values,
+match collections, and blank diagnostic messages at the public boundary so
+invalid resolution outcomes fail with clear argument names.
+
 ## Example
 
 ```csharp

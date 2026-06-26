@@ -25,6 +25,9 @@ component packages to a concrete owner or lifecycle model.
 - `ResourceDiagnostic`: stable diagnostics for missing, duplicate, unused, kind
   mismatch, and invalid resources.
 
+`ResourceLookupResult` factory helpers reject null references or descriptors at
+the public boundary so invalid lookup outcomes fail with clear argument names.
+
 ## Example
 
 ```csharp
