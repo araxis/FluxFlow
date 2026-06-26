@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.7
+
+Hardens component design metadata provider catalog loading.
+
+- `ComponentDesignMetadataCatalog.FromProviders(...)` now reports a clear
+  provider contract error when a provider returns a null metadata collection.
+- Adds catalog coverage for invalid provider metadata collection results.
+
 ## FluxFlow.Components.Designer 2.2.6
 
 Hardens component design metadata ordering validation.

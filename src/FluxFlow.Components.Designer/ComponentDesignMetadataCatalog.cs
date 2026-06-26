@@ -17,7 +17,11 @@ public sealed class ComponentDesignMetadataCatalog
         foreach (var provider in providers)
         {
             ArgumentNullException.ThrowIfNull(provider);
-            foreach (var metadata in provider.GetMetadata())
+            var metadataItems = provider.GetMetadata()
+                ?? throw new InvalidOperationException(
+                    $"Design metadata provider '{provider.GetType().FullName}' returned a null metadata collection.");
+
+            foreach (var metadata in metadataItems)
                 catalog.Add(metadata);
         }
 

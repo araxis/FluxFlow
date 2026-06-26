@@ -128,6 +128,8 @@ returns metadata for their public node type constants. Hosts compose those
 providers into a `ComponentDesignMetadataCatalog` to build palettes, editors,
 validation views, and generated documentation without duplicating package
 descriptors.
+Providers must return a non-null metadata collection; catalog loading reports a
+clear provider error when that contract is violated.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

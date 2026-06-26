@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.2.6</Version>
+    <Version>2.2.7</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens component design metadata validation for resource and port ordering.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens component design metadata provider catalog loading.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
