@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sources 3.1.1
+
+Aligns source constructor validation with the standalone node conventions.
+
+- `GeneratedSourceNode<TOutput>` and `SequenceSourceNode` now validate all
+  construction options before their source pipelines are created.
+- Invalid capacities, negative timing settings, generated loop/max item
+  settings, sequence counts, and zero steps remain fail-fast construction
+  errors.
+- Runtime source lifecycle, timing, diagnostics, and correlation propagation
+  are unchanged.
+
+## FluxFlow.Components.Sources.Composition 1.3.1
+
+Hardens config-bound source option diagnostics.
+
+- Invalid generated and sequence source options now fail during composition
+  build through the matching factories.
+- Adds hosted composition coverage proving invalid timing, capacity,
+  loop/max-item, count, and step values surface as factory diagnostics when
+  build failures are configured as diagnostics.
+
 ## FluxFlow.Components.Sessions 3.1.5
 
 Aligns Sessions constructor validation with the standalone node conventions.

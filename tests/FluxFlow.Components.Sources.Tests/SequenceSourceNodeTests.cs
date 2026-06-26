@@ -171,6 +171,20 @@ public sealed class SequenceSourceNodeTests
                 () => new SequenceSourceNode(new SequenceSourceOptions { BoundedCapacity = 0 }))
             .Message.ShouldContain("boundedCapacity");
 
+    [Theory]
+    [InlineData("initialDelayMilliseconds")]
+    [InlineData("intervalMilliseconds")]
+    public void Sequence_RejectsNegativeTiming(string optionName)
+    {
+        var options = optionName == "initialDelayMilliseconds"
+            ? new SequenceSourceOptions { InitialDelayMilliseconds = -1 }
+            : new SequenceSourceOptions { IntervalMilliseconds = -1 };
+
+        Should.Throw<ArgumentOutOfRangeException>(
+                () => new SequenceSourceNode(options))
+            .Message.ShouldContain(optionName);
+    }
+
     [Fact]
     public void Sequence_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(() => new SequenceSourceNode(null!));

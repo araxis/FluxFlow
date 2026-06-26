@@ -26,38 +26,59 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
     private readonly TimeProvider _clock;
 
     public SequenceSourceNode(SequenceSourceOptions options, TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : this(ResolveOptions(options), clock)
     {
-        _options = options;
-        _clock = clock ?? TimeProvider.System;
+    }
 
-        if (_options.InitialDelayMilliseconds < 0)
+    private SequenceSourceNode(
+        ResolvedSequenceSourceOptions resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
+        _clock = clock ?? TimeProvider.System;
+    }
+
+    private static ResolvedSequenceSourceOptions ResolveOptions(SequenceSourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.sequence option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (options.InitialDelayMilliseconds < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.sequence option 'initialDelayMilliseconds' cannot be negative.");
         }
 
-        if (_options.IntervalMilliseconds < 0)
+        if (options.IntervalMilliseconds < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.sequence option 'intervalMilliseconds' cannot be negative.");
         }
 
-        if (_options.Count <= 0)
+        if (options.Count <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.sequence option 'count' must be greater than zero.");
         }
 
-        if (_options.Step == 0)
+        if (options.Step == 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.sequence option 'step' cannot be zero.");
         }
+
+        return new ResolvedSequenceSourceOptions(options);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -117,19 +138,6 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
 
     private void CompleteSequence(int emitted, string message)
         => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
-
-    private static FlowSourceOptions BuildSourceOptions(SequenceSourceOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "source.sequence option 'boundedCapacity' must be greater than zero.");
-        }
-
-        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
-    }
 
     private void ReportFailure(Exception exception, int emitted)
     {
@@ -197,4 +205,6 @@ public sealed class SequenceSourceNode : FlowSource<SourceSequenceItem>
                 $"count={_options.Count}",
                 $"emitted={emitted}"
             ]);
+
+    private sealed record ResolvedSequenceSourceOptions(SequenceSourceOptions Options);
 }

@@ -23,6 +23,9 @@ surface a `FlowError` on the `Errors` port.
 `BoundedCapacity` configures the source output capacity. Generated and sequence
 loops await source output acceptance. Output remains broadcast/latest-wins; use
 a dedicated durable buffer if a workflow edge must guarantee no loss.
+Source options validate at construction. Invalid capacities, negative delays,
+invalid generated loop/max item settings, invalid sequence counts, and zero
+steps fail before source pipelines are created.
 
 ## Generated
 

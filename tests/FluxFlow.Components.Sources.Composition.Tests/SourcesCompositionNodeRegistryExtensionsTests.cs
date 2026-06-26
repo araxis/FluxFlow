@@ -298,10 +298,20 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     }
 
     [Theory]
-    [InlineData(SourcesCompositionNodeTypes.Generated, "maxItems")]
-    [InlineData(SourcesCompositionNodeTypes.Sequence, "count")]
+    [InlineData(SourcesCompositionNodeTypes.Generated, "boundedCapacity", 0, "capacity")]
+    [InlineData(SourcesCompositionNodeTypes.Generated, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
+    [InlineData(SourcesCompositionNodeTypes.Generated, "intervalMilliseconds", -1, "intervalMilliseconds")]
+    [InlineData(SourcesCompositionNodeTypes.Generated, "maxItems", 0, "maxItems")]
+    [InlineData(SourcesCompositionNodeTypes.Generated, "loop", true, "maxItems")]
+    [InlineData(SourcesCompositionNodeTypes.Sequence, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SourcesCompositionNodeTypes.Sequence, "initialDelayMilliseconds", -1, "initialDelayMilliseconds")]
+    [InlineData(SourcesCompositionNodeTypes.Sequence, "intervalMilliseconds", -1, "intervalMilliseconds")]
+    [InlineData(SourcesCompositionNodeTypes.Sequence, "count", 0, "count")]
+    [InlineData(SourcesCompositionNodeTypes.Sequence, "step", 0L, "step")]
     public async Task Invalid_source_configuration_surfaces_factory_diagnostic(
         string nodeType,
+        string optionName,
+        object value,
         string expectedMessage)
     {
         var services = new ServiceCollection();
@@ -315,14 +325,10 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                     {
                         if (nodeType == SourcesCompositionNodeTypes.Generated)
                         {
-                            node
-                                .Configure("loop", true)
-                                .Configure("items", new[] { "one" });
+                            node.Configure("items", new[] { "one" });
                         }
-                        else
-                        {
-                            node.Configure("count", 0);
-                        }
+
+                        node.Configure(optionName, value);
                     }))
                 .Build())
             .RegisterNodes(registry => registry

@@ -303,6 +303,9 @@ optional `FluxFlow.Components.Sources.Composition` package when a composition
 host wants generated or sequence source factories. The generated factory
 deserializes inline `items` into the closed output type; both factories resolve
 optional keyed `TimeProvider` resources through the host.
+Invalid source option values fail during composition build through the factory
+path, so hosts that collect build diagnostics receive `FactoryFailed` entries
+instead of a partially created runtime.
 
 `SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
 generated and sequence source composition nodes so hosts can compose palette,
