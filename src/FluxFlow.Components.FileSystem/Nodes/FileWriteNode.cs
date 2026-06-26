@@ -27,21 +27,20 @@ public sealed class FileWriteNode : FlowNode<FileWriteRequest, FileWriteResult>
     public FileWriteNode(
         FileWriteOptions? options = null,
         TimeProvider? clock = null)
-        : this(ResolveOptions(options), clock, validated: true)
+        : this(new ResolvedFileWriteOptions(ResolveOptions(options)), clock)
     {
     }
 
     private FileWriteNode(
-        FileWriteOptions options,
-        TimeProvider? clock,
-        bool validated)
+        ResolvedFileWriteOptions resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = options.BoundedCapacity,
+            InputCapacity = resolved.Options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options;
+        _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -346,6 +345,8 @@ public sealed class FileWriteNode : FlowNode<FileWriteRequest, FileWriteResult>
     }
 
     private sealed record ResolvedWrite(string Path, byte[] Bytes);
+
+    private sealed record ResolvedFileWriteOptions(FileWriteOptions Options);
 
     private sealed class FileWriteNodeException : Exception
     {

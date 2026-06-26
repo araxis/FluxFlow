@@ -481,6 +481,9 @@ Use `RegisterFileRead()`, `RegisterFileWrite()`,
 wants file-system node factories. The factories bind existing file-system
 options and can resolve an optional keyed `TimeProvider` resource through the
 host.
+Invalid file-system option values fail during composition build through the
+factory path, so hosts that collect build diagnostics receive `FactoryFailed`
+entries instead of a partially created runtime.
 
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes so hosts can compose palette,

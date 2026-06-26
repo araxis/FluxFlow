@@ -26,21 +26,20 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
     public FileReadNode(
         FileReadOptions? options = null,
         TimeProvider? clock = null)
-        : this(ResolveOptions(options), clock, validated: true)
+        : this(new ResolvedFileReadOptions(ResolveOptions(options)), clock)
     {
     }
 
     private FileReadNode(
-        FileReadOptions options,
-        TimeProvider? clock,
-        bool validated)
+        ResolvedFileReadOptions resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = options.BoundedCapacity,
+            InputCapacity = resolved.Options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options;
+        _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -406,6 +405,8 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
     }
 
     private sealed record ResolvedRead(string Path, Encoding? Encoding, string? EncodingName);
+
+    private sealed record ResolvedFileReadOptions(FileReadOptions Options);
 
     private sealed class FileReadNodeException : Exception
     {

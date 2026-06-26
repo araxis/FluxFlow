@@ -470,10 +470,17 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     [Theory]
     [InlineData(FileSystemCompositionNodeTypes.Read, "boundedCapacity", 0, "capacity")]
     [InlineData(FileSystemCompositionNodeTypes.Read, "maxBytes", 0L, "maxBytes")]
+    [InlineData(FileSystemCompositionNodeTypes.Read, "defaultEncoding", "not-a-real-encoding", "defaultEncoding")]
     [InlineData(FileSystemCompositionNodeTypes.Write, "boundedCapacity", 0, "capacity")]
+    [InlineData(FileSystemCompositionNodeTypes.Write, "defaultEncoding", "not-a-real-encoding", "defaultEncoding")]
+    [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "directory", "", "directory")]
+    [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "filter", "", "filter")]
+    [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "includeFiles", false, "includeFiles")]
     [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "maxEntries", 0L, "maxEntries")]
+    [InlineData(FileSystemCompositionNodeTypes.Watch, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(FileSystemCompositionNodeTypes.Watch, "directory", "", "directory")]
+    [InlineData(FileSystemCompositionNodeTypes.Watch, "filter", "", "filter")]
     [InlineData(FileSystemCompositionNodeTypes.Watch, "internalBufferSize", 1024, "internalBufferSize")]
     public async Task Invalid_configuration_surfaces_factory_diagnostic(
         string nodeType,

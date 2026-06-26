@@ -26,11 +26,17 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
     public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
         TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : this(new ResolvedDirectoryEnumerateOptions(ResolveOptions(options)), clock)
     {
-        _options = options;
+    }
+
+    private DirectoryEnumerateNode(
+        ResolvedDirectoryEnumerateOptions resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
-        ValidateOptions(_options);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -250,8 +256,17 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
             Exception = exception
         });
 
-    private static void ValidateOptions(DirectoryEnumerateOptions options)
+    private static DirectoryEnumerateOptions ResolveOptions(DirectoryEnumerateOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.Directory))
         {
             throw new ArgumentException(
@@ -279,19 +294,8 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
                 nameof(options),
                 "directory.enumerate option 'maxEntries' must be greater than zero when set.");
         }
-    }
 
-    private static FlowSourceOptions BuildSourceOptions(DirectoryEnumerateOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
-        }
-
-        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
+        return options;
     }
 
     private Dictionary<string, object?> CreateAttributes(
@@ -374,4 +378,7 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
 
         return string.Join("; ", values);
     }
+
+    private sealed record ResolvedDirectoryEnumerateOptions(
+        DirectoryEnumerateOptions Options);
 }

@@ -77,6 +77,9 @@ Path safety is still configured through the existing node options such as
 The adapter binds the existing FileSystem option records from composition
 configuration. `CompositionRuntime.StartAsync()` starts `directory.enumerate`
 and `file.watch`; normal runtime stop/dispose stops `file.watch`.
+Invalid option values fail during composition build through the node factory. If
+build failures are configured as diagnostics, the runtime is not created and the
+host receives a `FactoryFailed` diagnostic with the relevant option name.
 
 ## Design Metadata
 
