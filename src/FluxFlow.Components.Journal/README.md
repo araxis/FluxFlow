@@ -7,6 +7,8 @@ Reusable event journal contracts for FluxFlow hosts.
 - `JournalRecord` for normalized runtime event storage.
 - `JournalEventInput` and `JournalRecordMapper` for mapping host event data into
   journal records without depending on a runtime package.
+- `JournalEventInputBuilder` for fluent neutral event authoring and direct
+  mapping through the existing record mapper.
 - `JournalQuery` and `JournalQueryMatcher` for type, status, source, subject, channel, attribute, time range, and severity matching.
 - `IJournalStore` for host-owned persistence.
 - `IJournalStoreFactory`, `JournalStoreContext`, and `JournalStoreLease` for explicit host-owned store opening and ownership.
@@ -20,18 +22,17 @@ Reusable event journal contracts for FluxFlow hosts.
 ```csharp
 var store = new InMemoryJournalStore();
 
-var record = JournalRecordMapper.FromEvent(new JournalEventInput
-{
-    Timestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
-    Type = "job.completed",
-    Source = "worker",
-    Subject = "job/42",
-    Status = "ok",
-    Attributes = new Dictionary<string, string>
-    {
-        ["tenant"] = "primary"
-    }
-}, "evt-1");
+var record = JournalEventInputBuilder
+    .Create(DateTimeOffset.Parse("2026-01-01T00:00:00Z"))
+    .WithType("job.completed")
+    .WithSource("worker")
+    .WithSubject("job/42")
+    .WithStatus("ok")
+    .WithWorkflow("orders", "Orders")
+    .WithNode("complete-job")
+    .WithSummary("Job completed")
+    .AddAttribute("tenant", "primary")
+    .BuildRecord("evt-1");
 
 await store.AppendAsync(record);
 
@@ -85,6 +86,10 @@ nodes that emit events remain in their owning component packages.
 
 Journal is runtime-neutral. Hosts that use another runtime should adapt runtime
 events into `JournalEventInput` before calling `JournalRecordMapper`.
+`JournalEventInputBuilder` is an authoring helper over the same contracts. It
+does not own runtime event collection, persistence, retention, or store
+lifetime; it creates normalized `JournalEventInput` snapshots and can map them
+to `JournalRecord` through `JournalRecordMapper`.
 
 Journal contracts normalize incoming text so record ids, optional fields, query
 filters, and attribute keys/values are trimmed before storage or matching. Blank

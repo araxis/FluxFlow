@@ -15,6 +15,15 @@ Adds session store factory support.
   `SessionComponentOptions` for explicit host-owned session store opening and
   lease ownership.
 
+## FluxFlow.Components.Journal 2.2.0
+
+Adds fluent journal event input building.
+
+- Adds `JournalEventInputBuilder` for declaring neutral journal events and
+  mapping them through the existing `JournalRecordMapper`.
+- Keeps event collection, persistence, retention, store lookup, and store
+  lifetime ownership with hosts.
+
 ## FluxFlow.Components.Configuration 1.2.0
 
 Adds fluent configuration validation request building.
