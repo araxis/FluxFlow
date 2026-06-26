@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.2
+
+Documents and verifies the full keyed MQTT adapter registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures before keyed client-session creation.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.2
+
+Documents and verifies the full keyed MQTT adapter registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures before keyed client-session creation.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
 ## FluxFlow.Components.Storage.FileSystem 3.3.2
 
 Documents and verifies the full keyed storage backend registration contract.

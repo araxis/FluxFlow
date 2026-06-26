@@ -55,15 +55,30 @@ public sealed class MqttNetRegistrationTests
     }
 
     [Fact]
-    public void AddFluxFlowMqttClient_RejectsNullOptions()
+    public void AddFluxFlowMqttClient_RejectsInvalidArguments()
     {
         var services = new ServiceCollection();
+        var options = new MqttNetClientOptions { Host = "localhost" };
 
-        var exception = Should.Throw<ArgumentNullException>(() => services.AddFluxFlowMqttClient(
-            "primary",
-            (MqttNetClientOptions)null!));
-
-        exception.ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            FluxFlowMqttServiceCollectionExtensions.AddFluxFlowMqttClient(
+                null!,
+                "primary",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowMqttClient(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowMqttClient(
+                "primary",
+                (MqttNetClientOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowMqttClient(
+                "primary",
+                (Func<IServiceProvider, MqttNetClientOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
     }
 
     [Fact]

@@ -79,15 +79,30 @@ public sealed class PulseMqttRegistrationTests
     }
 
     [Fact]
-    public void AddFluxFlowMqttClient_RejectsNullOptions()
+    public void AddFluxFlowMqttClient_RejectsInvalidArguments()
     {
         var services = new ServiceCollection();
+        var options = new PulseMqttClientOptions { Host = "localhost" };
 
-        var exception = Should.Throw<ArgumentNullException>(() => services.AddFluxFlowMqttClient(
-            "primary",
-            (PulseMqttClientOptions)null!));
-
-        exception.ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            FluxFlowMqttServiceCollectionExtensions.AddFluxFlowMqttClient(
+                null!,
+                "primary",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowMqttClient(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowMqttClient(
+                "primary",
+                (PulseMqttClientOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowMqttClient(
+                "primary",
+                (Func<IServiceProvider, PulseMqttClientOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
     }
 
     [Fact]

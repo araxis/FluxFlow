@@ -71,9 +71,9 @@ services.AddFluxFlowMqttClient(
 The extension registers one keyed `PulseMqttClient` and exposes the same
 singleton as keyed `IMqttPublisher`, `IMqttTriggerSource`, and
 `IMqttClientHealthSource`.
-The direct options overload rejects null options, and the factory overload
-requires the options factory to return a non-null `PulseMqttClientOptions`
-before the keyed client session is created.
+The registration helpers reject null service collections, blank keys, null
+direct options, null options factories, and null options factory results before
+creating the keyed client session.
 
 By default, the registration does not add hosted lifetime. Set
 `StartWithHost = true` when the host should start and stop the client session:
