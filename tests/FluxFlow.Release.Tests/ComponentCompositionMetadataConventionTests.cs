@@ -401,6 +401,98 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_resource_requiredness_matches_factory_lookups()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var resourceNamesFiles = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionResourceNames.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
+                1,
+                $"{entry.PackageId} must keep resource-name constants in one file.");
+
+            if (resourceNamesFiles.Length == 0)
+                continue;
+
+            var registryFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryContent = File.ReadAllText(registryFile);
+            var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
+            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
+            var resourceConstants = PublicStringConstantWithValueRegex()
+                .Matches(resourceContent)
+                .Select(match => new ResourceConstant(
+                    match.Groups["name"].Value,
+                    match.Groups["value"].Value))
+                .ToArray();
+            var project = XDocument.Load(projectPath);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataResources = provider
+                .GetMetadata()
+                .SelectMany(metadata => metadata.Resources)
+                .ToArray();
+
+            resourceConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} resource-name file should expose at least one resource constant.");
+
+            foreach (var resource in resourceConstants)
+            {
+                var lookupUsage = ReadResourceLookupUsage(
+                    registryContent,
+                    resourceContent,
+                    resourceTypeName,
+                    resource.Name);
+                var matchingResources = metadataResources
+                    .Where(metadata => ResourceMetadataMatchesConstant(
+                        metadata.Name,
+                        resource.Value,
+                        resource.Name))
+                    .ToArray();
+
+                lookupUsage.IsReferenced.ShouldBeTrue(
+                    $"{entry.PackageId} registry extensions must resolve resource '{resourceTypeName}.{resource.Name}'.");
+                matchingResources.ShouldNotBeEmpty(
+                    $"{entry.PackageId} Designer metadata must expose resource '{resource.Value}'.");
+
+                if (lookupUsage.UsesRequiredLookup)
+                {
+                    matchingResources
+                        .Any(ResourceMetadataDocumentsRequiredness)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} resource '{resource.Value}' uses GetRequiredResource and must be marked required or document conditional requiredness.");
+                }
+                else
+                {
+                    matchingResources
+                        .Any(resourceMetadata => resourceMetadata.IsRequired)
+                        .ShouldBeFalse(
+                            $"{entry.PackageId} resource '{resource.Value}' only uses optional GetResource and must not be marked required.");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_port_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -844,6 +936,150 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return false;
     }
 
+    private static ResourceLookupUsage ReadResourceLookupUsage(
+        string registryContent,
+        string resourceContent,
+        string resourceTypeName,
+        string resourceConstant)
+    {
+        var usage = new ResourceLookupUsage(false, false);
+
+        foreach (Match match in ResourceLookupRegex().Matches(registryContent))
+        {
+            var lookupContent = match.Value;
+            if (!ResourceLookupMentionsConstant(
+                    lookupContent,
+                    resourceContent,
+                    resourceTypeName,
+                    resourceConstant))
+            {
+                continue;
+            }
+
+            usage = match.Groups["required"].Success
+                ? usage with { UsesRequiredLookup = true }
+                : usage with { UsesOptionalLookup = true };
+        }
+
+        return usage.IsReferenced
+            ? usage
+            : ReadResourceHelperLookupUsage(
+                registryContent,
+                resourceContent,
+                resourceTypeName,
+                resourceConstant);
+    }
+
+    private static bool ResourceLookupMentionsConstant(
+        string lookupContent,
+        string resourceContent,
+        string resourceTypeName,
+        string resourceConstant)
+    {
+        var directReference = $"{resourceTypeName}.{resourceConstant}";
+        if (lookupContent.Contains(directReference, StringComparison.Ordinal))
+            return true;
+
+        foreach (Match match in PublicStaticStringMethodRegex().Matches(resourceContent))
+        {
+            var methodName = match.Groups["name"].Value;
+            if (!lookupContent.Contains($"{resourceTypeName}.{methodName}(", StringComparison.Ordinal))
+                continue;
+
+            if (ResourceHelperMentionsConstant(resourceContent, match.Index, resourceConstant))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static ResourceLookupUsage ReadResourceHelperLookupUsage(
+        string registryContent,
+        string resourceContent,
+        string resourceTypeName,
+        string resourceConstant)
+    {
+        var usage = new ResourceLookupUsage(false, false);
+
+        foreach (Match match in PublicStaticStringMethodRegex().Matches(resourceContent))
+        {
+            if (!ResourceHelperMentionsConstant(resourceContent, match.Index, resourceConstant))
+                continue;
+
+            var methodName = match.Groups["name"].Value;
+            var helperReference = $"{resourceTypeName}.{methodName}(";
+            var helperIndex = registryContent.IndexOf(helperReference, StringComparison.Ordinal);
+            if (helperIndex < 0)
+                continue;
+
+            var registryMethodContent = ReadContainingRegistryMethod(registryContent, helperIndex);
+            if (registryMethodContent.Contains(".GetRequiredResource<", StringComparison.Ordinal))
+                usage = usage with { UsesRequiredLookup = true };
+            if (registryMethodContent.Contains(".GetResource<", StringComparison.Ordinal))
+                usage = usage with { UsesOptionalLookup = true };
+        }
+
+        return usage;
+    }
+
+    private static string ReadContainingRegistryMethod(
+        string registryContent,
+        int memberIndex)
+    {
+        var methodStart = registryContent.LastIndexOf(
+            "\n    private static",
+            memberIndex,
+            StringComparison.Ordinal);
+        if (methodStart < 0)
+        {
+            methodStart = registryContent.LastIndexOf(
+                "\n    public static",
+                memberIndex,
+                StringComparison.Ordinal);
+        }
+
+        if (methodStart < 0)
+            methodStart = 0;
+
+        var nextMethodIndex = registryContent.IndexOf(
+            "\n    private static",
+            memberIndex + 1,
+            StringComparison.Ordinal);
+        var nextPublicMethodIndex = registryContent.IndexOf(
+            "\n    public static",
+            memberIndex + 1,
+            StringComparison.Ordinal);
+        if (nextPublicMethodIndex >= 0 &&
+            (nextMethodIndex < 0 || nextPublicMethodIndex < nextMethodIndex))
+        {
+            nextMethodIndex = nextPublicMethodIndex;
+        }
+
+        var methodLength = nextMethodIndex < 0
+            ? registryContent.Length - methodStart
+            : nextMethodIndex - methodStart;
+        return registryContent.Substring(methodStart, methodLength);
+    }
+
+    private static bool ResourceMetadataMatchesConstant(
+        string resourceName,
+        string resourceValue,
+        string resourceConstant)
+    {
+        if (string.Equals(resourceName, resourceValue, StringComparison.Ordinal))
+            return true;
+
+        return resourceConstant.EndsWith("Prefix", StringComparison.Ordinal) &&
+            resourceName.StartsWith(resourceValue, StringComparison.Ordinal);
+    }
+
+    private static bool ResourceMetadataDocumentsRequiredness(
+        ResourceDesignMetadata resource)
+        => resource.IsRequired ||
+            resource.Attributes.Keys.Any(key =>
+                key.StartsWith("requiredWhen", StringComparison.OrdinalIgnoreCase)) ||
+            resource.Attributes.ContainsKey("option");
+
     private static bool ResourceHelperMentionsConstant(
         string resourceContent,
         int methodStartIndex,
@@ -926,6 +1162,15 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private sealed record RegistryMessageB(string Value);
 
+    private sealed record ResourceConstant(string Name, string Value);
+
+    private sealed record ResourceLookupUsage(
+        bool UsesRequiredLookup,
+        bool UsesOptionalLookup)
+    {
+        public bool IsReferenced => UsesRequiredLookup || UsesOptionalLookup;
+    }
+
     private static readonly Type[] RegistryGenericArgumentTypes =
     [
         typeof(RegistryMessageA),
@@ -935,8 +1180,14 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex PublicStringConstantRegex();
 
+    [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=\s*""(?<value>[^""]*)""\s*;")]
+    private static partial Regex PublicStringConstantWithValueRegex();
+
     [GeneratedRegex(@"public\s+static\s+string\s+(?<name>\w+)\s*\(")]
     private static partial Regex PublicStaticStringMethodRegex();
+
+    [GeneratedRegex(@"\.Get(?<required>Required)?Resource\s*<[^;]+?;", RegexOptions.Singleline)]
+    private static partial Regex ResourceLookupRegex();
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
