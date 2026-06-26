@@ -89,6 +89,8 @@ public static class ComponentDesignMetadataValidator
                     "Option minimum cannot be greater than the maximum."));
             }
 
+            ValidateOptionRangeUsage(option, path, errors);
+            ValidateOptionDefaultValue(option, path, errors);
             ValidateOptionalText(option.DisplayName, $"{path}.{nameof(OptionDesignMetadata.DisplayName)}", errors);
             ValidateOptionalText(option.HelperText, $"{path}.{nameof(OptionDesignMetadata.HelperText)}", errors);
             if (option.Choices is null)
@@ -106,6 +108,115 @@ public static class ComponentDesignMetadataValidator
             ValidateAttributes(option.Attributes, $"{path}.{nameof(OptionDesignMetadata.Attributes)}", errors);
         }
     }
+
+    private static void ValidateOptionRangeUsage(
+        OptionDesignMetadata option,
+        string optionPath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        if (option.Min is null && option.Max is null)
+            return;
+
+        if (option.Kind is OptionValueKind.Number or OptionValueKind.Duration)
+            return;
+
+        errors.Add(new DesignerMetadataValidationError(
+            $"{optionPath}.{nameof(OptionDesignMetadata.Min)}",
+            "Option min/max constraints are valid only for number and duration options."));
+    }
+
+    private static void ValidateOptionDefaultValue(
+        OptionDesignMetadata option,
+        string optionPath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        if (option.DefaultValue is null)
+            return;
+
+        var defaultValuePath = $"{optionPath}.{nameof(OptionDesignMetadata.DefaultValue)}";
+
+        switch (option.Kind)
+        {
+            case OptionValueKind.Text:
+            case OptionValueKind.MultilineText:
+            case OptionValueKind.Expression:
+            case OptionValueKind.Secret:
+                ValidateDefaultValueType<string>(option.DefaultValue, defaultValuePath, option.Kind, errors);
+                break;
+            case OptionValueKind.Number:
+                if (!IsNumericDefaultValue(option.DefaultValue))
+                {
+                    errors.Add(new DesignerMetadataValidationError(
+                        defaultValuePath,
+                        $"Default value for {option.Kind} options must be numeric."));
+                }
+
+                break;
+            case OptionValueKind.Boolean:
+                ValidateDefaultValueType<bool>(option.DefaultValue, defaultValuePath, option.Kind, errors);
+                break;
+            case OptionValueKind.Duration:
+                ValidateDefaultValueType<TimeSpan>(option.DefaultValue, defaultValuePath, option.Kind, errors);
+                break;
+            case OptionValueKind.Enum:
+                ValidateEnumDefaultValue(option, defaultValuePath, errors);
+                break;
+            case OptionValueKind.Json:
+                break;
+        }
+    }
+
+    private static void ValidateDefaultValueType<TValue>(
+        object defaultValue,
+        string defaultValuePath,
+        OptionValueKind kind,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        if (defaultValue is TValue)
+            return;
+
+        errors.Add(new DesignerMetadataValidationError(
+            defaultValuePath,
+            $"Default value for {kind} options must be {typeof(TValue).Name}."));
+    }
+
+    private static void ValidateEnumDefaultValue(
+        OptionDesignMetadata option,
+        string defaultValuePath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        var defaultValue = option.DefaultValue switch
+        {
+            string value => value,
+            Enum value => value.ToString(),
+            _ => null
+        };
+
+        if (defaultValue is null)
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                defaultValuePath,
+                "Default value for enum options must be a string or enum value."));
+            return;
+        }
+
+        if (option.Choices is null || option.Choices.Count == 0)
+            return;
+
+        if (option.Choices.Any(choice => choice is not null && string.Equals(choice.Value, defaultValue, StringComparison.Ordinal)))
+            return;
+
+        errors.Add(new DesignerMetadataValidationError(
+            defaultValuePath,
+            "Default value for enum options must match one of the option choices."));
+    }
+
+    private static bool IsNumericDefaultValue(object value)
+        => value is byte or sbyte
+            or short or ushort
+            or int or uint
+            or long or ulong
+            or float or double or decimal;
 
     private static void ValidateChoiceUsage(
         OptionDesignMetadata option,

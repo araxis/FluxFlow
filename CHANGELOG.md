@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.3
+
+Hardens component design metadata option validation.
+
+- `ComponentDesignMetadataValidator` now validates option default values
+  against the declared `OptionValueKind` for text-like, number, boolean,
+  duration, and enum options.
+- Enum defaults must be strings or enum values and must match a declared choice
+  when choices are available.
+- `Min` and `Max` metadata are now reported as invalid unless the option kind is
+  number or duration.
+- Adds validator coverage for accepted defaults, mismatched defaults, and
+  invalid min/max usage.
+
 ## FluxFlow.Components.Designer 2.2.2
 
 Hardens component design metadata catalog registration.

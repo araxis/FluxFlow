@@ -339,6 +339,185 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_option_default_value_mismatches()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "count",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = "1"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "enabled",
+                    Kind = OptionValueKind.Boolean,
+                    DefaultValue = "true"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "delay",
+                    Kind = OptionValueKind.Duration,
+                    DefaultValue = "00:00:01"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "label",
+                    Kind = OptionValueKind.Text,
+                    DefaultValue = 1
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "mode",
+                    Kind = OptionValueKind.Enum,
+                    DefaultValue = 1,
+                    Choices =
+                    [
+                        new OptionChoiceMetadata { Value = "strict" }
+                    ]
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "missingMode",
+                    Kind = OptionValueKind.Enum,
+                    DefaultValue = "missing",
+                    Choices =
+                    [
+                        new OptionChoiceMetadata { Value = "strict" }
+                    ]
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.DefaultValue)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[1].{nameof(OptionDesignMetadata.DefaultValue)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[2].{nameof(OptionDesignMetadata.DefaultValue)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[3].{nameof(OptionDesignMetadata.DefaultValue)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[4].{nameof(OptionDesignMetadata.DefaultValue)}");
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Options)}[5].{nameof(OptionDesignMetadata.DefaultValue)}");
+    }
+
+    [Fact]
+    public void Validator_accepts_option_default_values_that_match_kind()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.valid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "label",
+                    Kind = OptionValueKind.Text,
+                    DefaultValue = "value"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "body",
+                    Kind = OptionValueKind.MultilineText,
+                    DefaultValue = "line one"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "expression",
+                    Kind = OptionValueKind.Expression,
+                    DefaultValue = "$"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "secret",
+                    Kind = OptionValueKind.Secret,
+                    DefaultValue = "name"
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "count",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = 1,
+                    Min = 0,
+                    Max = 10
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "enabled",
+                    Kind = OptionValueKind.Boolean,
+                    DefaultValue = true
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "delay",
+                    Kind = OptionValueKind.Duration,
+                    DefaultValue = TimeSpan.FromSeconds(1),
+                    Min = 1
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "mode",
+                    Kind = OptionValueKind.Enum,
+                    DefaultValue = "strict",
+                    Choices =
+                    [
+                        new OptionChoiceMetadata { Value = "strict" }
+                    ]
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "enumMode",
+                    Kind = OptionValueKind.Enum,
+                    DefaultValue = SampleMode.Relaxed,
+                    Choices =
+                    [
+                        new OptionChoiceMetadata { Value = nameof(SampleMode.Relaxed) }
+                    ]
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "json",
+                    Kind = OptionValueKind.Json,
+                    DefaultValue = new Dictionary<string, string>
+                    {
+                        ["name"] = "value"
+                    }
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Validator_reports_min_max_on_non_numeric_options()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "label",
+                    Kind = OptionValueKind.Text,
+                    Min = 1
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.Min)}" &&
+            error.Message.Contains("min/max", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_reports_invalid_resource_metadata_shape()
     {
         var metadata = new ComponentDesignMetadata
@@ -551,4 +730,9 @@ public sealed class ComponentDesignMetadataCatalogTests
             ["shape"] = "transform"
         }
     };
+
+    private enum SampleMode
+    {
+        Relaxed
+    }
 }
