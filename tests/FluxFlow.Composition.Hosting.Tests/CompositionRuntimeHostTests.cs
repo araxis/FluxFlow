@@ -73,6 +73,34 @@ public sealed class CompositionRuntimeHostTests
     }
 
     [Fact]
+    public void Hosting_exception_snapshots_diagnostics()
+    {
+        var diagnostics = new List<CompositionDiagnostic>
+        {
+            new()
+            {
+                Code = CompositionDiagnosticCode.UnknownNodeType,
+                Message = "Unknown node type."
+            }
+        };
+
+        var exception = new CompositionHostingException("Build failed.", diagnostics);
+
+        diagnostics.Clear();
+
+        exception.Diagnostics.ShouldHaveSingleItem()
+            .Message.ShouldBe("Unknown node type.");
+    }
+
+    [Fact]
+    public void Hosting_exception_treats_null_diagnostics_as_empty()
+    {
+        var exception = new CompositionHostingException("Build failed.", null!);
+
+        exception.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Hosted_runtime_resolves_keyed_resources_and_runs_definition()
     {
         var collector = new TextCollector();
