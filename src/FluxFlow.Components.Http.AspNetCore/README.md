@@ -25,6 +25,16 @@ app.MapFluxFlowTrigger("/greet", "greet");   // endpoint feeds the keyed trigger
 fed from it, and a hosted service that starts the trigger with the app (which wires the
 graph and starts consuming) and disposes it on shutdown.
 
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. It owns the
+ASP.NET Core endpoint and trigger DI integration through `AddFluxFlowHttpTrigger`
+and `MapFluxFlowTrigger`.
+
+Use `FluxFlow.Components.Http.Composition` only for outbound `http.client`
+composition. Config-composed inbound HTTP trigger factories are intentionally
+outside this package boundary.
+
 ## Without DI
 
 For tests or manual composition, hold a coordinator and map it directly:

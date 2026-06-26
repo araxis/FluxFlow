@@ -66,6 +66,43 @@ public sealed class ComponentPackageBoundaryTests
         }
     }
 
+    [Fact]
+    public void Non_composition_component_readmes_document_their_composition_boundary()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var packageIds = PackageManifest
+            .Read(root)
+            .Select(entry => entry.PackageId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var entry in ReadNonCompositionComponentPackages(root))
+        {
+            var readmePath = Path.Combine(ReadProjectDirectory(root, entry), "README.md");
+            File.Exists(readmePath)
+                .ShouldBeTrue($"{entry.PackageId} must include a package README.");
+
+            var readme = File.ReadAllText(readmePath);
+            readme.Contains("## Composition", StringComparison.Ordinal)
+                .ShouldBeTrue($"{entry.PackageId} README must document its composition boundary.");
+
+            var adapterPackageId = entry.PackageId + ".Composition";
+            if (packageIds.Contains(adapterPackageId))
+            {
+                readme.Contains(adapterPackageId, StringComparison.Ordinal)
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} README must point composition users to {adapterPackageId}.");
+                continue;
+            }
+
+            readme.Contains("does not expose", StringComparison.OrdinalIgnoreCase)
+                .ShouldBeTrue(
+                    $"{entry.PackageId} README must explicitly state that it does not expose composition factories.");
+            readme.Contains("FluxFlow.Composition", StringComparison.Ordinal)
+                .ShouldBeTrue(
+                    $"{entry.PackageId} README must name FluxFlow.Composition when documenting the absence of composition factories.");
+        }
+    }
+
     private static PackageManifestEntry[] ReadNonCompositionComponentPackages(string root)
         => PackageManifest
             .Read(root)

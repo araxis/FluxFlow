@@ -44,3 +44,13 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
   in-flight callers with `OperationCanceledException`, so `Completion` can be
   awaited without leaving callers hanging.
+
+## Composition
+
+This package does not expose standalone nodes or `FluxFlow.Composition`
+factories. It is support infrastructure for transport adapters that need to
+bridge inbound request/reply behavior into one-way workflow graphs.
+
+HTTP and MQTT trigger packages own their transport-specific integration. Normal
+composition packages consume those adapters or their host-owned resources rather
+than composing `RequestReplyCoordinator<TRequest, TResponse>` directly.
