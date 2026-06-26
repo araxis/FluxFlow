@@ -761,7 +761,10 @@ These packages are intentionally not standalone node composition adapters:
   including trimmed resource option paths and resource option metadata
   diagnostics with normalized valid metadata maps, request collection
   snapshotting, and a fluent `ConfigurationValidationRequestBuilder` with
-  individual and range additions over the same validation DTOs.
+  individual and range additions over the same validation DTOs. It supports both
+  runtime validation through `IResourceLookup`/`ISecretResolver` and
+  descriptor-only validation through `IResourceDescriptorProvider` and
+  `ISecretDescriptorProvider`.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including descriptor-provider separation, trimmed resource
   names, kinds, display text, and null-safe normalized metadata and attribute

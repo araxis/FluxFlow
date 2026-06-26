@@ -18,6 +18,20 @@ Adds keyed resource registration helpers.
 - Registers keyed resource lookups as descriptor providers under the same key
   so metadata-only consumers can reuse lookup-backed catalogs.
 
+## FluxFlow.Components.Configuration 1.4.0
+
+Adds descriptor-only configuration reference validation to
+`FluxFlow.Components.Configuration`.
+
+- Adds `ValidateDeclaredReferences(...)`,
+  `ValidateDeclaredResources(...)`, and `ValidateDeclaredSecrets(...)` for
+  checking configuration resource and secret references against descriptor
+  providers.
+- Lets design/config hosts validate declared resources and secrets without
+  opening resources, resolving secret values, or owning runtime lifecycle.
+- Preserves the existing runtime validation path that uses `IResourceLookup`
+  and `ISecretResolver`.
+
 ## FluxFlow.Components.Secrets 1.5.0
 
 Adds keyed secret registration helpers.
