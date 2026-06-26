@@ -78,6 +78,77 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_is_usable_for_palette_and_inspectors()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                AssertRequiredDesignerText(
+                    metadata.DisplayName,
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a display name.");
+                AssertRequiredDesignerText(
+                    metadata.Category,
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a category.");
+                AssertRequiredDesignerText(
+                    metadata.Summary,
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a summary.");
+
+                foreach (var option in metadata.Options)
+                {
+                    AssertRequiredDesignerText(
+                        option.DisplayName,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' must include a display name.");
+                    AssertRequiredDesignerText(
+                        option.HelperText,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' must include helper text.");
+
+                    foreach (var choice in option.Choices)
+                    {
+                        AssertRequiredDesignerText(
+                            choice.DisplayName,
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' choice '{choice.Value}' must include a display name.");
+                    }
+                }
+
+                foreach (var resource in metadata.Resources)
+                {
+                    AssertRequiredDesignerText(
+                        resource.DisplayName,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a display name.");
+                    AssertRequiredDesignerText(
+                        resource.Summary,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a summary.");
+                    AssertRequiredDesignerText(
+                        resource.ValueType,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a value type.");
+                }
+
+                foreach (var port in metadata.Ports)
+                {
+                    AssertRequiredDesignerText(
+                        port.DisplayName,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a display name.");
+                    AssertRequiredDesignerText(
+                        port.Summary,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a summary.");
+                    AssertRequiredDesignerText(
+                        port.ValueType,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a value type.");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_matches_default_registry_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -947,6 +1018,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         executableMethod.Invoke(null, arguments);
     }
+
+    private static void AssertRequiredDesignerText(
+        string? value,
+        string message)
+        => string.IsNullOrWhiteSpace(value).ShouldBeFalse(message);
 
     private static void AssertConcretePortValueType(
         string packageId,
