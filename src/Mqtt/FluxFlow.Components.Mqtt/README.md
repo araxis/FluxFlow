@@ -107,6 +107,8 @@ the surrounding `FlowMessage`.
 User-property dictionaries are snapshotted when assigned, and null maps are
 treated as empty so caller-owned mutable dictionaries cannot alter queued
 publish contracts after creation.
+Publish payload byte arrays are also copied when assigned, so mutating the
+caller-owned buffer after creating a request does not change the request.
 
 ## Trigger
 
@@ -181,6 +183,8 @@ Incoming `MqttReceivedMessage.Timestamp` and adapter-provided
 Received-message user properties and health-event attributes are snapshotted
 when assigned, matching the immutable-envelope behavior used across the node
 contract surface.
+Received payload and correlation-data byte arrays are copied when assigned so
+adapter-owned buffers cannot mutate a received-message contract after mapping.
 
 ## Runtime Timing
 

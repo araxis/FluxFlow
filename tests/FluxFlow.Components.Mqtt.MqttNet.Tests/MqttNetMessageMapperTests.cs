@@ -46,6 +46,22 @@ public sealed class MqttNetMessageMapperTests
     }
 
     [Fact]
+    public void ToApplicationMessage_copies_payload_for_adapter_handoff()
+    {
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1, 2, 3]
+        };
+
+        var message = MqttNetMessageMapper.ToApplicationMessage(request);
+
+        request.Payload[0] = 9;
+
+        ToArray(message.Payload).ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public void ToApplicationMessage_treats_null_user_property_maps_as_empty()
     {
         var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest

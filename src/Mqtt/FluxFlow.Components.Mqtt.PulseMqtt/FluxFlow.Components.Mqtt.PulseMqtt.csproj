@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>2.0.5</Version>
+    <Version>2.0.6</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Pulse MQTT-backed adapter for FluxFlow MQTT components. Owns Pulse client creation, start/stop, broker transport configuration, Last Will setup, publish mapping, trigger subscriptions, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens MQTT adapter client options by snapshotting user-property dictionaries and treating null maps as empty.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens MQTT adapter payload ownership by snapshotting Last Will payload arrays and copying publish/Last Will payloads before concrete client handoff.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

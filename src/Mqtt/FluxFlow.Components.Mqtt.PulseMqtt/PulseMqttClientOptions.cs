@@ -63,9 +63,15 @@ public sealed record PulseMqttClientOptions
 
 public sealed record PulseMqttLastWillOptions
 {
+    private byte[]? _payload = [];
+
     public required string Topic { get; init; }
 
-    public byte[] Payload { get; init; } = [];
+    public byte[] Payload
+    {
+        get => _payload!;
+        init => _payload = value?.ToArray();
+    }
 
     public string? ContentType { get; init; }
 

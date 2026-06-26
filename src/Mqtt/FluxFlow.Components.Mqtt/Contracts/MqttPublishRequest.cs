@@ -2,8 +2,15 @@ namespace FluxFlow.Components.Mqtt.Contracts;
 
 public sealed record MqttPublishRequest
 {
+    private byte[]? _payload;
+
     public required string Topic { get; init; }
-    public required byte[] Payload { get; init; }
+    public required byte[] Payload
+    {
+        get => _payload!;
+        init => _payload = value?.ToArray();
+    }
+
     public string? PayloadPreview { get; init; }
     public string? ContentType { get; init; }
     public MqttQualityOfService QualityOfService { get; init; } = MqttQualityOfService.AtMostOnce;
