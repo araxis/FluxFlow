@@ -61,15 +61,15 @@ public sealed partial class SampleDocumentationTests
     }
 
     [Fact]
-    public async Task Non_server_samples_run_to_completion()
+    public void Non_server_samples_run_to_completion()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
 
-        await AssertSampleRunAsync(
+        AssertSampleRun(
             root,
             "samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj",
             ["ALPHA", "BETA"]);
-        await AssertSampleRunAsync(
+        AssertSampleRun(
             root,
             "samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj",
             [
@@ -78,7 +78,7 @@ public sealed partial class SampleDocumentationTests
                 "fluent:",
                 "devices/pump-02/state/reply -> ACK: offline"
             ]);
-        await AssertSampleRunAsync(
+        AssertSampleRun(
             root,
             "samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj",
             [
@@ -96,7 +96,7 @@ public sealed partial class SampleDocumentationTests
                relative.Contains("/obj/", StringComparison.Ordinal);
     }
 
-    private static async Task AssertSampleRunAsync(
+    private static void AssertSampleRun(
         string root,
         string project,
         IReadOnlyList<string> expectedOutput)
@@ -108,20 +108,14 @@ public sealed partial class SampleDocumentationTests
             RedirectStandardOutput = true
         };
         startInfo.ArgumentList.Add("run");
+        startInfo.ArgumentList.Add("--disable-build-servers");
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(project);
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet.");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-        var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
-        try
-        {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException)
+        if (!process.WaitForExit(milliseconds: 180_000))
         {
             try
             {
@@ -134,8 +128,8 @@ public sealed partial class SampleDocumentationTests
             throw new TimeoutException($"{project} did not finish within the sample smoke-test timeout.");
         }
 
-        var output = await outputTask;
-        var error = await errorTask;
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
         process.ExitCode.ShouldBe(
             0,
             $"""
