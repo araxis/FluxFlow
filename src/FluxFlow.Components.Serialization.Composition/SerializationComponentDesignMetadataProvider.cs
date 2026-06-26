@@ -69,127 +69,98 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
         string iconKey,
         string preferredNodeName,
         string inputType,
-        string outputType) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Serialization",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 420,
-            Options = SharedOptions(),
-            Resources = ClockResources(),
-            Ports = SerializationPorts(inputType, outputType)
-        };
+        string outputType)
+    {
+        var builder = new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Serialization",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 420)
+            .AddResource(
+                SerializationCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 0,
+                summary: "Optional keyed clock for deterministic serialization diagnostics.",
+                valueType: nameof(TimeProvider));
 
-    private static IReadOnlyList<PortDesignMetadata> SerializationPorts(
+        AddSharedOptions(builder);
+        AddSerializationPorts(builder, inputType, outputType);
+
+        return builder.Build();
+    }
+
+    private static void AddSerializationPorts(
+        ComponentDesignMetadataBuilder builder,
         string inputType,
         string outputType)
-        =>
-        [
-            InputPort(inputType),
-            OutputPort(outputType)
-        ];
-
-    private static PortDesignMetadata InputPort(string valueType) => new()
     {
-        Name = new ComponentPortName(SerializationCompositionPortNames.Input),
-        Direction = PortDirection.Input,
-        DisplayName = "Input",
-        Group = "Messages",
-        Order = 0,
-        Summary = "Serialization request message.",
-        ValueType = valueType,
-        IsPrimary = true
-    };
+        builder
+            .AddInputPort(
+                SerializationCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Serialization request message.",
+                valueType: inputType,
+                isPrimary: true)
+            .AddOutputPort(
+                SerializationCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Serialization result message.",
+                valueType: outputType,
+                isPrimary: true);
+    }
 
-    private static PortDesignMetadata OutputPort(string valueType) => new()
-    {
-        Name = new ComponentPortName(SerializationCompositionPortNames.Output),
-        Direction = PortDirection.Output,
-        DisplayName = "Output",
-        Group = "Results",
-        Order = 1,
-        Summary = "Serialization result message.",
-        ValueType = valueType,
-        IsPrimary = true
-    };
-
-    private static IReadOnlyList<OptionDesignMetadata> SharedOptions()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = Defaults.BoundedCapacity,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "defaultEncoding",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Default Encoding",
-                DefaultValue = Defaults.DefaultEncoding,
-                HelperText = "Encoding name used when a request does not specify one."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxInputBytes",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Input Bytes",
-                DefaultValue = Defaults.MaxInputBytes,
-                Min = 1,
-                HelperText = "Maximum input payload size accepted by the node."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxOutputBytes",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Output Bytes",
-                DefaultValue = Defaults.MaxOutputBytes,
-                Min = 1,
-                HelperText = "Maximum output payload size emitted by the node."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "writeIndented",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Write Indented",
-                DefaultValue = Defaults.WriteIndented,
-                HelperText = "Write formatted JSON where the node emits JSON text."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "allowTrailingCommas",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Allow Trailing Commas",
-                DefaultValue = Defaults.AllowTrailingCommas,
-                HelperText = "Allow trailing commas while parsing JSON."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "skipComments",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Skip Comments",
-                DefaultValue = Defaults.SkipComments,
-                HelperText = "Skip comments while parsing JSON."
-            }
-        ];
-
-    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = SerializationCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic serialization diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+    private static void AddSharedOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: Defaults.BoundedCapacity,
+                min: 1)
+            .AddOption(
+                "defaultEncoding",
+                OptionValueKind.Text,
+                displayName: "Default Encoding",
+                helperText: "Encoding name used when a request does not specify one.",
+                defaultValue: Defaults.DefaultEncoding)
+            .AddOption(
+                "maxInputBytes",
+                OptionValueKind.Number,
+                displayName: "Max Input Bytes",
+                helperText: "Maximum input payload size accepted by the node.",
+                defaultValue: Defaults.MaxInputBytes,
+                min: 1)
+            .AddOption(
+                "maxOutputBytes",
+                OptionValueKind.Number,
+                displayName: "Max Output Bytes",
+                helperText: "Maximum output payload size emitted by the node.",
+                defaultValue: Defaults.MaxOutputBytes,
+                min: 1)
+            .AddOption(
+                "writeIndented",
+                OptionValueKind.Boolean,
+                displayName: "Write Indented",
+                helperText: "Write formatted JSON where the node emits JSON text.",
+                defaultValue: Defaults.WriteIndented)
+            .AddOption(
+                "allowTrailingCommas",
+                OptionValueKind.Boolean,
+                displayName: "Allow Trailing Commas",
+                helperText: "Allow trailing commas while parsing JSON.",
+                defaultValue: Defaults.AllowTrailingCommas)
+            .AddOption(
+                "skipComments",
+                OptionValueKind.Boolean,
+                displayName: "Skip Comments",
+                helperText: "Skip comments while parsing JSON.",
+                defaultValue: Defaults.SkipComments);
 }
