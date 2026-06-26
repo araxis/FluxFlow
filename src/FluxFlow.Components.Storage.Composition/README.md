@@ -3,15 +3,15 @@
 Optional `FluxFlow.Composition` registration helpers for the standalone storage
 nodes from `FluxFlow.Components.Storage`.
 
-This package does not scan assemblies, open stores, own store leases, register
-backend stores, or configure concrete storage adapters. Hosts register storage
-node factories explicitly and provide a keyed `IStorageStore`; they may also
-provide an optional keyed `TimeProvider`.
+This package does not scan assemblies, register backend stores, or configure
+concrete storage adapters. Hosts register storage node factories explicitly and
+provide either a keyed `IStorageStore` or a keyed `IStorageStoreFactory`; they
+may also provide an optional keyed `TimeProvider`.
 
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<IStorageStore>("items-store", store);
+services.AddKeyedSingleton<IStorageStoreFactory>("items-store", storeFactory);
 
 services
     .AddFluxFlowComposition(configuration)
@@ -32,8 +32,10 @@ services
 | `storage.delete` | `StorageDeleteNode` | `Input`, `Output` |
 
 Each factory exposes `Events` and `Errors`. `store` is a required keyed
-`IStorageStore` resource. `clock` is an optional keyed `TimeProvider` resource
-for deterministic result, event, and error timestamps.
+`IStorageStore` or `IStorageStoreFactory` resource. Direct stores remain
+host-owned. Factory leases are opened during composition build and disposed with
+the composed node. `clock` is an optional keyed `TimeProvider` resource for
+deterministic result, event, and error timestamps.
 
 ## Configuration
 
@@ -67,9 +69,9 @@ for deterministic result, event, and error timestamps.
 ```
 
 The adapter binds the existing storage option records from node configuration.
-Backend packages such as file-system or SQL-file storage remain host concerns:
-open or register the store in the host, then reference it from composition with
-the `store` resource.
+Backend packages remain host concerns: register an opened keyed store or a
+keyed store factory in the host, then reference it from composition with the
+`store` resource.
 
 ## Design Metadata
 
@@ -78,6 +80,6 @@ the `store` resource.
 build palettes, editors, validation hints, or documentation without copying
 package descriptors. The metadata describes the existing storage option records
 and fixed ports, plus resource hints for the required `store` and optional
-`clock` resources. Concrete `IStorageStore` instances and optional keyed
-`TimeProvider` clocks remain host-owned resources and are not modeled as
-editable node options.
+`clock` resources. Concrete `IStorageStore` instances, `IStorageStoreFactory`
+registrations, and optional keyed `TimeProvider` clocks remain host-owned
+resources and are not modeled as editable node options.

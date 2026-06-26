@@ -547,13 +547,16 @@ Use `RegisterStoragePut()`, `RegisterStorageGet()`,
 `RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
 `FluxFlow.Components.Storage.Composition` package when a composition host wants
 storage node factories. The factories bind existing storage options, resolve a
-required keyed `IStorageStore`, and can resolve an optional keyed
-`TimeProvider` resource through the host.
+required keyed `IStorageStore` or `IStorageStoreFactory`, and can resolve an
+optional keyed `TimeProvider` resource through the host. Factory resources are
+opened during composition build and released with composed node disposal; direct
+stores remain host-owned.
 
 `StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the four storage composition nodes, including existing storage options and fixed
 ports, plus resource hints for the required `store` resource and optional
-`clock` resource.
+`clock` resource. The `store` resource may point at either a keyed
+`IStorageStore` or keyed `IStorageStoreFactory`.
 
 ## Sessions Composition
 
@@ -743,9 +746,9 @@ These packages are intentionally not standalone node composition adapters:
   metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and
   `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
-  backend factories consumed by host-owned storage registration, including
-  direct rejection of unsupported storage write modes and deterministic
-  per-query expiration timestamps.
+  backend factories plus keyed factory registration helpers consumed by
+  host-owned storage registration, including direct rejection of unsupported
+  storage write modes and deterministic per-query expiration timestamps.
 
 Composition hosts consume these packages indirectly through adapter-owned
 resources or host setup. They should not add `FluxFlow.Composition` node

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.FileSystem</RootNamespace>
-    <Version>3.1.4</Version>
+    <Version>3.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>File-system-backed storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;filesystem;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>File-system storage queries now capture one clock timestamp per query so expiration filtering is deterministic across every record in the result set.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds AddFluxFlowFileSystemStorageStoreFactory for keyed IStorageStoreFactory registration in composition and resource hosts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -19,6 +19,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />

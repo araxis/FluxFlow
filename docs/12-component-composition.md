@@ -67,10 +67,10 @@ support packages. A composition adapter should consume them through host-owned
 resources or setup code only when a real standalone node needs them.
 
 For example, `FluxFlow.Components.Storage.FileSystem` and
-`FluxFlow.Components.Storage.SqlFile` create `IStorageStore` implementations;
-`FluxFlow.Components.Storage.Composition` is the package that registers the
-`storage.put`, `storage.get`, `storage.query`, and `storage.delete` node
-factories.
+`FluxFlow.Components.Storage.SqlFile` provide store implementations and keyed
+store-factory registration helpers; `FluxFlow.Components.Storage.Composition`
+is the package that registers the `storage.put`, `storage.get`,
+`storage.query`, and `storage.delete` node factories.
 
 ## Package Boundary
 

@@ -63,7 +63,8 @@ provide:
 
 - one `IStorageStore` implementation
 - one `IStorageStoreFactory` implementation when useful
-- registration helpers such as `UseFileSystemStorage(...)`
+- registration helpers such as `UseFileSystemStorage(...)` and keyed
+  `IStorageStoreFactory` service registration
 - adapter-specific options and validation
 - adapter-specific tests and README content
 
@@ -108,6 +109,8 @@ Expected public shape:
 - `FileSystemStorageStoreOptions`
 - `FileSystemStorageStoreFactory`
 - `UseFileSystemStorage(...)` registration helper
+- `AddFluxFlowFileSystemStorageStoreFactory(...)` keyed resource registration
+  helper
 
 Expected options:
 
@@ -122,7 +125,8 @@ Expected options:
 The package uses shared leases from `FileSystemStorageStoreFactory` so multiple
 opens for the same root, store name, default collection, and clock share the same
 in-process lock. Hosts can still pass a shared `FileSystemStorageStore` through
-the base storage package when they want to own the lifetime directly.
+the base storage package when they want to own the lifetime directly, or
+register a keyed `IStorageStoreFactory` for composition/resource hosts.
 
 ## SQL File Adapter Package
 
@@ -146,6 +150,8 @@ Expected public shape:
 - `SqlFileStorageStoreOptions`
 - `SqlFileStorageStoreFactory`
 - `UseSqlFileStorage(...)` registration helper
+- `AddFluxFlowSqlFileStorageStoreFactory(...)` keyed resource registration
+  helper
 
 Expected options:
 

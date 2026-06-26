@@ -2,6 +2,7 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.FileSystem;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Components.Storage.SqlFile;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -66,6 +67,59 @@ public sealed class StorageAdapterRegistrationTests
         sqlRecord.Collection.ShouldBe("records");
         fileRecord.Version.ShouldBe(1);
         sqlRecord.Version.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task BackendFactoriesCanBeRegisteredAsKeyedResources()
+    {
+        using var workspace = TempWorkspace.Create();
+        var services = new ServiceCollection();
+        services.AddFluxFlowFileSystemStorageStoreFactory(
+            "files",
+            new FileSystemStorageStoreOptions
+            {
+                RootDirectory = workspace.CreateDirectory("files"),
+                DefaultCollection = "records"
+            });
+        services.AddFluxFlowSqlFileStorageStoreFactory(
+            "database",
+            new SqlFileStorageStoreOptions
+            {
+                DatabasePath = workspace.CreateFilePath("sql", "records.db"),
+                DefaultCollection = "records"
+            });
+
+        await using var provider = services.BuildServiceProvider();
+        var fileFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("files");
+        var databaseFactory = provider.GetRequiredKeyedService<IStorageStoreFactory>("database");
+
+        await using var fileLease = await fileFactory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "primary"
+        });
+        await using var databaseLease = await databaseFactory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "primary"
+        });
+
+        fileLease.OwnsStore.ShouldBeFalse();
+        databaseLease.OwnsStore.ShouldBeTrue();
+
+        var fileRecord = await fileLease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "file"
+        });
+        var databaseRecord = await databaseLease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "database"
+        });
+
+        fileRecord.Collection.ShouldBe("records");
+        databaseRecord.Collection.ShouldBe("records");
+        fileRecord.Value.ShouldBe("file");
+        databaseRecord.Value.ShouldBe("database");
     }
 
     private sealed class TempWorkspace : IDisposable

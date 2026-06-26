@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage.SqlFile</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.SqlFile</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.SqlFile</RootNamespace>
-    <Version>3.1.4</Version>
+    <Version>3.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Single-file SQL storage adapter for FluxFlow storage components.</Description>
     <PackageTags>workflow;dataflow;components;storage;sql;file</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>SQL-file storage queries now capture one clock timestamp per query and use it for both database and in-memory expiration filtering.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds AddFluxFlowSqlFileStorageStoreFactory for keyed IStorageStoreFactory registration in composition and resource hosts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -21,6 +21,7 @@
     <ProjectReference Include="..\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.27" />
     <!-- Pin to the newest native SQLite bundle (overrides the 2.1.6 that Microsoft.Data.Sqlite
          8.0.27 brings in transitively). NOTE: even 2.1.11 bundles SQLite 3.49.1, which predates

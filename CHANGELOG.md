@@ -7,6 +7,29 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.Composition 1.3.0
+
+Adds storage resource factory support.
+
+- Storage composition can now resolve the required `store` resource from either
+  a keyed `IStorageStore` or a keyed `IStorageStoreFactory`.
+- Factory-backed stores are opened during composition build and disposed through
+  composed node cleanup; direct keyed stores remain host-owned.
+
+## FluxFlow.Components.Storage.FileSystem 3.2.0
+
+Adds keyed store factory registration for resource hosts.
+
+- Adds `AddFluxFlowFileSystemStorageStoreFactory(...)` for registering a keyed
+  `IStorageStoreFactory`.
+
+## FluxFlow.Components.Storage.SqlFile 3.2.0
+
+Adds keyed store factory registration for resource hosts.
+
+- Adds `AddFluxFlowSqlFileStorageStoreFactory(...)` for registering a keyed
+  `IStorageStoreFactory`.
+
 ## FluxFlow.Components.Mqtt.PulseMqtt 2.0.0
 
 Breaking: keyed client DI registration no longer starts the client with the host
