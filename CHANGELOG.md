@@ -196,6 +196,15 @@ Uses the shared Designer metadata builder for file-system metadata.
 - Preserves existing file-system options, clock resources, fixed ports, source
   outputs, validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.State.Composition 1.2.1
+
+Uses the shared Designer metadata builder for state reducer metadata.
+
+- Refactors `StateComponentDesignMetadataProvider` to author
+  `state.reducer` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing state reducer options, engine and clock resources, fixed
+  ports, validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

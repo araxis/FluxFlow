@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone state reducer node over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for state reducer engine and clock resources while keeping expression engines and clocks host-owned resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Refactors state reducer Designer metadata to use the shared validated metadata builder while preserving existing ports, resources, options, validation, and runtime behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

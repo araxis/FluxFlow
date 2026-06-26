@@ -540,6 +540,8 @@ keyed `TimeProvider` resource through the host.
 `state.reducer`, including the existing reducer options, fixed ports, and
 resource hints for the required `engine` resource plus optional `clock`
 resource. The `engine` option is diagnostic/config metadata, not DI selection.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Storage Composition
 

@@ -74,3 +74,5 @@ ports, plus resource hints for the required keyed expression engine and
 optional keyed `TimeProvider`. Those resources stay host-owned; the `engine`
 option remains only diagnostic/config metadata and is not used for DI
 selection.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
