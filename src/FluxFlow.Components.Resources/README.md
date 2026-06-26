@@ -12,8 +12,10 @@ component packages to a concrete owner or lifecycle model.
 - `ResourceReference`: a name plus optional kind and attributes.
 - `ResourceDescriptor`: a declared resource name, optional kind, display fields,
   and metadata.
+- `IResourceDescriptorProvider`: a small metadata enumeration abstraction for
+  declared resources.
 - `IResourceLookup`: a small lookup abstraction hosts can back with their own
-  resource lifecycle.
+  resource lifecycle; it also exposes declared descriptors.
 - `ResourceDescriptorCatalogBuilder`: a fluent helper that creates
   `ResourceDescriptor` snapshots or a validated `ResourceDescriptorCatalog`.
 - `ResourceLookupResult`: lookup outcome plus a structured diagnostic when a
@@ -48,6 +50,14 @@ var result = await catalog.LookupAsync(new ResourceReference
 });
 
 Console.WriteLine(result.Found);
+```
+
+Code that only needs declared resource metadata can depend on
+`IResourceDescriptorProvider` without performing lookups:
+
+```csharp
+foreach (var descriptor in descriptorProvider.GetResources())
+    Console.WriteLine(descriptor.Name);
 ```
 
 Fluent descriptor construction is available when code wants the same descriptor
@@ -97,6 +107,8 @@ invalid-resource diagnostics.
 
 This package only defines resource contracts and helper logic. Hosts decide how
 resources are created, secured, refreshed, shared, disposed, and displayed.
+`IResourceDescriptorProvider` separates resource metadata enumeration from
+lookup call sites that resolve a specific `ResourceReference`.
 `ResourceDescriptorCatalogBuilder` is only an authoring helper over the same
 descriptor and catalog contracts; it does not create or own concrete resources.
 
