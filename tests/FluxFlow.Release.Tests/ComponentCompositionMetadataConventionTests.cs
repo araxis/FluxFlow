@@ -547,26 +547,33 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
-            var resourceConstants = PublicStringConstantRegex()
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataResources = provider
+                .GetMetadata()
+                .SelectMany(metadata => metadata.Resources)
+                .ToArray();
+            var resourceConstants = PublicStringConstantWithValueRegex()
                 .Matches(File.ReadAllText(resourceNamesFiles[0]))
-                .Select(match => match.Groups["name"].Value)
+                .Select(match => new ResourceConstant(
+                    match.Groups["name"].Value,
+                    match.Groups["value"].Value))
                 .ToArray();
 
             resourceConstants.ShouldNotBeEmpty(
                 $"{entry.PackageId} resource-name file should expose at least one resource constant.");
-            providerContent.Contains(
-                    "ResourceDesignMetadata",
-                    StringComparison.Ordinal)
-                .ShouldBeTrue($"{entry.PackageId} provider must expose Designer resource metadata.");
+            metadataResources.ShouldNotBeEmpty(
+                $"{entry.PackageId} provider must expose Designer resource metadata.");
 
-            foreach (var resourceConstant in resourceConstants)
+            foreach (var resource in resourceConstants)
             {
-                var resourceReference = $"{resourceTypeName}.{resourceConstant}";
-                providerContent.Contains(resourceReference, StringComparison.Ordinal)
-                    .ShouldBeTrue($"{entry.PackageId} provider must expose resource '{resourceReference}'.");
+                metadataResources.Any(metadata => ResourceMetadataMatchesConstant(
+                        metadata.Name,
+                        resource.Value,
+                        resource.Name))
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} Designer metadata must expose resource '{resource.Value}'.");
             }
         }
     }
