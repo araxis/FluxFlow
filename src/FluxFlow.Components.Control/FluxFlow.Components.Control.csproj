@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone expression-driven control nodes for FluxFlow: flow.filter passes matching messages and drops the rest, flow.when routes each message to its WhenTrue/WhenFalse ports. Each node takes an IFlowExpressionEngine directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt flow.filter and flow.when as standalone nodes on the FluxFlow.Nodes kit: a message in on Input, the surviving/routed message broadcast out on Output (When also fans to WhenFalse), failures on the error port and diagnostics on the event port — all carrying the message correlation id. Each node compiles its predicate once from an injected IFlowExpressionEngine (and optional IFlowMapContextFactory) and runs without the engine. The node factory, module, registration extensions, design-metadata provider, definition-options reader, and the expression-engine/context-factory registry layer are removed; only the options, ports, error-code, and diagnostic-name constants remain.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: expression-backed control nodes require a non-empty expression, all control nodes reject empty inputType and non-positive boundedCapacity values, and compiled-predicate construction remains available without an expression.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

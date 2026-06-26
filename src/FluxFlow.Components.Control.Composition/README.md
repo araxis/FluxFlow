@@ -73,6 +73,10 @@ For `flow.when`, `Output` is an alias for the node's primary `WhenTrue` stream.
 `ControlExpressionOptions.InputType` remains diagnostic metadata. The actual
 composition port type comes from the closed generic registration selected by the
 host.
+Invalid `ControlExpressionOptions`, such as a missing expression, blank
+`inputType`, or non-positive `boundedCapacity`, fail during composition build
+and surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 ## Design Metadata
 

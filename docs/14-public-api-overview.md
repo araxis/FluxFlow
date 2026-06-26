@@ -208,7 +208,9 @@ Use `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` from the optional
 `FluxFlow.Components.Control.Composition` package when a composition host wants
 closed generic `flow.filter` and `flow.when` node factories. The factories
 resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
-factory and clock resources stay host-owned.
+factory and clock resources stay host-owned. Invalid control options fail
+during build as factory diagnostics when the host is configured to collect
+build failures.
 
 `ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.filter` and `flow.when` composition nodes so hosts can compose palette,

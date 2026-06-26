@@ -498,6 +498,102 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
                 StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Invalid_filter_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "filter",
+                    ControlCompositionNodeTypes.Filter,
+                    node => node
+                        .Resource(ControlCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "pass")
+                        .Configure("boundedCapacity", 0)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterFilter<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("boundedCapacity", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Missing_filter_expression_surfaces_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "filter",
+                    ControlCompositionNodeTypes.Filter,
+                    node => node.Resource(ControlCompositionResourceNames.Engine, "primary")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterFilter<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("expression", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Invalid_when_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "when",
+                    ControlCompositionNodeTypes.When,
+                    node => node
+                        .Resource(ControlCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "route")
+                        .Configure("inputType", " ")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterWhen<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("inputType", StringComparison.Ordinal));
+    }
+
     private sealed record InputMessage(int Value);
 
     private sealed class CustomContextFactory(bool matches) :
