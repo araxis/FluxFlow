@@ -126,6 +126,9 @@ services
     .AddFluxFlowResourceDescriptorProvider("declared-resources", descriptorProvider);
 ```
 
+Keyed DI helper names are trimmed before registration, matching the normalization
+used by `ResourceName` and catalog lookups.
+
 Registering an `IResourceLookup` also exposes it as an
 `IResourceDescriptorProvider` with the same key. These helpers only register
 already-owned services; they do not create clients, stores, secrets, or
