@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Payloads.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone payload inspection node over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;payloads;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for the payload inspection clock resource while keeping payload inspection runtime behavior and host-owned clocks unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Uses the shared Designer metadata builder for payload inspection metadata while preserving the existing options, resources, ports, validation, catalog loading, and runtime composition behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

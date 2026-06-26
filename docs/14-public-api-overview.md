@@ -475,6 +475,8 @@ the `payload.inspect` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes options, fixed ports, and a resource hint for the optional
 `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## FileSystem Composition
 

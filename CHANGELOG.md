@@ -141,6 +141,15 @@ Uses the shared Designer metadata builder for routing metadata.
   ports, dynamic-output attributes, validation, catalog loading, and runtime
   composition behavior.
 
+## FluxFlow.Components.Payloads.Composition 1.2.1
+
+Uses the shared Designer metadata builder for payload inspection metadata.
+
+- Refactors `PayloadsComponentDesignMetadataProvider` to author
+  `payload.inspect` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing payload inspection options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

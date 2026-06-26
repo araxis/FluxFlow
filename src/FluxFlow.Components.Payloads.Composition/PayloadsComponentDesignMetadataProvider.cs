@@ -12,122 +12,97 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreatePayloadInspectMetadata()];
 
-    private static ComponentDesignMetadata CreatePayloadInspectMetadata() => new()
+    private static ComponentDesignMetadata CreatePayloadInspectMetadata()
     {
-        Type = new ComponentType(PayloadsCompositionNodeTypes.Inspect),
-        DisplayName = "Payload Inspect",
-        Category = "Payloads",
-        Summary = "Classifies payload content and creates bounded text or formatted previews.",
-        IconKey = "scan-search",
-        PreferredNodeName = "inspect",
-        SuggestedEditorWidth = 420,
-        Options = PayloadInspectOptionsMetadata(),
-        Resources = PayloadInspectResources(),
-        Ports = PayloadInspectPorts()
-    };
+        var builder = new ComponentDesignMetadataBuilder(PayloadsCompositionNodeTypes.Inspect)
+            .WithDisplay(
+                displayName: "Payload Inspect",
+                category: "Payloads",
+                summary: "Classifies payload content and creates bounded text or formatted previews.",
+                iconKey: "scan-search",
+                preferredNodeName: "inspect",
+                suggestedEditorWidth: 420);
 
-    private static IReadOnlyList<OptionDesignMetadata> PayloadInspectOptionsMetadata()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "maxInputBytes",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Input Bytes",
-                DefaultValue = Defaults.MaxInputBytes,
-                Min = 1,
-                HelperText = "Maximum input payload size to inspect."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxPreviewBytes",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Preview Bytes",
-                DefaultValue = Defaults.MaxPreviewBytes,
-                Min = 1,
-                HelperText = "Maximum text preview size in bytes."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxFormattedChars",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Formatted Chars",
-                DefaultValue = Defaults.MaxFormattedChars,
-                Min = 1,
-                HelperText = "Maximum formatted preview size in characters."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "detectBase64",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Detect Base64",
-                DefaultValue = Defaults.DetectBase64,
-                HelperText = "Detect and summarize base64 text payloads."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "formatJson",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Format JSON",
-                DefaultValue = Defaults.FormatJson,
-                HelperText = "Create formatted previews for JSON payloads."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "formatXml",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Format XML",
-                DefaultValue = Defaults.FormatXml,
-                HelperText = "Create formatted previews for XML payloads."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = Defaults.BoundedCapacity,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            }
-        ];
+        AddPayloadInspectOptions(builder);
+        AddPayloadInspectResources(builder);
+        AddPayloadInspectPorts(builder);
 
-    private static IReadOnlyList<ResourceDesignMetadata> PayloadInspectResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = PayloadsCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic payload inspection results and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+        return builder.Build();
+    }
 
-    private static IReadOnlyList<PortDesignMetadata> PayloadInspectPorts()
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(PayloadsCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Payload inspection request.",
-                ValueType = nameof(PayloadInspectionRequest),
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(PayloadsCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = "Payload inspection result.",
-                ValueType = nameof(PayloadInspectionResult),
-                IsPrimary = true
-            }
-        ];
+    private static void AddPayloadInspectOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "maxInputBytes",
+                OptionValueKind.Number,
+                displayName: "Max Input Bytes",
+                helperText: "Maximum input payload size to inspect.",
+                defaultValue: Defaults.MaxInputBytes,
+                min: 1)
+            .AddOption(
+                "maxPreviewBytes",
+                OptionValueKind.Number,
+                displayName: "Max Preview Bytes",
+                helperText: "Maximum text preview size in bytes.",
+                defaultValue: Defaults.MaxPreviewBytes,
+                min: 1)
+            .AddOption(
+                "maxFormattedChars",
+                OptionValueKind.Number,
+                displayName: "Max Formatted Chars",
+                helperText: "Maximum formatted preview size in characters.",
+                defaultValue: Defaults.MaxFormattedChars,
+                min: 1)
+            .AddOption(
+                "detectBase64",
+                OptionValueKind.Boolean,
+                displayName: "Detect Base64",
+                helperText: "Detect and summarize base64 text payloads.",
+                defaultValue: Defaults.DetectBase64)
+            .AddOption(
+                "formatJson",
+                OptionValueKind.Boolean,
+                displayName: "Format JSON",
+                helperText: "Create formatted previews for JSON payloads.",
+                defaultValue: Defaults.FormatJson)
+            .AddOption(
+                "formatXml",
+                OptionValueKind.Boolean,
+                displayName: "Format XML",
+                helperText: "Create formatted previews for XML payloads.",
+                defaultValue: Defaults.FormatXml)
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: Defaults.BoundedCapacity,
+                min: 1);
+
+    private static void AddPayloadInspectResources(ComponentDesignMetadataBuilder builder)
+        => builder.AddResource(
+            PayloadsCompositionResourceNames.Clock,
+            displayName: "Clock",
+            order: 0,
+            summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
+            valueType: nameof(TimeProvider));
+
+    private static void AddPayloadInspectPorts(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddInputPort(
+                PayloadsCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Payload inspection request.",
+                valueType: nameof(PayloadInspectionRequest),
+                isPrimary: true)
+            .AddOutputPort(
+                PayloadsCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Payload inspection result.",
+                valueType: nameof(PayloadInspectionResult),
+                isPrimary: true);
 }
