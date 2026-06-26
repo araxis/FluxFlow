@@ -92,3 +92,5 @@ validators, or documentation views.
 Path safety remains runtime configuration through `baseDirectory` and
 `allowAbsolutePaths`. The optional `clock` resource remains host-owned and is
 not represented as an editable node option.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.

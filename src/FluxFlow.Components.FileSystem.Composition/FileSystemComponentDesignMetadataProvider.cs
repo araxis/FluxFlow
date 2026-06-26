@@ -22,161 +22,167 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         ];
 
     private static ComponentDesignMetadata CreateReadMetadata()
-        => CreateFileSystemMetadata(
+    {
+        var builder = CreateFileSystemMetadataBuilder(
             FileSystemCompositionNodeTypes.Read,
             "File Read",
             "Reads text or bytes from a file path using configured path policy.",
             "file-input",
-            "readFile",
-            [
-                BoundedCapacityOption(ReadDefaults.BoundedCapacity),
-                BaseDirectoryOption(),
-                AllowAbsolutePathsOption(ReadDefaults.AllowAbsolutePaths),
-                DefaultEncodingOption(ReadDefaults.DefaultEncoding),
-                new OptionDesignMetadata
-                {
-                    Name = "maxBytes",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Max Bytes",
-                    DefaultValue = ReadDefaults.MaxBytes,
-                    Min = 1,
-                    HelperText = "Optional maximum file size to read. Leave empty for unlimited reads."
-                }
-            ],
-            TransformPorts(
-                nameof(FileReadRequest),
-                "File read request.",
-                nameof(FileReadResult),
-                "File read result."));
+            "readFile");
+
+        builder
+            .AddOption(BoundedCapacityOption(ReadDefaults.BoundedCapacity))
+            .AddOption(BaseDirectoryOption())
+            .AddOption(AllowAbsolutePathsOption(ReadDefaults.AllowAbsolutePaths))
+            .AddOption(DefaultEncodingOption(ReadDefaults.DefaultEncoding))
+            .AddOption(
+                "maxBytes",
+                OptionValueKind.Number,
+                displayName: "Max Bytes",
+                helperText: "Optional maximum file size to read. Leave empty for unlimited reads.",
+                defaultValue: ReadDefaults.MaxBytes,
+                min: 1);
+
+        AddTransformPorts(
+            builder,
+            nameof(FileReadRequest),
+            "File read request.",
+            nameof(FileReadResult),
+            "File read result.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateWriteMetadata()
-        => CreateFileSystemMetadata(
+    {
+        var builder = CreateFileSystemMetadataBuilder(
             FileSystemCompositionNodeTypes.Write,
             "File Write",
             "Writes text or bytes to a file path using configured path policy.",
             "file-output",
-            "writeFile",
-            [
-                BoundedCapacityOption(WriteDefaults.BoundedCapacity),
-                BaseDirectoryOption(),
-                AllowAbsolutePathsOption(WriteDefaults.AllowAbsolutePaths),
-                DefaultEncodingOption(WriteDefaults.DefaultEncoding)
-            ],
-            TransformPorts(
-                nameof(FileWriteRequest),
-                "File write request.",
-                nameof(FileWriteResult),
-                "File write result."));
+            "writeFile");
+
+        builder
+            .AddOption(BoundedCapacityOption(WriteDefaults.BoundedCapacity))
+            .AddOption(BaseDirectoryOption())
+            .AddOption(AllowAbsolutePathsOption(WriteDefaults.AllowAbsolutePaths))
+            .AddOption(DefaultEncodingOption(WriteDefaults.DefaultEncoding));
+
+        AddTransformPorts(
+            builder,
+            nameof(FileWriteRequest),
+            "File write request.",
+            nameof(FileWriteResult),
+            "File write result.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateDirectoryEnumerateMetadata()
-        => CreateFileSystemMetadata(
+    {
+        var builder = CreateFileSystemMetadataBuilder(
             FileSystemCompositionNodeTypes.DirectoryEnumerate,
             "Directory Enumerate",
             "Enumerates matching files and directories from a configured directory.",
             "folder-search",
-            "enumerateDirectory",
-            [
-                BoundedCapacityOption(EnumerateDefaults.BoundedCapacity),
-                DirectoryOption(EnumerateDefaults.Directory),
-                FilterOption(EnumerateDefaults.Filter),
-                new OptionDesignMetadata
-                {
-                    Name = "includeSubdirectories",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Subdirectories",
-                    DefaultValue = EnumerateDefaults.IncludeSubdirectories,
-                    HelperText = "Enumerate entries below child directories."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "includeFiles",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Files",
-                    DefaultValue = EnumerateDefaults.IncludeFiles,
-                    HelperText = "Emit matching file entries."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "includeDirectories",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Directories",
-                    DefaultValue = EnumerateDefaults.IncludeDirectories,
-                    HelperText = "Emit matching directory entries."
-                },
-                BaseDirectoryOption(),
-                AllowAbsolutePathsOption(EnumerateDefaults.AllowAbsolutePaths),
-                new OptionDesignMetadata
-                {
-                    Name = "maxEntries",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Max Entries",
-                    Min = 1,
-                    HelperText = "Optional maximum number of entries to emit."
-                }
-            ],
-            SourcePorts(nameof(DirectoryEnumerateEntry), "Directory entry."));
+            "enumerateDirectory");
+
+        builder
+            .AddOption(BoundedCapacityOption(EnumerateDefaults.BoundedCapacity))
+            .AddOption(DirectoryOption(EnumerateDefaults.Directory))
+            .AddOption(FilterOption(EnumerateDefaults.Filter))
+            .AddOption(
+                "includeSubdirectories",
+                OptionValueKind.Boolean,
+                displayName: "Include Subdirectories",
+                helperText: "Enumerate entries below child directories.",
+                defaultValue: EnumerateDefaults.IncludeSubdirectories)
+            .AddOption(
+                "includeFiles",
+                OptionValueKind.Boolean,
+                displayName: "Include Files",
+                helperText: "Emit matching file entries.",
+                defaultValue: EnumerateDefaults.IncludeFiles)
+            .AddOption(
+                "includeDirectories",
+                OptionValueKind.Boolean,
+                displayName: "Include Directories",
+                helperText: "Emit matching directory entries.",
+                defaultValue: EnumerateDefaults.IncludeDirectories)
+            .AddOption(BaseDirectoryOption())
+            .AddOption(AllowAbsolutePathsOption(EnumerateDefaults.AllowAbsolutePaths))
+            .AddOption(
+                "maxEntries",
+                OptionValueKind.Number,
+                displayName: "Max Entries",
+                helperText: "Optional maximum number of entries to emit.",
+                min: 1);
+
+        AddSourcePort(builder, nameof(DirectoryEnumerateEntry), "Directory entry.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateWatchMetadata()
-        => CreateFileSystemMetadata(
+    {
+        var builder = CreateFileSystemMetadataBuilder(
             FileSystemCompositionNodeTypes.Watch,
             "File Watch",
             "Watches a configured directory and emits file change events.",
             "folder-sync",
-            "watchFiles",
-            [
-                BoundedCapacityOption(WatchDefaults.BoundedCapacity),
-                DirectoryOption(WatchDefaults.Directory),
-                BaseDirectoryOption(),
-                AllowAbsolutePathsOption(WatchDefaults.AllowAbsolutePaths),
-                FilterOption(WatchDefaults.Filter),
-                new OptionDesignMetadata
-                {
-                    Name = "includeSubdirectories",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Subdirectories",
-                    DefaultValue = WatchDefaults.IncludeSubdirectories,
-                    HelperText = "Watch child directories."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "notifyFilters",
-                    Kind = OptionValueKind.Json,
-                    DisplayName = "Notify Filters",
-                    DefaultValue = WatchDefaults.NotifyFilters,
-                    HelperText = "Optional array of FileSystemWatcher notify filter names."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "internalBufferSize",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Internal Buffer Size",
-                    Min = 4096,
-                    Max = 65536,
-                    HelperText = "Optional watcher buffer size in bytes."
-                }
-            ],
-            SourcePorts(nameof(FileWatchEvent), "File watch event."));
+            "watchFiles");
 
-    private static ComponentDesignMetadata CreateFileSystemMetadata(
+        builder
+            .AddOption(BoundedCapacityOption(WatchDefaults.BoundedCapacity))
+            .AddOption(DirectoryOption(WatchDefaults.Directory))
+            .AddOption(BaseDirectoryOption())
+            .AddOption(AllowAbsolutePathsOption(WatchDefaults.AllowAbsolutePaths))
+            .AddOption(FilterOption(WatchDefaults.Filter))
+            .AddOption(
+                "includeSubdirectories",
+                OptionValueKind.Boolean,
+                displayName: "Include Subdirectories",
+                helperText: "Watch child directories.",
+                defaultValue: WatchDefaults.IncludeSubdirectories)
+            .AddOption(
+                "notifyFilters",
+                OptionValueKind.Json,
+                displayName: "Notify Filters",
+                helperText: "Optional array of FileSystemWatcher notify filter names.",
+                defaultValue: WatchDefaults.NotifyFilters)
+            .AddOption(
+                "internalBufferSize",
+                OptionValueKind.Number,
+                displayName: "Internal Buffer Size",
+                helperText: "Optional watcher buffer size in bytes.",
+                min: 4096,
+                max: 65536);
+
+        AddSourcePort(builder, nameof(FileWatchEvent), "File watch event.");
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadataBuilder CreateFileSystemMetadataBuilder(
         string type,
         string displayName,
         string summary,
         string iconKey,
-        string preferredNodeName,
-        IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "FileSystem",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 460,
-            Options = options,
-            Resources = ClockResources(),
-            Ports = ports
-        };
+        string preferredNodeName)
+        => new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "FileSystem",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 460)
+            .AddResource(
+                FileSystemCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 0,
+                summary: "Optional keyed clock for deterministic file-system diagnostics and timestamps.",
+                valueType: nameof(TimeProvider));
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
@@ -234,65 +240,40 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         IsRequired = true
     };
 
-    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = FileSystemCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic file-system diagnostics and timestamps.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
-
-    private static IReadOnlyList<PortDesignMetadata> TransformPorts(
+    private static void AddTransformPorts(
+        ComponentDesignMetadataBuilder builder,
         string inputType,
         string inputSummary,
         string outputType,
         string outputSummary)
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(FileSystemCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = inputSummary,
-                ValueType = inputType,
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(FileSystemCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = outputSummary,
-                ValueType = outputType,
-                IsPrimary = true
-            }
-        ];
+        => builder
+            .AddInputPort(
+                FileSystemCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: inputSummary,
+                valueType: inputType,
+                isPrimary: true)
+            .AddOutputPort(
+                FileSystemCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: outputSummary,
+                valueType: outputType,
+                isPrimary: true);
 
-    private static IReadOnlyList<PortDesignMetadata> SourcePorts(
+    private static void AddSourcePort(
+        ComponentDesignMetadataBuilder builder,
         string outputType,
         string outputSummary)
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(FileSystemCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Messages",
-                Order = 0,
-                Summary = outputSummary,
-                ValueType = outputType,
-                IsPrimary = true
-            }
-        ];
+        => builder.AddOutputPort(
+            FileSystemCompositionPortNames.Output,
+            displayName: "Output",
+            group: "Messages",
+            order: 0,
+            summary: outputSummary,
+            valueType: outputType,
+            isPrimary: true);
 }

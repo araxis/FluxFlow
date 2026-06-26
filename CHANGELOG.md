@@ -186,6 +186,16 @@ Uses the shared Designer metadata builder for event expectation metadata.
 - Preserves existing event expectation options, clock resources, fixed ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.FileSystem.Composition 1.3.2
+
+Uses the shared Designer metadata builder for file-system metadata.
+
+- Refactors `FileSystemComponentDesignMetadataProvider` to author file read,
+  file write, directory enumerate, and file watch metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing file-system options, clock resources, fixed ports, source
+  outputs, validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
