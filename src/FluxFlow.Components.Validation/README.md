@@ -40,6 +40,9 @@ await node.Input.SendAsync(FlowMessage.Create(order));
 `Schema` or `SchemaPath`), so the node never performs File I/O or compilation in
 its pump. A missing or malformed schema throws `InvalidOperationException` at
 that point — configuration mistakes fail fast.
+Node construction also validates option shape before the pipeline is created:
+blank `InputType` and non-positive `BoundedCapacity` values fail with
+`json.schema-validator` construction errors.
 
 ## Value selectors
 
@@ -98,3 +101,6 @@ Use custom node type strings for multiple input shapes, for example
 `json.schema-validator.order` and `json.schema-validator.http`. `InputType`
 remains diagnostic metadata; the CLR port type comes from the closed generic
 registration.
+Invalid `JsonSchemaValidatorOptions`, such as blank `inputType` or non-positive
+`boundedCapacity`, fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.

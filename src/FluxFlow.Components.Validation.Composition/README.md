@@ -86,6 +86,10 @@ does not perform file I/O or schema compilation in its message pump.
 composition port type comes from the closed generic registration selected by the
 host.
 
+Invalid `JsonSchemaValidatorOptions`, such as blank `inputType` or non-positive
+`boundedCapacity`, fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.
+
 ## Design Metadata
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata for

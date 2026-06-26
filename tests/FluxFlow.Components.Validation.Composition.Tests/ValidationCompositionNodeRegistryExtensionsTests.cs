@@ -424,6 +424,41 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains("schema", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData("boundedCapacity", 0, "boundedCapacity")]
+    [InlineData("inputType", " ", "inputType")]
+    public async Task Invalid_validator_options_surface_factory_diagnostic(
+        string optionName,
+        object optionValue,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "validate",
+                    ValidationCompositionNodeTypes.JsonSchemaValidator,
+                    node => node
+                        .Configure("schema", StringSchemaJson())
+                        .Configure(optionName, optionValue)))
+                .Build())
+            .RegisterNodes(registry =>
+                registry.RegisterJsonSchemaValidator<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static JsonElement OrderSchemaJson()
         => JsonSerializer.SerializeToElement(new
         {

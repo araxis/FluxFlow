@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Validation 3.0.1
+
+Aligns JSON schema validator constructor option validation with the standalone
+node conventions.
+
+- `JsonSchemaValidatorNode<TInput>` now validates `JsonSchemaValidatorOptions`
+  before the base node pipeline is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  `json.schema-validator` construction errors.
+- Runtime validation behavior, schema evaluation, and routing through
+  `Valid`/`Invalid` are unchanged.
+
+## FluxFlow.Components.Validation.Composition 1.2.1
+
+Hardens config-bound validation option diagnostics.
+
+- Invalid `JsonSchemaValidatorOptions` values now fail during composition build
+  through the `json.schema-validator` factory.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
 ## FluxFlow.Components.Routing 3.0.1
 
 Aligns routing node constructor option validation with the standalone node
