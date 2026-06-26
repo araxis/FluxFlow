@@ -671,7 +671,9 @@ resource through the host.
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.expectation` composition node, including existing expectation
 options, fixed ports, and a resource hint for the optional `clock` resource.
-Completion result flushing remains a direct node API in this composition pass.
+The provider authors that metadata through the shared validated Designer
+metadata builder. Completion result flushing remains a direct node API in this
+composition pass.
 
 ## MQTT Composition
 
