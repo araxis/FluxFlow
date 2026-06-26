@@ -16,11 +16,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_packages_ship_designer_metadata_providers()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         entries.ShouldNotBeEmpty("component composition packages should be listed in the release manifest.");
 
@@ -63,11 +59,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_designer_metadata_providers_validate_at_runtime()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -102,11 +94,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_designer_metadata_matches_default_registry_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -154,11 +142,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_concrete_port_value_types_match_registry_message_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -202,11 +186,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_registry_extensions_are_discoverable_and_default_invokable()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -282,11 +262,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var publicApiOverview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -324,11 +300,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var publicApiOverview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
         var changelog = File.ReadAllText(Path.Combine(root, "CHANGELOG.md"));
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -366,11 +338,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_node_types_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -411,11 +379,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_node_types_are_used_by_registry_extensions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -456,11 +420,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_resource_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -514,11 +474,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_resource_names_are_used_by_registry_extensions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -573,11 +529,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_resource_requiredness_matches_factory_lookups()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -665,11 +617,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_port_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -723,11 +671,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_port_names_are_used_by_registry_extensions()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -781,11 +725,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var sourceFiles = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
             .ToArray();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -850,11 +790,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         var sourceFiles = Directory
             .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
             .ToArray();
-        var entries = PackageManifest
-            .Read(root)
-            .Where(IsComponentCompositionPackage)
-            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
-            .ToArray();
+        var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
@@ -921,6 +857,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private static bool IsComponentCompositionPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal)
             && entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal);
+
+    private static PackageManifestEntry[] ReadComponentCompositionPackages(string root)
+        => PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
 
     private static IEnumerable<string> ReadReferencedPackageIds(
         XDocument project,
