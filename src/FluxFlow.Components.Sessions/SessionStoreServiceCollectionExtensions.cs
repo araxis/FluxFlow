@@ -23,8 +23,10 @@ public static class SessionStoreServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(storeFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<ISessionStore>(
-            name,
+            normalizedName,
             (provider, _) => storeFactory(provider)
                 ?? throw new InvalidOperationException("Session store provider returned null."));
 
@@ -49,8 +51,10 @@ public static class SessionStoreServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(storeFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<ISessionStoreFactory>(
-            name,
+            normalizedName,
             (provider, _) => storeFactory(provider)
                 ?? throw new InvalidOperationException("Session store factory provider returned null."));
 

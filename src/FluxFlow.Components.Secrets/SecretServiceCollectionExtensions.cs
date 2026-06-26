@@ -25,8 +25,10 @@ public static class SecretServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(resolverFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<ISecretResolver>(
-            name,
+            normalizedName,
             (provider, _) => resolverFactory(provider)
                 ?? throw new InvalidOperationException("Secret resolver factory returned null."));
 
@@ -54,8 +56,10 @@ public static class SecretServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(descriptorProviderFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<ISecretDescriptorProvider>(
-            name,
+            normalizedName,
             (provider, _) => descriptorProviderFactory(provider)
                 ?? throw new InvalidOperationException("Secret descriptor provider factory returned null."));
 

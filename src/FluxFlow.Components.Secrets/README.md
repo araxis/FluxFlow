@@ -98,6 +98,9 @@ services
     .AddFluxFlowSecretDescriptorProvider("declared-secrets", descriptorProvider);
 ```
 
+Keyed DI helper names are trimmed before registration, matching the normalization
+used by `SecretName` and configuration-bound secret references.
+
 Resolver registration does not automatically register a descriptor provider
 because descriptor enumeration is optional. Register
 `ISecretDescriptorProvider` separately when a resolver can safely expose
