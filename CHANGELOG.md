@@ -23,6 +23,22 @@ Hardens adapter-local MQTT client DI registration.
 - Reports a clear registration error when an options factory returns null
   before the keyed client session is created.
 
+## FluxFlow.Components.Storage.FileSystem 3.3.1
+
+Hardens keyed storage backend DI registration.
+
+- Reports a clear registration error when options factories return null before
+  creating keyed direct stores or keyed store factories.
+- Keeps direct options overloads strict and documented.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.1
+
+Hardens keyed storage backend DI registration.
+
+- Reports a clear registration error when options factories return null before
+  creating keyed direct stores or keyed store factories.
+- Keeps direct options overloads strict and documented.
+
 ## FluxFlow.Components.Resources 1.5.0
 
 Adds keyed resource registration helpers.

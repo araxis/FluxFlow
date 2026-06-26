@@ -25,7 +25,10 @@ public static class SqlFileStorageServiceCollectionExtensions
 
         services.AddKeyedSingleton<IStorageStore>(
             name,
-            (provider, _) => new SqlFileStorageStore(optionsFactory(provider)));
+            (provider, _) => new SqlFileStorageStore(
+                optionsFactory(provider)
+                    ?? throw new InvalidOperationException(
+                        "SQL-file storage options factory returned null.")));
 
         return services;
     }
@@ -50,7 +53,10 @@ public static class SqlFileStorageServiceCollectionExtensions
 
         services.AddKeyedSingleton<IStorageStoreFactory>(
             name,
-            (provider, _) => new SqlFileStorageStoreFactory(optionsFactory(provider)));
+            (provider, _) => new SqlFileStorageStoreFactory(
+                optionsFactory(provider)
+                    ?? throw new InvalidOperationException(
+                        "SQL-file storage options factory returned null.")));
 
         return services;
     }

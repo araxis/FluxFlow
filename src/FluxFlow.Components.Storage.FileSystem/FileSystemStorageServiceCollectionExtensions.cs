@@ -25,7 +25,10 @@ public static class FileSystemStorageServiceCollectionExtensions
 
         services.AddKeyedSingleton<IStorageStore>(
             name,
-            (provider, _) => new FileSystemStorageStore(optionsFactory(provider)));
+            (provider, _) => new FileSystemStorageStore(
+                optionsFactory(provider)
+                    ?? throw new InvalidOperationException(
+                        "File-system storage options factory returned null.")));
 
         return services;
     }
@@ -50,7 +53,10 @@ public static class FileSystemStorageServiceCollectionExtensions
 
         services.AddKeyedSingleton<IStorageStoreFactory>(
             name,
-            (provider, _) => new FileSystemStorageStoreFactory(optionsFactory(provider)));
+            (provider, _) => new FileSystemStorageStoreFactory(
+                optionsFactory(provider)
+                    ?? throw new InvalidOperationException(
+                        "File-system storage options factory returned null.")));
 
         return services;
     }
