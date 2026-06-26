@@ -2,6 +2,12 @@ namespace FluxFlow.Components.Secrets.Contracts;
 
 internal static class SecretContractMap
 {
+    public static IReadOnlyDictionary<string, string> Copy(
+        IReadOnlyDictionary<string, string>? values)
+        => values is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(values, StringComparer.Ordinal);
+
     public static IReadOnlyDictionary<string, string>? NormalizeOrPreserveInvalid(
         IReadOnlyDictionary<string, string>? values)
     {

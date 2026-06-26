@@ -450,6 +450,35 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Diagnostic_metadata_is_copied_and_null_assignments_become_empty()
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["path"] = "secrets[0]"
+        };
+
+        var diagnostic = new SecretDiagnostic
+        {
+            Code = SecretDiagnosticCode.InvalidSecret,
+            Severity = SecretDiagnosticSeverity.Error,
+            Message = "Invalid secret.",
+            Metadata = metadata
+        };
+        var emptyMetadataDiagnostic = new SecretDiagnostic
+        {
+            Code = SecretDiagnosticCode.MissingSecret,
+            Severity = SecretDiagnosticSeverity.Error,
+            Message = "Missing secret.",
+            Metadata = null!
+        };
+
+        metadata["path"] = "changed";
+
+        diagnostic.Metadata["path"].ShouldBe("secrets[0]");
+        emptyMetadataDiagnostic.Metadata.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Diagnostic_and_result_formatting_do_not_emit_metadata_values()
     {
         var diagnostic = new SecretDiagnostic

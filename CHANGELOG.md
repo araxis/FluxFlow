@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.2.6
+
+Hardens secret diagnostic metadata handling.
+
+- `SecretDiagnostic` now copies assigned metadata so callers cannot mutate a
+  diagnostic after construction by changing the source dictionary.
+- Null diagnostic metadata assignments now produce an empty metadata map.
+- Existing diagnostic string formatting remains metadata-safe.
+
 ## FluxFlow.Components.Resources 1.2.5
 
 Hardens resource diagnostic metadata handling.
