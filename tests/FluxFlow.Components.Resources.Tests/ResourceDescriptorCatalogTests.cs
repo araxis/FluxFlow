@@ -169,8 +169,14 @@ public sealed class ResourceDescriptorCatalogTests
         Should.Throw<ArgumentNullException>(() =>
             ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(null!, "resources", lookup))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(null!, "resources", (IResourceLookup)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowResourceLookup(" ", lookup))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceLookup(" ", (IResourceLookup)null!))
             .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowResourceLookup("resources", (IResourceLookup)null!))
@@ -185,8 +191,17 @@ public sealed class ResourceDescriptorCatalogTests
                 "resources",
                 descriptorProvider))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceServiceCollectionExtensions.AddFluxFlowResourceDescriptorProvider(
+                null!,
+                "resources",
+                (IResourceDescriptorProvider)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowResourceDescriptorProvider(" ", descriptorProvider))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceDescriptorProvider(" ", (IResourceDescriptorProvider)null!))
             .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowResourceDescriptorProvider(

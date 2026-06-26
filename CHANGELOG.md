@@ -7,6 +7,22 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.5.1
+
+Hardens resource keyed DI registration helper validation.
+
+- Direct resource lookup and descriptor-provider overloads now validate the
+  service collection and resource key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
+## FluxFlow.Components.Secrets 1.5.1
+
+Hardens secret keyed DI registration helper validation.
+
+- Direct secret resolver and descriptor-provider overloads now validate the
+  service collection and secret key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
 ## FluxFlow.Components.Storage.FileSystem 3.3.3
 
 Hardens file-system storage adapter registration helpers.

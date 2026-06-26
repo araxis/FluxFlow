@@ -88,8 +88,14 @@ public sealed class SecretServiceCollectionExtensionsTests
         Should.Throw<ArgumentNullException>(() =>
             SecretServiceCollectionExtensions.AddFluxFlowSecretResolver(null!, "secrets", resolver))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretServiceCollectionExtensions.AddFluxFlowSecretResolver(null!, "secrets", (ISecretResolver)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowSecretResolver(" ", resolver))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowSecretResolver(" ", (ISecretResolver)null!))
             .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowSecretResolver("secrets", (ISecretResolver)null!))
@@ -104,8 +110,17 @@ public sealed class SecretServiceCollectionExtensionsTests
                 "secrets",
                 descriptorProvider))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretServiceCollectionExtensions.AddFluxFlowSecretDescriptorProvider(
+                null!,
+                "secrets",
+                (ISecretDescriptorProvider)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowSecretDescriptorProvider(" ", descriptorProvider))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowSecretDescriptorProvider(" ", (ISecretDescriptorProvider)null!))
             .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowSecretDescriptorProvider(

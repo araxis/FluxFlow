@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Resources</PackageId>
     <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
-    <Version>1.5.0</Version>
+    <Version>1.5.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable named resource contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds keyed DI registration helpers for host-owned resource lookups and descriptor providers.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens keyed DI registration helper argument validation ordering for direct lookup and descriptor-provider overloads.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

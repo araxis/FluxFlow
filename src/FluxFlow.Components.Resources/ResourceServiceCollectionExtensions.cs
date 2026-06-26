@@ -9,7 +9,10 @@ public static class ResourceServiceCollectionExtensions
         string name,
         IResourceLookup lookup)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(lookup);
+
         return services.AddFluxFlowResourceLookup(name, _ => lookup);
     }
 
@@ -38,7 +41,10 @@ public static class ResourceServiceCollectionExtensions
         string name,
         IResourceDescriptorProvider descriptorProvider)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(descriptorProvider);
+
         return services.AddFluxFlowResourceDescriptorProvider(name, _ => descriptorProvider);
     }
 
