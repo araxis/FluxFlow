@@ -14,6 +14,8 @@ is controlled, how values are refreshed, and how ownership is handled.
 - `SecretDescriptor`: non-sensitive metadata for a declared secret.
 - `SecretValue`: resolved value wrapper with redacted string formatting.
 - `ISecretResolver`: runtime abstraction for resolving a reference.
+- `ISecretDescriptorProvider`: optional capability for resolvers that can list
+  non-sensitive secret descriptors.
 - `SecretResolveResult`: resolved value or structured diagnostic.
 - `SecretOptionReference`: an option path plus optional secret reference.
 - `SecretOptionResolver`: helper for resolving required or optional secret
@@ -53,6 +55,17 @@ var result = await resolver.ResolveAsync(new SecretReference
 
 Console.WriteLine(result.Resolved);
 Console.WriteLine(result.Value);
+```
+
+Resolvers that can safely list declared non-sensitive descriptors can implement
+`ISecretDescriptorProvider`:
+
+```csharp
+if (resolver is ISecretDescriptorProvider descriptorProvider)
+{
+    foreach (var descriptor in descriptorProvider.GetDescriptors())
+        Console.WriteLine(descriptor.Name);
+}
 ```
 
 Fluent in-memory resolver construction is available for local hosts and tests:
@@ -136,6 +149,9 @@ such as `Kind`.
 This package does not own concrete secret storage. It only defines neutral
 contracts and helper logic. Hosts own persistence, access control, refresh,
 rotation, auditing, and disposal.
+`ISecretDescriptorProvider` is intentionally separate from `ISecretResolver` so
+resolvers can support runtime resolution without exposing descriptor
+enumeration.
 `InMemorySecretResolverBuilder` only creates in-memory records and resolver
 instances; it is not a storage, refresh, or access-control model.
 

@@ -768,9 +768,9 @@ These packages are intentionally not standalone node composition adapters:
   existing descriptor/catalog contracts.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
-  option paths, null-safe normalized metadata validation, defensive diagnostic
-  metadata copying, and a fluent `InMemorySecretResolverBuilder` for local
-  secret record authoring.
+  option paths, optional non-sensitive descriptor enumeration, null-safe
+  normalized metadata validation, defensive diagnostic metadata copying, and a
+  fluent `InMemorySecretResolverBuilder` for local secret record authoring.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services, including deterministic most-specific context factory lookup.

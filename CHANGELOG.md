@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.4.0
+
+Adds optional secret descriptor enumeration.
+
+- Adds `ISecretDescriptorProvider` to `FluxFlow.Components.Secrets` for
+  resolvers that can safely list non-sensitive `SecretDescriptor` metadata.
+- Keeps `ISecretResolver` focused on runtime resolution and leaves descriptor
+  enumeration as an optional capability.
+
 ## FluxFlow.Components.Configuration 1.3.0
 
 Adds range helpers to the configuration validation request builder.
