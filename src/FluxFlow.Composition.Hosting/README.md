@@ -78,6 +78,8 @@ foreach (var diagnostic in host.Diagnostics)
 
 By default the hosted service builds and starts the runtime with the host and
 throws `CompositionHostingException` if the composition cannot be built.
+`CompositionHostingException.Diagnostics` is a construction-time snapshot, so
+callers can safely keep the exception as stable build-failure evidence.
 Hosted and manual start/stop calls are idempotent at the hosting boundary: a
 runtime that is already started is not started again, and a runtime that has
 already been stopped is not completed or started again.

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition.Hosting</PackageId>
     <AssemblyName>FluxFlow.Composition.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Composition.Hosting</RootNamespace>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional hosting bridge for FluxFlow.Composition that builds standalone compositions from DI/configuration, starts them with host lifecycle, and resolves adapter-owned keyed resources.</Description>
     <PackageTags>workflow;dataflow;composition;hosting</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Hardens composition hosting registration contracts by validating direct definition/configuration sources and null registration arguments consistently.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens CompositionHostingException diagnostics by snapshotting diagnostic collections at construction.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

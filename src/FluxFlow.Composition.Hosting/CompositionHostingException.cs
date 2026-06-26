@@ -10,7 +10,7 @@ public sealed class CompositionHostingException : Exception
         Exception? innerException = null)
         : base(message, innerException)
     {
-        Diagnostics = diagnostics;
+        Diagnostics = diagnostics?.ToArray() ?? [];
     }
 
     public IReadOnlyList<CompositionDiagnostic> Diagnostics { get; }

@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 1.0.4
+
+Hardens composition hosting exception diagnostics.
+
+- `CompositionHostingException` now snapshots diagnostics at construction so
+  later caller-side collection mutations cannot change exception evidence.
+- Null diagnostics passed to the exception constructor now produce an empty
+  diagnostic collection.
+
 ## FluxFlow.Composition 1.0.7
 
 Hardens composition definition validation for malformed mutable DTO entries.
