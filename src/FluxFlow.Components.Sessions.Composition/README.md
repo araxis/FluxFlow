@@ -84,3 +84,5 @@ resources. Concrete `ISessionStore` instances, `ISessionStoreFactory`
 registrations, and optional keyed `TimeProvider` clocks remain host-owned
 resources and are not modeled as editable node options; the `store` option
 remains only diagnostic/config metadata.
+The provider authors that metadata through the shared validated Designer
+metadata builder.

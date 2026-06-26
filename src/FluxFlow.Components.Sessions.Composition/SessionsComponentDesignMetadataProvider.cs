@@ -22,210 +22,209 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         ];
 
     private static ComponentDesignMetadata CreateRecorderMetadata()
-        => CreateSessionMetadata(
+    {
+        var builder = CreateSessionMetadataBuilder(
             SessionsCompositionNodeTypes.Recorder,
             "Session Recorder",
             "Records incoming messages to a host-owned session store.",
             "history",
-            "recordSession",
-            [
-                StoreOption(),
-                SessionIdOption(isRequired: false),
-                new OptionDesignMetadata
-                {
-                    Name = "name",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Name",
-                    HelperText = "Optional session name stored with session metadata."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "notes",
-                    Kind = OptionValueKind.MultilineText,
-                    DisplayName = "Notes",
-                    HelperText = "Optional session notes stored with session metadata."
-                },
-                TagsOption(),
-                BoundedCapacityOption(RecorderDefaults.BoundedCapacity)
-            ],
-            TransformPorts(
-                nameof(SessionRecordInput),
-                "Session record input.",
-                nameof(SessionRecord),
-                "Stored session record."));
+            "recordSession");
+
+        builder
+            .AddOption(StoreOption())
+            .AddOption(SessionIdOption(isRequired: false))
+            .AddOption(
+                "name",
+                OptionValueKind.Text,
+                displayName: "Name",
+                helperText: "Optional session name stored with session metadata.")
+            .AddOption(
+                "notes",
+                OptionValueKind.MultilineText,
+                displayName: "Notes",
+                helperText: "Optional session notes stored with session metadata.")
+            .AddOption(TagsOption())
+            .AddOption(BoundedCapacityOption(RecorderDefaults.BoundedCapacity));
+
+        AddTransformPorts(
+            builder,
+            nameof(SessionRecordInput),
+            "Session record input.",
+            nameof(SessionRecord),
+            "Stored session record.");
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateReplayMetadata()
-        => CreateSessionMetadata(
+    {
+        var builder = CreateSessionMetadataBuilder(
             SessionsCompositionNodeTypes.Replay,
             "Session Replay",
             "Replays records from a host-owned session store as source messages.",
             "history-play",
-            "replaySession",
-            [
-                StoreOption(),
-                SessionIdOption(isRequired: true),
-                new OptionDesignMetadata
-                {
-                    Name = "mode",
-                    Kind = OptionValueKind.Enum,
-                    DisplayName = "Mode",
-                    DefaultValue = ReplayDefaults.Mode.ToString(),
-                    HelperText = "Timing mode used between replayed records.",
-                    Choices = ReplayModeChoices()
-                },
-                BoundedCapacityOption(ReplayDefaults.BoundedCapacity),
-                new OptionDesignMetadata
-                {
-                    Name = "startSequence",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Start Sequence",
-                    Min = 1,
-                    HelperText = "Optional first record sequence to replay."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "maxMessages",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Max Messages",
-                    Min = 1,
-                    HelperText = "Optional maximum number of messages to replay."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "fixedIntervalMilliseconds",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Fixed Interval Milliseconds",
-                    DefaultValue = ReplayDefaults.FixedIntervalMilliseconds,
-                    Min = 0,
-                    HelperText = "Delay used by FixedInterval replay mode."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "speedMultiplier",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Speed Multiplier",
-                    DefaultValue = ReplayDefaults.SpeedMultiplier,
-                    Min = PositiveDoubleMin,
-                    HelperText = "Multiplier used by Multiplier replay mode; must be greater than zero."
-                }
-            ],
-            [
-                OutputPort(
-                    SessionsCompositionPortNames.Output,
-                    "Output",
-                    "Messages",
-                    0,
-                    nameof(SessionRecord),
-                    "Replayed session record.",
-                    isPrimary: true)
-            ]);
+            "replaySession");
+
+        builder
+            .AddOption(StoreOption())
+            .AddOption(SessionIdOption(isRequired: true))
+            .AddOption(
+                "mode",
+                OptionValueKind.Enum,
+                displayName: "Mode",
+                helperText: "Timing mode used between replayed records.",
+                defaultValue: ReplayDefaults.Mode.ToString(),
+                choices: ReplayModeChoices())
+            .AddOption(BoundedCapacityOption(ReplayDefaults.BoundedCapacity))
+            .AddOption(
+                "startSequence",
+                OptionValueKind.Number,
+                displayName: "Start Sequence",
+                helperText: "Optional first record sequence to replay.",
+                min: 1)
+            .AddOption(
+                "maxMessages",
+                OptionValueKind.Number,
+                displayName: "Max Messages",
+                helperText: "Optional maximum number of messages to replay.",
+                min: 1)
+            .AddOption(
+                "fixedIntervalMilliseconds",
+                OptionValueKind.Number,
+                displayName: "Fixed Interval Milliseconds",
+                helperText: "Delay used by FixedInterval replay mode.",
+                defaultValue: ReplayDefaults.FixedIntervalMilliseconds,
+                min: 0)
+            .AddOption(
+                "speedMultiplier",
+                OptionValueKind.Number,
+                displayName: "Speed Multiplier",
+                helperText: "Multiplier used by Multiplier replay mode; must be greater than zero.",
+                defaultValue: ReplayDefaults.SpeedMultiplier,
+                min: PositiveDoubleMin);
+
+        builder.AddOutputPort(
+            SessionsCompositionPortNames.Output,
+            displayName: "Output",
+            group: "Messages",
+            order: 0,
+            summary: "Replayed session record.",
+            valueType: nameof(SessionRecord),
+            isPrimary: true);
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateQueryMetadata()
-        => CreateSessionMetadata(
+    {
+        var builder = CreateSessionMetadataBuilder(
             SessionsCompositionNodeTypes.Query,
             "Session Query",
             "Queries sessions and can fan matching sessions to a separate output.",
             "history-search",
-            "querySessions",
-            [
-                StoreOption(),
-                new OptionDesignMetadata
-                {
-                    Name = "name",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Name",
-                    HelperText = "Default exact session name filter."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "namePrefix",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Name Prefix",
-                    HelperText = "Default session name prefix filter."
-                },
-                TagsOption(),
-                new OptionDesignMetadata
-                {
-                    Name = "includeActive",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Active",
-                    DefaultValue = QueryDefaults.IncludeActive,
-                    HelperText = "Include active sessions in query results."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "includeCompleted",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Include Completed",
-                    DefaultValue = QueryDefaults.IncludeCompleted,
-                    HelperText = "Include completed sessions in query results."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "limit",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Limit",
-                    DefaultValue = QueryDefaults.Limit,
-                    Min = 1,
-                    HelperText = "Maximum number of sessions to return."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitSessionsInResult",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Sessions In Result",
-                    DefaultValue = QueryDefaults.EmitSessionsInResult,
-                    HelperText = "Include matching session metadata in the query result payload."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitSessionOutputs",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Session Outputs",
-                    DefaultValue = QueryDefaults.EmitSessionOutputs,
-                    HelperText = "Fan each matching session to the Sessions output."
-                },
-                BoundedCapacityOption(QueryDefaults.BoundedCapacity)
-            ],
-            [
-                InputPort(nameof(SessionQueryRequest), "Session query request."),
-                OutputPort(
-                    SessionsCompositionPortNames.Output,
-                    "Output",
-                    "Results",
-                    1,
-                    nameof(SessionQueryResult),
-                    "Session query result.",
-                    isPrimary: true),
-                OutputPort(
-                    SessionsCompositionPortNames.Sessions,
-                    "Sessions",
-                    "Sessions",
-                    2,
-                    nameof(SessionMetadata),
-                    "Matching session metadata.")
-            ]);
+            "querySessions");
 
-    private static ComponentDesignMetadata CreateSessionMetadata(
+        builder
+            .AddOption(StoreOption())
+            .AddOption(
+                "name",
+                OptionValueKind.Text,
+                displayName: "Name",
+                helperText: "Default exact session name filter.")
+            .AddOption(
+                "namePrefix",
+                OptionValueKind.Text,
+                displayName: "Name Prefix",
+                helperText: "Default session name prefix filter.")
+            .AddOption(TagsOption())
+            .AddOption(
+                "includeActive",
+                OptionValueKind.Boolean,
+                displayName: "Include Active",
+                helperText: "Include active sessions in query results.",
+                defaultValue: QueryDefaults.IncludeActive)
+            .AddOption(
+                "includeCompleted",
+                OptionValueKind.Boolean,
+                displayName: "Include Completed",
+                helperText: "Include completed sessions in query results.",
+                defaultValue: QueryDefaults.IncludeCompleted)
+            .AddOption(
+                "limit",
+                OptionValueKind.Number,
+                displayName: "Limit",
+                helperText: "Maximum number of sessions to return.",
+                defaultValue: QueryDefaults.Limit,
+                min: 1)
+            .AddOption(
+                "emitSessionsInResult",
+                OptionValueKind.Boolean,
+                displayName: "Emit Sessions In Result",
+                helperText: "Include matching session metadata in the query result payload.",
+                defaultValue: QueryDefaults.EmitSessionsInResult)
+            .AddOption(
+                "emitSessionOutputs",
+                OptionValueKind.Boolean,
+                displayName: "Emit Session Outputs",
+                helperText: "Fan each matching session to the Sessions output.",
+                defaultValue: QueryDefaults.EmitSessionOutputs)
+            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
+
+        builder
+            .AddInputPort(
+                SessionsCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Session query request.",
+                valueType: nameof(SessionQueryRequest),
+                isPrimary: true)
+            .AddOutputPort(
+                SessionsCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Session query result.",
+                valueType: nameof(SessionQueryResult),
+                isPrimary: true)
+            .AddOutputPort(
+                SessionsCompositionPortNames.Sessions,
+                displayName: "Sessions",
+                group: "Sessions",
+                order: 2,
+                summary: "Matching session metadata.",
+                valueType: nameof(SessionMetadata));
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadataBuilder CreateSessionMetadataBuilder(
         string type,
         string displayName,
         string summary,
         string iconKey,
-        string preferredNodeName,
-        IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Sessions",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 460,
-            Options = options,
-            Resources = SessionResources(),
-            Ports = ports
-        };
+        string preferredNodeName)
+        => new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Sessions",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 460)
+            .AddResource(
+                SessionsCompositionResourceNames.Store,
+                displayName: "Store",
+                order: 0,
+                summary: "Required keyed session store or store factory used to record, replay, or query sessions.",
+                valueType: $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}",
+                isRequired: true)
+            .AddResource(
+                SessionsCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
+                valueType: nameof(TimeProvider));
 
     private static OptionDesignMetadata StoreOption() => new()
     {
@@ -283,76 +282,27 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             HelperText = helperText
         };
 
-    private static IReadOnlyList<ResourceDesignMetadata> SessionResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = SessionsCompositionResourceNames.Store,
-                DisplayName = "Store",
-                Order = 0,
-                Summary = "Required keyed session store or store factory used to record, replay, or query sessions.",
-                ValueType = $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}",
-                IsRequired = true
-            },
-            new ResourceDesignMetadata
-            {
-                Name = SessionsCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 1,
-                Summary = "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
-
-    private static IReadOnlyList<PortDesignMetadata> TransformPorts(
+    private static void AddTransformPorts(
+        ComponentDesignMetadataBuilder builder,
         string inputType,
         string inputSummary,
         string outputType,
         string outputSummary)
-        =>
-        [
-            InputPort(inputType, inputSummary),
-            OutputPort(
-                SessionsCompositionPortNames.Output,
-                "Output",
-                "Results",
-                1,
-                outputType,
-                outputSummary,
+        => builder
+            .AddInputPort(
+                SessionsCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: inputSummary,
+                valueType: inputType,
                 isPrimary: true)
-        ];
-
-    private static PortDesignMetadata InputPort(
-        string valueType,
-        string summary) => new()
-        {
-            Name = new ComponentPortName(SessionsCompositionPortNames.Input),
-            Direction = PortDirection.Input,
-            DisplayName = "Input",
-            Group = "Messages",
-            Order = 0,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = true
-        };
-
-    private static PortDesignMetadata OutputPort(
-        string name,
-        string displayName,
-        string group,
-        int order,
-        string valueType,
-        string summary,
-        bool isPrimary = false) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Output,
-            DisplayName = displayName,
-            Group = group,
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+            .AddOutputPort(
+                SessionsCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: outputSummary,
+                valueType: outputType,
+                isPrimary: true);
 }
