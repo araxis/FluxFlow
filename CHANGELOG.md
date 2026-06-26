@@ -64,6 +64,16 @@ Uses the shared Designer metadata builder for mapper metadata.
 - Preserves the existing `flow.mapper` options, resources, ports, validation,
   catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Control.Composition 1.2.2
+
+Uses the shared Designer metadata builder for control metadata.
+
+- Refactors `ControlComponentDesignMetadataProvider` to author `flow.filter`
+  and `flow.when` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing control options, resources, port metadata, `flow.when`
+  output alias metadata, validation, catalog loading, and runtime composition
+  behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
