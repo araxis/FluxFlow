@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expressions 2.1.2
+
+Hardens keyed expression service registration.
+
+- `AddFluxFlowExpressionEngine(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowMapContextFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving expression services through normalized
+  keys.
+
 ## FluxFlow.Components.Secrets 1.5.4
 
 Hardens secret redaction guardrails.
