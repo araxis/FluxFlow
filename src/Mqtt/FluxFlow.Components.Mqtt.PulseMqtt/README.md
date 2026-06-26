@@ -68,18 +68,18 @@ services.AddFluxFlowMqttClient(
     });
 ```
 
-The extension registers one keyed `PulseMqttClient` and exposes the same singleton
-as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
+The extension registers one keyed `PulseMqttClient` and exposes the same
+singleton as keyed `IMqttPublisher`, `IMqttTriggerSource`, and
+`IMqttClientHealthSource`.
 
-By default, the registration adds a hosted lifetime and starts the client with the
-host. Set `StartWithHost = false` when the composition layer will start the
-client explicitly:
+By default, the registration does not add hosted lifetime. Set
+`StartWithHost = true` when the host should start and stop the client session:
 
 ```csharp
 services.AddFluxFlowMqttClient(
     "primary",
     options,
-    new MqttClientRegistrationOptions { StartWithHost = false });
+    new MqttClientRegistrationOptions { StartWithHost = true });
 ```
 
 Use `WaitForConnectedOnStart = true` only when application startup should wait for
