@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using FluxFlow.Components.Designer;
@@ -192,6 +193,85 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         metadata,
                         output,
                         PortDirection.Output);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void Component_composition_registry_extensions_are_discoverable_and_default_invokable()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var nodeTypesFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeTypes.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep node-type constants in one file.");
+            var nodeTypeValues = PublicStringConstantWithValueRegex()
+                .Matches(File.ReadAllText(nodeTypesFile))
+                .Select(match => match.Groups["value"].Value)
+                .ToHashSet(StringComparer.Ordinal);
+            var project = XDocument.Load(projectPath);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+
+            nodeTypeValues.ShouldNotBeEmpty(
+                $"{entry.PackageId} node-type file should expose at least one node type constant.");
+
+            foreach (var method in ReadRegistryMethods(assembly, entry.PackageId))
+            {
+                method.Name.StartsWith("Register", StringComparison.Ordinal)
+                    .ShouldBeTrue($"{entry.PackageId} registry method '{method.Name}' must use the Register* naming convention.");
+                method.IsDefined(typeof(ExtensionAttribute), inherit: false)
+                    .ShouldBeTrue($"{entry.PackageId} registry method '{method.Name}' must be an extension method.");
+
+                var parameters = method.GetParameters();
+                parameters[0].ParameterType.ShouldBe(
+                    typeof(CompositionNodeRegistry),
+                    $"{entry.PackageId} registry method '{method.Name}' must extend CompositionNodeRegistry.");
+
+                foreach (var parameter in parameters.Skip(1))
+                {
+                    parameter.HasDefaultValue.ShouldBeTrue(
+                        $"{entry.PackageId} registry method '{method.Name}' parameter '{parameter.Name}' must have a default value so default registration is discoverable.");
+
+                    if (parameter.ParameterType != typeof(string))
+                        continue;
+
+                    parameter.Name.ShouldBe(
+                        "nodeType",
+                        $"{entry.PackageId} registry method '{method.Name}' string parameter must be the optional nodeType override.");
+                    parameter.DefaultValue.ShouldBeOfType<string>(
+                        $"{entry.PackageId} registry method '{method.Name}' nodeType default must be a node-type constant value.");
+                    nodeTypeValues.Contains((string)parameter.DefaultValue)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} registry method '{method.Name}' nodeType default '{parameter.DefaultValue}' must come from its CompositionNodeTypes constants.");
+                }
+
+                var registry = new CompositionNodeRegistry();
+                InvokeRegistryMethod(method, registry, entry.PackageId);
+
+                registry.Registrations.ShouldNotBeEmpty(
+                    $"{entry.PackageId} registry method '{method.Name}' must register at least one default node type.");
+                registry.Registrations.Keys.All(nodeTypeValues.Contains)
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} registry method '{method.Name}' must register only package node-type constants by default.");
+
+                foreach (var nodeTypeParameter in parameters.Skip(1).Where(parameter => parameter.Name == "nodeType"))
+                {
+                    registry.Registrations.ContainsKey((string)nodeTypeParameter.DefaultValue!)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} registry method '{method.Name}' must register its default nodeType '{nodeTypeParameter.DefaultValue}'.");
                 }
             }
         }
@@ -885,6 +965,19 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string packageId)
     {
         var registry = new CompositionNodeRegistry();
+
+        foreach (var method in ReadRegistryMethods(assembly, packageId))
+        {
+            InvokeRegistryMethod(method, registry, packageId);
+        }
+
+        return registry;
+    }
+
+    private static MethodInfo[] ReadRegistryMethods(
+        Assembly assembly,
+        string packageId)
+    {
         var registryMethods = assembly
             .GetTypes()
             .Where(type => type is { IsAbstract: true, IsSealed: true } &&
@@ -899,13 +992,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .ToArray();
 
         registryMethods.ShouldNotBeEmpty($"{packageId} must expose registry extension methods.");
-
-        foreach (var method in registryMethods)
-        {
-            InvokeRegistryMethod(method, registry, packageId);
-        }
-
-        return registry;
+        return registryMethods;
     }
 
     private static void InvokeRegistryMethod(
