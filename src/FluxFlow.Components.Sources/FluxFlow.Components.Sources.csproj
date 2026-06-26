@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sources</PackageId>
     <AssemblyName>FluxFlow.Components.Sources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sources</RootNamespace>
-    <Version>3.1.0</Version>
+    <Version>3.1.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone deterministic source nodes for FluxFlow: generated and sequence emitters built as FlowSource&lt;T&gt; over an injected TimeProvider, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sources</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Wires source.generated and source.sequence boundedCapacity into FluxFlow.Nodes bounded broadcast source output. Loop-driven source emission now awaits output-block acceptance while preserving existing correlation, timing, diagnostics, and standalone construction behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns source constructor validation with the standalone node conventions. Generated and sequence sources now validate all construction options before source pipelines are created.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

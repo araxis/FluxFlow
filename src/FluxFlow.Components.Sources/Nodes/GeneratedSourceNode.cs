@@ -30,39 +30,63 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
         GeneratedSourceOptions options,
         IReadOnlyList<TOutput> items,
         TimeProvider? clock = null)
-        : base(BuildSourceOptions(options))
+        : this(ResolveArguments(options, items), clock)
     {
-        _options = options;
-        _items = items ?? throw new ArgumentNullException(nameof(items));
-        _clock = clock ?? TimeProvider.System;
+    }
 
-        if (_options.InitialDelayMilliseconds < 0)
+    private GeneratedSourceNode(
+        ResolvedGeneratedSourceArguments resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
+        _items = resolved.Items;
+        _clock = clock ?? TimeProvider.System;
+    }
+
+    private static ResolvedGeneratedSourceArguments ResolveArguments(
+        GeneratedSourceOptions options,
+        IReadOnlyList<TOutput> items)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(items);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "source.generated bounded capacity must be greater than zero.");
+        }
+
+        if (options.InitialDelayMilliseconds < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.generated option 'initialDelayMilliseconds' cannot be negative.");
         }
 
-        if (_options.IntervalMilliseconds < 0)
+        if (options.IntervalMilliseconds < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
                 "source.generated option 'intervalMilliseconds' cannot be negative.");
         }
 
-        if (_options.MaxItems.HasValue && _options.MaxItems.Value <= 0)
+        if (options.MaxItems.HasValue && options.MaxItems.Value <= 0)
         {
             throw new ArgumentException(
                 "source.generated option 'maxItems' must be greater than zero.",
                 nameof(options));
         }
 
-        if (_options.Loop && !_options.MaxItems.HasValue)
+        if (options.Loop && !options.MaxItems.HasValue)
         {
             throw new ArgumentException(
                 "source.generated option 'maxItems' is required when 'loop' is true.",
                 nameof(options));
         }
+
+        return new ResolvedGeneratedSourceArguments(options, items);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -122,19 +146,6 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
             : Math.Min(_options.MaxItems ?? _items.Count, _items.Count);
     }
 
-    private static FlowSourceOptions BuildSourceOptions(GeneratedSourceOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "source.generated bounded capacity must be greater than zero.");
-        }
-
-        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
-    }
-
     private void CompleteGenerated(int emitted, string message)
         => EmitDiagnostic(Completed, message, CreateAttributes(emitted));
 
@@ -192,4 +203,8 @@ public sealed class GeneratedSourceNode<TOutput> : FlowSource<TOutput>
                 $"loop={_options.Loop}",
                 $"emitted={emitted}"
             ]);
+
+    private sealed record ResolvedGeneratedSourceArguments(
+        GeneratedSourceOptions Options,
+        IReadOnlyList<TOutput> Items);
 }

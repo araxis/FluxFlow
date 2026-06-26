@@ -97,3 +97,7 @@ resource and is not exposed as an editable node option.
 Missing generated `items` bind as an empty source. `GeneratedSourceOptions.OutputType`
 remains diagnostic metadata; the actual output port type comes from the closed
 generic registration selected by the host.
+Invalid source option values fail during composition build through the node
+factory. If build failures are configured as diagnostics, the runtime is not
+created and the host receives a `FactoryFailed` diagnostic with the relevant
+option name.
