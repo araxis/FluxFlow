@@ -132,6 +132,17 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void FromProviders_rejects_null_provider_metadata_collection()
+    {
+        var provider = new NullMetadataProvider();
+
+        var act = () => ComponentDesignMetadataCatalog.FromProviders([provider]);
+
+        act.ShouldThrow<InvalidOperationException>()
+            .Message.ShouldContain(nameof(NullMetadataProvider));
+    }
+
+    [Fact]
     public void Validator_reports_invalid_metadata_shape()
     {
         var metadata = new ComponentDesignMetadata
@@ -993,6 +1004,11 @@ public sealed class ComponentDesignMetadataCatalogTests
             ["shape"] = "transform"
         }
     };
+
+    private sealed class NullMetadataProvider : IComponentDesignMetadataProvider
+    {
+        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() => null!;
+    }
 
     private enum SampleMode
     {
