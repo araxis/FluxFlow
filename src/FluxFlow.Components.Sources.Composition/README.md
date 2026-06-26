@@ -51,6 +51,8 @@ The provider describes node options, ports, and a resource hint for the
 optional `clock` resource. Inline generated `items` are node configuration and
 are exposed as JSON metadata. The clock remains a host-owned composition
 resource and is not exposed as an editable node option.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
 
 ## Configuration
 

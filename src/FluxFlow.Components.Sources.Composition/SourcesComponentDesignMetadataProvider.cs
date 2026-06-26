@@ -22,44 +22,41 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             "list-plus",
             "generated",
             suggestedEditorWidth: 440,
-            options:
-            [
-                NameOption(GeneratedSourceOptions.DefaultName),
-                new OptionDesignMetadata
-                {
-                    Name = "outputType",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Output Type",
-                    DefaultValue = GeneratedSourceOptions.ObjectTypeName,
-                    HelperText = "Diagnostic output type metadata; CLR output type comes from the closed registration."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "items",
-                    Kind = OptionValueKind.Json,
-                    DisplayName = "Items",
-                    HelperText = "Inline array of payloads deserialized into the closed generated output type."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "loop",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Loop",
-                    DefaultValue = false,
-                    HelperText = "Repeat configured items until maxItems is reached."
-                },
-                MaxItemsOption(),
-                MillisecondsOption(
+            builder =>
+            {
+                AddNameOption(builder, GeneratedSourceOptions.DefaultName);
+                builder
+                    .AddOption(
+                        "outputType",
+                        OptionValueKind.Text,
+                        displayName: "Output Type",
+                        helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.",
+                        defaultValue: GeneratedSourceOptions.ObjectTypeName)
+                    .AddOption(
+                        "items",
+                        OptionValueKind.Json,
+                        displayName: "Items",
+                        helperText: "Inline array of payloads deserialized into the closed generated output type.")
+                    .AddOption(
+                        "loop",
+                        OptionValueKind.Boolean,
+                        displayName: "Loop",
+                        helperText: "Repeat configured items until maxItems is reached.",
+                        defaultValue: false);
+                AddMaxItemsOption(builder);
+                AddMillisecondsOption(
+                    builder,
                     "initialDelayMilliseconds",
                     "Initial Delay Milliseconds",
-                    "Delay before the first item is emitted."),
-                MillisecondsOption(
+                    "Delay before the first item is emitted.");
+                AddMillisecondsOption(
+                    builder,
                     "intervalMilliseconds",
                     "Interval Milliseconds",
-                    "Delay between emitted items."),
-                BoundedCapacityOption()
-            ],
-            OutputPort("TOutput", "Generated source item.", isPrimary: true));
+                    "Delay between emitted items.");
+                AddBoundedCapacityOption(builder);
+                AddOutputPort(builder, "TOutput", "Generated source item.");
+            });
 
     private static ComponentDesignMetadata CreateSequenceMetadata()
         => CreateSourceMetadata(
@@ -69,45 +66,42 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             "list-ordered",
             "sequence",
             suggestedEditorWidth: 420,
-            options:
-            [
-                NameOption(SequenceSourceOptions.DefaultName),
-                new OptionDesignMetadata
-                {
-                    Name = "start",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Start",
-                    DefaultValue = 1,
-                    HelperText = "First numeric value emitted."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "step",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Step",
-                    DefaultValue = 1,
-                    HelperText = "Amount added for each item; cannot be zero."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "count",
-                    Kind = OptionValueKind.Number,
-                    DisplayName = "Count",
-                    DefaultValue = 1,
-                    Min = 1,
-                    HelperText = "Number of sequence items to emit."
-                },
-                MillisecondsOption(
+            builder =>
+            {
+                AddNameOption(builder, SequenceSourceOptions.DefaultName);
+                builder
+                    .AddOption(
+                        "start",
+                        OptionValueKind.Number,
+                        displayName: "Start",
+                        helperText: "First numeric value emitted.",
+                        defaultValue: 1)
+                    .AddOption(
+                        "step",
+                        OptionValueKind.Number,
+                        displayName: "Step",
+                        helperText: "Amount added for each item; cannot be zero.",
+                        defaultValue: 1)
+                    .AddOption(
+                        "count",
+                        OptionValueKind.Number,
+                        displayName: "Count",
+                        helperText: "Number of sequence items to emit.",
+                        defaultValue: 1,
+                        min: 1);
+                AddMillisecondsOption(
+                    builder,
                     "initialDelayMilliseconds",
                     "Initial Delay Milliseconds",
-                    "Delay before the first item is emitted."),
-                MillisecondsOption(
+                    "Delay before the first item is emitted.");
+                AddMillisecondsOption(
+                    builder,
                     "intervalMilliseconds",
                     "Interval Milliseconds",
-                    "Delay between emitted items."),
-                BoundedCapacityOption()
-            ],
-            OutputPort(nameof(SourceSequenceItem), "Sequence source item.", isPrimary: true));
+                    "Delay between emitted items.");
+                AddBoundedCapacityOption(builder);
+                AddOutputPort(builder, nameof(SourceSequenceItem), "Sequence source item.");
+            });
 
     private static ComponentDesignMetadata CreateSourceMetadata(
         string type,
@@ -116,90 +110,78 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
         string iconKey,
         string preferredNodeName,
         int suggestedEditorWidth,
-        IReadOnlyList<OptionDesignMetadata> options,
-        PortDesignMetadata outputPort) => new()
-        {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Sources",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = suggestedEditorWidth,
-            Options = options,
-            Resources = ClockResources(),
-            Ports = SourcePorts(outputPort)
-        };
-
-    private static IReadOnlyList<PortDesignMetadata> SourcePorts(PortDesignMetadata outputPort)
-        => [outputPort];
-
-    private static OptionDesignMetadata NameOption(string defaultValue) => new()
+        Action<ComponentDesignMetadataBuilder> configure)
     {
-        Name = "name",
-        Kind = OptionValueKind.Text,
-        DisplayName = "Name",
-        DefaultValue = defaultValue,
-        HelperText = "Name emitted in source diagnostics and payloads."
-    };
+        var builder = new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Sources",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: suggestedEditorWidth)
+            .AddResource(
+                SourcesCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 0,
+                summary: "Optional keyed clock for deterministic source timing and diagnostics.",
+                valueType: nameof(TimeProvider));
 
-    private static OptionDesignMetadata MaxItemsOption() => new()
-    {
-        Name = "maxItems",
-        Kind = OptionValueKind.Number,
-        DisplayName = "Max Items",
-        Min = 1,
-        HelperText = "Optional maximum number of generated items to emit."
-    };
+        configure(builder);
 
-    private static OptionDesignMetadata MillisecondsOption(
+        return builder.Build();
+    }
+
+    private static void AddNameOption(
+        ComponentDesignMetadataBuilder builder,
+        string defaultValue)
+        => builder.AddOption(
+            "name",
+            OptionValueKind.Text,
+            displayName: "Name",
+            helperText: "Name emitted in source diagnostics and payloads.",
+            defaultValue: defaultValue);
+
+    private static void AddMaxItemsOption(ComponentDesignMetadataBuilder builder)
+        => builder.AddOption(
+            "maxItems",
+            OptionValueKind.Number,
+            displayName: "Max Items",
+            helperText: "Optional maximum number of generated items to emit.",
+            min: 1);
+
+    private static void AddMillisecondsOption(
+        ComponentDesignMetadataBuilder builder,
         string name,
         string displayName,
-        string helperText) => new()
-        {
-            Name = name,
-            Kind = OptionValueKind.Number,
-            DisplayName = displayName,
-            DefaultValue = 0,
-            Min = 0,
-            HelperText = helperText
-        };
+        string helperText)
+        => builder.AddOption(
+            name,
+            OptionValueKind.Number,
+            displayName: displayName,
+            helperText: helperText,
+            defaultValue: 0,
+            min: 0);
 
-    private static OptionDesignMetadata BoundedCapacityOption() => new()
-    {
-        Name = "boundedCapacity",
-        Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
-        DefaultValue = 128,
-        Min = 1,
-        HelperText = "Maximum queued source messages."
-    };
+    private static void AddBoundedCapacityOption(ComponentDesignMetadataBuilder builder)
+        => builder.AddOption(
+            "boundedCapacity",
+            OptionValueKind.Number,
+            displayName: "Bounded Capacity",
+            helperText: "Maximum queued source messages.",
+            defaultValue: 128,
+            min: 1);
 
-    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = SourcesCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic source timing and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
-
-    private static PortDesignMetadata OutputPort(
+    private static void AddOutputPort(
+        ComponentDesignMetadataBuilder builder,
         string valueType,
-        string summary,
-        bool isPrimary) => new()
-        {
-            Name = new ComponentPortName(SourcesCompositionPortNames.Output),
-            Direction = PortDirection.Output,
-            DisplayName = "Output",
-            Group = "Messages",
-            Order = 0,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+        string summary)
+        => builder.AddOutputPort(
+            SourcesCompositionPortNames.Output,
+            displayName: "Output",
+            group: "Messages",
+            order: 0,
+            summary: summary,
+            valueType: valueType,
+            isPrimary: true);
 }

@@ -318,6 +318,8 @@ generated and sequence source composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata includes inline generated `items` as JSON node configuration,
 fixed output ports, and a resource hint for the optional `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Observability Composition
 
