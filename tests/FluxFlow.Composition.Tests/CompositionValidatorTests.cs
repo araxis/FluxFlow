@@ -20,6 +20,29 @@ public sealed class CompositionValidatorTests
     }
 
     [Fact]
+    public void Validator_uses_normalized_node_definition_types()
+    {
+        var definition = new CompositionDefinition
+        {
+            Workflows =
+            {
+                ["main"] = new WorkflowDefinition
+                {
+                    Nodes =
+                    {
+                        ["source"] = new NodeDefinition { Type = $" {TestNodeTypes.Source} " }
+                    }
+                }
+            }
+        };
+
+        var result = new CompositionValidator().Validate(definition, TestCompositionRegistry.Create());
+
+        result.Diagnostics.ShouldBeEmpty();
+        definition.Workflows["main"].Nodes["source"].Type.ShouldBe(TestNodeTypes.Source);
+    }
+
+    [Fact]
     public void Validator_reports_missing_ports()
     {
         var definition = CompositionDefinitionBuilder

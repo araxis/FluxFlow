@@ -28,9 +28,12 @@ validation/build, but caller-owned collections used during construction cannot
 mutate the definition later.
 Node and port references trim assigned workflow/node/port segments and reject
 empty dotted segments when parsed from fluent or configuration link strings.
-Composition port metadata rejects null or blank port names and null message
-types at the registration boundary. Node registrations also reject null port
-metadata entries before validation/build. `CompositionPortMetadata` also
+Node definition types, node registration types, and composition port metadata
+names are trimmed at the public boundary so incidental configuration or
+registration whitespace does not create unknown node types or duplicate-looking
+ports. Composition port metadata rejects null or blank port names and null
+message types at the registration boundary. Node registrations also reject null
+port metadata entries before validation/build. `CompositionPortMetadata` also
 supports deconstruction for callers that prefer tuple-style reads.
 If mutable DTO collections are hand-built with null workflow, node, link, or
 link endpoint entries, validation reports `InvalidDefinition` diagnostics

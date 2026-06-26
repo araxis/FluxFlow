@@ -6,8 +6,13 @@ public sealed record NodeDefinition
 {
     private Dictionary<string, JsonElement> _configuration = new(StringComparer.Ordinal);
     private Dictionary<string, string> _resources = new(StringComparer.Ordinal);
+    private string _type = string.Empty;
 
-    public required string Type { get; init; }
+    public required string Type
+    {
+        get => _type;
+        init => _type = value?.Trim() ?? string.Empty;
+    }
 
     public Dictionary<string, JsonElement> Configuration
     {
