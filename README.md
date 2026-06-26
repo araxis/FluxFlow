@@ -23,8 +23,9 @@ packages.
 | `FluxFlow.Engine` | Optional legacy/advanced runtime for `ApplicationDefinition`-based execution. |
 
 Component packages should expose normal standalone nodes first. Composition
-factory registration, engine modules, design metadata, and host-specific DI
-helpers are optional adapters around those nodes.
+factory registration, design metadata, and host-specific DI helpers are optional
+adapters around those nodes. Engine-specific integration is separate from the
+normal component package shape.
 
 ## Standalone Node Example
 

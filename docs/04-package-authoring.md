@@ -1,8 +1,9 @@
 # Package Authoring
 
 Reusable component packages should be standalone-node-first. The package's core
-job is to expose normal nodes over `FluxFlow.Nodes`; composition adapters,
-engine modules, DI helpers, and design metadata are optional layers.
+job is to expose normal nodes over `FluxFlow.Nodes`. Composition adapters,
+adapter-local DI helpers, and design metadata are optional layers around those
+nodes.
 
 ## Default Shape
 
@@ -50,8 +51,8 @@ public static CompositionNodeRegistry RegisterOrderNodes(
 }
 ```
 
-Use engine `IFlowNodeModule` only for packages that intentionally support the
-optional engine runtime. It is not required for normal component packages.
+Normal component packages do not need engine registration. Keep the default
+composition path explicit and reflection-free.
 
 If the package also owns concrete resources, keep those registrations in an
 adapter-local DI extension. `FluxFlow.Composition.Hosting` can resolve those
@@ -60,11 +61,11 @@ options and lifetime.
 
 ## Support Packages
 
-Support packages do not need node constants, composition registration, or engine
-modules unless they expose actual standalone node behavior. Resource, secret,
-configuration, expression, journal, design metadata, and storage-backend
-packages can stay as contracts, helpers, or concrete resource factories that
-hosts and node adapters consume.
+Support packages do not need node constants or composition registration unless
+they expose actual standalone node behavior. Resource, secret, configuration,
+expression, journal, design metadata, and storage-backend packages can stay as
+contracts, helpers, or concrete resource factories that hosts and node adapters
+consume.
 
 ## Package Rules
 
@@ -77,7 +78,6 @@ Each component package should own:
 - diagnostics and event names
 - adapter-local DI extensions when the package owns a concrete integration
 - optional composition registration
-- optional engine module
 - optional design metadata provider
 - tests
 - a small runnable sample when useful
@@ -107,14 +107,13 @@ the expected package pieces:
 - node implementation
 - focused tests
 
-Use it as the starting shape for new component families, then add composition or
-engine adapters only when a real host needs them.
+Use it as the starting shape for new component families, then add composition
+adapters only when a real host needs them.
 
 ## Versioning Guidance
 
 Treat node type names and port names as part of the package contract when they
-are exposed through composition or engine definitions. Changing a node type or
-port name can break persisted definitions, so prefer additive changes whenever
-possible.
+are exposed through composition definitions. Changing a node type or port name
+can break persisted definitions, so prefer additive changes whenever possible.
 
 Next: [Hosting And Observability](05-hosting-and-observability.md).
