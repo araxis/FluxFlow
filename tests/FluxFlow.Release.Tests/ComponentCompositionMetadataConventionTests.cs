@@ -22,27 +22,15 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var providerFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            providerFiles.Length.ShouldBe(
-                1,
-                $"{entry.PackageId} must ship exactly one package-owned Designer metadata provider.");
-
-            var providerContent = File.ReadAllText(providerFiles[0]);
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
+            var providerContent = File.ReadAllText(providerFile);
             providerContent.Contains(
                     "IComponentDesignMetadataProvider",
                     StringComparison.Ordinal)
                 .ShouldBeTrue($"{entry.PackageId} provider must implement IComponentDesignMetadataProvider.");
 
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var referencedPackageIds = ReadReferencedPackageIds(project, projectDirectory)
                 .ToArray();
 
@@ -63,8 +51,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
             var metadata = provider.GetMetadata();
@@ -98,8 +85,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
             var metadataByType = provider
@@ -146,8 +132,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
             var metadataByType = provider
@@ -190,19 +175,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var nodeTypesFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeTypes.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep node-type constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
             var nodeTypeValues = PublicStringConstantWithValueRegex()
                 .Matches(File.ReadAllText(nodeTypesFile))
                 .Select(match => match.Groups["value"].Value)
                 .ToHashSet(StringComparer.Ordinal);
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
 
             nodeTypeValues.ShouldNotBeEmpty(
@@ -266,14 +245,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var projectDirectory = ReadProjectDirectory(root, entry);
             var readmePath = Path.Combine(projectDirectory, "README.md");
             File.Exists(readmePath)
                 .ShouldBeTrue($"{entry.PackageId} must include a package README.");
 
             var readme = File.ReadAllText(readmePath);
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var registryMethods = ReadRegistryMethods(assembly, entry.PackageId)
                 .Select(method => method.Name)
@@ -304,17 +282,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var project = XDocument.Load(projectPath);
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
             var version = ReadRequiredProperty(project, "Version", entry.PackageId);
             var readmePath = Path.Combine(projectDirectory, "README.md");
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerName = Path.GetFileNameWithoutExtension(providerFile);
 
             File.Exists(readmePath)
@@ -342,20 +314,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var nodeTypesFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeTypes.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep node-type constants in one file.");
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
             var nodeTypeConstants = PublicStringConstantRegex()
@@ -383,20 +344,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var nodeTypesFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeTypes.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep node-type constants in one file.");
-            var registryFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
+            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
             var registryContent = File.ReadAllText(registryFile);
             var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
             var nodeTypeConstants = PublicStringConstantRegex()
@@ -424,29 +374,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var resourceNamesFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionResourceNames.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
-                1,
-                $"{entry.PackageId} must keep resource-name constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var resourceNamesFiles = ReadOptionalResourceNamesFiles(projectDirectory, entry.PackageId);
 
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
             var resourceConstants = PublicStringConstantRegex()
@@ -478,29 +412,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var resourceNamesFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionResourceNames.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
-                1,
-                $"{entry.PackageId} must keep resource-name constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var resourceNamesFiles = ReadOptionalResourceNamesFiles(projectDirectory, entry.PackageId);
 
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
             var registryContent = File.ReadAllText(registryFile);
             var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
@@ -533,29 +451,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var resourceNamesFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionResourceNames.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
-                1,
-                $"{entry.PackageId} must keep resource-name constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var resourceNamesFiles = ReadOptionalResourceNamesFiles(projectDirectory, entry.PackageId);
 
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
             var registryContent = File.ReadAllText(registryFile);
             var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
@@ -565,7 +467,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     match.Groups["name"].Value,
                     match.Groups["value"].Value))
                 .ToArray();
-            var project = XDocument.Load(projectPath);
+            var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
             var metadataResources = provider
@@ -621,29 +523,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var portNamesFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionPortNames.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            portNamesFiles.Length.ShouldBeLessThanOrEqualTo(
-                1,
-                $"{entry.PackageId} must keep port-name constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var portNamesFiles = ReadOptionalPortNamesFiles(projectDirectory, entry.PackageId);
 
             if (portNamesFiles.Length == 0)
                 continue;
 
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
             var portConstants = PublicStringConstantRegex()
@@ -675,29 +561,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var portNamesFiles = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionPortNames.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-
-            portNamesFiles.Length.ShouldBeLessThanOrEqualTo(
-                1,
-                $"{entry.PackageId} must keep port-name constants in one file.");
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var portNamesFiles = ReadOptionalPortNamesFiles(projectDirectory, entry.PackageId);
 
             if (portNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
             var registryContent = File.ReadAllText(registryFile);
             var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
             var portConstants = PublicStringConstantRegex()
@@ -729,26 +599,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
-            var boundOptionTypes = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Select(File.ReadAllText)
-                .SelectMany(content => BindConfigurationRegex()
-                    .Matches(content)
-                    .Select(match => match.Groups["type"].Value.Trim()))
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
+            var boundOptionTypes = ReadBoundOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var optionType in boundOptionTypes)
             {
@@ -794,27 +648,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         foreach (var entry in entries)
         {
-            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
-            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
-            var providerFile = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*ComponentDesignMetadataProvider.cs",
-                    SearchOption.TopDirectoryOnly)
-                .ShouldHaveSingleItem();
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var providerOptionKinds = ReadProviderOptionKinds(providerContent);
-            var boundOptionTypes = Directory
-                .EnumerateFiles(
-                    projectDirectory,
-                    "*CompositionNodeRegistryExtensions.cs",
-                    SearchOption.TopDirectoryOnly)
-                .Select(File.ReadAllText)
-                .SelectMany(content => BindConfigurationRegex()
-                    .Matches(content)
-                    .Select(match => match.Groups["type"].Value.Trim()))
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
+            var boundOptionTypes = ReadBoundOptionTypes(projectDirectory, entry.PackageId);
 
             foreach (var optionType in boundOptionTypes)
             {
@@ -863,6 +701,99 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .Read(root)
             .Where(IsComponentCompositionPackage)
             .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+    private static string ReadProjectPath(
+        string root,
+        PackageManifestEntry entry)
+        => Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+
+    private static string ReadProjectDirectory(
+        string root,
+        PackageManifestEntry entry)
+        => Path.GetDirectoryName(ReadProjectPath(root, entry)).ShouldNotBeNull();
+
+    private static XDocument LoadProject(
+        string root,
+        PackageManifestEntry entry)
+        => XDocument.Load(ReadProjectPath(root, entry));
+
+    private static string ReadSingleProviderFile(
+        string projectDirectory,
+        string packageId)
+        => Directory
+            .EnumerateFiles(
+                projectDirectory,
+                "*ComponentDesignMetadataProvider.cs",
+                SearchOption.TopDirectoryOnly)
+            .ShouldHaveSingleItem(
+                $"{packageId} must ship exactly one package-owned Designer metadata provider.");
+
+    private static string ReadSingleNodeTypesFile(
+        string projectDirectory,
+        string packageId)
+        => Directory
+            .EnumerateFiles(
+                projectDirectory,
+                "*CompositionNodeTypes.cs",
+                SearchOption.TopDirectoryOnly)
+            .ShouldHaveSingleItem($"{packageId} must keep node-type constants in one file.");
+
+    private static string ReadSingleRegistryFile(
+        string projectDirectory,
+        string packageId)
+        => Directory
+            .EnumerateFiles(
+                projectDirectory,
+                "*CompositionNodeRegistryExtensions.cs",
+                SearchOption.TopDirectoryOnly)
+            .ShouldHaveSingleItem($"{packageId} must keep registry extensions in one file.");
+
+    private static string[] ReadOptionalResourceNamesFiles(
+        string projectDirectory,
+        string packageId)
+    {
+        var files = Directory
+            .EnumerateFiles(
+                projectDirectory,
+                "*CompositionResourceNames.cs",
+                SearchOption.TopDirectoryOnly)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        files.Length.ShouldBeLessThanOrEqualTo(
+            1,
+            $"{packageId} must keep resource-name constants in one file.");
+
+        return files;
+    }
+
+    private static string[] ReadOptionalPortNamesFiles(
+        string projectDirectory,
+        string packageId)
+    {
+        var files = Directory
+            .EnumerateFiles(
+                projectDirectory,
+                "*CompositionPortNames.cs",
+                SearchOption.TopDirectoryOnly)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        files.Length.ShouldBeLessThanOrEqualTo(
+            1,
+            $"{packageId} must keep port-name constants in one file.");
+
+        return files;
+    }
+
+    private static string[] ReadBoundOptionTypes(
+        string projectDirectory,
+        string packageId)
+        => BindConfigurationRegex()
+            .Matches(File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId)))
+            .Select(match => match.Groups["type"].Value.Trim())
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
     private static IEnumerable<string> ReadReferencedPackageIds(
