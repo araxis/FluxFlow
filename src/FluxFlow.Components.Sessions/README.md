@@ -51,6 +51,9 @@ services
     .AddFluxFlowSessionStoreFactory("session-factory", sessionStoreFactory);
 ```
 
+The direct registration overloads reject null stores and store factories. The
+provider overloads fail with clear diagnostics if they return null.
+
 Stores are expected to honor the non-null parts of `ISessionStore`; when a store
 returns a null session, record, query result, or replay stream where the contract
 requires a value, the node reports a clear session error instead of surfacing an

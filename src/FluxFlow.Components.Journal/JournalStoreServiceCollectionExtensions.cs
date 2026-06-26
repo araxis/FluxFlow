@@ -26,7 +26,7 @@ public static class JournalStoreServiceCollectionExtensions
         services.AddKeyedSingleton<IJournalStore>(
             name,
             (provider, _) => storeFactory(provider)
-                ?? throw new InvalidOperationException("Journal store factory returned null."));
+                ?? throw new InvalidOperationException("Journal store provider returned null."));
 
         return services;
     }
