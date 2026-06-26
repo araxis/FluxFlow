@@ -800,6 +800,43 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_omitted_designer_options_match_bound_configuration()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var configurationKeys = ReadConfigurationKeys(
+                    assembly,
+                    projectDirectory,
+                    entry.PackageId)
+                .ToArray();
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+
+                foreach (var omittedOption in ReadOmittedOptions(metadata).Order(StringComparer.Ordinal))
+                {
+                    ConfigurationKeysContainOption(configurationKeys, omittedOption)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' omits option '{omittedOption}', but no bound options property or explicit configuration read owns that key.");
+
+                    metadata.Options.Any(option =>
+                            string.Equals(option.Name, omittedOption, StringComparison.Ordinal))
+                        .ShouldBeFalse(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{omittedOption}' cannot be both editable and declared in omittedOptions.");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_options_match_bound_configuration()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
