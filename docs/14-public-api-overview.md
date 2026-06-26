@@ -388,6 +388,8 @@ optional `FluxFlow.Components.Routing.Composition` package when a composition
 host wants routing node factories. Switch, correlation, and join factories
 resolve host-owned keyed selector delegates; all factories can resolve an
 optional keyed `TimeProvider` resource through the host.
+Invalid routing options fail during build as factory diagnostics when the host
+is configured to collect build failures.
 
 `RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the six routing composition nodes so hosts can compose palette, editor,

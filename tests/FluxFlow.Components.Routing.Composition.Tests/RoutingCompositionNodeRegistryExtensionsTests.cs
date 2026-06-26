@@ -726,6 +726,87 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains("built-in", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Invalid_routing_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "switch",
+                    RoutingCompositionNodeTypes.Switch,
+                    node => node
+                        .Resource(RoutingCompositionResourceNames.RouteKeySelector, "route")
+                        .Configure("boundedCapacity", 0)))
+                .Build(),
+            services => services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                "route",
+                input => input.Route),
+            registry => registry.RegisterSwitch<InputMessage>(),
+            "boundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "fork",
+                    RoutingCompositionNodeTypes.Fork,
+                    node => node
+                        .Configure("outputs", new[] { "Audit" })
+                        .Configure("inputType", " ")))
+                .Build(),
+            null,
+            registry => registry.RegisterFork<InputMessage>(),
+            "inputType");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "merge",
+                    RoutingCompositionNodeTypes.Merge,
+                    node => node.Configure("boundedCapacity", 0)))
+                .Build(),
+            null,
+            registry => registry.RegisterMerge<InputMessage>(),
+            "boundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "window",
+                    RoutingCompositionNodeTypes.Window,
+                    node => node.Configure("maxItems", -1)))
+                .Build(),
+            null,
+            registry => registry.RegisterWindow<InputMessage>(),
+            "maxItems");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "correlate",
+                    RoutingCompositionNodeTypes.Correlation,
+                    node => node
+                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
+                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
+                        .Configure("timeoutMilliseconds", 0)))
+                .Build(),
+            services =>
+            {
+                services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                    "key",
+                    input => input.Id);
+                services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                    "side",
+                    input => input.Route);
+            },
+            registry => registry.RegisterCorrelation<InputMessage>(),
+            "timeoutMilliseconds");
+    }
+
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
         => new RoutingComponentDesignMetadataProvider()
             .GetMetadata()
@@ -792,6 +873,29 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     {
         var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
         await hostedService.StartAsync(CancellationToken.None);
+    }
+
+    private static async Task AssertFactoryDiagnosticAsync(
+        CompositionDefinition definition,
+        Action<IServiceCollection>? configureServices,
+        Action<CompositionNodeRegistry> registerNodes,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        configureServices?.Invoke(services);
+        services
+            .AddFluxFlowComposition(definition)
+            .RegisterNodes(registerNodes)
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
     }
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)

@@ -7,6 +7,31 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Routing 3.0.1
+
+Aligns routing node constructor option validation with the standalone node
+conventions.
+
+- `FlowSwitchNode<TInput>`, `FlowForkNode<TInput>`,
+  `FlowMergeNode<TInput>`, `FlowWindowNode<TInput>`, and
+  `FlowCorrelationNode<TInput>` now validate options before the base node
+  pipeline is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  routing-specific construction errors.
+- Window and correlation-specific limits now fail fast with node-specific
+  validation errors.
+
+## FluxFlow.Components.Routing.Composition 1.2.1
+
+Hardens config-bound routing option diagnostics.
+
+- Invalid routing options now fail during composition build through the
+  `flow.switch`, `flow.fork`, `flow.merge`, `flow.window`, and
+  `flow.correlation` factories.
+- Adds hosted composition coverage proving invalid `inputType`,
+  `boundedCapacity`, window, and correlation values surface as factory
+  diagnostics when build failures are configured as diagnostics.
+
 ## FluxFlow.Components.Observability 3.0.1
 
 Aligns observability node constructor option validation with the standalone

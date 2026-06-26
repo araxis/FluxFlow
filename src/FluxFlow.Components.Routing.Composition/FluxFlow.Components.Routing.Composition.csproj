@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Routing.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Routing.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone routing nodes over host-owned keyed selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for routing selector and clock resources while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Documents and tests routing option validation through composition build diagnostics for invalid config-bound inputType, boundedCapacity, window, and correlation values.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

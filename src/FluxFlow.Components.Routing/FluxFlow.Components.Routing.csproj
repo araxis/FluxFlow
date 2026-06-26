@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone routing nodes for FluxFlow: switch, fork, merge, window, correlation, and join over the FluxFlow.Nodes kit, with broadcast output/error/event ports. Predicate/key extraction comes from FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt on the FluxFlow.Nodes kit: flow.switch/fork/window/correlation are FlowNode&lt;TInput, ...&gt; transforms and flow.merge is a fan-in FlowNode&lt;TInput, TInput&gt;, all carrying the message correlation id and timing off an injected TimeProvider; flow.join is built directly on kit primitives with two typed inputs (Left/Right), a result Output, and a Timeouts output. Each node takes its options record, key/predicate selectors (IFlowPredicate / IFlowExpressionEngine from FluxFlow.Mapping), and a TimeProvider directly. The engine factories, module, registration extensions, design-metadata provider, the definition-options reader, and the string-to-Type / expression-registry resolution layer are removed; the package depends only on FluxFlow.Nodes and FluxFlow.Mapping (runs without the engine).</PackageReleaseNotes>
+    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: switch, fork, merge, window, and correlation nodes reject blank inputType and non-positive boundedCapacity values before the node pipeline is created; window and correlation-specific limits now fail with routing-specific construction errors.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

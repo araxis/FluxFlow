@@ -104,6 +104,12 @@ public sealed class FlowMergeNodeTests
             () => new FlowMergeNode<int>(new MergeRoutingOptions { BoundedCapacity = 0 }));
 
     [Fact]
+    public void Merge_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowMergeNode<int>(new MergeRoutingOptions { InputType = " " }))
+            .Message.ShouldContain("inputType");
+
+    [Fact]
     public void Merge_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowMergeNode<int>(null!));
 }

@@ -105,3 +105,8 @@ are exposed after the composition factory binds node options.
 
 Dynamic output names for switch and fork composition must be simple identifiers
 and cannot collide with built-in composition ports.
+
+Invalid routing options, such as blank `inputType`, non-positive
+`boundedCapacity`, invalid window boundaries, or invalid correlation limits,
+fail during composition build and surface as factory diagnostics when build
+failures are configured as diagnostics.
