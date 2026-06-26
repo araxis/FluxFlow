@@ -22,19 +22,15 @@ public sealed class FlowMergeNode<TInput> : FlowNode<TInput, TInput>
     public FlowMergeNode(
         MergeRoutingOptions options,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), clock)
     {
-        _options = options;
+    }
+
+    private FlowMergeNode(ValidatedOptions options, TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.MergeOptions;
         _clock = clock ?? TimeProvider.System;
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.merge bounded capacity must be greater than zero.");
-        }
     }
 
     protected override Task ProcessAsync(FlowMessage<TInput> message)
@@ -60,5 +56,35 @@ public sealed class FlowMergeNode<TInput> : FlowNode<TInput, TInput>
         });
 
         return Task.CompletedTask;
+    }
+
+    private static ValidatedOptions ValidateOptions(MergeRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.merge option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.merge option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(MergeRoutingOptions mergeOptions)
+    {
+        public MergeRoutingOptions MergeOptions { get; } = mergeOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = mergeOptions.BoundedCapacity
+        };
     }
 }

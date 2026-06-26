@@ -31,42 +31,16 @@ public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>
     public FlowWindowNode(
         WindowRoutingOptions options,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), clock)
     {
-        _options = options;
+    }
+
+    private FlowWindowNode(ValidatedOptions options, TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.WindowOptions;
         _clock = clock ?? TimeProvider.System;
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.window bounded capacity must be greater than zero.");
-        }
-
-        if (options.MaxItems < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.window max item count cannot be negative.");
-        }
-
-        if (options.TimeMilliseconds < 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.window time window cannot be negative.");
-        }
-
-        if (options.MaxItems == 0 && options.TimeMilliseconds == 0)
-        {
-            throw new ArgumentException(
-                "flow.window requires maxItems or timeMilliseconds.",
-                nameof(options));
-        }
-
-        _timeLimit = TimeSpan.FromMilliseconds(options.TimeMilliseconds);
+        _timeLimit = TimeSpan.FromMilliseconds(options.WindowOptions.TimeMilliseconds);
     }
 
     protected override Task ProcessAsync(FlowMessage<TInput> message)
@@ -283,4 +257,55 @@ public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>
 
     private string CreateErrorContext()
         => $"inputType={_options.InputType}; maxItems={_options.MaxItems}; timeMilliseconds={_options.TimeMilliseconds}";
+
+    private static ValidatedOptions ValidateOptions(WindowRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.window option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'boundedCapacity' must be greater than zero.");
+        }
+
+        if (options.MaxItems < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'maxItems' cannot be negative.");
+        }
+
+        if (options.TimeMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.window option 'timeMilliseconds' cannot be negative.");
+        }
+
+        if (options.MaxItems == 0 && options.TimeMilliseconds == 0)
+        {
+            throw new ArgumentException(
+                "flow.window requires maxItems or timeMilliseconds.",
+                nameof(options));
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(WindowRoutingOptions windowOptions)
+    {
+        public WindowRoutingOptions WindowOptions { get; } = windowOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = windowOptions.BoundedCapacity
+        };
+    }
 }

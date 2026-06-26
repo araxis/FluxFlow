@@ -22,29 +22,24 @@ public sealed class FlowForkNode<TInput> : FlowNode<TInput, TInput>
     public FlowForkNode(
         ForkRoutingOptions options,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), clock)
     {
-        _options = options;
-        _clock = clock ?? TimeProvider.System;
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.fork bounded capacity must be greater than zero.");
-        }
+    }
 
+    private FlowForkNode(ValidatedOptions options, TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.ForkOptions;
+        _clock = clock ?? TimeProvider.System;
         RoutingPortNames.Validate(
             "flow.fork",
             "outputs",
-            options.Outputs,
+            options.ForkOptions.Outputs,
             [RoutingComponentPorts.Input, RoutingComponentPorts.Errors]);
 
         // The first output reuses the primary Output port; the rest are extra broadcast
         // ports created with AddOutput. A null value marks "this name maps to Output".
-        var ordered = options.Outputs.Select(output => output.Trim()).ToArray();
+        var ordered = options.ForkOptions.Outputs.Select(output => output.Trim()).ToArray();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         _outputBlocks = new Dictionary<string, BroadcastBlock<FlowMessage<TInput>>?>(StringComparer.Ordinal);
         var outputs = new Dictionary<string, ISourceBlock<FlowMessage<TInput>>>(StringComparer.Ordinal);
@@ -106,5 +101,35 @@ public sealed class FlowForkNode<TInput> : FlowNode<TInput, TInput>
         });
 
         return Task.CompletedTask;
+    }
+
+    private static ValidatedOptions ValidateOptions(ForkRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.fork option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.fork option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(ForkRoutingOptions forkOptions)
+    {
+        public ForkRoutingOptions ForkOptions { get; } = forkOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = forkOptions.BoundedCapacity
+        };
     }
 }

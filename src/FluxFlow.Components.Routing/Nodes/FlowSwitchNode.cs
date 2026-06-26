@@ -34,29 +34,29 @@ public sealed class FlowSwitchNode<TInput> : FlowNode<TInput, TInput>
         Func<TInput, string?> routeKeySelector,
         string? engineName = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), routeKeySelector, engineName, clock)
     {
-        _options = options;
+    }
+
+    private FlowSwitchNode(
+        ValidatedOptions options,
+        Func<TInput, string?> routeKeySelector,
+        string? engineName,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.SwitchOptions;
         _routeKeySelector = routeKeySelector ?? throw new ArgumentNullException(nameof(routeKeySelector));
         _engineName = engineName;
         _clock = clock ?? TimeProvider.System;
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.switch bounded capacity must be greater than zero.");
-        }
 
-        _routes = CreateRouteSet(options);
-        _routeOutputPorts = CreateRouteOutputPortMap(options);
+        _routes = CreateRouteSet(options.SwitchOptions);
+        _routeOutputPorts = CreateRouteOutputPortMap(options.SwitchOptions);
 
         // The primary Output is the Matched branch; Default and (optionally) Routed plus
         // each configured route-output port are extra broadcast ports.
         _default = AddOutput<FlowMessage<TInput>>();
-        if (options.EmitRouteEnvelope)
+        if (options.SwitchOptions.EmitRouteEnvelope)
         {
             _routed = AddOutput<FlowMessage<TInput>>();
         }
@@ -266,5 +266,35 @@ public sealed class FlowSwitchNode<TInput> : FlowNode<TInput, TInput>
         }
 
         return string.Join("; ", values);
+    }
+
+    private static ValidatedOptions ValidateOptions(SwitchRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.switch option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.switch option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(SwitchRoutingOptions switchOptions)
+    {
+        public SwitchRoutingOptions SwitchOptions { get; } = switchOptions;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = switchOptions.BoundedCapacity
+        };
     }
 }

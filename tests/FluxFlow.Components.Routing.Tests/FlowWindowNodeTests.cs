@@ -178,6 +178,13 @@ public sealed class FlowWindowNodeTests
                 new WindowRoutingOptions { MaxItems = 1, BoundedCapacity = 0 }));
 
     [Fact]
+    public void Window_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowWindowNode<int>(
+                new WindowRoutingOptions { InputType = " ", MaxItems = 1 }))
+            .Message.ShouldContain("inputType");
+
+    [Fact]
     public void Window_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowWindowNode<int>(null!));
 }

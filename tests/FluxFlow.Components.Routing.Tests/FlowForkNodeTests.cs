@@ -109,6 +109,13 @@ public sealed class FlowForkNodeTests
                 new ForkRoutingOptions { Outputs = ["First"], BoundedCapacity = 0 }));
 
     [Fact]
+    public void Fork_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowForkNode<int>(
+                new ForkRoutingOptions { InputType = " ", Outputs = ["First"] }))
+            .Message.ShouldContain("inputType");
+
+    [Fact]
     public void Fork_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowForkNode<int>(null!));
 }
