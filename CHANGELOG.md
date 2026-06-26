@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.5
+
+Hardens composition port metadata registration guardrails.
+
+- `CompositionPortMetadata` now rejects null or blank names and null message
+  types at construction.
+- Node registrations now reject null input/output metadata entries explicitly.
+- Adds regression coverage for invalid port metadata arguments.
+
 ## FluxFlow.Components.Designer 2.3.2
 
 Hardens fluent component design metadata builder guardrails.
