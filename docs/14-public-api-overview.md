@@ -615,7 +615,8 @@ the three session composition nodes, including existing session options and fixe
 ports, plus resource hints for the required `store` resource and optional
 `clock` resource. The `store` resource may point at either a keyed
 `ISessionStore` or keyed `ISessionStoreFactory`; the `store` option is
-diagnostic/config metadata, not DI selection.
+diagnostic/config metadata, not DI selection. The provider authors that
+metadata through the shared validated Designer metadata builder.
 
 The base Sessions package owns the neutral store factory, context, lease, and
 component option helpers used by direct hosts and composition adapters; it still

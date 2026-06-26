@@ -225,6 +225,17 @@ Adds journal store factory support.
   lease ownership.
 - Adds `InMemoryJournalStoreFactory` for named shared in-memory journal stores.
 
+## FluxFlow.Components.Sessions.Composition 1.4.1
+
+Uses the shared Designer metadata builder for session metadata.
+
+- Refactors `SessionsComponentDesignMetadataProvider` to author
+  `session.recorder`, `session.replay`, and `session.query` metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing session options, resource hints, fixed ports, validation,
+  catalog loading, direct store and store-factory resources, and runtime
+  composition behavior.
+
 ## FluxFlow.Components.Sessions.Composition 1.4.0
 
 Adds session resource factory support.
