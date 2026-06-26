@@ -104,6 +104,9 @@ runtime behavior such as timeout and bounded input capacity.
 `MqttPublishRequest.Properties` contains MQTT protocol metadata such as MQTT
 correlation id, response topic, and user properties. Workflow correlation stays on
 the surrounding `FlowMessage`.
+User-property dictionaries are snapshotted when assigned, and null maps are
+treated as empty so caller-owned mutable dictionaries cannot alter queued
+publish contracts after creation.
 
 ## Trigger
 
@@ -175,6 +178,9 @@ nodes do not consume health directly.
 
 Incoming `MqttReceivedMessage.Timestamp` and adapter-provided
 `MqttClientHealthEvent.Timestamp` values stay adapter-owned.
+Received-message user properties and health-event attributes are snapshotted
+when assigned, matching the immutable-envelope behavior used across the node
+contract surface.
 
 ## Runtime Timing
 

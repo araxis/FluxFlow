@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt</RootNamespace>
-    <Version>4.1.1</Version>
+    <Version>4.1.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone MQTT nodes for FluxFlow over small injected MQTT contracts: IMqttPublisher for publish, IMqttTriggerSource for trigger subscriptions, and optional IMqttClientHealthSource health. Includes trigger request/reply acknowledgement through a correlated response port. Broadcast output/error/event ports. No engine or concrete MQTT client required.</Description>
     <PackageTags>workflow;dataflow;components;mqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens MQTT trigger message handling so malformed received contexts are reported as trigger errors without stopping later valid subscription messages.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens MQTT contract records by snapshotting user-property and health-attribute dictionaries, with null maps treated as empty.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

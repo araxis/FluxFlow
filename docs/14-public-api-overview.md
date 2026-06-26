@@ -706,6 +706,43 @@ The provider authors that metadata through the shared validated Designer
 metadata builder. Completion result flushing remains a direct node API in this
 composition pass.
 
+## MQTT Core
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt
+FluxFlow.Components.Mqtt.Contracts
+FluxFlow.Components.Mqtt.Nodes
+FluxFlow.Components.Mqtt.Options
+```
+
+Main types:
+
+- `IMqttPublisher`
+- `IMqttTriggerSource`
+- `IMqttSubscription`
+- `IMqttReceivedContext`
+- `IMqttClientHealthSource`
+- `MqttPublishNode`
+- `MqttTriggerNode`
+- `MqttPublishRequest`
+- `MqttPublishResult`
+- `MqttPublishProperties`
+- `MqttReceivedMessage`
+- `MqttTriggerOptions`
+- `MqttTriggerResponse`
+- `MqttClientHealthEvent`
+- `MqttTopicValidator`
+
+Use `FluxFlow.Components.Mqtt` when a host wants standalone MQTT publish and
+trigger nodes over neutral contracts. Concrete MQTT clients stay behind
+adapter-owned `IMqttPublisher` and `IMqttTriggerSource` implementations.
+`MqttPublishProperties.UserProperties`,
+`MqttReceivedMessage.UserProperties`, and
+`MqttClientHealthEvent.Attributes` snapshot assigned dictionaries with ordinal
+key comparison, and treat null maps as empty.
+
 ## MQTT Composition
 
 Namespace:

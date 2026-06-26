@@ -13,7 +13,14 @@ public sealed record MqttPublishRequest
 
 public sealed record MqttPublishProperties
 {
+    private IReadOnlyDictionary<string, string> _userProperties =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public string? CorrelationId { get; init; }
     public string? ResponseTopic { get; init; }
-    public Dictionary<string, string> UserProperties { get; init; } = [];
+    public IReadOnlyDictionary<string, string> UserProperties
+    {
+        get => _userProperties;
+        init => _userProperties = MqttContractMap.Copy(value);
+    }
 }

@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt 4.1.2
+
+Hardens MQTT contract dictionary snapshots.
+
+- `MqttPublishProperties.UserProperties`,
+  `MqttReceivedMessage.UserProperties`, and
+  `MqttClientHealthEvent.Attributes` now copy assigned dictionaries with ordinal
+  key comparison.
+- Null assigned maps are treated as empty, preserving optional config-bound
+  behavior.
+- Adds focused contract coverage for caller-owned dictionary mutation.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.4
 
 Hardens MQTT adapter user-property mapping.
