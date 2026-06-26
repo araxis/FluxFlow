@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mapping.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for closed generic standalone mapper nodes over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;mapping;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for flow.mapper host-owned engine, context factory, and clock resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Documents and tests mapper option validation through composition build diagnostics for invalid config-bound capacity.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

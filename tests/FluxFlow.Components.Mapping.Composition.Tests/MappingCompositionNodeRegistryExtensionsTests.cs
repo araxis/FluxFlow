@@ -305,6 +305,39 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                 StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Invalid_mapper_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine());
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "map",
+                    MappingCompositionNodeTypes.Mapper,
+                    node => node
+                        .Resource(MappingCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "map")
+                        .Configure("boundedCapacity", 0)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterMapper<object, object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("Mapper bounded capacity", StringComparison.Ordinal));
+    }
+
     private sealed record InputMessage(string Value);
 
     private sealed record OutputMessage(string Value);
