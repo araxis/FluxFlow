@@ -660,21 +660,53 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
-    public void Service_registration_rejects_null_options()
+    public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();
+        var options = new SqlFileStorageStoreOptions
+        {
+            DatabasePath = "data/storage.db"
+        };
 
-        var storeException = Should.Throw<ArgumentNullException>(() =>
+        Should.Throw<ArgumentNullException>(() =>
+            SqlFileStorageServiceCollectionExtensions.AddFluxFlowSqlFileStorageStore(
+                null!,
+                "items-store",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowSqlFileStorageStore(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowSqlFileStorageStore(
                 "items-store",
-                (SqlFileStorageStoreOptions)null!));
-        var factoryException = Should.Throw<ArgumentNullException>(() =>
+                (SqlFileStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowSqlFileStorageStore(
+                "items-store",
+                (Func<IServiceProvider, SqlFileStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
+
+        Should.Throw<ArgumentNullException>(() =>
+            SqlFileStorageServiceCollectionExtensions.AddFluxFlowSqlFileStorageStoreFactory(
+                null!,
+                "items-factory",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowSqlFileStorageStoreFactory(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowSqlFileStorageStoreFactory(
                 "items-factory",
-                (SqlFileStorageStoreOptions)null!));
-
-        storeException.ParamName.ShouldBe("options");
-        factoryException.ParamName.ShouldBe("options");
+                (SqlFileStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowSqlFileStorageStoreFactory(
+                "items-factory",
+                (Func<IServiceProvider, SqlFileStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
     }
 
     [Fact]

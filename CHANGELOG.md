@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.3.2
+
+Documents and verifies the full keyed storage backend registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures for direct store and store-factory registrations.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.2
+
+Documents and verifies the full keyed storage backend registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures for direct store and store-factory registrations.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
 ## FluxFlow.Components.Http.AspNetCore 1.0.2
 
 Hardens HTTP trigger endpoint authoring.
