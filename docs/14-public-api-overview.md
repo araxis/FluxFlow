@@ -767,7 +767,8 @@ These packages are intentionally not standalone node composition adapters:
   names, kinds, display text, and null-safe normalized metadata and attribute
   validation, defensive diagnostic metadata copying, and a fluent
   `ResourceDescriptorCatalogBuilder` over the existing descriptor/catalog
-  contracts.
+  contracts, plus keyed DI registration helpers for host-owned lookups and
+  descriptor providers.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
   option paths, optional non-sensitive descriptor enumeration, null-safe
