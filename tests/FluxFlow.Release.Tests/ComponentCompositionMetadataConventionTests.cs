@@ -875,6 +875,45 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_required_bound_options_are_required_in_designer_metadata()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+
+                foreach (var optionTypeName in optionTypeNames!)
+                {
+                    var optionType = ResolveReferencedType(assembly, optionTypeName, entry.PackageId);
+
+                    foreach (var requiredOption in ReadRequiredOptionProperties(optionType))
+                    {
+                        var option = metadata.Options.SingleOrDefault(option =>
+                            string.Equals(option.Name, requiredOption.ConfigurationKey, StringComparison.Ordinal));
+
+                        option.ShouldNotBeNull(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' must expose required bound option '{requiredOption.ConfigurationKey}' from {optionType.Name}.{requiredOption.Name}.");
+                        option.IsRequired.ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{requiredOption.ConfigurationKey}' must be marked required because {optionType.Name}.{requiredOption.Name} is a C# required member.");
+                    }
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_bound_option_metadata_kinds_match_simple_clr_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1312,6 +1351,18 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             ? field.GetRawConstantValue()
             : field.GetValue(null);
     }
+
+    private static RequiredOptionProperty[] ReadRequiredOptionProperties(Type optionType)
+        => optionType
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property =>
+                property.SetMethod?.IsPublic == true &&
+                property.GetCustomAttribute<RequiredMemberAttribute>() is not null)
+            .Select(property => new RequiredOptionProperty(
+                property.Name,
+                ToConfigurationKey(property.Name)))
+            .OrderBy(option => option.ConfigurationKey, StringComparer.Ordinal)
+            .ToArray();
 
     private static IEnumerable<string> ReadReferencedPackageIds(
         XDocument project,
@@ -1979,6 +2030,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string OptionType,
         string PropertyName,
         object? Value);
+
+    private sealed record RequiredOptionProperty(
+        string Name,
+        string ConfigurationKey);
 
     private sealed record ResourceLookupUsage(
         bool UsesRequiredLookup,
