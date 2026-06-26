@@ -166,7 +166,8 @@ public sealed class TimerThrottleNodeTests
                 {
                     Interval = TimeSpan.FromMilliseconds(1),
                     BoundedCapacity = 0
-                }));
+                }))
+            .Message.ShouldContain("BoundedCapacity");
 
     [Fact]
     public void Throttle_RejectsNullSettings()

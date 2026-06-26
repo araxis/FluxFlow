@@ -171,7 +171,8 @@ public sealed class TimerDebounceNodeTests
                 {
                     QuietPeriod = TimeSpan.FromMilliseconds(1),
                     BoundedCapacity = 0
-                }));
+                }))
+            .Message.ShouldContain("BoundedCapacity");
 
     [Fact]
     public void Debounce_RejectsNullSettings()

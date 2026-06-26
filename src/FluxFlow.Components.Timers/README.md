@@ -30,6 +30,10 @@ broadcast/latest-wins; use a dedicated durable buffer if a workflow edge must
 guarantee no loss. Delay, throttle, and debounce keep using `BoundedCapacity`
 as their bounded input capacity.
 
+Construction validates settings before the node pipeline is created. Invalid
+interval, delay, throttle, debounce, and capacity settings fail fast with
+timer-specific construction errors.
+
 ## Interval
 
 ```csharp
@@ -117,3 +121,5 @@ Use custom node type strings for multiple transform input shapes, for example
 `timer.delay.order` and `timer.debounce.http`. Schedule composition uses the
 existing `TimerScheduleSettings` model; this adapter does not add time zone id
 conversion.
+Invalid timer settings fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.

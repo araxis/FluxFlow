@@ -102,3 +102,6 @@ configuration and this package still does not add time-zone id conversion.
 Timer settings bind to the existing settings records. `timer.schedule` uses the
 existing `TimerScheduleSettings` shape; no additional time zone id conversion is
 added by this adapter.
+Invalid timer settings, such as non-positive intervals, negative delays, or
+non-positive `boundedCapacity`, fail during composition build and surface as
+factory diagnostics when build failures are configured as diagnostics.

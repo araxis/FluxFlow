@@ -392,26 +392,51 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Invalid_timer_configuration_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
                 .Create()
                 .Workflow("main", workflow => workflow.Node(
                     "poll",
                     TimersCompositionNodeTypes.Interval,
                     node => node.Configure("interval", TimeSpan.Zero)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterTimerInterval())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+                .Build(),
+            registry => registry.RegisterTimerInterval(),
+            "Interval");
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "delay",
+                    TimersCompositionNodeTypes.Delay,
+                    node => node.Configure("delay", TimeSpan.FromMilliseconds(-1))))
+                .Build(),
+            registry => registry.RegisterTimerDelay<InputMessage>(),
+            "Delay");
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("Interval", StringComparison.Ordinal));
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "throttle",
+                    TimersCompositionNodeTypes.Throttle,
+                    node => node
+                        .Configure("interval", TimeSpan.FromMilliseconds(1))
+                        .Configure("boundedCapacity", 0)))
+                .Build(),
+            registry => registry.RegisterTimerThrottle<InputMessage>(),
+            "BoundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "debounce",
+                    TimersCompositionNodeTypes.Debounce,
+                    node => node.Configure("quietPeriod", TimeSpan.Zero)))
+                .Build(),
+            registry => registry.RegisterTimerDebounce<InputMessage>(),
+            "QuietPeriod");
     }
 
     private static void AssertTransformMetadata(
@@ -506,6 +531,27 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
         await hostedService.StartAsync(CancellationToken.None);
+    }
+
+    private static async Task AssertFactoryDiagnosticAsync(
+        CompositionDefinition definition,
+        Action<CompositionNodeRegistry> registerNodes,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(definition)
+            .RegisterNodes(registerNodes)
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
     }
 
     private static (
