@@ -77,6 +77,8 @@ payload shaping should compose serialization or payload nodes before storage.
 Attribute keys and values are trimmed before persistence and query matching.
 Blank attribute keys/values and duplicate attribute keys after trimming are
 rejected so attribute filters stay deterministic.
+Invalid query paging and stored time ranges where `StoredFrom` is later than
+`StoredTo` are rejected through the shared storage query validation.
 
 ## Composition
 
