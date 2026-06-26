@@ -45,14 +45,16 @@ public static class FluxFlowMqttServiceCollectionExtensions
                 nameof(registrationOptions));
         }
 
-        services.AddKeyedSingleton(name, (provider, _) => new PulseMqttClientRegistrationState(
+        var normalizedName = name.Trim();
+
+        services.AddKeyedSingleton(normalizedName, (provider, _) => new PulseMqttClientRegistrationState(
             optionsFactory(provider)
                 ?? throw new InvalidOperationException(
                     "MQTT client options factory returned null."),
             clockFactory?.Invoke(provider),
             transportFactory?.Invoke(provider)));
 
-        services.AddKeyedSingleton<PulseMqttClient>(name, (provider, key) =>
+        services.AddKeyedSingleton<PulseMqttClient>(normalizedName, (provider, key) =>
         {
             var state = provider.GetRequiredKeyedService<PulseMqttClientRegistrationState>(key!);
             return new PulseMqttClient(
@@ -62,19 +64,19 @@ public static class FluxFlowMqttServiceCollectionExtensions
         });
 
         services.AddKeyedSingleton<IMqttPublisher>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<PulseMqttClient>(key!));
         services.AddKeyedSingleton<IMqttTriggerSource>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<PulseMqttClient>(key!));
         services.AddKeyedSingleton<IMqttClientHealthSource>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<PulseMqttClient>(key!));
 
         if (lifecycle.StartWithHost)
         {
             services.AddSingleton<IHostedService>(
-                provider => new PulseMqttClientLifetime(provider, name, lifecycle));
+                provider => new PulseMqttClientLifetime(provider, normalizedName, lifecycle));
         }
 
         return services;

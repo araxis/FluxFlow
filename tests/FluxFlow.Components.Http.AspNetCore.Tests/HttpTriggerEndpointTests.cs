@@ -106,6 +106,37 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public async Task DiComposition_TrimsKeyedTriggerNames()
+    {
+        using var host = await new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddRouting();
+                    services.AddFluxFlowHttpTrigger(" echo ", trigger =>
+                    {
+                        var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
+                            trigger.Responses.Post(request.With(HttpTriggerReply.Text(
+                                $"trimmed:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                        trigger.Output.LinkTo(handler);
+                    });
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapFluxFlowTrigger("/echo", " echo "));
+                }))
+            .StartAsync();
+        var client = host.GetTestClient();
+
+        var response = await client.PostAsync("/echo", new StringContent("hi"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("trimmed:hi");
+    }
+
+    [Fact]
     public void AddFluxFlowHttpTrigger_RejectsInvalidRegistrationArguments()
     {
         var services = new ServiceCollection();

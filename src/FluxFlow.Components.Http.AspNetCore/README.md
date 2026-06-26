@@ -32,6 +32,9 @@ configuration delegate. Trigger source capacity comes from `RequestReplyOptions`
 and must be greater than zero.
 `MapFluxFlowTrigger` validates the endpoint builder, route pattern, trigger name
 or direct coordinator before handing the route to framework routing.
+Trigger names are trimmed before keyed DI registration and endpoint lookup, so
+configuration-bound names with surrounding whitespace resolve to the same
+logical trigger.
 
 ## Composition
 

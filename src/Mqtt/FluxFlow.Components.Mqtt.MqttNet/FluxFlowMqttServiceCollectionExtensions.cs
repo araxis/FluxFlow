@@ -38,15 +38,16 @@ public static class FluxFlowMqttServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(optionsFactory);
 
         var lifecycle = registrationOptions ?? new MqttClientRegistrationOptions();
+        var normalizedName = name.Trim();
 
-        services.AddKeyedSingleton(name, (provider, _) => new MqttNetClientRegistrationState(
+        services.AddKeyedSingleton(normalizedName, (provider, _) => new MqttNetClientRegistrationState(
             optionsFactory(provider)
                 ?? throw new InvalidOperationException(
                     "MQTT client options factory returned null."),
             clockFactory?.Invoke(provider),
             factory?.Invoke(provider)));
 
-        services.AddKeyedSingleton<MqttNetClient>(name, (provider, key) =>
+        services.AddKeyedSingleton<MqttNetClient>(normalizedName, (provider, key) =>
         {
             var state = provider.GetRequiredKeyedService<MqttNetClientRegistrationState>(key!);
             return new MqttNetClient(
@@ -56,19 +57,19 @@ public static class FluxFlowMqttServiceCollectionExtensions
         });
 
         services.AddKeyedSingleton<IMqttPublisher>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<MqttNetClient>(key!));
         services.AddKeyedSingleton<IMqttTriggerSource>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<MqttNetClient>(key!));
         services.AddKeyedSingleton<IMqttClientHealthSource>(
-            name,
+            normalizedName,
             (provider, key) => provider.GetRequiredKeyedService<MqttNetClient>(key!));
 
         if (lifecycle.ConnectWithHost)
         {
             services.AddSingleton<IHostedService>(
-                provider => new MqttNetClientLifetime(provider, name));
+                provider => new MqttNetClientLifetime(provider, normalizedName));
         }
 
         return services;

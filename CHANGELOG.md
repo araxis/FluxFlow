@@ -7,6 +7,36 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http.AspNetCore 1.0.4
+
+Hardens keyed HTTP trigger registration.
+
+- `AddFluxFlowHttpTrigger(...)` now trims trigger names before keyed DI
+  registration.
+- `MapFluxFlowTrigger(...)` now trims trigger names before keyed source lookup.
+- Adds TestServer coverage for configuration-bound trigger names with
+  surrounding whitespace.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.7
+
+Hardens keyed MQTTnet adapter registration.
+
+- `AddFluxFlowMqttClient(...)` now trims client names before keyed DI
+  registration.
+- Hosted client lifetime uses the same normalized key.
+- Adds regression coverage for resolving MQTTnet client contracts through
+  normalized keys.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.7
+
+Hardens keyed Pulse MQTT adapter registration.
+
+- `AddFluxFlowMqttClient(...)` now trims client names before keyed DI
+  registration.
+- Hosted client lifetime uses the same normalized key.
+- Adds regression coverage for resolving Pulse MQTT client contracts through
+  normalized keys.
+
 ## FluxFlow.Components.Storage.FileSystem 3.3.4
 
 Hardens keyed file-system storage registration.
