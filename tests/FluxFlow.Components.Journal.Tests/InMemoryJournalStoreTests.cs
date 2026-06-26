@@ -369,12 +369,35 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
-    public async Task QueryAsync_validates_pagination()
+    public void JournalQueryMatcher_validates_query_shape()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            JournalQueryMatcher.Validate(new JournalQuery { Offset = -1 }));
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            JournalQueryMatcher.Validate(new JournalQuery { Limit = 0 }));
+        Should.Throw<ArgumentException>(() =>
+            JournalQueryMatcher.Validate(new JournalQuery
+            {
+                From = Timestamp(2),
+                To = Timestamp(1)
+            }));
+    }
+
+    [Fact]
+    public async Task QueryAsync_validates_query_shape()
     {
         var store = new InMemoryJournalStore();
 
         await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+            store.QueryAsync(new JournalQuery { Offset = -1 }).AsTask());
+        await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
             store.QueryAsync(new JournalQuery { Limit = 0 }).AsTask());
+        await Should.ThrowAsync<ArgumentException>(() =>
+            store.QueryAsync(new JournalQuery
+            {
+                From = Timestamp(2),
+                To = Timestamp(1)
+            }).AsTask());
     }
 
     [Fact]

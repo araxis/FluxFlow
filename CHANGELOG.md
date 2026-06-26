@@ -330,6 +330,9 @@ Hardens journal contract normalization.
   not leak into records, event inputs, or queries.
 - `JournalQueryResult` now copies assigned record collections so returned
   results remain stable after caller list mutations.
+- `JournalQueryMatcher.Validate()` now owns shared query validation for
+  invalid paging and inverted `From`/`To` time ranges, and the in-memory store
+  uses the same validator before matching records.
 
 ## FluxFlow.Components.Configuration 1.1.4
 

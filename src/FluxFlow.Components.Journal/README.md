@@ -60,3 +60,8 @@ query matching deterministic.
 Record, event, and query attribute maps are copied on assignment. Query result
 record lists are copied on assignment. Later caller mutations do not change
 already-created records, queries, event inputs, or query results.
+
+`JournalQueryMatcher.Validate()` owns structural query validation. It rejects
+negative offsets, non-positive limits, and time ranges where `From` is later
+than `To`; `InMemoryJournalStore.QueryAsync()` uses the same validator before
+matching records.
