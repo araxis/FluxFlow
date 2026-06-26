@@ -35,6 +35,20 @@ internal static class JournalContractNormalization
     }
 
     public static IReadOnlyList<JournalRecord> CopyRecords(
-        IEnumerable<JournalRecord>? records)
-        => records?.ToArray() ?? [];
+        IEnumerable<JournalRecord>? records,
+        string argumentName = "records")
+    {
+        if (records is null)
+            return [];
+
+        var snapshot = records.ToArray();
+        if (Array.Exists(snapshot, record => record is null))
+        {
+            throw new ArgumentNullException(
+                argumentName,
+                "Journal query results cannot contain null records.");
+        }
+
+        return snapshot;
+    }
 }

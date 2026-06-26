@@ -113,7 +113,9 @@ query matching deterministic.
 
 Record, event, and query attribute maps are copied on assignment. Query result
 record lists are copied on assignment. Later caller mutations do not change
-already-created records, queries, event inputs, or query results.
+already-created records, queries, event inputs, or query results. Null query
+result record collections become empty results, while null record entries are
+rejected at the public result boundary.
 
 `JournalQueryMatcher.Validate()` owns structural query validation. It rejects
 negative offsets, non-positive limits, and time ranges where `From` is later

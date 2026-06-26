@@ -7,7 +7,7 @@ public sealed record JournalQueryResult
     public required IReadOnlyList<JournalRecord> Records
     {
         get => _records;
-        init => _records = JournalContractNormalization.CopyRecords(value);
+        init => _records = JournalContractNormalization.CopyRecords(value, nameof(Records));
     }
 
     public required int TotalMatched { get; init; }

@@ -701,6 +701,20 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public void QueryResult_rejects_null_record_entries()
+    {
+        Should.Throw<ArgumentNullException>(() =>
+            new JournalQueryResult
+            {
+                Records = [null!],
+                TotalMatched = 1,
+                Offset = 0,
+                HasMore = false
+            })
+            .ParamName.ShouldBe("Records");
+    }
+
+    [Fact]
     public void JournalQueryMatcher_validates_query_shape()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>
