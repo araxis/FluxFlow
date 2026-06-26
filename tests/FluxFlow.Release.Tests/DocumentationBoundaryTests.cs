@@ -62,6 +62,32 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Workspace_docs_keep_composition_projection_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "06-workspace-projection.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_400)];
+
+        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("workspace docs should lead with composition projection.");
+        defaultSection.Contains("ToCompositionDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("workspace docs should show composition projection before optional engine APIs.");
+        defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeFalse("workspace docs must not lead with optional engine projection.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Projection", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "workspace docs should keep engine projection in an explicitly optional section.");
+
+        var engineDefinitionIndex = text.IndexOf("ApplicationDefinition", StringComparison.Ordinal);
+        engineDefinitionIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "ApplicationDefinition should only appear after the optional engine projection heading.");
+    }
+
+    [Fact]
     public void Validation_docs_keep_composition_validation_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
