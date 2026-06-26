@@ -168,6 +168,15 @@ Uses the shared Designer metadata builder for event projection metadata.
 - Preserves existing event projection options, clock resources, fixed ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Metrics.Composition 1.2.1
+
+Uses the shared Designer metadata builder for metrics aggregate metadata.
+
+- Refactors `MetricsComponentDesignMetadataProvider` to author
+  `metrics.aggregate` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing metrics aggregate options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

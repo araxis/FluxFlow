@@ -12,136 +12,107 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateAggregateMetadata()];
 
-    private static ComponentDesignMetadata CreateAggregateMetadata() => new()
+    private static ComponentDesignMetadata CreateAggregateMetadata()
     {
-        Type = new ComponentType(MetricsCompositionNodeTypes.Aggregate),
-        DisplayName = "Metrics Aggregate",
-        Category = "Metrics",
-        Summary = "Folds metric samples into rolling count, value, rate, size, and group snapshots.",
-        IconKey = "chart-no-axes-combined",
-        PreferredNodeName = "aggregateMetrics",
-        SuggestedEditorWidth = 460,
-        Options = AggregateOptionsMetadata(),
-        Resources = AggregateResources(),
-        Ports = AggregatePorts()
-    };
+        var builder = new ComponentDesignMetadataBuilder(MetricsCompositionNodeTypes.Aggregate)
+            .WithDisplay(
+                displayName: "Metrics Aggregate",
+                category: "Metrics",
+                summary: "Folds metric samples into rolling count, value, rate, size, and group snapshots.",
+                iconKey: "chart-no-axes-combined",
+                preferredNodeName: "aggregateMetrics",
+                suggestedEditorWidth: 460);
 
-    private static IReadOnlyList<OptionDesignMetadata> AggregateOptionsMetadata()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "rateWindowSeconds",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Rate Window Seconds",
-                DefaultValue = Defaults.RateWindowSeconds,
-                Min = 0.000001,
-                HelperText = "Rolling window in seconds for current-rate calculations."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = Defaults.BoundedCapacity,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxGroups",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Groups",
-                DefaultValue = Defaults.MaxGroups,
-                Min = 0,
-                HelperText = "Maximum number of per-group snapshots to track."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "emitEverySample",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Emit Every Sample",
-                DefaultValue = Defaults.EmitEverySample,
-                HelperText = "Emit a snapshot after every accepted sample instead of only at completion."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "trackLatest",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Track Latest",
-                DefaultValue = Defaults.TrackLatest,
-                HelperText = "Include the latest metric sample in snapshots."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "trackMinMax",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Track Min/Max",
-                DefaultValue = Defaults.TrackMinMax,
-                HelperText = "Track minimum and maximum numeric values."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "trackSize",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Track Size",
-                DefaultValue = Defaults.TrackSize,
-                HelperText = "Track total size when samples include size values."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "groupByTag",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Group By Tag",
-                HelperText = "Optional tag key used for grouping instead of the sample group."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "treatMissingValueAsZero",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Treat Missing Value As Zero",
-                DefaultValue = Defaults.TreatMissingValueAsZero,
-                HelperText = "Count missing numeric values as zero-valued observations."
-            }
-        ];
+        AddAggregateOptions(builder);
+        AddAggregateResources(builder);
+        AddAggregatePorts(builder);
 
-    private static IReadOnlyList<ResourceDesignMetadata> AggregateResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = MetricsCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic metric timestamps and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+        return builder.Build();
+    }
 
-    private static IReadOnlyList<PortDesignMetadata> AggregatePorts()
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(MetricsCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Metric sample to aggregate.",
-                ValueType = nameof(MetricSampleInput),
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(MetricsCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = "Metric aggregate snapshot.",
-                ValueType = nameof(MetricSnapshotOutput),
-                IsPrimary = true
-            }
-        ];
+    private static void AddAggregateOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "rateWindowSeconds",
+                OptionValueKind.Number,
+                displayName: "Rate Window Seconds",
+                helperText: "Rolling window in seconds for current-rate calculations.",
+                defaultValue: Defaults.RateWindowSeconds,
+                min: 0.000001)
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: Defaults.BoundedCapacity,
+                min: 1)
+            .AddOption(
+                "maxGroups",
+                OptionValueKind.Number,
+                displayName: "Max Groups",
+                helperText: "Maximum number of per-group snapshots to track.",
+                defaultValue: Defaults.MaxGroups,
+                min: 0)
+            .AddOption(
+                "emitEverySample",
+                OptionValueKind.Boolean,
+                displayName: "Emit Every Sample",
+                helperText: "Emit a snapshot after every accepted sample instead of only at completion.",
+                defaultValue: Defaults.EmitEverySample)
+            .AddOption(
+                "trackLatest",
+                OptionValueKind.Boolean,
+                displayName: "Track Latest",
+                helperText: "Include the latest metric sample in snapshots.",
+                defaultValue: Defaults.TrackLatest)
+            .AddOption(
+                "trackMinMax",
+                OptionValueKind.Boolean,
+                displayName: "Track Min/Max",
+                helperText: "Track minimum and maximum numeric values.",
+                defaultValue: Defaults.TrackMinMax)
+            .AddOption(
+                "trackSize",
+                OptionValueKind.Boolean,
+                displayName: "Track Size",
+                helperText: "Track total size when samples include size values.",
+                defaultValue: Defaults.TrackSize)
+            .AddOption(
+                "groupByTag",
+                OptionValueKind.Text,
+                displayName: "Group By Tag",
+                helperText: "Optional tag key used for grouping instead of the sample group.")
+            .AddOption(
+                "treatMissingValueAsZero",
+                OptionValueKind.Boolean,
+                displayName: "Treat Missing Value As Zero",
+                helperText: "Count missing numeric values as zero-valued observations.",
+                defaultValue: Defaults.TreatMissingValueAsZero);
+
+    private static void AddAggregateResources(ComponentDesignMetadataBuilder builder)
+        => builder.AddResource(
+            MetricsCompositionResourceNames.Clock,
+            displayName: "Clock",
+            order: 0,
+            summary: "Optional keyed clock for deterministic metric timestamps and diagnostics.",
+            valueType: nameof(TimeProvider));
+
+    private static void AddAggregatePorts(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddInputPort(
+                MetricsCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Metric sample to aggregate.",
+                valueType: nameof(MetricSampleInput),
+                isPrimary: true)
+            .AddOutputPort(
+                MetricsCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "Metric aggregate snapshot.",
+                valueType: nameof(MetricSnapshotOutput),
+                isPrimary: true);
 }
