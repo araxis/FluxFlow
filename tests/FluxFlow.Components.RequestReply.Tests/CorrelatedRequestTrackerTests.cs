@@ -114,6 +114,19 @@ public sealed class CorrelatedRequestTrackerTests
             .ShouldBe(CorrelatedRequestStartResult.Stopped);
     }
 
+    [Fact]
+    public void Options_reject_invalid_values_when_assigned()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new CorrelatedRequestTrackerOptions
+        {
+            Timeout = TimeSpan.Zero
+        }).Message.ShouldContain("Timeout");
+        Should.Throw<ArgumentOutOfRangeException>(() => new CorrelatedRequestTrackerOptions
+        {
+            SweepInterval = TimeSpan.Zero
+        }).Message.ShouldContain("Sweep interval");
+    }
+
     private sealed record CompletedRequest(
         CorrelationId CorrelationId,
         string Context,
