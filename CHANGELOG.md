@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.4
+
+Hardens component design metadata port validation.
+
+- `ComponentDesignMetadataValidator` now reports duplicate primary ports within
+  the same direction, keeping Designer metadata to one preferred input and one
+  preferred output.
+- Adds validator coverage for duplicate primary input and output ports.
+
 ## FluxFlow.Components.Designer 2.2.3
 
 Hardens component design metadata option validation.

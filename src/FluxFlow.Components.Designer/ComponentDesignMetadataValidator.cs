@@ -425,6 +425,7 @@ public static class ComponentDesignMetadataValidator
         }
 
         var names = new HashSet<(PortDirection Direction, string Name)>();
+        var primaryPorts = new Dictionary<PortDirection, string>();
 
         for (var index = 0; index < ports.Count; index++)
         {
@@ -450,6 +451,13 @@ public static class ComponentDesignMetadataValidator
                 errors.Add(new DesignerMetadataValidationError(
                     $"{path}.{nameof(PortDesignMetadata.Name)}",
                     $"Port '{port.Name}' is already used for direction '{port.Direction}'."));
+            }
+
+            if (port.IsPrimary && !primaryPorts.TryAdd(port.Direction, port.Name.Value))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.IsPrimary)}",
+                    $"Primary port for direction '{port.Direction}' is already set to '{primaryPorts[port.Direction]}'."));
             }
 
             ValidateOptionalText(port.DisplayName, $"{path}.{nameof(PortDesignMetadata.DisplayName)}", errors);
