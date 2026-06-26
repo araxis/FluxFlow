@@ -7,6 +7,25 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mapping 3.0.1
+
+Hardens mapper option validation.
+
+- `FlowMapperNode<TInput,TOutput>` now validates `MapperOptions` before the
+  base node pipeline is created.
+- Non-positive `BoundedCapacity` now fails with a mapper-specific construction
+  error.
+- Adds direct standalone mapper tests for invalid capacity.
+
+## FluxFlow.Components.Mapping.Composition 1.2.1
+
+Hardens config-bound mapper option diagnostics.
+
+- Invalid `MapperOptions` values now fail during composition build through the
+  `flow.mapper` factory.
+- Adds hosted composition coverage proving invalid `boundedCapacity` surfaces
+  as a factory diagnostic when build failures are configured as diagnostics.
+
 ## FluxFlow.Components.Http 3.0.1
 
 Hardens HTTP client node option validation.

@@ -151,7 +151,8 @@ Use `RegisterMapper<TInput,TOutput>()` from the optional
 `FluxFlow.Components.Mapping.Composition` package when a composition host wants
 closed generic `flow.mapper` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed context factory and clock
-resources stay host-owned.
+resources stay host-owned. Invalid mapper options fail during build as factory
+diagnostics when the host is configured to collect build failures.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.mapper` composition node so hosts can compose palette, editor,

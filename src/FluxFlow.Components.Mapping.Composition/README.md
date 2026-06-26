@@ -69,6 +69,9 @@ for deterministic diagnostics.
 `MapperOptions.InputType`, `OutputType`, and `targetType` remain diagnostic
 metadata. The actual composition port types come from the closed generic
 registration selected by the host.
+Invalid `MapperOptions`, such as a missing expression or non-positive
+`boundedCapacity`, fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.
 
 ## Design Metadata
 

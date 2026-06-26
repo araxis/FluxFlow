@@ -269,6 +269,17 @@ public sealed class FlowMapperNodeTests
     }
 
     [Fact]
+    public void Constructor_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowMapperNode<object, object>(
+                new MapperOptions { Expression = "map", BoundedCapacity = 0 },
+                new RecordingExpressionEngine()));
+
+        exception.Message.ShouldContain("Mapper bounded capacity");
+    }
+
+    [Fact]
     public void Constructor_RequiresOptions()
         => Should.Throw<ArgumentNullException>(
             () => new FlowMapperNode<object, object>(null!, new RecordingExpressionEngine()));
