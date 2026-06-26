@@ -14,105 +14,109 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
             CreateWhenMetadata()
         ];
 
-    private static ComponentDesignMetadata CreateFilterMetadata() => new()
+    private static ComponentDesignMetadata CreateFilterMetadata()
+        => CreateControlMetadata(
+            ControlCompositionNodeTypes.Filter,
+            "Filter",
+            "Forwards input messages only when an expression matches.",
+            "filter",
+            "filter",
+            [
+                InputPort(),
+                OutputPort(
+                    ControlCompositionPortNames.Output,
+                    "Output",
+                    "Messages",
+                    1,
+                    "Input message when the expression matches.",
+                    isPrimary: true)
+            ]);
+
+    private static ComponentDesignMetadata CreateWhenMetadata()
+        => CreateControlMetadata(
+            ControlCompositionNodeTypes.When,
+            "When",
+            "Routes input messages to true and false branches.",
+            "branch",
+            "when",
+            [
+                InputPort(),
+                OutputPort(
+                    ControlCompositionPortNames.Output,
+                    "Output",
+                    "Messages",
+                    1,
+                    "Primary true-branch output alias.",
+                    isPrimary: true,
+                    attributes: new Dictionary<string, string>
+                    {
+                        ["aliasOf"] = ControlCompositionPortNames.WhenTrue
+                    }),
+                OutputPort(
+                    ControlCompositionPortNames.WhenTrue,
+                    "When True",
+                    "Branches",
+                    2,
+                    "Input message when the expression matches."),
+                OutputPort(
+                    ControlCompositionPortNames.WhenFalse,
+                    "When False",
+                    "Branches",
+                    3,
+                    "Input message when the expression does not match.")
+            ]);
+
+    private static ComponentDesignMetadata CreateControlMetadata(
+        string type,
+        string displayName,
+        string summary,
+        string iconKey,
+        string preferredNodeName,
+        IReadOnlyList<PortDesignMetadata> ports) => new()
+        {
+            Type = new ComponentType(type),
+            DisplayName = displayName,
+            Category = "Control",
+            Summary = summary,
+            IconKey = iconKey,
+            PreferredNodeName = preferredNodeName,
+            SuggestedEditorWidth = 420,
+            Options = CreateExpressionOptions(),
+            Resources = CreateExpressionResources(),
+            Ports = ports
+        };
+
+    private static PortDesignMetadata InputPort() => new()
     {
-        Type = new ComponentType(ControlCompositionNodeTypes.Filter),
-        DisplayName = "Filter",
-        Category = "Control",
-        Summary = "Forwards input messages only when an expression matches.",
-        IconKey = "filter",
-        PreferredNodeName = "filter",
-        SuggestedEditorWidth = 420,
-        Options = CreateExpressionOptions(),
-        Resources = CreateExpressionResources(),
-        Ports =
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Input message.",
-                ValueType = "TInput",
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Messages",
-                Order = 1,
-                Summary = "Input message when the expression matches.",
-                ValueType = "TInput",
-                IsPrimary = true
-            }
-        ]
+        Name = new ComponentPortName(ControlCompositionPortNames.Input),
+        Direction = PortDirection.Input,
+        DisplayName = "Input",
+        Group = "Messages",
+        Order = 0,
+        Summary = "Input message.",
+        ValueType = "TInput",
+        IsPrimary = true
     };
 
-    private static ComponentDesignMetadata CreateWhenMetadata() => new()
-    {
-        Type = new ComponentType(ControlCompositionNodeTypes.When),
-        DisplayName = "When",
-        Category = "Control",
-        Summary = "Routes input messages to true and false branches.",
-        IconKey = "branch",
-        PreferredNodeName = "when",
-        SuggestedEditorWidth = 420,
-        Options = CreateExpressionOptions(),
-        Resources = CreateExpressionResources(),
-        Ports =
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Input message.",
-                ValueType = "TInput",
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Messages",
-                Order = 1,
-                Summary = "Primary true-branch output alias.",
-                ValueType = "TInput",
-                IsPrimary = true,
-                Attributes = new Dictionary<string, string>
-                {
-                    ["aliasOf"] = ControlCompositionPortNames.WhenTrue
-                }
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.WhenTrue),
-                Direction = PortDirection.Output,
-                DisplayName = "When True",
-                Group = "Branches",
-                Order = 2,
-                Summary = "Input message when the expression matches.",
-                ValueType = "TInput"
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.WhenFalse),
-                Direction = PortDirection.Output,
-                DisplayName = "When False",
-                Group = "Branches",
-                Order = 3,
-                Summary = "Input message when the expression does not match.",
-                ValueType = "TInput"
-            }
-        ]
-    };
+    private static PortDesignMetadata OutputPort(
+        string name,
+        string displayName,
+        string group,
+        int order,
+        string summary,
+        bool isPrimary = false,
+        IReadOnlyDictionary<string, string>? attributes = null) => new()
+        {
+            Name = new ComponentPortName(name),
+            Direction = PortDirection.Output,
+            DisplayName = displayName,
+            Group = group,
+            Order = order,
+            Summary = summary,
+            ValueType = "TInput",
+            IsPrimary = isPrimary,
+            Attributes = attributes ?? new Dictionary<string, string>()
+        };
 
     private static IReadOnlyList<OptionDesignMetadata> CreateExpressionOptions()
         =>
