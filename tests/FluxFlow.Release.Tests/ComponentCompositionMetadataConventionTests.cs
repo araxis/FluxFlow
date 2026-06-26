@@ -328,6 +328,82 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         }
     }
 
+    [Fact]
+    public void Component_composition_bound_option_metadata_kinds_match_simple_clr_types()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var sourceRoot = Path.Combine(root, "src");
+        var sourceFiles = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .ToArray();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var providerFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*ComponentDesignMetadataProvider.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem();
+            var providerContent = File.ReadAllText(providerFile);
+            var providerOptionKinds = ReadProviderOptionKinds(providerContent);
+            var boundOptionTypes = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Select(File.ReadAllText)
+                .SelectMany(content => BindConfigurationRegex()
+                    .Matches(content)
+                    .Select(match => match.Groups["type"].Value.Trim()))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var optionType in boundOptionTypes)
+            {
+                var optionTypeFile = sourceFiles
+                    .SingleOrDefault(file =>
+                        string.Equals(
+                            Path.GetFileNameWithoutExtension(file),
+                            optionType,
+                            StringComparison.Ordinal));
+                optionTypeFile.ShouldNotBeNull(
+                    $"{entry.PackageId} binds unknown option type '{optionType}'.");
+
+                var optionContent = File.ReadAllText(optionTypeFile);
+                var optionProperties = OptionPropertyWithTypeRegex()
+                    .Matches(optionContent)
+                    .Concat(ValidatedOptionPropertyWithTypeRegex().Matches(optionContent))
+                    .Select(match => new
+                    {
+                        Name = match.Groups["name"].Value,
+                        ConfigurationKey = ToConfigurationKey(match.Groups["name"].Value),
+                        ClrType = match.Groups["type"].Value.Trim()
+                    })
+                    .DistinctBy(option => option.ConfigurationKey, StringComparer.Ordinal)
+                    .ToArray();
+
+                foreach (var option in optionProperties)
+                {
+                    var expectedKind = ExpectedOptionKind(option.ClrType);
+                    if (expectedKind is null || !providerOptionKinds.TryGetValue(option.ConfigurationKey, out var actualKinds))
+                        continue;
+
+                    actualKinds.Contains(expectedKind)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} option '{optionType}.{option.Name}' has CLR type '{option.ClrType}' and must use OptionValueKind.{expectedKind}.");
+                }
+            }
+        }
+    }
+
     private static bool IsComponentCompositionPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal)
             && entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal);
@@ -386,6 +462,64 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private static string ToConfigurationKey(string propertyName)
         => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
 
+    private static Dictionary<string, HashSet<string>> ReadProviderOptionKinds(string providerContent)
+    {
+        var optionKinds = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (Match match in OptionMetadataBlockRegex().Matches(providerContent))
+        {
+            var body = match.Groups["body"].Value;
+            var nameMatch = OptionNameAssignmentRegex().Match(body);
+            var kindMatch = OptionKindAssignmentRegex().Match(body);
+
+            if (!nameMatch.Success || !kindMatch.Success)
+                continue;
+
+            var name = nameMatch.Groups["name"].Value;
+            if (!optionKinds.TryGetValue(name, out var kinds))
+            {
+                kinds = new HashSet<string>(StringComparer.Ordinal);
+                optionKinds.Add(name, kinds);
+            }
+
+            kinds.Add(kindMatch.Groups["kind"].Value);
+        }
+
+        return optionKinds;
+    }
+
+    private static string? ExpectedOptionKind(string clrType)
+    {
+        var type = NormalizeClrType(clrType);
+
+        return type switch
+        {
+            "bool" => "Boolean",
+            "byte" or "short" or "int" or "long" or "float" or "double" or "decimal" => "Number",
+            "TimeSpan" => "Duration",
+            "JsonDocument" or "JsonElement" or "JsonNode" or "JsonObject" => "Json",
+            _ when type.Contains("Dictionary", StringComparison.Ordinal) => "Json",
+            _ => null
+        };
+    }
+
+    private static string NormalizeClrType(string clrType)
+    {
+        var type = clrType
+            .Replace("global::", string.Empty, StringComparison.Ordinal)
+            .Trim();
+
+        if (type.EndsWith('?'))
+            type = type[..^1];
+
+        var nullableMatch = NullableTypeRegex().Match(type);
+        if (nullableMatch.Success)
+            type = nullableMatch.Groups["type"].Value.Trim();
+
+        var lastDotIndex = type.LastIndexOf('.');
+        return lastDotIndex >= 0 ? type[(lastDotIndex + 1)..] : type;
+    }
+
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex PublicStringConstantRegex();
 
@@ -397,4 +531,22 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"public\s+(?:required\s+)?[^\r\n{]+\s+(?<name>\w+)\s*\{\s*get\s*=>[^{};]+;\s*init\s*=>[^{};]+;\s*\}")]
     private static partial Regex ValidatedOptionPropertyRegex();
+
+    [GeneratedRegex(@"public\s+(?:required\s+)?(?<type>[^\r\n{;=]+?)\s+(?<name>\w+)\s*\{\s*get;\s*init;\s*\}")]
+    private static partial Regex OptionPropertyWithTypeRegex();
+
+    [GeneratedRegex(@"public\s+(?:required\s+)?(?<type>[^\r\n{;=]+?)\s+(?<name>\w+)\s*\{\s*get\s*=>[^{};]+;\s*init\s*=>[^{};]+;\s*\}")]
+    private static partial Regex ValidatedOptionPropertyWithTypeRegex();
+
+    [GeneratedRegex(@"(?:new\s+OptionDesignMetadata\s*(?:\([^)]*\))?|=>\s*new\s*\(\s*\))\s*\{(?<body>.*?)\}", RegexOptions.Singleline)]
+    private static partial Regex OptionMetadataBlockRegex();
+
+    [GeneratedRegex(@"Name\s*=\s*""(?<name>[^""]+)""")]
+    private static partial Regex OptionNameAssignmentRegex();
+
+    [GeneratedRegex(@"Kind\s*=\s*OptionValueKind\.(?<kind>\w+)")]
+    private static partial Regex OptionKindAssignmentRegex();
+
+    [GeneratedRegex(@"Nullable<(?<type>[^>]+)>")]
+    private static partial Regex NullableTypeRegex();
 }
