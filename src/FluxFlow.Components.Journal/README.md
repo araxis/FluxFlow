@@ -87,6 +87,9 @@ services
     .AddFluxFlowJournalStoreFactory("journal-factory", factory);
 ```
 
+The direct registration overloads reject null stores and store factories. The
+provider overloads fail with clear diagnostics if they return null.
+
 ## Composition
 
 This package does not expose standalone nodes or `FluxFlow.Composition`

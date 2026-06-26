@@ -123,6 +123,46 @@ public sealed class SessionOptionsTests
     }
 
     [Fact]
+    public void Service_registration_rejects_null_store_instances()
+    {
+        var services = new ServiceCollection();
+
+        var storeException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowSessionStore(
+                "sessions",
+                (ISessionStore)null!));
+        var factoryException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowSessionStoreFactory(
+                "sessions-factory",
+                (ISessionStoreFactory)null!));
+
+        storeException.ParamName.ShouldBe("store");
+        factoryException.ParamName.ShouldBe("storeFactory");
+    }
+
+    [Fact]
+    public async Task Service_registration_rejects_null_provider_results()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowSessionStore(
+                "sessions",
+                static _ => null!)
+            .AddFluxFlowSessionStoreFactory(
+                "sessions-factory",
+                static _ => null!);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var storeException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<ISessionStore>("sessions"));
+        var factoryException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory"));
+
+        storeException.Message.ShouldBe("Session store provider returned null.");
+        factoryException.Message.ShouldBe("Session store factory provider returned null.");
+    }
+
+    [Fact]
     public void Recorder_options_normalize_text_and_copy_tags()
     {
         var tags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

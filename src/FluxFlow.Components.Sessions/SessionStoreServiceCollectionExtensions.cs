@@ -26,7 +26,7 @@ public static class SessionStoreServiceCollectionExtensions
         services.AddKeyedSingleton<ISessionStore>(
             name,
             (provider, _) => storeFactory(provider)
-                ?? throw new InvalidOperationException("Session store factory returned null."));
+                ?? throw new InvalidOperationException("Session store provider returned null."));
 
         return services;
     }

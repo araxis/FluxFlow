@@ -39,6 +39,22 @@ Hardens keyed storage backend DI registration.
   creating keyed direct stores or keyed store factories.
 - Keeps direct options overloads strict and documented.
 
+## FluxFlow.Components.Journal 2.3.1
+
+Hardens keyed journal store DI registration diagnostics.
+
+- Direct store provider failures now clearly report null store provider results.
+- Store-factory provider failures remain explicit and are covered by focused
+  tests.
+
+## FluxFlow.Components.Sessions 3.3.1
+
+Hardens keyed session store DI registration diagnostics.
+
+- Direct store provider failures now clearly report null store provider results.
+- Store-factory provider failures remain explicit and are covered by focused
+  tests.
+
 ## FluxFlow.Components.Resources 1.5.0
 
 Adds keyed resource registration helpers.

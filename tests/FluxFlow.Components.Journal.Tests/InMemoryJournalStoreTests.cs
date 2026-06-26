@@ -148,6 +148,46 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public void Service_registration_rejects_null_store_instances()
+    {
+        var services = new ServiceCollection();
+
+        var storeException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowJournalStore(
+                "journal",
+                (IJournalStore)null!));
+        var factoryException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowJournalStoreFactory(
+                "journal-factory",
+                (IJournalStoreFactory)null!));
+
+        storeException.ParamName.ShouldBe("store");
+        factoryException.ParamName.ShouldBe("storeFactory");
+    }
+
+    [Fact]
+    public async Task Service_registration_rejects_null_provider_results()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowJournalStore(
+                "journal",
+                static _ => null!)
+            .AddFluxFlowJournalStoreFactory(
+                "journal-factory",
+                static _ => null!);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var storeException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IJournalStore>("journal"));
+        var factoryException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IJournalStoreFactory>("journal-factory"));
+
+        storeException.Message.ShouldBe("Journal store provider returned null.");
+        factoryException.Message.ShouldBe("Journal store factory provider returned null.");
+    }
+
+    [Fact]
     public async Task InMemoryJournalStoreFactory_rejects_null_context_before_opening()
     {
         var factory = new InMemoryJournalStoreFactory();
