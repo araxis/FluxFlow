@@ -354,7 +354,8 @@ conditionally required expression engine plus optional context factory and
 clock resources. Logger metadata includes the dynamic `attribute:{name}`
 selector resource pattern, and metrics metadata includes the optional
 `sizeSelector` and `clock` resources. Expression engines, context factories,
-selectors, and clocks remain host-owned keyed resources.
+selectors, and clocks remain host-owned keyed resources. The provider authors
+that metadata through the shared validated Designer metadata builder.
 
 ## Metrics Composition
 

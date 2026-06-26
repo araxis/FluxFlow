@@ -93,6 +93,8 @@ conditionally required when `predicate` or `expression` is configured. Logger
 metadata exposes `clock` and the dynamic `attribute:{name}` selector resource
 pattern used by `attributeSelectors`. Metrics metadata exposes `sizeSelector`
 and `clock`.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
 
 Expression engines, context factories, selectors, and optional keyed
 `TimeProvider` clocks remain host-owned resources; option fields such as
