@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.5
+
+Hardens component design metadata enum validation.
+
+- `ComponentDesignMetadataValidator` now reports unsupported `OptionValueKind`
+  and `PortDirection` values.
+- Adds validator coverage for invalid numeric enum casts in option and port
+  metadata.
+
 ## FluxFlow.Components.Designer 2.2.4
 
 Hardens component design metadata port validation.

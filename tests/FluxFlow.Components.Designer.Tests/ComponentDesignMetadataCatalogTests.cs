@@ -334,6 +334,40 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_invalid_enum_contract_values()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "mode",
+                    Kind = (OptionValueKind)999
+                }
+            ],
+            Ports =
+            [
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Input"),
+                    Direction = (PortDirection)999
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.Kind)}" &&
+            error.Message.Contains("Option kind", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[0].{nameof(PortDesignMetadata.Direction)}" &&
+            error.Message.Contains("Port direction", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_reports_enum_option_without_choices()
     {
         var metadata = new ComponentDesignMetadata

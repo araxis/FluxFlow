@@ -82,6 +82,13 @@ public static class ComponentDesignMetadataValidator
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(OptionDesignMetadata.Name)}", $"Option name '{option.Name}' is already used."));
             }
 
+            if (!Enum.IsDefined(option.Kind))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(OptionDesignMetadata.Kind)}",
+                    $"Option kind '{option.Kind}' is not supported."));
+            }
+
             if (option.Min > option.Max)
             {
                 errors.Add(new DesignerMetadataValidationError(
@@ -442,6 +449,13 @@ public static class ComponentDesignMetadataValidator
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(PortDesignMetadata.Name)}", "Port name is required."));
                 continue;
+            }
+
+            if (!Enum.IsDefined(port.Direction))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.Direction)}",
+                    $"Port direction '{port.Direction}' is not supported."));
             }
 
             var key = (port.Direction, port.Name.Value);
