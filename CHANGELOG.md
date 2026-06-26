@@ -7,6 +7,30 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Timers 3.1.1
+
+Aligns timer transform constructor option validation with the standalone node
+conventions.
+
+- `TimerDelayNode<TInput>`, `TimerThrottleNode<TInput>`, and
+  `TimerDebounceNode<TInput>` now validate settings before their base node
+  pipelines are created.
+- Invalid duration settings and non-positive `BoundedCapacity` values now fail
+  with timer-specific construction errors.
+- Runtime timing behavior, correlation propagation, and source node behavior are
+  unchanged.
+
+## FluxFlow.Components.Timers.Composition 1.4.1
+
+Hardens config-bound timer option diagnostics.
+
+- Invalid timer settings now fail during composition build through the
+  `timer.interval`, `timer.delay`, `timer.throttle`, and `timer.debounce`
+  factories covered by this pass.
+- Adds hosted composition coverage proving invalid transform durations and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
 ## FluxFlow.Components.Validation 3.0.1
 
 Aligns JSON schema validator constructor option validation with the standalone

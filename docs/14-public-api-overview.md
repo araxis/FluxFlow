@@ -271,6 +271,8 @@ Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
 `FluxFlow.Components.Timers.Composition` package when a composition host wants
 timer source and transform node factories. The factories bind existing timer
 settings and resolve optional keyed `TimeProvider` resources through the host.
+Invalid timer settings fail during build as factory diagnostics when the host is
+configured to collect build failures.
 
 `TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the five timer composition nodes so hosts can compose palette, editor,
