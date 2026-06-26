@@ -576,6 +576,30 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public void Service_registration_trims_keyed_store_and_factory_names()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                " items-store ",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path
+                })
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                " items-factory ",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path
+                });
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IStorageStore>("items-store").ShouldNotBeNull();
+        provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory").ShouldNotBeNull();
+    }
+
+    [Fact]
     public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();

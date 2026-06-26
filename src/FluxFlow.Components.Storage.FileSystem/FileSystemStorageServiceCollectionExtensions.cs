@@ -23,8 +23,10 @@ public static class FileSystemStorageServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(optionsFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IStorageStore>(
-            name,
+            normalizedName,
             (provider, _) => new FileSystemStorageStore(
                 optionsFactory(provider)
                     ?? throw new InvalidOperationException(
@@ -51,8 +53,10 @@ public static class FileSystemStorageServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(optionsFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IStorageStoreFactory>(
-            name,
+            normalizedName,
             (provider, _) => new FileSystemStorageStoreFactory(
                 optionsFactory(provider)
                     ?? throw new InvalidOperationException(

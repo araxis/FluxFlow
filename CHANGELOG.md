@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.FileSystem 3.3.4
+
+Hardens keyed file-system storage registration.
+
+- `AddFluxFlowFileSystemStorageStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowFileSystemStorageStoreFactory(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving file-system stores and factories
+  through normalized keys.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.4
+
+Hardens keyed SQL-file storage registration.
+
+- `AddFluxFlowSqlFileStorageStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSqlFileStorageStoreFactory(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving SQL-file stores and factories through
+  normalized keys.
+
 ## FluxFlow.Components.Journal 2.3.5
 
 Hardens keyed journal service registration.
