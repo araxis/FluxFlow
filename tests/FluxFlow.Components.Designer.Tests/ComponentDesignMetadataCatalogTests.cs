@@ -289,6 +289,51 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_duplicate_primary_ports_per_direction()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Ports =
+            [
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Input"),
+                    Direction = PortDirection.Input,
+                    IsPrimary = true
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("AlternativeInput"),
+                    Direction = PortDirection.Input,
+                    IsPrimary = true
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Output"),
+                    Direction = PortDirection.Output,
+                    IsPrimary = true
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("AlternativeOutput"),
+                    Direction = PortDirection.Output,
+                    IsPrimary = true
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[1].{nameof(PortDesignMetadata.IsPrimary)}" &&
+            error.Message.Contains("Input", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[3].{nameof(PortDesignMetadata.IsPrimary)}" &&
+            error.Message.Contains("Output", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_reports_enum_option_without_choices()
     {
         var metadata = new ComponentDesignMetadata

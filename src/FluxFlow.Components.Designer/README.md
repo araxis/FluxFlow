@@ -26,9 +26,10 @@ component without depending on a specific rendering framework.
   more providers.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
-options and ports, invalid option defaults, invalid min/max usage, invalid
-choices, invalid resources, invalid attributes, and null-bound metadata
-collections as validation errors before metadata is registered.
+options and ports, duplicate primary ports per direction, invalid option
+defaults, invalid min/max usage, invalid choices, invalid resources, invalid
+attributes, and null-bound metadata collections as validation errors before
+metadata is registered.
 `ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
 including nested choices and attribute maps, so later mutations to
 provider-owned collections do not change the catalog.
