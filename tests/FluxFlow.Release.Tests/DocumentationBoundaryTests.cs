@@ -6,6 +6,36 @@ namespace FluxFlow.Release.Tests;
 public sealed class DocumentationBoundaryTests
 {
     [Fact]
+    public void Definition_docs_keep_composition_definition_as_the_default_model()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "02-definitions-and-links.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_200)];
+
+        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("definition docs should lead with the composition definition model.");
+        defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeFalse("definition docs must not lead with the optional engine definition model.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Definition", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "definition docs should keep engine definitions in an explicitly optional section.");
+
+        var fluentBuilderIndex = text.IndexOf("CompositionDefinitionBuilder", StringComparison.Ordinal);
+        fluentBuilderIndex.ShouldBeInRange(
+            0,
+            optionalEngineSectionIndex,
+            "definition docs should show the fluent composition builder before optional engine APIs.");
+
+        var engineDefinitionIndex = text.IndexOf("ApplicationDefinition", StringComparison.Ordinal);
+        engineDefinitionIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "ApplicationDefinition should only appear after the optional engine definition heading.");
+    }
+
+    [Fact]
     public void Hosting_docs_keep_composition_hosting_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
