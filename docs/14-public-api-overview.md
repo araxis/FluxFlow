@@ -382,6 +382,8 @@ resource through the host.
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `metrics.aggregate` composition node, including existing metrics aggregate
 options, fixed ports, and a resource hint for the optional `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Routing Composition
 
