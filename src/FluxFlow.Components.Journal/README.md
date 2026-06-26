@@ -87,6 +87,9 @@ services
     .AddFluxFlowJournalStoreFactory("journal-factory", factory);
 ```
 
+Keyed DI helper names are trimmed before registration, matching the normalization
+used by `JournalStoreContext.StoreName` and `InMemoryJournalStoreFactory`.
+
 The direct registration overloads validate the service collection and key before
 captured stores or store factories. Provider overloads receive the current
 `IServiceProvider`, reject null delegates, and fail with clear diagnostics if

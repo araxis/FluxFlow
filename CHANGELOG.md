@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.3.5
+
+Hardens keyed journal service registration.
+
+- `AddFluxFlowJournalStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowJournalStoreFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving journal stores and factories through
+  normalized keys.
+
 ## FluxFlow.Components.Resources 1.5.3
 
 Hardens keyed resource service registration.

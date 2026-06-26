@@ -148,6 +148,21 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
+    public void Service_registration_trims_keyed_store_and_factory_names()
+    {
+        var store = new InMemoryJournalStore();
+        var factory = new InMemoryJournalStoreFactory();
+        var services = new ServiceCollection()
+            .AddFluxFlowJournalStore(" journal ", store)
+            .AddFluxFlowJournalStoreFactory(" journal-factory ", factory);
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IJournalStore>("journal").ShouldBeSameAs(store);
+        provider.GetRequiredKeyedService<IJournalStoreFactory>("journal-factory").ShouldBeSameAs(factory);
+    }
+
+    [Fact]
     public async Task Service_registration_passes_provider_to_store_and_factory_providers()
     {
         var services = new ServiceCollection();
