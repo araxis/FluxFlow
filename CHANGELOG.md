@@ -7,6 +7,23 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 3.2.0
+
+Adds session store factory support.
+
+- Adds `ISessionStoreFactory`, `SessionStoreContext`, `SessionStoreLease`, and
+  `SessionComponentOptions` for explicit host-owned session store opening and
+  lease ownership.
+
+## FluxFlow.Components.Sessions.Composition 1.4.0
+
+Adds session resource factory support.
+
+- Sessions composition can now resolve the required `store` resource from
+  either a keyed `ISessionStore` or a keyed `ISessionStoreFactory`.
+- Factory-backed stores are opened during composition build and disposed through
+  composed node cleanup; direct keyed stores remain host-owned.
+
 ## FluxFlow.Components.Storage.Composition 1.3.0
 
 Adds storage resource factory support.

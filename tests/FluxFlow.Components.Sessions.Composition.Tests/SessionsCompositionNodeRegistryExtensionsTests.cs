@@ -380,6 +380,53 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public async Task Hosted_recorder_can_resolve_store_factory_resource_and_dispose_owned_lease()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-06-21T09:30:00Z");
+        var clock = new FakeTimeProvider(timestamp);
+        var store = new TestSessionStore();
+        var factory = new RecordingSessionStoreFactory(store);
+
+        await WithNodeAsync(
+            SessionsCompositionNodeTypes.Recorder,
+            async descriptor =>
+            {
+                var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
+                    .ShouldBeOfType<CompositionInputPort<SessionRecordInput>>();
+                var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
+                    .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
+                var records = Link(output.Source);
+                var message = FlowMessage.Create(
+                    new SessionRecordInput { Name = "event", Payload = "payload" },
+                    new CorrelationId("factory-record"));
+
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+
+                var record = await records.ReceiveAsync().WaitAsync(Timeout);
+                record.CorrelationId.ShouldBe(message.CorrelationId);
+                record.Payload.SessionId.ShouldBe("session-1");
+                record.Payload.Timestamp.ShouldBe(timestamp);
+            },
+            node => node
+                .Resource(SessionsCompositionResourceNames.Store, "factory")
+                .Resource(SessionsCompositionResourceNames.Clock, "fixed")
+                .Configure("sessionId", "session-1"),
+            services =>
+            {
+                services.AddKeyedSingleton<ISessionStoreFactory>("factory", factory);
+                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
+            });
+
+        factory.OpenCount.ShouldBe(1);
+        factory.Context.ShouldNotBeNull();
+        factory.Context.StoreName.ShouldBe("factory");
+        factory.Context.SessionId.ShouldBe("session-1");
+        factory.Context.Clock.ShouldBe(clock);
+        store.CompletedSession.ShouldNotBeNull().SessionId.ShouldBe("session-1");
+        store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Hosted_query_emits_result_sessions_branch_and_uses_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-21T10:00:00Z");
@@ -515,6 +562,36 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             SessionsCompositionNodeTypes.Replay,
             node => node.Resource(SessionsCompositionResourceNames.Store, "sessions"),
             "session id");
+
+    [Fact]
+    public async Task Factory_failure_disposes_owned_store_lease()
+    {
+        var store = new TestSessionStore();
+        var factory = new RecordingSessionStoreFactory(store);
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ISessionStoreFactory>("factory", factory);
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "replay",
+                    SessionsCompositionNodeTypes.Replay,
+                    node => node.Resource(SessionsCompositionResourceNames.Store, "factory")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterSessionReplay())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("session id", StringComparison.OrdinalIgnoreCase));
+        factory.OpenCount.ShouldBe(1);
+        store.DisposeCount.ShouldBe(1);
+    }
 
     [Fact]
     public async Task Query_excluding_active_and_completed_surfaces_factory_diagnostic()
@@ -784,7 +861,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([
-            (SessionsCompositionResourceNames.Store, 0, true, nameof(ISessionStore)),
+            (SessionsCompositionResourceNames.Store, 0, true, $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}"),
             (SessionsCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
@@ -886,12 +963,13 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             => new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    private sealed class TestSessionStore : ISessionStore
+    private sealed class TestSessionStore : ISessionStore, IAsyncDisposable
     {
         public List<SessionMetadata> Sessions { get; } = [];
         public List<SessionRecord> Records { get; } = [];
         public bool FailNextAppend { get; set; }
         public bool FailNextQuery { get; set; }
+        public int DisposeCount { get; private set; }
         public SessionMetadata? CompletedSession { get; private set; }
 
         public void AddSession(SessionMetadata session) => UpsertSession(session);
@@ -1076,5 +1154,27 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             => source is null
                 ? []
                 : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingSessionStoreFactory(ISessionStore store) : ISessionStoreFactory
+    {
+        public int OpenCount { get; private set; }
+        public SessionStoreContext? Context { get; private set; }
+
+        public ValueTask<SessionStoreLease> OpenAsync(
+            SessionStoreContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            OpenCount++;
+            Context = context;
+            return ValueTask.FromResult(SessionStoreLease.Owned(store));
+        }
     }
 }

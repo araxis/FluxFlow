@@ -574,12 +574,21 @@ Main types:
 - `SessionsCompositionResourceNames`
 - `SessionsComponentDesignMetadataProvider`
 
+Related base Sessions types:
+
+- `ISessionStoreFactory`
+- `SessionStoreContext`
+- `SessionStoreLease`
+- `SessionComponentOptions`
+
 Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 `RegisterSessionQuery()` from the optional
 `FluxFlow.Components.Sessions.Composition` package when a composition host wants
 session node factories. The factories bind existing session options, resolve a
-required keyed `ISessionStore`, and can resolve an optional keyed
-`TimeProvider` resource through the host.
+required keyed `ISessionStore` or `ISessionStoreFactory`, and can resolve an
+optional keyed `TimeProvider` resource through the host. Factory resources are
+opened during composition build and released with composed node disposal; direct
+stores remain host-owned.
 Invalid session option values fail during composition build through the factory
 path, so hosts that collect build diagnostics receive `FactoryFailed` entries
 instead of a partially created runtime.
@@ -587,8 +596,13 @@ instead of a partially created runtime.
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the three session composition nodes, including existing session options and fixed
 ports, plus resource hints for the required `store` resource and optional
-`clock` resource. The `store` option is diagnostic/config metadata, not DI
-selection.
+`clock` resource. The `store` resource may point at either a keyed
+`ISessionStore` or keyed `ISessionStoreFactory`; the `store` option is
+diagnostic/config metadata, not DI selection.
+
+The base Sessions package owns the neutral store factory, context, lease, and
+component option helpers used by direct hosts and composition adapters; it still
+does not own any concrete persistence backend.
 
 ## Projections Composition
 

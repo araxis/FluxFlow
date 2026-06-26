@@ -3,15 +3,15 @@
 Optional `FluxFlow.Composition` registration helpers for the standalone session
 recorder, replay, and query nodes from `FluxFlow.Components.Sessions`.
 
-This package does not scan assemblies, create stores, own retention policy, or
-configure persistence. Hosts register session node factories explicitly and
-provide a keyed `ISessionStore`; they may also provide an optional keyed
-`TimeProvider`.
+This package does not scan assemblies, register concrete stores, own retention
+policy, or configure persistence. Hosts register session node factories
+explicitly and provide either a keyed `ISessionStore` or a keyed
+`ISessionStoreFactory`; they may also provide an optional keyed `TimeProvider`.
 
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<ISessionStore>("sessions", sessionStore);
+services.AddKeyedSingleton<ISessionStoreFactory>("sessions", sessionStoreFactory);
 
 services
     .AddFluxFlowComposition(configuration)
@@ -30,8 +30,10 @@ services
 | `session.query` | `SessionQueryNode` | `Input`, `Output`, `Sessions` |
 
 Each factory exposes `Events` and `Errors`. `store` is a required keyed
-`ISessionStore` resource. `clock` is an optional keyed `TimeProvider` resource
-for deterministic result, event, error, and replay timing.
+`ISessionStore` or `ISessionStoreFactory` resource. Direct stores remain
+host-owned. Factory leases are opened during composition build and disposed with
+the composed node. `clock` is an optional keyed `TimeProvider` resource for
+deterministic result, event, error, and replay timing.
 
 ## Configuration
 
@@ -65,7 +67,8 @@ for deterministic result, event, error, and replay timing.
 
 The adapter binds the existing session option records from node configuration.
 The `Store` option remains configuration metadata; the composition adapter
-resolves the concrete `ISessionStore` from the `store` resource.
+resolves the concrete `ISessionStore` or `ISessionStoreFactory` from the
+`store` resource.
 Invalid option values fail during composition build through the node factory. If
 build failures are configured as diagnostics, the runtime is not created and the
 host receives a `FactoryFailed` diagnostic with the relevant option name.
@@ -77,6 +80,7 @@ host receives a `FactoryFailed` diagnostic with the relevant option name.
 palettes, editors, validation hints, or documentation without copying package
 descriptors. The metadata describes the existing session option records and
 fixed ports, plus resource hints for the required `store` and optional `clock`
-resources. Concrete `ISessionStore` instances and optional keyed `TimeProvider`
-clocks remain host-owned resources and are not modeled as editable node options;
-the `store` option remains only diagnostic/config metadata.
+resources. Concrete `ISessionStore` instances, `ISessionStoreFactory`
+registrations, and optional keyed `TimeProvider` clocks remain host-owned
+resources and are not modeled as editable node options; the `store` option
+remains only diagnostic/config metadata.

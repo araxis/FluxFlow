@@ -291,8 +291,8 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 Name = SessionsCompositionResourceNames.Store,
                 DisplayName = "Store",
                 Order = 0,
-                Summary = "Required keyed session store used to record, replay, or query sessions.",
-                ValueType = nameof(ISessionStore),
+                Summary = "Required keyed session store or store factory used to record, replay, or query sessions.",
+                ValueType = $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}",
                 IsRequired = true
             },
             new ResourceDesignMetadata
