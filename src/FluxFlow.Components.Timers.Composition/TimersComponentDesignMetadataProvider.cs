@@ -23,38 +23,36 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             "Emits tick messages on a fixed interval.",
             "timer",
             "interval",
-            [
-                NameOption("interval"),
-                new OptionDesignMetadata
-                {
-                    Name = "interval",
-                    Kind = OptionValueKind.Duration,
-                    DisplayName = "Interval",
-                    HelperText = "Delay between ticks.",
-                    IsRequired = true
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "initialDelay",
-                    Kind = OptionValueKind.Duration,
-                    DisplayName = "Initial Delay",
-                    DefaultValue = TimeSpan.Zero,
-                    HelperText = "Optional delay before the first scheduled tick."
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitImmediately",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit Immediately",
-                    DefaultValue = false,
-                    HelperText = "Emit the first tick immediately when the source starts."
-                },
-                MaxTicksOption(),
-                BoundedCapacityOption()
-            ],
-            [
-                OutputPort(nameof(TimerTick), "Timer tick message.", isPrimary: true)
-            ]);
+            builder =>
+            {
+                AddNameOption(builder, "interval");
+                builder
+                    .AddOption(
+                        "interval",
+                        OptionValueKind.Duration,
+                        displayName: "Interval",
+                        helperText: "Delay between ticks.",
+                        isRequired: true)
+                    .AddOption(
+                        "initialDelay",
+                        OptionValueKind.Duration,
+                        displayName: "Initial Delay",
+                        helperText: "Optional delay before the first scheduled tick.",
+                        defaultValue: TimeSpan.Zero)
+                    .AddOption(
+                        "emitImmediately",
+                        OptionValueKind.Boolean,
+                        displayName: "Emit Immediately",
+                        helperText: "Emit the first tick immediately when the source starts.",
+                        defaultValue: false);
+                AddMaxTicksOption(builder);
+                AddBoundedCapacityOption(builder);
+                AddOutputPort(
+                    builder,
+                    nameof(TimerTick),
+                    "Timer tick message.",
+                    isPrimary: true);
+            });
 
     private static ComponentDesignMetadata CreateScheduleMetadata()
         => CreateTimerMetadata(
@@ -63,23 +61,24 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             "Emits tick messages from a cron schedule.",
             "calendar-clock",
             "schedule",
-            [
-                NameOption("schedule"),
-                new OptionDesignMetadata
-                {
-                    Name = "cron",
-                    Kind = OptionValueKind.Text,
-                    DisplayName = "Cron",
-                    HelperText = "Five- or six-field cron expression. Schedule composition uses UTC unless the host provides a typed time-zone setting.",
-                    IsRequired = true
-                },
-                MaxTicksOption(),
-                BoundedCapacityOption()
-            ],
-            [
-                OutputPort(nameof(ScheduleTick), "Schedule tick message.", isPrimary: true)
-            ],
-            new Dictionary<string, string>
+            builder =>
+            {
+                AddNameOption(builder, "schedule");
+                builder.AddOption(
+                    "cron",
+                    OptionValueKind.Text,
+                    displayName: "Cron",
+                    helperText: "Five- or six-field cron expression. Schedule composition uses UTC unless the host provides a typed time-zone setting.",
+                    isRequired: true);
+                AddMaxTicksOption(builder);
+                AddBoundedCapacityOption(builder);
+                AddOutputPort(
+                    builder,
+                    nameof(ScheduleTick),
+                    "Schedule tick message.",
+                    isPrimary: true);
+            },
+            attributes: new Dictionary<string, string>
             {
                 ["omittedOptions"] = "timeZone",
                 ["omittedOptionsReason"] = "TimerScheduleSettings.TimeZone requires typed configuration; this adapter does not add time-zone id conversion."
@@ -92,19 +91,18 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             "Re-emits each input message after a configured delay.",
             "clock",
             "delay",
-            [
-                NameOption("delay"),
-                new OptionDesignMetadata
-                {
-                    Name = "delay",
-                    Kind = OptionValueKind.Duration,
-                    DisplayName = "Delay",
-                    HelperText = "Delay applied to each input message.",
-                    IsRequired = true
-                },
-                BoundedCapacityOption()
-            ],
-            TransformPorts());
+            builder =>
+            {
+                AddNameOption(builder, "delay");
+                builder.AddOption(
+                    "delay",
+                    OptionValueKind.Duration,
+                    displayName: "Delay",
+                    helperText: "Delay applied to each input message.",
+                    isRequired: true);
+                AddBoundedCapacityOption(builder);
+                AddTransformPorts(builder);
+            });
 
     private static ComponentDesignMetadata CreateThrottleMetadata()
         => CreateTimerMetadata(
@@ -113,27 +111,25 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             "Rate-limits input messages to one output per interval.",
             "gauge",
             "throttle",
-            [
-                NameOption("throttle"),
-                new OptionDesignMetadata
-                {
-                    Name = "interval",
-                    Kind = OptionValueKind.Duration,
-                    DisplayName = "Interval",
-                    HelperText = "Minimum delay between emitted messages.",
-                    IsRequired = true
-                },
-                new OptionDesignMetadata
-                {
-                    Name = "emitFirstImmediately",
-                    Kind = OptionValueKind.Boolean,
-                    DisplayName = "Emit First Immediately",
-                    DefaultValue = true,
-                    HelperText = "Emit the first input immediately before applying the throttle interval."
-                },
-                BoundedCapacityOption()
-            ],
-            TransformPorts());
+            builder =>
+            {
+                AddNameOption(builder, "throttle");
+                builder
+                    .AddOption(
+                        "interval",
+                        OptionValueKind.Duration,
+                        displayName: "Interval",
+                        helperText: "Minimum delay between emitted messages.",
+                        isRequired: true)
+                    .AddOption(
+                        "emitFirstImmediately",
+                        OptionValueKind.Boolean,
+                        displayName: "Emit First Immediately",
+                        helperText: "Emit the first input immediately before applying the throttle interval.",
+                        defaultValue: true);
+                AddBoundedCapacityOption(builder);
+                AddTransformPorts(builder);
+            });
 
     private static ComponentDesignMetadata CreateDebounceMetadata()
         => CreateTimerMetadata(
@@ -142,19 +138,18 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             "Emits the latest input message after a quiet period.",
             "timer-reset",
             "debounce",
-            [
-                NameOption("debounce"),
-                new OptionDesignMetadata
-                {
-                    Name = "quietPeriod",
-                    Kind = OptionValueKind.Duration,
-                    DisplayName = "Quiet Period",
-                    HelperText = "Required quiet period before the latest input is emitted.",
-                    IsRequired = true
-                },
-                BoundedCapacityOption()
-            ],
-            TransformPorts());
+            builder =>
+            {
+                AddNameOption(builder, "debounce");
+                builder.AddOption(
+                    "quietPeriod",
+                    OptionValueKind.Duration,
+                    displayName: "Quiet Period",
+                    helperText: "Required quiet period before the latest input is emitted.",
+                    isRequired: true);
+                AddBoundedCapacityOption(builder);
+                AddTransformPorts(builder);
+            });
 
     private static ComponentDesignMetadata CreateTimerMetadata(
         string type,
@@ -162,93 +157,92 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         string summary,
         string iconKey,
         string preferredNodeName,
-        IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports,
-        IReadOnlyDictionary<string, string>? attributes = null) => new()
+        Action<ComponentDesignMetadataBuilder> configure,
+        IReadOnlyDictionary<string, string>? attributes = null)
+    {
+        var builder = new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Timers",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 420)
+            .AddResource(
+                TimersCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 0,
+                summary: "Optional keyed clock for deterministic timer scheduling and diagnostics.",
+                valueType: nameof(TimeProvider));
+
+        if (attributes is not null)
         {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Timers",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = 420,
-            Options = options,
-            Resources = ClockResources(),
-            Ports = ports,
-            Attributes = attributes ?? new Dictionary<string, string>()
-        };
-
-    private static OptionDesignMetadata NameOption(string defaultValue) => new()
-    {
-        Name = "name",
-        Kind = OptionValueKind.Text,
-        DisplayName = "Name",
-        DefaultValue = defaultValue,
-        HelperText = "Name emitted in timer diagnostics and payloads."
-    };
-
-    private static OptionDesignMetadata MaxTicksOption() => new()
-    {
-        Name = "maxTicks",
-        Kind = OptionValueKind.Number,
-        DisplayName = "Max Ticks",
-        Min = 1,
-        HelperText = "Optional maximum number of ticks to emit before completing."
-    };
-
-    private static OptionDesignMetadata BoundedCapacityOption() => new()
-    {
-        Name = "boundedCapacity",
-        Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
-        DefaultValue = 128,
-        Min = 1,
-        HelperText = "Maximum queued messages."
-    };
-
-    private static IReadOnlyList<ResourceDesignMetadata> ClockResources()
-        =>
-        [
-            new ResourceDesignMetadata
+            foreach (var attribute in attributes)
             {
-                Name = TimersCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 0,
-                Summary = "Optional keyed clock for deterministic timer scheduling and diagnostics.",
-                ValueType = nameof(TimeProvider)
+                builder.AddAttribute(attribute.Key, attribute.Value);
             }
-        ];
+        }
 
-    private static IReadOnlyList<PortDesignMetadata> TransformPorts()
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(TimersCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Input message.",
-                ValueType = "TInput",
-                IsPrimary = true
-            },
-            OutputPort("TInput", "Original input message after timer processing.", isPrimary: true)
-        ];
+        configure(builder);
 
-    private static PortDesignMetadata OutputPort(
+        return builder.Build();
+    }
+
+    private static void AddNameOption(
+        ComponentDesignMetadataBuilder builder,
+        string defaultValue)
+        => builder.AddOption(
+            "name",
+            OptionValueKind.Text,
+            displayName: "Name",
+            helperText: "Name emitted in timer diagnostics and payloads.",
+            defaultValue: defaultValue);
+
+    private static void AddMaxTicksOption(ComponentDesignMetadataBuilder builder)
+        => builder.AddOption(
+            "maxTicks",
+            OptionValueKind.Number,
+            displayName: "Max Ticks",
+            helperText: "Optional maximum number of ticks to emit before completing.",
+            min: 1);
+
+    private static void AddBoundedCapacityOption(ComponentDesignMetadataBuilder builder)
+        => builder.AddOption(
+            "boundedCapacity",
+            OptionValueKind.Number,
+            displayName: "Bounded Capacity",
+            helperText: "Maximum queued messages.",
+            defaultValue: 128,
+            min: 1);
+
+    private static void AddTransformPorts(ComponentDesignMetadataBuilder builder)
+    {
+        builder.AddInputPort(
+            TimersCompositionPortNames.Input,
+            displayName: "Input",
+            group: "Messages",
+            order: 0,
+            summary: "Input message.",
+            valueType: "TInput",
+            isPrimary: true);
+        AddOutputPort(
+            builder,
+            "TInput",
+            "Original input message after timer processing.",
+            isPrimary: true);
+    }
+
+    private static void AddOutputPort(
+        ComponentDesignMetadataBuilder builder,
         string valueType,
         string summary,
-        bool isPrimary) => new()
-        {
-            Name = new ComponentPortName(TimersCompositionPortNames.Output),
-            Direction = PortDirection.Output,
-            DisplayName = "Output",
-            Group = "Messages",
-            Order = 1,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+        bool isPrimary)
+        => builder.AddOutputPort(
+            TimersCompositionPortNames.Output,
+            displayName: "Output",
+            group: "Messages",
+            order: 1,
+            summary: summary,
+            valueType: valueType,
+            isPrimary: isPrimary);
 }

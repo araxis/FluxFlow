@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Timers.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Timers.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers.Composition</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.4.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone timer source and transform nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;timers;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Documents and tests timer option diagnostics through composition build failures for invalid config-bound delay, throttle, debounce, and capacity settings.</PackageReleaseNotes>
+    <PackageReleaseNotes>Refactors the timer Designer metadata provider through the shared component design metadata builder while preserving the same public timer metadata.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
