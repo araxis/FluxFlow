@@ -185,8 +185,17 @@ public sealed class InMemoryJournalStoreTests
                 "journal",
                 store))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            JournalStoreServiceCollectionExtensions.AddFluxFlowJournalStore(
+                null!,
+                "journal",
+                (IJournalStore)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowJournalStore(" ", store))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowJournalStore(" ", (IJournalStore)null!))
             .ParamName.ShouldBe("name");
         var storeException = Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowJournalStore(
@@ -203,8 +212,17 @@ public sealed class InMemoryJournalStoreTests
                 "journal-factory",
                 factory))
             .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            JournalStoreServiceCollectionExtensions.AddFluxFlowJournalStoreFactory(
+                null!,
+                "journal-factory",
+                (IJournalStoreFactory)null!))
+            .ParamName.ShouldBe("services");
         Should.Throw<ArgumentException>(() =>
             services.AddFluxFlowJournalStoreFactory(" ", factory))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowJournalStoreFactory(" ", (IJournalStoreFactory)null!))
             .ParamName.ShouldBe("name");
         var factoryException = Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowJournalStoreFactory(

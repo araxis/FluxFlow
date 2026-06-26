@@ -87,10 +87,11 @@ services
     .AddFluxFlowJournalStoreFactory("journal-factory", factory);
 ```
 
-The direct registration overloads reject null stores and store factories. The
-provider overloads receive the current `IServiceProvider`, reject null delegates,
-and fail with clear diagnostics if they return null. All keyed registration
-overloads reject blank keys and null service collections at the package boundary.
+The direct registration overloads validate the service collection and key before
+captured stores or store factories. Provider overloads receive the current
+`IServiceProvider`, reject null delegates, and fail with clear diagnostics if
+they return null. All keyed registration overloads reject blank keys and null
+service collections at the package boundary.
 
 ## Composition
 

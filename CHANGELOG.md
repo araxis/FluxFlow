@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.3.3
+
+Hardens keyed journal store registration helper validation.
+
+- Direct journal store and store-factory overloads now validate the service
+  collection and journal key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
 ## FluxFlow.Components.Resources 1.5.1
 
 Hardens resource keyed DI registration helper validation.

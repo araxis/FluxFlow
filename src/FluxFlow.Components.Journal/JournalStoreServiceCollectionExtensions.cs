@@ -10,7 +10,10 @@ public static class JournalStoreServiceCollectionExtensions
         string name,
         IJournalStore store)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(store);
+
         return services.AddFluxFlowJournalStore(name, _ => store);
     }
 
@@ -36,7 +39,10 @@ public static class JournalStoreServiceCollectionExtensions
         string name,
         IJournalStoreFactory storeFactory)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(storeFactory);
+
         return services.AddFluxFlowJournalStoreFactory(name, _ => storeFactory);
     }
 
