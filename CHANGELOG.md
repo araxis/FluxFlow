@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.0.3
+
+Hardens journal retention option contracts.
+
+- `JournalRetentionOptions.MaxRecords` now rejects negative values when
+  assigned.
+- `JournalRetentionOptions.MaxAge` now rejects zero or negative durations when
+  assigned.
+- Adds direct retention option tests while keeping cross-field validation, such
+  as requiring `ReferenceTime` with `MaxAge`, in `InMemoryJournalStore`.
+
 ## FluxFlow.Components.Storage.FileSystem 3.1.4
 
 Hardens file-system storage query expiration filtering.

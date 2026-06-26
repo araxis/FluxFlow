@@ -65,3 +65,8 @@ already-created records, queries, event inputs, or query results.
 negative offsets, non-positive limits, and time ranges where `From` is later
 than `To`; `InMemoryJournalStore.QueryAsync()` uses the same validator before
 matching records.
+
+`JournalRetentionOptions` rejects negative `MaxRecords` values and non-positive
+`MaxAge` values when assigned. `InMemoryJournalStore.PruneAsync()` still owns
+cross-field retention validation, including requiring `ReferenceTime` when
+`MaxAge` is configured.
