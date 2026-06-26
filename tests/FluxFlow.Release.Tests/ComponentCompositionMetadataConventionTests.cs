@@ -914,6 +914,67 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_numeric_metadata_bounds_are_accepted_by_bound_options()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+
+                var boundProperties = ReadBoundOptionProperties(
+                    assembly,
+                    optionTypeNames!,
+                    entry.PackageId);
+
+                foreach (var option in metadata.Options.Where(option =>
+                    option.Kind == OptionValueKind.Number &&
+                    (option.Min.HasValue || option.Max.HasValue)))
+                {
+                    if (!boundProperties.TryGetValue(option.Name, out var boundProperty) ||
+                        !IsNumericOptionProperty(boundProperty.Property.PropertyType))
+                    {
+                        continue;
+                    }
+
+                    if (option.Min.HasValue)
+                    {
+                        AssertNumericMetadataBoundIsAccepted(
+                            entry.PackageId,
+                            nodeType,
+                            option,
+                            boundProperty,
+                            option.Min.Value,
+                            nameof(OptionDesignMetadata.Min));
+                    }
+
+                    if (option.Max.HasValue)
+                    {
+                        AssertNumericMetadataBoundIsAccepted(
+                            entry.PackageId,
+                            nodeType,
+                            option,
+                            boundProperty,
+                            option.Max.Value,
+                            nameof(OptionDesignMetadata.Max));
+                    }
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_bound_option_metadata_kinds_match_simple_clr_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1336,6 +1397,40 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return defaults;
     }
 
+    private static Dictionary<string, BoundOptionProperty> ReadBoundOptionProperties(
+        Assembly assembly,
+        IReadOnlyCollection<string> optionTypeNames,
+        string packageId)
+    {
+        var properties = new Dictionary<string, BoundOptionProperty>(StringComparer.Ordinal);
+
+        foreach (var optionTypeName in optionTypeNames)
+        {
+            var optionType = ResolveReferencedType(assembly, optionTypeName, packageId);
+
+            foreach (var property in optionType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.SetMethod?.IsPublic != true)
+                    continue;
+
+                var key = ToConfigurationKey(property.Name);
+                var candidate = new BoundOptionProperty(optionType, property);
+
+                if (properties.TryGetValue(key, out var existing))
+                {
+                    existing.Property.PropertyType.ShouldBe(
+                        candidate.Property.PropertyType,
+                        $"{packageId} option key '{key}' must not map to incompatible property types in {existing.OptionType.Name} and {candidate.OptionType.Name}.");
+                    continue;
+                }
+
+                properties.Add(key, candidate);
+            }
+        }
+
+        return properties;
+    }
+
     private static object? ReadNamedEffectiveDefault(
         Type optionType,
         PropertyInfo property)
@@ -1723,6 +1818,110 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             string.Equals(key, optionName, StringComparison.Ordinal) ||
             optionName.StartsWith($"{key}.", StringComparison.Ordinal));
 
+    private static void AssertNumericMetadataBoundIsAccepted(
+        string packageId,
+        string nodeType,
+        OptionDesignMetadata option,
+        BoundOptionProperty boundProperty,
+        double bound,
+        string boundName)
+    {
+        TryConvertDesignerNumericBound(
+                bound,
+                boundProperty.Property.PropertyType,
+                out var convertedBound)
+            .ShouldBeTrue(
+                $"{packageId} Designer metadata for '{nodeType}' option '{option.Name}' {boundName} '{bound}' must be representable as {boundProperty.OptionType.Name}.{boundProperty.Property.Name} type '{boundProperty.Property.PropertyType.Name}'.");
+
+        BoundOptionAcceptsValue(
+                boundProperty.OptionType,
+                boundProperty.Property,
+                convertedBound)
+            .ShouldBeTrue(
+                $"{packageId} Designer metadata for '{nodeType}' option '{option.Name}' {boundName} '{bound}' must be accepted by bound option {boundProperty.OptionType.Name}.{boundProperty.Property.Name}.");
+    }
+
+    private static bool BoundOptionAcceptsValue(
+        Type optionType,
+        PropertyInfo property,
+        object? value)
+    {
+        var instance = Activator.CreateInstance(optionType);
+
+        try
+        {
+            property.SetValue(instance, value);
+            return true;
+        }
+        catch (TargetInvocationException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryConvertDesignerNumericBound(
+        double bound,
+        Type propertyType,
+        out object? value)
+    {
+        var targetType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+        value = null;
+
+        if (targetType == typeof(byte))
+            return TryConvertWholeNumber(bound, byte.MinValue, byte.MaxValue, out value, number => (byte)number);
+        if (targetType == typeof(short))
+            return TryConvertWholeNumber(bound, short.MinValue, short.MaxValue, out value, number => (short)number);
+        if (targetType == typeof(int))
+            return TryConvertWholeNumber(bound, int.MinValue, int.MaxValue, out value, number => (int)number);
+        if (targetType == typeof(long))
+            return TryConvertWholeNumber(bound, long.MinValue, long.MaxValue, out value, number => (long)number);
+        if (targetType == typeof(float))
+        {
+            value = (float)bound;
+            return true;
+        }
+
+        if (targetType == typeof(double))
+        {
+            value = bound;
+            return true;
+        }
+
+        if (targetType == typeof(decimal))
+        {
+            value = (decimal)bound;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryConvertWholeNumber(
+        double bound,
+        long min,
+        long max,
+        out object? value,
+        Func<long, object> convert)
+    {
+        value = null;
+        if (bound < min ||
+            bound > max ||
+            Math.Truncate(bound) != bound)
+        {
+            return false;
+        }
+
+        value = convert((long)bound);
+        return true;
+    }
+
+    private static bool IsNumericOptionProperty(Type type)
+        => IsNumericType(Nullable.GetUnderlyingType(type) ?? type);
+
     private static bool MetadataDefaultMatches(
         object? actual,
         object? expected)
@@ -2030,6 +2229,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string OptionType,
         string PropertyName,
         object? Value);
+
+    private sealed record BoundOptionProperty(
+        Type OptionType,
+        PropertyInfo Property);
 
     private sealed record RequiredOptionProperty(
         string Name,
