@@ -86,3 +86,5 @@ and fixed ports. `mqtt.publish` requires `publisher`; `mqtt.trigger` requires
 descriptive only, so `IMqttPublisher`, `IMqttTriggerSource`, and optional keyed
 `TimeProvider` clocks remain host-owned and are not modeled as editable node
 options.
+The provider authors that metadata through the shared validated Designer
+metadata builder.

@@ -706,7 +706,8 @@ the host still own broker/client registration.
 MQTT publish and trigger composition nodes, including existing options, fixed
 ports, and resource hints for `publisher`, `triggerSource`, and optional
 `clock` resources. Publisher, trigger source, and clock resources remain
-host-owned.
+host-owned. The provider authors that metadata through the shared validated
+Designer metadata builder.
 
 ## Designer Metadata
 

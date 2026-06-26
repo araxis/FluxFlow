@@ -236,6 +236,15 @@ Uses the shared Designer metadata builder for session metadata.
   catalog loading, direct store and store-factory resources, and runtime
   composition behavior.
 
+## FluxFlow.Components.Mqtt.Composition 1.3.1
+
+Uses the shared Designer metadata builder for MQTT metadata.
+
+- Refactors `MqttComponentDesignMetadataProvider` to author `mqtt.publish` and
+  `mqtt.trigger` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing publish and trigger options, required resource hints,
+  fixed ports, validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Sessions.Composition 1.4.0
 
 Adds session resource factory support.
