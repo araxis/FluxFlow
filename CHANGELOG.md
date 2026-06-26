@@ -18,6 +18,17 @@ Adds keyed resource registration helpers.
 - Registers keyed resource lookups as descriptor providers under the same key
   so metadata-only consumers can reuse lookup-backed catalogs.
 
+## FluxFlow.Components.Secrets 1.5.0
+
+Adds keyed secret registration helpers.
+
+- Adds `AddFluxFlowSecretResolver(...)` for registering host-owned
+  `ISecretResolver` services in keyed DI.
+- Adds `AddFluxFlowSecretDescriptorProvider(...)` for registering host-owned
+  `ISecretDescriptorProvider` services in keyed DI.
+- Keeps concrete secret storage, access control, refresh, rotation, auditing,
+  and disposal ownership with hosts.
+
 ## FluxFlow.Components.Expressions 2.1.0
 
 Adds keyed expression service registration helpers.

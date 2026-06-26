@@ -22,6 +22,8 @@ is controlled, how values are refreshed, and how ownership is handled.
   option references through a host-provided resolver.
 - `InMemorySecretResolverBuilder`: a fluent helper for declaring local
   `SecretRecord` values and creating an `InMemorySecretResolver`.
+- `SecretServiceCollectionExtensions`: keyed DI helpers for registering
+  host-owned `ISecretResolver` and `ISecretDescriptorProvider` services.
 - `SecretOptionResolution`: option-level resolved value, missing state, or
   structured diagnostic.
 - `SecretDiagnostic`: stable diagnostics for missing, duplicate, ambiguous,
@@ -79,6 +81,20 @@ var resolver = new InMemorySecretResolverBuilder()
         displayName: "Primary Token")
     .BuildResolver();
 ```
+
+Hosts that use keyed service registration can register resolvers and descriptor
+providers explicitly:
+
+```csharp
+services
+    .AddFluxFlowSecretResolver("secrets", resolver)
+    .AddFluxFlowSecretDescriptorProvider("declared-secrets", descriptorProvider);
+```
+
+Resolver registration does not automatically register a descriptor provider
+because descriptor enumeration is optional. Register
+`ISecretDescriptorProvider` separately when a resolver can safely expose
+non-sensitive declarations.
 
 ## Component Options
 
@@ -154,6 +170,8 @@ resolvers can support runtime resolution without exposing descriptor
 enumeration.
 `InMemorySecretResolverBuilder` only creates in-memory records and resolver
 instances; it is not a storage, refresh, or access-control model.
+Keyed DI helpers only register already host-owned services. They do not create
+stores, load values, rotate credentials, audit access, or own disposal policy.
 
 ## Composition
 
