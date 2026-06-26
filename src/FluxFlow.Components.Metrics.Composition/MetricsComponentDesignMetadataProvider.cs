@@ -21,7 +21,13 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
         IconKey = "chart-no-axes-combined",
         PreferredNodeName = "aggregateMetrics",
         SuggestedEditorWidth = 460,
-        Options =
+        Options = AggregateOptionsMetadata(),
+        Resources = AggregateResources(),
+        Ports = AggregatePorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> AggregateOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -97,8 +103,10 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 DefaultValue = Defaults.TreatMissingValueAsZero,
                 HelperText = "Count missing numeric values as zero-valued observations."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> AggregateResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -108,8 +116,10 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 Summary = "Optional keyed clock for deterministic metric timestamps and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> AggregatePorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -133,6 +143,5 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 ValueType = nameof(MetricSnapshotOutput),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 }
