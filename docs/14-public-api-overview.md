@@ -728,7 +728,9 @@ Use `RegisterMqttNodes()` from the optional
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
 the host still own broker/client registration. MQTT adapter registration
 helpers reject invalid service/key/options arguments and null options factory
-results before creating keyed client sessions.
+results before creating keyed client sessions. At the standalone node layer,
+`MqttTriggerNode` reports malformed received contexts as trigger errors without
+stopping later valid subscription messages.
 
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
 MQTT publish and trigger composition nodes, including existing options, fixed

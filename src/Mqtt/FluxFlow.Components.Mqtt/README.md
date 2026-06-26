@@ -121,6 +121,8 @@ The trigger source opens one `IMqttSubscription` and emits a
 implementation-supplied correlation id when present. The subscription is disposed
 when the source stops. Reconnect and resubscribe behavior belongs inside the supplied
 `IMqttTriggerSource` or concrete client adapter.
+Malformed received contexts from an adapter are reported on `Errors` and do not
+stop later valid subscription messages from flowing.
 
 `MqttTriggerOptions.BoundedCapacity` configures bounded broadcast source output.
 Trigger receive processing awaits output-block acceptance before `OnEmit`
