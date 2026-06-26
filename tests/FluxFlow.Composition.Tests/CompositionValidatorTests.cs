@@ -73,4 +73,41 @@ public sealed class CompositionValidatorTests
         result.Diagnostics.ShouldContain(diagnostic =>
             diagnostic.Code == CompositionDiagnosticCode.PortTypeMismatch);
     }
+
+    [Fact]
+    public void Validator_reports_invalid_definition_for_null_dto_entries()
+    {
+        var definition = new CompositionDefinition();
+        definition.Workflows["null-workflow"] = null!;
+        definition.Workflows["main"] = new WorkflowDefinition
+        {
+            Nodes =
+            {
+                ["null-node"] = null!
+            },
+            Links =
+            [
+                null!,
+                new LinkDefinition
+                {
+                    From = null!,
+                    To = new PortReference { Node = "sink", Port = "Input" }
+                }
+            ]
+        };
+
+        var result = new CompositionValidator().Validate(definition, TestCompositionRegistry.Create());
+
+        var messages = result.Diagnostics
+            .Where(diagnostic => diagnostic.Code == CompositionDiagnosticCode.InvalidDefinition)
+            .Select(diagnostic => diagnostic.Message)
+            .ToArray();
+        messages.ShouldBe(
+        [
+            "Workflow 'null-workflow' is null.",
+            "Node 'main.null-node' is null.",
+            "Workflow 'main' contains a null link.",
+            "Workflow 'main' contains a link with a null endpoint."
+        ]);
+    }
 }

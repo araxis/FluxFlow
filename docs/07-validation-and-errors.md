@@ -50,6 +50,7 @@ Validation diagnostic codes:
 | `EmptyDefinition` | The composition has no workflows. |
 | `EmptyWorkflowName` | A workflow dictionary key is empty. |
 | `EmptyWorkflow` | A workflow has no nodes. |
+| `InvalidDefinition` | A mutable DTO collection contains a null workflow, node, link, or link endpoint. |
 | `EmptyNodeName` | A node dictionary key is empty. |
 | `EmptyNodeType` | A node has no `type`. |
 | `UnknownNodeType` | No composition factory registration exists for the node type. |
