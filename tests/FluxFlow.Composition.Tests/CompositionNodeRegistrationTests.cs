@@ -20,6 +20,17 @@ public sealed class CompositionNodeRegistrationTests
     }
 
     [Fact]
+    public void Port_metadata_supports_deconstruction()
+    {
+        var metadata = CompositionPortMetadata.Create<string>("Output");
+
+        var (name, messageType) = metadata;
+
+        name.ShouldBe("Output");
+        messageType.ShouldBe(typeof(string));
+    }
+
+    [Fact]
     public void Node_registration_rejects_null_port_metadata_entries()
     {
         var inputException = Should.Throw<ArgumentNullException>(() =>

@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.6
+
+Restores explicit composition port metadata deconstruction.
+
+- `CompositionPortMetadata` now keeps tuple-style deconstruction while retaining
+  the validated constructor introduced in 1.0.5.
+- Adds regression coverage for deconstructing port metadata.
+
 ## FluxFlow.Composition 1.0.5
 
 Hardens composition port metadata registration guardrails.

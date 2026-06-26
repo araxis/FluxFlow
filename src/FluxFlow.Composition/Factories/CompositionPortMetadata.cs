@@ -14,6 +14,12 @@ public sealed record CompositionPortMetadata
 
     public Type MessageType { get; }
 
+    public void Deconstruct(out string name, out Type messageType)
+    {
+        name = Name;
+        messageType = MessageType;
+    }
+
     public static CompositionPortMetadata Create<TMessage>(string name)
         => new(name, typeof(TMessage));
 }
