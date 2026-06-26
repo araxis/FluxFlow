@@ -15,6 +15,16 @@ Adds session store factory support.
   `SessionComponentOptions` for explicit host-owned session store opening and
   lease ownership.
 
+## FluxFlow.Components.Configuration 1.2.0
+
+Adds fluent configuration validation request building.
+
+- Adds `ConfigurationValidationRequestBuilder` to
+  `FluxFlow.Components.Configuration` for declaring resource and secret
+  validation references with the existing validation DTOs.
+- Keeps resource lookup, secret resolution, ownership, and validation behavior
+  unchanged.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

@@ -11,6 +11,124 @@ namespace FluxFlow.Components.Configuration.Tests;
 public sealed class ConfigurationValidatorTests
 {
     [Fact]
+    public void Request_builder_creates_normalized_resource_and_secret_references()
+    {
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResource(
+                " connections.primary ",
+                " primary ",
+                kind: " connection ",
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .AddSecret(
+                " connections.primary.credential ",
+                " primary-credential ",
+                version: " v1 ",
+                kind: " credential ",
+                metadata: new Dictionary<string, string>
+                {
+                    [" scope "] = " workflow "
+                })
+            .Build();
+
+        request.Resources.Count.ShouldBe(1);
+        request.Resources[0].Path.ShouldBe("connections.primary");
+        request.Resources[0].Required.ShouldBeTrue();
+        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(new ResourceName("primary"));
+        request.Resources[0].Reference.ShouldNotBeNull().Kind.ShouldBe("connection");
+        request.Resources[0].Metadata["owner"].ShouldBe("runtime");
+
+        request.Secrets.Count.ShouldBe(1);
+        request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
+        request.Secrets[0].Required.ShouldBeTrue();
+        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(new SecretName("primary-credential"));
+        request.Secrets[0].Reference.ShouldNotBeNull().Version.ShouldBe("v1");
+        request.Secrets[0].Reference.ShouldNotBeNull().Kind.ShouldBe("credential");
+        request.Secrets[0].Metadata["scope"].ShouldBe("workflow");
+    }
+
+    [Fact]
+    public async Task Request_builder_optional_absent_references_validate_without_diagnostics()
+    {
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddOptionalResource(" connections.optional ")
+            .AddOptionalSecret(" connections.optional.credential ")
+            .Build();
+
+        var report = await ConfigurationValidator.ValidateAsync(
+            new ResourceDescriptorCatalog([]),
+            new InMemorySecretResolver([]),
+            request);
+
+        report.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Request_builder_accepts_existing_entries_and_snapshots_build_results()
+    {
+        var builder = new ConfigurationValidationRequestBuilder()
+            .AddResource(new ConfigurationResourceReference
+            {
+                Path = "connections.primary",
+                Required = false
+            })
+            .AddSecret(new SecretOptionReference
+            {
+                OptionPath = "connections.primary.credential",
+                Required = false
+            });
+
+        var request = builder.Build();
+        builder
+            .AddOptionalResource("connections.secondary")
+            .AddOptionalSecret("connections.secondary.credential");
+
+        request.Resources.Count.ShouldBe(1);
+        request.Resources[0].Path.ShouldBe("connections.primary");
+        request.Secrets.Count.ShouldBe(1);
+        request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
+    }
+
+    [Fact]
+    public async Task Request_builder_output_validates_through_existing_validator()
+    {
+        var resourceLookup = new ResourceDescriptorCatalog(
+        [
+            new ResourceDescriptor
+            {
+                Name = new ResourceName("primary"),
+                Kind = "connection"
+            }
+        ]);
+        var secretResolver = new InMemorySecretResolver(
+        [
+            CreateSecret("primary-credential", "runtime-value")
+        ]);
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResource("connections.primary", "primary", kind: "connection")
+            .AddSecret("connections.primary.credential", "primary-credential")
+            .Build();
+
+        var report = await ConfigurationValidator.ValidateAsync(
+            resourceLookup,
+            secretResolver,
+            request);
+
+        report.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Request_builder_rejects_null_existing_entries()
+    {
+        var builder = new ConfigurationValidationRequestBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.AddResource(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddSecret(null!));
+    }
+
+    [Fact]
     public void Configuration_diagnostic_normalizes_text_and_copies_metadata()
     {
         var metadata = new Dictionary<string, string>
