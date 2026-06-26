@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.4.2
+
+Documents and verifies Configuration validator argument contracts.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- Adds focused coverage for null resource lookups, secret resolvers,
+  descriptor providers, validation requests, and reference collections across
+  the public `ConfigurationValidator` entry points.
+- Updates package notes and README wording to match the explicit validator
+  guardrails.
+
 ## FluxFlow.Components.Journal 2.3.2
 
 Documents and verifies the full keyed journal store registration contract.
