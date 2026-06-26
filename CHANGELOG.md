@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.2.2
+
+Hardens component design metadata catalog registration.
+
+- `ComponentDesignMetadataCatalog.Add(...)` now stores a defensive snapshot of
+  registered metadata after validation.
+- Top-level metadata collections, nested option choices, and attribute maps are
+  copied so later mutations to provider-owned collections cannot change catalog
+  contents.
+- Adds catalog snapshot coverage for options, choices, resources, ports, and
+  attributes.
+
 ## FluxFlow.Components.RequestReply 1.1.3
 
 Hardens request/reply option contracts.

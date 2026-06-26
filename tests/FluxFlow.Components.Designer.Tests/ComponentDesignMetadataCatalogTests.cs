@@ -14,9 +14,96 @@ public sealed class ComponentDesignMetadataCatalogTests
         var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 
         catalog.TryGet(new ComponentType("sample.transform"), out var found).ShouldBeTrue();
-        found.ShouldBeSameAs(metadata);
+        found.ShouldNotBeSameAs(metadata);
         found.Options[0].Kind.ShouldBe(OptionValueKind.Expression);
         found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
+    }
+
+    [Fact]
+    public void Add_snapshots_registered_metadata()
+    {
+        var metadataAttributes = new Dictionary<string, string>
+        {
+            ["shape"] = "transform"
+        };
+        var optionAttributes = new Dictionary<string, string>
+        {
+            ["scope"] = "editable"
+        };
+        var choiceAttributes = new Dictionary<string, string>
+        {
+            ["kind"] = "mode"
+        };
+        var resourceAttributes = new Dictionary<string, string>
+        {
+            ["resource"] = "host-owned"
+        };
+        var portAttributes = new Dictionary<string, string>
+        {
+            ["side"] = "input"
+        };
+        var choices = new List<OptionChoiceMetadata>
+        {
+            new()
+            {
+                Value = "strict",
+                Attributes = choiceAttributes
+            }
+        };
+        var options = new List<OptionDesignMetadata>
+        {
+            new()
+            {
+                Name = "mode",
+                Kind = OptionValueKind.Enum,
+                Choices = choices,
+                Attributes = optionAttributes
+            }
+        };
+        var resources = new List<ResourceDesignMetadata>
+        {
+            new()
+            {
+                Name = "engine",
+                Attributes = resourceAttributes
+            }
+        };
+        var ports = new List<PortDesignMetadata>
+        {
+            new()
+            {
+                Name = new ComponentPortName("Input"),
+                Direction = PortDirection.Input,
+                Attributes = portAttributes
+            }
+        };
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.snapshot"),
+            Options = options,
+            Resources = resources,
+            Ports = ports,
+            Attributes = metadataAttributes
+        };
+
+        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+        options.Clear();
+        choices.Clear();
+        resources.Clear();
+        ports.Clear();
+        metadataAttributes["shape"] = "changed";
+        optionAttributes["scope"] = "changed";
+        choiceAttributes["kind"] = "changed";
+        resourceAttributes["resource"] = "changed";
+        portAttributes["side"] = "changed";
+
+        catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
+
+        found.Options.ShouldHaveSingleItem().Attributes["scope"].ShouldBe("editable");
+        found.Options[0].Choices.ShouldHaveSingleItem().Attributes["kind"].ShouldBe("mode");
+        found.Resources.ShouldHaveSingleItem().Attributes["resource"].ShouldBe("host-owned");
+        found.Ports.ShouldHaveSingleItem().Attributes["side"].ShouldBe("input");
+        found.Attributes["shape"].ShouldBe("transform");
     }
 
     [Fact]
