@@ -459,6 +459,57 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Validator_reports_non_finite_number_bounds_and_default_values()
+    {
+        var metadata = new ComponentDesignMetadata
+        {
+            Type = new ComponentType("sample.invalid"),
+            Options =
+            [
+                new OptionDesignMetadata
+                {
+                    Name = "nanMin",
+                    Kind = OptionValueKind.Number,
+                    Min = double.NaN
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "infiniteMax",
+                    Kind = OptionValueKind.Number,
+                    Max = double.PositiveInfinity
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "nanDefault",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = double.NaN
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "infiniteDefault",
+                    Kind = OptionValueKind.Number,
+                    DefaultValue = float.NegativeInfinity
+                }
+            ]
+        };
+
+        var errors = ComponentDesignMetadataValidator.Validate(metadata);
+
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[0].{nameof(OptionDesignMetadata.Min)}" &&
+            error.Message.Contains("finite", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[1].{nameof(OptionDesignMetadata.Max)}" &&
+            error.Message.Contains("finite", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[2].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("finite", StringComparison.Ordinal));
+        errors.ShouldContain(error =>
+            error.Path == $"{nameof(ComponentDesignMetadata.Options)}[3].{nameof(OptionDesignMetadata.DefaultValue)}" &&
+            error.Message.Contains("finite", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validator_accepts_option_default_values_that_match_kind()
     {
         var metadata = new ComponentDesignMetadata

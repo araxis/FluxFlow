@@ -89,6 +89,7 @@ public static class ComponentDesignMetadataValidator
                     "Option minimum cannot be greater than the maximum."));
             }
 
+            ValidateOptionRangeFiniteValues(option, path, errors);
             ValidateOptionRangeUsage(option, path, errors);
             ValidateOptionDefaultValue(option, path, errors);
             ValidateOptionalText(option.DisplayName, $"{path}.{nameof(OptionDesignMetadata.DisplayName)}", errors);
@@ -125,6 +126,26 @@ public static class ComponentDesignMetadataValidator
             "Option min/max constraints are valid only for number and duration options."));
     }
 
+    private static void ValidateOptionRangeFiniteValues(
+        OptionDesignMetadata option,
+        string optionPath,
+        ICollection<DesignerMetadataValidationError> errors)
+    {
+        if (option.Min is { } min && !double.IsFinite(min))
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                $"{optionPath}.{nameof(OptionDesignMetadata.Min)}",
+                "Option minimum must be finite."));
+        }
+
+        if (option.Max is { } max && !double.IsFinite(max))
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                $"{optionPath}.{nameof(OptionDesignMetadata.Max)}",
+                "Option maximum must be finite."));
+        }
+    }
+
     private static void ValidateOptionDefaultValue(
         OptionDesignMetadata option,
         string optionPath,
@@ -149,6 +170,14 @@ public static class ComponentDesignMetadataValidator
                     errors.Add(new DesignerMetadataValidationError(
                         defaultValuePath,
                         $"Default value for {option.Kind} options must be numeric."));
+                    break;
+                }
+
+                if (!double.IsFinite(numericDefaultValue))
+                {
+                    errors.Add(new DesignerMetadataValidationError(
+                        defaultValuePath,
+                        "Default value for Number options must be finite."));
                     break;
                 }
 
@@ -256,6 +285,9 @@ public static class ComponentDesignMetadataValidator
         string defaultValuePath,
         ICollection<DesignerMetadataValidationError> errors)
     {
+        if (!double.IsFinite(defaultValue))
+            return;
+
         if (option.Min is { } min && defaultValue < min)
         {
             errors.Add(new DesignerMetadataValidationError(
