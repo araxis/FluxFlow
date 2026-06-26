@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expressions 2.1.1
+
+Documents and verifies expression engine registry argument contracts.
+
+- Adds focused coverage for non-blank registry scope names, non-null engine
+  instances, non-blank engine names, and non-null resolver delegates.
+- Updates package notes, README, and public API overview wording to match the
+  explicit registry guardrails.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.2
 
 Documents and verifies the full keyed MQTT adapter registration contract.

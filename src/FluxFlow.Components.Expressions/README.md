@@ -17,6 +17,9 @@ Use `Use(engine, useAsDefault: false)` for a named-only engine that should be
 resolved explicitly by name but not become the fallback engine for empty names.
 Engine names are trimmed for registration and lookup. Blank lookup names are
 treated as the default engine, including when a custom resolver is configured.
+Registry construction requires a non-blank scope name, engine registration
+requires a non-null engine with a non-blank name, and custom resolver
+registration requires a non-null delegate.
 Context factory lookup prefers exact registrations, then a single most-specific
 assignable registration, then the default factory. If multiple assignable
 registrations match and no single registration is more specific than all others,

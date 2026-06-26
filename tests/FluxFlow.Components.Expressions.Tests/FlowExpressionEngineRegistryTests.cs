@@ -129,6 +129,25 @@ public sealed class FlowExpressionEngineRegistryTests
         exception.Message.ShouldContain("Mapping expression engine resolver returned null");
     }
 
+    [Fact]
+    public void Public_methods_reject_invalid_arguments()
+    {
+        var registry = new FlowExpressionEngineRegistry("Mapping");
+
+        Should.Throw<ArgumentException>(() => new FlowExpressionEngineRegistry(" "))
+            .ParamName.ShouldBe("scopeName");
+        Should.Throw<ArgumentNullException>(() => registry.Use(null!))
+            .ParamName.ShouldBe("expressionEngine");
+
+        var missingNameException = Should.Throw<ArgumentException>(() =>
+            registry.Use(new TestExpressionEngine(" ")));
+        missingNameException.ParamName.ShouldBe("expressionEngine");
+        missingNameException.Message.ShouldContain("Expression engine name is required.");
+
+        Should.Throw<ArgumentNullException>(() => registry.UseResolver(null!))
+            .ParamName.ShouldBe("resolver");
+    }
+
     private sealed class TestExpressionEngine(string name) : IFlowExpressionEngine
     {
         public string Name { get; } = name;
