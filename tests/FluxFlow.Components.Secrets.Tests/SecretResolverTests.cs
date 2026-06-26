@@ -151,6 +151,51 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Resolve_result_factories_reject_invalid_arguments()
+    {
+        var reference = new SecretReference { Name = new SecretName("primary") };
+        var descriptor = new SecretDescriptor { Name = new SecretName("primary") };
+        var value = new SecretValue("runtime-value");
+
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.ResolvedResult(null!, descriptor, value))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.ResolvedResult(reference, null!, value))
+            .ParamName.ShouldBe("descriptor");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.ResolvedResult(reference, descriptor, null!))
+            .ParamName.ShouldBe("value");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.Missing(null!))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.Ambiguous(null!, [descriptor]))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.Ambiguous(reference, null!))
+            .ParamName.ShouldBe("matches");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.KindMismatch(null!, descriptor))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.KindMismatch(reference, null!))
+            .ParamName.ShouldBe("descriptor");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.AccessDenied(null!, "Denied."))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentException>(() =>
+            SecretResolveResult.AccessDenied(reference, " "))
+            .ParamName.ShouldBe("message");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretResolveResult.Failed(null!, "Failed."))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentException>(() =>
+            SecretResolveResult.Failed(reference, " "))
+            .ParamName.ShouldBe("message");
+    }
+
+    [Fact]
     public async Task Resolver_returns_value_for_matching_reference()
     {
         var resolver = new InMemorySecretResolver(

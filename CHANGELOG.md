@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.5.2
+
+Hardens resource lookup result factory guardrails.
+
+- `ResourceLookupResult` factories now reject null references and descriptors
+  with explicit argument exceptions instead of relying on later dereferences.
+- Adds regression coverage for invalid result factory arguments.
+
+## FluxFlow.Components.Secrets 1.5.2
+
+Hardens secret resolve result factory guardrails.
+
+- `SecretResolveResult` factories now reject null references, descriptors,
+  values, and match collections with explicit argument exceptions.
+- Failed and access-denied result factories now reject blank diagnostic
+  messages.
+- Adds regression coverage for invalid result factory arguments.
+
 ## FluxFlow.Composition.Hosting 1.0.4
 
 Hardens composition hosting exception diagnostics.

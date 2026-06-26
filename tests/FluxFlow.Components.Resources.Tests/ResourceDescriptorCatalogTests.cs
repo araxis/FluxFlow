@@ -76,6 +76,29 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Lookup_result_factories_reject_invalid_arguments()
+    {
+        var reference = new ResourceReference { Name = new ResourceName("primary") };
+        var descriptor = CreateDescriptor("primary", "profile");
+
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceLookupResult.FoundResult(null!, descriptor))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceLookupResult.FoundResult(reference, null!))
+            .ParamName.ShouldBe("descriptor");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceLookupResult.Missing(null!))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceLookupResult.KindMismatch(null!, descriptor))
+            .ParamName.ShouldBe("reference");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceLookupResult.KindMismatch(reference, null!))
+            .ParamName.ShouldBe("descriptor");
+    }
+
+    [Fact]
     public void Catalog_exposes_descriptors_through_descriptor_provider_contract()
     {
         IResourceDescriptorProvider provider = new ResourceDescriptorCatalogBuilder()
