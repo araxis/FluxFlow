@@ -693,6 +693,31 @@ public sealed class SqlFileStorageStoreTests
     }
 
     [Fact]
+    public async Task Service_registration_trims_keyed_store_and_factory_names()
+    {
+        using var temp = TempDirectory.Create();
+        var path = Path.Combine(temp.Path, "records.db");
+        var services = new ServiceCollection()
+            .AddFluxFlowSqlFileStorageStore(
+                " items-store ",
+                new SqlFileStorageStoreOptions
+                {
+                    DatabasePath = path
+                })
+            .AddFluxFlowSqlFileStorageStoreFactory(
+                " items-factory ",
+                new SqlFileStorageStoreOptions
+                {
+                    DatabasePath = path
+                });
+
+        await using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IStorageStore>("items-store").ShouldNotBeNull();
+        provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory").ShouldNotBeNull();
+    }
+
+    [Fact]
     public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();

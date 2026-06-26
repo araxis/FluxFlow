@@ -69,6 +69,8 @@ composed node lifetime.
 The registration helpers reject null service collections, blank keys, null
 direct options, null options factories, and null options factory results before
 creating the keyed store or store factory.
+Keyed DI helper names are trimmed before registration, matching the store-name
+normalization used by storage contexts and adapter options.
 
 ## Behavior
 
