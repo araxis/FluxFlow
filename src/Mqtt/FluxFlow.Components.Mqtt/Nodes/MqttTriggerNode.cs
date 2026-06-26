@@ -139,7 +139,21 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 .WithCancellation(cancellationToken)
                 .ConfigureAwait(false))
             {
-                await ProcessReceivedAsync(context, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await ProcessReceivedAsync(context, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    ReportTriggerError(
+                        MqttErrorCodes.TriggerFailed,
+                        $"MQTT trigger message handling failed: {exception.Message}",
+                        exception);
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -155,13 +169,30 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
     }
 
     private async Task ProcessReceivedAsync(
-        IMqttReceivedContext context,
+        IMqttReceivedContext? context,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(context.Message);
+        if (context is null)
+        {
+            ReportTriggerError(
+                MqttErrorCodes.TriggerFailed,
+                "MQTT trigger received a null message context.",
+                new ArgumentNullException(nameof(context)),
+                FlowEventLevel.Warning);
+            return;
+        }
 
         var message = context.Message;
+        if (message is null)
+        {
+            ReportTriggerError(
+                MqttErrorCodes.TriggerFailed,
+                "MQTT trigger received a null message payload.",
+                new ArgumentNullException(nameof(context.Message)),
+                FlowEventLevel.Warning);
+            return;
+        }
+
         var envelope = FlowMessage.Create(message, ToCorrelationId(message.CorrelationId));
         EmitReceivedEvent(envelope);
 

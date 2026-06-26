@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt 4.1.1
+
+Hardens MQTT trigger message handling.
+
+- `MqttTriggerNode` now reports malformed received contexts as trigger errors
+  without stopping the subscription pump.
+- Adds regression coverage proving a later valid MQTT message still flows after
+  an invalid adapter delivery.
+
 ## FluxFlow.Components.RequestReply 1.1.5
 
 Hardens request/reply publication observability.
