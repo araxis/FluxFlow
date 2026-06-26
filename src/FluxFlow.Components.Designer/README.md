@@ -26,6 +26,8 @@ component without depending on a specific rendering framework.
   metadata contracts.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
+- `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
+  for registering providers and resolving one validated catalog.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
 options and ports, duplicate primary ports per direction, invalid option
@@ -163,6 +165,14 @@ want to build those same contracts fluently before returning them. The builder
 validates null fluent option, resource, port, enum-choice, and attribute
 arguments immediately, then still runs the same metadata validation path during
 `Build()` for blank values, duplicates, invalid directions, and shape errors.
+
+Hosts that use DI can register package-owned providers and one shared catalog:
+
+```csharp
+services
+    .AddComponentDesignMetadataProvider<MyPackageMetadataProvider>()
+    .AddComponentDesignMetadataCatalog();
+```
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

@@ -1,4 +1,5 @@
 using FluxFlow.Components.Designer.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -347,6 +348,86 @@ public sealed class ComponentDesignMetadataCatalogTests
         catalog.All.Count.ShouldBe(2);
         catalog.TryGet(first.Type, out _).ShouldBeTrue();
         catalog.TryGet(second.Type, out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ServiceCollection_helpers_register_provider_and_catalog()
+    {
+        var services = new ServiceCollection()
+            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
+            .AddComponentDesignMetadataCatalog();
+
+        using var provider = services.BuildServiceProvider();
+
+        var registeredProvider = provider
+            .GetServices<IComponentDesignMetadataProvider>()
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TestMetadataProvider>();
+        registeredProvider.GetMetadata().ShouldHaveSingleItem()
+            .Type.ShouldBe(new ComponentType("sample.service"));
+
+        var catalog = provider.GetRequiredService<ComponentDesignMetadataCatalog>();
+        catalog.TryGet(new ComponentType("sample.service"), out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void ServiceCollection_helpers_skip_duplicate_provider_types()
+    {
+        var services = new ServiceCollection()
+            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
+            .AddComponentDesignMetadataProvider<TestMetadataProvider>()
+            .AddComponentDesignMetadataCatalog()
+            .AddComponentDesignMetadataCatalog();
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetServices<IComponentDesignMetadataProvider>()
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TestMetadataProvider>();
+        provider.GetServices<ComponentDesignMetadataCatalog>()
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void ServiceCollection_helpers_register_provider_instance()
+    {
+        var metadataProvider = new InstanceMetadataProvider("sample.instance");
+        var services = new ServiceCollection()
+            .AddComponentDesignMetadataProvider(metadataProvider)
+            .AddComponentDesignMetadataProvider(metadataProvider)
+            .AddComponentDesignMetadataCatalog();
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetServices<IComponentDesignMetadataProvider>()
+            .ShouldHaveSingleItem()
+            .ShouldBeSameAs(metadataProvider);
+        provider.GetRequiredService<ComponentDesignMetadataCatalog>()
+            .TryGet(new ComponentType("sample.instance"), out _)
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ServiceCollection_helpers_reject_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+
+        Should.Throw<ArgumentNullException>(() =>
+            ComponentDesignMetadataServiceCollectionExtensions
+                .AddComponentDesignMetadataProvider<TestMetadataProvider>(null!))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            ComponentDesignMetadataServiceCollectionExtensions
+                .AddComponentDesignMetadataProvider(null!, new TestMetadataProvider()))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddComponentDesignMetadataProvider(null!))
+            .ParamName.ShouldBe("provider");
+        Should.Throw<ArgumentNullException>(() =>
+            ComponentDesignMetadataServiceCollectionExtensions
+                .AddComponentDesignMetadataCatalog(null!))
+            .ParamName.ShouldBe("services");
     }
 
     [Fact]
@@ -1271,6 +1352,18 @@ public sealed class ComponentDesignMetadataCatalogTests
     private sealed class NullMetadataProvider : IComponentDesignMetadataProvider
     {
         public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() => null!;
+    }
+
+    private sealed class TestMetadataProvider : IComponentDesignMetadataProvider
+    {
+        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
+            => [CreateMetadata("sample.service")];
+    }
+
+    private sealed class InstanceMetadataProvider(string type) : IComponentDesignMetadataProvider
+    {
+        public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
+            => [CreateMetadata(type)];
     }
 
     private enum SampleMode
