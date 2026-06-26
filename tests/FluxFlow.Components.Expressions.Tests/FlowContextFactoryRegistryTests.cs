@@ -18,6 +18,17 @@ public sealed class FlowContextFactoryRegistryTests
     }
 
     [Fact]
+    public void Register_GenericInputTypeRegistersFactory()
+    {
+        var defaultFactory = new TestFactory("default");
+        var exactFactory = new TestFactory("exact");
+        var registry = new FlowContextFactoryRegistry<TestFactory>(defaultFactory)
+            .Register<string>(exactFactory);
+
+        registry.Resolve(typeof(string)).ShouldBeSameAs(exactFactory);
+    }
+
+    [Fact]
     public void Resolve_ReturnsAssignableFactory()
     {
         var defaultFactory = new TestFactory("default");
@@ -74,6 +85,7 @@ public sealed class FlowContextFactoryRegistryTests
 
         exception.Message.ShouldContain(nameof(IFirstMarker));
         exception.Message.ShouldContain(nameof(ISecondMarker));
+        exception.Message.ShouldContain("no single registration is more specific");
     }
 
     [Fact]
@@ -87,6 +99,24 @@ public sealed class FlowContextFactoryRegistryTests
             .Register(typeof(BothMarkersMessage), exactBase);
 
         registry.Resolve(typeof(DerivedBothMarkersMessage)).ShouldBeSameAs(exactBase);
+    }
+
+    [Fact]
+    public void Public_methods_reject_null_arguments()
+    {
+        var defaultFactory = new TestFactory("default");
+        var registry = new FlowContextFactoryRegistry<TestFactory>(defaultFactory);
+
+        Should.Throw<ArgumentNullException>(() => new FlowContextFactoryRegistry<TestFactory>(null!))
+            .ParamName.ShouldBe("defaultFactory");
+        Should.Throw<ArgumentNullException>(() => registry.UseDefault(null!))
+            .ParamName.ShouldBe("factory");
+        Should.Throw<ArgumentNullException>(() => registry.Register(null!, defaultFactory))
+            .ParamName.ShouldBe("inputType");
+        Should.Throw<ArgumentNullException>(() => registry.Register(typeof(string), null!))
+            .ParamName.ShouldBe("factory");
+        Should.Throw<ArgumentNullException>(() => registry.Resolve(null!))
+            .ParamName.ShouldBe("inputType");
     }
 
     private sealed record TestFactory(string Name);
