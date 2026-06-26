@@ -94,6 +94,27 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Resolver_exposes_descriptors_through_optional_provider_contract()
+    {
+        ISecretDescriptorProvider provider = new InMemorySecretResolverBuilder()
+            .Add(
+                "primary",
+                "runtime-value",
+                version: "v1",
+                kind: "profile",
+                displayName: "Primary")
+            .BuildResolver();
+
+        var descriptor = provider.GetDescriptors().ShouldHaveSingleItem();
+
+        descriptor.Name.ShouldBe(new SecretName("primary"));
+        descriptor.Version.ShouldBe("v1");
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary");
+        descriptor.ToString().ShouldNotContain("runtime-value");
+    }
+
+    [Fact]
     public void Resolver_builder_uses_existing_resolver_validation()
     {
         var builder = new InMemorySecretResolverBuilder()
