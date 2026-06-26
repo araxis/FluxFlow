@@ -763,6 +763,72 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         }
     }
 
+    [Fact]
+    public void Component_composition_bound_enum_options_expose_all_enum_choices()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var providerOptionsByName = provider
+                .GetMetadata()
+                .SelectMany(metadata => metadata.Options)
+                .GroupBy(option => option.Name, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToArray(),
+                    StringComparer.Ordinal);
+
+            foreach (var optionTypeName in ReadBoundOptionTypes(projectDirectory, entry.PackageId))
+            {
+                var optionType = ResolveReferencedType(assembly, optionTypeName, entry.PackageId);
+
+                foreach (var option in ReadEnumOptionProperties(optionType))
+                {
+                    providerOptionsByName.TryGetValue(option.ConfigurationKey, out var providerOptions)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} must describe enum option '{optionType.Name}.{option.Name}'.");
+
+                    var expectedChoices = Enum
+                        .GetNames(option.EnumType)
+                        .Order(StringComparer.Ordinal)
+                        .ToArray();
+
+                    foreach (var providerOption in providerOptions!)
+                    {
+                        providerOption.Kind.ShouldBe(
+                            OptionValueKind.Enum,
+                            $"{entry.PackageId} option '{optionType.Name}.{option.Name}' has enum CLR type '{option.EnumType.Name}' and must use OptionValueKind.Enum.");
+                        var actualChoices = providerOption.Choices
+                            .Select(choice => choice.Value)
+                            .Order(StringComparer.Ordinal)
+                            .ToArray();
+
+                        actualChoices.ShouldBe(
+                            expectedChoices,
+                            $"{entry.PackageId} option '{optionType.Name}.{option.Name}' choices must match enum '{option.EnumType.Name}'.");
+
+                        if (providerOption.DefaultValue is null)
+                            continue;
+
+                        var defaultValue = providerOption.DefaultValue is Enum enumValue
+                            ? enumValue.ToString()
+                            : providerOption.DefaultValue.ToString();
+
+                        expectedChoices.Contains(defaultValue)
+                            .ShouldBeTrue(
+                                $"{entry.PackageId} option '{optionType.Name}.{option.Name}' default value '{defaultValue}' must match enum '{option.EnumType.Name}'.");
+                    }
+                }
+            }
+        }
+    }
+
     private static bool IsComponentCompositionPackage(PackageManifestEntry entry)
         => entry.PackageId.StartsWith("FluxFlow.Components.", StringComparison.Ordinal)
             && entry.PackageId.EndsWith(".Composition", StringComparison.Ordinal);
@@ -923,6 +989,77 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return Assembly.Load(new AssemblyName(assemblyName));
     }
 
+    private static Type ResolveReferencedType(
+        Assembly assembly,
+        string typeName,
+        string packageId)
+    {
+        var normalizedTypeName = NormalizeClrType(typeName);
+        var matchingTypes = ReadFluxFlowAssemblyClosure(assembly)
+            .SelectMany(SafeGetTypes)
+            .Where(type =>
+                string.Equals(type.Name, normalizedTypeName, StringComparison.Ordinal) ||
+                string.Equals(type.FullName, typeName, StringComparison.Ordinal))
+            .Distinct()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        matchingTypes.Length.ShouldBe(
+            1,
+            $"{packageId} must resolve bound option type '{typeName}' to exactly one CLR type.");
+
+        return matchingTypes[0];
+    }
+
+    private static Assembly[] ReadFluxFlowAssemblyClosure(Assembly assembly)
+    {
+        var assemblies = new Dictionary<string, Assembly>(StringComparer.Ordinal);
+        var queue = new Queue<Assembly>();
+
+        AddAssembly(assembly);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+
+            foreach (var reference in current.GetReferencedAssemblies())
+            {
+                if (reference.Name is null ||
+                    !reference.Name.StartsWith("FluxFlow.", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                AddAssembly(Assembly.Load(reference));
+            }
+        }
+
+        return assemblies.Values.ToArray();
+
+        void AddAssembly(Assembly candidate)
+        {
+            if (!assemblies.TryAdd(candidate.FullName.ShouldNotBeNull(), candidate))
+                return;
+
+            queue.Enqueue(candidate);
+        }
+    }
+
+    private static Type[] SafeGetTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types
+                .Where(type => type is not null)
+                .Cast<Type>()
+                .ToArray();
+        }
+    }
+
     private static IComponentDesignMetadataProvider CreateSingleMetadataProvider(
         Assembly assembly,
         string packageId)
@@ -1018,6 +1155,23 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         executableMethod.Invoke(null, arguments);
     }
+
+    private static EnumOptionProperty[] ReadEnumOptionProperties(Type optionType)
+        => optionType
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.SetMethod?.IsPublic == true)
+            .Select(property => new
+            {
+                Property = property,
+                EnumType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType
+            })
+            .Where(option => option.EnumType.IsEnum)
+            .Select(option => new EnumOptionProperty(
+                option.Property.Name,
+                ToConfigurationKey(option.Property.Name),
+                option.EnumType))
+            .OrderBy(option => option.ConfigurationKey, StringComparer.Ordinal)
+            .ToArray();
 
     private static void AssertRequiredDesignerText(
         string? value,
@@ -1352,6 +1506,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private sealed record RegistryMessageB(string Value);
 
     private sealed record ResourceConstant(string Name, string Value);
+
+    private sealed record EnumOptionProperty(
+        string Name,
+        string ConfigurationKey,
+        Type EnumType);
 
     private sealed record ResourceLookupUsage(
         bool UsesRequiredLookup,
