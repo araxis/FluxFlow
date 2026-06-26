@@ -878,6 +878,7 @@ Main types:
 - `ComponentDesignMetadataBuilder`
 - `ComponentDesignMetadataCatalog`
 - `ComponentDesignMetadataModule`
+- `ComponentDesignMetadataServiceCollectionExtensions`
 - `ComponentDesignMetadataValidator`
 - `DesignerMetadataValidationError`
 
@@ -897,6 +898,9 @@ mutate catalog contents after registration.
 it supports single and bulk component-level attributes through `AddAttribute`
 and `AddAttributes`, builds through the validated module path, and does not own
 rendering, localization, resource selection, or runtime mapping.
+`ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
+metadata providers and a singleton validated catalog in host DI, while leaving
+palette rendering, localization, and resource pickers owned by the host.
 
 ## Support Packages
 

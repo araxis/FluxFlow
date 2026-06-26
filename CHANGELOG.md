@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.3.3
+
+Adds Designer provider service registration helpers.
+
+- Adds `AddComponentDesignMetadataProvider<TProvider>()` for registering
+  package-owned metadata providers with duplicate-safe service collection
+  semantics.
+- Adds `AddComponentDesignMetadataProvider(...)` for registering provider
+  instances.
+- Adds `AddComponentDesignMetadataCatalog()` so hosts can resolve one validated
+  `ComponentDesignMetadataCatalog` from registered providers.
+
 ## FluxFlow.Components.Secrets 1.5.5
 
 Hardens keyed secret service registration.
