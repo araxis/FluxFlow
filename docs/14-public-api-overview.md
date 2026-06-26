@@ -413,6 +413,8 @@ the six routing composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata describes built-in ports and option-defined dynamic output surfaces
 plus host-owned resource hints for selector delegates and `clock`.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Serialization Composition
 

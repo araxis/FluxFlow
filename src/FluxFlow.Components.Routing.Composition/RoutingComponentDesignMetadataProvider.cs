@@ -27,20 +27,42 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         IReadOnlyList<OptionDesignMetadata> options,
         IReadOnlyList<PortDesignMetadata> ports,
         IReadOnlyList<ResourceDesignMetadata> resources,
-        IReadOnlyDictionary<string, string>? attributes = null) => new()
+        IReadOnlyDictionary<string, string>? attributes = null)
+    {
+        var builder = new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Routing",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: suggestedEditorWidth);
+
+        foreach (var option in options)
         {
-            Type = new ComponentType(type),
-            DisplayName = displayName,
-            Category = "Routing",
-            Summary = summary,
-            IconKey = iconKey,
-            PreferredNodeName = preferredNodeName,
-            SuggestedEditorWidth = suggestedEditorWidth,
-            Options = options,
-            Ports = ports,
-            Resources = resources,
-            Attributes = attributes ?? new Dictionary<string, string>()
-        };
+            builder.AddOption(option);
+        }
+
+        foreach (var resource in resources)
+        {
+            builder.AddResource(resource);
+        }
+
+        foreach (var port in ports)
+        {
+            builder.AddPort(port);
+        }
+
+        if (attributes is not null)
+        {
+            foreach (var attribute in attributes)
+            {
+                builder.AddAttribute(attribute.Key, attribute.Value);
+            }
+        }
+
+        return builder.Build();
+    }
 
     private static ComponentDesignMetadata CreateSwitchMetadata()
         => RoutingMetadata(
