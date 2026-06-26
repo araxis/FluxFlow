@@ -71,7 +71,8 @@ is exposed separately from editable node options. Switch `routeOutputs` and fork
 `outputs` are represented as configuration options because those dynamic ports
 are exposed after the composition factory binds node options.
 The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+while preserving the same public metadata contracts consumed by hosts. Built-in
+input and output port descriptors are also added through the builder.
 
 ## Configuration
 

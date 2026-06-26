@@ -417,7 +417,7 @@ validation, or documentation hints without copying package descriptors. The
 metadata describes built-in ports and option-defined dynamic output surfaces
 plus host-owned resource hints for selector delegates and `clock`.
 The provider authors that metadata through the shared validated Designer
-metadata builder.
+metadata builder, including built-in input and output port descriptors.
 
 ## Serialization Composition
 

@@ -25,7 +25,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string preferredNodeName,
         int suggestedEditorWidth,
         IReadOnlyList<OptionDesignMetadata> options,
-        IReadOnlyList<PortDesignMetadata> ports,
+        Action<ComponentDesignMetadataBuilder> configurePorts,
         IReadOnlyList<ResourceDesignMetadata> resources,
         IReadOnlyDictionary<string, string>? attributes = null)
     {
@@ -48,10 +48,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             builder.AddResource(resource);
         }
 
-        foreach (var port in ports)
-        {
-            builder.AddPort(port);
-        }
+        configurePorts(builder);
 
         if (attributes is not null)
         {
@@ -93,13 +90,14 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             BoolOption("emitRouteEnvelope", "Emit Route Envelope", false, "Emit routed messages on the Routed output."),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Primary routed output.", "TInput", 1, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Matched, "Matched", "Input message when a configured route matches.", "TInput", 2),
-            OutputPort(RoutingCompositionPortNames.Default, "Default", "Input message when no configured route matches.", "TInput", 3),
-            OutputPort(RoutingCompositionPortNames.Routed, "Routed", "Input message when route envelope output is enabled.", "TInput", 4)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Primary routed output.", "TInput", 1, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Matched, "Matched", "Input message when a configured route matches.", "TInput", 2);
+            AddOutputPort(builder, RoutingCompositionPortNames.Default, "Default", "Input message when no configured route matches.", "TInput", 3);
+            AddOutputPort(builder, RoutingCompositionPortNames.Routed, "Routed", "Input message when route envelope output is enabled.", "TInput", 4);
+        },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.RouteKeySelector,
@@ -128,10 +126,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             JsonOption("outputs", "Outputs", "Required dynamic output port names.", isRequired: true),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Primary output alias.", "TInput", 1, isPrimary: true)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Primary output alias.", "TInput", 1, isPrimary: true);
+        },
         [ClockResource(0)],
         new Dictionary<string, string>
         {
@@ -150,10 +149,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             InputTypeOption("inputType"),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true);
+        },
         [ClockResource(0)]);
 
     private static ComponentDesignMetadata CreateWindowMetadata()
@@ -171,10 +171,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             BoolOption("emitPartialOnCompletion", "Emit Partial On Completion", true, "Emit a partial window when input completes."),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Buffered window.", "FlowWindow<TInput>", 1, isPrimary: true)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Buffered window.", "FlowWindow<TInput>", 1, isPrimary: true);
+        },
         [ClockResource(0)]);
 
     private static ComponentDesignMetadata CreateCorrelationMetadata()
@@ -199,12 +200,13 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             NumberOption("maxPending", "Max Pending", 1_024, 1, "Maximum pending correlation keys."),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Input, "Input", "Input request or response message.", "TInput", 0, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Correlation match result.", "FlowCorrelationMatch<TInput>", 1, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Matched, "Matched", "Correlation match result alias.", "FlowCorrelationMatch<TInput>", 2),
-            OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Correlation timeout result.", "FlowCorrelationTimeout<TInput>", 3)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input request or response message.", "TInput", 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Correlation match result.", "FlowCorrelationMatch<TInput>", 1, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Matched, "Matched", "Correlation match result alias.", "FlowCorrelationMatch<TInput>", 2);
+            AddOutputPort(builder, RoutingCompositionPortNames.Timeouts, "Timeouts", "Correlation timeout result.", "FlowCorrelationTimeout<TInput>", 3);
+        },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.KeySelector,
@@ -246,12 +248,13 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             NumberOption("maxPending", "Max Pending", 1_024, 1, "Maximum pending join keys."),
             BoundedCapacityOption()
         ],
-        [
-            InputPort(RoutingCompositionPortNames.Left, "Left", "Left input message.", "TLeft", 0, isPrimary: true),
-            InputPort(RoutingCompositionPortNames.Right, "Right", "Right input message.", "TRight", 1),
-            OutputPort(RoutingCompositionPortNames.Output, "Output", "Joined output result.", "FlowJoinResult<TLeft,TRight>", 2, isPrimary: true),
-            OutputPort(RoutingCompositionPortNames.Timeouts, "Timeouts", "Join timeout result.", "FlowJoinTimeout<TLeft,TRight>", 3)
-        ],
+        builder =>
+        {
+            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Left input message.", "TLeft", 0, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Right input message.", "TRight", 1);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Joined output result.", "FlowJoinResult<TLeft,TRight>", 2, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Timeouts, "Timeouts", "Join timeout result.", "FlowJoinTimeout<TLeft,TRight>", 3);
+        },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.LeftKeySelector,
@@ -406,39 +409,37 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         HelperText = "Maximum queued input messages."
     };
 
-    private static PortDesignMetadata InputPort(
+    private static void AddInputPort(
+        ComponentDesignMetadataBuilder builder,
         string name,
         string displayName,
         string summary,
         string valueType,
         int order,
-        bool isPrimary = false) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Input,
-            DisplayName = displayName,
-            Group = "Messages",
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+        bool isPrimary = false)
+        => builder.AddInputPort(
+            name,
+            displayName: displayName,
+            group: "Messages",
+            order: order,
+            summary: summary,
+            valueType: valueType,
+            isPrimary: isPrimary);
 
-    private static PortDesignMetadata OutputPort(
+    private static void AddOutputPort(
+        ComponentDesignMetadataBuilder builder,
         string name,
         string displayName,
         string summary,
         string valueType,
         int order,
-        bool isPrimary = false) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Output,
-            DisplayName = displayName,
-            Group = "Messages",
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = isPrimary
-        };
+        bool isPrimary = false)
+        => builder.AddOutputPort(
+            name,
+            displayName: displayName,
+            group: "Messages",
+            order: order,
+            summary: summary,
+            valueType: valueType,
+            isPrimary: isPrimary);
 }
