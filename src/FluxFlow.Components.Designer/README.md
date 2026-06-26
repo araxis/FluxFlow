@@ -22,6 +22,8 @@ component without depending on a specific rendering framework.
   component types and ports. They do not depend on engine definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
+- `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
+  metadata contracts.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
 
@@ -121,6 +123,25 @@ var metadata = new ComponentDesignMetadata
 var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 ```
 
+The fluent builder can author the same validated metadata shape with less
+boilerplate:
+
+```csharp
+var built = new ComponentDesignMetadataBuilder("sample.transform")
+    .WithDisplay(
+        displayName: "Sample Transform",
+        category: "Samples",
+        summary: "Transforms a sample value.",
+        iconKey: "transform",
+        preferredNodeName: "transform",
+        suggestedEditorWidth: 420)
+    .AddOption("expression", OptionValueKind.Expression, isRequired: true)
+    .AddResource("engine", order: 0, valueType: "IExpressionEngine", isRequired: true)
+    .AddInputPort("Input", order: 0, isPrimary: true)
+    .AddOutputPort("Output", order: 0, isPrimary: true)
+    .Build();
+```
+
 ## Package Providers
 
 Runtime component packages can ship an `IComponentDesignMetadataProvider` that
@@ -132,6 +153,8 @@ Providers must return a non-null metadata collection; catalog loading reports a
 clear provider error when that contract is violated.
 `ComponentDesignMetadataModule` is a small provider helper that validates,
 rejects duplicate component types, and snapshots the metadata it receives.
+`ComponentDesignMetadataBuilder` is a small authoring helper for providers that
+want to build those same contracts fluently before returning them.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

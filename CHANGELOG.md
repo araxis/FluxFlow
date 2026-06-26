@@ -45,6 +45,16 @@ Adds fluent in-memory secret resolver building.
 - Keeps concrete secret storage, access control, refresh, rotation, auditing,
   and disposal ownership with hosts.
 
+## FluxFlow.Components.Designer 2.3.0
+
+Adds fluent component design metadata building.
+
+- Adds `ComponentDesignMetadataBuilder` to
+  `FluxFlow.Components.Designer` for authoring validated Designer metadata with
+  the existing metadata contracts.
+- Keeps catalog validation, provider loading, metadata snapshotting, rendering,
+  localization, and runtime mapping ownership unchanged.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
