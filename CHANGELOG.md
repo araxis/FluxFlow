@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.3.0
+
+Adds range helpers to the configuration validation request builder.
+
+- Adds `ConfigurationValidationRequestBuilder.AddResources(...)` and
+  `AddSecrets(...)` to `FluxFlow.Components.Configuration` for appending
+  existing resource and secret validation reference collections.
+- Keeps resource lookup, secret resolution, validation behavior, and request
+  DTO ownership unchanged.
+
 ## FluxFlow.Components.Sessions 3.2.0
 
 Adds session store factory support.

@@ -71,6 +71,8 @@ var request = new ConfigurationValidationRequestBuilder()
     .AddResource("connections.primary", "primary", kind: "connection")
     .AddSecret("connections.primary.credential", "primary-credential")
     .AddOptionalResource("connections.secondary")
+    .AddResources(componentResourceReferences)
+    .AddSecrets(componentSecretReferences)
     .Build();
 
 var report = await ConfigurationValidator.ValidateAsync(
@@ -98,6 +100,9 @@ request diagnostics.
 `ConfigurationValidationRequestBuilder` is only an authoring helper over these
 same DTOs. It does not own resource lookup, secret resolution, or validation
 policy.
+The builder can append individual references or existing reference collections
+through `AddResources` and `AddSecrets`; built requests snapshot the current
+builder contents.
 
 Resource option paths trim surrounding whitespace when assigned, matching the
 secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and

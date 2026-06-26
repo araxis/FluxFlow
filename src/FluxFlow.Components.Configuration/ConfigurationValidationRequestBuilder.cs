@@ -16,6 +16,16 @@ public sealed class ConfigurationValidationRequestBuilder
         return this;
     }
 
+    public ConfigurationValidationRequestBuilder AddResources(IEnumerable<ConfigurationResourceReference> resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+
+        foreach (var resource in resources)
+            AddResource(resource);
+
+        return this;
+    }
+
     public ConfigurationValidationRequestBuilder AddResource(
         string path,
         string resourceName,
@@ -69,6 +79,16 @@ public sealed class ConfigurationValidationRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(secret);
         secrets.Add(secret);
+        return this;
+    }
+
+    public ConfigurationValidationRequestBuilder AddSecrets(IEnumerable<SecretOptionReference> secrets)
+    {
+        ArgumentNullException.ThrowIfNull(secrets);
+
+        foreach (var secret in secrets)
+            AddSecret(secret);
+
         return this;
     }
 

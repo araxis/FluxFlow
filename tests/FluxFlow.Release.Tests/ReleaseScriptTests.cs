@@ -138,7 +138,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Adds fluent configuration validation request building.");
+            notes.ShouldContain("Adds range helpers to the configuration validation request builder.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
         }
