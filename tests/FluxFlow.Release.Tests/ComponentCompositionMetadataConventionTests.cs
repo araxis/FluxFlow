@@ -305,6 +305,65 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_resource_names_are_used_by_registry_extensions()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var projectDirectory = Path.GetDirectoryName(projectPath).ShouldNotBeNull();
+            var resourceNamesFiles = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionResourceNames.cs",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+
+            resourceNamesFiles.Length.ShouldBeLessThanOrEqualTo(
+                1,
+                $"{entry.PackageId} must keep resource-name constants in one file.");
+
+            if (resourceNamesFiles.Length == 0)
+                continue;
+
+            var registryFile = Directory
+                .EnumerateFiles(
+                    projectDirectory,
+                    "*CompositionNodeRegistryExtensions.cs",
+                    SearchOption.TopDirectoryOnly)
+                .ShouldHaveSingleItem($"{entry.PackageId} must keep registry extensions in one file.");
+            var registryContent = File.ReadAllText(registryFile);
+            var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
+            var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
+            var resourceConstants = PublicStringConstantRegex()
+                .Matches(resourceContent)
+                .Select(match => match.Groups["name"].Value)
+                .ToArray();
+
+            resourceConstants.ShouldNotBeEmpty(
+                $"{entry.PackageId} resource-name file should expose at least one resource constant.");
+
+            foreach (var resourceConstant in resourceConstants)
+            {
+                ResourceReferenceIsUsedByRegistry(
+                        registryContent,
+                        resourceContent,
+                        resourceTypeName,
+                        resourceConstant)
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} registry extensions must resolve resource '{resourceTypeName}.{resourceConstant}' directly or through a resource-name helper.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_port_names_are_exposed_by_designer_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -628,6 +687,49 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private static string ToConfigurationKey(string propertyName)
         => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
 
+    private static bool ResourceReferenceIsUsedByRegistry(
+        string registryContent,
+        string resourceContent,
+        string resourceTypeName,
+        string resourceConstant)
+    {
+        var directReference = $"{resourceTypeName}.{resourceConstant}";
+        if (registryContent.Contains(directReference, StringComparison.Ordinal))
+            return true;
+
+        foreach (Match match in PublicStaticStringMethodRegex().Matches(resourceContent))
+        {
+            var methodName = match.Groups["name"].Value;
+            if (!registryContent.Contains($"{resourceTypeName}.{methodName}(", StringComparison.Ordinal))
+                continue;
+
+            if (ResourceHelperMentionsConstant(resourceContent, match.Index, resourceConstant))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ResourceHelperMentionsConstant(
+        string resourceContent,
+        int methodStartIndex,
+        string resourceConstant)
+    {
+        if (methodStartIndex < 0 || methodStartIndex >= resourceContent.Length)
+            return false;
+
+        var nextMemberIndex = resourceContent.IndexOf(
+            "\n    public",
+            methodStartIndex + 1,
+            StringComparison.Ordinal);
+        var methodLength = nextMemberIndex < 0
+            ? resourceContent.Length - methodStartIndex
+            : nextMemberIndex - methodStartIndex;
+        var methodContent = resourceContent.Substring(methodStartIndex, methodLength);
+
+        return methodContent.Contains(resourceConstant, StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, HashSet<string>> ReadProviderOptionKinds(string providerContent)
     {
         var optionKinds = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
@@ -688,6 +790,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=")]
     private static partial Regex PublicStringConstantRegex();
+
+    [GeneratedRegex(@"public\s+static\s+string\s+(?<name>\w+)\s*\(")]
+    private static partial Regex PublicStaticStringMethodRegex();
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
