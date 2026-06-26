@@ -14,6 +14,11 @@ public sealed class PulseMqttMessageMapperTests
     [Fact]
     public void ToPublishPacket_MapsPublishMetadata()
     {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "alpha"
+        };
+
         var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
         {
             Topic = "devices/a",
@@ -25,10 +30,7 @@ public sealed class PulseMqttMessageMapperTests
             {
                 CorrelationId = "corr-1",
                 ResponseTopic = "devices/a/reply",
-                UserProperties =
-                {
-                    ["tenant"] = "alpha"
-                }
+                UserProperties = userProperties
             }
         });
 
@@ -61,20 +63,24 @@ public sealed class PulseMqttMessageMapperTests
 
     [Fact]
     public void ToPublishPacket_rejects_null_named_user_property_values()
-        => Should.Throw<ArgumentNullException>(() =>
+    {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = null!
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
             PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
             {
                 Topic = "devices/a",
                 Payload = [1],
                 Properties = new MqttPublishProperties
                 {
-                    UserProperties =
-                    {
-                        ["tenant"] = null!
-                    }
+                    UserProperties = userProperties
                 }
             }))
             .ParamName.ShouldBe("value");
+    }
 
     [Fact]
     public void ToReceivedMessage_MapsPacketMetadata()

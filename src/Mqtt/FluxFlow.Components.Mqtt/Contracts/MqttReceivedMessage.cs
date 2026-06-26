@@ -2,6 +2,9 @@ namespace FluxFlow.Components.Mqtt.Contracts;
 
 public sealed record MqttReceivedMessage
 {
+    private IReadOnlyDictionary<string, string> _userProperties =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public required DateTimeOffset Timestamp { get; init; }
     public required string Topic { get; init; }
     public required byte[] Payload { get; init; }
@@ -12,5 +15,9 @@ public sealed record MqttReceivedMessage
     public string? CorrelationId { get; init; }
     public string? ResponseTopic { get; init; }
     public byte[]? CorrelationData { get; init; }
-    public Dictionary<string, string> UserProperties { get; init; } = [];
+    public IReadOnlyDictionary<string, string> UserProperties
+    {
+        get => _userProperties;
+        init => _userProperties = MqttContractMap.Copy(value);
+    }
 }
