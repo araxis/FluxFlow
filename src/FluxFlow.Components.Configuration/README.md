@@ -18,7 +18,7 @@ application files, or runtime lifecycle.
   severity, path, name, kind, and metadata.
 - `ConfigurationValidationReport`: ordered diagnostics plus summary counts.
 - `ConfigurationValidator`: helper for resource-only, secret-only, or combined
-  validation.
+  runtime validation, plus descriptor-only validation for declared references.
 - `ConfigurationValidationRequestBuilder`: fluent helper that builds the same
   validation request DTOs used by configuration loading.
 
@@ -81,6 +81,17 @@ var report = await ConfigurationValidator.ValidateAsync(
     request);
 ```
 
+Design-time or configuration-only hosts can validate references against
+descriptor providers without opening runtime resources or resolving secret
+values:
+
+```csharp
+var report = ConfigurationValidator.ValidateDeclaredReferences(
+    resourceDescriptorProvider,
+    secretDescriptorProvider,
+    request);
+```
+
 ## Boundaries
 
 This package only normalizes validation. Hosts still decide where resources and
@@ -100,6 +111,10 @@ request diagnostics.
 `ConfigurationValidationRequestBuilder` is only an authoring helper over these
 same DTOs. It does not own resource lookup, secret resolution, or validation
 policy.
+Descriptor-only validation uses host-owned resource and secret descriptor
+providers. It checks declaration presence, kind mismatches, ambiguous secret
+versions, and invalid descriptor provider output, but it does not open
+resources or read secret values.
 The builder can append individual references or existing reference collections
 through `AddResources` and `AddSecrets`; built requests snapshot the current
 builder contents.

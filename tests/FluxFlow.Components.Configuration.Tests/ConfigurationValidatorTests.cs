@@ -162,6 +162,201 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void ValidateDeclaredReferences_returns_empty_report_for_declared_references()
+    {
+        var resourceDescriptors = new StaticResourceDescriptorProvider(
+        [
+            new ResourceDescriptor
+            {
+                Name = new ResourceName("primary"),
+                Kind = "connection"
+            }
+        ]);
+        var secretDescriptors = new StaticSecretDescriptorProvider(
+        [
+            new SecretDescriptor
+            {
+                Name = new SecretName("primary-credential"),
+                Version = "v1",
+                Kind = "credential"
+            }
+        ]);
+
+        var report = ConfigurationValidator.ValidateDeclaredReferences(
+            resourceDescriptors,
+            secretDescriptors,
+            new ConfigurationValidationRequestBuilder()
+                .AddResource("connections.primary", "primary", kind: "connection")
+                .AddSecret("connections.primary.credential", "primary-credential", version: "v1", kind: "credential")
+                .Build());
+
+        report.Diagnostics.ShouldBeEmpty();
+        report.HasErrors.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ValidateDeclaredReferences_reports_missing_kind_and_ambiguous_declarations()
+    {
+        var resourceDescriptors = new StaticResourceDescriptorProvider(
+        [
+            new ResourceDescriptor
+            {
+                Name = new ResourceName("primary"),
+                Kind = "connection"
+            }
+        ]);
+        var secretDescriptors = new StaticSecretDescriptorProvider(
+        [
+            new SecretDescriptor
+            {
+                Name = new SecretName("primary-credential"),
+                Version = "v1",
+                Kind = "credential"
+            },
+            new SecretDescriptor
+            {
+                Name = new SecretName("primary-credential"),
+                Version = "v2",
+                Kind = "credential"
+            }
+        ]);
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResource("connections.missing", "missing", kind: "connection")
+            .AddResource("connections.primary", "primary", kind: "database")
+            .AddSecret("connections.missing.credential", "missing-credential")
+            .AddSecret("connections.primary.credential", "primary-credential")
+            .AddSecret("connections.primary.profile", "primary-credential", version: "v1", kind: "profile")
+            .Build();
+
+        var report = ConfigurationValidator.ValidateDeclaredReferences(
+            resourceDescriptors,
+            secretDescriptors,
+            request);
+
+        report.HasErrors.ShouldBeTrue();
+        report.Diagnostics.Select(diagnostic => diagnostic.Source).ShouldBe(
+        [
+            ConfigurationDiagnosticSource.Resource,
+            ConfigurationDiagnosticSource.Resource,
+            ConfigurationDiagnosticSource.Secret,
+            ConfigurationDiagnosticSource.Secret,
+            ConfigurationDiagnosticSource.Secret
+        ]);
+        report.Diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
+        [
+            nameof(ResourceDiagnosticCode.MissingResource),
+            nameof(ResourceDiagnosticCode.KindMismatch),
+            nameof(SecretDiagnosticCode.MissingSecret),
+            nameof(SecretDiagnosticCode.AmbiguousSecret),
+            nameof(SecretDiagnosticCode.KindMismatch)
+        ]);
+        report.Diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            "connections.missing",
+            "connections.primary",
+            "connections.missing.credential",
+            "connections.primary.credential",
+            "connections.primary.profile"
+        ]);
+    }
+
+    [Fact]
+    public void ValidateDeclaredReferences_reports_null_request_collections_as_diagnostics()
+    {
+        var report = ConfigurationValidator.ValidateDeclaredReferences(
+            new StaticResourceDescriptorProvider([]),
+            new StaticSecretDescriptorProvider([]),
+            new ConfigurationValidationRequest
+            {
+                Resources = null!,
+                Secrets = null!
+            });
+
+        report.HasErrors.ShouldBeTrue();
+        report.ErrorCount.ShouldBe(2);
+        report.Diagnostics.ShouldAllBe(diagnostic =>
+            diagnostic.Source == ConfigurationDiagnosticSource.Configuration);
+        report.Diagnostics.Select(diagnostic => diagnostic.Metadata["referencePath"]).ShouldBe(
+        [
+            "request.resources",
+            "request.secrets"
+        ]);
+    }
+
+    [Fact]
+    public void ValidateDeclaredResources_reports_descriptor_provider_diagnostics()
+    {
+        var diagnostics = ConfigurationValidator.ValidateDeclaredResources(
+            new StaticResourceDescriptorProvider(
+            [
+                new ResourceDescriptor
+                {
+                    Name = default,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        [""] = "value"
+                    }
+                },
+                null!
+            ]),
+            []);
+
+        diagnostics.Count.ShouldBe(3);
+        diagnostics.ShouldAllBe(diagnostic => diagnostic.Source == ConfigurationDiagnosticSource.Resource);
+        diagnostics.ShouldAllBe(diagnostic => diagnostic.Code == nameof(ResourceDiagnosticCode.InvalidResource));
+        diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            "resources[0]",
+            "resources[0].metadata",
+            "resources[1]"
+        ]);
+    }
+
+    [Fact]
+    public void ValidateDeclaredSecrets_reports_descriptor_provider_diagnostics()
+    {
+        var diagnostics = ConfigurationValidator.ValidateDeclaredSecrets(
+            new StaticSecretDescriptorProvider(
+            [
+                new SecretDescriptor
+                {
+                    Name = default,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        [""] = "value"
+                    }
+                },
+                null!,
+                new SecretDescriptor
+                {
+                    Name = new SecretName("primary")
+                },
+                new SecretDescriptor
+                {
+                    Name = new SecretName("primary")
+                }
+            ]),
+            []);
+
+        diagnostics.Count.ShouldBe(4);
+        diagnostics.ShouldAllBe(diagnostic => diagnostic.Source == ConfigurationDiagnosticSource.Secret);
+        diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
+        [
+            nameof(SecretDiagnosticCode.InvalidSecret),
+            nameof(SecretDiagnosticCode.InvalidSecret),
+            nameof(SecretDiagnosticCode.InvalidSecret),
+            nameof(SecretDiagnosticCode.DuplicateSecret)
+        ]);
+        diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            "secrets[0].name",
+            "secrets[0].metadata",
+            "secrets[1]",
+            "secretDescriptors"
+        ]);
+    }
+
+    [Fact]
     public void Request_builder_rejects_null_existing_entries()
     {
         var builder = new ConfigurationValidationRequestBuilder();
@@ -701,4 +896,16 @@ public sealed class ConfigurationValidatorTests
             },
             Value = new SecretValue(value)
         };
+
+    private sealed class StaticResourceDescriptorProvider(
+        IReadOnlyCollection<ResourceDescriptor> resources) : IResourceDescriptorProvider
+    {
+        public IReadOnlyCollection<ResourceDescriptor> GetResources() => resources;
+    }
+
+    private sealed class StaticSecretDescriptorProvider(
+        IReadOnlyCollection<SecretDescriptor> descriptors) : ISecretDescriptorProvider
+    {
+        public IReadOnlyCollection<SecretDescriptor> GetDescriptors() => descriptors;
+    }
 }
