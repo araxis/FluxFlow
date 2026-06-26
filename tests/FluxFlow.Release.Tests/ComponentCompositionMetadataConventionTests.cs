@@ -150,6 +150,54 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_concrete_port_value_types_match_registry_message_types()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest
+            .Read(root)
+            .Where(IsComponentCompositionPackage)
+            .OrderBy(entry => entry.PackageId, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            var projectPath = Path.GetFullPath(Path.Combine(root, NormalizePath(entry.Project)));
+            var project = XDocument.Load(projectPath);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataByType = provider
+                .GetMetadata()
+                .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
+            var registry = BuildDefaultRegistry(assembly, entry.PackageId);
+
+            foreach (var (nodeType, registration) in registry.Registrations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var metadata = metadataByType[nodeType];
+
+                foreach (var input in registration.Inputs.Values.OrderBy(input => input.Name, StringComparer.Ordinal))
+                {
+                    AssertConcretePortValueType(
+                        entry.PackageId,
+                        nodeType,
+                        metadata,
+                        input,
+                        PortDirection.Input);
+                }
+
+                foreach (var output in registration.Outputs.Values.OrderBy(output => output.Name, StringComparer.Ordinal))
+                {
+                    AssertConcretePortValueType(
+                        entry.PackageId,
+                        nodeType,
+                        metadata,
+                        output,
+                        PortDirection.Output);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_is_documented()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -897,6 +945,69 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         executableMethod.Invoke(null, arguments);
     }
+
+    private static void AssertConcretePortValueType(
+        string packageId,
+        string nodeType,
+        ComponentDesignMetadata metadata,
+        CompositionPortMetadata port,
+        PortDirection direction)
+    {
+        if (!ShouldValidateConcretePortType(port.MessageType))
+            return;
+
+        var designerPort = metadata.Ports.SingleOrDefault(designerPort =>
+            designerPort.Direction == direction &&
+            string.Equals(designerPort.Name.ToString(), port.Name, StringComparison.Ordinal));
+
+        designerPort.ShouldNotBeNull(
+            $"{packageId} Designer metadata for '{nodeType}' must expose {direction.ToString().ToLowerInvariant()} port '{port.Name}'.");
+
+        string.IsNullOrWhiteSpace(designerPort.ValueType)
+            .ShouldBeFalse(
+                $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must expose a ValueType for concrete port type '{port.MessageType.FullName}'.");
+
+        var expectedValueType = ToDesignerValueType(port.MessageType);
+        NormalizeValueType(designerPort.ValueType!)
+            .ShouldBe(
+                NormalizeValueType(expectedValueType),
+                $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must use ValueType '{expectedValueType}' for registry type '{port.MessageType.FullName}'.");
+    }
+
+    private static bool ShouldValidateConcretePortType(Type type)
+        => !type.ContainsGenericParameters &&
+            !ContainsRegistryGenericArgument(type);
+
+    private static bool ContainsRegistryGenericArgument(Type type)
+    {
+        if (RegistryGenericArgumentTypes.Contains(type))
+            return true;
+
+        if (type.HasElementType && type.GetElementType() is { } elementType)
+            return ContainsRegistryGenericArgument(elementType);
+
+        return type.IsGenericType &&
+            type.GetGenericArguments().Any(ContainsRegistryGenericArgument);
+    }
+
+    private static string ToDesignerValueType(Type type)
+    {
+        if (!type.IsGenericType)
+            return type.Name;
+
+        var genericTickIndex = type.Name.IndexOf('`', StringComparison.Ordinal);
+        var name = genericTickIndex < 0
+            ? type.Name
+            : type.Name[..genericTickIndex];
+        var arguments = string.Join(
+            ", ",
+            type.GetGenericArguments().Select(ToDesignerValueType));
+
+        return $"{name}<{arguments}>";
+    }
+
+    private static string NormalizeValueType(string valueType)
+        => new(valueType.Where(character => !char.IsWhiteSpace(character)).ToArray());
 
     private static string NormalizePath(string path)
         => path
