@@ -60,7 +60,7 @@ public sealed class InMemoryJournalStore : IJournalStore
         ArgumentNullException.ThrowIfNull(query);
         cancellationToken.ThrowIfCancellationRequested();
 
-        ValidateQuery(query);
+        JournalQueryMatcher.Validate(query);
         List<JournalEntry> snapshot;
         lock (gate)
         {
@@ -214,19 +214,6 @@ public sealed class InMemoryJournalStore : IJournalStore
         }
 
         return normalized;
-    }
-
-    private static void ValidateQuery(JournalQuery query)
-    {
-        if (query.Offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(query), "Journal query offset cannot be negative.");
-        }
-
-        if (query.Limit is <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(query), "Journal query limit must be positive.");
-        }
     }
 
     private static DateTimeOffset? ValidateRetention(JournalRetentionOptions options)

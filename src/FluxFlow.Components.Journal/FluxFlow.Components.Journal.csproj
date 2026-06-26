@@ -11,7 +11,7 @@
     <Description>Reusable event journal contracts and in-memory store for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;journal;store</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Journal contracts now normalize text fields and copy attribute maps and query results so caller mutations cannot change records, queries, events, or returned results.</PackageReleaseNotes>
+    <PackageReleaseNotes>Journal contracts now normalize text fields, copy attribute maps and query results, and expose shared query validation that rejects invalid paging and inverted time ranges.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
