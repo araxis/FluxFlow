@@ -159,6 +159,15 @@ Uses the shared Designer metadata builder for observability metadata.
 - Preserves existing observability options, resources, fixed ports, validation,
   catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Projections.Composition 1.2.1
+
+Uses the shared Designer metadata builder for event projection metadata.
+
+- Refactors `ProjectionsComponentDesignMetadataProvider` to author
+  `event.projection` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing event projection options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

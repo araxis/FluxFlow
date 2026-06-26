@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Projections.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Projections.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for the standalone event projection node over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for the event projection clock resource while keeping clocks host-owned resources.</PackageReleaseNotes>
+    <PackageReleaseNotes>Refactors event projection Designer metadata to use the shared validated metadata builder while preserving existing ports, resources, options, validation, and runtime behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
