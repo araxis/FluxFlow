@@ -149,6 +149,49 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_is_palette_ready()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var preferredNodeNames = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                AssertRequiredDesignerText(
+                    metadata.IconKey,
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include an icon key.");
+                AssertRequiredDesignerText(
+                    metadata.PreferredNodeName,
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' must include a preferred node name.");
+
+                metadata.SuggestedEditorWidth.HasValue
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' must include a suggested editor width.");
+                metadata.SuggestedEditorWidth.GetValueOrDefault()
+                    .ShouldBeGreaterThan(
+                        319,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' suggested editor width should support usable editors.");
+                metadata.SuggestedEditorWidth.GetValueOrDefault()
+                    .ShouldBeLessThan(
+                        721,
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' suggested editor width should avoid oversized inspectors.");
+
+                preferredNodeNames
+                    .Add(metadata.PreferredNodeName!)
+                    .ShouldBeTrue(
+                        $"{entry.PackageId} Designer metadata preferred node name '{metadata.PreferredNodeName}' is duplicated.");
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_matches_default_registry_metadata()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
