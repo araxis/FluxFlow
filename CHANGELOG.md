@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Journal 2.3.2
+
+Documents and verifies the full keyed journal store registration contract.
+
+- Covers service collection, key name, direct store/factory, provider delegate,
+  DI dependency access, and null provider-result failures for keyed journal
+  stores and store factories.
+- Updates package notes and README wording to match the explicit registration
+  guardrails.
+
 ## FluxFlow.Components.Mqtt 4.1.1
 
 Hardens MQTT trigger message handling.
