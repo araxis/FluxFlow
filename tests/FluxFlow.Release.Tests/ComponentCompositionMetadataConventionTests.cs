@@ -758,46 +758,35 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     public void Component_composition_bound_options_are_described_or_explicitly_omitted()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
-        var sourceRoot = Path.Combine(root, "src");
-        var sourceFiles = Directory
-            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .ToArray();
         var entries = ReadComponentCompositionPackages(root);
 
         foreach (var entry in entries)
         {
             var projectDirectory = ReadProjectDirectory(root, entry);
-            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
-            var providerContent = File.ReadAllText(providerFile);
-            var boundOptionTypes = ReadBoundOptionTypes(projectDirectory, entry.PackageId);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
 
-            foreach (var optionType in boundOptionTypes)
+            foreach (var metadata in provider.GetMetadata())
             {
-                var optionTypeFile = sourceFiles
-                    .SingleOrDefault(file =>
-                        string.Equals(
-                            Path.GetFileNameWithoutExtension(file),
-                            optionType,
-                            StringComparison.Ordinal));
-                optionTypeFile.ShouldNotBeNull(
-                    $"{entry.PackageId} binds unknown option type '{optionType}'.");
+                var nodeType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
 
-                var optionContent = File.ReadAllText(optionTypeFile);
-                var optionNames = OptionPropertyRegex()
-                    .Matches(optionContent)
-                    .Concat(ValidatedOptionPropertyRegex().Matches(optionContent))
-                    .Select(match => ToConfigurationKey(match.Groups["name"].Value))
-                    .Distinct(StringComparer.Ordinal)
-                    .ToArray();
+                var boundProperties = ReadBoundOptionProperties(
+                    assembly,
+                    optionTypeNames!,
+                    entry.PackageId);
 
-                optionNames.ShouldNotBeEmpty(
-                    $"{entry.PackageId} option type '{optionType}' should expose configuration properties.");
+                boundProperties.ShouldNotBeEmpty(
+                    $"{entry.PackageId} Designer metadata for '{nodeType}' should have bound option properties.");
 
-                foreach (var optionName in optionNames)
+                foreach (var optionName in boundProperties.Keys.Order(StringComparer.Ordinal))
                 {
-                    ProviderMentionsOption(providerContent, optionName)
+                    MetadataDescribesOrOmitsOption(metadata, optionName)
                         .ShouldBeTrue(
-                            $"{entry.PackageId} must describe bound option '{optionName}' from '{optionType}' or declare it in omittedOptions.");
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' must describe bound option '{optionName}' or declare it in omittedOptions.");
                 }
             }
         }
@@ -1804,19 +1793,32 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .Replace('/', Path.DirectorySeparatorChar)
             .Replace('\\', Path.DirectorySeparatorChar);
 
-    private static bool ProviderMentionsOption(
-        string providerContent,
-        string optionName)
-        => providerContent.Contains(
-            $"\"{optionName}\"",
-            StringComparison.Ordinal);
-
     private static bool ConfigurationKeysContainOption(
         IReadOnlyCollection<string> configurationKeys,
         string optionName)
         => configurationKeys.Any(key =>
             string.Equals(key, optionName, StringComparison.Ordinal) ||
             optionName.StartsWith($"{key}.", StringComparison.Ordinal));
+
+    private static bool MetadataDescribesOrOmitsOption(
+        ComponentDesignMetadata metadata,
+        string optionName)
+        => metadata.Options.Any(option =>
+                string.Equals(option.Name, optionName, StringComparison.Ordinal)) ||
+            ReadOmittedOptions(metadata).Contains(optionName);
+
+    private static HashSet<string> ReadOmittedOptions(ComponentDesignMetadata metadata)
+    {
+        if (!metadata.Attributes.TryGetValue("omittedOptions", out var omittedOptions) ||
+            string.IsNullOrWhiteSpace(omittedOptions))
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        return omittedOptions
+            .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
+    }
 
     private static void AssertNumericMetadataBoundIsAccepted(
         string packageId,
