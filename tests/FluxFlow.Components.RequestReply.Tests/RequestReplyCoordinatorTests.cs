@@ -102,6 +102,57 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task NullRequestContext_ReportsError_AndContinues()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
+
+        await bridge.Incoming.SendAsync(null!);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidRequestContext);
+        error.CorrelationId.ShouldBeNull();
+        flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
+        flowEvent.Level.ShouldBe(FlowEventLevel.Error);
+
+        var context = new FakeContext("valid");
+        await bridge.Incoming.SendAsync(context);
+
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        request.Payload.ShouldBe("valid");
+        await bridge.Responses.SendAsync(request.With("ok"));
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Replied.ShouldBe("ok");
+    }
+
+    [Fact]
+    public async Task NullResponseMessage_ReportsError_AndContinues()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
+
+        await bridge.Responses.SendAsync(null!);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidResponseMessage);
+        error.CorrelationId.ShouldBeNull();
+        flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
+        flowEvent.Level.ShouldBe(FlowEventLevel.Error);
+
+        var context = new FakeContext("valid");
+        await bridge.Incoming.SendAsync(context);
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await bridge.Responses.SendAsync(request.With("ok"));
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Replied.ShouldBe("ok");
+    }
+
+    [Fact]
     public async Task Fault_FailsInFlightCallers_AndFaultsCompletion()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();

@@ -32,6 +32,17 @@ Adds descriptor-only configuration reference validation to
 - Preserves the existing runtime validation path that uses `IResourceLookup`
   and `ISecretResolver`.
 
+## FluxFlow.Components.RequestReply 1.1.4
+
+Hardens invalid request/reply input handling.
+
+- Reports null request contexts as `InvalidRequestContext` errors and
+  `requestreply.invalid` events without faulting the coordinator.
+- Reports null response messages as `InvalidResponseMessage` errors and
+  `requestreply.invalid` events without stopping later valid responses.
+- Rejects null lower-level tracker contexts before they can be stored as
+  pending requests.
+
 ## FluxFlow.Components.Secrets 1.5.0
 
 Adds keyed secret registration helpers.

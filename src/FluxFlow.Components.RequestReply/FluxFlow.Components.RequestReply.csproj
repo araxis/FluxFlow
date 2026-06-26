@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.RequestReply</PackageId>
     <AssemblyName>FluxFlow.Components.RequestReply</AssemblyName>
     <RootNamespace>FluxFlow.Components.RequestReply</RootNamespace>
-    <Version>1.1.3</Version>
+    <Version>1.1.4</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A transport-agnostic request/reply bridge for FluxFlow: turns an inbound request stream into a one-way dataflow graph and correlates the response back to the caller by CorrelationId. Reused by HTTP and MQTT triggers.</Description>
     <PackageTags>workflow;dataflow;components;request-reply;trigger</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Request/reply option records now reject invalid mode, capacity, timeout, and sweep interval values when assigned.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens request/reply invalid input handling so null contexts and response messages produce diagnostics without stopping later messages.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

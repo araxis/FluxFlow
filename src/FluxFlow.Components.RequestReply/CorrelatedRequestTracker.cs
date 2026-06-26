@@ -42,6 +42,8 @@ public sealed class CorrelatedRequestTracker<TContext, TResponse> : IAsyncDispos
     public CorrelatedRequestStartResult TryAdd(CorrelationId correlationId, TContext context)
     {
         ValidateCorrelationId(correlationId);
+        ArgumentNullException.ThrowIfNull(context);
+
         if (Volatile.Read(ref _disposed) != 0)
         {
             return CorrelatedRequestStartResult.Stopped;

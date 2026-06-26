@@ -58,6 +58,19 @@ public sealed class CorrelatedRequestTrackerTests
     }
 
     [Fact]
+    public async Task Add_RejectsNullContext()
+    {
+        await using var tracker = new CorrelatedRequestTracker<string, string>(
+            (_, _, _, _) => ValueTask.CompletedTask,
+            (_, _, _, _) => ValueTask.CompletedTask);
+
+        Should.Throw<ArgumentNullException>(() =>
+            tracker.TryAdd(new CorrelationId("trace-1"), null!))
+            .ParamName.ShouldBe("context");
+        tracker.PendingCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Timeout_FailsPendingRequest_AndEvicts()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-06-20T00:00:00+00:00"));

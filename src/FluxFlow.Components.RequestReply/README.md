@@ -41,6 +41,10 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
   invariants when values are assigned. Unsupported modes, non-positive capacity,
   non-positive timeout, and non-positive sweep interval fail fast before
   dataflow blocks or timers are created.
+- Invalid null request contexts and null response messages are reported through
+  `Errors` and `Events` without faulting the coordinator, so later valid
+  messages can still flow. `CorrelatedRequestTracker` rejects null contexts
+  before storing them as pending requests.
 - `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
   in-flight callers with `OperationCanceledException`, so `Completion` can be
   awaited without leaving callers hanging.
