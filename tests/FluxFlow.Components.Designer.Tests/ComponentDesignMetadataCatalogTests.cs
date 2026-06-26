@@ -7,6 +7,147 @@ namespace FluxFlow.Components.Designer.Tests;
 public sealed class ComponentDesignMetadataCatalogTests
 {
     [Fact]
+    public void Metadata_builder_creates_valid_metadata_with_options_resources_ports_and_attributes()
+    {
+        var metadata = new ComponentDesignMetadataBuilder("sample.builder")
+            .WithDisplay(
+                displayName: "Sample Builder",
+                category: "Samples",
+                summary: "Builds sample metadata.",
+                iconKey: "sample",
+                preferredNodeName: "sample",
+                suggestedEditorWidth: 360)
+            .AddOption(
+                "expression",
+                OptionValueKind.Expression,
+                displayName: "Expression",
+                helperText: "Evaluated for each input.",
+                isRequired: true)
+            .AddEnumOption(
+                "mode",
+                ["strict", "relaxed"],
+                defaultValue: "strict")
+            .AddResource(
+                "engine",
+                displayName: "Engine",
+                order: 0,
+                summary: "Expression engine.",
+                valueType: "IExpressionEngine",
+                isRequired: true)
+            .AddInputPort(
+                "Input",
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "Input message.",
+                valueType: "SampleInput",
+                isPrimary: true)
+            .AddOutputPort(
+                "Output",
+                displayName: "Output",
+                group: "Messages",
+                order: 0,
+                summary: "Output message.",
+                valueType: "SampleOutput",
+                isPrimary: true)
+            .AddAttribute("shape", "transform")
+            .Build();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+        metadata.Type.ShouldBe(new ComponentType("sample.builder"));
+        metadata.DisplayName.ShouldBe("Sample Builder");
+        metadata.Category.ShouldBe("Samples");
+        metadata.Summary.ShouldBe("Builds sample metadata.");
+        metadata.IconKey.ShouldBe("sample");
+        metadata.PreferredNodeName.ShouldBe("sample");
+        metadata.SuggestedEditorWidth.ShouldBe(360);
+        metadata.Options.Select(option => option.Name).ShouldBe(["expression", "mode"]);
+        metadata.Options[1].Choices.Select(choice => choice.Value).ShouldBe(["strict", "relaxed"]);
+        metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe("engine");
+        metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
+        metadata.Attributes["shape"].ShouldBe("transform");
+    }
+
+    [Fact]
+    public void Metadata_builder_output_can_be_registered_in_catalog()
+    {
+        var metadata = new ComponentDesignMetadataBuilder("sample.catalog")
+            .AddInputPort("Input", order: 0)
+            .AddOutputPort("Output", order: 0)
+            .Build();
+
+        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+
+        catalog.TryGet(new ComponentType("sample.catalog"), out var found).ShouldBeTrue();
+        found.ShouldNotBeSameAs(metadata);
+        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
+    }
+
+    [Fact]
+    public void Metadata_builder_snapshots_mutable_inputs_and_build_results()
+    {
+        var optionAttributes = new Dictionary<string, string>
+        {
+            ["scope"] = "editable"
+        };
+        var resourceAttributes = new Dictionary<string, string>
+        {
+            ["resource"] = "host-owned"
+        };
+        var portAttributes = new Dictionary<string, string>
+        {
+            ["side"] = "input"
+        };
+        var builder = new ComponentDesignMetadataBuilder("sample.snapshot")
+            .AddOption(
+                "expression",
+                OptionValueKind.Expression,
+                attributes: optionAttributes)
+            .AddResource(
+                "engine",
+                attributes: resourceAttributes)
+            .AddInputPort(
+                "Input",
+                attributes: portAttributes)
+            .AddAttribute("shape", "transform");
+
+        var metadata = builder.Build();
+        optionAttributes["scope"] = "changed";
+        resourceAttributes["resource"] = "changed";
+        portAttributes["side"] = "changed";
+        builder
+            .AddOption("enabled", OptionValueKind.Boolean)
+            .AddOutputPort("Output");
+
+        metadata.Options.Select(option => option.Name).ShouldBe(["expression"]);
+        metadata.Options[0].Attributes["scope"].ShouldBe("editable");
+        metadata.Resources.ShouldHaveSingleItem().Attributes["resource"].ShouldBe("host-owned");
+        metadata.Ports.ShouldHaveSingleItem().Attributes["side"].ShouldBe("input");
+        metadata.Attributes["shape"].ShouldBe("transform");
+    }
+
+    [Fact]
+    public void Metadata_builder_uses_existing_validation()
+    {
+        var builder = new ComponentDesignMetadataBuilder("sample.invalid")
+            .WithDisplay(suggestedEditorWidth: 0);
+
+        var exception = Should.Throw<InvalidOperationException>(() => builder.Build());
+
+        exception.Message.ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
+    }
+
+    [Fact]
+    public void Metadata_builder_rejects_null_nested_metadata()
+    {
+        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
+
+        Should.Throw<ArgumentNullException>(() => builder.AddOption(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddResource(null!));
+        Should.Throw<ArgumentNullException>(() => builder.AddPort(null!));
+    }
+
+    [Fact]
     public void Add_registers_and_finds_metadata_by_component_type()
     {
         var metadata = CreateMetadata();
