@@ -11,6 +11,7 @@ adapter packages still provide `IFlowExpressionEngine` implementations.
 |------|---------|
 | `FlowExpressionEngineRegistry` | Registers named/default expression engines or a host-provided resolver. |
 | `FlowContextFactoryRegistry<TFactory>` | Resolves exact, assignable, or default context factories by input type. |
+| `ExpressionServiceCollectionExtensions` | Registers host-owned expression engines and typed map context factories as keyed DI resources. |
 
 Use `Use(engine, useAsDefault: false)` for a named-only engine that should be
 resolved explicitly by name but not become the fallback engine for empty names.
@@ -25,6 +26,19 @@ registration types.
 The package is intended for component package authors. Application code usually
 uses higher-level registration methods from packages such as Mapping, Control,
 Assertions, Routing, State, or Observability.
+
+Hosts that wire composition resources through keyed DI can register expression
+services directly:
+
+```csharp
+services
+    .AddFluxFlowExpressionEngine("primary", expressionEngine)
+    .AddFluxFlowMapContextFactory<Order>("order-context", contextFactory);
+```
+
+These helpers only register already-owned services. They do not select an
+expression language, compile expressions, scan assemblies, or create node
+factories.
 
 ## Composition
 

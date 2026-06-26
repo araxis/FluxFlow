@@ -72,7 +72,7 @@ Add `FluxFlow.Components.Mapping.Composition` when a host wants mapper nodes fro
 fluent or `IConfiguration` composition definitions:
 
 ```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+services.AddFluxFlowExpressionEngine("default", expressionEngine);
 
 services
     .AddFluxFlowComposition(configuration)
@@ -166,6 +166,14 @@ typed `IFlowMapContextFactory<TInput>` implementations when needed.
 
 In composition, register that adapter as a keyed `contextFactory` resource and
 reference it from the node's `resources` map.
+
+For typed context factories used by Control, Assertions, Observability, or other
+adapters that consume `IFlowMapContextFactory<TInput>` directly, register them
+with:
+
+```csharp
+services.AddFluxFlowMapContextFactory<OrderInput>("order-context", contextFactory);
+```
 
 ## Predicates And Control Nodes
 

@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expressions 2.1.0
+
+Adds keyed expression service registration helpers.
+
+- Adds `AddFluxFlowExpressionEngine(...)` for registering host-owned
+  `IFlowExpressionEngine` resources in keyed DI.
+- Adds `AddFluxFlowMapContextFactory<TInput>(...)` for registering host-owned
+  typed `IFlowMapContextFactory<TInput>` resources in keyed DI.
+- Keeps expression language selection, expression compilation, context
+  construction, and resource ownership with the host.
+
 ## FluxFlow.Components.Sessions 3.3.0
 
 Adds keyed session store registration helpers.

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Expressions</PackageId>
     <AssemblyName>FluxFlow.Components.Expressions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expressions</RootNamespace>
-    <Version>2.0.3</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Shared expression registration helpers for FluxFlow component packages.</Description>
     <PackageTags>workflow;dataflow;components;expressions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens FlowContextFactoryRegistry matching with deterministic ambiguity diagnostics and explicit public guardrail coverage.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds keyed DI registration helpers for host-owned expression engines and typed map context factories.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -19,6 +19,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
