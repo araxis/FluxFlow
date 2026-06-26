@@ -92,6 +92,17 @@ Uses the shared Designer metadata builder for validation metadata.
 - Preserves existing JSON schema validator options, resources, ports,
   validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Timers.Composition 1.4.2
+
+Uses the shared Designer metadata builder for timer metadata.
+
+- Refactors `TimersComponentDesignMetadataProvider` to author interval,
+  schedule, delay, throttle, and debounce metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing timer options, clock resources, ports, schedule
+  omitted-option attributes, validation, catalog loading, and runtime
+  composition behavior.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.
