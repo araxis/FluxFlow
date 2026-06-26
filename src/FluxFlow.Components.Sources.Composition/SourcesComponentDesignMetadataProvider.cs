@@ -14,112 +14,122 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             CreateSequenceMetadata()
         ];
 
-    private static ComponentDesignMetadata CreateGeneratedMetadata() => new()
-    {
-        Type = new ComponentType(SourcesCompositionNodeTypes.Generated),
-        DisplayName = "Generated Source",
-        Category = "Sources",
-        Summary = "Emits inline configured items as typed source messages.",
-        IconKey = "list-plus",
-        PreferredNodeName = "generated",
-        SuggestedEditorWidth = 440,
-        Options =
-        [
-            NameOption(GeneratedSourceOptions.DefaultName),
-            new OptionDesignMetadata
-            {
-                Name = "outputType",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Output Type",
-                DefaultValue = GeneratedSourceOptions.ObjectTypeName,
-                HelperText = "Diagnostic output type metadata; CLR output type comes from the closed registration."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "items",
-                Kind = OptionValueKind.Json,
-                DisplayName = "Items",
-                HelperText = "Inline array of payloads deserialized into the closed generated output type."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "loop",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Loop",
-                DefaultValue = false,
-                HelperText = "Repeat configured items until maxItems is reached."
-            },
-            MaxItemsOption(),
-            MillisecondsOption(
-                "initialDelayMilliseconds",
-                "Initial Delay Milliseconds",
-                "Delay before the first item is emitted."),
-            MillisecondsOption(
-                "intervalMilliseconds",
-                "Interval Milliseconds",
-                "Delay between emitted items."),
-            BoundedCapacityOption()
-        ],
-        Resources = ClockResources(),
-        Ports =
-        [
-            OutputPort("TOutput", "Generated source item.", isPrimary: true)
-        ]
-    };
+    private static ComponentDesignMetadata CreateGeneratedMetadata()
+        => CreateSourceMetadata(
+            SourcesCompositionNodeTypes.Generated,
+            "Generated Source",
+            "Emits inline configured items as typed source messages.",
+            "list-plus",
+            "generated",
+            suggestedEditorWidth: 440,
+            options:
+            [
+                NameOption(GeneratedSourceOptions.DefaultName),
+                new OptionDesignMetadata
+                {
+                    Name = "outputType",
+                    Kind = OptionValueKind.Text,
+                    DisplayName = "Output Type",
+                    DefaultValue = GeneratedSourceOptions.ObjectTypeName,
+                    HelperText = "Diagnostic output type metadata; CLR output type comes from the closed registration."
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "items",
+                    Kind = OptionValueKind.Json,
+                    DisplayName = "Items",
+                    HelperText = "Inline array of payloads deserialized into the closed generated output type."
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "loop",
+                    Kind = OptionValueKind.Boolean,
+                    DisplayName = "Loop",
+                    DefaultValue = false,
+                    HelperText = "Repeat configured items until maxItems is reached."
+                },
+                MaxItemsOption(),
+                MillisecondsOption(
+                    "initialDelayMilliseconds",
+                    "Initial Delay Milliseconds",
+                    "Delay before the first item is emitted."),
+                MillisecondsOption(
+                    "intervalMilliseconds",
+                    "Interval Milliseconds",
+                    "Delay between emitted items."),
+                BoundedCapacityOption()
+            ],
+            OutputPort("TOutput", "Generated source item.", isPrimary: true));
 
-    private static ComponentDesignMetadata CreateSequenceMetadata() => new()
-    {
-        Type = new ComponentType(SourcesCompositionNodeTypes.Sequence),
-        DisplayName = "Sequence Source",
-        Category = "Sources",
-        Summary = "Emits numeric sequence items as source messages.",
-        IconKey = "list-ordered",
-        PreferredNodeName = "sequence",
-        SuggestedEditorWidth = 420,
-        Options =
-        [
-            NameOption(SequenceSourceOptions.DefaultName),
-            new OptionDesignMetadata
-            {
-                Name = "start",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Start",
-                DefaultValue = 1,
-                HelperText = "First numeric value emitted."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "step",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Step",
-                DefaultValue = 1,
-                HelperText = "Amount added for each item; cannot be zero."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "count",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Count",
-                DefaultValue = 1,
-                Min = 1,
-                HelperText = "Number of sequence items to emit."
-            },
-            MillisecondsOption(
-                "initialDelayMilliseconds",
-                "Initial Delay Milliseconds",
-                "Delay before the first item is emitted."),
-            MillisecondsOption(
-                "intervalMilliseconds",
-                "Interval Milliseconds",
-                "Delay between emitted items."),
-            BoundedCapacityOption()
-        ],
-        Resources = ClockResources(),
-        Ports =
-        [
-            OutputPort(nameof(SourceSequenceItem), "Sequence source item.", isPrimary: true)
-        ]
-    };
+    private static ComponentDesignMetadata CreateSequenceMetadata()
+        => CreateSourceMetadata(
+            SourcesCompositionNodeTypes.Sequence,
+            "Sequence Source",
+            "Emits numeric sequence items as source messages.",
+            "list-ordered",
+            "sequence",
+            suggestedEditorWidth: 420,
+            options:
+            [
+                NameOption(SequenceSourceOptions.DefaultName),
+                new OptionDesignMetadata
+                {
+                    Name = "start",
+                    Kind = OptionValueKind.Number,
+                    DisplayName = "Start",
+                    DefaultValue = 1,
+                    HelperText = "First numeric value emitted."
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "step",
+                    Kind = OptionValueKind.Number,
+                    DisplayName = "Step",
+                    DefaultValue = 1,
+                    HelperText = "Amount added for each item; cannot be zero."
+                },
+                new OptionDesignMetadata
+                {
+                    Name = "count",
+                    Kind = OptionValueKind.Number,
+                    DisplayName = "Count",
+                    DefaultValue = 1,
+                    Min = 1,
+                    HelperText = "Number of sequence items to emit."
+                },
+                MillisecondsOption(
+                    "initialDelayMilliseconds",
+                    "Initial Delay Milliseconds",
+                    "Delay before the first item is emitted."),
+                MillisecondsOption(
+                    "intervalMilliseconds",
+                    "Interval Milliseconds",
+                    "Delay between emitted items."),
+                BoundedCapacityOption()
+            ],
+            OutputPort(nameof(SourceSequenceItem), "Sequence source item.", isPrimary: true));
+
+    private static ComponentDesignMetadata CreateSourceMetadata(
+        string type,
+        string displayName,
+        string summary,
+        string iconKey,
+        string preferredNodeName,
+        int suggestedEditorWidth,
+        IReadOnlyList<OptionDesignMetadata> options,
+        PortDesignMetadata outputPort) => new()
+        {
+            Type = new ComponentType(type),
+            DisplayName = displayName,
+            Category = "Sources",
+            Summary = summary,
+            IconKey = iconKey,
+            PreferredNodeName = preferredNodeName,
+            SuggestedEditorWidth = suggestedEditorWidth,
+            Options = options,
+            Resources = ClockResources(),
+            Ports = [outputPort]
+        };
 
     private static OptionDesignMetadata NameOption(string defaultValue) => new()
     {
