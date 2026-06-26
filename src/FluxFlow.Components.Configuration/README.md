@@ -109,8 +109,10 @@ collections, so later caller list mutations do not change what a constructed
 request represents. Null collection assignments are preserved for structured
 request diagnostics.
 `ConfigurationValidationRequestBuilder` is only an authoring helper over these
-same DTOs. It does not own resource lookup, secret resolution, or validation
-policy.
+same DTOs. It rejects null resource paths and secret option paths immediately,
+while blank paths are still represented in the DTOs and reported later as
+structured validation diagnostics. It does not own resource lookup, secret
+resolution, or validation policy.
 Descriptor-only validation uses host-owned resource and secret descriptor
 providers. It checks declaration presence, kind mismatches, ambiguous secret
 versions, and invalid descriptor provider output, but it does not open

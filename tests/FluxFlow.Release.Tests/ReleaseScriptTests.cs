@@ -138,7 +138,7 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Adds descriptor-only configuration reference validation to");
+            notes.ShouldContain("Hardens fluent validation request authoring.");
             notes.ShouldContain(package.PackageId);
             notes.ShouldNotContain("## ");
         }

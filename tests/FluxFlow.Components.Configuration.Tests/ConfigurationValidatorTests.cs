@@ -370,6 +370,68 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Request_builder_rejects_null_paths_for_fluent_references()
+    {
+        var builder = new ConfigurationValidationRequestBuilder();
+
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddResource(null!, "primary"))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddResource(null!, new ResourceReference
+            {
+                Name = new ResourceName("primary")
+            }))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddOptionalResource(null!))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddSecret(null!, "primary"))
+            .ParamName.ShouldBe("optionPath");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddSecret(null!, new SecretReference
+            {
+                Name = new SecretName("primary")
+            }))
+            .ParamName.ShouldBe("optionPath");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddOptionalSecret(null!))
+            .ParamName.ShouldBe("optionPath");
+    }
+
+    [Fact]
+    public async Task Request_builder_preserves_blank_paths_for_structured_validation()
+    {
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResource(" ", "primary")
+            .AddSecret(" ", "primary")
+            .Build();
+
+        var report = await ConfigurationValidator.ValidateAsync(
+            new ResourceDescriptorCatalog([]),
+            new InMemorySecretResolver([]),
+            request);
+
+        report.HasErrors.ShouldBeTrue();
+        report.Diagnostics.Select(diagnostic => diagnostic.Source).ShouldBe(
+        [
+            ConfigurationDiagnosticSource.Configuration,
+            ConfigurationDiagnosticSource.Secret
+        ]);
+        report.Diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
+        [
+            null,
+            null
+        ]);
+        report.Diagnostics.Select(diagnostic => diagnostic.Metadata["referencePath"]).ShouldBe(
+        [
+            "resource.path",
+            "option.path"
+        ]);
+    }
+
+    [Fact]
     public void Configuration_diagnostic_normalizes_text_and_copies_metadata()
     {
         var metadata = new Dictionary<string, string>

@@ -52,6 +52,8 @@ public sealed class ConfigurationValidationRequestBuilder
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         var resource = new ConfigurationResourceReference
         {
             Path = path,
@@ -120,6 +122,8 @@ public sealed class ConfigurationValidationRequestBuilder
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
+        ArgumentNullException.ThrowIfNull(optionPath);
+
         var secret = new SecretOptionReference
         {
             OptionPath = optionPath,

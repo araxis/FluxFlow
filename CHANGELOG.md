@@ -15,6 +15,17 @@ Improves fluent Designer metadata authoring.
   component-level attribute authoring.
 - Adds explicit null argument checks for fluent attribute keys and values.
 
+## FluxFlow.Components.Configuration 1.4.1
+
+Hardens fluent validation request authoring.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- `ConfigurationValidationRequestBuilder` now rejects null resource paths and
+  secret option paths immediately.
+- Blank paths still flow through the DTO validation path as structured
+  configuration diagnostics for config-bound data.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.1
 
 Hardens adapter-local MQTT client DI registration.

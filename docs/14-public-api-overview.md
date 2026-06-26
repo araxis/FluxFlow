@@ -762,7 +762,9 @@ These packages are intentionally not standalone node composition adapters:
   including trimmed resource option paths and resource option metadata
   diagnostics with normalized valid metadata maps, request collection
   snapshotting, and a fluent `ConfigurationValidationRequestBuilder` with
-  individual and range additions over the same validation DTOs. It supports both
+  individual and range additions over the same validation DTOs. The builder
+  rejects null fluent resource and secret option paths while preserving blank
+  config-bound paths for structured validation diagnostics. It supports both
   runtime validation through `IResourceLookup`/`ISecretResolver` and
   descriptor-only validation through `IResourceDescriptorProvider` and
   `ISecretDescriptorProvider`.
