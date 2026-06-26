@@ -391,6 +391,7 @@ public static class ComponentDesignMetadataValidator
         }
 
         var names = new HashSet<string>(StringComparer.Ordinal);
+        var orders = new HashSet<int>();
 
         for (var index = 0; index < resources.Count; index++)
         {
@@ -410,6 +411,19 @@ public static class ComponentDesignMetadataValidator
             else if (!names.Add(resource.Name))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(ResourceDesignMetadata.Name)}", $"Resource name '{resource.Name}' is already used."));
+            }
+
+            if (resource.Order < 0)
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(ResourceDesignMetadata.Order)}",
+                    "Resource order cannot be negative."));
+            }
+            else if (!orders.Add(resource.Order))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(ResourceDesignMetadata.Order)}",
+                    $"Resource order '{resource.Order}' is already used."));
             }
 
             ValidateOptionalText(resource.DisplayName, $"{path}.{nameof(ResourceDesignMetadata.DisplayName)}", errors);
@@ -433,6 +447,7 @@ public static class ComponentDesignMetadataValidator
 
         var names = new HashSet<(PortDirection Direction, string Name)>();
         var primaryPorts = new Dictionary<PortDirection, string>();
+        var orders = new HashSet<(PortDirection Direction, int Order)>();
 
         for (var index = 0; index < ports.Count; index++)
         {
@@ -465,6 +480,19 @@ public static class ComponentDesignMetadataValidator
                 errors.Add(new DesignerMetadataValidationError(
                     $"{path}.{nameof(PortDesignMetadata.Name)}",
                     $"Port '{port.Name}' is already used for direction '{port.Direction}'."));
+            }
+
+            if (port.Order < 0)
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.Order)}",
+                    "Port order cannot be negative."));
+            }
+            else if (!orders.Add((port.Direction, port.Order)))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.Order)}",
+                    $"Port order '{port.Order}' is already used for direction '{port.Direction}'."));
             }
 
             if (port.IsPrimary && !primaryPorts.TryAdd(port.Direction, port.Name.Value))
