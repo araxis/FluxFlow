@@ -830,8 +830,10 @@ These packages are intentionally not standalone node composition adapters:
   `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
   backends, backend factories, direct keyed store registration helpers, and
   keyed factory registration helpers consumed by host-owned storage
-  registration, including direct rejection of unsupported storage write modes
-  and deterministic per-query expiration timestamps.
+  registration. Those helpers reject invalid service/key/options arguments and
+  null options factory results before creating keyed stores or factories. The
+  backends also reject unsupported storage write modes and use deterministic
+  per-query expiration timestamps.
 
 Composition hosts consume these packages indirectly through adapter-owned
 resources or host setup. They should not add `FluxFlow.Composition` node

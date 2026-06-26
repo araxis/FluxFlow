@@ -543,21 +543,53 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
-    public void Service_registration_rejects_null_options()
+    public void Service_registration_rejects_invalid_arguments()
     {
         var services = new ServiceCollection();
+        var options = new FileSystemStorageStoreOptions
+        {
+            RootDirectory = "data/storage"
+        };
 
-        var storeException = Should.Throw<ArgumentNullException>(() =>
+        Should.Throw<ArgumentNullException>(() =>
+            FileSystemStorageServiceCollectionExtensions.AddFluxFlowFileSystemStorageStore(
+                null!,
+                "items-store",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowFileSystemStorageStore(
                 "items-store",
-                (FileSystemStorageStoreOptions)null!));
-        var factoryException = Should.Throw<ArgumentNullException>(() =>
+                (FileSystemStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                (Func<IServiceProvider, FileSystemStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
+
+        Should.Throw<ArgumentNullException>(() =>
+            FileSystemStorageServiceCollectionExtensions.AddFluxFlowFileSystemStorageStoreFactory(
+                null!,
+                "items-factory",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowFileSystemStorageStoreFactory(
                 "items-factory",
-                (FileSystemStorageStoreOptions)null!));
-
-        storeException.ParamName.ShouldBe("options");
-        factoryException.ParamName.ShouldBe("options");
+                (FileSystemStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                (Func<IServiceProvider, FileSystemStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
     }
 
     [Fact]

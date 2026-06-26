@@ -66,9 +66,9 @@ This registers a keyed `IStorageStoreFactory`. Storage composition can reference
 either key through the `store` resource. Direct keyed stores are treated as
 shared host-owned stores; keyed factories are opened and released as part of
 composed node lifetime.
-The direct options overloads reject null options, and the factory overloads
-require the options factory to return non-null options before creating the keyed
-store or store factory.
+The registration helpers reject null service collections, blank keys, null
+direct options, null options factories, and null options factory results before
+creating the keyed store or store factory.
 
 ## Behavior
 
