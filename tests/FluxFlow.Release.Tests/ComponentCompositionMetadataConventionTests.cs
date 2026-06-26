@@ -804,6 +804,39 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_options_match_bound_configuration()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var configurationKeys = ReadConfigurationKeys(
+                    assembly,
+                    projectDirectory,
+                    entry.PackageId)
+                .ToArray();
+
+            configurationKeys.ShouldNotBeEmpty(
+                $"{entry.PackageId} must expose bound or explicitly read configuration keys.");
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                foreach (var option in metadata.Options)
+                {
+                    ConfigurationKeysContainOption(configurationKeys, option.Name)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{metadata.Type}' exposes option '{option.Name}', but no bound options property or explicit configuration read owns that key.");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_bound_option_metadata_kinds_match_simple_clr_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1028,6 +1061,44 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .Select(match => match.Groups["type"].Value.Trim())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+
+    private static IEnumerable<string> ReadConfigurationKeys(
+        Assembly assembly,
+        string projectDirectory,
+        string packageId)
+    {
+        foreach (var optionTypeName in ReadBoundOptionTypes(projectDirectory, packageId))
+        {
+            var optionType = ResolveReferencedType(assembly, optionTypeName, packageId);
+
+            foreach (var property in optionType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.SetMethod?.IsPublic == true)
+                    yield return ToConfigurationKey(property.Name);
+            }
+        }
+
+        var registryContent = File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId));
+        var stringConstants = StringConstantWithValueRegex()
+            .Matches(registryContent)
+            .ToDictionary(
+                match => match.Groups["name"].Value,
+                match => match.Groups["value"].Value,
+                StringComparer.Ordinal);
+
+        foreach (Match match in ExplicitConfigurationValueRegex().Matches(registryContent))
+        {
+            var argument = match.Groups["argument"].Value.Trim();
+            if (argument.Length >= 2 && argument[0] == '"' && argument[^1] == '"')
+            {
+                yield return argument[1..^1];
+                continue;
+            }
+
+            if (stringConstants.TryGetValue(argument, out var constantValue))
+                yield return constantValue;
+        }
+    }
 
     private static IEnumerable<string> ReadReferencedPackageIds(
         XDocument project,
@@ -1381,6 +1452,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             $"\"{optionName}\"",
             StringComparison.Ordinal);
 
+    private static bool ConfigurationKeysContainOption(
+        IReadOnlyCollection<string> configurationKeys,
+        string optionName)
+        => configurationKeys.Any(key =>
+            string.Equals(key, optionName, StringComparison.Ordinal) ||
+            optionName.StartsWith($"{key}.", StringComparison.Ordinal));
+
     private static string ToConfigurationKey(string propertyName)
         => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
 
@@ -1659,6 +1737,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     [GeneratedRegex(@"public\s+const\s+string\s+(?<name>\w+)\s*=\s*""(?<value>[^""]*)""\s*;")]
     private static partial Regex PublicStringConstantWithValueRegex();
 
+    [GeneratedRegex(@"const\s+string\s+(?<name>\w+)\s*=\s*""(?<value>[^""]*)""\s*;")]
+    private static partial Regex StringConstantWithValueRegex();
+
     [GeneratedRegex(@"public\s+static\s+string\s+(?<name>\w+)\s*\(")]
     private static partial Regex PublicStaticStringMethodRegex();
 
@@ -1667,6 +1748,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
+
+    [GeneratedRegex(@"GetConfigurationValue<[^>]+>\(\s*(?<argument>[^)]+?)\s*\)")]
+    private static partial Regex ExplicitConfigurationValueRegex();
 
     [GeneratedRegex(@"public\s+(?:required\s+)?[^\r\n{]+\s+(?<name>\w+)\s*\{\s*get;\s*init;\s*\}")]
     private static partial Regex OptionPropertyRegex();
