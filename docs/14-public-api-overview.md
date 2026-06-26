@@ -820,6 +820,8 @@ These packages are intentionally not standalone node composition adapters:
   fluent event input authoring, record mapping, store contracts, store
   factory/context/lease helpers, keyed DI registration helpers, retention
   option validation, and named in-memory store factory support for hosts.
+  Its keyed registration helpers reject invalid service/key/provider arguments
+  and null provider results before creating keyed store resources.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   with self-validating request/reply and tracker option contracts, and is
   intentionally not covered by composition adapters in this pass. Its

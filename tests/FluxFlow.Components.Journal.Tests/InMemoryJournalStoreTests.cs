@@ -148,21 +148,77 @@ public sealed class InMemoryJournalStoreTests
     }
 
     [Fact]
-    public void Service_registration_rejects_null_store_instances()
+    public async Task Service_registration_passes_provider_to_store_and_factory_providers()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(new JournalRegistrationDependency("primary"));
+        services
+            .AddFluxFlowJournalStore(
+                "journal",
+                provider => new NamedJournalStore(
+                    provider.GetRequiredService<JournalRegistrationDependency>().Name))
+            .AddFluxFlowJournalStoreFactory(
+                "journal-factory",
+                provider => new NamedJournalStoreFactory(
+                    provider.GetRequiredService<JournalRegistrationDependency>().Name));
 
+        await using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredKeyedService<IJournalStore>("journal")
+            .ShouldBeOfType<NamedJournalStore>();
+        var factory = provider.GetRequiredKeyedService<IJournalStoreFactory>("journal-factory")
+            .ShouldBeOfType<NamedJournalStoreFactory>();
+
+        store.Name.ShouldBe("primary");
+        factory.Name.ShouldBe("primary");
+    }
+
+    [Fact]
+    public void Service_registration_rejects_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+        var store = new InMemoryJournalStore();
+        var factory = new InMemoryJournalStoreFactory();
+
+        Should.Throw<ArgumentNullException>(() =>
+            JournalStoreServiceCollectionExtensions.AddFluxFlowJournalStore(
+                null!,
+                "journal",
+                store))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowJournalStore(" ", store))
+            .ParamName.ShouldBe("name");
         var storeException = Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowJournalStore(
                 "journal",
                 (IJournalStore)null!));
+        var storeFactoryDelegateException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowJournalStore(
+                "journal",
+                (Func<IServiceProvider, IJournalStore>)null!));
+
+        Should.Throw<ArgumentNullException>(() =>
+            JournalStoreServiceCollectionExtensions.AddFluxFlowJournalStoreFactory(
+                null!,
+                "journal-factory",
+                factory))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowJournalStoreFactory(" ", factory))
+            .ParamName.ShouldBe("name");
         var factoryException = Should.Throw<ArgumentNullException>(() =>
             services.AddFluxFlowJournalStoreFactory(
                 "journal-factory",
                 (IJournalStoreFactory)null!));
+        var factoryProviderException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowJournalStoreFactory(
+                "journal-factory",
+                (Func<IServiceProvider, IJournalStoreFactory>)null!));
 
         storeException.ParamName.ShouldBe("store");
+        storeFactoryDelegateException.ParamName.ShouldBe("storeFactory");
         factoryException.ParamName.ShouldBe("storeFactory");
+        factoryProviderException.ParamName.ShouldBe("storeFactory");
     }
 
     [Fact]
@@ -858,5 +914,37 @@ public sealed class InMemoryJournalStoreTests
     {
         public override DateTimeOffset GetUtcNow()
             => now;
+    }
+
+    private sealed record JournalRegistrationDependency(string Name);
+
+    private sealed class NamedJournalStore(string name) : IJournalStore
+    {
+        public string Name { get; } = name;
+
+        public ValueTask<JournalAppendResult> AppendAsync(
+            JournalRecord record,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask<JournalQueryResult> QueryAsync(
+            JournalQuery query,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ValueTask<JournalPruneResult> PruneAsync(
+            JournalRetentionOptions options,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class NamedJournalStoreFactory(string name) : IJournalStoreFactory
+    {
+        public string Name { get; } = name;
+
+        public ValueTask<JournalStoreLease> OpenAsync(
+            JournalStoreContext context,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }
