@@ -1,6 +1,7 @@
 using FluxFlow.Components.Journal.Contracts;
 using FluxFlow.Components.Journal.Options;
 using FluxFlow.Components.Journal.Stores;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -121,6 +122,29 @@ public sealed class InMemoryJournalStoreTests
 
         ownedStore.DisposeCount.ShouldBe(1);
         sharedStore.DisposeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Service_registration_registers_keyed_store_and_factory()
+    {
+        var store = new InMemoryJournalStore();
+        var factory = new InMemoryJournalStoreFactory();
+        var services = new ServiceCollection()
+            .AddFluxFlowJournalStore("journal", store)
+            .AddFluxFlowJournalStoreFactory("journal-factory", factory);
+
+        await using var provider = services.BuildServiceProvider();
+        var resolvedStore = provider.GetRequiredKeyedService<IJournalStore>("journal");
+        var resolvedFactory = provider.GetRequiredKeyedService<IJournalStoreFactory>("journal-factory");
+        await using var lease = await resolvedFactory.OpenAsync(new JournalStoreContext
+        {
+            StoreName = "journal"
+        });
+
+        resolvedStore.ShouldBeSameAs(store);
+        resolvedFactory.ShouldBeSameAs(factory);
+        lease.Store.ShouldNotBeNull();
+        lease.OwnsStore.ShouldBeFalse();
     }
 
     [Fact]

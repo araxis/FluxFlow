@@ -1,5 +1,6 @@
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -96,6 +97,29 @@ public sealed class SessionOptionsTests
 
         sharedStore.DisposeCount.ShouldBe(0);
         ownedStore.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Service_registration_registers_keyed_store_and_factory()
+    {
+        var store = new EmptySessionStore();
+        var factory = new EmptySessionStoreFactory(store);
+        var services = new ServiceCollection()
+            .AddFluxFlowSessionStore("sessions", store)
+            .AddFluxFlowSessionStoreFactory("sessions-factory", factory);
+
+        await using var provider = services.BuildServiceProvider();
+        var resolvedStore = provider.GetRequiredKeyedService<ISessionStore>("sessions");
+        var resolvedFactory = provider.GetRequiredKeyedService<ISessionStoreFactory>("sessions-factory");
+        await using var lease = await resolvedFactory.OpenAsync(new SessionStoreContext
+        {
+            StoreName = "sessions"
+        });
+
+        resolvedStore.ShouldBeSameAs(store);
+        resolvedFactory.ShouldBeSameAs(factory);
+        lease.Store.ShouldBeSameAs(store);
+        lease.OwnsStore.ShouldBeFalse();
     }
 
     [Fact]
@@ -278,6 +302,18 @@ public sealed class SessionOptionsTests
         {
             DisposeCount++;
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class EmptySessionStoreFactory(ISessionStore store) : ISessionStoreFactory
+    {
+        public ValueTask<SessionStoreLease> OpenAsync(
+            SessionStoreContext context,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(context);
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(SessionStoreLease.Shared(store));
         }
     }
 }

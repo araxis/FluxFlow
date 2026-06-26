@@ -593,6 +593,7 @@ Main types:
 
 Related base Sessions types:
 
+- `SessionStoreServiceCollectionExtensions`
 - `ISessionStoreFactory`
 - `SessionStoreContext`
 - `SessionStoreLease`
@@ -618,9 +619,9 @@ ports, plus resource hints for the required `store` resource and optional
 diagnostic/config metadata, not DI selection. The provider authors that
 metadata through the shared validated Designer metadata builder.
 
-The base Sessions package owns the neutral store factory, context, lease, and
-component option helpers used by direct hosts and composition adapters; it still
-does not own any concrete persistence backend.
+The base Sessions package owns the neutral store factory, context, lease,
+component option, and keyed DI registration helpers used by direct hosts and
+composition adapters; it still does not own any concrete persistence backend.
 
 ## Projections Composition
 
@@ -777,8 +778,8 @@ These packages are intentionally not standalone node composition adapters:
   services, including deterministic most-specific context factory lookup.
 - `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
   fluent event input authoring, record mapping, store contracts, store
-  factory/context/lease helpers, retention option validation, and named
-  in-memory store factory support for hosts.
+  factory/context/lease helpers, keyed DI registration helpers, retention
+  option validation, and named in-memory store factory support for hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   with self-validating request/reply and tracker option contracts, and is
   intentionally not covered by composition adapters in this pass.
