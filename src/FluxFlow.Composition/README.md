@@ -25,7 +25,9 @@ projection.
 Definition DTO collection properties copy assigned dictionaries and lists with
 ordinal key comparison. A host can still intentionally edit the model before
 validation/build, but caller-owned collections used during construction cannot
-mutate the definition later.
+mutate the definition later. Workflow, node, configuration, and resource
+dictionary keys are trimmed when assigned or built fluently; duplicate keys
+after trimming are rejected at the composition boundary.
 Node and port references trim assigned workflow/node/port segments and reject
 empty dotted segments when parsed from fluent or configuration link strings.
 Node definition types, node registration types, and composition port metadata

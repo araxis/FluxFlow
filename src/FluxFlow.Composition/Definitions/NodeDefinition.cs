@@ -17,9 +17,7 @@ public sealed record NodeDefinition
     public Dictionary<string, JsonElement> Configuration
     {
         get => _configuration;
-        init => _configuration = value is null
-            ? new Dictionary<string, JsonElement>(StringComparer.Ordinal)
-            : new Dictionary<string, JsonElement>(value, StringComparer.Ordinal);
+        init => _configuration = CompositionDictionary.NormalizeKeys(value, nameof(Configuration));
     }
 
     /// <summary>
@@ -29,8 +27,6 @@ public sealed record NodeDefinition
     public Dictionary<string, string> Resources
     {
         get => _resources;
-        init => _resources = value is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(value, StringComparer.Ordinal);
+        init => _resources = CompositionDictionary.NormalizeKeys(value, nameof(Resources));
     }
 }

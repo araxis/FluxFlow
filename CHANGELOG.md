@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.9
+
+Normalizes composition DTO dictionary keys.
+
+- Workflow, node, configuration, and resource dictionary keys are trimmed when
+  assigned to composition DTOs.
+- Fluent workflow, node, configuration, and resource names are trimmed before
+  they are stored.
+- Duplicate keys after trimming now fail at the DTO/fluent boundary instead of
+  surfacing later as link or resource lookup mismatches.
+
 ## FluxFlow.Composition 1.0.8
 
 Normalizes composition registration identifiers.

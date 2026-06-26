@@ -8,9 +8,7 @@ public sealed record WorkflowDefinition
     public Dictionary<string, NodeDefinition> Nodes
     {
         get => _nodes;
-        init => _nodes = value is null
-            ? new Dictionary<string, NodeDefinition>(StringComparer.Ordinal)
-            : new Dictionary<string, NodeDefinition>(value, StringComparer.Ordinal);
+        init => _nodes = CompositionDictionary.NormalizeKeys(value, nameof(Nodes));
     }
 
     public List<LinkDefinition> Links

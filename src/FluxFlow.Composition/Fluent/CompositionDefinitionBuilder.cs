@@ -20,12 +20,13 @@ public sealed class CompositionDefinitionBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(configure);
 
-        if (_workflows.ContainsKey(name))
+        var normalizedName = name.Trim();
+        if (_workflows.ContainsKey(normalizedName))
             throw new InvalidOperationException($"Workflow '{name}' is already defined.");
 
-        var builder = new WorkflowDefinitionBuilder(name);
+        var builder = new WorkflowDefinitionBuilder(normalizedName);
         configure(builder);
-        _workflows.Add(name, builder.Build());
+        _workflows.Add(normalizedName, builder.Build());
         return this;
     }
 
@@ -60,12 +61,13 @@ public sealed class WorkflowDefinitionBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
 
-        if (_nodes.ContainsKey(name))
+        var normalizedName = name.Trim();
+        if (_nodes.ContainsKey(normalizedName))
             throw new InvalidOperationException($"Node '{Name}.{name}' is already defined.");
 
         var builder = new NodeDefinitionBuilder(type);
         configure?.Invoke(builder);
-        _nodes.Add(name, builder.Build());
+        _nodes.Add(normalizedName, builder.Build());
         return this;
     }
 
@@ -118,7 +120,7 @@ public sealed class NodeDefinitionBuilder
     public NodeDefinitionBuilder Configure<TValue>(string name, TValue value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        _configuration[name] = JsonSerializer.SerializeToElement(value, _serializerOptions);
+        _configuration[name.Trim()] = JsonSerializer.SerializeToElement(value, _serializerOptions);
         return this;
     }
 
@@ -126,7 +128,7 @@ public sealed class NodeDefinitionBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        _resources[name] = reference;
+        _resources[name.Trim()] = reference;
         return this;
     }
 

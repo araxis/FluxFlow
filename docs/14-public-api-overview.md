@@ -73,6 +73,8 @@ Use these types when the host wants direct standalone-node composition from
 fluent C# or `IConfiguration` JSON without depending on the engine. Definition
 DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.
+Workflow, node, configuration, and resource dictionary keys are trimmed when
+assigned or built fluently; duplicate keys after trimming are rejected.
 Node and port references trim assigned segments and reject empty dotted segments
 when parsed from fluent or configuration link strings.
 Node definition types, node registration types, and composition port metadata

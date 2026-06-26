@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>1.0.8</Version>
+    <Version>1.0.9</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional standalone-first FluxFlow composition layer for building linked node workflows from fluent C# or Microsoft.Extensions.Configuration without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Normalizes node type and port metadata names at composition registration and definition boundaries.</PackageReleaseNotes>
+    <PackageReleaseNotes>Normalizes composition DTO dictionary keys at assignment and fluent build boundaries.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

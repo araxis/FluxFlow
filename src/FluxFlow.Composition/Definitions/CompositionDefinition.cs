@@ -11,8 +11,6 @@ public sealed record CompositionDefinition
     public Dictionary<string, WorkflowDefinition> Workflows
     {
         get => _workflows;
-        init => _workflows = value is null
-            ? new Dictionary<string, WorkflowDefinition>(StringComparer.Ordinal)
-            : new Dictionary<string, WorkflowDefinition>(value, StringComparer.Ordinal);
+        init => _workflows = CompositionDictionary.NormalizeKeys(value, nameof(Workflows));
     }
 }
