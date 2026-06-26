@@ -30,7 +30,8 @@ Node and port references trim assigned workflow/node/port segments and reject
 empty dotted segments when parsed from fluent or configuration link strings.
 Composition port metadata rejects null or blank port names and null message
 types at the registration boundary. Node registrations also reject null port
-metadata entries before validation/build.
+metadata entries before validation/build. `CompositionPortMetadata` also
+supports deconstruction for callers that prefer tuple-style reads.
 
 `ComposedNode` disposal always attempts both the node disposal path and the
 optional descriptor cleanup hook. If both fail, the failures are reported
