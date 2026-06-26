@@ -13,132 +13,104 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateReducerMetadata()];
 
-    private static ComponentDesignMetadata CreateReducerMetadata() => new()
+    private static ComponentDesignMetadata CreateReducerMetadata()
     {
-        Type = new ComponentType(StateCompositionNodeTypes.Reducer),
-        DisplayName = "State Reducer",
-        Category = "State",
-        Summary = "Maintains keyed state by applying a reducer expression to each input message.",
-        IconKey = "database-zap",
-        PreferredNodeName = "stateReducer",
-        SuggestedEditorWidth = 460,
-        Options = ReducerOptionsMetadata(),
-        Resources = ReducerResources(),
-        Ports = ReducerPorts()
-    };
+        var builder = new ComponentDesignMetadataBuilder(StateCompositionNodeTypes.Reducer)
+            .WithDisplay(
+                displayName: "State Reducer",
+                category: "State",
+                summary: "Maintains keyed state by applying a reducer expression to each input message.",
+                iconKey: "database-zap",
+                preferredNodeName: "stateReducer",
+                suggestedEditorWidth: 460);
 
-    private static IReadOnlyList<OptionDesignMetadata> ReducerOptionsMetadata()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "engine",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Engine",
-                HelperText = "Diagnostic engine metadata; DI selection uses the required host-owned engine resource."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "keyExpression",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Key Expression",
-                HelperText = "Optional expression used to resolve the state key from each input."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "reducer",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Reducer",
-                HelperText = "Expression evaluated once per reduce operation to produce the next state.",
-                IsRequired = true
-            },
-            new OptionDesignMetadata
-            {
-                Name = "expressionId",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Expression ID",
-                HelperText = "Optional expression identifier emitted in diagnostics."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "expressionName",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Expression Name",
-                HelperText = "Optional expression display name emitted in diagnostics."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "initialState",
-                Kind = OptionValueKind.Json,
-                DisplayName = "Initial State",
-                HelperText = "Optional initial state used for new keys or reset operations."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = DefaultBoundedCapacity,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "maxKeys",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Max Keys",
-                DefaultValue = DefaultMaxKeys,
-                Min = 0,
-                HelperText = "Maximum number of keys to track. Zero rejects new keys."
-            }
-        ];
+        AddReducerOptions(builder);
+        AddReducerResources(builder);
+        AddReducerPorts(builder);
 
-    private static IReadOnlyList<ResourceDesignMetadata> ReducerResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = StateCompositionResourceNames.Engine,
-                DisplayName = "Engine",
-                Order = 0,
-                Summary = "Required keyed expression engine used to evaluate reducer and key expressions.",
-                ValueType = nameof(IFlowExpressionEngine),
-                IsRequired = true
-            },
-            new ResourceDesignMetadata
-            {
-                Name = StateCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 1,
-                Summary = "Optional keyed clock for deterministic state reducer results and diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+        return builder.Build();
+    }
 
-    private static IReadOnlyList<PortDesignMetadata> ReducerPorts()
-        =>
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(StateCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "State reducer request.",
-                ValueType = nameof(StateReducerInput),
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(StateCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Results",
-                Order = 1,
-                Summary = "State reducer result.",
-                ValueType = nameof(StateReducerResult),
-                IsPrimary = true
-            }
-        ];
+    private static void AddReducerOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "engine",
+                OptionValueKind.Text,
+                displayName: "Engine",
+                helperText: "Diagnostic engine metadata; DI selection uses the required host-owned engine resource.")
+            .AddOption(
+                "keyExpression",
+                OptionValueKind.Text,
+                displayName: "Key Expression",
+                helperText: "Optional expression used to resolve the state key from each input.")
+            .AddOption(
+                "reducer",
+                OptionValueKind.Text,
+                displayName: "Reducer",
+                helperText: "Expression evaluated once per reduce operation to produce the next state.",
+                isRequired: true)
+            .AddOption(
+                "expressionId",
+                OptionValueKind.Text,
+                displayName: "Expression ID",
+                helperText: "Optional expression identifier emitted in diagnostics.")
+            .AddOption(
+                "expressionName",
+                OptionValueKind.Text,
+                displayName: "Expression Name",
+                helperText: "Optional expression display name emitted in diagnostics.")
+            .AddOption(
+                "initialState",
+                OptionValueKind.Json,
+                displayName: "Initial State",
+                helperText: "Optional initial state used for new keys or reset operations.")
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: DefaultBoundedCapacity,
+                min: 1)
+            .AddOption(
+                "maxKeys",
+                OptionValueKind.Number,
+                displayName: "Max Keys",
+                helperText: "Maximum number of keys to track. Zero rejects new keys.",
+                defaultValue: DefaultMaxKeys,
+                min: 0);
+
+    private static void AddReducerResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                StateCompositionResourceNames.Engine,
+                displayName: "Engine",
+                order: 0,
+                summary: "Required keyed expression engine used to evaluate reducer and key expressions.",
+                valueType: nameof(IFlowExpressionEngine),
+                isRequired: true)
+            .AddResource(
+                StateCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic state reducer results and diagnostics.",
+                valueType: nameof(TimeProvider));
+
+    private static void AddReducerPorts(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddInputPort(
+                StateCompositionPortNames.Input,
+                displayName: "Input",
+                group: "Messages",
+                order: 0,
+                summary: "State reducer request.",
+                valueType: nameof(StateReducerInput),
+                isPrimary: true)
+            .AddOutputPort(
+                StateCompositionPortNames.Output,
+                displayName: "Output",
+                group: "Results",
+                order: 1,
+                summary: "State reducer result.",
+                valueType: nameof(StateReducerResult),
+                isPrimary: true);
 }
