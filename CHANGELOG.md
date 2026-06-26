@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.3.2
+
+Hardens fluent component design metadata builder guardrails.
+
+- Fluent option, resource, and port overloads now reject null names at the
+  builder boundary.
+- Enum option authoring now rejects null choice values before metadata
+  validation.
+- Adds regression coverage for null primitive builder arguments.
+
 ## FluxFlow.Components.Configuration 1.4.3
 
 Hardens fluent configuration validation request builder contracts.

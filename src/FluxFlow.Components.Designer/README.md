@@ -160,8 +160,9 @@ clear provider error when that contract is violated.
 rejects duplicate component types, and snapshots the metadata it receives.
 `ComponentDesignMetadataBuilder` is a small authoring helper for providers that
 want to build those same contracts fluently before returning them. The builder
-validates null attribute keys and values immediately, then still runs the same
-metadata validation path during `Build()`.
+validates null fluent option, resource, port, enum-choice, and attribute
+arguments immediately, then still runs the same metadata validation path during
+`Build()` for blank values, duplicates, invalid directions, and shape errors.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

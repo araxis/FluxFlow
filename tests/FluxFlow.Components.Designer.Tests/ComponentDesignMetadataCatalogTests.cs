@@ -170,6 +170,34 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Metadata_builder_rejects_null_fluent_primitive_arguments()
+    {
+        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
+
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddOption((string)null!, OptionValueKind.Text))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddEnumOption((string)null!, ["strict"]))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddEnumOption("mode", [null!]))
+            .ParamName.ShouldBe("choice");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddResource((string)null!))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddInputPort(null!))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddOutputPort(null!))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            builder.AddPort((string)null!, PortDirection.Input))
+            .ParamName.ShouldBe("name");
+    }
+
+    [Fact]
     public void Metadata_builder_rejects_invalid_attribute_arguments()
     {
         var builder = new ComponentDesignMetadataBuilder("sample.invalid");

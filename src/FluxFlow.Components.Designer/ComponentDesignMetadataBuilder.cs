@@ -62,6 +62,8 @@ public sealed class ComponentDesignMetadataBuilder
         IReadOnlyList<OptionChoiceMetadata>? choices = null,
         IReadOnlyDictionary<string, string>? attributes = null)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
         var option = new OptionDesignMetadata
         {
             Name = name,
@@ -102,7 +104,17 @@ public sealed class ComponentDesignMetadataBuilder
         string? defaultValue = null,
         IReadOnlyDictionary<string, string>? attributes = null)
     {
+        ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(choices);
+
+        var optionChoices = choices.Select(choice =>
+        {
+            ArgumentNullException.ThrowIfNull(choice);
+            return new OptionChoiceMetadata
+            {
+                Value = choice
+            };
+        }).ToArray();
 
         return AddOption(
             name,
@@ -111,10 +123,7 @@ public sealed class ComponentDesignMetadataBuilder
             helperText,
             isRequired,
             defaultValue,
-            choices: choices.Select(choice => new OptionChoiceMetadata
-            {
-                Value = choice
-            }).ToArray(),
+            choices: optionChoices,
             attributes: attributes);
     }
 
@@ -134,6 +143,8 @@ public sealed class ComponentDesignMetadataBuilder
         bool isRequired = false,
         IReadOnlyDictionary<string, string>? attributes = null)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
         var resource = new ResourceDesignMetadata
         {
             Name = name,
@@ -213,6 +224,8 @@ public sealed class ComponentDesignMetadataBuilder
         bool isPrimary = false,
         IReadOnlyDictionary<string, string>? attributes = null)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
         var port = new PortDesignMetadata
         {
             Name = new ComponentPortName(name),

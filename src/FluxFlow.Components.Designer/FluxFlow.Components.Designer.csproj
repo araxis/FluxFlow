@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.3.1</Version>
+    <Version>2.3.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds bulk attribute authoring to the component design metadata builder and explicit null argument checks for fluent metadata attributes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens component design metadata builder fluent primitive argument guardrails for option, resource, port, and enum-choice authoring.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
