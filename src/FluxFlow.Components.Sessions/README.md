@@ -38,6 +38,10 @@ Storage is injected by the host through `ISessionStore`, passed directly to each
 constructor. This keeps database paths, schemas, workspace ownership, and retention
 policy outside the component package. Hosts that need deterministic recording or replay
 timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
+Hosts that need explicit open/close ownership can wrap stores with
+`ISessionStoreFactory`, `SessionStoreContext`, and `SessionStoreLease`.
+`SessionComponentOptions` provides direct-code helpers for shared stores,
+factory-backed stores, and a shared clock.
 Stores are expected to honor the non-null parts of `ISessionStore`; when a store
 returns a null session, record, query result, or replay stream where the contract
 requires a value, the node reports a clear session error instead of surfacing an
@@ -49,6 +53,20 @@ requested limit, is reported through the query error port.
 ```csharp
 ISessionStore store = new MySessionStore(...);
 TimeProvider clock = TimeProvider.System;
+```
+
+```csharp
+var options = new SessionComponentOptions()
+    .UseSharedStore(store)
+    .UseClock(clock);
+
+await using var lease = await options.StoreFactory.OpenAsync(
+    new SessionStoreContext
+    {
+        StoreName = "sessions",
+        SessionId = "sample-session",
+        Clock = options.Clock
+    });
 ```
 
 ## Recorder
@@ -132,6 +150,10 @@ The package owns the recording and replay contracts:
 - `SessionQueryResult`
 - `SessionStartRequest`, `SessionAppendRequest`, `SessionCompleteRequest`, `SessionReadRequest`
 - `ISessionStore`
+- `ISessionStoreFactory`
+- `SessionStoreContext`
+- `SessionStoreLease`
+- `SessionComponentOptions`
 
 Records carry neutral fields: session id, sequence, timestamp, type, name, payload,
 content type, and string attributes. Hosts can map their own envelope or event types
@@ -152,7 +174,7 @@ Use `FluxFlow.Components.Sessions.Composition` when a `FluxFlow.Composition`
 host should register the optional session factories:
 
 ```csharp
-services.AddKeyedSingleton<ISessionStore>("sessions", sessionStore);
+services.AddKeyedSingleton<ISessionStoreFactory>("sessions", sessionStoreFactory);
 
 services
     .AddFluxFlowComposition(configuration)
@@ -163,9 +185,12 @@ services
 ```
 
 The composition adapter binds the existing session option records from node
-configuration, resolves the required store from the keyed `store` resource, and
-can resolve an optional keyed `TimeProvider` resource named `clock`. Store
-implementation, retention policy, and persistence setup remain host concerns.
+configuration, resolves the required store from either a keyed `ISessionStore`
+or keyed `ISessionStoreFactory` resource, and can resolve an optional keyed
+`TimeProvider` resource named `clock`. Direct stores remain host-owned; factory
+leases are opened during composition build and disposed with composed nodes.
+Store implementation, retention policy, and persistence setup remain host
+concerns.
 
 The optional composition package also exposes
 `SessionsComponentDesignMetadataProvider` for neutral Designer metadata over the

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sessions</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
-    <Version>3.1.5</Version>
+    <Version>3.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns Sessions constructor validation with the standalone node conventions. Recorder, replay, and query nodes now resolve validated options and required stores before creating their node/source pipelines.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds session store factory, lease, context, and component option helpers so hosts can open direct or composition-owned session store resources explicitly.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
