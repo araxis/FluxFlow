@@ -128,8 +128,11 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             SuggestedEditorWidth = suggestedEditorWidth,
             Options = options,
             Resources = ClockResources(),
-            Ports = [outputPort]
+            Ports = SourcePorts(outputPort)
         };
+
+    private static IReadOnlyList<PortDesignMetadata> SourcePorts(PortDesignMetadata outputPort)
+        => [outputPort];
 
     private static OptionDesignMetadata NameOption(string defaultValue) => new()
     {
