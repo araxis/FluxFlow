@@ -81,6 +81,16 @@ services.AddFluxFlowMqttClient(
 Workflow nodes should still be created and linked by the composition layer; the
 registration owns only the adapter client session.
 
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. It owns the
+MQTTnet-backed client session and DI registration only.
+
+Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
+composition. That package consumes host-owned `IMqttPublisher`,
+`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
+by this adapter package.
+
 ## Last Will
 
 Last Will is adapter-owned because it is registered during MQTT `CONNECT`. It is

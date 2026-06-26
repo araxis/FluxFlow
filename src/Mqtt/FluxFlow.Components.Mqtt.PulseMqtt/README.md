@@ -86,6 +86,17 @@ Use `WaitForConnectedOnStart = true` only when application startup should wait f
 an established connection. Workflow nodes should still be created and linked by the
 composition layer; the registration owns only the adapter client session.
 
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. It owns the
+Pulse MQTT-backed client session, resilient connection lifecycle, durable store
+options, and DI registration only.
+
+Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
+composition. That package consumes host-owned `IMqttPublisher`,
+`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
+by this adapter package.
+
 ## Durable Stores
 
 Durable message and session stores are adapter-owned. Provide Pulse MQTT store
