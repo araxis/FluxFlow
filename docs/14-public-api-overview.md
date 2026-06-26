@@ -73,6 +73,8 @@ Use these types when the host wants direct standalone-node composition from
 fluent C# or `IConfiguration` JSON without depending on the engine. Definition
 DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.
+Node and port references trim assigned segments and reject empty dotted segments
+when parsed from fluent or configuration link strings.
 `ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
 independently, and reports both failures together when both paths fail.
 Runtime builder cancellation disposes partially built nodes and links before

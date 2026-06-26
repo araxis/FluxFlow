@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.0.4
+
+Hardens composition reference parsing.
+
+- `NodeReference.Parse` and `PortReference.Parse` now reject empty dotted
+  segments instead of accepting malformed values such as `source..Output`.
+- Assigned workflow, node, and port reference segments now trim surrounding
+  whitespace, and blank workflow assignments are treated as absent.
+- Adds direct reference parsing and formatting coverage for valid, trimmed, and
+  malformed node and port references.
+
 ## FluxFlow.Nodes 1.1.2
 
 Hardens node option validation.
