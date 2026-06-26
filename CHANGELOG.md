@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.RequestReply 1.1.5
+
+Hardens request/reply publication observability.
+
+- `RequestReplyCoordinator<TRequest,TResponse>` now emits
+  `RequestReplyEvents.Published` after a request/reply-mode request reaches the
+  graph-facing `Output`, matching fire-and-forget publication diagnostics.
+- Adds regression coverage for the `Received` -> `Published` -> `Replied` event
+  sequence in request/reply mode.
+
 ## FluxFlow.Components.Http.AspNetCore 1.0.3
 
 Hardens HTTP trigger shutdown.

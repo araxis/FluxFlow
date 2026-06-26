@@ -822,7 +822,9 @@ These packages are intentionally not standalone node composition adapters:
   with self-validating request/reply and tracker option contracts, and is
   intentionally not covered by composition adapters in this pass. Its
   coordinator reports invalid null request contexts and response messages as
-  diagnostics without stopping later valid messages.
+  diagnostics without stopping later valid messages, and emits `Received`,
+  `Published`, and terminal/diagnostic events around correlated request
+  publication and reply handling.
 - `FluxFlow.Components.Storage` provides storage nodes and host-owned store
   contracts, including normalized `StorageStoreContext` values for backend
   factories plus normalized request, record, and result text for config-bound

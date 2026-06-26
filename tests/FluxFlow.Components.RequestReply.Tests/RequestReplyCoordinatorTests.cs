@@ -50,6 +50,30 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task RequestReplyMode_EmitsPublishedEventAfterRequestReachesOutput()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var events = Sink(bridge.Events);
+        var context = new FakeContext("hello");
+
+        await bridge.Incoming.SendAsync(context);
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await bridge.Responses.SendAsync(request.With("world"));
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var received = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var published = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var replied = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        received.Name.ShouldBe(RequestReplyEvents.Received);
+        received.CorrelationId.ShouldBe(request.CorrelationId);
+        published.Name.ShouldBe(RequestReplyEvents.Published);
+        published.CorrelationId.ShouldBe(request.CorrelationId);
+        replied.Name.ShouldBe(RequestReplyEvents.Replied);
+        replied.CorrelationId.ShouldBe(request.CorrelationId);
+    }
+
+    [Fact]
     public async Task EndToEnd_GraphHandler_RepliesThroughBridge()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();

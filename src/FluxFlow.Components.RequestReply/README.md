@@ -37,6 +37,10 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - Everything is keyed on `CorrelationId` from `FluxFlow.Nodes` — the same envelope id
   that flows through the whole graph.
 - Inject a `TimeProvider` for deterministic timeout tests.
+- `Events` emits `Received` when a request is accepted for processing,
+  `Published` after it reaches the graph-facing `Output`, and `Replied`,
+  `TimedOut`, `Unmatched`, or `Invalid` for the corresponding terminal or
+  diagnostic state.
 - `RequestReplyOptions` and `CorrelatedRequestTrackerOptions` validate simple
   invariants when values are assigned. Unsupported modes, non-positive capacity,
   non-positive timeout, and non-positive sweep interval fail fast before
