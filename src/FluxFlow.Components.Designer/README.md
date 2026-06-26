@@ -29,6 +29,9 @@ component without depending on a specific rendering framework.
 options and ports, invalid choices, invalid resources, invalid attributes, and
 null-bound metadata collections as validation errors before metadata is
 registered.
+`ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
+including nested choices and attribute maps, so later mutations to
+provider-owned collections do not change the catalog.
 
 ## Option Kinds
 

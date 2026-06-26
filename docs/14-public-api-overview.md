@@ -703,6 +703,9 @@ composition runtime or the engine runtime.
 `ComponentDesignMetadataValidator` enforces identifier, option, choice,
 resource, port, and attribute consistency. Enum options must define choices,
 and choice lists are valid only on enum options.
+`ComponentDesignMetadataCatalog` validates and snapshots registered metadata so
+caller-owned option, resource, port, choice, and attribute collections cannot
+mutate catalog contents after registration.
 
 ## Support Packages
 
