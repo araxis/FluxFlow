@@ -196,6 +196,42 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Option_resolution_factories_reject_invalid_arguments()
+    {
+        var option = new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Reference = new SecretReference { Name = new SecretName("primary") }
+        };
+        var result = SecretResolveResult.ResolvedResult(
+            option.Reference,
+            new SecretDescriptor { Name = new SecretName("primary") },
+            new SecretValue("runtime-value"));
+        var diagnostic = new SecretDiagnostic
+        {
+            Code = SecretDiagnosticCode.MissingSecret,
+            Severity = SecretDiagnosticSeverity.Error,
+            Message = "Missing secret."
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
+            SecretOptionResolution.FromResult(null!, result))
+            .ParamName.ShouldBe("option");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretOptionResolution.FromResult(option, null!))
+            .ParamName.ShouldBe("result");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretOptionResolution.NotProvidedResult(null!))
+            .ParamName.ShouldBe("option");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretOptionResolution.Failed(null!, diagnostic))
+            .ParamName.ShouldBe("option");
+        Should.Throw<ArgumentNullException>(() =>
+            SecretOptionResolution.Failed(option, null!))
+            .ParamName.ShouldBe("diagnostic");
+    }
+
+    [Fact]
     public async Task Resolver_returns_value_for_matching_reference()
     {
         var resolver = new InMemorySecretResolver(

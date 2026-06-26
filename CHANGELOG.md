@@ -7,6 +7,14 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Secrets 1.5.3
+
+Hardens secret option resolution factory guardrails.
+
+- `SecretOptionResolution` factories now reject null option references,
+  resolution results, and diagnostics with explicit argument exceptions.
+- Adds regression coverage for invalid option resolution factory arguments.
+
 ## FluxFlow.Components.Journal 2.3.4
 
 Hardens journal query result guardrails.
