@@ -33,6 +33,7 @@ public sealed class ConfigurationValidationRequestBuilder
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(resourceName);
 
         return AddResource(
@@ -102,6 +103,7 @@ public sealed class ConfigurationValidationRequestBuilder
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
+        ArgumentNullException.ThrowIfNull(optionPath);
         ArgumentNullException.ThrowIfNull(secretName);
 
         return AddSecret(
