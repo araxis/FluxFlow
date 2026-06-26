@@ -136,6 +136,8 @@ host is configured to collect build failures.
 HTTP client composition node, including existing options, fixed ports, and
 resource hints for the required `client` resource and optional `clock`
 resource. `HttpClient` instances and clocks remain host-owned keyed resources.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Mapping Composition
 
