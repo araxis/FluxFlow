@@ -12,14 +12,15 @@ public static class CompositionNodeFactoryContextResourceExtensions
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
-        if (context.Resources.TryGetValue(resourceName, out var key)
+        var name = resourceName.Trim();
+        if (context.Resources.TryGetValue(name, out var key)
             && !string.IsNullOrWhiteSpace(key))
         {
-            return key;
+            return key.Trim();
         }
 
         throw new InvalidOperationException(
-            $"Node '{context.WorkflowName}.{context.NodeName}' requires resource '{resourceName}', but no resource reference was configured.");
+            $"Node '{context.WorkflowName}.{context.NodeName}' requires resource '{name}', but no resource reference was configured.");
     }
 
     public static TResource GetRequiredResource<TResource>(
@@ -28,6 +29,7 @@ public static class CompositionNodeFactoryContextResourceExtensions
         where TResource : notnull
     {
         var key = context.GetRequiredResourceKey(resourceName);
+        var name = resourceName.Trim();
         try
         {
             return context.Services.GetRequiredKeyedService<TResource>(key);
@@ -35,7 +37,7 @@ public static class CompositionNodeFactoryContextResourceExtensions
         catch (InvalidOperationException exception)
         {
             throw new InvalidOperationException(
-                $"Node '{context.WorkflowName}.{context.NodeName}' resource '{resourceName}' references '{key}', but no keyed service of type '{typeof(TResource).Name}' is registered.",
+                $"Node '{context.WorkflowName}.{context.NodeName}' resource '{name}' references '{key}', but no keyed service of type '{typeof(TResource).Name}' is registered.",
                 exception);
         }
     }
@@ -48,12 +50,13 @@ public static class CompositionNodeFactoryContextResourceExtensions
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
-        if (!context.Resources.TryGetValue(resourceName, out var key)
+        var name = resourceName.Trim();
+        if (!context.Resources.TryGetValue(name, out var key)
             || string.IsNullOrWhiteSpace(key))
         {
             return null;
         }
 
-        return context.Services.GetKeyedService<TResource>(key);
+        return context.Services.GetKeyedService<TResource>(key.Trim());
     }
 }

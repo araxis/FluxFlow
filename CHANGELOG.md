@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 1.0.2
+
+Hardens hosted resource reference lookup.
+
+- `GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+  `GetResource<TResource>` now trim local resource slot names before reading
+  node resource references.
+- Configured keyed service references are trimmed before keyed DI lookup, so
+  incidental configuration whitespace no longer changes resource identity.
+- Adds hosted and direct resource-helper coverage for required and optional
+  resource resolution through normalized keys.
+
 ## FluxFlow.Composition 1.0.4
 
 Hardens composition reference parsing.

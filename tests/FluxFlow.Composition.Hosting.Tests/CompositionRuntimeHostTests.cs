@@ -35,6 +35,52 @@ public sealed class CompositionRuntimeHostTests
     }
 
     [Fact]
+    public async Task Hosted_runtime_trims_configured_resource_keys()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        services
+            .AddFluxFlowComposition(CreateDefinition(["spaced"], includeResource: true, resourceKey: " primary "))
+            .RegisterNodes(RegisterTestNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["SPACED"]);
+        host.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resource_helpers_trim_resource_slot_names_and_keys()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        using var provider = services.BuildServiceProvider();
+        var context = new CompositionNodeFactoryContext(
+            provider,
+            "main",
+            "sink",
+            new NodeDefinition
+            {
+                Type = "test.hosting.sink",
+                Resources =
+                {
+                    ["collector"] = " primary "
+                }
+            });
+
+        context.GetRequiredResourceKey(" collector ").ShouldBe("primary");
+        context.GetRequiredResource<ITextCollector>(" collector ").ShouldBeSameAs(collector);
+        context.GetResource<ITextCollector>(" collector ").ShouldBeSameAs(collector);
+    }
+
+    [Fact]
     public async Task Hosted_runtime_loads_definition_from_configuration()
     {
         var collector = new TextCollector();
@@ -196,7 +242,10 @@ public sealed class CompositionRuntimeHostTests
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed);
     }
 
-    private static CompositionDefinition CreateDefinition(string[] messages, bool includeResource)
+    private static CompositionDefinition CreateDefinition(
+        string[] messages,
+        bool includeResource,
+        string resourceKey = "primary")
         => CompositionDefinitionBuilder
             .Create()
             .Workflow("main", workflow =>
@@ -206,7 +255,7 @@ public sealed class CompositionRuntimeHostTests
                     .Node("sink", "test.hosting.sink", node =>
                     {
                         if (includeResource)
-                            node.Resource("collector", "primary");
+                            node.Resource("collector", resourceKey);
                     })
                     .Link("source.Output", "sink.Input");
             })

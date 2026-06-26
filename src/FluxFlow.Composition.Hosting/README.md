@@ -61,6 +61,9 @@ Configuration records the resource reference by name:
 
 The node factory asks for the local resource slot (`store`), and hosting
 resolves the keyed service named `primary`.
+Resource slot names passed to the factory helpers and configured keyed service
+references are trimmed before lookup, so incidental surrounding whitespace does
+not change which host-owned service is resolved.
 
 ## Runtime Access
 
