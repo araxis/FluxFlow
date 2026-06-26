@@ -90,6 +90,32 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
+    public void Json_docs_keep_composition_json_as_the_default_path()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var document = Path.Combine(root, "docs", "09-json-conversion.md");
+        var text = File.ReadAllText(document);
+        var defaultSection = text[..Math.Min(text.Length, 1_400)];
+
+        defaultSection.Contains("CompositionConfigurationLoader", StringComparison.Ordinal)
+            .ShouldBeTrue("JSON docs should lead with composition configuration loading.");
+        defaultSection.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
+            .ShouldBeTrue("JSON docs should show composition serializer options before optional engine APIs.");
+        defaultSection.Contains("ApplicationDefinitionJson", StringComparison.Ordinal)
+            .ShouldBeFalse("JSON docs must not lead with optional engine JSON APIs.");
+
+        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine JSON", StringComparison.Ordinal);
+        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+            0,
+            "JSON docs should keep engine JSON in an explicitly optional section.");
+
+        var engineJsonIndex = text.IndexOf("ApplicationDefinitionJson", StringComparison.Ordinal);
+        engineJsonIndex.ShouldBeGreaterThan(
+            optionalEngineSectionIndex,
+            "ApplicationDefinitionJson should only appear after the optional engine JSON heading.");
+    }
+
+    [Fact]
     public void Current_docs_keep_mapping_contracts_out_of_engine_namespace()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
