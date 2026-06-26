@@ -511,7 +511,8 @@ entries instead of a partially created runtime.
 for the four file-system composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata keeps path policy as node configuration and includes a resource
-hint for the optional `clock` resource.
+hint for the optional `clock` resource. The provider authors that metadata
+through the shared validated Designer metadata builder.
 
 ## State Composition
 
