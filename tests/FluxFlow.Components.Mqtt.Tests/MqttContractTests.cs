@@ -7,6 +7,22 @@ namespace FluxFlow.Components.Mqtt.Tests;
 public sealed class MqttContractTests
 {
     [Fact]
+    public void PublishRequest_snapshots_payload()
+    {
+        var payload = new byte[] { 1, 2, 3 };
+
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = payload
+        };
+
+        payload[0] = 9;
+
+        request.Payload.ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public void PublishProperties_snapshots_user_properties()
     {
         var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -60,6 +76,27 @@ public sealed class MqttContractTests
         message.UserProperties.Count.ShouldBe(1);
         message.UserProperties["source"].ShouldBe("sensor");
         message.UserProperties.ContainsKey("extra").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReceivedMessage_snapshots_payload_and_correlation_data()
+    {
+        var payload = new byte[] { 1, 2, 3 };
+        var correlationData = new byte[] { 4, 5, 6 };
+
+        var message = new MqttReceivedMessage
+        {
+            Timestamp = DateTimeOffset.Parse("2026-06-27T00:00:00+00:00"),
+            Topic = "devices/a",
+            Payload = payload,
+            CorrelationData = correlationData
+        };
+
+        payload[0] = 9;
+        correlationData[0] = 8;
+
+        message.Payload.ShouldBe([1, 2, 3]);
+        message.CorrelationData.ShouldBe([4, 5, 6]);
     }
 
     [Fact]

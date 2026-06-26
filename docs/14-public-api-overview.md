@@ -741,7 +741,10 @@ adapter-owned `IMqttPublisher` and `IMqttTriggerSource` implementations.
 `MqttPublishProperties.UserProperties`,
 `MqttReceivedMessage.UserProperties`, and
 `MqttClientHealthEvent.Attributes` snapshot assigned dictionaries with ordinal
-key comparison, and treat null maps as empty.
+key comparison, and treat null maps as empty. `MqttPublishRequest.Payload`,
+`MqttReceivedMessage.Payload`, and `MqttReceivedMessage.CorrelationData`
+snapshot assigned byte arrays while preserving the existing byte-array public
+contract.
 
 ## MQTT Composition
 
@@ -809,6 +812,8 @@ are still created through standalone composition, and the host decides whether
 the adapter connects with hosted lifetime through `ConnectWithHost`.
 `MqttNetClientOptions.UserProperties` snapshots assigned dictionaries with
 ordinal key comparison, and treats null maps as empty.
+`MqttNetLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
+publish/Last Will mapping copies payload buffers before concrete client handoff.
 
 ## Pulse MQTT Adapter
 
@@ -846,6 +851,8 @@ optionally add hosted lifecycle through `StartWithHost`; `WaitForConnectedOnStar
 is only valid with hosted start.
 `PulseMqttClientOptions.UserProperties` snapshots assigned dictionaries with
 ordinal key comparison, and treats null maps as empty.
+`PulseMqttLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
+publish/Last Will mapping copies payload buffers before concrete client handoff.
 
 ## Designer Metadata
 

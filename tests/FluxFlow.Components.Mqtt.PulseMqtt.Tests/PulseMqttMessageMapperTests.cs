@@ -46,6 +46,22 @@ public sealed class PulseMqttMessageMapperTests
     }
 
     [Fact]
+    public void ToPublishPacket_copies_payload_for_adapter_handoff()
+    {
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1, 2, 3]
+        };
+
+        var packet = PulseMqttMessageMapper.ToPublishPacket(request);
+
+        request.Payload[0] = 9;
+
+        packet.Payload.ToArray().ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public void ToPublishPacket_treats_null_user_property_maps_as_empty()
     {
         var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest

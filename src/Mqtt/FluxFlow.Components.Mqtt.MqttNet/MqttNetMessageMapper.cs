@@ -12,11 +12,12 @@ internal static class MqttNetMessageMapper
     public static MqttApplicationMessage ToApplicationMessage(MqttPublishRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(request.Payload);
+        var payload = request.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
 
         var builder = new MqttApplicationMessageBuilder()
             .WithTopic(request.Topic)
-            .WithPayload(request.Payload)
+            .WithPayload(payload.ToArray())
             .WithQualityOfServiceLevel(ToMqttNetQualityOfService(request.QualityOfService))
             .WithRetainFlag(request.Retain);
 

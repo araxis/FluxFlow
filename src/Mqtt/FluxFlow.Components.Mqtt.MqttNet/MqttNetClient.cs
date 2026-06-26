@@ -503,9 +503,12 @@ public sealed class MqttNetClient :
             return;
         }
 
+        var payload = lastWill.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
+
         builder
             .WithWillTopic(lastWill.Topic)
-            .WithWillPayload(lastWill.Payload)
+            .WithWillPayload(payload.ToArray())
             .WithWillQualityOfServiceLevel(
                 MqttNetMessageMapper.ToMqttNetQualityOfService(lastWill.QualityOfService))
             .WithWillRetain(lastWill.Retain);

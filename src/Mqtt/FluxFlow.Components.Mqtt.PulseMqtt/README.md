@@ -60,6 +60,9 @@ names are ignored, and named properties with null values are rejected with a
 clear `value` argument error.
 `PulseMqttClientOptions.UserProperties` also snapshots assigned dictionaries, so
 caller-owned maps cannot alter CONNECT user properties after options creation.
+`PulseMqttLastWillOptions.Payload` snapshots the assigned byte array, and publish
+and Last Will payloads are copied before concrete client handoff so caller-owned
+buffers cannot alter queued client-library messages.
 
 ## Dependency Injection
 

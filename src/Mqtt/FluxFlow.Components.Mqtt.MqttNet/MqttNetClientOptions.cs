@@ -50,9 +50,15 @@ public sealed record MqttNetClientOptions
 
 public sealed record MqttNetLastWillOptions
 {
+    private byte[]? _payload = [];
+
     public required string Topic { get; init; }
 
-    public byte[] Payload { get; init; } = [];
+    public byte[] Payload
+    {
+        get => _payload!;
+        init => _payload = value?.ToArray();
+    }
 
     public string? ContentType { get; init; }
 

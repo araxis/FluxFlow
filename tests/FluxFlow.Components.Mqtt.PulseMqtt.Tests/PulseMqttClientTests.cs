@@ -9,6 +9,22 @@ namespace FluxFlow.Components.Mqtt.PulseMqtt.Tests;
 public sealed class PulseMqttClientTests
 {
     [Fact]
+    public void LastWillOptions_snapshots_payload()
+    {
+        var payload = new byte[] { 1, 2, 3 };
+
+        var options = new PulseMqttLastWillOptions
+        {
+            Topic = "devices/a",
+            Payload = payload
+        };
+
+        payload[0] = 9;
+
+        options.Payload.ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public void Constructor_RejectsMissingHostWithoutCustomTransport()
         => Should.Throw<ArgumentException>(() => new PulseMqttClient(
             new PulseMqttClientOptions()));

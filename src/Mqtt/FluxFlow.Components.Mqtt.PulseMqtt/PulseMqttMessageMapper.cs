@@ -12,12 +12,13 @@ internal static class PulseMqttMessageMapper
     public static MqttPublishPacket ToPublishPacket(MqttPublishRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(request.Payload);
+        var payload = request.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
 
         return new MqttPublishPacket
         {
             Topic = request.Topic,
-            Payload = request.Payload,
+            Payload = payload.ToArray(),
             ContentType = string.IsNullOrWhiteSpace(request.ContentType)
                 ? null
                 : request.ContentType,
@@ -34,11 +35,12 @@ internal static class PulseMqttMessageMapper
     public static MqttWillMessage ToWillMessage(PulseMqttLastWillOptions lastWill)
     {
         ArgumentNullException.ThrowIfNull(lastWill);
-        ArgumentNullException.ThrowIfNull(lastWill.Payload);
+        var payload = lastWill.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
 
         return new MqttWillMessage(lastWill.Topic)
         {
-            Payload = lastWill.Payload,
+            Payload = payload.ToArray(),
             ContentType = string.IsNullOrWhiteSpace(lastWill.ContentType)
                 ? null
                 : lastWill.ContentType,

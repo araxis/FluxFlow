@@ -7,6 +7,32 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.1.6
+
+Hardens MQTT adapter payload ownership.
+
+- `MqttNetLastWillOptions.Payload` now copies assigned byte arrays.
+- Publish and Last Will mapping copy payload buffers before concrete client handoff.
+- Adds focused payload snapshot and adapter handoff coverage.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.6
+
+Hardens MQTT adapter payload ownership.
+
+- `PulseMqttLastWillOptions.Payload` now copies assigned byte arrays.
+- Publish and Last Will mapping copy payload buffers before concrete client handoff.
+- Adds focused payload snapshot and adapter handoff coverage.
+
+## FluxFlow.Components.Mqtt 4.1.3
+
+Hardens MQTT contract payload snapshots.
+
+- `MqttPublishRequest.Payload`, `MqttReceivedMessage.Payload`, and
+  `MqttReceivedMessage.CorrelationData` now copy assigned byte arrays.
+- Preserves existing byte-array public contracts while preventing caller-owned
+  buffers from altering contracts after creation.
+- Adds focused contract coverage for caller-owned payload mutation.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.1.5
 
 Hardens MQTT adapter client option user-property snapshots.
