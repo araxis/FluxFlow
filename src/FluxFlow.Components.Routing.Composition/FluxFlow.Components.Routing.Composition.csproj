@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Routing.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Routing.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing.Composition</RootNamespace>
-    <Version>1.2.2</Version>
+    <Version>1.2.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone routing nodes over host-owned keyed selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Uses the shared Designer metadata builder for routing metadata while preserving the existing options, resources, ports, validation, catalog loading, and runtime composition behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Routes built-in Designer port metadata through the shared metadata builder while preserving existing routing options, resources, ports, validation, catalog loading, and runtime composition behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

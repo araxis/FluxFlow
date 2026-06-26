@@ -130,6 +130,16 @@ Uses the shared Designer metadata builder for HTTP client metadata.
 - Preserves existing HTTP client options, client and clock resources, fixed
   ports, validation, catalog loading, and runtime composition behavior.
 
+## FluxFlow.Components.Routing.Composition 1.2.3
+
+Routes built-in Designer port metadata through the shared metadata builder.
+
+- Refactors `RoutingComponentDesignMetadataProvider` built-in port authoring to
+  use `ComponentDesignMetadataBuilder.AddInputPort()` and `AddOutputPort()`.
+- Preserves existing routing options, selector and clock resources, built-in
+  ports, dynamic-output attributes, validation, catalog loading, and runtime
+  composition behavior.
+
 ## FluxFlow.Components.Routing.Composition 1.2.2
 
 Uses the shared Designer metadata builder for routing metadata.
