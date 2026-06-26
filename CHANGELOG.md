@@ -35,6 +35,16 @@ Adds fluent resource descriptor catalog building.
 - Keeps resource creation, lifecycle, lookup ownership, and diagnostic
   validation behavior unchanged.
 
+## FluxFlow.Components.Secrets 1.3.0
+
+Adds fluent in-memory secret resolver building.
+
+- Adds `InMemorySecretResolverBuilder` to `FluxFlow.Components.Secrets` for
+  declaring local secret records with the existing resolver and diagnostic
+  contracts.
+- Keeps concrete secret storage, access control, refresh, rotation, auditing,
+  and disposal ownership with hosts.
+
 ## FluxFlow.Components.Journal 2.1.0
 
 Adds journal store factory support.

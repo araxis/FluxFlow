@@ -18,6 +18,8 @@ is controlled, how values are refreshed, and how ownership is handled.
 - `SecretOptionReference`: an option path plus optional secret reference.
 - `SecretOptionResolver`: helper for resolving required or optional secret
   option references through a host-provided resolver.
+- `InMemorySecretResolverBuilder`: a fluent helper for declaring local
+  `SecretRecord` values and creating an `InMemorySecretResolver`.
 - `SecretOptionResolution`: option-level resolved value, missing state, or
   structured diagnostic.
 - `SecretDiagnostic`: stable diagnostics for missing, duplicate, ambiguous,
@@ -51,6 +53,18 @@ var result = await resolver.ResolveAsync(new SecretReference
 
 Console.WriteLine(result.Resolved);
 Console.WriteLine(result.Value);
+```
+
+Fluent in-memory resolver construction is available for local hosts and tests:
+
+```csharp
+var resolver = new InMemorySecretResolverBuilder()
+    .Add(
+        "primary-token",
+        "value-from-host",
+        kind: "profile",
+        displayName: "Primary Token")
+    .BuildResolver();
 ```
 
 ## Component Options
@@ -122,6 +136,8 @@ such as `Kind`.
 This package does not own concrete secret storage. It only defines neutral
 contracts and helper logic. Hosts own persistence, access control, refresh,
 rotation, auditing, and disposal.
+`InMemorySecretResolverBuilder` only creates in-memory records and resolver
+instances; it is not a storage, refresh, or access-control model.
 
 ## Composition
 
