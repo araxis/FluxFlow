@@ -69,6 +69,8 @@ the `payload.inspect` composition node. The metadata describes the fixed
 request/result ports, `PayloadInspectOptions` surface, and optional `clock`
 resource hint for hosts that build palettes, editors, validators, or
 documentation views.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
 
 The optional `clock` resource remains host-owned and is not represented as an
 editable node option.
