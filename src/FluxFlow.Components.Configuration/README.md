@@ -19,6 +19,8 @@ application files, or runtime lifecycle.
 - `ConfigurationValidationReport`: ordered diagnostics plus summary counts.
 - `ConfigurationValidator`: helper for resource-only, secret-only, or combined
   validation.
+- `ConfigurationValidationRequestBuilder`: fluent helper that builds the same
+  validation request DTOs used by configuration loading.
 
 ## Example
 
@@ -61,6 +63,22 @@ var report = await ConfigurationValidator.ValidateAsync(
 Console.WriteLine(report.HasErrors);
 ```
 
+Fluent request construction is available when code wants the same DTO shape
+without hand-assembling nested objects:
+
+```csharp
+var request = new ConfigurationValidationRequestBuilder()
+    .AddResource("connections.primary", "primary", kind: "connection")
+    .AddSecret("connections.primary.credential", "primary-credential")
+    .AddOptionalResource("connections.secondary")
+    .Build();
+
+var report = await ConfigurationValidator.ValidateAsync(
+    resourceLookup,
+    secretResolver,
+    request);
+```
+
 ## Boundaries
 
 This package only normalizes validation. Hosts still decide where resources and
@@ -77,6 +95,9 @@ as normalization exceptions.
 collections, so later caller list mutations do not change what a constructed
 request represents. Null collection assignments are preserved for structured
 request diagnostics.
+`ConfigurationValidationRequestBuilder` is only an authoring helper over these
+same DTOs. It does not own resource lookup, secret resolution, or validation
+policy.
 
 Resource option paths trim surrounding whitespace when assigned, matching the
 secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and
