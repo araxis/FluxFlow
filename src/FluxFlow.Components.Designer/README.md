@@ -124,7 +124,8 @@ var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
 ```
 
 The fluent builder can author the same validated metadata shape with less
-boilerplate:
+boilerplate. Component-level attributes can be added one at a time or as a
+range through `AddAttribute` and `AddAttributes`:
 
 ```csharp
 var built = new ComponentDesignMetadataBuilder("sample.transform")
@@ -139,6 +140,10 @@ var built = new ComponentDesignMetadataBuilder("sample.transform")
     .AddResource("engine", order: 0, valueType: "IExpressionEngine", isRequired: true)
     .AddInputPort("Input", order: 0, isPrimary: true)
     .AddOutputPort("Output", order: 0, isPrimary: true)
+    .AddAttributes(new Dictionary<string, string>
+    {
+        ["shape"] = "transform"
+    })
     .Build();
 ```
 
@@ -154,7 +159,9 @@ clear provider error when that contract is violated.
 `ComponentDesignMetadataModule` is a small provider helper that validates,
 rejects duplicate component types, and snapshots the metadata it receives.
 `ComponentDesignMetadataBuilder` is a small authoring helper for providers that
-want to build those same contracts fluently before returning them.
+want to build those same contracts fluently before returning them. The builder
+validates null attribute keys and values immediately, then still runs the same
+metadata validation path during `Build()`.
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

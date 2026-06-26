@@ -127,6 +127,28 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Metadata_builder_adds_attribute_ranges_and_snapshots_inputs()
+    {
+        var attributes = new Dictionary<string, string>
+        {
+            ["shape"] = "transform",
+            ["domain"] = "sample"
+        };
+
+        var metadata = new ComponentDesignMetadataBuilder("sample.attributes")
+            .AddAttributes(attributes)
+            .Build();
+
+        attributes["shape"] = "changed";
+        attributes["later"] = "ignored";
+
+        metadata.Attributes.Count.ShouldBe(2);
+        metadata.Attributes["shape"].ShouldBe("transform");
+        metadata.Attributes["domain"].ShouldBe("sample");
+        metadata.Attributes.ContainsKey("later").ShouldBeFalse();
+    }
+
+    [Fact]
     public void Metadata_builder_uses_existing_validation()
     {
         var builder = new ComponentDesignMetadataBuilder("sample.invalid")
@@ -145,6 +167,33 @@ public sealed class ComponentDesignMetadataCatalogTests
         Should.Throw<ArgumentNullException>(() => builder.AddOption(null!));
         Should.Throw<ArgumentNullException>(() => builder.AddResource(null!));
         Should.Throw<ArgumentNullException>(() => builder.AddPort(null!));
+    }
+
+    [Fact]
+    public void Metadata_builder_rejects_invalid_attribute_arguments()
+    {
+        var builder = new ComponentDesignMetadataBuilder("sample.invalid");
+
+        Should.Throw<ArgumentNullException>(() => builder.AddAttribute(null!, "value"))
+            .ParamName.ShouldBe("key");
+        Should.Throw<ArgumentNullException>(() => builder.AddAttribute("shape", null!))
+            .ParamName.ShouldBe("value");
+        Should.Throw<ArgumentNullException>(() => builder.AddAttributes(null!))
+            .ParamName.ShouldBe("attributes");
+        Should.Throw<ArgumentNullException>(() => builder.AddAttributes(
+            [
+                new KeyValuePair<string, string>("shape", null!)
+            ]))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Metadata_builder_rejects_duplicate_attributes()
+    {
+        var builder = new ComponentDesignMetadataBuilder("sample.invalid")
+            .AddAttribute("shape", "transform");
+
+        Should.Throw<ArgumentException>(() => builder.AddAttribute("shape", "source"));
     }
 
     [Fact]

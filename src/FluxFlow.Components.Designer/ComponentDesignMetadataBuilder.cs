@@ -236,8 +236,22 @@ public sealed class ComponentDesignMetadataBuilder
         return AddPort(port);
     }
 
+    public ComponentDesignMetadataBuilder AddAttributes(
+        IEnumerable<KeyValuePair<string, string>> attributes)
+    {
+        ArgumentNullException.ThrowIfNull(attributes);
+
+        foreach (var attribute in attributes)
+            AddAttribute(attribute.Key, attribute.Value);
+
+        return this;
+    }
+
     public ComponentDesignMetadataBuilder AddAttribute(string key, string value)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(value);
+
         attributes.Add(key, value);
         return this;
     }
