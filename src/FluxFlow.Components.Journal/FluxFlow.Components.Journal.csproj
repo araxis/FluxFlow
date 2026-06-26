@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Journal</PackageId>
     <AssemblyName>FluxFlow.Components.Journal</AssemblyName>
     <RootNamespace>FluxFlow.Components.Journal</RootNamespace>
-    <Version>2.0.3</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable event journal contracts and in-memory store for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;events;journal;store</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Journal retention options now reject invalid numeric limits at assignment time so invalid retention policies fail before store construction or pruning.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds journal store factory, context, lease, component option helpers, and an in-memory store factory for explicit host-owned journal store lifetime.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

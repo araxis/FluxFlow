@@ -9,7 +9,10 @@ Reusable event journal contracts for FluxFlow hosts.
   journal records without depending on a runtime package.
 - `JournalQuery` and `JournalQueryMatcher` for type, status, source, subject, channel, attribute, time range, and severity matching.
 - `IJournalStore` for host-owned persistence.
+- `IJournalStoreFactory`, `JournalStoreContext`, and `JournalStoreLease` for explicit host-owned store opening and ownership.
+- `JournalComponentOptions` for direct hosts that need to configure journal store factories and clocks.
 - `InMemoryJournalStore` for local runtime use and focused verification.
+- `InMemoryJournalStoreFactory` for named shared in-memory stores.
 - Retention options for cutoff and maximum-record pruning.
 
 ## Example
@@ -41,6 +44,37 @@ var result = await store.QueryAsync(new JournalQuery
     },
     Limit = 10
 });
+```
+
+## Store Factories
+
+Hosts that need deferred store opening can use an explicit factory and lease:
+
+```csharp
+var factory = new InMemoryJournalStoreFactory(new JournalRetentionOptions
+{
+    MaxRecords = 1000
+});
+
+await using var lease = await factory.OpenAsync(new JournalStoreContext
+{
+    StoreName = "default",
+    Clock = TimeProvider.System
+});
+
+await lease.Store.AppendAsync(record);
+```
+
+`JournalStoreContext.StoreName` is trimmed and blank values are treated as the
+default store. `JournalStoreLease.Owned(...)` disposes stores when the lease is
+disposed; `JournalStoreLease.Shared(...)` leaves lifetime with the host.
+
+Direct host configuration can use `JournalComponentOptions`:
+
+```csharp
+var options = new JournalComponentOptions()
+    .UseStoreFactory(new InMemoryJournalStoreFactory())
+    .UseClock(TimeProvider.System);
 ```
 
 ## Composition

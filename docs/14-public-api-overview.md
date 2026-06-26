@@ -746,8 +746,9 @@ These packages are intentionally not standalone node composition adapters:
   factory registries used by adapters that resolve host-owned expression
   services, including deterministic most-specific context factory lookup.
 - `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
-  record mapping, store contracts, retention option validation, and in-memory
-  support for hosts.
+  record mapping, store contracts, store factory/context/lease helpers,
+  retention option validation, and named in-memory store factory support for
+  hosts.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
   with self-validating request/reply and tracker option contracts, and is
   intentionally not covered by composition adapters in this pass.
