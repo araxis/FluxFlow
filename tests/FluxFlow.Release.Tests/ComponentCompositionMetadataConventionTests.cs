@@ -837,6 +837,44 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_defaults_match_bound_option_defaults()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var boundOptionTypesByNodeType = ReadDefaultNodeOptionTypes(projectDirectory, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                boundOptionTypesByNodeType.TryGetValue(nodeType, out var optionTypeNames)
+                    .ShouldBeTrue($"{entry.PackageId} must map default node type '{nodeType}' to bound option types.");
+
+                var simpleDefaults = ReadSimpleBoundOptionDefaults(
+                    assembly,
+                    optionTypeNames!,
+                    entry.PackageId);
+
+                foreach (var option in metadata.Options.Where(option => option.DefaultValue is not null))
+                {
+                    if (!simpleDefaults.TryGetValue(option.Name, out var expected))
+                        continue;
+
+                    MetadataDefaultMatches(option.DefaultValue, expected.Value)
+                        .ShouldBeTrue(
+                            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{option.Name}' default '{option.DefaultValue}' must match bound option default '{expected.Value}' from {expected.OptionType}.{expected.PropertyName}.");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_bound_option_metadata_kinds_match_simple_clr_types()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1098,6 +1136,181 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (stringConstants.TryGetValue(argument, out var constantValue))
                 yield return constantValue;
         }
+    }
+
+    private static IReadOnlyDictionary<string, string[]> ReadDefaultNodeOptionTypes(
+        string projectDirectory,
+        string packageId)
+    {
+        var registryContent = File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId));
+        var nodeTypeConstants = PublicStringConstantWithValueRegex()
+            .Matches(File.ReadAllText(ReadSingleNodeTypesFile(projectDirectory, packageId)))
+            .ToDictionary(
+                match => match.Groups["name"].Value,
+                match => match.Groups["value"].Value,
+                StringComparer.Ordinal);
+        var optionTypesByFactory = ReadFactoryOptionTypes(registryContent, packageId);
+        var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        foreach (Match match in PublicRegistryMethodBlockRegex().Matches(registryContent))
+        {
+            var parameters = match.Groups["parameters"].Value;
+            var body = match.Groups["body"].Value;
+            var nodeTypeMatch = DefaultNodeTypeParameterRegex().Match(parameters);
+            var registrationMatches = RegistryRegistrationReferenceRegex().Matches(body);
+            registrationMatches.Count.ShouldBeGreaterThan(
+                0,
+                $"{packageId} registry method must pass a named node type and factory method to registry.Register.");
+
+            foreach (Match registrationMatch in registrationMatches)
+            {
+                var registeredNodeType = registrationMatch.Groups["nodeType"].Value;
+                var nodeTypeReference = nodeTypeMatch.Success &&
+                    string.Equals(registeredNodeType, "nodeType", StringComparison.Ordinal)
+                        ? nodeTypeMatch.Groups["constant"].Value
+                        : registeredNodeType;
+                var nodeTypeConstant = nodeTypeReference.Split('.')[^1];
+                nodeTypeConstants.TryGetValue(nodeTypeConstant, out var nodeType)
+                    .ShouldBeTrue($"{packageId} registry node type constant '{nodeTypeConstant}' must resolve.");
+
+                var factoryName = registrationMatch.Groups["factory"].Value;
+                optionTypesByFactory.TryGetValue(factoryName, out var optionTypes)
+                    .ShouldBeTrue($"{packageId} factory '{factoryName}' for '{nodeType}' must bind configuration.");
+
+                optionTypesByNodeType[nodeType!] = optionTypes!;
+            }
+        }
+
+        optionTypesByNodeType.ShouldNotBeEmpty($"{packageId} must expose default registry node option mappings.");
+        return optionTypesByNodeType;
+    }
+
+    private static IReadOnlyDictionary<string, string[]> ReadFactoryOptionTypes(
+        string registryContent,
+        string packageId)
+    {
+        var methodBodies = ReadFactoryMethodBodies(registryContent);
+        var optionTypesByFactory = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        foreach (var factoryName in methodBodies.Keys.Order(StringComparer.Ordinal))
+        {
+            var optionTypes = ReadFactoryOptionTypes(
+                factoryName,
+                methodBodies,
+                []);
+
+            if (optionTypes.Length > 0)
+                optionTypesByFactory[factoryName] = optionTypes;
+        }
+
+        optionTypesByFactory.ShouldNotBeEmpty($"{packageId} registry factories must bind configuration.");
+        return optionTypesByFactory;
+    }
+
+    private static Dictionary<string, string> ReadFactoryMethodBodies(string registryContent)
+    {
+        var methodBodies = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (Match match in PrivateFactoryMethodBlockRegex().Matches(registryContent))
+            methodBodies[match.Groups["name"].Value] = match.Groups["body"].Value;
+
+        foreach (Match match in PrivateFactoryExpressionMethodRegex().Matches(registryContent))
+            methodBodies[match.Groups["name"].Value] = match.Groups["body"].Value;
+
+        return methodBodies;
+    }
+
+    private static string[] ReadFactoryOptionTypes(
+        string factoryName,
+        IReadOnlyDictionary<string, string> methodBodies,
+        HashSet<string> visiting)
+    {
+        if (!visiting.Add(factoryName) ||
+            !methodBodies.TryGetValue(factoryName, out var body))
+        {
+            return [];
+        }
+
+        var directOptionTypes = BindConfigurationRegex()
+            .Matches(body)
+            .Select(match => match.Groups["type"].Value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (directOptionTypes.Length > 0)
+            return directOptionTypes;
+
+        foreach (Match match in FactoryMethodCallRegex().Matches(body))
+        {
+            var helperName = match.Groups["name"].Value;
+            if (!methodBodies.ContainsKey(helperName))
+                continue;
+
+            var helperOptionTypes = ReadFactoryOptionTypes(
+                helperName,
+                methodBodies,
+                visiting);
+            if (helperOptionTypes.Length > 0)
+                return helperOptionTypes;
+        }
+
+        return [];
+    }
+
+    private static Dictionary<string, BoundOptionDefault> ReadSimpleBoundOptionDefaults(
+        Assembly assembly,
+        IReadOnlyCollection<string> optionTypeNames,
+        string packageId)
+    {
+        var defaults = new Dictionary<string, BoundOptionDefault>(StringComparer.Ordinal);
+
+        foreach (var optionTypeName in optionTypeNames)
+        {
+            var optionType = ResolveReferencedType(assembly, optionTypeName, packageId);
+            var optionInstance = Activator.CreateInstance(optionType)
+                .ShouldNotBeNull($"{packageId} option type '{optionType.Name}' must be default constructible.");
+
+            foreach (var property in optionType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.SetMethod?.IsPublic != true ||
+                    !IsComparableDefaultType(property.PropertyType))
+                {
+                    continue;
+                }
+
+                var key = ToConfigurationKey(property.Name);
+                var defaultValue = property.GetValue(optionInstance) ??
+                    ReadNamedEffectiveDefault(optionType, property);
+                var candidate = new BoundOptionDefault(optionType.Name, property.Name, defaultValue);
+
+                if (defaults.TryGetValue(key, out var existing))
+                {
+                    MetadataDefaultMatches(existing.Value, candidate.Value)
+                        .ShouldBeTrue(
+                            $"{packageId} option key '{key}' has inconsistent defaults in {existing.OptionType}.{existing.PropertyName} and {candidate.OptionType}.{candidate.PropertyName}.");
+                    continue;
+                }
+
+                defaults.Add(key, candidate);
+            }
+        }
+
+        return defaults;
+    }
+
+    private static object? ReadNamedEffectiveDefault(
+        Type optionType,
+        PropertyInfo property)
+    {
+        var field = optionType.GetField(
+            $"Default{property.Name}",
+            BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+        if (field is null || !IsComparableDefaultType(field.FieldType))
+            return null;
+
+        return field.IsLiteral
+            ? field.GetRawConstantValue()
+            : field.GetValue(null);
     }
 
     private static IEnumerable<string> ReadReferencedPackageIds(
@@ -1459,6 +1672,50 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             string.Equals(key, optionName, StringComparison.Ordinal) ||
             optionName.StartsWith($"{key}.", StringComparison.Ordinal));
 
+    private static bool MetadataDefaultMatches(
+        object? actual,
+        object? expected)
+    {
+        if (actual is null || expected is null)
+            return actual is null && expected is null;
+
+        if (actual is Enum || expected is Enum)
+        {
+            return string.Equals(
+                actual.ToString(),
+                expected.ToString(),
+                StringComparison.Ordinal);
+        }
+
+        var actualType = Nullable.GetUnderlyingType(actual.GetType()) ?? actual.GetType();
+        var expectedType = Nullable.GetUnderlyingType(expected.GetType()) ?? expected.GetType();
+        if (IsNumericType(actualType) && IsNumericType(expectedType))
+            return Convert.ToDecimal(actual) == Convert.ToDecimal(expected);
+
+        return Equals(actual, expected) ||
+            string.Equals(actual.ToString(), expected.ToString(), StringComparison.Ordinal);
+    }
+
+    private static bool IsComparableDefaultType(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+
+        return underlyingType == typeof(string) ||
+            underlyingType == typeof(bool) ||
+            underlyingType == typeof(TimeSpan) ||
+            underlyingType.IsEnum ||
+            IsNumericType(underlyingType);
+    }
+
+    private static bool IsNumericType(Type type)
+        => type == typeof(byte) ||
+            type == typeof(short) ||
+            type == typeof(int) ||
+            type == typeof(long) ||
+            type == typeof(float) ||
+            type == typeof(double) ||
+            type == typeof(decimal);
+
     private static string ToConfigurationKey(string propertyName)
         => $"{char.ToLowerInvariant(propertyName[0])}{propertyName[1..]}";
 
@@ -1718,6 +1975,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string ConfigurationKey,
         Type EnumType);
 
+    private sealed record BoundOptionDefault(
+        string OptionType,
+        string PropertyName,
+        object? Value);
+
     private sealed record ResourceLookupUsage(
         bool UsesRequiredLookup,
         bool UsesOptionalLookup)
@@ -1748,6 +2010,24 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"BindConfiguration<(?<type>[^>]+)>")]
     private static partial Regex BindConfigurationRegex();
+
+    [GeneratedRegex(@"public\s+static\s+CompositionNodeRegistry\s+\w+(?:<[^>]+>)?\s*\((?<parameters>.*?)\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    private static partial Regex PublicRegistryMethodBlockRegex();
+
+    [GeneratedRegex(@"string\s+nodeType\s*=\s*(?<constant>\w+CompositionNodeTypes\.\w+)")]
+    private static partial Regex DefaultNodeTypeParameterRegex();
+
+    [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>\w+)")]
+    private static partial Regex RegistryRegistrationReferenceRegex();
+
+    [GeneratedRegex(@"private\s+static\s+ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
+    private static partial Regex PrivateFactoryMethodBlockRegex();
+
+    [GeneratedRegex(@"private\s+static\s+ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*=>\s*(?<body>.*?);", RegexOptions.Singleline)]
+    private static partial Regex PrivateFactoryExpressionMethodRegex();
+
+    [GeneratedRegex(@"(?<name>\w+)(?:<[^>]+>)?\s*\(")]
+    private static partial Regex FactoryMethodCallRegex();
 
     [GeneratedRegex(@"GetConfigurationValue<[^>]+>\(\s*(?<argument>[^)]+?)\s*\)")]
     private static partial Regex ExplicitConfigurationValueRegex();
