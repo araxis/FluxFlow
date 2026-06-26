@@ -21,7 +21,13 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
         IconKey = "activity",
         PreferredNodeName = "projectEvents",
         SuggestedEditorWidth = 460,
-        Options =
+        Options = EventProjectionOptionsMetadata(),
+        Resources = EventProjectionResources(),
+        Ports = EventProjectionPorts()
+    };
+
+    private static IReadOnlyList<OptionDesignMetadata> EventProjectionOptionsMetadata()
+        =>
         [
             new OptionDesignMetadata
             {
@@ -81,8 +87,10 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 Min = 1,
                 HelperText = "Maximum queued input messages."
             }
-        ],
-        Resources =
+        ];
+
+    private static IReadOnlyList<ResourceDesignMetadata> EventProjectionResources()
+        =>
         [
             new ResourceDesignMetadata
             {
@@ -92,8 +100,10 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 Summary = "Optional keyed clock for deterministic projection snapshot timestamps and diagnostics.",
                 ValueType = nameof(TimeProvider)
             }
-        ],
-        Ports =
+        ];
+
+    private static IReadOnlyList<PortDesignMetadata> EventProjectionPorts()
+        =>
         [
             new PortDesignMetadata
             {
@@ -117,6 +127,5 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 ValueType = nameof(EventProjectionSnapshot),
                 IsPrimary = true
             }
-        ]
-    };
+        ];
 }
