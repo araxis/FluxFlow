@@ -213,6 +213,32 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_providers_use_shared_builder()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
+            var providerContent = File.ReadAllText(providerFile);
+            var directMetadataConstruction = DirectComponentMetadataConstructionRegex()
+                .Matches(providerContent)
+                .Select(match => match.Value)
+                .ToArray();
+
+            providerContent.Contains(
+                    nameof(ComponentDesignMetadataBuilder),
+                    StringComparison.Ordinal)
+                .ShouldBeTrue(
+                    $"{entry.PackageId} provider must author metadata through {nameof(ComponentDesignMetadataBuilder)}.");
+            directMetadataConstruction.ShouldBeEmpty(
+                $"{entry.PackageId} provider must not manually construct {nameof(ComponentDesignMetadata)}.");
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_ordering_is_stable()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -2378,4 +2404,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"\b(?<property>Options|Resources|Ports)\s*=\s*\[")]
     private static partial Regex InlineMetadataCollectionAssignmentRegex();
+
+    [GeneratedRegex(@"\bnew\s+ComponentDesignMetadata\s*(?:\(|\{)")]
+    private static partial Regex DirectComponentMetadataConstructionRegex();
 }
