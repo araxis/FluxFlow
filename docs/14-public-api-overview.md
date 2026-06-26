@@ -889,13 +889,14 @@ Main types:
 - `IFlowMapper<TInput,TOutput>`
 - `ExpressionFlowMapper<TInput,TOutput>`
 - `DelegateFlowMapper<TInput,TOutput>`
-- `EvaluatingCompiledExpression<T>`
 
 These contracts live in an engine-free leaf package. The engine and standalone
 component packages consume them, but concrete expression languages, expression
 validation, and context factory registration remain host-owned. `FlowMapContext`
 copies assigned variable dictionaries with ordinal key comparison so each
-per-message expression context is stable after creation.
+per-message expression context is stable after creation. Expression mapper and
+predicate adapters compile during construction and fail fast when a host engine
+returns an invalid null compiled expression.
 
 ## Stability Notes
 

@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Mapping 1.0.2
+
+Hardens mapping adapter guardrails.
+
+- `ExpressionFlowMapper<TInput,TOutput>` and `ExpressionFlowPredicate<TInput>`
+  now fail at construction with a clear error when an expression engine returns
+  a null compiled expression.
+- Adds direct tests for delegate and expression mapper/predicate adapters,
+  including compile-once expression behavior, default predicate context values,
+  custom context factories, and public null guardrails.
+- Corrects the public API overview so the internal compiled-expression wrapper
+  is no longer listed as a public type.
+
 ## FluxFlow.Components.Expressions 2.0.3
 
 Hardens context factory registry resolution.
