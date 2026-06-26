@@ -8,6 +8,128 @@ namespace FluxFlow.Components.Secrets.Tests;
 public sealed class SecretResolverTests
 {
     [Fact]
+    public async Task Resolver_builder_creates_normalized_record_and_resolver()
+    {
+        var resolver = new InMemorySecretResolverBuilder()
+            .Add(
+                " primary-token ",
+                "runtime-value",
+                version: " v1 ",
+                kind: " profile ",
+                displayName: " Primary Token ",
+                summary: " Runtime credential. ",
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .BuildResolver();
+
+        var descriptor = resolver.GetDescriptors().ShouldHaveSingleItem();
+        descriptor.Name.ShouldBe(new SecretName("primary-token"));
+        descriptor.Version.ShouldBe("v1");
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary Token");
+        descriptor.Summary.ShouldBe("Runtime credential.");
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+
+        var result = await resolver.ResolveAsync(new SecretReference
+        {
+            Name = new SecretName("primary-token"),
+            Version = "v1",
+            Kind = "profile"
+        });
+
+        result.Resolved.ShouldBeTrue();
+        result.Value.ShouldNotBeNull().Reveal().ShouldBe("runtime-value");
+        result.Value.ToString().ShouldBe(SecretRedactor.RedactedText);
+    }
+
+    [Fact]
+    public void Resolver_builder_accepts_existing_records_and_snapshots_build_results()
+    {
+        var builder = new InMemorySecretResolverBuilder()
+            .Add(CreateRecord("primary", "one"));
+
+        var records = builder.BuildRecords();
+        builder.Add(CreateRecord("secondary", "two"));
+
+        records.Count.ShouldBe(1);
+        records[0].Descriptor.Name.ShouldBe(new SecretName("primary"));
+        builder.BuildRecords().Select(record => record.Descriptor.Name).ShouldBe(
+        [
+            new SecretName("primary"),
+            new SecretName("secondary")
+        ]);
+    }
+
+    [Fact]
+    public void Resolver_builder_add_range_preserves_order()
+    {
+        var records = new InMemorySecretResolverBuilder()
+            .AddRange(
+            [
+                CreateRecord("first", "one"),
+                CreateRecord("second", "two")
+            ])
+            .BuildRecords();
+
+        records.Select(record => record.Descriptor.Name).ShouldBe(
+        [
+            new SecretName("first"),
+            new SecretName("second")
+        ]);
+    }
+
+    [Fact]
+    public void Resolver_builder_accepts_existing_secret_values()
+    {
+        var value = new SecretValue("runtime-value");
+        var record = new InMemorySecretResolverBuilder()
+            .Add("primary", value)
+            .BuildRecords()
+            .ShouldHaveSingleItem();
+
+        record.Value.ShouldBeSameAs(value);
+        record.Value.ToString().ShouldBe(SecretRedactor.RedactedText);
+    }
+
+    [Fact]
+    public void Resolver_builder_uses_existing_resolver_validation()
+    {
+        var builder = new InMemorySecretResolverBuilder()
+            .Add("primary", "one", version: "v1")
+            .Add("primary", "two", version: "v1");
+
+        var exception = Should.Throw<InvalidOperationException>(() => builder.BuildResolver());
+
+        exception.Message.ShouldContain(nameof(SecretDiagnosticCode.DuplicateSecret));
+    }
+
+    [Fact]
+    public void Resolver_builder_rejects_null_existing_records()
+    {
+        var builder = new InMemorySecretResolverBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.Add((SecretRecord)null!));
+    }
+
+    [Fact]
+    public void Resolver_builder_rejects_null_record_ranges()
+    {
+        var builder = new InMemorySecretResolverBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.AddRange(null!));
+    }
+
+    [Fact]
+    public void Resolver_builder_rejects_null_secret_values()
+    {
+        var builder = new InMemorySecretResolverBuilder();
+
+        Should.Throw<ArgumentNullException>(() => builder.Add("primary", (SecretValue)null!));
+    }
+
+    [Fact]
     public async Task Resolver_returns_value_for_matching_reference()
     {
         var resolver = new InMemorySecretResolver(
