@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 1.0.5
+
+Adds explicit node-registry contributor registration.
+
+- Adds `CompositionHostingBuilder.RegisterNodeContributor<TContributor>()`
+  for registering reusable contributor classes without reflection or scanning.
+- Adds `CompositionHostingBuilder.RegisterNodeContributor(...)` for registering
+  explicit contributor instances.
+- Keeps `RegisterNodes(...)` as the direct delegate path for narrow host-local
+  registration.
+
 ## FluxFlow.Components.Designer 2.3.3
 
 Adds Designer provider service registration helpers.

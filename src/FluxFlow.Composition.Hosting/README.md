@@ -40,6 +40,19 @@ services
         inputs: [CompositionPorts.Metadata<string>("Input")]));
 ```
 
+Reusable packages or hosts can also register explicit contributor classes or
+instances:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodeContributor<AppCompositionNodes>();
+```
+
+Contributor registration is explicit and duplicate-safe by implementation type.
+The hosting package does not scan assemblies or discover node factories
+implicitly.
+
 Configuration records the resource reference by name:
 
 ```json
