@@ -543,6 +543,46 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public void Service_registration_rejects_null_options()
+    {
+        var services = new ServiceCollection();
+
+        var storeException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                (FileSystemStorageStoreOptions)null!));
+        var factoryException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                (FileSystemStorageStoreOptions)null!));
+
+        storeException.ParamName.ShouldBe("options");
+        factoryException.ParamName.ShouldBe("options");
+    }
+
+    [Fact]
+    public async Task Service_registration_rejects_null_options_factory_result()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                static _ => null!)
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                static _ => null!);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var storeException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IStorageStore>("items-store"));
+        var factoryException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory"));
+
+        storeException.Message.ShouldBe("File-system storage options factory returned null.");
+        factoryException.Message.ShouldBe("File-system storage options factory returned null.");
+    }
+
+    [Fact]
     public async Task Factory_DoesNotShareContextDefaultCollections()
     {
         using var temp = TempDirectory.Create();
