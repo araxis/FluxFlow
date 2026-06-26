@@ -29,10 +29,12 @@ Main types:
 - `FlowEventLevel`
 
 Use these types to author standalone nodes directly. `FlowNodeOptions`
-configures bounded transform intake. `FlowSourceOptions` lets source nodes opt
-into bounded broadcast output and awaitable output-block acceptance while
-sources that do not pass options keep the original unbounded broadcast
-behavior. `FlowMessage<T>` headers and `FlowEvent` attributes copy assigned
+configures bounded transform intake and validates non-positive capacities and
+parallelism values when assigned. `FlowSourceOptions` lets source nodes opt into
+bounded broadcast output and awaitable output-block acceptance while sources
+that do not pass options keep the original unbounded broadcast behavior. It
+allows `UnboundedOutputCapacity` and validates other output capacities when
+assigned. `FlowMessage<T>` headers and `FlowEvent` attributes copy assigned
 dictionaries with ordinal key comparison, keeping broadcast envelopes and
 diagnostics stable after creation.
 

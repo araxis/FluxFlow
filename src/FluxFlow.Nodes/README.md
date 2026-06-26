@@ -56,6 +56,9 @@ killing the pump. `Complete()` drains the input and completes the outputs;
 - **Outputs are broadcast** (latest-wins): a consumer that keeps up sees every
   message; one that falls badly behind may miss some. That is the deliberate
   trade for simplicity.
+- **Options validate on assignment**: `FlowNodeOptions` rejects non-positive
+  input capacity and max-degree-of-parallelism values, and `FlowSourceOptions`
+  rejects invalid output capacities while allowing `UnboundedOutputCapacity`.
 - **Sources can opt into bounded broadcast output** with
   `FlowSourceOptions.OutputCapacity` and `EmitAsync`. Source loops should await
   `EmitAsync` when they expose a capacity option, but this is still broadcast
