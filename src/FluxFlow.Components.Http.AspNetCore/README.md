@@ -24,6 +24,9 @@ app.MapFluxFlowTrigger("/greet", "greet");   // endpoint feeds the keyed trigger
 `AddFluxFlowHttpTrigger` registers a keyed request source + a keyed `HttpTriggerNode`
 fed from it, and a hosted service that starts the trigger with the app (which wires the
 graph and starts consuming) and disposes it on shutdown.
+The registration validates the service collection, trigger name, and graph
+configuration delegate. Trigger source capacity comes from `RequestReplyOptions`
+and must be greater than zero.
 
 ## Composition
 

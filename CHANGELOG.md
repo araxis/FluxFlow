@@ -55,6 +55,15 @@ Hardens keyed session store DI registration diagnostics.
 - Store-factory provider failures remain explicit and are covered by focused
   tests.
 
+## FluxFlow.Components.Http.AspNetCore 1.0.1
+
+Documents and verifies the HTTP trigger DI registration contract.
+
+- Adds focused coverage for invalid registration arguments, keyed source and
+  trigger node registration, hosted trigger lifetime, and source capacity
+  validation.
+- Documents that trigger source capacity comes from `RequestReplyOptions`.
+
 ## FluxFlow.Components.Resources 1.5.0
 
 Adds keyed resource registration helpers.
