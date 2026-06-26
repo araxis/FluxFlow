@@ -83,3 +83,8 @@ runtime that is already started is not started again, and a runtime that has
 already been stopped is not completed or started again.
 
 If you already have the exact section, call `AddFluxFlowCompositionSection(...)`.
+The hosting registration APIs reject null service collections, definitions,
+configuration roots, definition sources, node registration delegates, and options
+configuration delegates. A null section name is rejected explicitly; pass an
+empty string only when the supplied configuration object is already the exact
+composition section.

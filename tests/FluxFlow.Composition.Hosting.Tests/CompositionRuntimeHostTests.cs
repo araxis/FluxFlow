@@ -13,6 +13,66 @@ namespace FluxFlow.Composition.Hosting.Tests;
 public sealed class CompositionRuntimeHostTests
 {
     [Fact]
+    public void Hosting_registration_rejects_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+        var definition = new CompositionDefinition();
+        var configuration = new ConfigurationBuilder().Build();
+
+        var servicesException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowCompositionHostingServiceCollectionExtensions.AddFluxFlowComposition(
+                null!,
+                definition));
+        var definitionException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((CompositionDefinition)null!));
+        var configurationException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((IConfiguration)null!));
+        var sectionNameException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition(configuration, null!));
+        var sectionException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowCompositionSection(null!));
+        var sourceException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((ICompositionDefinitionSource)null!));
+
+        servicesException.ParamName.ShouldBe("services");
+        definitionException.ParamName.ShouldBe("definition");
+        configurationException.ParamName.ShouldBe("configuration");
+        sectionNameException.ParamName.ShouldBe("sectionName");
+        sectionException.ParamName.ShouldBe("configurationSection");
+        sourceException.ParamName.ShouldBe("definitionSource");
+    }
+
+    [Fact]
+    public void Hosting_builder_rejects_null_delegates()
+    {
+        var builder = new ServiceCollection()
+            .AddFluxFlowComposition(new CompositionDefinition());
+
+        var nodesException = Should.Throw<ArgumentNullException>(() =>
+            builder.RegisterNodes(null!));
+        var configureException = Should.Throw<ArgumentNullException>(() =>
+            builder.Configure(null!));
+
+        nodesException.ParamName.ShouldBe("configure");
+        configureException.ParamName.ShouldBe("configure");
+    }
+
+    [Fact]
+    public void Definition_sources_reject_null_inputs()
+    {
+        var definitionException = Should.Throw<ArgumentNullException>(() =>
+            new StaticCompositionDefinitionSource(null!));
+        var configurationException = Should.Throw<ArgumentNullException>(() =>
+            new ConfigurationCompositionDefinitionSource(null!));
+        var sectionNameException = Should.Throw<ArgumentNullException>(() =>
+            new ConfigurationCompositionDefinitionSource(new ConfigurationBuilder().Build(), null!));
+
+        definitionException.ParamName.ShouldBe("definition");
+        configurationException.ParamName.ShouldBe("configuration");
+        sectionNameException.ParamName.ShouldBe("sectionName");
+    }
+
+    [Fact]
     public async Task Hosted_runtime_resolves_keyed_resources_and_runs_definition()
     {
         var collector = new TextCollector();

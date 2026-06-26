@@ -64,6 +64,16 @@ Documents and verifies the HTTP trigger DI registration contract.
   validation.
 - Documents that trigger source capacity comes from `RequestReplyOptions`.
 
+## FluxFlow.Composition.Hosting 1.0.3
+
+Hardens composition hosting registration contracts.
+
+- Public definition source constructors now reject null definitions,
+  configuration roots, and section names immediately.
+- `AddFluxFlowComposition(...)` now rejects null section names explicitly
+  instead of treating them as the root section.
+- Adds focused registration and builder null-argument coverage.
+
 ## FluxFlow.Components.Resources 1.5.0
 
 Adds keyed resource registration helpers.

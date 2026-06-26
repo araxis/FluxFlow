@@ -26,6 +26,7 @@ public static class FluxFlowCompositionHostingServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(sectionName);
 
         return services.AddFluxFlowComposition(
             new ConfigurationCompositionDefinitionSource(configuration, sectionName));
