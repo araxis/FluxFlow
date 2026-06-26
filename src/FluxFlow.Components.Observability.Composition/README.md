@@ -76,6 +76,10 @@ strings such as `flow.counter.order`.
 ```
 
 Each node binds its existing options record from composition configuration.
+Invalid observability options, such as blank `inputType`, non-positive
+`boundedCapacity`, or unsupported logger `level`, fail during composition build
+and surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 ## Design Metadata
 

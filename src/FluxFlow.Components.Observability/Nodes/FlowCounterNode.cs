@@ -37,26 +37,26 @@ public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapsh
         IFlowExpressionEngine? expressionEngine = null,
         IFlowMapContextFactory<TInput>? contextFactory = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), expressionEngine, contextFactory, clock)
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "Counter bounded capacity must be greater than zero.");
-        }
+    }
 
-        _options = options;
+    private FlowCounterNode(
+        ValidatedOptions options,
+        IFlowExpressionEngine? expressionEngine,
+        IFlowMapContextFactory<TInput>? contextFactory,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.CounterOptions;
         _clock = clock ?? TimeProvider.System;
         _engineName = expressionEngine?.Name;
 
         // Compile the predicate expression once here (build time) when present;
         // when there is no predicate the node accepts every input and no engine is
         // required.
-        if (!string.IsNullOrWhiteSpace(options.EffectivePredicate))
+        var effectivePredicate = options.EffectivePredicate;
+        if (!string.IsNullOrWhiteSpace(effectivePredicate))
         {
             if (expressionEngine is null)
             {
@@ -66,8 +66,8 @@ public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapsh
             }
 
             _acceptPredicate = contextFactory is null
-                ? new ExpressionFlowPredicate<TInput>(options.EffectivePredicate!, expressionEngine)
-                : new ExpressionFlowPredicate<TInput>(options.EffectivePredicate!, expressionEngine, contextFactory);
+                ? new ExpressionFlowPredicate<TInput>(effectivePredicate, expressionEngine)
+                : new ExpressionFlowPredicate<TInput>(effectivePredicate, expressionEngine, contextFactory);
         }
     }
 
@@ -167,5 +167,37 @@ public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapsh
             });
             return false;
         }
+    }
+
+    private static ValidatedOptions ValidateOptions(FlowCounterOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.counter option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.counter option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(FlowCounterOptions counterOptions)
+    {
+        public FlowCounterOptions CounterOptions { get; } = counterOptions;
+
+        public string? EffectivePredicate { get; } = counterOptions.EffectivePredicate;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = counterOptions.BoundedCapacity
+        };
     }
 }

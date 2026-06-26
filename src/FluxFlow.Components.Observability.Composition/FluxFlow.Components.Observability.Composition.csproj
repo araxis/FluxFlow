@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone observability nodes over host-owned keyed expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for observability expression, selector, context, and clock resources while keeping runtime behavior unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Documents and tests observability option validation through composition build diagnostics for invalid config-bound inputType and boundedCapacity values.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
