@@ -25,13 +25,15 @@ public static class ResourceServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(lookupFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IResourceLookup>(
-            name,
+            normalizedName,
             (provider, _) => lookupFactory(provider)
                 ?? throw new InvalidOperationException("Resource lookup factory returned null."));
         services.AddKeyedSingleton<IResourceDescriptorProvider>(
-            name,
-            (provider, _) => provider.GetRequiredKeyedService<IResourceLookup>(name));
+            normalizedName,
+            (provider, _) => provider.GetRequiredKeyedService<IResourceLookup>(normalizedName));
 
         return services;
     }
@@ -57,8 +59,10 @@ public static class ResourceServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(descriptorProviderFactory);
 
+        var normalizedName = name.Trim();
+
         services.AddKeyedSingleton<IResourceDescriptorProvider>(
-            name,
+            normalizedName,
             (provider, _) => descriptorProviderFactory(provider)
                 ?? throw new InvalidOperationException("Resource descriptor provider factory returned null."));
 

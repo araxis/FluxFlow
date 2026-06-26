@@ -154,6 +154,29 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Service_registration_trims_keyed_names()
+    {
+        var catalog = new ResourceDescriptorCatalogBuilder()
+            .Add("primary", kind: "profile")
+            .BuildCatalog();
+        var descriptorProvider = new StaticResourceDescriptorProvider(
+        [
+            CreateDescriptor("secondary", "profile")
+        ]);
+
+        var services = new ServiceCollection()
+            .AddFluxFlowResourceLookup(" resources ", catalog)
+            .AddFluxFlowResourceDescriptorProvider(" declared-resources ", descriptorProvider);
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IResourceLookup>("resources").ShouldBeSameAs(catalog);
+        provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources").ShouldBeSameAs(catalog);
+        provider.GetRequiredKeyedService<IResourceDescriptorProvider>("declared-resources")
+            .ShouldBeSameAs(descriptorProvider);
+    }
+
+    [Fact]
     public void Service_registration_passes_provider_to_factories()
     {
         var services = new ServiceCollection();

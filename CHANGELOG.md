@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.5.3
+
+Hardens keyed resource service registration.
+
+- `AddFluxFlowResourceLookup(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowResourceDescriptorProvider(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving resource services through normalized
+  keys.
+
 ## FluxFlow.Components.Expressions 2.1.2
 
 Hardens keyed expression service registration.
