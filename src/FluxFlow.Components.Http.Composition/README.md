@@ -62,6 +62,9 @@ The composition package binds only `HttpClientNodeOptions`. HTTP method, URL,
 headers, body, content type, and per-message timeout still come from
 `HttpRequestInput` messages at runtime. Transport policy stays on the injected
 `HttpClient`.
+Invalid numeric `HttpClientNodeOptions` values fail during composition build and
+surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 ## Design Metadata
 

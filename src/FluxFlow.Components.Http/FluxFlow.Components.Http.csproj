@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone HTTP node for FluxFlow: a blockified HttpClient (request in, response out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone http.client node over an injected HttpClient: request in, response broadcast out, failures on the error port. The connection-resource node, sender-factory layer, and in-node SSRF guard are removed — all transport policy lives on the injected HttpClient. The node depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Hardens HttpClientNode option validation so non-positive capacities, response body limits, concurrency, and default timeout values fail fast during node construction.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

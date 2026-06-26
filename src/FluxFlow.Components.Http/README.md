@@ -58,6 +58,10 @@ new HttpClientNodeOptions
 };
 ```
 
+`BoundedCapacity`, `MaxResponseBodyBytes`, and `MaxDegreeOfParallelism` must be
+greater than zero. `DefaultTimeoutMilliseconds`, when set, must also be greater
+than zero. Invalid options fail fast during node construction.
+
 ## Composition
 
 Building a workflow — reading config, creating nodes, linking them — is a
