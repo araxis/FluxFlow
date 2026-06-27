@@ -86,7 +86,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Control");
+            item.Category.ShouldBe(new ComponentCategory("Control"));
             item.SuggestedEditorWidth.ShouldBe(420);
             item.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
                 ("expression", OptionValueKind.Expression),

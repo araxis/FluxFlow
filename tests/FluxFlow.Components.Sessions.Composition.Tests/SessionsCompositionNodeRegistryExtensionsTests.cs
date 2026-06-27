@@ -61,7 +61,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Sessions");
+            item.Category.ShouldBe(new ComponentCategory("Sessions"));
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
                 option.Name.Value == SessionsCompositionResourceNames.Clock);

@@ -39,7 +39,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(HttpCompositionNodeTypes.Client));
         metadata.DisplayName.ShouldBe("HTTP Client");
-        metadata.Category.ShouldBe("HTTP");
+        metadata.Category.ShouldBe(new ComponentCategory("HTTP"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == HttpCompositionResourceNames.Client ||

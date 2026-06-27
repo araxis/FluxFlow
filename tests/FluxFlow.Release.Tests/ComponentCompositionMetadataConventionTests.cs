@@ -96,7 +96,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     metadata.DisplayName,
                     $"{entry.PackageId} Designer metadata for '{nodeType}' must include a display name.");
                 AssertRequiredDesignerText(
-                    metadata.Category,
+                    metadata.Category?.Value,
                     $"{entry.PackageId} Designer metadata for '{nodeType}' must include a category.");
                 AssertRequiredDesignerText(
                     metadata.Summary,

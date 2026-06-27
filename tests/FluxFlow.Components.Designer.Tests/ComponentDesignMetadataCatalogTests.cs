@@ -57,7 +57,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType("sample.builder"));
         metadata.DisplayName.ShouldBe("Sample Builder");
-        metadata.Category.ShouldBe("Samples");
+        metadata.Category.ShouldBe(new ComponentCategory("Samples"));
         metadata.Summary.ShouldBe("Builds sample metadata.");
         metadata.IconKey.ShouldBe("sample");
         metadata.PreferredNodeName.ShouldBe("sample");
@@ -493,6 +493,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         {
             Type = new ComponentType("sample.invalid"),
             DisplayName = " ",
+            Category = default(ComponentCategory),
             SuggestedEditorWidth = 0,
             Options =
             [
@@ -537,6 +538,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         var errors = ComponentDesignMetadataValidator.Validate(metadata);
 
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.DisplayName));
+        errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.Category));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
         errors.ShouldContain(error => error.Message.Contains("Port name", StringComparison.Ordinal));
         errors.ShouldContain(error => error.Message.Contains("minimum", StringComparison.Ordinal));
@@ -1216,6 +1218,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentCategory_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentCategory("Mapping");
+        var second = new ComponentCategory("Mapping");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("Mapping");
+        first.ToString().ShouldBe("Mapping");
+        new ComponentCategory("Control").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentCategory_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentCategory(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component category cannot be empty");
+    }
+
+    [Fact]
     public void ComponentOptionName_validates_value_and_preserves_identity()
     {
         var first = new ComponentOptionName("expression");
@@ -1323,7 +1351,7 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         Type = new ComponentType(type),
         DisplayName = "Sample Transform",
-        Category = "Samples",
+        Category = new ComponentCategory("Samples"),
         Summary = "Transforms sample values.",
         IconKey = "transform",
         PreferredNodeName = "transform",

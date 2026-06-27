@@ -41,7 +41,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
         metadata.Type.Value.ShouldBe(PayloadsCompositionNodeTypes.Inspect);
         metadata.DisplayName.ShouldBe("Payload Inspect");
-        metadata.Category.ShouldBe("Payloads");
+        metadata.Category.ShouldBe(new ComponentCategory("Payloads"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>

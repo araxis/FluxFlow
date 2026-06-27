@@ -71,7 +71,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Storage");
+            item.Category.ShouldBe(new ComponentCategory("Storage"));
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
                 option.Name.Value == StorageCompositionResourceNames.Store ||

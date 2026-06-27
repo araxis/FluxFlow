@@ -65,7 +65,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("FileSystem");
+            item.Category.ShouldBe(new ComponentCategory("FileSystem"));
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
                 option.Name.Value == FileSystemCompositionResourceNames.Clock);

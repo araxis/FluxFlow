@@ -10,7 +10,7 @@ public sealed class ComponentDesignMetadataBuilder
     private readonly List<PortDesignMetadata> ports = [];
     private readonly Dictionary<string, string> attributes = new(StringComparer.Ordinal);
     private string? displayName;
-    private string? category;
+    private ComponentCategory? category;
     private string? summary;
     private string? iconKey;
     private string? preferredNodeName;
@@ -35,7 +35,7 @@ public sealed class ComponentDesignMetadataBuilder
         int? suggestedEditorWidth = null)
     {
         this.displayName = displayName;
-        this.category = category;
+        this.category = category is null ? null : new ComponentCategory(category);
         this.summary = summary;
         this.iconKey = iconKey;
         this.preferredNodeName = preferredNodeName;

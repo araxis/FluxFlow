@@ -64,7 +64,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator));
         metadata.DisplayName.ShouldBe("JSON Schema Validator");
-        metadata.Category.ShouldBe("Validation");
+        metadata.Category.ShouldBe(new ComponentCategory("Validation"));
         metadata.PreferredNodeName.ShouldBe("validate");
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([

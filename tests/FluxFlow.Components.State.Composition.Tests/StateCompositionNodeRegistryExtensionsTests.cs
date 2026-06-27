@@ -42,7 +42,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
 
         metadata.Type.Value.ShouldBe(StateCompositionNodeTypes.Reducer);
         metadata.DisplayName.ShouldBe("State Reducer");
-        metadata.Category.ShouldBe("State");
+        metadata.Category.ShouldBe(new ComponentCategory("State"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == StateCompositionResourceNames.Clock);

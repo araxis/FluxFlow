@@ -18,7 +18,12 @@ public static class ComponentDesignMetadataValidator
         }
 
         ValidateOptionalText(metadata.DisplayName, nameof(ComponentDesignMetadata.DisplayName), errors);
-        ValidateOptionalText(metadata.Category, nameof(ComponentDesignMetadata.Category), errors);
+        if (metadata.Category is { } category && string.IsNullOrWhiteSpace(category.Value))
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                nameof(ComponentDesignMetadata.Category),
+                "Component category cannot be empty when it is provided."));
+        }
         ValidateOptionalText(metadata.Summary, nameof(ComponentDesignMetadata.Summary), errors);
         ValidateOptionalText(metadata.IconKey, nameof(ComponentDesignMetadata.IconKey), errors);
         ValidateOptionalText(metadata.PreferredNodeName, nameof(ComponentDesignMetadata.PreferredNodeName), errors);

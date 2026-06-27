@@ -53,7 +53,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         foreach (var item in metadata.Values)
         {
-            item.Category.ShouldBe("Observability");
+            item.Category.ShouldBe(new ComponentCategory("Observability"));
             item.SuggestedEditorWidth.ShouldBe(460);
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
             item.Options.ShouldNotContain(option =>

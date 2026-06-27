@@ -40,7 +40,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
 
         metadata.Type.Value.ShouldBe(ProjectionsCompositionNodeTypes.EventProjection);
         metadata.DisplayName.ShouldBe("Event Projection");
-        metadata.Category.ShouldBe("Projections");
+        metadata.Category.ShouldBe(new ComponentCategory("Projections"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>

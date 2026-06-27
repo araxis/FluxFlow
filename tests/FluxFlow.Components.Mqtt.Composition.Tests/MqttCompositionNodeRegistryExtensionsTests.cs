@@ -49,7 +49,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("MQTT");
+            item.Category.ShouldBe(new ComponentCategory("MQTT"));
             item.Options.ShouldNotContain(option =>
                 option.Name.Value == MqttCompositionResourceNames.Publisher ||
                 option.Name.Value == MqttCompositionResourceNames.TriggerSource ||

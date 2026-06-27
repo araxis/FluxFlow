@@ -41,7 +41,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
 
         metadata.Type.Value.ShouldBe(MetricsCompositionNodeTypes.Aggregate);
         metadata.DisplayName.ShouldBe("Metrics Aggregate");
-        metadata.Category.ShouldBe("Metrics");
+        metadata.Category.ShouldBe(new ComponentCategory("Metrics"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>

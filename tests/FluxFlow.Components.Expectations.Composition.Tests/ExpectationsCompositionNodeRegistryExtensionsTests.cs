@@ -43,7 +43,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
         metadata.Type.Value.ShouldBe(ExpectationsCompositionNodeTypes.EventExpectation);
         metadata.DisplayName.ShouldBe("Event Expectation");
-        metadata.Category.ShouldBe("Expectations");
+        metadata.Category.ShouldBe(new ComponentCategory("Expectations"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>

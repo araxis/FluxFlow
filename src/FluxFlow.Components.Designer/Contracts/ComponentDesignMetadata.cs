@@ -4,7 +4,7 @@ public sealed record ComponentDesignMetadata
 {
     public required ComponentType Type { get; init; }
     public string? DisplayName { get; init; }
-    public string? Category { get; init; }
+    public ComponentCategory? Category { get; init; }
     public string? Summary { get; init; }
     public string? IconKey { get; init; }
     public string? PreferredNodeName { get; init; }

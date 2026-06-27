@@ -72,7 +72,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Serialization");
+            item.Category.ShouldBe(new ComponentCategory("Serialization"));
             item.SuggestedEditorWidth.ShouldBe(420);
             item.Options.ShouldNotContain(option =>
                 option.Name.Value == SerializationCompositionResourceNames.Clock);

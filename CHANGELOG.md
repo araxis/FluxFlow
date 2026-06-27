@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.6.0
+
+Adds a Designer-owned category identifier.
+
+- Adds `ComponentCategory` for non-empty palette category names.
+- Changes `ComponentDesignMetadata.Category` from `string?` to
+  `ComponentCategory?`, aligning category metadata with Designer-owned
+  component, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  category so provider authoring stays concise while stored metadata is typed.
+
 ## FluxFlow.Components.Designer 2.5.0
 
 Adds a Designer-owned option identifier.
