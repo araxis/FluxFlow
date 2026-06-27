@@ -73,8 +73,56 @@ public sealed class ConfigurationValidationRequestBuilder
         return AddResource(resource);
     }
 
+    public ConfigurationValidationRequestBuilder AddResource(
+        ConfigurationOptionPath path,
+        ResourceName resourceName,
+        ResourceKind? kind = null,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+        => AddResource(
+            path,
+            new ResourceReference
+            {
+                Name = resourceName,
+                Kind = kind?.Value
+            },
+            required,
+            metadata);
+
+    public ConfigurationValidationRequestBuilder AddResource(
+        ConfigurationOptionPath path,
+        ResourceReference? reference,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        if (string.IsNullOrWhiteSpace(path.Value))
+            throw new ArgumentException("Configuration option path cannot be empty.", nameof(path));
+
+        var resource = new ConfigurationResourceReference
+        {
+            Path = path.Value,
+            Reference = reference,
+            Required = required
+        };
+
+        if (metadata is not null)
+        {
+            resource = resource with
+            {
+                Metadata = metadata
+            };
+        }
+
+        return AddResource(resource);
+    }
+
     public ConfigurationValidationRequestBuilder AddOptionalResource(
         string path,
+        IReadOnlyDictionary<string, string>? metadata = null)
+        => AddResource(path, reference: null, required: false, metadata);
+
+    public ConfigurationValidationRequestBuilder AddOptionalResource(
+        ConfigurationOptionPath path,
         IReadOnlyDictionary<string, string>? metadata = null)
         => AddResource(path, reference: null, required: false, metadata);
 
@@ -144,8 +192,58 @@ public sealed class ConfigurationValidationRequestBuilder
         return AddSecret(secret);
     }
 
+    public ConfigurationValidationRequestBuilder AddSecret(
+        ConfigurationOptionPath optionPath,
+        SecretName secretName,
+        SecretVersion? version = null,
+        SecretKind? kind = null,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+        => AddSecret(
+            optionPath,
+            new SecretReference
+            {
+                Name = secretName,
+                Version = version?.Value,
+                Kind = kind?.Value
+            },
+            required,
+            metadata);
+
+    public ConfigurationValidationRequestBuilder AddSecret(
+        ConfigurationOptionPath optionPath,
+        SecretReference? reference,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        if (string.IsNullOrWhiteSpace(optionPath.Value))
+            throw new ArgumentException("Configuration option path cannot be empty.", nameof(optionPath));
+
+        var secret = new SecretOptionReference
+        {
+            OptionPath = optionPath.Value,
+            Reference = reference,
+            Required = required
+        };
+
+        if (metadata is not null)
+        {
+            secret = secret with
+            {
+                Metadata = metadata
+            };
+        }
+
+        return AddSecret(secret);
+    }
+
     public ConfigurationValidationRequestBuilder AddOptionalSecret(
         string optionPath,
+        IReadOnlyDictionary<string, string>? metadata = null)
+        => AddSecret(optionPath, reference: null, required: false, metadata);
+
+    public ConfigurationValidationRequestBuilder AddOptionalSecret(
+        ConfigurationOptionPath optionPath,
         IReadOnlyDictionary<string, string>? metadata = null)
         => AddSecret(optionPath, reference: null, required: false, metadata);
 

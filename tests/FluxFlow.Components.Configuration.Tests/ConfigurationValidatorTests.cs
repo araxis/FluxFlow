@@ -50,6 +50,53 @@ public sealed class ConfigurationValidatorTests
     }
 
     [Fact]
+    public void Request_builder_accepts_typed_authoring_values()
+    {
+        var request = new ConfigurationValidationRequestBuilder()
+            .AddResource(
+                new ConfigurationOptionPath(" connections.primary "),
+                new ResourceName(" primary "),
+                kind: new ResourceKind(" connection "),
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .AddSecret(
+                new ConfigurationOptionPath(" connections.primary.credential "),
+                new SecretName(" primary-credential "),
+                version: new SecretVersion(" v1 "),
+                kind: new SecretKind(" credential "),
+                metadata: new Dictionary<string, string>
+                {
+                    [" scope "] = " workflow "
+                })
+            .AddOptionalResource(new ConfigurationOptionPath(" connections.secondary "))
+            .AddOptionalSecret(new ConfigurationOptionPath(" connections.secondary.credential "))
+            .Build();
+
+        request.Resources.Count.ShouldBe(2);
+        request.Resources[0].Path.ShouldBe("connections.primary");
+        request.Resources[0].Required.ShouldBeTrue();
+        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(new ResourceName("primary"));
+        request.Resources[0].Reference.ShouldNotBeNull().Kind.ShouldBe("connection");
+        request.Resources[0].Metadata["owner"].ShouldBe("runtime");
+        request.Resources[1].Path.ShouldBe("connections.secondary");
+        request.Resources[1].Required.ShouldBeFalse();
+        request.Resources[1].Reference.ShouldBeNull();
+
+        request.Secrets.Count.ShouldBe(2);
+        request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
+        request.Secrets[0].Required.ShouldBeTrue();
+        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(new SecretName("primary-credential"));
+        request.Secrets[0].Reference.ShouldNotBeNull().Version.ShouldBe("v1");
+        request.Secrets[0].Reference.ShouldNotBeNull().Kind.ShouldBe("credential");
+        request.Secrets[0].Metadata["scope"].ShouldBe("workflow");
+        request.Secrets[1].OptionPath.ShouldBe("connections.secondary.credential");
+        request.Secrets[1].Required.ShouldBeFalse();
+        request.Secrets[1].Reference.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Request_builder_optional_absent_references_validate_without_diagnostics()
     {
         var request = new ConfigurationValidationRequestBuilder()
@@ -505,6 +552,50 @@ public sealed class ConfigurationValidatorTests
             "resource.path",
             "option.path"
         ]);
+    }
+
+    [Fact]
+    public void Configuration_option_path_trims_surrounding_whitespace()
+    {
+        var path = new ConfigurationOptionPath("  connections.primary  ");
+
+        path.Value.ShouldBe("connections.primary");
+        path.ToString().ShouldBe("connections.primary");
+        path.ShouldBe(new ConfigurationOptionPath("connections.primary"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Configuration_option_path_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new ConfigurationOptionPath(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_configuration_option_path_to_string_returns_empty()
+    {
+        default(ConfigurationOptionPath).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Request_builder_typed_authoring_rejects_default_paths()
+    {
+        var builder = new ConfigurationValidationRequestBuilder();
+
+        Should.Throw<ArgumentException>(() =>
+                builder.AddResource(default(ConfigurationOptionPath), new ResourceName("primary")))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentException>(() =>
+                builder.AddOptionalResource(default(ConfigurationOptionPath)))
+            .ParamName.ShouldBe("path");
+        Should.Throw<ArgumentException>(() =>
+                builder.AddSecret(default(ConfigurationOptionPath), new SecretName("primary")))
+            .ParamName.ShouldBe("optionPath");
+        Should.Throw<ArgumentException>(() =>
+                builder.AddOptionalSecret(default(ConfigurationOptionPath)))
+            .ParamName.ShouldBe("optionPath");
     }
 
     [Fact]

@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.4.4</Version>
+    <Version>1.5.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens ConfigurationValidationReport diagnostic collection guardrails by rejecting null diagnostic entries at construction.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a typed configuration option path for code-authored validation requests.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

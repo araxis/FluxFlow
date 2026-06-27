@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Configuration 1.5.0
+
+Adds typed option-path authoring for configuration validation requests.
+
+- Adds `ConfigurationOptionPath` for non-empty, trimmed code-authored resource
+  and secret option paths.
+- Adds `ConfigurationValidationRequestBuilder` overloads that accept typed
+  option paths plus typed resource and secret authoring values.
+- Keeps the request DTOs string-shaped so configuration-bound blank paths can
+  still be reported as structured diagnostics.
+
 ## FluxFlow.Components.Resources 1.6.0
 
 Adds typed resource descriptor authoring helpers.

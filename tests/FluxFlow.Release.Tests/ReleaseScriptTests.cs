@@ -138,8 +138,8 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Hardens configuration validation report guardrails.");
-            notes.ShouldContain(package.PackageId);
+            notes.ShouldContain("Adds typed option-path authoring for configuration validation requests.");
+            notes.ShouldContain("ConfigurationOptionPath");
             notes.ShouldNotContain("## ");
         }
         finally

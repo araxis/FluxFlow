@@ -12,6 +12,8 @@ application files, or runtime lifecycle.
 
 - `ConfigurationResourceReference`: a resource option path plus optional
   `ResourceReference`.
+- `ConfigurationOptionPath`: non-empty, trimmed option-path value for
+  code-authored validation requests.
 - `ConfigurationValidationRequest`: resource references and secret option
   references to validate.
 - `ConfigurationDiagnostic`: normalized validation issue with source, code,
@@ -81,6 +83,23 @@ var report = await ConfigurationValidator.ValidateAsync(
     request);
 ```
 
+Code-authored requests can use typed paths and typed resource or secret
+metadata values at the builder boundary:
+
+```csharp
+var request = new ConfigurationValidationRequestBuilder()
+    .AddResource(
+        new ConfigurationOptionPath("connections.primary"),
+        new ResourceName("primary"),
+        kind: new ResourceKind("connection"))
+    .AddSecret(
+        new ConfigurationOptionPath("connections.primary.credential"),
+        new SecretName("primary-credential"),
+        version: new SecretVersion("v1"),
+        kind: new SecretKind("credential"))
+    .Build();
+```
+
 Design-time or configuration-only hosts can validate references against
 descriptor providers without opening runtime resources or resolving secret
 values:
@@ -117,6 +136,8 @@ request diagnostics.
 same DTOs. It rejects null resource paths and secret option paths immediately,
 before constructing resource or secret references. Blank paths are still
 represented in the DTOs and reported later as structured validation diagnostics.
+`ConfigurationOptionPath` is available for code-authored requests that should
+fail fast on blank paths before constructing DTOs.
 It does not own resource lookup, secret resolution, or validation policy.
 Descriptor-only validation uses host-owned resource and secret descriptor
 providers. It checks declaration presence, kind mismatches, ambiguous secret

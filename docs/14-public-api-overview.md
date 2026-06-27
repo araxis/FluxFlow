@@ -937,7 +937,8 @@ palette rendering, localization, and resource pickers owned by the host.
 These packages are intentionally not standalone node composition adapters:
 
 - `FluxFlow.Components.Configuration` validates resource and secret references,
-  including trimmed resource option paths and resource option metadata
+  including trimmed resource option paths, typed `ConfigurationOptionPath`
+  values for code-authored validation requests, and resource option metadata
   diagnostics with normalized valid metadata maps, request collection
   snapshotting, and a fluent `ConfigurationValidationRequestBuilder` with
   individual and range additions over the same validation DTOs. The builder
