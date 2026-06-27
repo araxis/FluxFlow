@@ -165,7 +165,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 var nodeType = metadata.Type.ToString();
                 AssertRequiredDesignerText(
-                    metadata.IconKey,
+                    metadata.IconKey?.Value,
                     $"{entry.PackageId} Designer metadata for '{nodeType}' must include an icon key.");
                 AssertRequiredDesignerText(
                     metadata.PreferredNodeName,

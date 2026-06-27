@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.7.0
+
+Adds a Designer-owned icon-key identifier.
+
+- Adds `ComponentIconKey` for non-empty palette icon keys.
+- Changes `ComponentDesignMetadata.IconKey` from `string?` to
+  `ComponentIconKey?`, aligning icon metadata with Designer-owned component,
+  category, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  icon key so provider authoring stays concise while stored metadata is typed.
+
 ## FluxFlow.Components.Designer 2.6.0
 
 Adds a Designer-owned category identifier.

@@ -18,10 +18,11 @@ component without depending on a specific rendering framework.
   required flag, value type hint, summary, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
-- `ComponentType`, `ComponentCategory`, `ComponentOptionName`,
-  `ComponentResourceName`, and `ComponentPortName`: Designer-owned identifiers
-  for component types, palette categories, editable options, host-owned
-  resource slots, and ports. They do not depend on engine definition types.
+- `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
+  `ComponentOptionName`, `ComponentResourceName`, and `ComponentPortName`:
+  Designer-owned identifiers for component types, palette categories, palette
+  icon keys, editable options, host-owned resource slots, and ports. They do
+  not depend on engine definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
@@ -81,7 +82,7 @@ var metadata = new ComponentDesignMetadata
     DisplayName = "Sample Transform",
     Category = new ComponentCategory("Samples"),
     Summary = "Transforms a sample value.",
-    IconKey = "transform",
+    IconKey = new ComponentIconKey("transform"),
     PreferredNodeName = "transform",
     SuggestedEditorWidth = 420,
     Options =

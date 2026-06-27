@@ -59,7 +59,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.DisplayName.ShouldBe("Sample Builder");
         metadata.Category.ShouldBe(new ComponentCategory("Samples"));
         metadata.Summary.ShouldBe("Builds sample metadata.");
-        metadata.IconKey.ShouldBe("sample");
+        metadata.IconKey.ShouldBe(new ComponentIconKey("sample"));
         metadata.PreferredNodeName.ShouldBe("sample");
         metadata.SuggestedEditorWidth.ShouldBe(360);
         metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression", "mode"]);
@@ -494,6 +494,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             Type = new ComponentType("sample.invalid"),
             DisplayName = " ",
             Category = default(ComponentCategory),
+            IconKey = default(ComponentIconKey),
             SuggestedEditorWidth = 0,
             Options =
             [
@@ -539,6 +540,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.DisplayName));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.Category));
+        errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.IconKey));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
         errors.ShouldContain(error => error.Message.Contains("Port name", StringComparison.Ordinal));
         errors.ShouldContain(error => error.Message.Contains("minimum", StringComparison.Ordinal));
@@ -1244,6 +1246,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentIconKey_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentIconKey("transform");
+        var second = new ComponentIconKey("transform");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("transform");
+        first.ToString().ShouldBe("transform");
+        new ComponentIconKey("source").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentIconKey_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentIconKey(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component icon key cannot be empty");
+    }
+
+    [Fact]
     public void ComponentOptionName_validates_value_and_preserves_identity()
     {
         var first = new ComponentOptionName("expression");
@@ -1353,7 +1381,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         DisplayName = "Sample Transform",
         Category = new ComponentCategory("Samples"),
         Summary = "Transforms sample values.",
-        IconKey = "transform",
+        IconKey = new ComponentIconKey("transform"),
         PreferredNodeName = "transform",
         SuggestedEditorWidth = 420,
         Options =

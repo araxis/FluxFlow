@@ -25,7 +25,12 @@ public static class ComponentDesignMetadataValidator
                 "Component category cannot be empty when it is provided."));
         }
         ValidateOptionalText(metadata.Summary, nameof(ComponentDesignMetadata.Summary), errors);
-        ValidateOptionalText(metadata.IconKey, nameof(ComponentDesignMetadata.IconKey), errors);
+        if (metadata.IconKey is { } iconKey && string.IsNullOrWhiteSpace(iconKey.Value))
+        {
+            errors.Add(new DesignerMetadataValidationError(
+                nameof(ComponentDesignMetadata.IconKey),
+                "Component icon key cannot be empty when it is provided."));
+        }
         ValidateOptionalText(metadata.PreferredNodeName, nameof(ComponentDesignMetadata.PreferredNodeName), errors);
 
         if (metadata.SuggestedEditorWidth is <= 0)
