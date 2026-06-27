@@ -71,6 +71,7 @@ Release tests currently enforce these consistency rules:
 - every manifest package is mentioned in the public API overview
 - every manifest package has release metadata, changelog coverage, and a
   package-local README packed as `README.md`
+- every package README starts with an H1 matching its package id
 - non-composition component packages stay free of `FluxFlow.Engine`,
   `FluxFlow.Composition`, `FluxFlow.Composition.Hosting`, and
   `FluxFlow.Components.Designer`

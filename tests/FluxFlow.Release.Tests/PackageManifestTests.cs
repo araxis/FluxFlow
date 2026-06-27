@@ -168,6 +168,11 @@ public sealed class PackageManifestTests
 
         var readmePath = Path.GetFullPath(Path.Combine(projectDirectory, NormalizePath(packedReadme.Include!)));
         File.Exists(readmePath).ShouldBeTrue($"{packageId} readme file does not exist at {readmePath}");
+
+        var heading = File
+            .ReadLines(readmePath)
+            .FirstOrDefault(line => line.StartsWith("# ", StringComparison.Ordinal));
+        heading.ShouldBe($"# {packageId}", $"{packageId} README must start with the package id.");
     }
 
     private static string ReadRequiredProperty(XDocument project, string name, string packageId)

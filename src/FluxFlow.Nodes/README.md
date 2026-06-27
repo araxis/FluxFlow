@@ -3,6 +3,18 @@
 The minimal base every FluxFlow node is built on. A node is a self-contained TPL
 Dataflow processor — you `new` it and link it; no engine, registry, or runtime.
 
+## When To Use It
+
+Use this package when you are authoring reusable nodes or linking node instances
+directly in code. It owns the message envelope, node/source base classes, common
+error and event contracts, and the bounded Dataflow plumbing shared by component
+packages.
+
+Do not use it as an application workspace model or resource registry. Hosts own
+workflow files, resource lookup, concrete clients, stores, and any UI or
+dashboard projection. Add `FluxFlow.Composition` only when a host wants fluent or
+configuration-driven node composition.
+
 ## Messages
 
 Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
