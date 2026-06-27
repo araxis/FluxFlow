@@ -881,6 +881,7 @@ Main types:
 - `ComponentOptionName`
 - `ComponentResourceName`
 - `ComponentPortName`
+- `ComponentPortGroup`
 - `ComponentDesignMetadata`
 - `OptionDesignMetadata`
 - `OptionChoiceMetadata`
@@ -901,9 +902,10 @@ editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
 `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
 `ComponentPreferredNodeName`, `ComponentOptionName`, `ComponentResourceName`,
-and `ComponentPortName` are Designer-owned identifier value types, keeping
-component, category, icon, preferred node name, option, resource, and port
-metadata independent from engine definition contracts.
+`ComponentPortName`, and `ComponentPortGroup` are Designer-owned identifier
+value types, keeping component, category, icon, preferred node name, option,
+resource, port, and port-group metadata independent from engine definition
+contracts.
 
 `ComponentDesignMetadataValidator` enforces identifier, option, choice,
 resource, port, and attribute consistency. Enum options must define choices,

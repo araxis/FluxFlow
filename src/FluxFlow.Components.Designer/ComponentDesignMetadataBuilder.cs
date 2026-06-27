@@ -231,7 +231,7 @@ public sealed class ComponentDesignMetadataBuilder
             Name = new ComponentPortName(name),
             Direction = direction,
             DisplayName = displayName,
-            Group = group,
+            Group = group is null ? null : new ComponentPortGroup(group),
             Order = order,
             Summary = summary,
             ValueType = valueType,

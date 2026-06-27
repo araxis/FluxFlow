@@ -5,7 +5,7 @@ public sealed record PortDesignMetadata
     public required ComponentPortName Name { get; init; }
     public required PortDirection Direction { get; init; }
     public string? DisplayName { get; init; }
-    public string? Group { get; init; }
+    public ComponentPortGroup? Group { get; init; }
     public int Order { get; init; }
     public string? Summary { get; init; }
     public string? ValueType { get; init; }

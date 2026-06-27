@@ -527,7 +527,8 @@ public sealed class ComponentDesignMetadataCatalogTests
                 new PortDesignMetadata
                 {
                     Name = new ComponentPortName("Input"),
-                    Direction = PortDirection.Input
+                    Direction = PortDirection.Input,
+                    Group = default(ComponentPortGroup)
                 },
                 new PortDesignMetadata
                 {
@@ -544,6 +545,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.IconKey));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.PreferredNodeName));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
+        errors.ShouldContain(error => error.Path == $"{nameof(ComponentDesignMetadata.Ports)}[1].{nameof(PortDesignMetadata.Group)}");
         errors.ShouldContain(error => error.Message.Contains("Port name", StringComparison.Ordinal));
         errors.ShouldContain(error => error.Message.Contains("minimum", StringComparison.Ordinal));
         errors.ShouldContain(error => error.Message.Contains("Choice value", StringComparison.Ordinal));
@@ -1365,6 +1367,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentPortGroup_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentPortGroup("Messages");
+        var second = new ComponentPortGroup("Messages");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("Messages");
+        first.ToString().ShouldBe("Messages");
+        new ComponentPortGroup("Errors").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentPortGroup_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentPortGroup(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component port group cannot be empty");
+    }
+
+    [Fact]
     public void ComponentResourceName_validates_value_and_preserves_identity()
     {
         var first = new ComponentResourceName("engine");
@@ -1396,7 +1424,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         var ports = CreateMetadata().Ports.OrderBy(port => port.Order).ToArray();
 
         ports[0].Name.ShouldBe(new ComponentPortName("Input"));
-        ports[0].Group.ShouldBe("Messages");
+        ports[0].Group.ShouldBe(new ComponentPortGroup("Messages"));
         ports[0].ValueType.ShouldBe("SampleInput");
         ports[0].IsPrimary.ShouldBeTrue();
         ports[1].Name.ShouldBe(new ComponentPortName("Output"));
@@ -1461,7 +1489,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 Name = new ComponentPortName("Input"),
                 Direction = PortDirection.Input,
                 DisplayName = "Input",
-                Group = "Messages",
+                Group = new ComponentPortGroup("Messages"),
                 Order = 0,
                 Summary = "Input message.",
                 ValueType = "SampleInput",
@@ -1472,7 +1500,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 Name = new ComponentPortName("Output"),
                 Direction = PortDirection.Output,
                 DisplayName = "Output",
-                Group = "Messages",
+                Group = new ComponentPortGroup("Messages"),
                 Order = 1,
                 Summary = "Mapped message.",
                 ValueType = "SampleOutput",

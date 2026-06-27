@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.9.0
+
+Adds a Designer-owned port-group identifier.
+
+- Adds `ComponentPortGroup` for non-empty port group names.
+- Changes `PortDesignMetadata.Group` from `string?` to `ComponentPortGroup?`,
+  aligning port grouping metadata with Designer-owned component, category,
+  icon, preferred node-name, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddInputPort(...)`,
+  `AddOutputPort(...)`, and `AddPort(...)` accepting string group names so
+  provider authoring stays concise while stored metadata is typed.
+
 ## FluxFlow.Components.Designer 2.8.0
 
 Adds a Designer-owned preferred node-name identifier.

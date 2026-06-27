@@ -518,7 +518,12 @@ public static class ComponentDesignMetadataValidator
             }
 
             ValidateOptionalText(port.DisplayName, $"{path}.{nameof(PortDesignMetadata.DisplayName)}", errors);
-            ValidateOptionalText(port.Group, $"{path}.{nameof(PortDesignMetadata.Group)}", errors);
+            if (port.Group is { } group && string.IsNullOrWhiteSpace(group.Value))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.Group)}",
+                    "Port group cannot be empty when it is provided."));
+            }
             ValidateOptionalText(port.Summary, $"{path}.{nameof(PortDesignMetadata.Summary)}", errors);
             ValidateOptionalText(port.ValueType, $"{path}.{nameof(PortDesignMetadata.ValueType)}", errors);
             ValidateAttributes(port.Attributes, $"{path}.{nameof(PortDesignMetadata.Attributes)}", errors);
