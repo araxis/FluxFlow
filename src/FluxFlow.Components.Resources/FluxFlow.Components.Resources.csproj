@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Resources</PackageId>
     <AssemblyName>FluxFlow.Components.Resources</AssemblyName>
     <RootNamespace>FluxFlow.Components.Resources</RootNamespace>
-    <Version>1.5.3</Version>
+    <Version>1.6.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable named resource contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;resources;metadata</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens keyed resource service registration by trimming lookup and descriptor-provider keys before DI registration.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds typed resource kind and metadata text authoring helpers for resource descriptors.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

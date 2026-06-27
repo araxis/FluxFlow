@@ -51,6 +51,35 @@ public sealed class ResourceDescriptorCatalogBuilder
         return Add(descriptor);
     }
 
+    public ResourceDescriptorCatalogBuilder Add(
+        ResourceName name,
+        ResourceKind? kind = null,
+        ResourceMetadataText? displayName = null,
+        ResourceMetadataText? summary = null,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        if (string.IsNullOrWhiteSpace(name.Value))
+            throw new ArgumentException("Resource name cannot be empty.", nameof(name));
+
+        var descriptor = new ResourceDescriptor
+        {
+            Name = name,
+            Kind = kind?.Value,
+            DisplayName = displayName?.Value,
+            Summary = summary?.Value
+        };
+
+        if (metadata is not null)
+        {
+            descriptor = descriptor with
+            {
+                Metadata = metadata
+            };
+        }
+
+        return Add(descriptor);
+    }
+
     public IReadOnlyList<ResourceDescriptor> BuildDescriptors()
         => descriptors.ToArray();
 

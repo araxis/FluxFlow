@@ -951,11 +951,14 @@ These packages are intentionally not standalone node composition adapters:
   diagnostics.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
   diagnostics, including descriptor-provider separation, trimmed resource
-  names, kinds, display text, and null-safe normalized metadata and attribute
+  names, code-authored `ResourceKind` and `ResourceMetadataText` values,
+  descriptor display text, and null-safe normalized metadata and attribute
   validation, defensive diagnostic metadata copying, and a fluent
   `ResourceDescriptorCatalogBuilder` over the existing descriptor/catalog
   contracts, plus keyed DI registration helpers for host-owned lookups and
-  descriptor providers.
+  descriptor providers. Descriptor/reference DTOs keep string-shaped optional
+  text so configuration-bound invalid values can still be reported as
+  diagnostics.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
   option helpers, redaction helpers, trimmed secret names, versions, kinds,
   option paths, optional non-sensitive descriptor enumeration, null-safe

@@ -40,6 +40,30 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
+    public void Catalog_builder_accepts_typed_authoring_values()
+    {
+        var catalog = new ResourceDescriptorCatalogBuilder()
+            .Add(
+                new ResourceName(" primary-profile "),
+                kind: new ResourceKind(" profile "),
+                displayName: new ResourceMetadataText(" Primary Profile "),
+                summary: new ResourceMetadataText(" Runtime profile. "),
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .BuildCatalog();
+
+        var descriptor = catalog.GetResources().ShouldHaveSingleItem();
+
+        descriptor.Name.ShouldBe(new ResourceName("primary-profile"));
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary Profile");
+        descriptor.Summary.ShouldBe("Runtime profile.");
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+    }
+
+    [Fact]
     public void Catalog_builder_accepts_existing_descriptors_and_snapshots_build_results()
     {
         var builder = new ResourceDescriptorCatalogBuilder()
@@ -418,6 +442,64 @@ public sealed class ResourceDescriptorCatalogTests
         name.Value.ShouldBe("primary");
         name.ToString().ShouldBe("primary");
         name.ShouldBe(new ResourceName("primary"));
+    }
+
+    [Fact]
+    public void Resource_kind_trims_surrounding_whitespace()
+    {
+        var kind = new ResourceKind("  profile  ");
+
+        kind.Value.ShouldBe("profile");
+        kind.ToString().ShouldBe("profile");
+        kind.ShouldBe(new ResourceKind("profile"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Resource_kind_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new ResourceKind(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_resource_kind_to_string_returns_empty()
+    {
+        default(ResourceKind).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Resource_metadata_text_trims_surrounding_whitespace()
+    {
+        var text = new ResourceMetadataText("  Primary Profile  ");
+
+        text.Value.ShouldBe("Primary Profile");
+        text.ToString().ShouldBe("Primary Profile");
+        text.ShouldBe(new ResourceMetadataText("Primary Profile"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Resource_metadata_text_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new ResourceMetadataText(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_resource_metadata_text_to_string_returns_empty()
+    {
+        default(ResourceMetadataText).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Catalog_builder_typed_authoring_rejects_default_resource_name()
+    {
+        Should.Throw<ArgumentException>(() =>
+                new ResourceDescriptorCatalogBuilder().Add(default(ResourceName)))
+            .ParamName.ShouldBe("name");
     }
 
     [Fact]

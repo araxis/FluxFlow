@@ -12,6 +12,8 @@ component packages to a concrete owner or lifecycle model.
 - `ResourceReference`: a name plus optional kind and attributes.
 - `ResourceDescriptor`: a declared resource name, optional kind, display fields,
   and metadata.
+- `ResourceKind` and `ResourceMetadataText`: small value types for code-authored
+  descriptor kind, display-name, and summary values.
 - `IResourceDescriptorProvider`: a small metadata enumeration abstraction for
   declared resources.
 - `IResourceLookup`: a small lookup abstraction hosts can back with their own
@@ -81,6 +83,19 @@ var catalog = new ResourceDescriptorCatalogBuilder()
     .BuildCatalog();
 ```
 
+Code-authored descriptors can use value types at the builder boundary while the
+underlying DTOs remain configuration-friendly:
+
+```csharp
+var catalog = new ResourceDescriptorCatalogBuilder()
+    .Add(
+        new ResourceName("primary-profile"),
+        kind: new ResourceKind("profile"),
+        displayName: new ResourceMetadataText("Primary Profile"),
+        summary: new ResourceMetadataText("Runtime profile."))
+    .BuildCatalog();
+```
+
 ## Diagnostics
 
 Use `ResourceDiagnostics` to:
@@ -99,9 +114,11 @@ accidental null-reference failures.
 as empty, and formats as a metadata-safe one-line summary.
 
 `ResourceName`, resource `Kind`, `DisplayName`, and `Summary` trim surrounding
-whitespace when assigned. This keeps configuration-bound descriptors and
-references matching the same logical name and kind, and makes duplicate
-detection catch names that differ only by padding.
+whitespace when assigned. `ResourceKind` and `ResourceMetadataText` provide the
+same trimming for code-authored descriptors and reject empty values at the
+builder boundary. The descriptor/reference DTOs still keep their string-shaped
+fields so configuration-bound invalid text can be reported as structured
+diagnostics instead of throwing during binding.
 
 Valid metadata and attribute maps trim surrounding whitespace from keys and
 values when assigned. Maps with null values, blank keys or values, or duplicate

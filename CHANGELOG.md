@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 1.6.0
+
+Adds typed resource descriptor authoring helpers.
+
+- Adds `ResourceKind` for non-empty, trimmed code-authored resource kind values.
+- Adds `ResourceMetadataText` for non-empty, trimmed descriptor display names
+  and summaries.
+- Adds a `ResourceDescriptorCatalogBuilder.Add(...)` overload that accepts
+  `ResourceName`, optional `ResourceKind`, and optional `ResourceMetadataText`
+  values while keeping the descriptor DTOs configuration-friendly for
+  structured diagnostics.
+
 ## FluxFlow.Components.Designer 2.14.0
 
 Adds a Designer-owned metadata text value type.
