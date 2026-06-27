@@ -12,5 +12,5 @@ public sealed record ComponentDesignMetadata
     public IReadOnlyList<OptionDesignMetadata> Options { get; init; } = [];
     public IReadOnlyList<ResourceDesignMetadata> Resources { get; init; } = [];
     public IReadOnlyList<PortDesignMetadata> Ports { get; init; } = [];
-    public IReadOnlyDictionary<ComponentAttributeName, string> Attributes { get; init; } = new Dictionary<ComponentAttributeName, string>();
+    public IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Attributes { get; init; } = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
 }

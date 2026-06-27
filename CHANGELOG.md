@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.13.0
+
+Adds a Designer-owned metadata attribute value identifier.
+
+- Adds `ComponentAttributeValue` for non-empty metadata attribute values.
+- Changes Designer metadata `Attributes` dictionaries from `string` values to
+  `ComponentAttributeValue` values across component, option, option-choice,
+  resource, and port metadata.
+- Keeps `ComponentDesignMetadataBuilder` accepting string-keyed string-valued
+  attribute maps and string `AddAttribute(...)` calls so provider authoring
+  stays concise while stored metadata is typed.
+
 ## FluxFlow.Components.Designer 2.12.0
 
 Adds a Designer-owned value type hint identifier.

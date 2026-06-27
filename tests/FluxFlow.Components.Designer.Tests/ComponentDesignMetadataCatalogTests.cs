@@ -66,7 +66,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.Options[1].Choices.Select(choice => choice.Value.Value).ShouldBe(["strict", "relaxed"]);
         metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
-        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
+        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
     }
 
     [Fact]
@@ -121,10 +121,10 @@ public sealed class ComponentDesignMetadataCatalogTests
             .AddOutputPort("Output");
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression"]);
-        metadata.Options[0].Attributes[Attribute("scope")].ShouldBe("editable");
-        metadata.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].ShouldBe("host-owned");
-        metadata.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].ShouldBe("input");
-        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
+        metadata.Options[0].Attributes[Attribute("scope")].Value.ShouldBe("editable");
+        metadata.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].Value.ShouldBe("host-owned");
+        metadata.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].Value.ShouldBe("input");
+        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
     }
 
     [Fact]
@@ -144,8 +144,8 @@ public sealed class ComponentDesignMetadataCatalogTests
         attributes["later"] = "ignored";
 
         metadata.Attributes.Count.ShouldBe(2);
-        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
-        metadata.Attributes[Attribute("domain")].ShouldBe("sample");
+        metadata.Attributes[Attribute("shape")].Value.ShouldBe("transform");
+        metadata.Attributes[Attribute("domain")].Value.ShouldBe("sample");
         metadata.Attributes.ContainsKey(Attribute("later")).ShouldBeFalse();
     }
 
@@ -296,19 +296,19 @@ public sealed class ComponentDesignMetadataCatalogTests
         choices.Clear();
         resources.Clear();
         ports.Clear();
-        metadataAttributes[Attribute("shape")] = "changed";
-        optionAttributes[Attribute("scope")] = "changed";
-        choiceAttributes[Attribute("kind")] = "changed";
-        resourceAttributes[Attribute("resource")] = "changed";
-        portAttributes[Attribute("side")] = "changed";
+        metadataAttributes[Attribute("shape")] = new ComponentAttributeValue("changed");
+        optionAttributes[Attribute("scope")] = new ComponentAttributeValue("changed");
+        choiceAttributes[Attribute("kind")] = new ComponentAttributeValue("changed");
+        resourceAttributes[Attribute("resource")] = new ComponentAttributeValue("changed");
+        portAttributes[Attribute("side")] = new ComponentAttributeValue("changed");
 
         catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
 
-        found.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].ShouldBe("editable");
-        found.Options[0].Choices.ShouldHaveSingleItem().Attributes[Attribute("kind")].ShouldBe("mode");
-        found.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].ShouldBe("host-owned");
-        found.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].ShouldBe("input");
-        found.Attributes[Attribute("shape")].ShouldBe("transform");
+        found.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].Value.ShouldBe("editable");
+        found.Options[0].Choices.ShouldHaveSingleItem().Attributes[Attribute("kind")].Value.ShouldBe("mode");
+        found.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].Value.ShouldBe("host-owned");
+        found.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].Value.ShouldBe("input");
+        found.Attributes[Attribute("shape")].Value.ShouldBe("transform");
     }
 
     [Fact]
@@ -436,14 +436,14 @@ public sealed class ComponentDesignMetadataCatalogTests
         };
 
         var module = new ComponentDesignMetadataModule([metadata]);
-        attributes[Attribute("shape")] = "changed";
-        optionAttributes[Attribute("scope")] = "changed";
+        attributes[Attribute("shape")] = new ComponentAttributeValue("changed");
+        optionAttributes[Attribute("scope")] = new ComponentAttributeValue("changed");
 
         var stored = module.GetMetadata().ShouldHaveSingleItem();
 
         stored.ShouldNotBeSameAs(metadata);
-        stored.Attributes[Attribute("shape")].ShouldBe("transform");
-        stored.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].ShouldBe("editable");
+        stored.Attributes[Attribute("shape")].Value.ShouldBe("transform");
+        stored.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].Value.ShouldBe("editable");
     }
 
     [Fact]
@@ -1136,9 +1136,9 @@ public sealed class ComponentDesignMetadataCatalogTests
                 {
                     Name = default,
                     DisplayName = " ",
-                    Attributes = new Dictionary<ComponentAttributeName, string>
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
                     {
-                        [default] = "resource"
+                        [default] = new ComponentAttributeValue("resource")
                     }
                 },
                 new ResourceDesignMetadata
@@ -1344,6 +1344,32 @@ public sealed class ComponentDesignMetadataCatalogTests
         first.Value.ShouldBe("shape");
         first.ToString().ShouldBe("shape");
         new ComponentAttributeName("domain").ShouldNotBe(first);
+    }
+
+    [Fact]
+    public void ComponentAttributeValue_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentAttributeValue("transform");
+        var second = new ComponentAttributeValue("transform");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("transform");
+        first.ToString().ShouldBe("transform");
+        new ComponentAttributeValue("source").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentAttributeValue_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentAttributeValue(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component attribute value cannot be empty");
     }
 
     [Theory]
@@ -1571,11 +1597,11 @@ public sealed class ComponentDesignMetadataCatalogTests
 
     private static ComponentAttributeName Attribute(string name) => new(name);
 
-    private static Dictionary<ComponentAttributeName, string> AttributeMap(
+    private static Dictionary<ComponentAttributeName, ComponentAttributeValue> AttributeMap(
         params (string Name, string Value)[] attributes)
         => attributes.ToDictionary(
             attribute => Attribute(attribute.Name),
-            attribute => attribute.Value);
+            attribute => new ComponentAttributeValue(attribute.Value));
 
     private sealed class NullMetadataProvider : IComponentDesignMetadataProvider
     {

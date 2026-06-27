@@ -541,7 +541,7 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateAttributes(
-        IReadOnlyDictionary<ComponentAttributeName, string>? attributes,
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue>? attributes,
         string path,
         ICollection<DesignerMetadataValidationError> errors)
     {
@@ -558,7 +558,7 @@ public static class ComponentDesignMetadataValidator
                 errors.Add(new DesignerMetadataValidationError(path, "Attribute keys are required."));
             }
 
-            if (string.IsNullOrWhiteSpace(attribute.Value))
+            if (string.IsNullOrWhiteSpace(attribute.Value.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{attribute.Key}", "Attribute values are required."));
             }

@@ -21,12 +21,13 @@ component without depending on a specific rendering framework.
 - `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
   `ComponentPreferredNodeName`, `ComponentOptionName`,
   `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
-  `ComponentPortGroup`, `ComponentAttributeName`, and
-  `ComponentValueTypeHint`:
+  `ComponentPortGroup`, `ComponentAttributeName`,
+  `ComponentAttributeValue`, and `ComponentValueTypeHint`:
   Designer-owned identifiers for component types, palette categories, palette
   icon keys, preferred node names, editable options, option choices,
-  host-owned resource slots, ports, port groups, metadata attribute keys, and
-  value type hints. They do not depend on engine definition types.
+  host-owned resource slots, ports, port groups, metadata attribute keys,
+  metadata attribute values, and value type hints. They do not depend on engine
+  definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
@@ -146,9 +147,9 @@ var metadata = new ComponentDesignMetadata
             IsPrimary = true
         }
     ],
-    Attributes = new Dictionary<ComponentAttributeName, string>
+    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
     {
-        [new ComponentAttributeName("shape")] = "transform"
+        [new ComponentAttributeName("shape")] = new ComponentAttributeValue("transform")
     }
 };
 

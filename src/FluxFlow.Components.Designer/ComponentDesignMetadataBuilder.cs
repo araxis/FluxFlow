@@ -8,7 +8,7 @@ public sealed class ComponentDesignMetadataBuilder
     private readonly List<OptionDesignMetadata> options = [];
     private readonly List<ResourceDesignMetadata> resources = [];
     private readonly List<PortDesignMetadata> ports = [];
-    private readonly Dictionary<ComponentAttributeName, string> attributes = [];
+    private readonly Dictionary<ComponentAttributeName, ComponentAttributeValue> attributes = [];
     private string? displayName;
     private ComponentCategory? category;
     private string? summary;
@@ -265,7 +265,7 @@ public sealed class ComponentDesignMetadataBuilder
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
 
-        attributes.Add(new ComponentAttributeName(key), value);
+        attributes.Add(new ComponentAttributeName(key), new ComponentAttributeValue(value));
         return this;
     }
 
@@ -283,7 +283,7 @@ public sealed class ComponentDesignMetadataBuilder
             Options = options.ToArray(),
             Resources = resources.ToArray(),
             Ports = ports.ToArray(),
-            Attributes = new Dictionary<ComponentAttributeName, string>(attributes)
+            Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(attributes)
         };
 
         return new ComponentDesignMetadataModule([metadata])
@@ -291,9 +291,9 @@ public sealed class ComponentDesignMetadataBuilder
             .Single();
     }
 
-    private static IReadOnlyDictionary<ComponentAttributeName, string> CopyAttributes(
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> CopyAttributes(
         IReadOnlyDictionary<string, string> source)
         => source.ToDictionary(
             attribute => new ComponentAttributeName(attribute.Key),
-            attribute => attribute.Value);
+            attribute => new ComponentAttributeValue(attribute.Value));
 }

@@ -149,7 +149,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             (ControlCompositionPortNames.WhenFalse, PortDirection.Output, 3, false, "TInput")
         ]);
         metadata.Ports.Single(port => port.Name.Value == ControlCompositionPortNames.Output)
-            .Attributes[new ComponentAttributeName("aliasOf")].ShouldBe(ControlCompositionPortNames.WhenTrue);
+            .Attributes[new ComponentAttributeName("aliasOf")].Value.ShouldBe(ControlCompositionPortNames.WhenTrue);
     }
 
     [Fact]

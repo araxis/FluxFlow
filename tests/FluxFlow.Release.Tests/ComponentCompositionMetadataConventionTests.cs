@@ -1893,12 +1893,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     private static HashSet<string> ReadOmittedOptions(ComponentDesignMetadata metadata)
     {
         if (!metadata.Attributes.TryGetValue(new ComponentAttributeName("omittedOptions"), out var omittedOptions) ||
-            string.IsNullOrWhiteSpace(omittedOptions))
+            string.IsNullOrWhiteSpace(omittedOptions.Value))
         {
             return new HashSet<string>(StringComparer.Ordinal);
         }
 
-        return omittedOptions
+        return omittedOptions.Value
             .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.Ordinal);
     }

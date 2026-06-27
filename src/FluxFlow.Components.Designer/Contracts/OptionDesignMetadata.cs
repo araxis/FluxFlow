@@ -11,5 +11,5 @@ public sealed record OptionDesignMetadata
     public double? Min { get; init; }
     public double? Max { get; init; }
     public IReadOnlyList<OptionChoiceMetadata> Choices { get; init; } = [];
-    public IReadOnlyDictionary<ComponentAttributeName, string> Attributes { get; init; } = new Dictionary<ComponentAttributeName, string>();
+    public IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Attributes { get; init; } = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
 }
