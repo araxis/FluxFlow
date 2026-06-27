@@ -87,13 +87,17 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 order: 0,
                 summary: "Required keyed expression engine used to evaluate reducer and key expressions.",
                 valueType: nameof(IFlowExpressionEngine),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
             .AddResource(
                 StateCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic state reducer results and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddReducerPorts(ComponentDesignMetadataBuilder builder)
         => builder

@@ -185,22 +185,25 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 order: 0,
                 summary: "Conditionally required keyed expression engine when predicate or expression is configured.",
                 valueType: nameof(IFlowExpressionEngine),
-                attributes: new Dictionary<string, string>
-                {
-                    ["requiredWhenAnyOption"] = "predicate,expression"
-                })
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    requiredWhenAnyOption: "predicate,expression"))
             .AddResource(
                 ObservabilityCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
-                valueType: "IFlowMapContextFactory<TInput>")
+                valueType: "IFlowMapContextFactory<TInput>",
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ContextFactory))
             .AddResource(
                 ObservabilityCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddLoggerResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -209,18 +212,19 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
-                valueType: nameof(TimeProvider))
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock))
             .AddResource(
                 ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
                 displayName: "Attribute Selector",
                 order: 1,
                 summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
                 valueType: "IObservabilityValueSelector<TInput>",
-                attributes: new Dictionary<string, string>
-                {
-                    ["pattern"] = "true",
-                    ["option"] = "attributeSelectors"
-                });
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Selector,
+                    keyPattern: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
+                    option: "attributeSelectors"));
 
     private static void AddMetricsResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -229,13 +233,17 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Size Selector",
                 order: 0,
                 summary: "Optional keyed selector used to calculate message size metrics.",
-                valueType: "IObservabilityValueSelector<TInput>")
+                valueType: "IObservabilityValueSelector<TInput>",
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Selector))
             .AddResource(
                 ObservabilityCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
     {

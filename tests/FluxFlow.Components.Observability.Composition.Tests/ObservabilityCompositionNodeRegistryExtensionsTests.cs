@@ -72,7 +72,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         metadata[ObservabilityCompositionNodeTypes.Counter]
             .Resources
             .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.Engine)
-            .Attributes[new ComponentAttributeName("requiredWhenAnyOption")]
+            .Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)]
             .Value.ShouldBe("predicate,expression");
 
         AssertResources(
@@ -84,8 +84,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Resources
             .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
-        attributeSelector.Attributes[new ComponentAttributeName("pattern")].Value.ShouldBe("true");
-        attributeSelector.Attributes[new ComponentAttributeName("option")].Value.ShouldBe("attributeSelectors");
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership)]
+            .Value.ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
+            .Value.ShouldBe(ResourceDesignMetadataAttributeValues.Selector);
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern)]
+            .Value.ShouldBe(ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Option)]
+            .Value.ShouldBe("attributeSelectors");
 
         AssertResources(
             metadata[ObservabilityCompositionNodeTypes.Metrics],

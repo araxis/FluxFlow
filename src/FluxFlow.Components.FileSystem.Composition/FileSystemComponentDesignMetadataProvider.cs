@@ -182,7 +182,9 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic file-system diagnostics and timestamps.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {

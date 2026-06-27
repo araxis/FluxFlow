@@ -223,13 +223,17 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 order: 0,
                 summary: "Required keyed storage store or store factory used for put, get, query, and delete operations.",
                 valueType: $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Store))
             .AddResource(
                 StorageCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic storage diagnostics and timestamps.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static OptionDesignMetadata CollectionOption() => new()
     {

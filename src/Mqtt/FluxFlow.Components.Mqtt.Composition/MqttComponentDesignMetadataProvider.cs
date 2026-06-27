@@ -42,13 +42,17 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
                 order: 0,
                 summary: "Keyed MQTT publisher used to send publish requests.",
                 valueType: nameof(IMqttPublisher),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Publisher))
             .AddResource(
                 MqttCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic publish diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
         AddPorts(
             builder,
@@ -125,13 +129,17 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
                 order: 0,
                 summary: "Keyed MQTT trigger source used to open subscriptions.",
                 valueType: nameof(IMqttTriggerSource),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.TriggerSource))
             .AddResource(
                 MqttCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic trigger diagnostics and response timeouts.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
         AddPorts(
             builder,

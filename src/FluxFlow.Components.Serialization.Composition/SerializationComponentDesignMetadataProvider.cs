@@ -84,7 +84,9 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic serialization diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
         AddSharedOptions(builder);
         AddSerializationPorts(builder, inputType, outputType);

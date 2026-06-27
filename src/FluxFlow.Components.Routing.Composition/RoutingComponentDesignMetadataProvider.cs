@@ -287,7 +287,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             Order = order,
             Summary = new ComponentMetadataText(summary),
             ValueType = new ComponentValueTypeHint(valueType),
-            IsRequired = true
+            IsRequired = true,
+            Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                ResourceDesignMetadataAttributeValues.Delegate)
         };
 
     private static ResourceDesignMetadata ClockResource(int order) => new()
@@ -296,7 +298,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         DisplayName = new ComponentMetadataText("Clock"),
         Order = order,
         Summary = new ComponentMetadataText("Optional keyed clock for deterministic routing timing, timeouts, and diagnostics."),
-        ValueType = new ComponentValueTypeHint(nameof(TimeProvider))
+        ValueType = new ComponentValueTypeHint(nameof(TimeProvider)),
+        Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+            ResourceDesignMetadataAttributeValues.Clock)
     };
 
     private static OptionDesignMetadata EngineOption() => new()

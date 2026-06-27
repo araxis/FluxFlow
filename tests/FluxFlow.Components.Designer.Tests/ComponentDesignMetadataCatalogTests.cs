@@ -128,6 +128,80 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Resource_metadata_attribute_helper_creates_host_owned_picker_hints()
+    {
+        var attributes = ResourceDesignMetadataAttributes.CreateHostOwned(
+            ResourceDesignMetadataAttributeValues.Clock,
+            keyPattern: "clock:{name}",
+            option: "clockResource",
+            requiredWhenAnyOption: "usesClock");
+
+        attributes[ResourceDesignMetadataAttributeNames.Ownership]
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        attributes[ResourceDesignMetadataAttributeNames.PickerKind]
+            .ShouldBe(ResourceDesignMetadataAttributeValues.Clock);
+        attributes[ResourceDesignMetadataAttributeNames.KeyPattern]
+            .ShouldBe("clock:{name}");
+        attributes[ResourceDesignMetadataAttributeNames.Option]
+            .ShouldBe("clockResource");
+        attributes[ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption]
+            .ShouldBe("usesClock");
+
+        var metadata = new ComponentDesignMetadataBuilder("sample.resource-hints")
+            .AddResource("clock", attributes: attributes)
+            .Build();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resource_metadata_attribute_helper_creates_typed_attribute_map()
+    {
+        var attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+            ResourceDesignMetadataAttributeValues.Store);
+
+        attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership)]
+            .ShouldBe(new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.HostOwned));
+        attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
+            .ShouldBe(new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.Store));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Resource_metadata_attribute_helper_rejects_empty_picker_kind(string pickerKind)
+    {
+        var act = () => ResourceDesignMetadataAttributes.CreateHostOwned(pickerKind);
+
+        act.ShouldThrow<ArgumentException>()
+            .ParamName.ShouldBe("pickerKind");
+    }
+
+    [Theory]
+    [InlineData("keyPattern")]
+    [InlineData("option")]
+    [InlineData("requiredWhenAnyOption")]
+    public void Resource_metadata_attribute_helper_rejects_empty_optional_values(string argumentName)
+    {
+        Action act = argumentName switch
+        {
+            "keyPattern" => () => ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock,
+                keyPattern: " "),
+            "option" => () => ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock,
+                option: " "),
+            "requiredWhenAnyOption" => () => ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock,
+                requiredWhenAnyOption: " "),
+            _ => throw new ArgumentOutOfRangeException(nameof(argumentName))
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Resource metadata attribute");
+    }
+
+    [Fact]
     public void Metadata_builder_adds_attribute_ranges_and_snapshots_inputs()
     {
         var attributes = new Dictionary<string, string>

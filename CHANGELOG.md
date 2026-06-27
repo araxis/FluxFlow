@@ -53,6 +53,19 @@ Adds typed in-memory secret descriptor authoring helpers.
   `SecretMetadataText` values while keeping the descriptor/reference DTOs
   configuration-friendly for structured diagnostics.
 
+## FluxFlow.Components.Designer 2.15.0
+
+Adds shared host-owned resource metadata attribute helpers.
+
+- Adds `ResourceDesignMetadataAttributeNames`,
+  `ResourceDesignMetadataAttributeValues`, and
+  `ResourceDesignMetadataAttributes` for resource picker metadata.
+- Standardizes host-owned resource ownership, picker kind, key pattern, related
+  option, and conditional requiredness hints across composition metadata
+  providers.
+- Keeps Designer metadata engine/composition neutral; hosts still own resource
+  catalogs, keyed registrations, secrets, lifetimes, and disposal.
+
 ## FluxFlow.Components.Designer 2.14.0
 
 Adds a Designer-owned metadata text value type.

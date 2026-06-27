@@ -218,13 +218,17 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 order: 0,
                 summary: "Required keyed session store or store factory used to record, replay, or query sessions.",
                 valueType: $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}",
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Store))
             .AddResource(
                 SessionsCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static OptionDesignMetadata StoreOption() => new()
     {

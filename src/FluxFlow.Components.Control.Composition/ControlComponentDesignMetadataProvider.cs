@@ -170,17 +170,23 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 order: 0,
                 summary: "Keyed expression engine used to evaluate control expressions.",
                 valueType: nameof(IFlowExpressionEngine),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
             .AddResource(
                 ControlCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
-                valueType: "IFlowMapContextFactory<TInput>")
+                valueType: "IFlowMapContextFactory<TInput>",
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ContextFactory))
             .AddResource(
                 ControlCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 }

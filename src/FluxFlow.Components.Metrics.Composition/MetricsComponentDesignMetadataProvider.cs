@@ -95,7 +95,9 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic metric timestamps and diagnostics.",
-            valueType: nameof(TimeProvider));
+            valueType: nameof(TimeProvider),
+            attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddAggregatePorts(ComponentDesignMetadataBuilder builder)
         => builder

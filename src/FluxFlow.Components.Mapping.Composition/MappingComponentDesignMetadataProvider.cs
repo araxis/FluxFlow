@@ -71,19 +71,25 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 order: 0,
                 summary: "Keyed expression engine service used to evaluate mapper expressions.",
                 valueType: nameof(IFlowExpressionEngine),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
             .AddResource(
                 MappingCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed mapping context factory for custom expression variables.",
-                valueType: nameof(IMappingContextFactory))
+                valueType: nameof(IMappingContextFactory),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ContextFactory))
             .AddResource(
                 MappingCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 2,
                 summary: "Optional keyed clock for deterministic mapper diagnostics.",
-                valueType: nameof(TimeProvider))
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock))
             .AddInputPort(
                 MappingCompositionPortNames.Input,
                 displayName: "Input",

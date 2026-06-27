@@ -125,7 +125,9 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic source timing and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
         configure(builder);
 

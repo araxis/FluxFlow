@@ -85,7 +85,9 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
-            valueType: nameof(TimeProvider));
+            valueType: nameof(TimeProvider),
+            attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddPayloadInspectPorts(ComponentDesignMetadataBuilder builder)
         => builder

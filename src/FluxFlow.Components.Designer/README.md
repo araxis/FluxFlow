@@ -38,6 +38,10 @@ component without depending on a specific rendering framework.
   more providers.
 - `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
   for registering providers and resolving one validated catalog.
+- `ResourceDesignMetadataAttributeNames`,
+  `ResourceDesignMetadataAttributeValues`, and
+  `ResourceDesignMetadataAttributes`: shared names, values, and helpers for
+  describing host-owned resource picker hints.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
 options and ports, duplicate primary ports per direction, invalid option
@@ -76,6 +80,12 @@ matches a choice. `Min` and `Max` apply only to number and duration options.
 Resources describe host-owned dependencies such as keyed clients, stores,
 expression engines, or clocks. They are metadata only; this package does not
 register, resolve, validate, or dispose those resources.
+
+Use `ResourceDesignMetadataAttributes.CreateHostOwned(...)` when a provider
+needs to describe a host-owned resource picker. The shared attribute names cover
+resource ownership, picker kind, key pattern, related option, and conditional
+requiredness. They are only hints for hosts; the host still owns resource
+catalogs, keyed registrations, secrets, lifetimes, and disposal.
 
 ## Example
 
@@ -129,7 +139,9 @@ var metadata = new ComponentDesignMetadata
             DisplayName = new ComponentMetadataText("Engine"),
             Order = 0,
             ValueType = new ComponentValueTypeHint("IExpressionEngine"),
-            IsRequired = true
+            IsRequired = true,
+            Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                ResourceDesignMetadataAttributeValues.ExpressionEngine)
         }
     ],
     Ports =
@@ -172,7 +184,13 @@ var built = new ComponentDesignMetadataBuilder("sample.transform")
         preferredNodeName: "transform",
         suggestedEditorWidth: 420)
     .AddOption("expression", OptionValueKind.Expression, isRequired: true)
-    .AddResource("engine", order: 0, valueType: "IExpressionEngine", isRequired: true)
+    .AddResource(
+        "engine",
+        order: 0,
+        valueType: "IExpressionEngine",
+        isRequired: true,
+        attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+            ResourceDesignMetadataAttributeValues.ExpressionEngine))
     .AddInputPort("Input", order: 0, isPrimary: true)
     .AddOutputPort("Output", order: 0, isPrimary: true)
     .AddAttributes(new Dictionary<string, string>

@@ -130,6 +130,10 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     AssertRequiredDesignerText(
                         resource.ValueType?.Value,
                         $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a value type.");
+                    AssertHostOwnedResourcePickerMetadata(
+                        entry,
+                        nodeType,
+                        resource);
                 }
 
                 foreach (var port in metadata.Ports)
@@ -1781,6 +1785,40 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string message)
         => string.IsNullOrWhiteSpace(value).ShouldBeFalse(message);
 
+    private static void AssertHostOwnedResourcePickerMetadata(
+        PackageManifestEntry entry,
+        string nodeType,
+        ResourceDesignMetadata resource)
+    {
+        var ownershipKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership);
+        var pickerKindKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind);
+
+        resource.Attributes.TryGetValue(ownershipKey, out var ownership)
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare host-owned resource ownership.");
+        ownership!.Value.ShouldBe(
+            ResourceDesignMetadataAttributeValues.HostOwned,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must use host-owned resource ownership.");
+
+        resource.Attributes.TryGetValue(pickerKindKey, out var pickerKind)
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a resource picker kind.");
+        AssertRequiredDesignerText(
+            pickerKind.Value,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a non-empty resource picker kind.");
+
+        if (!resource.Name.Value.Contains('{', StringComparison.Ordinal))
+            return;
+
+        var keyPatternKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern);
+        resource.Attributes.TryGetValue(keyPatternKey, out var keyPattern)
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' pattern resource '{resource.Name.Value}' must declare a key pattern.");
+        keyPattern!.Value.ShouldBe(
+            resource.Name.Value,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' pattern resource '{resource.Name.Value}' must match its resource key pattern.");
+    }
+
     private static void AssertStableMetadataOrder(
         IEnumerable<(string Name, int Order)> items,
         string scope)
@@ -2225,7 +2263,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         => resource.IsRequired ||
             resource.Attributes.Keys.Any(key =>
                 key.Value.StartsWith("requiredWhen", StringComparison.OrdinalIgnoreCase)) ||
-            resource.Attributes.ContainsKey(new ComponentAttributeName("option"));
+            resource.Attributes.ContainsKey(new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Option));
 
     private static bool ResourceHelperMentionsConstant(
         string resourceContent,

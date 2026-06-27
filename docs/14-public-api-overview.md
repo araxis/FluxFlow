@@ -905,6 +905,9 @@ Main types:
 - `ComponentDesignMetadataServiceCollectionExtensions`
 - `ComponentDesignMetadataValidator`
 - `DesignerMetadataValidationError`
+- `ResourceDesignMetadataAttributeNames`
+- `ResourceDesignMetadataAttributeValues`
+- `ResourceDesignMetadataAttributes`
 
 Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
@@ -932,6 +935,10 @@ cannot mutate catalog contents after registration.
 it supports single and bulk component-level attributes through `AddAttribute`
 and `AddAttributes`, builds through the validated module path, and does not own
 rendering, localization, resource selection, or runtime mapping.
+`ResourceDesignMetadataAttributes` provides shared host-owned resource
+attribute helpers so package metadata can declare resource ownership, picker
+kind, key pattern, related option, and conditional requiredness without owning
+the host resource catalog.
 `ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
 metadata providers and a singleton validated catalog in host DI, while leaving
 palette rendering, localization, and resource pickers owned by the host.

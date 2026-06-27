@@ -62,13 +62,17 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Selector",
                 order: 0,
                 summary: "Optional keyed JSON schema value selector used to choose the value to validate.",
-                valueType: "IJsonSchemaValueSelector<TInput>")
+                valueType: "IJsonSchemaValueSelector<TInput>",
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Selector))
             .AddResource(
                 ValidationCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic validation results and diagnostics.",
-                valueType: nameof(TimeProvider))
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock))
             .AddInputPort(
                 ValidationCompositionPortNames.Input,
                 displayName: "Input",

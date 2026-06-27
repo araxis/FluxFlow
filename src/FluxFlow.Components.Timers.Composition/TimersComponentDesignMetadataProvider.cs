@@ -173,7 +173,9 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 displayName: "Clock",
                 order: 0,
                 summary: "Optional keyed clock for deterministic timer scheduling and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
         if (attributes is not null)
         {

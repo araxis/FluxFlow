@@ -75,13 +75,17 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 order: 0,
                 summary: "Keyed HttpClient used to send request messages.",
                 valueType: nameof(HttpClient),
-                isRequired: true)
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Client))
             .AddResource(
                 HttpCompositionResourceNames.Clock,
                 displayName: "Clock",
                 order: 1,
                 summary: "Optional keyed clock for deterministic request timeouts and diagnostics.",
-                valueType: nameof(TimeProvider));
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddClientPorts(ComponentDesignMetadataBuilder builder)
         => builder

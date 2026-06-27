@@ -90,7 +90,9 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
             displayName: "Clock",
             order: 0,
             summary: "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.",
-            valueType: nameof(TimeProvider));
+            valueType: nameof(TimeProvider),
+            attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                ResourceDesignMetadataAttributeValues.Clock));
 
     private static void AddEventExpectationPorts(ComponentDesignMetadataBuilder builder)
         => builder
