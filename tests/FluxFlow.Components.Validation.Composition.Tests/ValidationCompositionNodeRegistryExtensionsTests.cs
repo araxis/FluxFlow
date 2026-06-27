@@ -88,7 +88,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (ValidationCompositionResourceNames.Selector, 0, false, "IJsonSchemaValueSelector<TInput>"),
             (ValidationCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
@@ -106,7 +106,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ValidationCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ValidationCompositionPortNames.Output, PortDirection.Output, 1, true, "JsonSchemaValidationResult<TInput>"),
             (ValidationCompositionPortNames.Valid, PortDirection.Output, 2, false, "TInput"),

@@ -60,14 +60,14 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(PayloadsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(nameof(PayloadInspectionRequest));
+        input.ValueType?.Value.ShouldBe(nameof(PayloadInspectionRequest));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(PayloadsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(nameof(PayloadInspectionResult));
+        output.ValueType?.Value.ShouldBe(nameof(PayloadInspectionResult));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -321,7 +321,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task WithNodeAsync(

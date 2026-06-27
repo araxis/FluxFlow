@@ -60,14 +60,14 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(MetricsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(nameof(MetricSampleInput));
+        input.ValueType?.Value.ShouldBe(nameof(MetricSampleInput));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(MetricsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(nameof(MetricSnapshotOutput));
+        output.ValueType?.Value.ShouldBe(nameof(MetricSnapshotOutput));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -349,7 +349,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task WithNodeAsync(

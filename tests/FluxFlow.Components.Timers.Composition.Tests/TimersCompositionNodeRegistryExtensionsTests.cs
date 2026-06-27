@@ -465,7 +465,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, outputType)
         ]);
     }
@@ -477,7 +477,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
         ]);
@@ -491,7 +491,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertOptions(

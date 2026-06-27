@@ -151,7 +151,7 @@ public sealed class ComponentDesignMetadataBuilder
             DisplayName = displayName,
             Order = order,
             Summary = summary,
-            ValueType = valueType,
+            ValueType = valueType is null ? null : new ComponentValueTypeHint(valueType),
             IsRequired = isRequired
         };
 
@@ -234,7 +234,7 @@ public sealed class ComponentDesignMetadataBuilder
             Group = group is null ? null : new ComponentPortGroup(group),
             Order = order,
             Summary = summary,
-            ValueType = valueType,
+            ValueType = valueType is null ? null : new ComponentValueTypeHint(valueType),
             IsPrimary = isPrimary
         };
 

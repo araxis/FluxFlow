@@ -8,7 +8,7 @@ public sealed record PortDesignMetadata
     public ComponentPortGroup? Group { get; init; }
     public int Order { get; init; }
     public string? Summary { get; init; }
-    public string? ValueType { get; init; }
+    public ComponentValueTypeHint? ValueType { get; init; }
     public bool IsPrimary { get; init; }
     public IReadOnlyDictionary<ComponentAttributeName, string> Attributes { get; init; } = new Dictionary<ComponentAttributeName, string>();
 }

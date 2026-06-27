@@ -770,7 +770,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
@@ -802,7 +802,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         metadata.Ports[0].Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].Order.ShouldBe(0);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(SessionQueryRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(SessionQueryRequest));
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
         AssertOutputPort(
@@ -828,7 +828,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         port.Name.Value.ShouldBe(name);
         port.Direction.ShouldBe(PortDirection.Output);
         port.Order.ShouldBe(order);
-        port.ValueType.ShouldBe(valueType);
+        port.ValueType?.Value.ShouldBe(valueType);
         port.IsPrimary.ShouldBe(isPrimary);
     }
 
@@ -860,7 +860,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (SessionsCompositionResourceNames.Store, 0, true, $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}"),
             (SessionsCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);

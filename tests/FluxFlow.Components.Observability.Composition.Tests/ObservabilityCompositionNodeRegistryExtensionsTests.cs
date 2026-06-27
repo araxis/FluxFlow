@@ -640,14 +640,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe("TInput");
+        input.ValueType?.Value.ShouldBe("TInput");
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(outputType);
+        output.ValueType?.Value.ShouldBe(outputType);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -672,7 +672,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType!)).ShouldBe(expected);
+            resource.ValueType?.Value!)).ShouldBe(expected);
     }
 
     private static async Task AssertFactoryDiagnosticAsync(

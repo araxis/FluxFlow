@@ -61,14 +61,14 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(StateCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(nameof(StateReducerInput));
+        input.ValueType?.Value.ShouldBe(nameof(StateReducerInput));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(StateCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(nameof(StateReducerResult));
+        output.ValueType?.Value.ShouldBe(nameof(StateReducerResult));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -462,7 +462,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (StateCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
             (StateCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);

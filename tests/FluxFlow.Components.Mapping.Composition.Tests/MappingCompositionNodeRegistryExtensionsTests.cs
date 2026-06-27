@@ -81,7 +81,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (MappingCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
             (MappingCompositionResourceNames.ContextFactory, 1, false, nameof(IMappingContextFactory)),
             (MappingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
@@ -100,7 +100,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "TOutput"),
             (MappingCompositionPortNames.Failed, PortDirection.Output, 2, false, "TInput")

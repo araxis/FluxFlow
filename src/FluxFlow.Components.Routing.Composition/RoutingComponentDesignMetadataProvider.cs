@@ -286,7 +286,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             DisplayName = displayName,
             Order = order,
             Summary = summary,
-            ValueType = valueType,
+            ValueType = new ComponentValueTypeHint(valueType),
             IsRequired = true
         };
 
@@ -296,7 +296,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         DisplayName = "Clock",
         Order = order,
         Summary = "Optional keyed clock for deterministic routing timing, timeouts, and diagnostics.",
-        ValueType = nameof(TimeProvider)
+        ValueType = new ComponentValueTypeHint(nameof(TimeProvider))
     };
 
     private static OptionDesignMetadata EngineOption() => new()

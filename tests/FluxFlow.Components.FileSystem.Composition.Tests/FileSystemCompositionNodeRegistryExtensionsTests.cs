@@ -603,14 +603,14 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(FileSystemCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(FileSystemCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -623,7 +623,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(FileSystemCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(0);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -666,7 +666,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

@@ -48,7 +48,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (HttpCompositionResourceNames.Client, 0, true, nameof(HttpClient)),
             (HttpCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
@@ -64,14 +64,14 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Input));
         input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType.ShouldBe(nameof(HttpRequestInput));
+        input.ValueType?.Value.ShouldBe(nameof(HttpRequestInput));
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType.ShouldBe(nameof(HttpResponseOutput));
+        output.ValueType?.Value.ShouldBe(nameof(HttpResponseOutput));
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }

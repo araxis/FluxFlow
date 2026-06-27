@@ -124,7 +124,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
         ]);
@@ -142,7 +142,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput"),
             (ControlCompositionPortNames.WhenTrue, PortDirection.Output, 2, false, "TInput"),
@@ -181,7 +181,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(index);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
 

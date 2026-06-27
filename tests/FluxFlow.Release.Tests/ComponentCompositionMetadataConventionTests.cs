@@ -128,7 +128,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         resource.Summary,
                         $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a summary.");
                     AssertRequiredDesignerText(
-                        resource.ValueType,
+                        resource.ValueType?.Value,
                         $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a value type.");
                 }
 
@@ -141,7 +141,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         port.Summary,
                         $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a summary.");
                     AssertRequiredDesignerText(
-                        port.ValueType,
+                        port.ValueType?.Value,
                         $"{entry.PackageId} Designer metadata for '{nodeType}' {port.Direction.ToString().ToLowerInvariant()} port '{port.Name}' must include a value type.");
                 }
             }
@@ -1825,12 +1825,12 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         designerPort.ShouldNotBeNull(
             $"{packageId} Designer metadata for '{nodeType}' must expose {direction.ToString().ToLowerInvariant()} port '{port.Name}'.");
 
-        string.IsNullOrWhiteSpace(designerPort.ValueType)
+        string.IsNullOrWhiteSpace(designerPort.ValueType?.Value)
             .ShouldBeFalse(
                 $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must expose a ValueType for concrete port type '{port.MessageType.FullName}'.");
 
         var expectedValueType = ToDesignerValueType(port.MessageType);
-        NormalizeValueType(designerPort.ValueType!)
+        NormalizeValueType(designerPort.ValueType?.Value!)
             .ShouldBe(
                 NormalizeValueType(expectedValueType),
                 $"{packageId} Designer metadata for '{nodeType}.{port.Name}' must use ValueType '{expectedValueType}' for registry type '{port.MessageType.FullName}'.");

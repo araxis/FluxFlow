@@ -360,7 +360,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (SourcesCompositionPortNames.Output, PortDirection.Output, 0, true, outputType)
         ]);
     }
@@ -373,7 +373,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertOptions(

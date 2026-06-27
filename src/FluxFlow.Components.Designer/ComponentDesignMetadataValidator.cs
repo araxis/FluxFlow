@@ -443,7 +443,12 @@ public static class ComponentDesignMetadataValidator
 
             ValidateOptionalText(resource.DisplayName, $"{path}.{nameof(ResourceDesignMetadata.DisplayName)}", errors);
             ValidateOptionalText(resource.Summary, $"{path}.{nameof(ResourceDesignMetadata.Summary)}", errors);
-            ValidateOptionalText(resource.ValueType, $"{path}.{nameof(ResourceDesignMetadata.ValueType)}", errors);
+            if (resource.ValueType is { } valueType && string.IsNullOrWhiteSpace(valueType.Value))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(ResourceDesignMetadata.ValueType)}",
+                    "Resource value type hint cannot be empty when it is provided."));
+            }
             ValidateAttributes(resource.Attributes, $"{path}.{nameof(ResourceDesignMetadata.Attributes)}", errors);
         }
     }
@@ -525,7 +530,12 @@ public static class ComponentDesignMetadataValidator
                     "Port group cannot be empty when it is provided."));
             }
             ValidateOptionalText(port.Summary, $"{path}.{nameof(PortDesignMetadata.Summary)}", errors);
-            ValidateOptionalText(port.ValueType, $"{path}.{nameof(PortDesignMetadata.ValueType)}", errors);
+            if (port.ValueType is { } valueType && string.IsNullOrWhiteSpace(valueType.Value))
+            {
+                errors.Add(new DesignerMetadataValidationError(
+                    $"{path}.{nameof(PortDesignMetadata.ValueType)}",
+                    "Port value type hint cannot be empty when it is provided."));
+            }
             ValidateAttributes(port.Attributes, $"{path}.{nameof(PortDesignMetadata.Attributes)}", errors);
         }
     }

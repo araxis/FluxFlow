@@ -334,14 +334,14 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(SerializationCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(SerializationCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -420,7 +420,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(

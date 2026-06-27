@@ -614,14 +614,14 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(StorageCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(StorageCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -630,7 +630,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         metadata.Ports.Count.ShouldBe(4);
 
         metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageGetRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(StorageGetRequest));
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
@@ -657,7 +657,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         metadata.Ports.Count.ShouldBe(3);
 
         metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageQueryRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(StorageQueryRequest));
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
@@ -684,7 +684,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         port.Name.Value.ShouldBe(name);
         port.Direction.ShouldBe(PortDirection.Output);
         port.Order.ShouldBe(order);
-        port.ValueType.ShouldBe(valueType);
+        port.ValueType?.Value.ShouldBe(valueType);
         port.IsPrimary.ShouldBe(isPrimary);
     }
 
@@ -714,7 +714,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (StorageCompositionResourceNames.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
             (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);

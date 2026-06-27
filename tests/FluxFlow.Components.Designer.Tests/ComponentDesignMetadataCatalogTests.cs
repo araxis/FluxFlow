@@ -1361,6 +1361,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentValueTypeHint_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentValueTypeHint("SampleInput");
+        var second = new ComponentValueTypeHint("SampleInput");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("SampleInput");
+        first.ToString().ShouldBe("SampleInput");
+        new ComponentValueTypeHint("SampleOutput").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentValueTypeHint_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentValueTypeHint(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component value type hint cannot be empty");
+    }
+
+    [Fact]
     public void ComponentPortName_validates_value_and_preserves_identity()
     {
         var first = new ComponentPortName("Input");
@@ -1379,7 +1405,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         resources[0].Name.ShouldBe(new ComponentResourceName("engine"));
         resources[0].DisplayName.ShouldBe("Engine");
-        resources[0].ValueType.ShouldBe("IExpressionEngine");
+        resources[0].ValueType?.Value.ShouldBe("IExpressionEngine");
         resources[0].IsRequired.ShouldBeTrue();
         resources[1].Name.ShouldBe(new ComponentResourceName("clock"));
         resources[1].IsRequired.ShouldBeFalse();
@@ -1458,7 +1484,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         ports[0].Name.ShouldBe(new ComponentPortName("Input"));
         ports[0].Group.ShouldBe(new ComponentPortGroup("Messages"));
-        ports[0].ValueType.ShouldBe("SampleInput");
+        ports[0].ValueType?.Value.ShouldBe("SampleInput");
         ports[0].IsPrimary.ShouldBeTrue();
         ports[1].Name.ShouldBe(new ComponentPortName("Output"));
         ports[1].Direction.ShouldBe(PortDirection.Output);
@@ -1503,7 +1529,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 DisplayName = "Engine",
                 Order = 0,
                 Summary = "Expression engine resource.",
-                ValueType = "IExpressionEngine",
+                ValueType = new ComponentValueTypeHint("IExpressionEngine"),
                 IsRequired = true
             },
             new ResourceDesignMetadata
@@ -1512,7 +1538,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 DisplayName = "Clock",
                 Order = 1,
                 Summary = "Optional clock resource.",
-                ValueType = nameof(TimeProvider)
+                ValueType = new ComponentValueTypeHint(nameof(TimeProvider))
             }
         ],
         Ports =
@@ -1525,7 +1551,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 Group = new ComponentPortGroup("Messages"),
                 Order = 0,
                 Summary = "Input message.",
-                ValueType = "SampleInput",
+                ValueType = new ComponentValueTypeHint("SampleInput"),
                 IsPrimary = true
             },
             new PortDesignMetadata
@@ -1536,7 +1562,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 Group = new ComponentPortGroup("Messages"),
                 Order = 1,
                 Summary = "Mapped message.",
-                ValueType = "SampleOutput",
+                ValueType = new ComponentValueTypeHint("SampleOutput"),
                 IsPrimary = true
             }
         ],

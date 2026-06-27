@@ -364,14 +364,14 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(inputPortName));
         input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(MqttCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }
@@ -402,7 +402,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(index);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
 

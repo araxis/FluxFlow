@@ -109,7 +109,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(FlowAssertionResult)),
             (AssertionsCompositionPortNames.Passed, PortDirection.Output, 2, false, "TInput"),
@@ -143,7 +143,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(expected[index].Order);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
 

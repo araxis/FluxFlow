@@ -821,7 +821,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType!)).ShouldBe(expected);
+            port.ValueType?.Value!)).ShouldBe(expected);
     }
 
     private static void AssertOptionNames(
@@ -866,7 +866,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType!)).ShouldBe(expected);
+            resource.ValueType?.Value!)).ShouldBe(expected);
     }
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)

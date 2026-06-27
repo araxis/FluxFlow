@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.12.0
+
+Adds a Designer-owned value type hint identifier.
+
+- Adds `ComponentValueTypeHint` for non-empty resource and port value type
+  hints.
+- Changes `ResourceDesignMetadata.ValueType` and `PortDesignMetadata.ValueType`
+  from `string?` to `ComponentValueTypeHint?`.
+- Keeps `ComponentDesignMetadataBuilder` accepting string `valueType`
+  arguments so provider authoring stays concise while stored metadata is typed.
+
 ## FluxFlow.Components.Designer 2.11.0
 
 Adds a Designer-owned metadata attribute key identifier.
