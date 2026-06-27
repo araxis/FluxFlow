@@ -168,7 +168,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     metadata.IconKey?.Value,
                     $"{entry.PackageId} Designer metadata for '{nodeType}' must include an icon key.");
                 AssertRequiredDesignerText(
-                    metadata.PreferredNodeName,
+                    metadata.PreferredNodeName?.Value,
                     $"{entry.PackageId} Designer metadata for '{nodeType}' must include a preferred node name.");
 
                 metadata.SuggestedEditorWidth.HasValue
@@ -184,7 +184,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         $"{entry.PackageId} Designer metadata for '{nodeType}' suggested editor width should avoid oversized inspectors.");
 
                 preferredNodeNames
-                    .Add(metadata.PreferredNodeName!)
+                    .Add(metadata.PreferredNodeName.GetValueOrDefault().Value)
                     .ShouldBeTrue(
                         $"{entry.PackageId} Designer metadata preferred node name '{metadata.PreferredNodeName}' is duplicated.");
             }

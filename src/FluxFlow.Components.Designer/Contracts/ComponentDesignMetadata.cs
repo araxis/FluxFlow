@@ -7,7 +7,7 @@ public sealed record ComponentDesignMetadata
     public ComponentCategory? Category { get; init; }
     public string? Summary { get; init; }
     public ComponentIconKey? IconKey { get; init; }
-    public string? PreferredNodeName { get; init; }
+    public ComponentPreferredNodeName? PreferredNodeName { get; init; }
     public int? SuggestedEditorWidth { get; init; }
     public IReadOnlyList<OptionDesignMetadata> Options { get; init; } = [];
     public IReadOnlyList<ResourceDesignMetadata> Resources { get; init; } = [];

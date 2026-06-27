@@ -13,7 +13,7 @@ public sealed class ComponentDesignMetadataBuilder
     private ComponentCategory? category;
     private string? summary;
     private ComponentIconKey? iconKey;
-    private string? preferredNodeName;
+    private ComponentPreferredNodeName? preferredNodeName;
     private int? suggestedEditorWidth;
 
     public ComponentDesignMetadataBuilder(string type)
@@ -38,7 +38,7 @@ public sealed class ComponentDesignMetadataBuilder
         this.category = category is null ? null : new ComponentCategory(category);
         this.summary = summary;
         this.iconKey = iconKey is null ? null : new ComponentIconKey(iconKey);
-        this.preferredNodeName = preferredNodeName;
+        this.preferredNodeName = preferredNodeName is null ? null : new ComponentPreferredNodeName(preferredNodeName);
         this.suggestedEditorWidth = suggestedEditorWidth;
         return this;
     }

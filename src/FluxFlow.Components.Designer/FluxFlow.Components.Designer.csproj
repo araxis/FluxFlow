@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.7.0</Version>
+    <Version>2.8.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds ComponentIconKey and uses it for ComponentDesignMetadata.IconKey so palette icon metadata uses Designer-owned identifiers.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds ComponentPreferredNodeName and uses it for ComponentDesignMetadata.PreferredNodeName so palette node-name hints use Designer-owned identifiers.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -60,7 +60,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.Category.ShouldBe(new ComponentCategory("Samples"));
         metadata.Summary.ShouldBe("Builds sample metadata.");
         metadata.IconKey.ShouldBe(new ComponentIconKey("sample"));
-        metadata.PreferredNodeName.ShouldBe("sample");
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("sample"));
         metadata.SuggestedEditorWidth.ShouldBe(360);
         metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression", "mode"]);
         metadata.Options[1].Choices.Select(choice => choice.Value).ShouldBe(["strict", "relaxed"]);
@@ -495,6 +495,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             DisplayName = " ",
             Category = default(ComponentCategory),
             IconKey = default(ComponentIconKey),
+            PreferredNodeName = default(ComponentPreferredNodeName),
             SuggestedEditorWidth = 0,
             Options =
             [
@@ -541,6 +542,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.DisplayName));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.Category));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.IconKey));
+        errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.PreferredNodeName));
         errors.Select(error => error.Path).ShouldContain(nameof(ComponentDesignMetadata.SuggestedEditorWidth));
         errors.ShouldContain(error => error.Message.Contains("Port name", StringComparison.Ordinal));
         errors.ShouldContain(error => error.Message.Contains("minimum", StringComparison.Ordinal));
@@ -1272,6 +1274,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentPreferredNodeName_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentPreferredNodeName("transform");
+        var second = new ComponentPreferredNodeName("transform");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("transform");
+        first.ToString().ShouldBe("transform");
+        new ComponentPreferredNodeName("source").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("node.name")]
+    public void ComponentPreferredNodeName_rejects_invalid_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentPreferredNodeName(value);
+        };
+
+        act.ShouldThrow<ArgumentException>();
+    }
+
+    [Fact]
     public void ComponentOptionName_validates_value_and_preserves_identity()
     {
         var first = new ComponentOptionName("expression");
@@ -1382,7 +1410,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         Category = new ComponentCategory("Samples"),
         Summary = "Transforms sample values.",
         IconKey = new ComponentIconKey("transform"),
-        PreferredNodeName = "transform",
+        PreferredNodeName = new ComponentPreferredNodeName("transform"),
         SuggestedEditorWidth = 420,
         Options =
         [

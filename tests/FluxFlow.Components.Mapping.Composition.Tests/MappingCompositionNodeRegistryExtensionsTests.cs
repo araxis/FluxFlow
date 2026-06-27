@@ -57,7 +57,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
         metadata.DisplayName.ShouldBe("Mapper");
         metadata.Category.ShouldBe(new ComponentCategory("Mapping"));
-        metadata.PreferredNodeName.ShouldBe("map");
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("map"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("expression", OptionValueKind.Expression),

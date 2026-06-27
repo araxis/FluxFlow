@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.8.0
+
+Adds a Designer-owned preferred node-name identifier.
+
+- Adds `ComponentPreferredNodeName` for non-empty preferred node names that do
+  not contain `.`.
+- Changes `ComponentDesignMetadata.PreferredNodeName` from `string?` to
+  `ComponentPreferredNodeName?`, aligning palette node-name hints with
+  Designer-owned component, category, icon, option, resource, and port
+  identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  preferred node name so provider authoring stays concise while stored metadata
+  is typed.
+
 ## FluxFlow.Components.Designer 2.7.0
 
 Adds a Designer-owned icon-key identifier.
