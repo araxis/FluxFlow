@@ -33,6 +33,7 @@ runtime is the right fit for a host.
 14. [Public API Overview](14-public-api-overview.md)
 15. [Engine Compatibility](15-engine-compatibility.md)
 16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
+17. [Component Coverage Matrix](17-component-coverage-matrix.md)
 
 Pages 2 and later still describe engine-era APIs where named. Treat those as
 optional advanced runtime guidance, not the default component-package contract.

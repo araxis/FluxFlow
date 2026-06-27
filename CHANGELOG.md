@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Engine 2.0.1
+
+Adds a package-local Engine README and keeps the package readme aligned with the
+optional advanced runtime boundary.
+
+- Documents `FluxFlow.Engine` as the optional `ApplicationDefinition` runtime,
+  not the default standalone component composition path.
+- Packs the Engine package's own `README.md` instead of the repository root
+  README.
+
 ## FluxFlow.Components.Configuration 1.5.0
 
 Adds typed option-path authoring for configuration validation requests.

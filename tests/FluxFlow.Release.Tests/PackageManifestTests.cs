@@ -161,6 +161,9 @@ public sealed class PackageManifestTests
             });
 
         packedReadme.ShouldNotBeNull($"{packageId} must pack {readmeFile}.");
+        NormalizePath(packedReadme.Include!).ShouldBe(
+            readmeFile,
+            $"{packageId} must pack a package-local {readmeFile}, not a shared repository README.");
         packedReadme.PackagePath.ShouldBe("\\");
 
         var readmePath = Path.GetFullPath(Path.Combine(projectDirectory, NormalizePath(packedReadme.Include!)));
