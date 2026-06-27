@@ -75,7 +75,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             item.Category.ShouldBe("Serialization");
             item.SuggestedEditorWidth.ShouldBe(420);
             item.Options.ShouldNotContain(option =>
-                option.Name == SerializationCompositionResourceNames.Clock);
+                option.Name.Value == SerializationCompositionResourceNames.Clock);
             AssertClockResource(item);
         }
     }
@@ -349,7 +349,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var defaults = new SerializationNodeOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "boundedCapacity",
             "defaultEncoding",
             "maxInputBytes",
@@ -406,7 +406,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

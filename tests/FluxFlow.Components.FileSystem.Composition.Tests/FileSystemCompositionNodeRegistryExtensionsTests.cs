@@ -68,7 +68,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             item.Category.ShouldBe("FileSystem");
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
-                option.Name == FileSystemCompositionResourceNames.Clock);
+                option.Name.Value == FileSystemCompositionResourceNames.Clock);
             AssertClockResource(item);
         }
     }
@@ -630,7 +630,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         params string[] names)
-        => metadata.Options.Select(option => option.Name)
+        => metadata.Options.Select(option => option.Name.Value)
             .ShouldBe(names, ignoreOrder: false);
 
     private static void AssertOption(
@@ -642,7 +642,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         double? max = null,
         bool isRequired = false)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         if (defaultValue is string[] expectedArray)
         {

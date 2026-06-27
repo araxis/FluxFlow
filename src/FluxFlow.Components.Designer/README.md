@@ -18,9 +18,10 @@ component without depending on a specific rendering framework.
   required flag, value type hint, summary, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
-- `ComponentType`, `ComponentResourceName`, and `ComponentPortName`:
-  Designer-owned identifiers for component types, host-owned resource slots, and
-  ports. They do not depend on engine definition types.
+- `ComponentType`, `ComponentOptionName`, `ComponentResourceName`, and
+  `ComponentPortName`: Designer-owned identifiers for component types, editable
+  options, host-owned resource slots, and ports. They do not depend on engine
+  definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
@@ -87,7 +88,7 @@ var metadata = new ComponentDesignMetadata
     [
         new OptionDesignMetadata
         {
-            Name = "expression",
+            Name = new ComponentOptionName("expression"),
             Kind = OptionValueKind.Expression,
             DisplayName = "Expression",
             IsRequired = true

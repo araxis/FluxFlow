@@ -66,7 +66,7 @@ public sealed class ComponentDesignMetadataBuilder
 
         var option = new OptionDesignMetadata
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = kind,
             DisplayName = displayName,
             HelperText = helperText,

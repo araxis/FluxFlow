@@ -74,8 +74,8 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             item.Category.ShouldBe("Storage");
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
-                option.Name == StorageCompositionResourceNames.Store ||
-                option.Name == StorageCompositionResourceNames.Clock);
+                option.Name.Value == StorageCompositionResourceNames.Store ||
+                option.Name.Value == StorageCompositionResourceNames.Clock);
             AssertResources(item);
         }
     }
@@ -691,7 +691,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         params string[] names)
-        => metadata.Options.Select(option => option.Name)
+        => metadata.Options.Select(option => option.Name.Value)
             .ShouldBe(names, ignoreOrder: false);
 
     private static OptionDesignMetadata AssertOption(
@@ -701,7 +701,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         object? defaultValue = null,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

@@ -79,7 +79,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             JsonOption("routeOutputs", "Route Outputs", "Optional mapping of route key to dynamic output port name."),
             new OptionDesignMetadata
             {
-                Name = "defaultRoute",
+                Name = new ComponentOptionName("defaultRoute"),
                 Kind = OptionValueKind.Text,
                 DisplayName = "Default Route",
                 HelperText = "Optional route name used when the selector returns no configured route."
@@ -301,7 +301,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata EngineOption() => new()
     {
-        Name = "engine",
+        Name = new ComponentOptionName("engine"),
         Kind = OptionValueKind.Text,
         DisplayName = "Engine",
         HelperText = "Diagnostic engine metadata; composition DI selection uses host-owned selector resources."
@@ -312,7 +312,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string displayName,
         string helperText) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Expression,
             DisplayName = displayName,
             HelperText = helperText
@@ -320,7 +320,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata ExpressionIdOption() => new()
     {
-        Name = "expressionId",
+        Name = new ComponentOptionName("expressionId"),
         Kind = OptionValueKind.Text,
         DisplayName = "Expression ID",
         HelperText = "Optional diagnostic identifier emitted with routing diagnostics."
@@ -328,7 +328,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata ExpressionNameOption() => new()
     {
-        Name = "expressionName",
+        Name = new ComponentOptionName("expressionName"),
         Kind = OptionValueKind.Text,
         DisplayName = "Expression Name",
         HelperText = "Optional diagnostic name emitted with routing diagnostics."
@@ -338,7 +338,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string name,
         string? displayName = null) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
             DisplayName = displayName ?? "Input Type",
             DefaultValue = SwitchRoutingOptions.ObjectTypeName,
@@ -351,7 +351,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string helperText,
         bool isRequired = false) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Json,
             DisplayName = displayName,
             HelperText = helperText,
@@ -364,7 +364,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string defaultValue,
         string helperText) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
             DisplayName = displayName,
             DefaultValue = defaultValue,
@@ -377,7 +377,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         bool defaultValue,
         string helperText) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Boolean,
             DisplayName = displayName,
             DefaultValue = defaultValue,
@@ -391,7 +391,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         double min,
         string helperText) => new()
         {
-            Name = name,
+            Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Number,
             DisplayName = displayName,
             DefaultValue = defaultValue,
@@ -401,7 +401,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata BoundedCapacityOption() => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = 128,

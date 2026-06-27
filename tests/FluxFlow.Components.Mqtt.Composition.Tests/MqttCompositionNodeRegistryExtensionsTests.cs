@@ -51,9 +51,9 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
             item.Category.ShouldBe("MQTT");
             item.Options.ShouldNotContain(option =>
-                option.Name == MqttCompositionResourceNames.Publisher ||
-                option.Name == MqttCompositionResourceNames.TriggerSource ||
-                option.Name == MqttCompositionResourceNames.Clock);
+                option.Name.Value == MqttCompositionResourceNames.Publisher ||
+                option.Name.Value == MqttCompositionResourceNames.TriggerSource ||
+                option.Name.Value == MqttCompositionResourceNames.Clock);
         }
     }
 
@@ -69,7 +69,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             metadata,
             MqttCompositionPortNames.Input);
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "publishTimeoutMilliseconds",
             "boundedCapacity"
         ], ignoreOrder: false);
@@ -103,7 +103,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             metadata,
             MqttCompositionPortNames.Responses);
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "topicFilter",
             "qualityOfService",
             "receiveRetainedMessages",
@@ -383,7 +383,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

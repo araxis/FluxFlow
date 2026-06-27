@@ -2,7 +2,7 @@ namespace FluxFlow.Components.Designer.Contracts;
 
 public sealed record OptionDesignMetadata
 {
-    public required string Name { get; init; }
+    public required ComponentOptionName Name { get; init; }
     public required OptionValueKind Kind { get; init; }
     public string? DisplayName { get; init; }
     public string? HelperText { get; init; }

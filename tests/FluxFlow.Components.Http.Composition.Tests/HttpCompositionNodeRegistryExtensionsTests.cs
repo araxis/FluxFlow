@@ -42,8 +42,8 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         metadata.Category.ShouldBe("HTTP");
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.ShouldNotContain(option =>
-            option.Name == HttpCompositionResourceNames.Client ||
-            option.Name == HttpCompositionResourceNames.Clock);
+            option.Name.Value == HttpCompositionResourceNames.Client ||
+            option.Name.Value == HttpCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
@@ -82,7 +82,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var metadata = GetClientDesignMetadata();
         var defaults = HttpClientNodeOptions.Default;
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "boundedCapacity",
             "maxResponseBodyBytes",
             "treatNonSuccessStatusAsError",
@@ -325,7 +325,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

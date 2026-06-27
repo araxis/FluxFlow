@@ -57,9 +57,9 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             item.SuggestedEditorWidth.ShouldBe(460);
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
             item.Options.ShouldNotContain(option =>
-                option.Name == ObservabilityCompositionResourceNames.Clock ||
-                option.Name == ObservabilityCompositionResourceNames.ContextFactory ||
-                option.Name.StartsWith("attribute:", StringComparison.Ordinal));
+                option.Name.Value == ObservabilityCompositionResourceNames.Clock ||
+                option.Name.Value == ObservabilityCompositionResourceNames.ContextFactory ||
+                option.Name.Value.StartsWith("attribute:", StringComparison.Ordinal));
         }
 
         AssertResources(
@@ -117,7 +117,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Counter];
         var defaults = new FlowCounterOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "name",
             "engine",
@@ -149,7 +149,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Logger];
         var defaults = new FlowLoggerOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "level",
             "category",
@@ -160,7 +160,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
 
-        var level = metadata.Options.Single(option => option.Name == "level");
+        var level = metadata.Options.Single(option => option.Name.Value == "level");
         level.Kind.ShouldBe(OptionValueKind.Enum);
         level.DefaultValue.ShouldBe(defaults.Level);
         level.Choices.Select(choice => choice.Value).ShouldBe([
@@ -175,7 +175,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         AssertOption(metadata, "category", OptionValueKind.Text, defaults.Category);
         AssertOption(metadata, "messageTemplate", OptionValueKind.MultilineText, defaultValue: null);
 
-        var selectors = metadata.Options.Single(option => option.Name == "attributeSelectors");
+        var selectors = metadata.Options.Single(option => option.Name.Value == "attributeSelectors");
         selectors.Kind.ShouldBe(OptionValueKind.Json);
         selectors.DefaultValue.ShouldBeOfType<string[]>().ShouldBeEmpty();
 
@@ -193,7 +193,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Metrics];
         var defaults = new FlowMetricsOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "name",
             "sizeSelector",
@@ -658,7 +658,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

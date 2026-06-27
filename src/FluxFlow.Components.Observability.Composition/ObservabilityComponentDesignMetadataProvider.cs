@@ -239,7 +239,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
     {
-        Name = "inputType",
+        Name = new ComponentOptionName("inputType"),
         Kind = OptionValueKind.Text,
         DisplayName = "Input Type",
         DefaultValue = defaultValue,
@@ -248,7 +248,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = defaultValue,

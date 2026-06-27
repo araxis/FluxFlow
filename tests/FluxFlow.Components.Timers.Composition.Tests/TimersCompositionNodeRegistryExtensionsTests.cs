@@ -75,7 +75,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
         metadata.SelectMany(item => item.Options)
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ShouldNotContain(TimersCompositionResourceNames.Clock);
         foreach (var item in metadata)
         {
@@ -119,7 +119,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
         metadata[TimersCompositionNodeTypes.Schedule].Options
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ShouldNotContain("timeZone");
         metadata[TimersCompositionNodeTypes.Schedule]
             .Attributes["omittedOptions"]
@@ -149,7 +149,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
 
         metadata.Values
             .SelectMany(item => item.Options)
-            .Where(option => option.Name == "boundedCapacity" || option.Name == "maxTicks")
+            .Where(option => option.Name.Value == "boundedCapacity" || option.Name.Value == "maxTicks")
             .ShouldAllBe(option => option.Min == 1);
     }
 
@@ -499,7 +499,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         IReadOnlyList<(string Name, OptionValueKind Kind, object? DefaultValue, bool IsRequired)> expected)
     {
         metadata.Options.Select(option => (
-            option.Name,
+            option.Name.Value,
             option.Kind,
             option.DefaultValue,
             option.IsRequired)).ShouldBe(expected);

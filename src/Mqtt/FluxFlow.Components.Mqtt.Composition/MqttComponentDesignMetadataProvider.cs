@@ -162,7 +162,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = defaultValue,

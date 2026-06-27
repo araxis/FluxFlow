@@ -93,7 +93,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
 
         var optionNames = metadata.SelectMany(item => item.Options)
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ToArray();
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.Clock);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.RouteKeySelector);
@@ -828,7 +828,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         ComponentDesignMetadata metadata,
         IReadOnlyList<string> expected)
     {
-        metadata.Options.Select(option => option.Name).ShouldBe(expected);
+        metadata.Options.Select(option => option.Name.Value).ShouldBe(expected);
     }
 
     private static void AssertOption(
@@ -839,7 +839,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         double? min = null,
         bool? isRequired = null)
     {
-        var option = metadata.Options.Single(option => option.Name == optionName);
+        var option = metadata.Options.Single(option => option.Name.Value == optionName);
         option.Kind.ShouldBe(kind);
 
         if (defaultValue is not null)

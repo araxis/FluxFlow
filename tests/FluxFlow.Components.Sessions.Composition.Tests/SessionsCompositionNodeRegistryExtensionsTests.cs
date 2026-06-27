@@ -64,7 +64,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             item.Category.ShouldBe("Sessions");
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
-                option.Name == SessionsCompositionResourceNames.Clock);
+                option.Name.Value == SessionsCompositionResourceNames.Clock);
             AssertResources(item);
         }
     }
@@ -835,7 +835,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         params string[] names)
-        => metadata.Options.Select(option => option.Name)
+        => metadata.Options.Select(option => option.Name.Value)
             .ShouldBe(names, ignoreOrder: false);
 
     private static OptionDesignMetadata AssertOption(
@@ -846,7 +846,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         double? min = null,
         bool isRequired = false)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

@@ -45,7 +45,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name == PayloadsCompositionResourceNames.Clock);
+            option.Name.Value == PayloadsCompositionResourceNames.Clock);
         AssertClockResource(metadata);
     }
 
@@ -77,7 +77,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var metadata = PayloadDesignMetadata();
         var defaults = PayloadInspectOptions.Default;
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "maxInputBytes",
             "maxPreviewBytes",
             "maxFormattedChars",
@@ -307,7 +307,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

@@ -47,7 +47,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name == ExpectationsCompositionResourceNames.Clock);
+            option.Name.Value == ExpectationsCompositionResourceNames.Clock);
         AssertClockResource(metadata);
     }
 
@@ -79,7 +79,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         var metadata = ExpectationDesignMetadata();
         var defaults = new EventExpectationOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "kind",
             "name",
             "filter",
@@ -89,7 +89,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             "boundedCapacity"
         ], ignoreOrder: false);
 
-        var kind = metadata.Options.Single(option => option.Name == "kind");
+        var kind = metadata.Options.Single(option => option.Name.Value == "kind");
         kind.Kind.ShouldBe(OptionValueKind.Enum);
         kind.DefaultValue.ShouldBe(defaults.Kind.ToString());
         kind.Choices.Select(choice => choice.Value).ShouldBe([
@@ -99,7 +99,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
         AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
 
-        var filter = metadata.Options.Single(option => option.Name == "filter");
+        var filter = metadata.Options.Single(option => option.Name.Value == "filter");
         filter.Kind.ShouldBe(OptionValueKind.Json);
         filter.DefaultValue.ShouldBeOfType<EventFilter>();
 
@@ -394,7 +394,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

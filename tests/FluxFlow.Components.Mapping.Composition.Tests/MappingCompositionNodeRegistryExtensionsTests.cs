@@ -59,7 +59,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         metadata.Category.ShouldBe("Mapping");
         metadata.PreferredNodeName.ShouldBe("map");
         metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("expression", OptionValueKind.Expression),
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
@@ -69,13 +69,13 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             ("targetType", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number)
         ]);
-        metadata.Options.Single(option => option.Name == "expression")
+        metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(MappingCompositionResourceNames.ContextFactory);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(MappingCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
             resource.Name.Value,

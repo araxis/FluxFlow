@@ -7,6 +7,18 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.5.0
+
+Adds a Designer-owned option identifier.
+
+- Adds `ComponentOptionName` for non-empty editable option names.
+- Changes `OptionDesignMetadata.Name` from `string` to `ComponentOptionName`,
+  aligning option metadata with Designer-owned component, resource, and port
+  identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddOption(...)` and
+  `AddEnumOption(...)` string overloads so provider authoring stays concise
+  while still producing typed option names.
+
 ## FluxFlow.Components.Designer 2.4.0
 
 Adds a Designer-owned resource identifier.

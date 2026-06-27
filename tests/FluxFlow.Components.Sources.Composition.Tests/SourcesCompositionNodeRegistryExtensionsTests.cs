@@ -57,7 +57,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
         metadata.SelectMany(item => item.Options)
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ShouldNotContain(SourcesCompositionResourceNames.Clock);
         foreach (var item in metadata)
         {
@@ -381,7 +381,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         IReadOnlyList<(string Name, OptionValueKind Kind, object? DefaultValue, double? Min)> expected)
     {
         metadata.Options.Select(option => (
-            option.Name,
+            option.Name.Value,
             option.Kind,
             option.DefaultValue,
             option.Min)).ShouldBe(expected);

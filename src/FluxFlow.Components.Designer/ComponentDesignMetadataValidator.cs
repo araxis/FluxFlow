@@ -73,11 +73,11 @@ public static class ComponentDesignMetadataValidator
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(option.Name))
+            if (string.IsNullOrWhiteSpace(option.Name.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(OptionDesignMetadata.Name)}", "Option name is required."));
             }
-            else if (!names.Add(option.Name))
+            else if (!names.Add(option.Name.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(OptionDesignMetadata.Name)}", $"Option name '{option.Name}' is already used."));
             }

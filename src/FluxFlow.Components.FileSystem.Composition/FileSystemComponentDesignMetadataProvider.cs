@@ -186,7 +186,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = defaultValue,
@@ -196,7 +196,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata BaseDirectoryOption() => new()
     {
-        Name = "baseDirectory",
+        Name = new ComponentOptionName("baseDirectory"),
         Kind = OptionValueKind.Text,
         DisplayName = "Base Directory",
         HelperText = "Optional base directory used to resolve relative paths."
@@ -204,7 +204,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata AllowAbsolutePathsOption(bool defaultValue) => new()
     {
-        Name = "allowAbsolutePaths",
+        Name = new ComponentOptionName("allowAbsolutePaths"),
         Kind = OptionValueKind.Boolean,
         DisplayName = "Allow Absolute Paths",
         DefaultValue = defaultValue,
@@ -213,7 +213,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata DefaultEncodingOption(string defaultValue) => new()
     {
-        Name = "defaultEncoding",
+        Name = new ComponentOptionName("defaultEncoding"),
         Kind = OptionValueKind.Text,
         DisplayName = "Default Encoding",
         DefaultValue = defaultValue,
@@ -222,7 +222,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata DirectoryOption(string defaultValue) => new()
     {
-        Name = "directory",
+        Name = new ComponentOptionName("directory"),
         Kind = OptionValueKind.Text,
         DisplayName = "Directory",
         DefaultValue = defaultValue,
@@ -232,7 +232,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
 
     private static OptionDesignMetadata FilterOption(string defaultValue) => new()
     {
-        Name = "filter",
+        Name = new ComponentOptionName("filter"),
         Kind = OptionValueKind.Text,
         DisplayName = "Filter",
         DefaultValue = defaultValue,

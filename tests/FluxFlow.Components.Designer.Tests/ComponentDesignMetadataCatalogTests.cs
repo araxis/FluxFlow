@@ -62,7 +62,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.IconKey.ShouldBe("sample");
         metadata.PreferredNodeName.ShouldBe("sample");
         metadata.SuggestedEditorWidth.ShouldBe(360);
-        metadata.Options.Select(option => option.Name).ShouldBe(["expression", "mode"]);
+        metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression", "mode"]);
         metadata.Options[1].Choices.Select(choice => choice.Value).ShouldBe(["strict", "relaxed"]);
         metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
@@ -120,7 +120,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             .AddOption("enabled", OptionValueKind.Boolean)
             .AddOutputPort("Output");
 
-        metadata.Options.Select(option => option.Name).ShouldBe(["expression"]);
+        metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression"]);
         metadata.Options[0].Attributes["scope"].ShouldBe("editable");
         metadata.Resources.ShouldHaveSingleItem().Attributes["resource"].ShouldBe("host-owned");
         metadata.Ports.ShouldHaveSingleItem().Attributes["side"].ShouldBe("input");
@@ -273,7 +273,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         {
             new()
             {
-                Name = "mode",
+                Name = new ComponentOptionName("mode"),
                 Kind = OptionValueKind.Enum,
                 Choices = choices,
                 Attributes = optionAttributes
@@ -448,7 +448,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "expression",
+                    Name = new ComponentOptionName("expression"),
                     Kind = OptionValueKind.Expression,
                     Attributes = optionAttributes
                 }
@@ -498,7 +498,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Enum,
                     Min = 2,
                     Max = 1,
@@ -510,7 +510,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Text
                 }
             ],
@@ -589,14 +589,14 @@ public sealed class ComponentDesignMetadataCatalogTests
                 null!,
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Enum,
                     Choices = null!,
                     Attributes = null!
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "level",
+                    Name = new ComponentOptionName("level"),
                     Kind = OptionValueKind.Enum,
                     Choices =
                     [
@@ -698,7 +698,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = (OptionValueKind)999
                 }
             ],
@@ -810,7 +810,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Enum
                 }
             ]
@@ -833,7 +833,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "expression",
+                    Name = new ComponentOptionName("expression"),
                     Kind = OptionValueKind.Expression,
                     Choices =
                     [
@@ -860,31 +860,31 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "count",
+                    Name = new ComponentOptionName("count"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = "1"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "enabled",
+                    Name = new ComponentOptionName("enabled"),
                     Kind = OptionValueKind.Boolean,
                     DefaultValue = "true"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "delay",
+                    Name = new ComponentOptionName("delay"),
                     Kind = OptionValueKind.Duration,
                     DefaultValue = "00:00:01"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "label",
+                    Name = new ComponentOptionName("label"),
                     Kind = OptionValueKind.Text,
                     DefaultValue = 1
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Enum,
                     DefaultValue = 1,
                     Choices =
@@ -894,7 +894,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "missingMode",
+                    Name = new ComponentOptionName("missingMode"),
                     Kind = OptionValueKind.Enum,
                     DefaultValue = "missing",
                     Choices =
@@ -925,28 +925,28 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "belowMin",
+                    Name = new ComponentOptionName("belowMin"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = 0,
                     Min = 1
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "aboveMax",
+                    Name = new ComponentOptionName("aboveMax"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = 11,
                     Max = 10
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "durationBelowMin",
+                    Name = new ComponentOptionName("durationBelowMin"),
                     Kind = OptionValueKind.Duration,
                     DefaultValue = TimeSpan.FromMilliseconds(500),
                     Min = 1
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "durationAboveMax",
+                    Name = new ComponentOptionName("durationAboveMax"),
                     Kind = OptionValueKind.Duration,
                     DefaultValue = TimeSpan.FromSeconds(2),
                     Max = 1
@@ -980,25 +980,25 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "nanMin",
+                    Name = new ComponentOptionName("nanMin"),
                     Kind = OptionValueKind.Number,
                     Min = double.NaN
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "infiniteMax",
+                    Name = new ComponentOptionName("infiniteMax"),
                     Kind = OptionValueKind.Number,
                     Max = double.PositiveInfinity
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "nanDefault",
+                    Name = new ComponentOptionName("nanDefault"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = double.NaN
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "infiniteDefault",
+                    Name = new ComponentOptionName("infiniteDefault"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = float.NegativeInfinity
                 }
@@ -1031,31 +1031,31 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "label",
+                    Name = new ComponentOptionName("label"),
                     Kind = OptionValueKind.Text,
                     DefaultValue = "value"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "body",
+                    Name = new ComponentOptionName("body"),
                     Kind = OptionValueKind.MultilineText,
                     DefaultValue = "line one"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "expression",
+                    Name = new ComponentOptionName("expression"),
                     Kind = OptionValueKind.Expression,
                     DefaultValue = "$"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "secret",
+                    Name = new ComponentOptionName("secret"),
                     Kind = OptionValueKind.Secret,
                     DefaultValue = "name"
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "count",
+                    Name = new ComponentOptionName("count"),
                     Kind = OptionValueKind.Number,
                     DefaultValue = 1,
                     Min = 0,
@@ -1063,20 +1063,20 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "enabled",
+                    Name = new ComponentOptionName("enabled"),
                     Kind = OptionValueKind.Boolean,
                     DefaultValue = true
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "delay",
+                    Name = new ComponentOptionName("delay"),
                     Kind = OptionValueKind.Duration,
                     DefaultValue = TimeSpan.FromSeconds(1),
                     Min = 1
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "mode",
+                    Name = new ComponentOptionName("mode"),
                     Kind = OptionValueKind.Enum,
                     DefaultValue = "strict",
                     Choices =
@@ -1086,7 +1086,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "enumMode",
+                    Name = new ComponentOptionName("enumMode"),
                     Kind = OptionValueKind.Enum,
                     DefaultValue = SampleMode.Relaxed,
                     Choices =
@@ -1096,7 +1096,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new OptionDesignMetadata
                 {
-                    Name = "json",
+                    Name = new ComponentOptionName("json"),
                     Kind = OptionValueKind.Json,
                     DefaultValue = new Dictionary<string, string>
                     {
@@ -1121,7 +1121,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new OptionDesignMetadata
                 {
-                    Name = "label",
+                    Name = new ComponentOptionName("label"),
                     Kind = OptionValueKind.Text,
                     Min = 1
                 }
@@ -1216,6 +1216,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentOptionName_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentOptionName("expression");
+        var second = new ComponentOptionName("expression");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("expression");
+        first.ToString().ShouldBe("expression");
+        new ComponentOptionName("mode").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentOptionName_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentOptionName(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component option name cannot be empty");
+    }
+
+    [Fact]
     public void ComponentPortName_validates_value_and_preserves_identity()
     {
         var first = new ComponentPortName("Input");
@@ -1306,7 +1332,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         [
             new OptionDesignMetadata
             {
-                Name = "expression",
+                Name = new ComponentOptionName("expression"),
                 Kind = OptionValueKind.Expression,
                 DisplayName = "Expression",
                 HelperText = "Expression evaluated for each input.",
@@ -1314,7 +1340,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             },
             new OptionDesignMetadata
             {
-                Name = "mode",
+                Name = new ComponentOptionName("mode"),
                 Kind = OptionValueKind.Enum,
                 DefaultValue = "strict",
                 Choices =

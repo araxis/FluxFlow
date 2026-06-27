@@ -88,7 +88,7 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
             item.Category.ShouldBe("Control");
             item.SuggestedEditorWidth.ShouldBe(420);
-            item.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+            item.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
                 ("expression", OptionValueKind.Expression),
                 ("expressionId", OptionValueKind.Text),
                 ("expressionName", OptionValueKind.Text),
@@ -96,13 +96,13 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
                 ("inputType", OptionValueKind.Text),
                 ("boundedCapacity", OptionValueKind.Number)
             ]);
-            item.Options.Single(option => option.Name == "expression")
+            item.Options.Single(option => option.Name.Value == "expression")
                 .IsRequired.ShouldBeTrue();
-            item.Options.Single(option => option.Name == "boundedCapacity")
+            item.Options.Single(option => option.Name.Value == "boundedCapacity")
                 .Min.ShouldBe(1);
-            item.Options.Select(option => option.Name)
+            item.Options.Select(option => option.Name.Value)
                 .ShouldNotContain(ControlCompositionResourceNames.ContextFactory);
-            item.Options.Select(option => option.Name)
+            item.Options.Select(option => option.Name.Value)
                 .ShouldNotContain(ControlCompositionResourceNames.Clock);
             AssertResources(
                 item,

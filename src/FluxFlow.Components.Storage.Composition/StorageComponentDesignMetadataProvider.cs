@@ -233,7 +233,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata CollectionOption() => new()
     {
-        Name = "collection",
+        Name = new ComponentOptionName("collection"),
         Kind = OptionValueKind.Text,
         DisplayName = "Collection",
         HelperText = "Default collection used when the input request does not specify one."
@@ -241,7 +241,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata IncludeExpiredOption(bool defaultValue) => new()
     {
-        Name = "includeExpired",
+        Name = new ComponentOptionName("includeExpired"),
         Kind = OptionValueKind.Boolean,
         DisplayName = "Include Expired",
         DefaultValue = defaultValue,
@@ -250,7 +250,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = defaultValue,

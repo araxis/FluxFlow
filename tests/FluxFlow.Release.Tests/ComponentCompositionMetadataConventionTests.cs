@@ -867,7 +867,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             $"{entry.PackageId} Designer metadata for '{nodeType}' omits option '{omittedOption}', but no bound options property or explicit configuration read owns that key.");
 
                     metadata.Options.Any(option =>
-                            string.Equals(option.Name, omittedOption, StringComparison.Ordinal))
+                            string.Equals(option.Name.Value, omittedOption, StringComparison.Ordinal))
                         .ShouldBeFalse(
                             $"{entry.PackageId} Designer metadata for '{nodeType}' option '{omittedOption}' cannot be both editable and declared in omittedOptions.");
                 }
@@ -900,7 +900,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 foreach (var option in metadata.Options)
                 {
-                    ConfigurationKeysContainOption(configurationKeys, option.Name)
+                    ConfigurationKeysContainOption(configurationKeys, option.Name.Value)
                         .ShouldBeTrue(
                             $"{entry.PackageId} Designer metadata for '{metadata.Type}' exposes option '{option.Name}', but no bound options property or explicit configuration read owns that key.");
                 }
@@ -935,7 +935,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
                 foreach (var option in metadata.Options.Where(option => option.DefaultValue is not null))
                 {
-                    if (!simpleDefaults.TryGetValue(option.Name, out var expected))
+                    if (!simpleDefaults.TryGetValue(option.Name.Value, out var expected))
                         continue;
 
                     MetadataDefaultMatches(option.DefaultValue, expected.Value)
@@ -973,7 +973,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     foreach (var requiredOption in ReadRequiredOptionProperties(optionType))
                     {
                         var option = metadata.Options.SingleOrDefault(option =>
-                            string.Equals(option.Name, requiredOption.ConfigurationKey, StringComparison.Ordinal));
+                            string.Equals(option.Name.Value, requiredOption.ConfigurationKey, StringComparison.Ordinal));
 
                         option.ShouldNotBeNull(
                             $"{entry.PackageId} Designer metadata for '{nodeType}' must expose required bound option '{requiredOption.ConfigurationKey}' from {optionType.Name}.{requiredOption.Name}.");
@@ -1014,7 +1014,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     option.Kind == OptionValueKind.Number &&
                     (option.Min.HasValue || option.Max.HasValue)))
                 {
-                    if (!boundProperties.TryGetValue(option.Name, out var boundProperty) ||
+                    if (!boundProperties.TryGetValue(option.Name.Value, out var boundProperty) ||
                         !IsNumericOptionProperty(boundProperty.Property.PropertyType))
                     {
                         continue;
@@ -1117,7 +1117,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var providerOptionsByName = provider
                 .GetMetadata()
                 .SelectMany(metadata => metadata.Options)
-                .GroupBy(option => option.Name, StringComparer.Ordinal)
+                .GroupBy(option => option.Name.Value, StringComparer.Ordinal)
                 .ToDictionary(
                     group => group.Key,
                     group => group.ToArray(),
@@ -1887,7 +1887,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         ComponentDesignMetadata metadata,
         string optionName)
         => metadata.Options.Any(option =>
-                string.Equals(option.Name, optionName, StringComparison.Ordinal)) ||
+                string.Equals(option.Name.Value, optionName, StringComparison.Ordinal)) ||
             ReadOmittedOptions(metadata).Contains(optionName);
 
     private static HashSet<string> ReadOmittedOptions(ComponentDesignMetadata metadata)

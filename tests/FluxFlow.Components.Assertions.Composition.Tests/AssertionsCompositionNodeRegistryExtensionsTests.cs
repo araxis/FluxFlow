@@ -65,7 +65,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         metadata.Category.ShouldBe("Assertions");
         metadata.PreferredNodeName.ShouldBe("assert");
         metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("expression", OptionValueKind.Expression),
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
@@ -77,17 +77,17 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             ("emitPassedInput", OptionValueKind.Boolean),
             ("emitFailedInput", OptionValueKind.Boolean)
         ]);
-        metadata.Options.Single(option => option.Name == "expression")
+        metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Single(option => option.Name == "description")
+        metadata.Options.Single(option => option.Name.Value == "description")
             .DefaultValue.ShouldBe("Flow assertion");
-        metadata.Options.Single(option => option.Name == "failureMessage")
+        metadata.Options.Single(option => option.Name.Value == "failureMessage")
             .DefaultValue.ShouldBe("Assertion failed.");
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(AssertionsCompositionResourceNames.ContextFactory);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(AssertionsCompositionResourceNames.Clock);
         AssertResources(
             metadata,

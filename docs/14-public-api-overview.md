@@ -875,6 +875,7 @@ FluxFlow.Components.Designer.Contracts
 Main types:
 
 - `ComponentType`
+- `ComponentOptionName`
 - `ComponentResourceName`
 - `ComponentPortName`
 - `ComponentDesignMetadata`
@@ -895,9 +896,10 @@ Main types:
 Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
-`ComponentType`, `ComponentResourceName`, and `ComponentPortName` are
-Designer-owned identifier value types, keeping component, resource, and port
-metadata independent from engine definition contracts.
+`ComponentType`, `ComponentOptionName`, `ComponentResourceName`, and
+`ComponentPortName` are Designer-owned identifier value types, keeping
+component, option, resource, and port metadata independent from engine
+definition contracts.
 
 `ComponentDesignMetadataValidator` enforces identifier, option, choice,
 resource, port, and attribute consistency. Enum options must define choices,

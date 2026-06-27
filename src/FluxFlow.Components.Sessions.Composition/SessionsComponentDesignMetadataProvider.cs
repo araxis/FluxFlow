@@ -228,7 +228,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static OptionDesignMetadata StoreOption() => new()
     {
-        Name = "store",
+        Name = new ComponentOptionName("store"),
         Kind = OptionValueKind.Text,
         DisplayName = "Store",
         HelperText = "Diagnostic store metadata; DI selection uses the required host-owned store resource."
@@ -236,7 +236,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static OptionDesignMetadata SessionIdOption(bool isRequired) => new()
     {
-        Name = "sessionId",
+        Name = new ComponentOptionName("sessionId"),
         Kind = OptionValueKind.Text,
         DisplayName = "Session ID",
         HelperText = isRequired
@@ -247,7 +247,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static OptionDesignMetadata TagsOption() => new()
     {
-        Name = "tags",
+        Name = new ComponentOptionName("tags"),
         Kind = OptionValueKind.Json,
         DisplayName = "Tags",
         HelperText = "Optional string tag map used in session metadata or query defaults."
@@ -255,7 +255,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
         DisplayName = "Bounded Capacity",
         DefaultValue = defaultValue,

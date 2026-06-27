@@ -67,7 +67,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         metadata.Category.ShouldBe("Validation");
         metadata.PreferredNodeName.ShouldBe("validate");
         metadata.SuggestedEditorWidth.ShouldBe(460);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("schema", OptionValueKind.Json),
             ("schemaPath", OptionValueKind.Text),
             ("schemaId", OptionValueKind.Text),
@@ -76,13 +76,13 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             ("payloadSelector", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number)
         ]);
-        metadata.Options.Single(option => option.Name == "valueSelector")
+        metadata.Options.Single(option => option.Name.Value == "valueSelector")
             .DefaultValue.ShouldBe("input");
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(ValidationCompositionResourceNames.Selector);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(ValidationCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
             resource.Name.Value,

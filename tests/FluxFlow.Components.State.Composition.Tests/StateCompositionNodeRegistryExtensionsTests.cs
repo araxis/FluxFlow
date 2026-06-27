@@ -45,7 +45,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         metadata.Category.ShouldBe("State");
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
-            option.Name == StateCompositionResourceNames.Clock);
+            option.Name.Value == StateCompositionResourceNames.Clock);
         AssertResources(metadata);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
@@ -77,7 +77,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     {
         var metadata = DesignMetadata();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "engine",
             "keyExpression",
             "reducer",
@@ -449,7 +449,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         double? min = null,
         bool isRequired = false)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);

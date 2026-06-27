@@ -45,7 +45,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name == MetricsCompositionResourceNames.Clock);
+            option.Name.Value == MetricsCompositionResourceNames.Clock);
         AssertClockResource(metadata);
     }
 
@@ -77,7 +77,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var metadata = MetricsDesignMetadata();
         var defaults = new MetricsAggregateOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "rateWindowSeconds",
             "boundedCapacity",
             "maxGroups",
@@ -335,7 +335,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
