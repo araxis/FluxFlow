@@ -266,7 +266,7 @@ public static class ComponentDesignMetadataValidator
         if (option.Choices is null || option.Choices.Count == 0)
             return;
 
-        if (option.Choices.Any(choice => choice is not null && string.Equals(choice.Value, defaultValue, StringComparison.Ordinal)))
+        if (option.Choices.Any(choice => choice is not null && string.Equals(choice.Value.Value, defaultValue, StringComparison.Ordinal)))
             return;
 
         errors.Add(new DesignerMetadataValidationError(
@@ -378,11 +378,11 @@ public static class ComponentDesignMetadataValidator
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(choice.Value))
+            if (string.IsNullOrWhiteSpace(choice.Value.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(OptionChoiceMetadata.Value)}", "Choice value is required."));
             }
-            else if (!values.Add(choice.Value))
+            else if (!values.Add(choice.Value.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(OptionChoiceMetadata.Value)}", $"Choice value '{choice.Value}' is already used."));
             }

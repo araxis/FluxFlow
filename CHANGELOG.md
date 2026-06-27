@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.10.0
+
+Adds a Designer-owned option-choice value identifier.
+
+- Adds `ComponentOptionChoiceValue` for non-empty enum option choice values.
+- Changes `OptionChoiceMetadata.Value` from `string` to
+  `ComponentOptionChoiceValue`, aligning enum choice metadata with
+  Designer-owned component, category, icon, preferred node-name, option,
+  resource, port, and port-group identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddEnumOption(...)` accepting string
+  choice values so provider authoring stays concise while stored metadata is
+  typed.
+
 ## FluxFlow.Components.Designer 2.9.0
 
 Adds a Designer-owned port-group identifier.

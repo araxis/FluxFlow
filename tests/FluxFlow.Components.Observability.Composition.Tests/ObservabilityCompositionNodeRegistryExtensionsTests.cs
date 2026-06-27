@@ -163,7 +163,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var level = metadata.Options.Single(option => option.Name.Value == "level");
         level.Kind.ShouldBe(OptionValueKind.Enum);
         level.DefaultValue.ShouldBe(defaults.Level);
-        level.Choices.Select(choice => choice.Value).ShouldBe([
+        level.Choices.Select(choice => choice.Value.Value).ShouldBe([
             FlowLogLevel.Trace.ToString(),
             FlowLogLevel.Debug.ToString(),
             FlowLogLevel.Information.ToString(),

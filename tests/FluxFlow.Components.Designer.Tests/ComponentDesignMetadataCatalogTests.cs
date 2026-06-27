@@ -63,7 +63,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("sample"));
         metadata.SuggestedEditorWidth.ShouldBe(360);
         metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression", "mode"]);
-        metadata.Options[1].Choices.Select(choice => choice.Value).ShouldBe(["strict", "relaxed"]);
+        metadata.Options[1].Choices.Select(choice => choice.Value.Value).ShouldBe(["strict", "relaxed"]);
         metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
         metadata.Attributes["shape"].ShouldBe("transform");
@@ -265,7 +265,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         {
             new()
             {
-                Value = "strict",
+                Value = new ComponentOptionChoiceValue("strict"),
                 Attributes = choiceAttributes
             }
         };
@@ -507,8 +507,9 @@ public sealed class ComponentDesignMetadataCatalogTests
                     Max = 1,
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = "fast" },
-                        new OptionChoiceMetadata { Value = "fast" }
+                        new OptionChoiceMetadata { Value = default },
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("fast") },
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("fast") }
                     ]
                 },
                 new OptionDesignMetadata
@@ -611,7 +612,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                         null!,
                         new OptionChoiceMetadata
                         {
-                            Value = "strict",
+                            Value = new ComponentOptionChoiceValue("strict"),
                             Attributes = null!
                         }
                     ]
@@ -845,7 +846,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                     Kind = OptionValueKind.Expression,
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = "value" }
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("value") }
                     ]
                 }
             ]
@@ -897,7 +898,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                     DefaultValue = 1,
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = "strict" }
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("strict") }
                     ]
                 },
                 new OptionDesignMetadata
@@ -907,7 +908,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                     DefaultValue = "missing",
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = "strict" }
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("strict") }
                     ]
                 }
             ]
@@ -1089,7 +1090,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                     DefaultValue = "strict",
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = "strict" }
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("strict") }
                     ]
                 },
                 new OptionDesignMetadata
@@ -1099,7 +1100,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                     DefaultValue = SampleMode.Relaxed,
                     Choices =
                     [
-                        new OptionChoiceMetadata { Value = nameof(SampleMode.Relaxed) }
+                        new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue(nameof(SampleMode.Relaxed)) }
                     ]
                 },
                 new OptionDesignMetadata
@@ -1328,6 +1329,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentOptionChoiceValue_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentOptionChoiceValue("strict");
+        var second = new ComponentOptionChoiceValue("strict");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("strict");
+        first.ToString().ShouldBe("strict");
+        new ComponentOptionChoiceValue("relaxed").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentOptionChoiceValue_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentOptionChoiceValue(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component option choice value cannot be empty");
+    }
+
+    [Fact]
     public void ComponentPortName_validates_value_and_preserves_identity()
     {
         var first = new ComponentPortName("Input");
@@ -1457,8 +1484,8 @@ public sealed class ComponentDesignMetadataCatalogTests
                 DefaultValue = "strict",
                 Choices =
                 [
-                    new OptionChoiceMetadata { Value = "strict", DisplayName = "Strict" },
-                    new OptionChoiceMetadata { Value = "relaxed", DisplayName = "Relaxed" }
+                    new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("strict"), DisplayName = "Strict" },
+                    new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("relaxed"), DisplayName = "Relaxed" }
                 ]
             }
         ],

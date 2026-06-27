@@ -92,7 +92,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         var kind = metadata.Options.Single(option => option.Name.Value == "kind");
         kind.Kind.ShouldBe(OptionValueKind.Enum);
         kind.DefaultValue.ShouldBe(defaults.Kind.ToString());
-        kind.Choices.Select(choice => choice.Value).ShouldBe([
+        kind.Choices.Select(choice => choice.Value.Value).ShouldBe([
             EventExpectationNodeKind.Expect.ToString(),
             EventExpectationNodeKind.Guard.ToString()
         ], ignoreOrder: false);

@@ -1144,7 +1144,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                             OptionValueKind.Enum,
                             $"{entry.PackageId} option '{optionType.Name}.{option.Name}' has enum CLR type '{option.EnumType.Name}' and must use OptionValueKind.Enum.");
                         var actualChoices = providerOption.Choices
-                            .Select(choice => choice.Value)
+                            .Select(choice => choice.Value.Value)
                             .Order(StringComparer.Ordinal)
                             .ToArray();
 

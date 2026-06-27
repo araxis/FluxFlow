@@ -20,10 +20,12 @@ component without depending on a specific rendering framework.
   value type, primary flag, and attributes.
 - `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
   `ComponentPreferredNodeName`, `ComponentOptionName`,
-  `ComponentResourceName`, `ComponentPortName`, and `ComponentPortGroup`:
+  `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
+  and `ComponentPortGroup`:
   Designer-owned identifiers for component types, palette categories, palette
-  icon keys, preferred node names, editable options, host-owned resource slots,
-  ports, and port groups. They do not depend on engine definition types.
+  icon keys, preferred node names, editable options, option choices,
+  host-owned resource slots, ports, and port groups. They do not depend on
+  engine definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
@@ -94,6 +96,25 @@ var metadata = new ComponentDesignMetadata
             Kind = OptionValueKind.Expression,
             DisplayName = "Expression",
             IsRequired = true
+        },
+        new OptionDesignMetadata
+        {
+            Name = new ComponentOptionName("mode"),
+            Kind = OptionValueKind.Enum,
+            DefaultValue = "strict",
+            Choices =
+            [
+                new OptionChoiceMetadata
+                {
+                    Value = new ComponentOptionChoiceValue("strict"),
+                    DisplayName = "Strict"
+                },
+                new OptionChoiceMetadata
+                {
+                    Value = new ComponentOptionChoiceValue("relaxed"),
+                    DisplayName = "Relaxed"
+                }
+            ]
         }
     ],
     Resources =

@@ -271,7 +271,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         string displayName,
         string helperText) => new()
         {
-            Value = mode.ToString(),
+            Value = new ComponentOptionChoiceValue(mode.ToString()),
             DisplayName = displayName,
             HelperText = helperText
         };

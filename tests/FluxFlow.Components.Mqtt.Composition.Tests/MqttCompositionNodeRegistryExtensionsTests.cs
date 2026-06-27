@@ -126,7 +126,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "qualityOfService",
             OptionValueKind.Enum,
             defaults.QualityOfService.ToString());
-        qualityOfService.Choices.Select(choice => choice.Value).ShouldBe([
+        qualityOfService.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttQualityOfService.AtMostOnce.ToString(),
             MqttQualityOfService.AtLeastOnce.ToString(),
             MqttQualityOfService.ExactlyOnce.ToString()
@@ -154,7 +154,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             defaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttTriggerMode.FireAndForget.ToString(),
             MqttTriggerMode.RequestReply.ToString()
         ], ignoreOrder: false);
@@ -164,7 +164,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "acknowledgement",
             OptionValueKind.Enum,
             defaults.Acknowledgement.ToString());
-        acknowledgement.Choices.Select(choice => choice.Value).ShouldBe([
+        acknowledgement.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttTriggerAcknowledgement.None.ToString(),
             MqttTriggerAcknowledgement.OnEmit.ToString(),
             MqttTriggerAcknowledgement.OnSuccessfulResponse.ToString()

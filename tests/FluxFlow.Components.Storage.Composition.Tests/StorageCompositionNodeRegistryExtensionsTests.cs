@@ -117,7 +117,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             putDefaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             nameof(StorageWriteMode.Upsert),
             nameof(StorageWriteMode.Create),
             nameof(StorageWriteMode.Replace)

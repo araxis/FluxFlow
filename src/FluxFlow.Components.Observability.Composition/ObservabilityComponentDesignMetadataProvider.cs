@@ -269,7 +269,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static OptionChoiceMetadata LogLevelChoice(FlowLogLevel level) => new()
     {
-        Value = level.ToString(),
+        Value = new ComponentOptionChoiceValue(level.ToString()),
         DisplayName = level.ToString()
     };
 

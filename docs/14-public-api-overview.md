@@ -879,6 +879,7 @@ Main types:
 - `ComponentIconKey`
 - `ComponentPreferredNodeName`
 - `ComponentOptionName`
+- `ComponentOptionChoiceValue`
 - `ComponentResourceName`
 - `ComponentPortName`
 - `ComponentPortGroup`
@@ -901,9 +902,10 @@ Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
 `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
-`ComponentPreferredNodeName`, `ComponentOptionName`, `ComponentResourceName`,
-`ComponentPortName`, and `ComponentPortGroup` are Designer-owned identifier
-value types, keeping component, category, icon, preferred node name, option,
+`ComponentPreferredNodeName`, `ComponentOptionName`,
+`ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`, and
+`ComponentPortGroup` are Designer-owned identifier value types, keeping
+component, category, icon, preferred node name, option, option-choice,
 resource, port, and port-group metadata independent from engine definition
 contracts.
 

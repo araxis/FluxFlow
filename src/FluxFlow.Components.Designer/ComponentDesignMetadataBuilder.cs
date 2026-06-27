@@ -112,7 +112,7 @@ public sealed class ComponentDesignMetadataBuilder
             ArgumentNullException.ThrowIfNull(choice);
             return new OptionChoiceMetadata
             {
-                Value = choice
+                Value = new ComponentOptionChoiceValue(choice)
             };
         }).ToArray();
 

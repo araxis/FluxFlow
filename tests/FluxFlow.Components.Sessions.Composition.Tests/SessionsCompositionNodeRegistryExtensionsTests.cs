@@ -140,7 +140,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             replayDefaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             nameof(SessionReplayMode.RealTime),
             nameof(SessionReplayMode.FixedInterval),
             nameof(SessionReplayMode.Multiplier),

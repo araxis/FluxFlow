@@ -226,7 +226,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
         where TEnum : struct, Enum
         => new()
         {
-            Value = value.ToString(),
+            Value = new ComponentOptionChoiceValue(value.ToString()),
             DisplayName = displayName
         };
 }

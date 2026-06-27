@@ -277,7 +277,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         string displayName,
         string helperText) => new()
         {
-            Value = mode.ToString(),
+            Value = new ComponentOptionChoiceValue(mode.ToString()),
             DisplayName = displayName,
             HelperText = helperText
         };
