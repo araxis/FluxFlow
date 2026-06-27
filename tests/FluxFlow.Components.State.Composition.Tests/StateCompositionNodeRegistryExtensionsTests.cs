@@ -459,7 +459,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     private static void AssertResources(ComponentDesignMetadata metadata)
     {
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([

@@ -85,7 +85,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         metadata.Options.Select(option => option.Name)
             .ShouldNotContain(ValidationCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([

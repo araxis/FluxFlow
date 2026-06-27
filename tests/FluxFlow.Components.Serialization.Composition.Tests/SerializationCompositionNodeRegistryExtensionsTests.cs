@@ -416,7 +416,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(SerializationCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(SerializationCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

@@ -123,13 +123,13 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 {
                     AssertRequiredDesignerText(
                         resource.DisplayName,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a display name.");
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a display name.");
                     AssertRequiredDesignerText(
                         resource.Summary,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a summary.");
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a summary.");
                     AssertRequiredDesignerText(
                         resource.ValueType,
-                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name}' must include a value type.");
+                        $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must include a value type.");
                 }
 
                 foreach (var port in metadata.Ports)
@@ -254,7 +254,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 var nodeType = metadata.Type.ToString();
                 AssertStableMetadataOrder(
-                    metadata.Resources.Select(resource => (resource.Name, resource.Order)),
+                    metadata.Resources.Select(resource => (resource.Name.Value, resource.Order)),
                     $"{entry.PackageId} Designer metadata for '{nodeType}' resources");
                 AssertStableMetadataOrder(
                     metadata.Ports
@@ -595,7 +595,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             foreach (var resource in resourceConstants)
             {
                 metadataResources.Any(metadata => ResourceMetadataMatchesConstant(
-                        metadata.Name,
+                        metadata.Name.Value,
                         resource.Value,
                         resource.Name))
                     .ShouldBeTrue(
@@ -687,7 +687,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                     resource.Name);
                 var matchingResources = metadataResources
                     .Where(metadata => ResourceMetadataMatchesConstant(
-                        metadata.Name,
+                        metadata.Name.Value,
                         resource.Value,
                         resource.Name))
                     .ToArray();

@@ -45,7 +45,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             option.Name == HttpCompositionResourceNames.Client ||
             option.Name == HttpCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([

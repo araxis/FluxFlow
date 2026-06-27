@@ -78,7 +78,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         metadata.Options.Select(option => option.Name)
             .ShouldNotContain(MappingCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType)).ShouldBe([

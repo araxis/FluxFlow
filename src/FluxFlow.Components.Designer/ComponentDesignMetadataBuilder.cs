@@ -147,7 +147,7 @@ public sealed class ComponentDesignMetadataBuilder
 
         var resource = new ResourceDesignMetadata
         {
-            Name = name,
+            Name = new ComponentResourceName(name),
             DisplayName = displayName,
             Order = order,
             Summary = summary,

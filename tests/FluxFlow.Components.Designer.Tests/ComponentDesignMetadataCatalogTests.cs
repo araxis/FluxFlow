@@ -64,7 +64,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.SuggestedEditorWidth.ShouldBe(360);
         metadata.Options.Select(option => option.Name).ShouldBe(["expression", "mode"]);
         metadata.Options[1].Choices.Select(choice => choice.Value).ShouldBe(["strict", "relaxed"]);
-        metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe("engine");
+        metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
         metadata.Attributes["shape"].ShouldBe("transform");
     }
@@ -283,7 +283,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         {
             new()
             {
-                Name = "engine",
+                Name = new ComponentResourceName("engine"),
                 Attributes = resourceAttributes
             }
         };
@@ -614,7 +614,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 null!,
                 new ResourceDesignMetadata
                 {
-                    Name = "engine",
+                    Name = new ComponentResourceName("engine"),
                     Attributes = null!
                 }
             ],
@@ -732,17 +732,17 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new ResourceDesignMetadata
                 {
-                    Name = "engine",
+                    Name = new ComponentResourceName("engine"),
                     Order = -1
                 },
                 new ResourceDesignMetadata
                 {
-                    Name = "clock",
+                    Name = new ComponentResourceName("clock"),
                     Order = 0
                 },
                 new ResourceDesignMetadata
                 {
-                    Name = "store",
+                    Name = new ComponentResourceName("store"),
                     Order = 0
                 }
             ],
@@ -1145,7 +1145,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             [
                 new ResourceDesignMetadata
                 {
-                    Name = "",
+                    Name = default,
                     DisplayName = " ",
                     Attributes = new Dictionary<string, string>
                     {
@@ -1154,11 +1154,11 @@ public sealed class ComponentDesignMetadataCatalogTests
                 },
                 new ResourceDesignMetadata
                 {
-                    Name = "engine"
+                    Name = new ComponentResourceName("engine")
                 },
                 new ResourceDesignMetadata
                 {
-                    Name = "engine"
+                    Name = new ComponentResourceName("engine")
                 }
             ]
         };
@@ -1232,11 +1232,11 @@ public sealed class ComponentDesignMetadataCatalogTests
     {
         var resources = CreateMetadata().Resources.OrderBy(resource => resource.Order).ToArray();
 
-        resources[0].Name.ShouldBe("engine");
+        resources[0].Name.ShouldBe(new ComponentResourceName("engine"));
         resources[0].DisplayName.ShouldBe("Engine");
         resources[0].ValueType.ShouldBe("IExpressionEngine");
         resources[0].IsRequired.ShouldBeTrue();
-        resources[1].Name.ShouldBe("clock");
+        resources[1].Name.ShouldBe(new ComponentResourceName("clock"));
         resources[1].IsRequired.ShouldBeFalse();
     }
 
@@ -1252,6 +1252,32 @@ public sealed class ComponentDesignMetadataCatalogTests
         };
 
         act.ShouldThrow<ArgumentException>();
+    }
+
+    [Fact]
+    public void ComponentResourceName_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentResourceName("engine");
+        var second = new ComponentResourceName("engine");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("engine");
+        first.ToString().ShouldBe("engine");
+        new ComponentResourceName("clock").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentResourceName_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentResourceName(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component resource name cannot be empty");
     }
 
     [Fact]
@@ -1302,7 +1328,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         [
             new ResourceDesignMetadata
             {
-                Name = "engine",
+                Name = new ComponentResourceName("engine"),
                 DisplayName = "Engine",
                 Order = 0,
                 Summary = "Expression engine resource.",
@@ -1311,7 +1337,7 @@ public sealed class ComponentDesignMetadataCatalogTests
             },
             new ResourceDesignMetadata
             {
-                Name = "clock",
+                Name = new ComponentResourceName("clock"),
                 DisplayName = "Clock",
                 Order = 1,
                 Summary = "Optional clock resource.",

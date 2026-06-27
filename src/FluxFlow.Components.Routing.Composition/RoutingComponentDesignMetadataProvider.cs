@@ -282,7 +282,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         int order,
         string summary) => new()
         {
-            Name = name,
+            Name = new ComponentResourceName(name),
             DisplayName = displayName,
             Order = order,
             Summary = summary,
@@ -292,7 +292,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
 
     private static ResourceDesignMetadata ClockResource(int order) => new()
     {
-        Name = RoutingCompositionResourceNames.Clock,
+        Name = new ComponentResourceName(RoutingCompositionResourceNames.Clock),
         DisplayName = "Clock",
         Order = order,
         Summary = "Optional keyed clock for deterministic routing timing, timeouts, and diagnostics.",

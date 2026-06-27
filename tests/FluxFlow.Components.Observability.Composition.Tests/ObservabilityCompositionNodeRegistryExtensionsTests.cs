@@ -71,7 +71,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ]);
         metadata[ObservabilityCompositionNodeTypes.Counter]
             .Resources
-            .Single(resource => resource.Name == ObservabilityCompositionResourceNames.Engine)
+            .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.Engine)
             .Attributes["requiredWhenAnyOption"]
             .ShouldBe("predicate,expression");
 
@@ -83,7 +83,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             ]);
         var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Resources
-            .Single(resource => resource.Name == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+            .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
         attributeSelector.Attributes["pattern"].ShouldBe("true");
         attributeSelector.Attributes["option"].ShouldBe("attributeSelectors");
 
@@ -669,7 +669,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
     {
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType!)).ShouldBe(expected);

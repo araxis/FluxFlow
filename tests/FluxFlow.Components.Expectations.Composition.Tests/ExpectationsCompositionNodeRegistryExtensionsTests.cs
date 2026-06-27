@@ -404,7 +404,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(ExpectationsCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(ExpectationsCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

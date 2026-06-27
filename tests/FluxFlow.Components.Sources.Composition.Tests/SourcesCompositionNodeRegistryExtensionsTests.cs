@@ -369,7 +369,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(SourcesCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(SourcesCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

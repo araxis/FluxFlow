@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.3.3</Version>
+    <Version>2.4.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds service-collection helpers for registering component design metadata providers and resolving a validated metadata catalog.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds ComponentResourceName and uses it for ResourceDesignMetadata.Name so resource identifiers match Designer-owned component and port identifier contracts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

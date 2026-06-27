@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.4.0
+
+Adds a Designer-owned resource identifier.
+
+- Adds `ComponentResourceName` for non-empty host-owned resource slot names.
+- Changes `ResourceDesignMetadata.Name` from `string` to
+  `ComponentResourceName`, aligning resource hints with Designer-owned
+  component and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddResource(...)` string overloads so
+  provider authoring stays concise while still producing typed resource names.
+
 ## FluxFlow.Composition 1.0.9
 
 Normalizes composition DTO dictionary keys.

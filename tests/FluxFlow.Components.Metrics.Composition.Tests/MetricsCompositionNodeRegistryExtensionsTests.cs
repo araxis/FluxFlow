@@ -345,7 +345,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(MetricsCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(MetricsCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

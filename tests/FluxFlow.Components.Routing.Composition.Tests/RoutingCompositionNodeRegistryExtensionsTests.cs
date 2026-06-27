@@ -863,7 +863,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
     {
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
             resource.ValueType!)).ShouldBe(expected);

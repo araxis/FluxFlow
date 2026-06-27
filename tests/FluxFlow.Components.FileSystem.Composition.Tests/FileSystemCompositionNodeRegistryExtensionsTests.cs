@@ -662,7 +662,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(FileSystemCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(FileSystemCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

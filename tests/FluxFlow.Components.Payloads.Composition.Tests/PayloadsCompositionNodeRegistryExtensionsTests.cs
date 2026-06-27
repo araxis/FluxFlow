@@ -317,7 +317,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(PayloadsCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

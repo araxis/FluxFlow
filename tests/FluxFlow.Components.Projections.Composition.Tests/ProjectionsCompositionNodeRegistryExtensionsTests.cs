@@ -331,7 +331,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(ProjectionsCompositionResourceNames.Clock);
+        resource.Name.Value.ShouldBe(ProjectionsCompositionResourceNames.Clock);
         resource.DisplayName.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();

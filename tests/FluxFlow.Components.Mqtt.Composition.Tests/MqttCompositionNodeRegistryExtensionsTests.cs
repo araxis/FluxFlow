@@ -399,7 +399,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         for (var index = 0; index < expected.Length; index++)
         {
             var resource = metadata.Resources[index];
-            resource.Name.ShouldBe(expected[index].Name);
+            resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(index);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
             resource.ValueType.ShouldBe(expected[index].ValueType);

@@ -404,11 +404,11 @@ public static class ComponentDesignMetadataValidator
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(resource.Name))
+            if (string.IsNullOrWhiteSpace(resource.Name.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(ResourceDesignMetadata.Name)}", "Resource name is required."));
             }
-            else if (!names.Add(resource.Name))
+            else if (!names.Add(resource.Name.Value))
             {
                 errors.Add(new DesignerMetadataValidationError($"{path}.{nameof(ResourceDesignMetadata.Name)}", $"Resource name '{resource.Name}' is already used."));
             }
