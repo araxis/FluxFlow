@@ -883,6 +883,7 @@ Main types:
 - `ComponentResourceName`
 - `ComponentPortName`
 - `ComponentPortGroup`
+- `ComponentAttributeName`
 - `ComponentDesignMetadata`
 - `OptionDesignMetadata`
 - `OptionChoiceMetadata`
@@ -904,10 +905,10 @@ composition runtime or the engine runtime.
 `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
 `ComponentPreferredNodeName`, `ComponentOptionName`,
 `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`, and
-`ComponentPortGroup` are Designer-owned identifier value types, keeping
-component, category, icon, preferred node name, option, option-choice,
-resource, port, and port-group metadata independent from engine definition
-contracts.
+`ComponentPortGroup`, and `ComponentAttributeName` are Designer-owned
+identifier value types, keeping component, category, icon, preferred node name,
+option, option-choice, resource, port, port-group, and metadata attribute-key
+contracts independent from engine definition contracts.
 
 `ComponentDesignMetadataValidator` enforces identifier, option, choice,
 resource, port, and attribute consistency. Enum options must define choices,
@@ -915,8 +916,8 @@ choice lists are valid only on enum options, option defaults must match their
 declared kind, and min/max constraints are limited to number and duration
 options.
 `ComponentDesignMetadataCatalog` validates and snapshots registered metadata so
-caller-owned option, resource, port, choice, and attribute collections cannot
-mutate catalog contents after registration.
+caller-owned option, resource, port, choice, and typed attribute collections
+cannot mutate catalog contents after registration.
 `ComponentDesignMetadataBuilder` is an authoring helper over the same contracts;
 it supports single and bulk component-level attributes through `AddAttribute`
 and `AddAttributes`, builds through the validated module path, and does not own

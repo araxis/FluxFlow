@@ -1892,7 +1892,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     private static HashSet<string> ReadOmittedOptions(ComponentDesignMetadata metadata)
     {
-        if (!metadata.Attributes.TryGetValue("omittedOptions", out var omittedOptions) ||
+        if (!metadata.Attributes.TryGetValue(new ComponentAttributeName("omittedOptions"), out var omittedOptions) ||
             string.IsNullOrWhiteSpace(omittedOptions))
         {
             return new HashSet<string>(StringComparer.Ordinal);
@@ -2219,8 +2219,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         ResourceDesignMetadata resource)
         => resource.IsRequired ||
             resource.Attributes.Keys.Any(key =>
-                key.StartsWith("requiredWhen", StringComparison.OrdinalIgnoreCase)) ||
-            resource.Attributes.ContainsKey("option");
+                key.Value.StartsWith("requiredWhen", StringComparison.OrdinalIgnoreCase)) ||
+            resource.Attributes.ContainsKey(new ComponentAttributeName("option"));
 
     private static bool ResourceHelperMentionsConstant(
         string resourceContent,

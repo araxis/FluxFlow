@@ -72,7 +72,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         metadata[ObservabilityCompositionNodeTypes.Counter]
             .Resources
             .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.Engine)
-            .Attributes["requiredWhenAnyOption"]
+            .Attributes[new ComponentAttributeName("requiredWhenAnyOption")]
             .ShouldBe("predicate,expression");
 
         AssertResources(
@@ -84,8 +84,8 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Resources
             .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
-        attributeSelector.Attributes["pattern"].ShouldBe("true");
-        attributeSelector.Attributes["option"].ShouldBe("attributeSelectors");
+        attributeSelector.Attributes[new ComponentAttributeName("pattern")].ShouldBe("true");
+        attributeSelector.Attributes[new ComponentAttributeName("option")].ShouldBe("attributeSelectors");
 
         AssertResources(
             metadata[ObservabilityCompositionNodeTypes.Metrics],

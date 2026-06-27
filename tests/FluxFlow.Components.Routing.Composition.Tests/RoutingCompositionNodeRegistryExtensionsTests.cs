@@ -151,7 +151,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         metadata[RoutingCompositionNodeTypes.Switch].Ports
             .Select(port => port.Name.Value)
             .ShouldNotContain("Priority");
-        metadata[RoutingCompositionNodeTypes.Switch].Attributes["dynamicOutputsOption"]
+        metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
             .ShouldBe("routeOutputs");
 
         AssertPorts(
@@ -160,7 +160,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
                 (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
             ]);
-        metadata[RoutingCompositionNodeTypes.Fork].Attributes["dynamicOutputsOption"]
+        metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
             .ShouldBe("outputs");
 
         AssertPorts(

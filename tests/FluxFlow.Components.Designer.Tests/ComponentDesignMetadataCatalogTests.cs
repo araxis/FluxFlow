@@ -66,7 +66,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         metadata.Options[1].Choices.Select(choice => choice.Value.Value).ShouldBe(["strict", "relaxed"]);
         metadata.Resources.ShouldHaveSingleItem().Name.ShouldBe(new ComponentResourceName("engine"));
         metadata.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
-        metadata.Attributes["shape"].ShouldBe("transform");
+        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
     }
 
     [Fact]
@@ -121,10 +121,10 @@ public sealed class ComponentDesignMetadataCatalogTests
             .AddOutputPort("Output");
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe(["expression"]);
-        metadata.Options[0].Attributes["scope"].ShouldBe("editable");
-        metadata.Resources.ShouldHaveSingleItem().Attributes["resource"].ShouldBe("host-owned");
-        metadata.Ports.ShouldHaveSingleItem().Attributes["side"].ShouldBe("input");
-        metadata.Attributes["shape"].ShouldBe("transform");
+        metadata.Options[0].Attributes[Attribute("scope")].ShouldBe("editable");
+        metadata.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].ShouldBe("host-owned");
+        metadata.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].ShouldBe("input");
+        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
     }
 
     [Fact]
@@ -144,9 +144,9 @@ public sealed class ComponentDesignMetadataCatalogTests
         attributes["later"] = "ignored";
 
         metadata.Attributes.Count.ShouldBe(2);
-        metadata.Attributes["shape"].ShouldBe("transform");
-        metadata.Attributes["domain"].ShouldBe("sample");
-        metadata.Attributes.ContainsKey("later").ShouldBeFalse();
+        metadata.Attributes[Attribute("shape")].ShouldBe("transform");
+        metadata.Attributes[Attribute("domain")].ShouldBe("sample");
+        metadata.Attributes.ContainsKey(Attribute("later")).ShouldBeFalse();
     }
 
     [Fact]
@@ -214,6 +214,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 new KeyValuePair<string, string>("shape", null!)
             ]))
             .ParamName.ShouldBe("value");
+        Should.Throw<ArgumentException>(() => builder.AddAttribute(" ", "value"));
     }
 
     [Fact]
@@ -241,26 +242,11 @@ public sealed class ComponentDesignMetadataCatalogTests
     [Fact]
     public void Add_snapshots_registered_metadata()
     {
-        var metadataAttributes = new Dictionary<string, string>
-        {
-            ["shape"] = "transform"
-        };
-        var optionAttributes = new Dictionary<string, string>
-        {
-            ["scope"] = "editable"
-        };
-        var choiceAttributes = new Dictionary<string, string>
-        {
-            ["kind"] = "mode"
-        };
-        var resourceAttributes = new Dictionary<string, string>
-        {
-            ["resource"] = "host-owned"
-        };
-        var portAttributes = new Dictionary<string, string>
-        {
-            ["side"] = "input"
-        };
+        var metadataAttributes = AttributeMap(("shape", "transform"));
+        var optionAttributes = AttributeMap(("scope", "editable"));
+        var choiceAttributes = AttributeMap(("kind", "mode"));
+        var resourceAttributes = AttributeMap(("resource", "host-owned"));
+        var portAttributes = AttributeMap(("side", "input"));
         var choices = new List<OptionChoiceMetadata>
         {
             new()
@@ -310,19 +296,19 @@ public sealed class ComponentDesignMetadataCatalogTests
         choices.Clear();
         resources.Clear();
         ports.Clear();
-        metadataAttributes["shape"] = "changed";
-        optionAttributes["scope"] = "changed";
-        choiceAttributes["kind"] = "changed";
-        resourceAttributes["resource"] = "changed";
-        portAttributes["side"] = "changed";
+        metadataAttributes[Attribute("shape")] = "changed";
+        optionAttributes[Attribute("scope")] = "changed";
+        choiceAttributes[Attribute("kind")] = "changed";
+        resourceAttributes[Attribute("resource")] = "changed";
+        portAttributes[Attribute("side")] = "changed";
 
         catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
 
-        found.Options.ShouldHaveSingleItem().Attributes["scope"].ShouldBe("editable");
-        found.Options[0].Choices.ShouldHaveSingleItem().Attributes["kind"].ShouldBe("mode");
-        found.Resources.ShouldHaveSingleItem().Attributes["resource"].ShouldBe("host-owned");
-        found.Ports.ShouldHaveSingleItem().Attributes["side"].ShouldBe("input");
-        found.Attributes["shape"].ShouldBe("transform");
+        found.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].ShouldBe("editable");
+        found.Options[0].Choices.ShouldHaveSingleItem().Attributes[Attribute("kind")].ShouldBe("mode");
+        found.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].ShouldBe("host-owned");
+        found.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].ShouldBe("input");
+        found.Attributes[Attribute("shape")].ShouldBe("transform");
     }
 
     [Fact]
@@ -433,14 +419,8 @@ public sealed class ComponentDesignMetadataCatalogTests
     [Fact]
     public void MetadataModule_validates_and_snapshots_metadata()
     {
-        var attributes = new Dictionary<string, string>
-        {
-            ["shape"] = "transform"
-        };
-        var optionAttributes = new Dictionary<string, string>
-        {
-            ["scope"] = "editable"
-        };
+        var attributes = AttributeMap(("shape", "transform"));
+        var optionAttributes = AttributeMap(("scope", "editable"));
         var metadata = CreateMetadata("sample.module") with
         {
             Attributes = attributes,
@@ -456,14 +436,14 @@ public sealed class ComponentDesignMetadataCatalogTests
         };
 
         var module = new ComponentDesignMetadataModule([metadata]);
-        attributes["shape"] = "changed";
-        optionAttributes["scope"] = "changed";
+        attributes[Attribute("shape")] = "changed";
+        optionAttributes[Attribute("scope")] = "changed";
 
         var stored = module.GetMetadata().ShouldHaveSingleItem();
 
         stored.ShouldNotBeSameAs(metadata);
-        stored.Attributes["shape"].ShouldBe("transform");
-        stored.Options.ShouldHaveSingleItem().Attributes["scope"].ShouldBe("editable");
+        stored.Attributes[Attribute("shape")].ShouldBe("transform");
+        stored.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].ShouldBe("editable");
     }
 
     [Fact]
@@ -1156,9 +1136,9 @@ public sealed class ComponentDesignMetadataCatalogTests
                 {
                     Name = default,
                     DisplayName = " ",
-                    Attributes = new Dictionary<string, string>
+                    Attributes = new Dictionary<ComponentAttributeName, string>
                     {
-                        [""] = "resource"
+                        [default] = "resource"
                     }
                 },
                 new ResourceDesignMetadata
@@ -1355,6 +1335,32 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void ComponentAttributeName_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentAttributeName("shape");
+        var second = new ComponentAttributeName("shape");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("shape");
+        first.ToString().ShouldBe("shape");
+        new ComponentAttributeName("domain").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentAttributeName_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentAttributeName(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component attribute name cannot be empty");
+    }
+
+    [Fact]
     public void ComponentPortName_validates_value_and_preserves_identity()
     {
         var first = new ComponentPortName("Input");
@@ -1534,11 +1540,16 @@ public sealed class ComponentDesignMetadataCatalogTests
                 IsPrimary = true
             }
         ],
-        Attributes = new Dictionary<string, string>
-        {
-            ["shape"] = "transform"
-        }
+        Attributes = AttributeMap(("shape", "transform"))
     };
+
+    private static ComponentAttributeName Attribute(string name) => new(name);
+
+    private static Dictionary<ComponentAttributeName, string> AttributeMap(
+        params (string Name, string Value)[] attributes)
+        => attributes.ToDictionary(
+            attribute => Attribute(attribute.Name),
+            attribute => attribute.Value);
 
     private sealed class NullMetadataProvider : IComponentDesignMetadataProvider
     {

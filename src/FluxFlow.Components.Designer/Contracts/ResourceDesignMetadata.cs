@@ -8,5 +8,5 @@ public sealed record ResourceDesignMetadata
     public string? Summary { get; init; }
     public string? ValueType { get; init; }
     public bool IsRequired { get; init; }
-    public IReadOnlyDictionary<string, string> Attributes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<ComponentAttributeName, string> Attributes { get; init; } = new Dictionary<ComponentAttributeName, string>();
 }

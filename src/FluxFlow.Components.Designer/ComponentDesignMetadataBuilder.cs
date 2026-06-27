@@ -8,7 +8,7 @@ public sealed class ComponentDesignMetadataBuilder
     private readonly List<OptionDesignMetadata> options = [];
     private readonly List<ResourceDesignMetadata> resources = [];
     private readonly List<PortDesignMetadata> ports = [];
-    private readonly Dictionary<string, string> attributes = new(StringComparer.Ordinal);
+    private readonly Dictionary<ComponentAttributeName, string> attributes = [];
     private string? displayName;
     private ComponentCategory? category;
     private string? summary;
@@ -88,7 +88,7 @@ public sealed class ComponentDesignMetadataBuilder
         {
             option = option with
             {
-                Attributes = attributes
+                Attributes = CopyAttributes(attributes)
             };
         }
 
@@ -159,7 +159,7 @@ public sealed class ComponentDesignMetadataBuilder
         {
             resource = resource with
             {
-                Attributes = attributes
+                Attributes = CopyAttributes(attributes)
             };
         }
 
@@ -242,7 +242,7 @@ public sealed class ComponentDesignMetadataBuilder
         {
             port = port with
             {
-                Attributes = attributes
+                Attributes = CopyAttributes(attributes)
             };
         }
 
@@ -265,7 +265,7 @@ public sealed class ComponentDesignMetadataBuilder
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
 
-        attributes.Add(key, value);
+        attributes.Add(new ComponentAttributeName(key), value);
         return this;
     }
 
@@ -283,11 +283,17 @@ public sealed class ComponentDesignMetadataBuilder
             Options = options.ToArray(),
             Resources = resources.ToArray(),
             Ports = ports.ToArray(),
-            Attributes = new Dictionary<string, string>(attributes, StringComparer.Ordinal)
+            Attributes = new Dictionary<ComponentAttributeName, string>(attributes)
         };
 
         return new ComponentDesignMetadataModule([metadata])
             .GetMetadata()
             .Single();
     }
+
+    private static IReadOnlyDictionary<ComponentAttributeName, string> CopyAttributes(
+        IReadOnlyDictionary<string, string> source)
+        => source.ToDictionary(
+            attribute => new ComponentAttributeName(attribute.Key),
+            attribute => attribute.Value);
 }

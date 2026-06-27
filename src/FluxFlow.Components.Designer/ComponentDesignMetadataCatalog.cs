@@ -89,7 +89,7 @@ public sealed class ComponentDesignMetadataCatalog
             Attributes = Snapshot(port.Attributes)
         };
 
-    private static IReadOnlyDictionary<string, string> Snapshot(
-        IReadOnlyDictionary<string, string> attributes)
-        => new Dictionary<string, string>(attributes, StringComparer.Ordinal);
+    private static IReadOnlyDictionary<ComponentAttributeName, string> Snapshot(
+        IReadOnlyDictionary<ComponentAttributeName, string> attributes)
+        => new Dictionary<ComponentAttributeName, string>(attributes);
 }

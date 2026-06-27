@@ -21,11 +21,11 @@ component without depending on a specific rendering framework.
 - `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
   `ComponentPreferredNodeName`, `ComponentOptionName`,
   `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
-  and `ComponentPortGroup`:
+  `ComponentPortGroup`, and `ComponentAttributeName`:
   Designer-owned identifiers for component types, palette categories, palette
   icon keys, preferred node names, editable options, option choices,
-  host-owned resource slots, ports, and port groups. They do not depend on
-  engine definition types.
+  host-owned resource slots, ports, port groups, and metadata attribute keys.
+  They do not depend on engine definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
 - `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
@@ -42,7 +42,7 @@ invalid choices, invalid resource and port order values, invalid resources,
 invalid attributes, and null-bound metadata collections as validation errors
 before metadata is registered.
 `ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
-including nested choices and attribute maps, so later mutations to
+including nested choices and typed attribute maps, so later mutations to
 provider-owned collections do not change the catalog.
 
 ## Option Kinds
@@ -144,7 +144,11 @@ var metadata = new ComponentDesignMetadata
             Order = 0,
             IsPrimary = true
         }
-    ]
+    ],
+    Attributes = new Dictionary<ComponentAttributeName, string>
+    {
+        [new ComponentAttributeName("shape")] = "transform"
+    }
 };
 
 var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
