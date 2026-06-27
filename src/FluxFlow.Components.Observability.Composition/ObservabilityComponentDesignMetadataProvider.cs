@@ -241,19 +241,19 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     {
         Name = new ComponentOptionName("inputType"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Input Type",
+        DisplayName = new ComponentMetadataText("Input Type"),
         DefaultValue = defaultValue,
-        HelperText = "Diagnostic input type metadata; CLR input type comes from the closed registration."
+        HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR input type comes from the closed registration.")
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued input messages."
+        HelperText = new ComponentMetadataText("Maximum queued input messages.")
     };
 
     private static IReadOnlyList<OptionChoiceMetadata> LogLevelChoices()
@@ -270,7 +270,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
     private static OptionChoiceMetadata LogLevelChoice(FlowLogLevel level) => new()
     {
         Value = new ComponentOptionChoiceValue(level.ToString()),
-        DisplayName = level.ToString()
+        DisplayName = new ComponentMetadataText(level.ToString())
     };
 
     private static void AddTransformPorts(

@@ -211,11 +211,11 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(StorageCompositionNodeTypes.Put),
             out var putMetadata).ShouldBeTrue();
-        putMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Put");
+        putMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Storage Put");
         catalog.TryGet(
             new ComponentType(StorageCompositionNodeTypes.Query),
             out var queryMetadata).ShouldBeTrue();
-        queryMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Query");
+        queryMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Storage Query");
     }
 
     [Fact]

@@ -164,10 +164,10 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued messages."
+        HelperText = new ComponentMetadataText("Maximum queued messages.")
     };
 
     private static void AddPorts(
@@ -227,6 +227,6 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
         => new()
         {
             Value = new ComponentOptionChoiceValue(value.ToString()),
-            DisplayName = displayName
+            DisplayName = new ComponentMetadataText(displayName)
         };
 }

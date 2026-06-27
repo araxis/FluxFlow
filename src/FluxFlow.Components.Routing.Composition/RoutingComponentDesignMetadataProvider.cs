@@ -81,8 +81,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             {
                 Name = new ComponentOptionName("defaultRoute"),
                 Kind = OptionValueKind.Text,
-                DisplayName = "Default Route",
-                HelperText = "Optional route name used when the selector returns no configured route."
+                DisplayName = new ComponentMetadataText("Default Route"),
+                HelperText = new ComponentMetadataText("Optional route name used when the selector returns no configured route.")
             },
             BoolOption("caseSensitive", "Case Sensitive", true, "Match route keys using case-sensitive comparisons."),
             BoolOption("emitMatchedInput", "Emit Matched Input", true, "Emit matched input messages on the Matched output."),
@@ -283,9 +283,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string summary) => new()
         {
             Name = new ComponentResourceName(name),
-            DisplayName = displayName,
+            DisplayName = new ComponentMetadataText(displayName),
             Order = order,
-            Summary = summary,
+            Summary = new ComponentMetadataText(summary),
             ValueType = new ComponentValueTypeHint(valueType),
             IsRequired = true
         };
@@ -293,9 +293,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
     private static ResourceDesignMetadata ClockResource(int order) => new()
     {
         Name = new ComponentResourceName(RoutingCompositionResourceNames.Clock),
-        DisplayName = "Clock",
+        DisplayName = new ComponentMetadataText("Clock"),
         Order = order,
-        Summary = "Optional keyed clock for deterministic routing timing, timeouts, and diagnostics.",
+        Summary = new ComponentMetadataText("Optional keyed clock for deterministic routing timing, timeouts, and diagnostics."),
         ValueType = new ComponentValueTypeHint(nameof(TimeProvider))
     };
 
@@ -303,8 +303,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
     {
         Name = new ComponentOptionName("engine"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Engine",
-        HelperText = "Diagnostic engine metadata; composition DI selection uses host-owned selector resources."
+        DisplayName = new ComponentMetadataText("Engine"),
+        HelperText = new ComponentMetadataText("Diagnostic engine metadata; composition DI selection uses host-owned selector resources.")
     };
 
     private static OptionDesignMetadata ExpressionOption(
@@ -314,24 +314,24 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Expression,
-            DisplayName = displayName,
-            HelperText = helperText
+            DisplayName = new ComponentMetadataText(displayName),
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static OptionDesignMetadata ExpressionIdOption() => new()
     {
         Name = new ComponentOptionName("expressionId"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Expression ID",
-        HelperText = "Optional diagnostic identifier emitted with routing diagnostics."
+        DisplayName = new ComponentMetadataText("Expression ID"),
+        HelperText = new ComponentMetadataText("Optional diagnostic identifier emitted with routing diagnostics.")
     };
 
     private static OptionDesignMetadata ExpressionNameOption() => new()
     {
         Name = new ComponentOptionName("expressionName"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Expression Name",
-        HelperText = "Optional diagnostic name emitted with routing diagnostics."
+        DisplayName = new ComponentMetadataText("Expression Name"),
+        HelperText = new ComponentMetadataText("Optional diagnostic name emitted with routing diagnostics.")
     };
 
     private static OptionDesignMetadata InputTypeOption(
@@ -340,9 +340,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
-            DisplayName = displayName ?? "Input Type",
+            DisplayName = new ComponentMetadataText(displayName ?? "Input Type"),
             DefaultValue = SwitchRoutingOptions.ObjectTypeName,
-            HelperText = "Diagnostic input type metadata; CLR type comes from the closed registration."
+            HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR type comes from the closed registration.")
         };
 
     private static OptionDesignMetadata JsonOption(
@@ -353,8 +353,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Json,
-            DisplayName = displayName,
-            HelperText = helperText,
+            DisplayName = new ComponentMetadataText(displayName),
+            HelperText = new ComponentMetadataText(helperText),
             IsRequired = isRequired
         };
 
@@ -366,9 +366,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
-            DisplayName = displayName,
+            DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
-            HelperText = helperText
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static OptionDesignMetadata BoolOption(
@@ -379,9 +379,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Boolean,
-            DisplayName = displayName,
+            DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
-            HelperText = helperText
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static OptionDesignMetadata NumberOption(
@@ -393,20 +393,20 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Number,
-            DisplayName = displayName,
+            DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
             Min = min,
-            HelperText = helperText
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static OptionDesignMetadata BoundedCapacityOption() => new()
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = 128,
         Min = 1,
-        HelperText = "Maximum queued input messages."
+        HelperText = new ComponentMetadataText("Maximum queued input messages.")
     };
 
     private static void AddInputPort(

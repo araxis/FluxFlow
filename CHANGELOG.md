@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.14.0
+
+Adds a Designer-owned metadata text value type.
+
+- Adds `ComponentMetadataText` for non-empty Designer display names,
+  summaries, option helper text, and option-choice helper text.
+- Changes Designer metadata display-name, summary, and helper-text properties
+  from `string?` to `ComponentMetadataText?` across component, option,
+  option-choice, resource, and port metadata.
+- Keeps `ComponentDesignMetadataBuilder` accepting string display, summary, and
+  helper-text arguments so provider authoring stays concise while stored
+  metadata is typed.
+
 ## FluxFlow.Components.Designer 2.13.0
 
 Adds a Designer-owned metadata attribute value identifier.

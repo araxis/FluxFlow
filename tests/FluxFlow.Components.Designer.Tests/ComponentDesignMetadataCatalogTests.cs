@@ -56,9 +56,9 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType("sample.builder"));
-        metadata.DisplayName.ShouldBe("Sample Builder");
+        metadata.DisplayName?.Value.ShouldBe("Sample Builder");
         metadata.Category.ShouldBe(new ComponentCategory("Samples"));
-        metadata.Summary.ShouldBe("Builds sample metadata.");
+        metadata.Summary?.Value.ShouldBe("Builds sample metadata.");
         metadata.IconKey.ShouldBe(new ComponentIconKey("sample"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("sample"));
         metadata.SuggestedEditorWidth.ShouldBe(360);
@@ -472,7 +472,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         var metadata = new ComponentDesignMetadata
         {
             Type = new ComponentType("sample.invalid"),
-            DisplayName = " ",
+            DisplayName = default(ComponentMetadataText),
             Category = default(ComponentCategory),
             IconKey = default(ComponentIconKey),
             PreferredNodeName = default(ComponentPreferredNodeName),
@@ -1135,7 +1135,7 @@ public sealed class ComponentDesignMetadataCatalogTests
                 new ResourceDesignMetadata
                 {
                     Name = default,
-                    DisplayName = " ",
+                    DisplayName = default(ComponentMetadataText),
                     Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
                     {
                         [default] = new ComponentAttributeValue("resource")
@@ -1372,6 +1372,32 @@ public sealed class ComponentDesignMetadataCatalogTests
             .Message.ShouldContain("Component attribute value cannot be empty");
     }
 
+    [Fact]
+    public void ComponentMetadataText_validates_value_and_preserves_identity()
+    {
+        var first = new ComponentMetadataText("Sample Transform");
+        var second = new ComponentMetadataText("Sample Transform");
+
+        first.ShouldBe(second);
+        first.Value.ShouldBe("Sample Transform");
+        first.ToString().ShouldBe("Sample Transform");
+        new ComponentMetadataText("Other Transform").ShouldNotBe(first);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ComponentMetadataText_rejects_empty_values(string value)
+    {
+        var act = () =>
+        {
+            _ = new ComponentMetadataText(value);
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Component metadata text cannot be empty");
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
@@ -1430,7 +1456,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         var resources = CreateMetadata().Resources.OrderBy(resource => resource.Order).ToArray();
 
         resources[0].Name.ShouldBe(new ComponentResourceName("engine"));
-        resources[0].DisplayName.ShouldBe("Engine");
+        resources[0].DisplayName?.Value.ShouldBe("Engine");
         resources[0].ValueType?.Value.ShouldBe("IExpressionEngine");
         resources[0].IsRequired.ShouldBeTrue();
         resources[1].Name.ShouldBe(new ComponentResourceName("clock"));
@@ -1519,9 +1545,9 @@ public sealed class ComponentDesignMetadataCatalogTests
     private static ComponentDesignMetadata CreateMetadata(string type = "sample.transform") => new()
     {
         Type = new ComponentType(type),
-        DisplayName = "Sample Transform",
+        DisplayName = new ComponentMetadataText("Sample Transform"),
         Category = new ComponentCategory("Samples"),
-        Summary = "Transforms sample values.",
+        Summary = new ComponentMetadataText("Transforms sample values."),
         IconKey = new ComponentIconKey("transform"),
         PreferredNodeName = new ComponentPreferredNodeName("transform"),
         SuggestedEditorWidth = 420,
@@ -1531,8 +1557,8 @@ public sealed class ComponentDesignMetadataCatalogTests
             {
                 Name = new ComponentOptionName("expression"),
                 Kind = OptionValueKind.Expression,
-                DisplayName = "Expression",
-                HelperText = "Expression evaluated for each input.",
+                DisplayName = new ComponentMetadataText("Expression"),
+                HelperText = new ComponentMetadataText("Expression evaluated for each input."),
                 IsRequired = true
             },
             new OptionDesignMetadata
@@ -1542,8 +1568,16 @@ public sealed class ComponentDesignMetadataCatalogTests
                 DefaultValue = "strict",
                 Choices =
                 [
-                    new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("strict"), DisplayName = "Strict" },
-                    new OptionChoiceMetadata { Value = new ComponentOptionChoiceValue("relaxed"), DisplayName = "Relaxed" }
+                    new OptionChoiceMetadata
+                    {
+                        Value = new ComponentOptionChoiceValue("strict"),
+                        DisplayName = new ComponentMetadataText("Strict")
+                    },
+                    new OptionChoiceMetadata
+                    {
+                        Value = new ComponentOptionChoiceValue("relaxed"),
+                        DisplayName = new ComponentMetadataText("Relaxed")
+                    }
                 ]
             }
         ],
@@ -1552,18 +1586,18 @@ public sealed class ComponentDesignMetadataCatalogTests
             new ResourceDesignMetadata
             {
                 Name = new ComponentResourceName("engine"),
-                DisplayName = "Engine",
+                DisplayName = new ComponentMetadataText("Engine"),
                 Order = 0,
-                Summary = "Expression engine resource.",
+                Summary = new ComponentMetadataText("Expression engine resource."),
                 ValueType = new ComponentValueTypeHint("IExpressionEngine"),
                 IsRequired = true
             },
             new ResourceDesignMetadata
             {
                 Name = new ComponentResourceName("clock"),
-                DisplayName = "Clock",
+                DisplayName = new ComponentMetadataText("Clock"),
                 Order = 1,
-                Summary = "Optional clock resource.",
+                Summary = new ComponentMetadataText("Optional clock resource."),
                 ValueType = new ComponentValueTypeHint(nameof(TimeProvider))
             }
         ],
@@ -1573,10 +1607,10 @@ public sealed class ComponentDesignMetadataCatalogTests
             {
                 Name = new ComponentPortName("Input"),
                 Direction = PortDirection.Input,
-                DisplayName = "Input",
+                DisplayName = new ComponentMetadataText("Input"),
                 Group = new ComponentPortGroup("Messages"),
                 Order = 0,
-                Summary = "Input message.",
+                Summary = new ComponentMetadataText("Input message."),
                 ValueType = new ComponentValueTypeHint("SampleInput"),
                 IsPrimary = true
             },
@@ -1584,10 +1618,10 @@ public sealed class ComponentDesignMetadataCatalogTests
             {
                 Name = new ComponentPortName("Output"),
                 Direction = PortDirection.Output,
-                DisplayName = "Output",
+                DisplayName = new ComponentMetadataText("Output"),
                 Group = new ComponentPortGroup("Messages"),
                 Order = 1,
-                Summary = "Mapped message.",
+                Summary = new ComponentMetadataText("Mapped message."),
                 ValueType = new ComponentValueTypeHint("SampleOutput"),
                 IsPrimary = true
             }

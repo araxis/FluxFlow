@@ -119,12 +119,12 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             new ComponentType(SerializationCompositionNodeTypes.JsonParse),
             out var jsonParseMetadata).ShouldBeTrue();
         jsonParseMetadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("JSON Parse");
+            .DisplayName?.Value.ShouldBe("JSON Parse");
         catalog.TryGet(
             new ComponentType(SerializationCompositionNodeTypes.Base64Decode),
             out var base64DecodeMetadata).ShouldBeTrue();
         base64DecodeMetadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Base64 Decode");
+            .DisplayName?.Value.ShouldBe("Base64 Decode");
     }
 
     [Fact]
@@ -417,7 +417,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(SerializationCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

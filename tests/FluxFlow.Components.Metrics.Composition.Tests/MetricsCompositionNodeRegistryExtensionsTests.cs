@@ -40,7 +40,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var metadata = MetricsDesignMetadata();
 
         metadata.Type.Value.ShouldBe(MetricsCompositionNodeTypes.Aggregate);
-        metadata.DisplayName.ShouldBe("Metrics Aggregate");
+        metadata.DisplayName?.Value.ShouldBe("Metrics Aggregate");
         metadata.Category.ShouldBe(new ComponentCategory("Metrics"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -146,7 +146,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             new ComponentType(MetricsCompositionNodeTypes.Aggregate),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Metrics Aggregate");
+            .DisplayName?.Value.ShouldBe("Metrics Aggregate");
     }
 
     [Fact]
@@ -346,7 +346,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(MetricsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

@@ -230,18 +230,18 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
     {
         Name = new ComponentOptionName("store"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Store",
-        HelperText = "Diagnostic store metadata; DI selection uses the required host-owned store resource."
+        DisplayName = new ComponentMetadataText("Store"),
+        HelperText = new ComponentMetadataText("Diagnostic store metadata; DI selection uses the required host-owned store resource.")
     };
 
     private static OptionDesignMetadata SessionIdOption(bool isRequired) => new()
     {
         Name = new ComponentOptionName("sessionId"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Session ID",
-        HelperText = isRequired
+        DisplayName = new ComponentMetadataText("Session ID"),
+        HelperText = new ComponentMetadataText(isRequired
             ? "Required session identifier to replay."
-            : "Optional session identifier. The store may generate one when omitted.",
+            : "Optional session identifier. The store may generate one when omitted."),
         IsRequired = isRequired
     };
 
@@ -249,18 +249,18 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
     {
         Name = new ComponentOptionName("tags"),
         Kind = OptionValueKind.Json,
-        DisplayName = "Tags",
-        HelperText = "Optional string tag map used in session metadata or query defaults."
+        DisplayName = new ComponentMetadataText("Tags"),
+        HelperText = new ComponentMetadataText("Optional string tag map used in session metadata or query defaults.")
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued messages."
+        HelperText = new ComponentMetadataText("Maximum queued messages.")
     };
 
     private static IReadOnlyList<OptionChoiceMetadata> ReplayModeChoices()
@@ -278,8 +278,8 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         string helperText) => new()
         {
             Value = new ComponentOptionChoiceValue(mode.ToString()),
-            DisplayName = displayName,
-            HelperText = helperText
+            DisplayName = new ComponentMetadataText(displayName),
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static void AddTransformPorts(

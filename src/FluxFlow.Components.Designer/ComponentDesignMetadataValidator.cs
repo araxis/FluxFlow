@@ -566,11 +566,11 @@ public static class ComponentDesignMetadataValidator
     }
 
     private static void ValidateOptionalText(
-        string? value,
+        ComponentMetadataText? value,
         string path,
         ICollection<DesignerMetadataValidationError> errors)
     {
-        if (value is not null && string.IsNullOrWhiteSpace(value))
+        if (value is not null && string.IsNullOrWhiteSpace(value.Value.Value))
             errors.Add(new DesignerMetadataValidationError(path, "Value cannot be empty when it is provided."));
     }
 }

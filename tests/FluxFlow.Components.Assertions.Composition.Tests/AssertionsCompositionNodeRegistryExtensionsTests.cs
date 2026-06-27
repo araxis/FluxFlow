@@ -61,7 +61,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
-        metadata.DisplayName.ShouldBe("Assertion");
+        metadata.DisplayName?.Value.ShouldBe("Assertion");
         metadata.Category.ShouldBe(new ComponentCategory("Assertions"));
         metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("assert"));
         metadata.SuggestedEditorWidth.ShouldBe(420);

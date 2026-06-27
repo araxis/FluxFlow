@@ -39,7 +39,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         var metadata = ProjectionDesignMetadata();
 
         metadata.Type.Value.ShouldBe(ProjectionsCompositionNodeTypes.EventProjection);
-        metadata.DisplayName.ShouldBe("Event Projection");
+        metadata.DisplayName?.Value.ShouldBe("Event Projection");
         metadata.Category.ShouldBe(new ComponentCategory("Projections"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -133,7 +133,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
             new ComponentType(ProjectionsCompositionNodeTypes.EventProjection),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Event Projection");
+            .DisplayName?.Value.ShouldBe("Event Projection");
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(ProjectionsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

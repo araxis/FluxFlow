@@ -235,27 +235,27 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
     {
         Name = new ComponentOptionName("collection"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Collection",
-        HelperText = "Default collection used when the input request does not specify one."
+        DisplayName = new ComponentMetadataText("Collection"),
+        HelperText = new ComponentMetadataText("Default collection used when the input request does not specify one.")
     };
 
     private static OptionDesignMetadata IncludeExpiredOption(bool defaultValue) => new()
     {
         Name = new ComponentOptionName("includeExpired"),
         Kind = OptionValueKind.Boolean,
-        DisplayName = "Include Expired",
+        DisplayName = new ComponentMetadataText("Include Expired"),
         DefaultValue = defaultValue,
-        HelperText = "Include records that the store considers expired."
+        HelperText = new ComponentMetadataText("Include records that the store considers expired.")
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued input messages."
+        HelperText = new ComponentMetadataText("Maximum queued input messages.")
     };
 
     private static IReadOnlyList<OptionChoiceMetadata> WriteModeChoices()
@@ -272,8 +272,8 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         string helperText) => new()
         {
             Value = new ComponentOptionChoiceValue(mode.ToString()),
-            DisplayName = displayName,
-            HelperText = helperText
+            DisplayName = new ComponentMetadataText(displayName),
+            HelperText = new ComponentMetadataText(helperText)
         };
 
     private static void AddTransformPorts(

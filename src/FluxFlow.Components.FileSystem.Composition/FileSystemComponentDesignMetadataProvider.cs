@@ -188,45 +188,45 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     {
         Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued messages."
+        HelperText = new ComponentMetadataText("Maximum queued messages.")
     };
 
     private static OptionDesignMetadata BaseDirectoryOption() => new()
     {
         Name = new ComponentOptionName("baseDirectory"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Base Directory",
-        HelperText = "Optional base directory used to resolve relative paths."
+        DisplayName = new ComponentMetadataText("Base Directory"),
+        HelperText = new ComponentMetadataText("Optional base directory used to resolve relative paths.")
     };
 
     private static OptionDesignMetadata AllowAbsolutePathsOption(bool defaultValue) => new()
     {
         Name = new ComponentOptionName("allowAbsolutePaths"),
         Kind = OptionValueKind.Boolean,
-        DisplayName = "Allow Absolute Paths",
+        DisplayName = new ComponentMetadataText("Allow Absolute Paths"),
         DefaultValue = defaultValue,
-        HelperText = "Allow absolute paths in requests or configured directories."
+        HelperText = new ComponentMetadataText("Allow absolute paths in requests or configured directories.")
     };
 
     private static OptionDesignMetadata DefaultEncodingOption(string defaultValue) => new()
     {
         Name = new ComponentOptionName("defaultEncoding"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Default Encoding",
+        DisplayName = new ComponentMetadataText("Default Encoding"),
         DefaultValue = defaultValue,
-        HelperText = "Encoding name used when a request does not specify one."
+        HelperText = new ComponentMetadataText("Encoding name used when a request does not specify one.")
     };
 
     private static OptionDesignMetadata DirectoryOption(string defaultValue) => new()
     {
         Name = new ComponentOptionName("directory"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Directory",
+        DisplayName = new ComponentMetadataText("Directory"),
         DefaultValue = defaultValue,
-        HelperText = "Directory path to resolve and use.",
+        HelperText = new ComponentMetadataText("Directory path to resolve and use."),
         IsRequired = true
     };
 
@@ -234,9 +234,9 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
     {
         Name = new ComponentOptionName("filter"),
         Kind = OptionValueKind.Text,
-        DisplayName = "Filter",
+        DisplayName = new ComponentMetadataText("Filter"),
         DefaultValue = defaultValue,
-        HelperText = "File-system wildcard filter.",
+        HelperText = new ComponentMetadataText("File-system wildcard filter."),
         IsRequired = true
     };
 

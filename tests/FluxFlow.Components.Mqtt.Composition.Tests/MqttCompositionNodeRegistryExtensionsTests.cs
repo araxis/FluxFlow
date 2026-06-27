@@ -63,7 +63,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Publish];
         var defaults = new MqttPublishOptions();
 
-        metadata.DisplayName.ShouldBe("MQTT Publish");
+        metadata.DisplayName?.Value.ShouldBe("MQTT Publish");
         metadata.SuggestedEditorWidth.ShouldBe(420);
         AssertPorts<MqttPublishRequest, MqttPublishResult>(
             metadata,
@@ -97,7 +97,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Trigger];
         var defaults = new MqttTriggerOptions();
 
-        metadata.DisplayName.ShouldBe("MQTT Trigger");
+        metadata.DisplayName?.Value.ShouldBe("MQTT Trigger");
         metadata.SuggestedEditorWidth.ShouldBe(460);
         AssertPorts<MqttTriggerResponse, MqttReceivedMessage>(
             metadata,
@@ -196,8 +196,8 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             new ComponentType(MqttCompositionNodeTypes.Trigger),
             out var triggerMetadata).ShouldBeTrue();
 
-        publishMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Publish");
-        triggerMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Trigger");
+        publishMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("MQTT Publish");
+        triggerMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("MQTT Trigger");
     }
 
     [Fact]

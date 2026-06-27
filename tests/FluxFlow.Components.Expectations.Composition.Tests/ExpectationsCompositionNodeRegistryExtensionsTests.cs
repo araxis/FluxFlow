@@ -42,7 +42,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         var metadata = ExpectationDesignMetadata();
 
         metadata.Type.Value.ShouldBe(ExpectationsCompositionNodeTypes.EventExpectation);
-        metadata.DisplayName.ShouldBe("Event Expectation");
+        metadata.DisplayName?.Value.ShouldBe("Event Expectation");
         metadata.Category.ShouldBe(new ComponentCategory("Expectations"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -140,7 +140,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             new ComponentType(ExpectationsCompositionNodeTypes.EventExpectation),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Event Expectation");
+            .DisplayName?.Value.ShouldBe("Event Expectation");
     }
 
     [Fact]
@@ -405,7 +405,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(ExpectationsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

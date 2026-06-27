@@ -4,8 +4,8 @@ public sealed record OptionDesignMetadata
 {
     public required ComponentOptionName Name { get; init; }
     public required OptionValueKind Kind { get; init; }
-    public string? DisplayName { get; init; }
-    public string? HelperText { get; init; }
+    public ComponentMetadataText? DisplayName { get; init; }
+    public ComponentMetadataText? HelperText { get; init; }
     public bool IsRequired { get; init; }
     public object? DefaultValue { get; init; }
     public double? Min { get; init; }

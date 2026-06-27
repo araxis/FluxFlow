@@ -22,9 +22,11 @@ component without depending on a specific rendering framework.
   `ComponentPreferredNodeName`, `ComponentOptionName`,
   `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
   `ComponentPortGroup`, `ComponentAttributeName`,
-  `ComponentAttributeValue`, and `ComponentValueTypeHint`:
-  Designer-owned identifiers for component types, palette categories, palette
-  icon keys, preferred node names, editable options, option choices,
+  `ComponentAttributeValue`, `ComponentMetadataText`, and
+  `ComponentValueTypeHint`:
+  Designer-owned value types for component types, palette categories, palette
+  icon keys, preferred node names, editable options, option choices, metadata
+  display text,
   host-owned resource slots, ports, port groups, metadata attribute keys,
   metadata attribute values, and value type hints. They do not depend on engine
   definition types.
@@ -84,9 +86,9 @@ using FluxFlow.Components.Designer.Contracts;
 var metadata = new ComponentDesignMetadata
 {
     Type = new ComponentType("sample.transform"),
-    DisplayName = "Sample Transform",
+    DisplayName = new ComponentMetadataText("Sample Transform"),
     Category = new ComponentCategory("Samples"),
-    Summary = "Transforms a sample value.",
+    Summary = new ComponentMetadataText("Transforms a sample value."),
     IconKey = new ComponentIconKey("transform"),
     PreferredNodeName = new ComponentPreferredNodeName("transform"),
     SuggestedEditorWidth = 420,
@@ -96,7 +98,7 @@ var metadata = new ComponentDesignMetadata
         {
             Name = new ComponentOptionName("expression"),
             Kind = OptionValueKind.Expression,
-            DisplayName = "Expression",
+            DisplayName = new ComponentMetadataText("Expression"),
             IsRequired = true
         },
         new OptionDesignMetadata
@@ -109,12 +111,12 @@ var metadata = new ComponentDesignMetadata
                 new OptionChoiceMetadata
                 {
                     Value = new ComponentOptionChoiceValue("strict"),
-                    DisplayName = "Strict"
+                    DisplayName = new ComponentMetadataText("Strict")
                 },
                 new OptionChoiceMetadata
                 {
                     Value = new ComponentOptionChoiceValue("relaxed"),
-                    DisplayName = "Relaxed"
+                    DisplayName = new ComponentMetadataText("Relaxed")
                 }
             ]
         }
@@ -124,7 +126,7 @@ var metadata = new ComponentDesignMetadata
         new ResourceDesignMetadata
         {
             Name = new ComponentResourceName("engine"),
-            DisplayName = "Engine",
+            DisplayName = new ComponentMetadataText("Engine"),
             Order = 0,
             ValueType = new ComponentValueTypeHint("IExpressionEngine"),
             IsRequired = true

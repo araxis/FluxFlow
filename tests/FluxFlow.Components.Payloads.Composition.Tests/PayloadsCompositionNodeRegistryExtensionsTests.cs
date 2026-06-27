@@ -40,7 +40,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var metadata = PayloadDesignMetadata();
 
         metadata.Type.Value.ShouldBe(PayloadsCompositionNodeTypes.Inspect);
-        metadata.DisplayName.ShouldBe("Payload Inspect");
+        metadata.DisplayName?.Value.ShouldBe("Payload Inspect");
         metadata.Category.ShouldBe(new ComponentCategory("Payloads"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
@@ -139,7 +139,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             new ComponentType(PayloadsCompositionNodeTypes.Inspect),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Payload Inspect");
+            .DisplayName?.Value.ShouldBe("Payload Inspect");
     }
 
     [Fact]
@@ -318,7 +318,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

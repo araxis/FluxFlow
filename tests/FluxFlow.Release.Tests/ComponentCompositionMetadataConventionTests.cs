@@ -1772,6 +1772,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             .ToArray();
 
     private static void AssertRequiredDesignerText(
+        ComponentMetadataText? value,
+        string message)
+        => AssertRequiredDesignerText(value?.Value, message);
+
+    private static void AssertRequiredDesignerText(
         string? value,
         string message)
         => string.IsNullOrWhiteSpace(value).ShouldBeFalse(message);

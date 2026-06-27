@@ -228,9 +228,9 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             new ComponentType(ObservabilityCompositionNodeTypes.Metrics),
             out var metrics).ShouldBeTrue();
 
-        counter.ShouldNotBeNull().DisplayName.ShouldBe("Counter");
-        logger.ShouldNotBeNull().DisplayName.ShouldBe("Logger");
-        metrics.ShouldNotBeNull().DisplayName.ShouldBe("Metrics");
+        counter.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Counter");
+        logger.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Logger");
+        metrics.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Metrics");
     }
 
     [Fact]

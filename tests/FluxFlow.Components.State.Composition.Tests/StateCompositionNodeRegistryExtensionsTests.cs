@@ -41,7 +41,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadata();
 
         metadata.Type.Value.ShouldBe(StateCompositionNodeTypes.Reducer);
-        metadata.DisplayName.ShouldBe("State Reducer");
+        metadata.DisplayName?.Value.ShouldBe("State Reducer");
         metadata.Category.ShouldBe(new ComponentCategory("State"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         metadata.Options.ShouldNotContain(option =>
@@ -118,7 +118,7 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(StateCompositionNodeTypes.Reducer),
             out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().DisplayName.ShouldBe("State Reducer");
+        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("State Reducer");
     }
 
     [Fact]

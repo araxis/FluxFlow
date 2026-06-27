@@ -225,11 +225,11 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(SessionsCompositionNodeTypes.Recorder),
             out var recorderMetadata).ShouldBeTrue();
-        recorderMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Recorder");
+        recorderMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Session Recorder");
         catalog.TryGet(
             new ComponentType(SessionsCompositionNodeTypes.Replay),
             out var replayMetadata).ShouldBeTrue();
-        replayMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Replay");
+        replayMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Session Replay");
     }
 
     [Fact]

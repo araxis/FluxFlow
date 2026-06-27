@@ -38,7 +38,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(HttpCompositionNodeTypes.Client));
-        metadata.DisplayName.ShouldBe("HTTP Client");
+        metadata.DisplayName?.Value.ShouldBe("HTTP Client");
         metadata.Category.ShouldBe(new ComponentCategory("HTTP"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.ShouldNotContain(option =>
@@ -131,7 +131,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(HttpCompositionNodeTypes.Client),
             out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().DisplayName.ShouldBe("HTTP Client");
+        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("HTTP Client");
     }
 
     [Fact]

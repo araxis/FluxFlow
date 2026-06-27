@@ -228,11 +228,11 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(FileSystemCompositionNodeTypes.Read),
             out var readMetadata).ShouldBeTrue();
-        readMetadata.ShouldNotBeNull().DisplayName.ShouldBe("File Read");
+        readMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("File Read");
         catalog.TryGet(
             new ComponentType(FileSystemCompositionNodeTypes.Watch),
             out var watchMetadata).ShouldBeTrue();
-        watchMetadata.ShouldNotBeNull().DisplayName.ShouldBe("File Watch");
+        watchMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("File Watch");
     }
 
     [Fact]
@@ -663,7 +663,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
         resource.Name.Value.ShouldBe(FileSystemCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));

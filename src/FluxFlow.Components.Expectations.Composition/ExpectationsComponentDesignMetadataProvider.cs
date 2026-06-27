@@ -117,7 +117,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
         string helperText) => new()
         {
             Value = new ComponentOptionChoiceValue(kind.ToString()),
-            DisplayName = displayName,
-            HelperText = helperText
+            DisplayName = new ComponentMetadataText(displayName),
+            HelperText = new ComponentMetadataText(helperText)
         };
 }

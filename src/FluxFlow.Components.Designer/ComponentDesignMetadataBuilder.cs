@@ -9,9 +9,9 @@ public sealed class ComponentDesignMetadataBuilder
     private readonly List<ResourceDesignMetadata> resources = [];
     private readonly List<PortDesignMetadata> ports = [];
     private readonly Dictionary<ComponentAttributeName, ComponentAttributeValue> attributes = [];
-    private string? displayName;
+    private ComponentMetadataText? displayName;
     private ComponentCategory? category;
-    private string? summary;
+    private ComponentMetadataText? summary;
     private ComponentIconKey? iconKey;
     private ComponentPreferredNodeName? preferredNodeName;
     private int? suggestedEditorWidth;
@@ -34,9 +34,9 @@ public sealed class ComponentDesignMetadataBuilder
         string? preferredNodeName = null,
         int? suggestedEditorWidth = null)
     {
-        this.displayName = displayName;
+        this.displayName = ToMetadataText(displayName);
         this.category = category is null ? null : new ComponentCategory(category);
-        this.summary = summary;
+        this.summary = ToMetadataText(summary);
         this.iconKey = iconKey is null ? null : new ComponentIconKey(iconKey);
         this.preferredNodeName = preferredNodeName is null ? null : new ComponentPreferredNodeName(preferredNodeName);
         this.suggestedEditorWidth = suggestedEditorWidth;
@@ -68,8 +68,8 @@ public sealed class ComponentDesignMetadataBuilder
         {
             Name = new ComponentOptionName(name),
             Kind = kind,
-            DisplayName = displayName,
-            HelperText = helperText,
+            DisplayName = ToMetadataText(displayName),
+            HelperText = ToMetadataText(helperText),
             IsRequired = isRequired,
             DefaultValue = defaultValue,
             Min = min,
@@ -148,9 +148,9 @@ public sealed class ComponentDesignMetadataBuilder
         var resource = new ResourceDesignMetadata
         {
             Name = new ComponentResourceName(name),
-            DisplayName = displayName,
+            DisplayName = ToMetadataText(displayName),
             Order = order,
-            Summary = summary,
+            Summary = ToMetadataText(summary),
             ValueType = valueType is null ? null : new ComponentValueTypeHint(valueType),
             IsRequired = isRequired
         };
@@ -230,10 +230,10 @@ public sealed class ComponentDesignMetadataBuilder
         {
             Name = new ComponentPortName(name),
             Direction = direction,
-            DisplayName = displayName,
+            DisplayName = ToMetadataText(displayName),
             Group = group is null ? null : new ComponentPortGroup(group),
             Order = order,
-            Summary = summary,
+            Summary = ToMetadataText(summary),
             ValueType = valueType is null ? null : new ComponentValueTypeHint(valueType),
             IsPrimary = isPrimary
         };
@@ -296,4 +296,7 @@ public sealed class ComponentDesignMetadataBuilder
         => source.ToDictionary(
             attribute => new ComponentAttributeName(attribute.Key),
             attribute => new ComponentAttributeValue(attribute.Value));
+
+    private static ComponentMetadataText? ToMetadataText(string? value)
+        => value is null ? null : new ComponentMetadataText(value);
 }
