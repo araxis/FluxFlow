@@ -87,8 +87,8 @@ Release tests currently enforce these consistency rules:
 Future work should be explicit and narrow. Good candidates:
 
 - run a full package README pass for clarity and examples without changing APIs
-- add package-level API compatibility baselines if binary compatibility becomes
-  a release requirement
+- expand the public API baseline into binary compatibility checks only if that
+  becomes a release requirement
 - plan a Designer UI host or resource-picker layer outside component packages
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node

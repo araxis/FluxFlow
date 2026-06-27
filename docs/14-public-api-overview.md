@@ -6,6 +6,10 @@ FluxFlow's default public surface is standalone-node-first:
 - `FluxFlow.Composition` for fluent/config composition of standalone nodes.
 - `FluxFlow.Engine` for the optional advanced engine runtime.
 
+The release tests maintain a lightweight public API baseline for package source
+declarations. Treat baseline changes as a prompt to review package versioning,
+changelog entries, and documentation before accepting the new public surface.
+
 ## Node Kit
 
 Namespace:

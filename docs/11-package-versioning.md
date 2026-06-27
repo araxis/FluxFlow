@@ -59,6 +59,25 @@ After 1.0:
 - minor: additive public API or behavior
 - patch: compatible fixes
 
+## Public API Baseline
+
+Release tests include a lightweight public API baseline for source declarations
+across the packages listed in `eng/packages.json`. The baseline is stored under
+`eng/public-api` and records a declaration count plus a normalized declaration
+hash for each package in manifest order.
+
+When the baseline changes, review the source diff before accepting it:
+
+- breaking public API changes require a major version after `1.0`
+- additive public API changes require a minor version after `1.0`
+- compatible fixes that keep the same public shape can stay patch-level
+- documentation-only changes should not update the baseline
+
+Accept an intentional baseline update by setting
+`FLUXFLOW_ACCEPT_PUBLIC_API_BASELINE=1` and rerunning
+`PublicApiBaselineTests`. Do this only after package version, changelog, and docs
+changes are correct for the public API change.
+
 ## Release Checklist
 
 Before publishing:
