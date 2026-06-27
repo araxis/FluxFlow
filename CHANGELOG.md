@@ -19,6 +19,19 @@ Adds typed resource descriptor authoring helpers.
   values while keeping the descriptor DTOs configuration-friendly for
   structured diagnostics.
 
+## FluxFlow.Components.Secrets 1.6.0
+
+Adds typed in-memory secret descriptor authoring helpers.
+
+- Adds `SecretVersion` for non-empty, trimmed code-authored secret versions.
+- Adds `SecretKind` for non-empty, trimmed code-authored secret kind values.
+- Adds `SecretMetadataText` for non-empty, trimmed descriptor display names and
+  summaries.
+- Adds `InMemorySecretResolverBuilder.Add(...)` overloads that accept
+  `SecretName`, optional `SecretVersion`, optional `SecretKind`, and optional
+  `SecretMetadataText` values while keeping the descriptor/reference DTOs
+  configuration-friendly for structured diagnostics.
+
 ## FluxFlow.Components.Designer 2.14.0
 
 Adds a Designer-owned metadata text value type.

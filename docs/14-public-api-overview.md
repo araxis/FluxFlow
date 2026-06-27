@@ -960,12 +960,14 @@ These packages are intentionally not standalone node composition adapters:
   text so configuration-bound invalid values can still be reported as
   diagnostics.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
-  option helpers, redaction helpers, trimmed secret names, versions, kinds,
-  option paths, optional non-sensitive descriptor enumeration, null-safe
-  normalized metadata validation, defensive diagnostic metadata copying, and a
-  fluent `InMemorySecretResolverBuilder` for local secret record authoring, plus
-  keyed DI registration helpers for host-owned resolvers and descriptor
-  providers.
+  option helpers, redaction helpers, trimmed secret names, code-authored
+  `SecretVersion`, `SecretKind`, and `SecretMetadataText` values, option paths,
+  optional non-sensitive descriptor enumeration, null-safe normalized metadata
+  validation, defensive diagnostic metadata copying, and a fluent
+  `InMemorySecretResolverBuilder` for local secret record authoring, plus keyed
+  DI registration helpers for host-owned resolvers and descriptor providers.
+  Descriptor/reference DTOs keep string-shaped optional text so
+  configuration-bound invalid values can still be reported as diagnostics.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services, explicit expression registry argument guards, deterministic

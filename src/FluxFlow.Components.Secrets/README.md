@@ -12,6 +12,8 @@ is controlled, how values are refreshed, and how ownership is handled.
 
 - `SecretReference`: a name plus optional version, kind, and attributes.
 - `SecretDescriptor`: non-sensitive metadata for a declared secret.
+- `SecretVersion`, `SecretKind`, and `SecretMetadataText`: small value types
+  for code-authored descriptor version, kind, display-name, and summary values.
 - `SecretValue`: resolved value wrapper with redacted string formatting.
 - `ISecretResolver`: runtime abstraction for resolving a reference.
 - `ISecretDescriptorProvider`: optional capability for resolvers that can list
@@ -89,6 +91,21 @@ var resolver = new InMemorySecretResolverBuilder()
     .BuildResolver();
 ```
 
+Code-authored in-memory records can use value types at the builder boundary
+while the underlying DTOs remain configuration-friendly:
+
+```csharp
+var resolver = new InMemorySecretResolverBuilder()
+    .Add(
+        new SecretName("primary-token"),
+        "value-from-host",
+        version: new SecretVersion("v1"),
+        kind: new SecretKind("profile"),
+        displayName: new SecretMetadataText("Primary Token"),
+        summary: new SecretMetadataText("Runtime credential."))
+    .BuildResolver();
+```
+
 Hosts that use keyed service registration can register resolvers and descriptor
 providers explicitly:
 
@@ -156,10 +173,12 @@ surfacing accidental null-reference failures.
 empty, and formats without exposing metadata values.
 
 `SecretName`, secret `Version`, `Kind`, `DisplayName`, `Summary`, and secret
-option paths trim surrounding whitespace when assigned. This keeps
-configuration-bound records and references matching the same logical name,
-version, and kind, and makes duplicate detection catch declarations that differ
-only by padding.
+option paths trim surrounding whitespace when assigned. `SecretVersion`,
+`SecretKind`, and `SecretMetadataText` provide the same trimming for
+code-authored in-memory records and reject empty values at the builder
+boundary. The descriptor/reference DTOs still keep their string-shaped fields
+so configuration-bound invalid text can be reported as structured diagnostics
+instead of throwing during binding.
 
 `SecretRedactor.RedactValues(...)` copies the input map and normalizes explicit
 protected keys before matching them, so caller-owned maps and padded protected

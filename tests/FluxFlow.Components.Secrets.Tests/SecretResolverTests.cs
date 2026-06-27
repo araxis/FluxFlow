@@ -45,6 +45,33 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
+    public void Resolver_builder_accepts_typed_authoring_values()
+    {
+        var resolver = new InMemorySecretResolverBuilder()
+            .Add(
+                new SecretName(" primary-token "),
+                "runtime-value",
+                version: new SecretVersion(" v1 "),
+                kind: new SecretKind(" profile "),
+                displayName: new SecretMetadataText(" Primary Token "),
+                summary: new SecretMetadataText(" Runtime credential. "),
+                metadata: new Dictionary<string, string>
+                {
+                    [" owner "] = " runtime "
+                })
+            .BuildResolver();
+
+        var descriptor = resolver.GetDescriptors().ShouldHaveSingleItem();
+
+        descriptor.Name.ShouldBe(new SecretName("primary-token"));
+        descriptor.Version.ShouldBe("v1");
+        descriptor.Kind.ShouldBe("profile");
+        descriptor.DisplayName.ShouldBe("Primary Token");
+        descriptor.Summary.ShouldBe("Runtime credential.");
+        descriptor.Metadata["owner"].ShouldBe("runtime");
+    }
+
+    [Fact]
     public void Resolver_builder_accepts_existing_records_and_snapshots_build_results()
     {
         var builder = new InMemorySecretResolverBuilder()
@@ -148,6 +175,15 @@ public sealed class SecretResolverTests
         var builder = new InMemorySecretResolverBuilder();
 
         Should.Throw<ArgumentNullException>(() => builder.Add("primary", (SecretValue)null!));
+        Should.Throw<ArgumentNullException>(() => builder.Add(new SecretName("primary"), (SecretValue)null!));
+    }
+
+    [Fact]
+    public void Resolver_builder_typed_authoring_rejects_default_secret_name()
+    {
+        Should.Throw<ArgumentException>(() =>
+                new InMemorySecretResolverBuilder().Add(default(SecretName), "value"))
+            .ParamName.ShouldBe("name");
     }
 
     [Fact]
@@ -259,6 +295,81 @@ public sealed class SecretResolverTests
         name.Value.ShouldBe("primary-token");
         name.ToString().ShouldBe("primary-token");
         name.ShouldBe(new SecretName("primary-token"));
+    }
+
+    [Fact]
+    public void Secret_version_trims_surrounding_whitespace()
+    {
+        var version = new SecretVersion("  v1  ");
+
+        version.Value.ShouldBe("v1");
+        version.ToString().ShouldBe("v1");
+        version.ShouldBe(new SecretVersion("v1"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Secret_version_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new SecretVersion(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_secret_version_to_string_returns_empty()
+    {
+        default(SecretVersion).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Secret_kind_trims_surrounding_whitespace()
+    {
+        var kind = new SecretKind("  profile  ");
+
+        kind.Value.ShouldBe("profile");
+        kind.ToString().ShouldBe("profile");
+        kind.ShouldBe(new SecretKind("profile"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Secret_kind_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new SecretKind(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_secret_kind_to_string_returns_empty()
+    {
+        default(SecretKind).ToString().ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void Secret_metadata_text_trims_surrounding_whitespace()
+    {
+        var text = new SecretMetadataText("  Primary Token  ");
+
+        text.Value.ShouldBe("Primary Token");
+        text.ToString().ShouldBe("Primary Token");
+        text.ShouldBe(new SecretMetadataText("Primary Token"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Secret_metadata_text_rejects_empty_values(string value)
+    {
+        Should.Throw<ArgumentException>(() => new SecretMetadataText(value))
+            .ParamName.ShouldBe("value");
+    }
+
+    [Fact]
+    public void Default_secret_metadata_text_to_string_returns_empty()
+    {
+        default(SecretMetadataText).ToString().ShouldBe(string.Empty);
     }
 
     [Fact]
