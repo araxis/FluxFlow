@@ -17,6 +17,16 @@ Adds richer Designer hints for the mapper metadata provider.
   `clock` resource hints.
 - Keeps the hints descriptive only; composition runtime behavior is unchanged.
 
+## FluxFlow.Components.Control.Composition 1.3.0
+
+Adds richer Designer hints for the control metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.filter` and `flow.when` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Designer 2.16.0
 
 Adds shared option metadata attribute helpers.

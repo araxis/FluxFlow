@@ -262,8 +262,9 @@ build failures.
 `ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.filter` and `flow.when` composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata includes editable options, ports, and resource hints for the
-required `engine` resource plus optional `contextFactory` and `clock` resources.
+The metadata includes editable options with section/editor hints, ports, and
+host-owned resource picker hints for the required `engine` resource plus
+optional `contextFactory` and `clock` resources.
 
 ## Validation Composition
 

@@ -132,35 +132,61 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Expression,
                 displayName: "Expression",
                 helperText: "Boolean expression evaluated for each input message.",
-                isRequired: true)
+                isRequired: true,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Control",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: ControlCompositionResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
                 displayName: "Expression ID",
-                helperText: "Optional diagnostic identifier emitted with control diagnostics.")
+                helperText: "Optional diagnostic identifier emitted with control diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "expressionName",
                 OptionValueKind.Text,
                 displayName: "Expression Name",
-                helperText: "Optional diagnostic name emitted with control diagnostics.")
+                helperText: "Optional diagnostic name emitted with control diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "engine",
                 OptionValueKind.Text,
                 displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.")
+                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: ControlExpressionOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.")
+                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: 128,
-                min: 1);
+                min: 1,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number));
 
     private static void AddExpressionResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -172,7 +198,8 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(IFlowExpressionEngine),
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    keyPattern: "expression-engine:{name}"))
             .AddResource(
                 ControlCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
@@ -180,7 +207,8 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed input context factory for custom expression variables.",
                 valueType: "IFlowMapContextFactory<TInput>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ContextFactory))
+                    ResourceDesignMetadataAttributeValues.ContextFactory,
+                    keyPattern: "context-factory:{name}"))
             .AddResource(
                 ControlCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -188,5 +216,6 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed clock for deterministic diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 }

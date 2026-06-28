@@ -131,6 +131,60 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_control_option_hints()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata();
+
+        foreach (var item in metadata)
+        {
+            var options = item.Options.ToDictionary(
+                option => option.Name.Value,
+                StringComparer.Ordinal);
+
+            AssertOptionHints(
+                options["expression"],
+                "Control",
+                OptionDesignMetadataAttributeValues.Primary,
+                OptionDesignMetadataAttributeValues.Expression,
+                syntax: OptionDesignMetadataAttributeValues.Expression,
+                relatedResource: ControlCompositionResourceNames.Engine);
+            AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_control_resource_picker_hints()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata();
+
+        foreach (var item in metadata)
+        {
+            var resources = item.Resources.ToDictionary(
+                resource => resource.Name.Value,
+                StringComparer.Ordinal);
+
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.Engine],
+                ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                "expression-engine:{name}");
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.ContextFactory],
+                ResourceDesignMetadataAttributeValues.ContextFactory,
+                "context-factory:{name}");
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_describes_when_ports_and_output_alias()
     {
         var metadata = new ControlComponentDesignMetadataProvider()
@@ -184,6 +238,62 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string editor,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+            .ShouldBe(editor);
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     [Fact]
     public async Task Hosted_filter_resolves_keyed_engine_and_forwards_only_matches()
