@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mapping.Composition 1.3.0
+
+Adds richer Designer hints for the mapper metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.mapper` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Designer 2.16.0
+
+Adds shared option metadata attribute helpers.
+
+- Adds `OptionDesignMetadataAttributeNames`,
+  `OptionDesignMetadataAttributeValues`, and
+  `OptionDesignMetadataAttributes`.
+- Supports section, importance, editor, syntax, and related-resource option
+  hints while keeping Designer metadata engine/composition neutral.
+- Keeps option hints metadata-only; hosts still own rendering, validation UI,
+  localization, and expression editor behavior.
+
 ## FluxFlow.Engine 2.0.1
 
 Adds a package-local Engine README and keeps the package readme aligned with the

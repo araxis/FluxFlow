@@ -25,46 +25,80 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Expression,
                 displayName: "Expression",
                 helperText: "Expression evaluated for each input message.",
-                isRequired: true)
+                isRequired: true,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Mapping",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: MappingCompositionResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
                 displayName: "Expression ID",
-                helperText: "Optional diagnostic identifier emitted with mapper diagnostics.")
+                helperText: "Optional diagnostic identifier emitted with mapper diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "expressionName",
                 OptionValueKind.Text,
                 displayName: "Expression Name",
-                helperText: "Optional diagnostic name emitted with mapper diagnostics.")
+                helperText: "Optional diagnostic name emitted with mapper diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "engine",
                 OptionValueKind.Text,
                 displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.")
+                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.")
+                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "outputType",
                 OptionValueKind.Text,
                 displayName: "Output Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.")
+                helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "targetType",
                 OptionValueKind.Text,
                 displayName: "Target Type",
-                helperText: "Optional output type alias used when outputType is object.")
+                helperText: "Optional output type alias used when outputType is object.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: 128,
-                min: 1)
+                min: 1,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number))
             .AddResource(
                 MappingCompositionResourceNames.Engine,
                 displayName: "Engine",
@@ -73,7 +107,8 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(IFlowExpressionEngine),
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    keyPattern: "expression-engine:{name}"))
             .AddResource(
                 MappingCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
@@ -81,7 +116,8 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed mapping context factory for custom expression variables.",
                 valueType: nameof(IMappingContextFactory),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ContextFactory))
+                    ResourceDesignMetadataAttributeValues.ContextFactory,
+                    keyPattern: "context-factory:{name}"))
             .AddResource(
                 MappingCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -89,7 +125,8 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed clock for deterministic mapper diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock))
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"))
             .AddInputPort(
                 MappingCompositionPortNames.Input,
                 displayName: "Input",

@@ -203,8 +203,9 @@ diagnostics when the host is configured to collect build failures.
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.mapper` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata includes editable options, ports, and resource hints for the required
-`engine` resource plus optional `contextFactory` and `clock` resources.
+metadata includes editable options with section/editor hints, ports, and
+host-owned resource picker hints for the required `engine` resource plus
+optional `contextFactory` and `clock` resources.
 
 ## Assertions Composition
 
@@ -895,6 +896,9 @@ Main types:
 - `OptionDesignMetadata`
 - `OptionChoiceMetadata`
 - `OptionValueKind`
+- `OptionDesignMetadataAttributeNames`
+- `OptionDesignMetadataAttributeValues`
+- `OptionDesignMetadataAttributes`
 - `ResourceDesignMetadata`
 - `PortDesignMetadata`
 - `PortDirection`
@@ -935,6 +939,9 @@ cannot mutate catalog contents after registration.
 it supports single and bulk component-level attributes through `AddAttribute`
 and `AddAttributes`, builds through the validated module path, and does not own
 rendering, localization, resource selection, or runtime mapping.
+`OptionDesignMetadataAttributes` provides shared option attribute helpers so
+package metadata can declare section, importance, editor, syntax, and
+related-resource hints without owning host rendering or editor behavior.
 `ResourceDesignMetadataAttributes` provides shared host-owned resource
 attribute helpers so package metadata can declare resource ownership, picker
 kind, key pattern, related option, and conditional requiredness without owning

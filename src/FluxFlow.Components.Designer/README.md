@@ -42,6 +42,11 @@ component without depending on a specific rendering framework.
   `ResourceDesignMetadataAttributeValues`, and
   `ResourceDesignMetadataAttributes`: shared names, values, and helpers for
   describing host-owned resource picker hints.
+- `OptionDesignMetadataAttributeNames`,
+  `OptionDesignMetadataAttributeValues`, and
+  `OptionDesignMetadataAttributes`: shared names, values, and helpers for
+  describing option editor, section, importance, syntax, and related-resource
+  hints.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
 options and ports, duplicate primary ports per direction, invalid option
@@ -74,6 +79,14 @@ Default values should match the option kind: text-like options use strings,
 numbers use numeric values, booleans use `bool`, durations use `TimeSpan`, and
 enum defaults use either a choice value string or an enum value whose name
 matches a choice. `Min` and `Max` apply only to number and duration options.
+
+## Option Metadata
+
+Options can carry host-facing editor hints through typed attributes. Use
+`OptionDesignMetadataAttributes.Create(...)` when a provider needs to describe
+an option's section, importance, editor kind, syntax, or related resource. These
+attributes are metadata only; hosts still choose their forms, grouping,
+validation UI, and expression editors.
 
 ## Resource Metadata
 
@@ -184,6 +197,13 @@ var built = new ComponentDesignMetadataBuilder("sample.transform")
         preferredNodeName: "transform",
         suggestedEditorWidth: 420)
     .AddOption("expression", OptionValueKind.Expression, isRequired: true)
+    .AddOption(
+        "label",
+        OptionValueKind.Text,
+        attributes: OptionDesignMetadataAttributes.Create(
+            section: "General",
+            importance: OptionDesignMetadataAttributeValues.Primary,
+            editor: OptionDesignMetadataAttributeValues.Text))
     .AddResource(
         "engine",
         order: 0,

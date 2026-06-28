@@ -166,6 +166,72 @@ public sealed class ComponentDesignMetadataCatalogTests
             .ShouldBe(new ComponentAttributeValue(ResourceDesignMetadataAttributeValues.Store));
     }
 
+    [Fact]
+    public void Option_metadata_attribute_helper_creates_editor_hints()
+    {
+        var attributes = OptionDesignMetadataAttributes.Create(
+            section: "Mapping",
+            importance: OptionDesignMetadataAttributeValues.Primary,
+            editor: OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: "engine");
+
+        attributes[OptionDesignMetadataAttributeNames.Section]
+            .ShouldBe("Mapping");
+        attributes[OptionDesignMetadataAttributeNames.Importance]
+            .ShouldBe(OptionDesignMetadataAttributeValues.Primary);
+        attributes[OptionDesignMetadataAttributeNames.Editor]
+            .ShouldBe(OptionDesignMetadataAttributeValues.Expression);
+        attributes[OptionDesignMetadataAttributeNames.Syntax]
+            .ShouldBe(OptionDesignMetadataAttributeValues.Expression);
+        attributes[OptionDesignMetadataAttributeNames.RelatedResource]
+            .ShouldBe("engine");
+
+        var metadata = new ComponentDesignMetadataBuilder("sample.option-hints")
+            .AddOption("expression", OptionValueKind.Expression, attributes: attributes)
+            .Build();
+
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Option_metadata_attribute_helper_creates_typed_attribute_map()
+    {
+        var attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Runtime",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Number);
+
+        attributes[new ComponentAttributeName(OptionDesignMetadataAttributeNames.Section)]
+            .ShouldBe(new ComponentAttributeValue("Runtime"));
+        attributes[new ComponentAttributeName(OptionDesignMetadataAttributeNames.Importance)]
+            .ShouldBe(new ComponentAttributeValue(OptionDesignMetadataAttributeValues.Advanced));
+        attributes[new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor)]
+            .ShouldBe(new ComponentAttributeValue(OptionDesignMetadataAttributeValues.Number));
+    }
+
+    [Theory]
+    [InlineData("section")]
+    [InlineData("importance")]
+    [InlineData("editor")]
+    [InlineData("syntax")]
+    [InlineData("relatedResource")]
+    public void Option_metadata_attribute_helper_rejects_empty_optional_values(string argumentName)
+    {
+        Action act = argumentName switch
+        {
+            "section" => () => OptionDesignMetadataAttributes.Create(section: " "),
+            "importance" => () => OptionDesignMetadataAttributes.Create(importance: " "),
+            "editor" => () => OptionDesignMetadataAttributes.Create(editor: " "),
+            "syntax" => () => OptionDesignMetadataAttributes.Create(syntax: " "),
+            "relatedResource" => () => OptionDesignMetadataAttributes.Create(relatedResource: " "),
+            _ => throw new ArgumentOutOfRangeException(nameof(argumentName))
+        };
+
+        act.ShouldThrow<ArgumentException>()
+            .Message.ShouldContain("Option metadata attribute");
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
