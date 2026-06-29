@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Assertions.Composition 1.3.0
+
+Adds richer Designer hints for the assertion metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.assert` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Mapping.Composition 1.3.0
 
 Adds richer Designer hints for the mapper metadata provider.

@@ -866,12 +866,22 @@ Date: 2026-05-31
 - Refreshed local graph output after the memory snapshot update: 11609 nodes,
   19587 edges, and 1081 communities. The local HTML graph was skipped because
   the graph exceeds the visualization size limit.
+- Completed the Assertions Designer metadata hint pass. The Assertions
+  composition provider now includes option section, importance, editor, syntax,
+  and related-resource hints, plus host-owned resource key patterns for
+  `engine`, `contextFactory`, and `clock`. The Assertions composition package is
+  bumped to `1.3.0`; README, changelog, and focused metadata tests were updated.
+  Verification passed for Assertions composition tests (`12`), Designer tests
+  (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout: 11622 nodes, 19610 edges, and 1076 communities. See
+  [[156-assertions-designer-metadata-hints]].
 
 ## Remaining
 
 - Continue the Designer metadata hint rollout one package family at a time.
-  Assertions is the suggested next package because it matches the already
-  proven expression-engine/context-factory/clock resource pattern.
+  Observability or State is the next reasonable candidate, but it should be
+  planned separately.
 - Keep future work bounded: one package family or one convention pass per local
   commit, with focused tests, release convention tests, and the controlled
   solution build.

@@ -93,14 +93,20 @@ Latest local commits:
   - Applied the same option/resource hint pattern to Control metadata for
     filter and when nodes.
   - Bumped Control Composition to `1.3.0`.
+- `Add assertions designer metadata hints`
+  - Applied the option/resource hint pattern to Assertions metadata for the
+    assertion node.
+  - Bumped Assertions Composition to `1.3.0`.
 
 ## Verification Notes
 
-Recent focused verification passed for the Mapping and Control hint passes:
+Recent focused verification passed for the Mapping, Control, and Assertions
+hint passes:
 
 - Designer tests.
 - Mapping composition tests.
 - Control composition tests.
+- Assertions composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -114,9 +120,9 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after this memory update: 11609 nodes, 19587
-edges, and 1081 communities. The local HTML graph was skipped because the graph
-exceeds the visualization size limit.
+Local graph output was refreshed after the Assertions hint pass closeout: 11622
+nodes, 19610 edges, and 1076 communities. The local HTML graph was skipped
+because the graph exceeds the visualization size limit.
 
 ## Current Constraints
 
@@ -134,6 +140,6 @@ exceeds the visualization size limit.
 ## Suggested Next Pass
 
 Continue the richer Designer metadata hint rollout one package family at a
-time. Assertions is the best next candidate because it has expression-backed
-options and the same host-owned `engine`, `contextFactory`, and `clock`
-resource pattern already proven by Mapping and Control.
+time. Observability or State is the next reasonable candidate because both
+already expose host-owned resources and expression-related options, but the
+next pass should be planned separately.
