@@ -69,10 +69,10 @@ composition adapter resolves the expression engine from the `engine` resource.
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `state.reducer` so hosts can build palettes, editors, validation hints, or
 documentation without copying package descriptors. The metadata describes the
-existing `StateReducerOptions` configuration surface and fixed `Input`/`Output`
-ports, plus resource hints for the required keyed expression engine and
-optional keyed `TimeProvider`. Those resources stay host-owned; the `engine`
-option remains only diagnostic/config metadata and is not used for DI
-selection.
+existing `StateReducerOptions` configuration surface, option grouping/editor
+hints, fixed `Input`/`Output` ports, and host-owned resource picker hints for
+the required keyed expression engine and optional keyed `TimeProvider`. Those
+resources stay host-owned; the `engine` option remains only diagnostic/config
+metadata and is not used for DI selection.
 The metadata is authored through the shared validated Designer metadata builder
 while preserving the same public metadata contracts consumed by hosts.

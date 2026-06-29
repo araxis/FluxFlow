@@ -37,47 +37,83 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 "engine",
                 OptionValueKind.Text,
                 displayName: "Engine",
-                helperText: "Diagnostic engine metadata; DI selection uses the required host-owned engine resource.")
+                helperText: "Diagnostic engine metadata; DI selection uses the required host-owned engine resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "keyExpression",
                 OptionValueKind.Text,
                 displayName: "Key Expression",
-                helperText: "Optional expression used to resolve the state key from each input.")
+                helperText: "Optional expression used to resolve the state key from each input.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "State",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: StateCompositionResourceNames.Engine))
             .AddOption(
                 "reducer",
                 OptionValueKind.Text,
                 displayName: "Reducer",
                 helperText: "Expression evaluated once per reduce operation to produce the next state.",
-                isRequired: true)
+                isRequired: true,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "State",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: StateCompositionResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
                 displayName: "Expression ID",
-                helperText: "Optional expression identifier emitted in diagnostics.")
+                helperText: "Optional expression identifier emitted in diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "expressionName",
                 OptionValueKind.Text,
                 displayName: "Expression Name",
-                helperText: "Optional expression display name emitted in diagnostics.")
+                helperText: "Optional expression display name emitted in diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "initialState",
                 OptionValueKind.Json,
                 displayName: "Initial State",
-                helperText: "Optional initial state used for new keys or reset operations.")
+                helperText: "Optional initial state used for new keys or reset operations.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "State",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Json))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: DefaultBoundedCapacity,
-                min: 1)
+                min: 1,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxKeys",
                 OptionValueKind.Number,
                 displayName: "Max Keys",
                 helperText: "Maximum number of keys to track. Zero rejects new keys.",
                 defaultValue: DefaultMaxKeys,
-                min: 0);
+                min: 0,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number));
 
     private static void AddReducerResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -89,7 +125,8 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 valueType: nameof(IFlowExpressionEngine),
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ExpressionEngine))
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    keyPattern: "expression-engine:{name}"))
             .AddResource(
                 StateCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -97,7 +134,8 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 summary: "Optional keyed clock for deterministic state reducer results and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
     private static void AddReducerPorts(ComponentDesignMetadataBuilder builder)
         => builder

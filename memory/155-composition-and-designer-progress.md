@@ -97,16 +97,21 @@ Latest local commits:
   - Applied the option/resource hint pattern to Assertions metadata for the
     assertion node.
   - Bumped Assertions Composition to `1.3.0`.
+- `Add state designer metadata hints`
+  - Applied the option/resource hint pattern to State metadata for the reducer
+    node.
+  - Bumped State Composition to `1.3.0`.
 
 ## Verification Notes
 
-Recent focused verification passed for the Mapping, Control, and Assertions
-hint passes:
+Recent focused verification passed for the Mapping, Control, Assertions, and
+State hint passes:
 
 - Designer tests.
 - Mapping composition tests.
 - Control composition tests.
 - Assertions composition tests.
+- State composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -120,9 +125,8 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the Assertions hint pass closeout: 11622
-nodes, 19610 edges, and 1076 communities. The local HTML graph was skipped
-because the graph exceeds the visualization size limit.
+Local graph output was refreshed after the State hint pass closeout. The local
+HTML graph was skipped because the graph exceeds the visualization size limit.
 
 ## Current Constraints
 
@@ -140,6 +144,6 @@ because the graph exceeds the visualization size limit.
 ## Suggested Next Pass
 
 Continue the richer Designer metadata hint rollout one package family at a
-time. Observability or State is the next reasonable candidate because both
-already expose host-owned resources and expression-related options, but the
-next pass should be planned separately.
+time. Observability is the next reasonable candidate because it already has
+expression-related counter options and host-owned selector, context factory,
+and clock resources, but the next pass should be planned separately.

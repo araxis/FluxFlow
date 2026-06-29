@@ -876,12 +876,21 @@ Date: 2026-05-31
   warnings and 0 errors. Local graph output was refreshed after the memory
   closeout: 11622 nodes, 19610 edges, and 1076 communities. See
   [[156-assertions-designer-metadata-hints]].
+- Completed the State Designer metadata hint pass. The State composition
+  provider now includes option section, importance, editor, syntax, and
+  related-resource hints for the state reducer node, plus host-owned resource
+  key patterns for `engine` and `clock`. The State composition package is
+  bumped to `1.3.0`; README, changelog, and focused metadata tests were
+  updated. Verification passed for State composition tests (`15`), Designer
+  tests (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout. See [[157-state-designer-metadata-hints]].
 
 ## Remaining
 
 - Continue the Designer metadata hint rollout one package family at a time.
-  Observability or State is the next reasonable candidate, but it should be
-  planned separately.
+  Observability is the next reasonable candidate, but it should be planned
+  separately.
 - Keep future work bounded: one package family or one convention pass per local
   commit, with focused tests, release convention tests, and the controlled
   solution build.
