@@ -1,13 +1,31 @@
 # Current State
 
-Date: 2026-06-21
+Date: 2026-06-29
 
 ## Repository
 
-- `D:\Projects\FluxFlow` has `main` matching `origin/main`.
-- Private remote: `https://github.com/araxis/FluxFlow`.
+- `D:\Projects\FluxFlow` is currently on local branch
+  `work/designer-value-type-hint-contract`.
+- The tracked worktree is clean as of the 2026-06-29 memory refresh.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
+- Current architecture direction: standalone nodes are the default,
+  `FluxFlow.Composition` is the optional standalone composition layer, component
+  `.Composition` packages own factory registration and optional Designer
+  metadata, and `FluxFlow.Engine` remains optional advanced runtime
+  infrastructure.
+- Composition adapters now exist for the normal standalone component families:
+  HTTP, Mapping, Control, Assertions, Validation, Timers, Sources, Routing,
+  Serialization, Payloads, Observability, Projections, Metrics, Expectations,
+  FileSystem, State, Storage, Sessions, and MQTT. Request/reply is intentionally
+  skipped as a normal component-family adapter; Journal remains support-only.
+- Designer has been decoupled from engine identifiers and now owns its own
+  design-time value types. Package-owned metadata providers are in place across
+  composition packages, with shared metadata helpers and stronger validation.
+- The active narrow track is richer Designer metadata hints. Mapping was the
+  pilot, Control followed, and Assertions is the next suggested package family.
+- See `155-composition-and-designer-progress.md` for the current summary and
+  verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

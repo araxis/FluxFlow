@@ -256,6 +256,11 @@ This folder records the extraction work for `FluxFlow.Engine`.
   names for keyed `IMqttPublisher` / `IMqttTriggerSource` / `TimeProvider`,
   broker-free MQTT composition sample, package/docs/manifest wiring, and
   verification.
+- `155-composition-and-designer-progress.md`: current snapshot after the
+  composition adapter sweep and Designer metadata work: standalone-node-first
+  architecture, completed component composition adapters, Designer boundary
+  cleanup, option/resource hint pilot state, reliable verification command, and
+  next suggested metadata hint pass.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

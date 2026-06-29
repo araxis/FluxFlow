@@ -850,18 +850,32 @@ Date: 2026-05-31
   `graphify update . --force`: 8563 nodes, 12734 edges, and 831 communities.
   `graph.html` was skipped because the graph exceeds the local HTML
   visualization limit.
+- Recorded the current composition and Designer progress snapshot. Since the
+  first MQTT composition adapter, optional `.Composition` adapters have been
+  added for the normal standalone component families: HTTP, Mapping, Control,
+  Assertions, Validation, Timers, Sources, Routing, Serialization, Payloads,
+  Observability, Projections, Metrics, Expectations, FileSystem, State,
+  Storage, Sessions, and MQTT. Request/reply remains intentionally skipped as a
+  normal component-family adapter, and Journal remains support-only.
+- Recorded the Designer boundary and metadata state. Designer is now engine
+  neutral, package-owned metadata providers exist across composition packages,
+  shared metadata helpers and validation are in place, and the latest local work
+  added richer option/resource hints first to Mapping and then to Control. The
+  suggested next narrow pass is Assertions metadata hints. See
+  [[155-composition-and-designer-progress]].
+- Refreshed local graph output after the memory snapshot update: 11609 nodes,
+  19587 edges, and 1081 communities. The local HTML graph was skipped because
+  the graph exceeds the visualization size limit.
 
 ## Remaining
 
-- 2.0 GA line is fully published. (The `1.0.0` component release track is also
-  complete.)
-- Standalone-node line is merged, tagged, and published. `FluxFlow.Composition`
-  now provides the default standalone composition path. Next architecture items
-  are hot reload semantics for composition definitions and optional adapter
-  packages where a host needs richer per-adapter node factory registration.
+- Continue the Designer metadata hint rollout one package family at a time.
+  Assertions is the suggested next package because it matches the already
+  proven expression-engine/context-factory/clock resource pattern.
+- Keep future work bounded: one package family or one convention pass per local
+  commit, with focused tests, release convention tests, and the controlled
+  solution build.
 - Keep local graph output updated after repo changes and keep it out of git.
   See [[140-local-graph-maintenance]].
-- MQTT connection pilot is merged and published. Review the final result before
-  broadening the pattern. The shared extraction so far is only
-  correlation/timeout tracking, not a generic transport acknowledgement policy.
-- Publish the MQTTnet and Pulse MQTT adapter `1.1.0` package updates together.
+- Hot reload semantics, renderer behavior, resource picker UI, runtime lifecycle
+  hooks, and request/reply redesign remain deferred until separately planned.
