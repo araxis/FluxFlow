@@ -78,11 +78,12 @@ host receives a `FactoryFailed` diagnostic with the relevant option name.
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `session.recorder`, `session.replay`, and `session.query` so hosts can build
 palettes, editors, validation hints, or documentation without copying package
-descriptors. The metadata describes the existing session option records and
-fixed ports, plus resource hints for the required `store` and optional `clock`
-resources. Concrete `ISessionStore` instances, `ISessionStoreFactory`
-registrations, and optional keyed `TimeProvider` clocks remain host-owned
-resources and are not modeled as editable node options; the `store` option
-remains only diagnostic/config metadata.
+descriptors. The metadata describes the existing session option records with
+section, importance, and editor hints; fixed ports; and resource picker hints
+with key patterns for the required `store` and optional `clock` resources.
+Concrete `ISessionStore` instances, `ISessionStoreFactory` registrations, and
+optional keyed `TimeProvider` clocks remain host-owned resources and are not
+modeled as editable node options; the `store` option remains only
+diagnostic/config metadata.
 The provider authors that metadata through the shared validated Designer
 metadata builder.

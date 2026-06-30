@@ -37,13 +37,20 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Optional session name stored with session metadata.")
+                helperText: "Optional session name stored with session metadata.",
+                attributes: OptionAttributes(
+                    "Session",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "notes",
                 OptionValueKind.MultilineText,
                 displayName: "Notes",
-                helperText: "Optional session notes stored with session metadata.")
-            .AddOption(TagsOption())
+                helperText: "Optional session notes stored with session metadata.",
+                attributes: OptionAttributes(
+                    "Session",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(TagsOption("Metadata"))
             .AddOption(BoundedCapacityOption(RecorderDefaults.BoundedCapacity));
 
         AddTransformPorts(
@@ -74,34 +81,53 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 displayName: "Mode",
                 helperText: "Timing mode used between replayed records.",
                 defaultValue: ReplayDefaults.Mode.ToString(),
-                choices: ReplayModeChoices())
+                choices: ReplayModeChoices(),
+                attributes: OptionAttributes(
+                    "Replay",
+                    OptionDesignMetadataAttributeValues.Primary))
             .AddOption(BoundedCapacityOption(ReplayDefaults.BoundedCapacity))
             .AddOption(
                 "startSequence",
                 OptionValueKind.Number,
                 displayName: "Start Sequence",
                 helperText: "Optional first record sequence to replay.",
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Replay",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxMessages",
                 OptionValueKind.Number,
                 displayName: "Max Messages",
                 helperText: "Optional maximum number of messages to replay.",
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Replay",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "fixedIntervalMilliseconds",
                 OptionValueKind.Number,
                 displayName: "Fixed Interval Milliseconds",
                 helperText: "Delay used by FixedInterval replay mode.",
                 defaultValue: ReplayDefaults.FixedIntervalMilliseconds,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Timing",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "speedMultiplier",
                 OptionValueKind.Number,
                 displayName: "Speed Multiplier",
                 helperText: "Multiplier used by Multiplier replay mode; must be greater than zero.",
                 defaultValue: ReplayDefaults.SpeedMultiplier,
-                min: PositiveDoubleMin);
+                min: PositiveDoubleMin,
+                attributes: OptionAttributes(
+                    "Timing",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number));
 
         builder.AddOutputPort(
             SessionsCompositionPortNames.Output,
@@ -130,44 +156,68 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Default exact session name filter.")
+                helperText: "Default exact session name filter.",
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "namePrefix",
                 OptionValueKind.Text,
                 displayName: "Name Prefix",
-                helperText: "Default session name prefix filter.")
-            .AddOption(TagsOption())
+                helperText: "Default session name prefix filter.",
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Text))
+            .AddOption(TagsOption("Filtering"))
             .AddOption(
                 "includeActive",
                 OptionValueKind.Boolean,
                 displayName: "Include Active",
                 helperText: "Include active sessions in query results.",
-                defaultValue: QueryDefaults.IncludeActive)
+                defaultValue: QueryDefaults.IncludeActive,
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "includeCompleted",
                 OptionValueKind.Boolean,
                 displayName: "Include Completed",
                 helperText: "Include completed sessions in query results.",
-                defaultValue: QueryDefaults.IncludeCompleted)
+                defaultValue: QueryDefaults.IncludeCompleted,
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "limit",
                 OptionValueKind.Number,
                 displayName: "Limit",
                 helperText: "Maximum number of sessions to return.",
                 defaultValue: QueryDefaults.Limit,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "emitSessionsInResult",
                 OptionValueKind.Boolean,
                 displayName: "Emit Sessions In Result",
                 helperText: "Include matching session metadata in the query result payload.",
-                defaultValue: QueryDefaults.EmitSessionsInResult)
+                defaultValue: QueryDefaults.EmitSessionsInResult,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "emitSessionOutputs",
                 OptionValueKind.Boolean,
                 displayName: "Emit Session Outputs",
                 helperText: "Fan each matching session to the Sessions output.",
-                defaultValue: QueryDefaults.EmitSessionOutputs)
+                defaultValue: QueryDefaults.EmitSessionOutputs,
+                attributes: OptionAttributes(
+                    "Branches",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
 
         builder
@@ -220,7 +270,8 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 valueType: $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}",
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Store))
+                    ResourceDesignMetadataAttributeValues.Store,
+                    keyPattern: "session-store:{name}"))
             .AddResource(
                 SessionsCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -228,14 +279,19 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 summary: "Optional keyed clock for deterministic session timestamps, replay pacing, and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
     private static OptionDesignMetadata StoreOption() => new()
     {
         Name = new ComponentOptionName("store"),
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Store"),
-        HelperText = new ComponentMetadataText("Diagnostic store metadata; DI selection uses the required host-owned store resource.")
+        HelperText = new ComponentMetadataText("Diagnostic store metadata; DI selection uses the required host-owned store resource."),
+        Attributes = OptionAttributeMap(
+            "Diagnostics",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata SessionIdOption(bool isRequired) => new()
@@ -246,15 +302,25 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         HelperText = new ComponentMetadataText(isRequired
             ? "Required session identifier to replay."
             : "Optional session identifier. The store may generate one when omitted."),
-        IsRequired = isRequired
+        IsRequired = isRequired,
+        Attributes = OptionAttributeMap(
+            "Session",
+            isRequired
+                ? OptionDesignMetadataAttributeValues.Primary
+                : OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text)
     };
 
-    private static OptionDesignMetadata TagsOption() => new()
+    private static OptionDesignMetadata TagsOption(string section) => new()
     {
         Name = new ComponentOptionName("tags"),
         Kind = OptionValueKind.Json,
         DisplayName = new ComponentMetadataText("Tags"),
-        HelperText = new ComponentMetadataText("Optional string tag map used in session metadata or query defaults.")
+        HelperText = new ComponentMetadataText("Optional string tag map used in session metadata or query defaults."),
+        Attributes = OptionAttributeMap(
+            section,
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Json)
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
@@ -264,8 +330,30 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued messages.")
+        HelperText = new ComponentMetadataText("Maximum queued messages."),
+        Attributes = OptionAttributeMap(
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number)
     };
+
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> OptionAttributeMap(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.CreateMap(
+            section: section,
+            importance: importance,
+            editor: editor);
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static IReadOnlyList<OptionChoiceMetadata> ReplayModeChoices()
         =>

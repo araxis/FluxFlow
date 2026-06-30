@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.5.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone session recording, replay, and query nodes over host-owned keyed session stores or store factories.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Sessions Designer metadata is now authored through the shared validated metadata builder while preserving existing session composition options, resources, ports, and store-factory behavior.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds richer Designer option hints and host-owned resource key patterns for Sessions composition metadata while preserving existing session composition behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

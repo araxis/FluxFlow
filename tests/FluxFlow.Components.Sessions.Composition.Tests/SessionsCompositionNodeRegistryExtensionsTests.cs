@@ -216,6 +216,62 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_sessions_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var recorder = OptionsByName(metadata[SessionsCompositionNodeTypes.Recorder]);
+        AssertOptionHints(recorder["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["sessionId"], "Session", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["name"], "Session", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["notes"], "Session", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(recorder["tags"], "Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(recorder["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var replay = OptionsByName(metadata[SessionsCompositionNodeTypes.Replay]);
+        AssertOptionHints(replay["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(replay["sessionId"], "Session", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(replay["mode"], "Replay", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(replay["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["startSequence"], "Replay", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["maxMessages"], "Replay", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["fixedIntervalMilliseconds"], "Timing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["speedMultiplier"], "Timing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var query = OptionsByName(metadata[SessionsCompositionNodeTypes.Query]);
+        AssertOptionHints(query["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["name"], "Filtering", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["namePrefix"], "Filtering", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["tags"], "Filtering", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(query["includeActive"], "Filtering", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["includeCompleted"], "Filtering", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["limit"], "Results", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(query["emitSessionsInResult"], "Results", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["emitSessionOutputs"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_sessions_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var resources = ResourcesByName(item);
+
+            AssertResourceHints(
+                resources[SessionsCompositionResourceNames.Store],
+                ResourceDesignMetadataAttributeValues.Store,
+                "session-store:{name}");
+            AssertResourceHints(
+                resources[SessionsCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new SessionsComponentDesignMetadataProvider();
@@ -854,6 +910,18 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         return option;
     }
 
+    private static IReadOnlyDictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static IReadOnlyDictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertResources(ComponentDesignMetadata metadata)
     {
         metadata.Resources.Select(resource => (
@@ -865,6 +933,52 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             (SessionsCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {

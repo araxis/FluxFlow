@@ -6,7 +6,7 @@ Date: 2026-06-30
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is clean as of the 2026-06-30 memory refresh.
+- The tracked worktree is clean as of the 2026-06-30 Sessions metadata refresh.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -24,9 +24,9 @@ Date: 2026-06-30
   composition packages, with shared metadata helpers and stronger validation.
 - The active narrow track is richer Designer metadata hints. Mapping was the
   pilot; Control, Assertions, State, Observability, Validation, Routing,
-  Timers, Sources, Serialization, Payloads, Projections, Metrics, and
-  Expectations, HTTP, FileSystem, and Storage followed. Any further
-  package-family metadata hint work, starting with Sessions if the rollout
+  Timers, Sources, Serialization, Payloads, Projections, Metrics,
+  Expectations, HTTP, FileSystem, Storage, and Sessions followed. Any further
+  package-family metadata hint work, starting with MQTT if the rollout
   continues, should be planned separately.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
