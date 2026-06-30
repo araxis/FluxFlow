@@ -971,6 +971,16 @@ Date: 2026-05-31
   (`84`), and the controlled solution build with 0 warnings and 0 errors.
   Local graph output was refreshed after the memory closeout. See
   [[166-metrics-designer-metadata-hints]].
+- Completed the Expectations Designer metadata hint pass. The Expectations
+  composition provider now includes option section, importance, and editor
+  hints for `event.expectation`, plus a host-owned resource key pattern for the
+  `clock` resource. The Expectations composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Expectations composition tests (`15`), Designer tests (`93`),
+  release tests (`84`), and the controlled solution build with 0 warnings and
+  0 errors after a scoped build-server shutdown and rerun. Local graph output
+  was refreshed after the memory closeout. See
+  [[167-expectations-designer-metadata-hints]].
 
 ## Remaining
 

@@ -44,45 +44,72 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 [
                     KindChoice(EventExpectationNodeKind.Expect, "Expect", "Satisfied when a matching event arrives."),
                     KindChoice(EventExpectationNodeKind.Guard, "Guard", "Satisfied when no matching event arrives.")
-                ])
+                ],
+                attributes: OptionAttributes(
+                    "Expectation",
+                    OptionDesignMetadataAttributeValues.Primary))
             .AddOption(
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Optional result name included in emitted expectation results.")
+                helperText: "Optional result name included in emitted expectation results.",
+                attributes: OptionAttributes(
+                    "Diagnostics",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "filter",
                 OptionValueKind.Json,
                 displayName: "Filter",
                 helperText: "Event filter object for matching projection events.",
-                defaultValue: Defaults.Filter)
+                defaultValue: Defaults.Filter,
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Json))
             .AddOption(
                 "timeoutMilliseconds",
                 OptionValueKind.Number,
                 displayName: "Timeout Milliseconds",
                 helperText: "Optional timeout in milliseconds; when set it must be greater than zero.",
-                min: 0.000001)
+                min: 0.000001,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxObservedEvents",
                 OptionValueKind.Number,
                 displayName: "Max Observed Events",
                 helperText: "Maximum recent observed event summaries retained in the result.",
                 defaultValue: Defaults.MaxObservedEvents,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxPreviewChars",
                 OptionValueKind.Number,
                 displayName: "Max Preview Chars",
                 helperText: "Maximum observed payload preview characters; zero disables previews.",
                 defaultValue: Defaults.MaxPreviewChars,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Preview",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1);
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number));
 
     private static void AddEventExpectationResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
@@ -92,7 +119,17 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
             summary: "Optional keyed clock for deterministic expectation timeouts, results, and diagnostics.",
             valueType: nameof(TimeProvider),
             attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                ResourceDesignMetadataAttributeValues.Clock));
+                ResourceDesignMetadataAttributeValues.Clock,
+                keyPattern: "clock:{name}"));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddEventExpectationPorts(ComponentDesignMetadataBuilder builder)
         => builder

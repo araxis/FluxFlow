@@ -137,12 +137,16 @@ Latest local commits:
   - Applied the option/resource hint pattern to Metrics metadata for the
     metrics aggregate node.
   - Bumped Metrics Composition to `1.3.0`.
+- `Add expectations designer metadata hints`
+  - Applied the option/resource hint pattern to Expectations metadata for the
+    event expectation node.
+  - Bumped Expectations Composition to `1.3.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
-Observability, Validation, Routing, Timers, Sources, Serialization, and
-Payloads, Projections, and Metrics hint passes:
+Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
+Projections, Metrics, and Expectations hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -158,6 +162,7 @@ Payloads, Projections, and Metrics hint passes:
 - Payloads composition tests.
 - Projections composition tests.
 - Metrics composition tests.
+- Expectations composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -171,7 +176,7 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the Metrics hint pass closeout. The
+Local graph output was refreshed after the Expectations hint pass closeout. The
 local HTML graph was skipped because the graph exceeds the visualization size
 limit.
 
@@ -191,4 +196,5 @@ limit.
 ## Suggested Next Pass
 
 Continue any further package-family metadata hint work as a separately planned
-local pass. Expectations is the next likely component-family candidate.
+local pass. HTTP is the next likely component-family candidate if the rollout
+continues.
