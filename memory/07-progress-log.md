@@ -925,6 +925,16 @@ Date: 2026-05-31
   tests (`93`), release tests (`84`), and the controlled solution build with 0
   warnings and 0 errors. Local graph output was refreshed after the memory
   closeout. See [[161-timers-designer-metadata-hints]].
+- Completed the Sources Designer metadata hint pass. The Sources composition
+  provider now includes option section, importance, and editor hints for
+  Generated Source and Sequence Source metadata, plus a host-owned resource key
+  pattern for the `clock` resource. The Sources composition package is bumped
+  to `1.4.0`; README, changelog, and focused metadata tests were updated.
+  Verification passed for Sources composition tests (`22`), Designer tests
+  (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors after a scoped build-server shutdown and rerun. Local
+  graph output was refreshed after the memory closeout. See
+  [[162-sources-designer-metadata-hints]].
 
 ## Remaining
 

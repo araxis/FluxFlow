@@ -105,6 +105,104 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_source_option_hints()
+    {
+        var metadata = MetadataByType();
+
+        var generatedOptions = OptionsByName(metadata[SourcesCompositionNodeTypes.Generated]);
+        AssertOptionHints(
+            generatedOptions["name"],
+            "Diagnostics",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            generatedOptions["outputType"],
+            "Type Metadata",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            generatedOptions["items"],
+            "Items",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(
+            generatedOptions["loop"],
+            "Emission",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            generatedOptions["maxItems"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            generatedOptions["initialDelayMilliseconds"],
+            "Timing",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            generatedOptions["intervalMilliseconds"],
+            "Timing",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            generatedOptions["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var sequenceOptions = OptionsByName(metadata[SourcesCompositionNodeTypes.Sequence]);
+        AssertOptionHints(
+            sequenceOptions["name"],
+            "Diagnostics",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            sequenceOptions["start"],
+            "Sequence",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            sequenceOptions["step"],
+            "Sequence",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            sequenceOptions["count"],
+            "Sequence",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            sequenceOptions["initialDelayMilliseconds"],
+            "Timing",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            sequenceOptions["intervalMilliseconds"],
+            "Timing",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            sequenceOptions["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_source_resource_picker_hints()
+    {
+        var metadata = MetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            AssertResourceHints(
+                item.Resources.ShouldHaveSingleItem(),
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new SourcesComponentDesignMetadataProvider();
@@ -351,6 +449,12 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertSourcePorts(
         ComponentDesignMetadata metadata,
         string outputType)
@@ -386,6 +490,52 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             option.DefaultValue,
             option.Min)).ShouldBe(expected);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(ServiceProvider provider)
     {

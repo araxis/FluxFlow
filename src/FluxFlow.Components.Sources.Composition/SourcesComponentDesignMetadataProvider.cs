@@ -31,18 +31,29 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                         OptionValueKind.Text,
                         displayName: "Output Type",
                         helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.",
-                        defaultValue: GeneratedSourceOptions.ObjectTypeName)
+                        defaultValue: GeneratedSourceOptions.ObjectTypeName,
+                        attributes: OptionAttributes(
+                            "Type Metadata",
+                            OptionDesignMetadataAttributeValues.Advanced,
+                            OptionDesignMetadataAttributeValues.Text))
                     .AddOption(
                         "items",
                         OptionValueKind.Json,
                         displayName: "Items",
-                        helperText: "Inline array of payloads deserialized into the closed generated output type.")
+                        helperText: "Inline array of payloads deserialized into the closed generated output type.",
+                        attributes: OptionAttributes(
+                            "Items",
+                            OptionDesignMetadataAttributeValues.Primary,
+                            OptionDesignMetadataAttributeValues.Json))
                     .AddOption(
                         "loop",
                         OptionValueKind.Boolean,
                         displayName: "Loop",
                         helperText: "Repeat configured items until maxItems is reached.",
-                        defaultValue: false);
+                        defaultValue: false,
+                        attributes: OptionAttributes(
+                            "Emission",
+                            OptionDesignMetadataAttributeValues.Advanced));
                 AddMaxItemsOption(builder);
                 AddMillisecondsOption(
                     builder,
@@ -75,20 +86,32 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                         OptionValueKind.Number,
                         displayName: "Start",
                         helperText: "First numeric value emitted.",
-                        defaultValue: 1)
+                        defaultValue: 1,
+                        attributes: OptionAttributes(
+                            "Sequence",
+                            OptionDesignMetadataAttributeValues.Advanced,
+                            OptionDesignMetadataAttributeValues.Number))
                     .AddOption(
                         "step",
                         OptionValueKind.Number,
                         displayName: "Step",
                         helperText: "Amount added for each item; cannot be zero.",
-                        defaultValue: 1)
+                        defaultValue: 1,
+                        attributes: OptionAttributes(
+                            "Sequence",
+                            OptionDesignMetadataAttributeValues.Advanced,
+                            OptionDesignMetadataAttributeValues.Number))
                     .AddOption(
                         "count",
                         OptionValueKind.Number,
                         displayName: "Count",
                         helperText: "Number of sequence items to emit.",
                         defaultValue: 1,
-                        min: 1);
+                        min: 1,
+                        attributes: OptionAttributes(
+                            "Sequence",
+                            OptionDesignMetadataAttributeValues.Primary,
+                            OptionDesignMetadataAttributeValues.Number));
                 AddMillisecondsOption(
                     builder,
                     "initialDelayMilliseconds",
@@ -127,7 +150,8 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed clock for deterministic source timing and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
         configure(builder);
 
@@ -142,7 +166,11 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             OptionValueKind.Text,
             displayName: "Name",
             helperText: "Name emitted in source diagnostics and payloads.",
-            defaultValue: defaultValue);
+            defaultValue: defaultValue,
+            attributes: OptionAttributes(
+                "Diagnostics",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Text));
 
     private static void AddMaxItemsOption(ComponentDesignMetadataBuilder builder)
         => builder.AddOption(
@@ -150,7 +178,11 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             OptionValueKind.Number,
             displayName: "Max Items",
             helperText: "Optional maximum number of generated items to emit.",
-            min: 1);
+            min: 1,
+            attributes: OptionAttributes(
+                "Runtime",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number));
 
     private static void AddMillisecondsOption(
         ComponentDesignMetadataBuilder builder,
@@ -163,7 +195,11 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             displayName: displayName,
             helperText: helperText,
             defaultValue: 0,
-            min: 0);
+            min: 0,
+            attributes: OptionAttributes(
+                "Timing",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number));
 
     private static void AddBoundedCapacityOption(ComponentDesignMetadataBuilder builder)
         => builder.AddOption(
@@ -172,7 +208,20 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             displayName: "Bounded Capacity",
             helperText: "Maximum queued source messages.",
             defaultValue: 128,
-            min: 1);
+            min: 1,
+            attributes: OptionAttributes(
+                "Runtime",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddOutputPort(
         ComponentDesignMetadataBuilder builder,

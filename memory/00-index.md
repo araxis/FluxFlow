@@ -283,6 +283,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   metadata hint pass: Interval/Schedule/Delay/Throttle/Debounce option
   grouping/editor hints, host-owned clock resource key pattern, package
   `1.5.0`, focused verification, and next candidate note.
+- `162-sources-designer-metadata-hints.md`: Sources composition Designer
+  metadata hint pass: Generated/Sequence option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.4.0`, focused
+  verification, and next candidate note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

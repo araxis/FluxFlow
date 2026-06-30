@@ -117,11 +117,15 @@ Latest local commits:
   - Applied the option/resource hint pattern to Timers metadata for Interval,
     Schedule, Delay, Throttle, and Debounce nodes.
   - Bumped Timers Composition to `1.5.0`.
+- `Add sources designer metadata hints`
+  - Applied the option/resource hint pattern to Sources metadata for Generated
+    Source and Sequence Source nodes.
+  - Bumped Sources Composition to `1.4.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
-Observability, Validation, Routing, and Timers hint passes:
+Observability, Validation, Routing, Timers, and Sources hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -132,6 +136,7 @@ Observability, Validation, Routing, and Timers hint passes:
 - Validation composition tests.
 - Routing composition tests.
 - Timers composition tests.
+- Sources composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -145,7 +150,7 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the Timers hint pass closeout. The
+Local graph output was refreshed after the Sources hint pass closeout. The
 local HTML graph was skipped because the graph exceeds the visualization size
 limit.
 
