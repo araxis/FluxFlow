@@ -315,6 +315,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   metadata hint pass: file read/write/enumerate/watch option grouping/editor
   hints, host-owned clock resource key pattern, package `1.4.0`, focused
   verification, and next candidate note.
+- `170-storage-designer-metadata-hints.md`: Storage composition Designer
+  metadata hint pass: put/get/query/delete option grouping/editor hints,
+  host-owned store and clock resource key patterns, package `1.4.0`, focused
+  verification, and next candidate note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

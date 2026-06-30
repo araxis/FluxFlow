@@ -202,6 +202,118 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_storage_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var put = OptionsByName(metadata[StorageCompositionNodeTypes.Put]);
+        AssertOptionHints(
+            put["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            put["mode"],
+            "Write",
+            OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(
+            put["emitStoredRecord"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            put["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var get = OptionsByName(metadata[StorageCompositionNodeTypes.Get]);
+        AssertOptionHints(
+            get["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            get["includeExpired"],
+            "Expiration",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            get["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var query = OptionsByName(metadata[StorageCompositionNodeTypes.Query]);
+        AssertOptionHints(
+            query["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            query["includeExpired"],
+            "Expiration",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["offset"],
+            "Query",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            query["limit"],
+            "Query",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            query["emitRecordsInResult"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["emitRecordOutputs"],
+            "Records",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var delete = OptionsByName(metadata[StorageCompositionNodeTypes.Delete]);
+        AssertOptionHints(
+            delete["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            delete["emitMissingAsResult"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            delete["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_storage_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var resources = ResourcesByName(item);
+
+            AssertResourceHints(
+                resources[StorageCompositionResourceNames.Store],
+                ResourceDesignMetadataAttributeValues.Store,
+                "storage-store:{name}");
+            AssertResourceHints(
+                resources[StorageCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new StorageComponentDesignMetadataProvider();
@@ -605,6 +717,18 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertTransformPorts<TInput, TOutput>(
         ComponentDesignMetadata metadata)
     {
@@ -719,6 +843,52 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {

@@ -38,13 +38,19 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Mode",
                 helperText: "Write behavior when a record already exists or is missing.",
                 defaultValue: PutDefaults.Mode.ToString(),
-                choices: WriteModeChoices())
+                choices: WriteModeChoices(),
+                attributes: OptionAttributes(
+                    "Write",
+                    OptionDesignMetadataAttributeValues.Primary))
             .AddOption(
                 "emitStoredRecord",
                 OptionValueKind.Boolean,
                 displayName: "Emit Stored Record",
                 helperText: "Include the stored record in the output result.",
-                defaultValue: PutDefaults.EmitStoredRecord)
+                defaultValue: PutDefaults.EmitStoredRecord,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(BoundedCapacityOption(PutDefaults.BoundedCapacity));
 
         AddTransformPorts(
@@ -124,26 +130,40 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Offset",
                 helperText: "Number of matched records to skip.",
                 defaultValue: QueryDefaults.Offset,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Query",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "limit",
                 OptionValueKind.Number,
                 displayName: "Limit",
                 helperText: "Maximum number of records to return.",
                 defaultValue: QueryDefaults.Limit,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Query",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "emitRecordsInResult",
                 OptionValueKind.Boolean,
                 displayName: "Emit Records In Result",
                 helperText: "Include matched records in the query result payload.",
-                defaultValue: QueryDefaults.EmitRecordsInResult)
+                defaultValue: QueryDefaults.EmitRecordsInResult,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "emitRecordOutputs",
                 OptionValueKind.Boolean,
                 displayName: "Emit Record Outputs",
                 helperText: "Fan each matched record to the Records output.",
-                defaultValue: QueryDefaults.EmitRecordOutputs)
+                defaultValue: QueryDefaults.EmitRecordOutputs,
+                attributes: OptionAttributes(
+                    "Records",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
 
         builder
@@ -190,7 +210,10 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Boolean,
                 displayName: "Emit Missing As Result",
                 helperText: "Emit a normal output result when the record is missing.",
-                defaultValue: DeleteDefaults.EmitMissingAsResult)
+                defaultValue: DeleteDefaults.EmitMissingAsResult,
+                attributes: OptionAttributes(
+                    "Results",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity));
 
         AddTransformPorts(
@@ -225,7 +248,8 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}",
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Store))
+                    ResourceDesignMetadataAttributeValues.Store,
+                    keyPattern: "storage-store:{name}"))
             .AddResource(
                 StorageCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -233,14 +257,19 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Optional keyed clock for deterministic storage diagnostics and timestamps.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
     private static OptionDesignMetadata CollectionOption() => new()
     {
         Name = new ComponentOptionName("collection"),
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Collection"),
-        HelperText = new ComponentMetadataText("Default collection used when the input request does not specify one.")
+        HelperText = new ComponentMetadataText("Default collection used when the input request does not specify one."),
+        Attributes = OptionAttributeMap(
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata IncludeExpiredOption(bool defaultValue) => new()
@@ -249,7 +278,10 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         Kind = OptionValueKind.Boolean,
         DisplayName = new ComponentMetadataText("Include Expired"),
         DefaultValue = defaultValue,
-        HelperText = new ComponentMetadataText("Include records that the store considers expired.")
+        HelperText = new ComponentMetadataText("Include records that the store considers expired."),
+        Attributes = OptionAttributeMap(
+            "Expiration",
+            OptionDesignMetadataAttributeValues.Advanced)
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
@@ -259,8 +291,30 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued input messages.")
+        HelperText = new ComponentMetadataText("Maximum queued input messages."),
+        Attributes = OptionAttributeMap(
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number)
     };
+
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> OptionAttributeMap(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.CreateMap(
+            section: section,
+            importance: importance,
+            editor: editor);
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static IReadOnlyList<OptionChoiceMetadata> WriteModeChoices()
         =>

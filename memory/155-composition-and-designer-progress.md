@@ -149,12 +149,16 @@ Latest local commits:
   - Applied the option/resource hint pattern to FileSystem metadata for file
     read, file write, directory enumerate, and file watch nodes.
   - Bumped FileSystem Composition to `1.4.0`.
+- `Add storage designer metadata hints`
+  - Applied the option/resource hint pattern to Storage metadata for put, get,
+    query, and delete nodes.
+  - Bumped Storage Composition to `1.4.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
 Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
-Projections, Metrics, Expectations, HTTP, and FileSystem hint passes:
+Projections, Metrics, Expectations, HTTP, FileSystem, and Storage hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -173,6 +177,7 @@ Projections, Metrics, Expectations, HTTP, and FileSystem hint passes:
 - Expectations composition tests.
 - HTTP composition tests.
 - FileSystem composition tests.
+- Storage composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -186,7 +191,7 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the FileSystem hint pass closeout. The
+Local graph output was refreshed after the Storage hint pass closeout. The
 local HTML graph was skipped because the graph exceeds the visualization size
 limit.
 
@@ -206,5 +211,5 @@ limit.
 ## Suggested Next Pass
 
 Continue any further package-family metadata hint work as a separately planned
-local pass. Storage is the next likely component-family candidate if the
+local pass. Sessions is the next likely component-family candidate if the
 rollout continues.

@@ -78,10 +78,11 @@ keyed store factory in the host, then reference it from composition with the
 `StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `storage.put`, `storage.get`, `storage.query`, and `storage.delete` so hosts can
 build palettes, editors, validation hints, or documentation without copying
-package descriptors. The metadata describes the existing storage option records
-and fixed ports, plus resource hints for the required `store` and optional
-`clock` resources. Concrete `IStorageStore` instances, `IStorageStoreFactory`
-registrations, and optional keyed `TimeProvider` clocks remain host-owned
-resources and are not modeled as editable node options.
+package descriptors. The metadata describes the existing storage option
+records, option section/importance/editor hints, fixed ports, and host-owned
+resource picker hints for the required `store` and optional `clock` resources.
+Concrete `IStorageStore` instances, `IStorageStoreFactory` registrations, and
+optional keyed `TimeProvider` clocks remain host-owned resources and are not
+modeled as editable node options.
 The provider authors that metadata through the shared validated Designer
 metadata builder.

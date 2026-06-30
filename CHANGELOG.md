@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage.Composition 1.4.0
+
+Adds richer Designer hints for the Storage metadata provider.
+
+- Adds option section, importance, and editor hints for `storage.put`,
+  `storage.get`, `storage.query`, and `storage.delete` options.
+- Adds host-owned resource key patterns for the `store` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.FileSystem.Composition 1.4.0
 
 Adds richer Designer hints for the FileSystem metadata provider.

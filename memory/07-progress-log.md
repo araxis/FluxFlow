@@ -1001,6 +1001,16 @@ Date: 2026-05-31
   lingering FluxFlow-owned build process and shutting down build servers. Local
   graph output was refreshed after the memory closeout. See
   [[169-filesystem-designer-metadata-hints]].
+- Completed the Storage Designer metadata hint pass. The Storage composition
+  provider now includes option section, importance, and editor hints for
+  `storage.put`, `storage.get`, `storage.query`, and `storage.delete`, plus
+  host-owned resource key patterns for the required `store` and optional
+  `clock` resources. The Storage composition package is bumped to `1.4.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Storage composition tests (`20`), Designer tests (`93`), release
+  tests (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[170-storage-designer-metadata-hints]].
 
 ## Remaining
 
