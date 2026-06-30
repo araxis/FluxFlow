@@ -109,11 +109,15 @@ Latest local commits:
   - Applied the option/resource hint pattern to Validation metadata for the JSON
     schema validator node.
   - Bumped Validation Composition to `1.3.0`.
+- `Add routing designer metadata hints`
+  - Applied the option/resource hint pattern to Routing metadata for Switch,
+    Fork, Merge, Window, Correlation, and Join nodes.
+  - Bumped Routing Composition to `1.3.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
-Observability, and Validation hint passes:
+Observability, Validation, and Routing hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -122,6 +126,7 @@ Observability, and Validation hint passes:
 - State composition tests.
 - Observability composition tests.
 - Validation composition tests.
+- Routing composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -135,8 +140,9 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the State hint pass closeout. The local
-HTML graph was skipped because the graph exceeds the visualization size limit.
+Local graph output was refreshed after the Routing hint pass closeout. The
+local HTML graph was skipped because the graph exceeds the visualization size
+limit.
 
 ## Current Constraints
 
@@ -153,6 +159,5 @@ HTML graph was skipped because the graph exceeds the visualization size limit.
 
 ## Suggested Next Pass
 
-Continue the richer Designer metadata hint rollout one package family at a
-time. Routing is a reasonable later candidate, but the next pass should be
-planned separately.
+Continue any further package-family metadata hint work as a separately planned
+local pass.

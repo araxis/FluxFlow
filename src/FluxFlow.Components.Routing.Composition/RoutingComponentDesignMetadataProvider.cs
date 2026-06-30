@@ -71,23 +71,30 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             460,
         [
             EngineOption(),
-            ExpressionOption("expression", "Expression", "Diagnostic expression metadata; route selection uses the routeKeySelector resource."),
+            ExpressionOption(
+                "expression",
+                "Expression",
+                "Diagnostic expression metadata; route selection uses the routeKeySelector resource.",
+                RoutingCompositionResourceNames.RouteKeySelector),
             ExpressionIdOption(),
             ExpressionNameOption(),
             InputTypeOption("inputType"),
             JsonOption("routes", "Routes", "Optional known route keys used for matching."),
-            JsonOption("routeOutputs", "Route Outputs", "Optional mapping of route key to dynamic output port name."),
-            new OptionDesignMetadata
-            {
-                Name = new ComponentOptionName("defaultRoute"),
-                Kind = OptionValueKind.Text,
-                DisplayName = new ComponentMetadataText("Default Route"),
-                HelperText = new ComponentMetadataText("Optional route name used when the selector returns no configured route.")
-            },
+            JsonOption(
+                "routeOutputs",
+                "Route Outputs",
+                "Optional mapping of route key to dynamic output port name.",
+                importance: OptionDesignMetadataAttributeValues.Primary),
+            TextOption(
+                "defaultRoute",
+                "Default Route",
+                null,
+                "Optional route name used when the selector returns no configured route.",
+                "Routing"),
             BoolOption("caseSensitive", "Case Sensitive", true, "Match route keys using case-sensitive comparisons."),
-            BoolOption("emitMatchedInput", "Emit Matched Input", true, "Emit matched input messages on the Matched output."),
-            BoolOption("emitDefaultInput", "Emit Default Input", true, "Emit default-routed messages on the Default output."),
-            BoolOption("emitRouteEnvelope", "Emit Route Envelope", false, "Emit routed messages on the Routed output."),
+            BoolOption("emitMatchedInput", "Emit Matched Input", true, "Emit matched input messages on the Matched output.", "Branches"),
+            BoolOption("emitDefaultInput", "Emit Default Input", true, "Emit default-routed messages on the Default output.", "Branches"),
+            BoolOption("emitRouteEnvelope", "Emit Route Envelope", false, "Emit routed messages on the Routed output.", "Branches"),
             BoundedCapacityOption()
         ],
         builder =>
@@ -123,7 +130,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             420,
         [
             InputTypeOption("inputType"),
-            JsonOption("outputs", "Outputs", "Required dynamic output port names.", isRequired: true),
+            JsonOption(
+                "outputs",
+                "Outputs",
+                "Required dynamic output port names.",
+                isRequired: true,
+                importance: OptionDesignMetadataAttributeValues.Primary),
             BoundedCapacityOption()
         ],
         builder =>
@@ -166,9 +178,28 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             420,
         [
             InputTypeOption("inputType"),
-            NumberOption("maxItems", "Max Items", 0, 0, "Maximum buffered item count; set timeMilliseconds when zero."),
-            NumberOption("timeMilliseconds", "Time Milliseconds", 0, 0, "Maximum window duration in milliseconds; set maxItems when zero."),
-            BoolOption("emitPartialOnCompletion", "Emit Partial On Completion", true, "Emit a partial window when input completes."),
+            NumberOption(
+                "maxItems",
+                "Max Items",
+                0,
+                0,
+                "Maximum buffered item count; set timeMilliseconds when zero.",
+                "Windowing",
+                OptionDesignMetadataAttributeValues.Primary),
+            NumberOption(
+                "timeMilliseconds",
+                "Time Milliseconds",
+                0,
+                0,
+                "Maximum window duration in milliseconds; set maxItems when zero.",
+                "Windowing",
+                OptionDesignMetadataAttributeValues.Primary),
+            BoolOption(
+                "emitPartialOnCompletion",
+                "Emit Partial On Completion",
+                true,
+                "Emit a partial window when input completes.",
+                "Windowing"),
             BoundedCapacityOption()
         ],
         builder =>
@@ -188,8 +219,16 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             460,
         [
             EngineOption(),
-            ExpressionOption("keyExpression", "Key Expression", "Diagnostic key expression metadata; key selection uses the keySelector resource."),
-            ExpressionOption("sideExpression", "Side Expression", "Diagnostic side expression metadata; side selection uses the sideSelector resource."),
+            ExpressionOption(
+                "keyExpression",
+                "Key Expression",
+                "Diagnostic key expression metadata; key selection uses the keySelector resource.",
+                RoutingCompositionResourceNames.KeySelector),
+            ExpressionOption(
+                "sideExpression",
+                "Side Expression",
+                "Diagnostic side expression metadata; side selection uses the sideSelector resource.",
+                RoutingCompositionResourceNames.SideSelector),
             ExpressionIdOption(),
             ExpressionNameOption(),
             InputTypeOption("inputType"),
@@ -237,8 +276,16 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             460,
         [
             EngineOption(),
-            ExpressionOption("leftKeyExpression", "Left Key Expression", "Diagnostic left key expression metadata; left keys use the leftKeySelector resource."),
-            ExpressionOption("rightKeyExpression", "Right Key Expression", "Diagnostic right key expression metadata; right keys use the rightKeySelector resource."),
+            ExpressionOption(
+                "leftKeyExpression",
+                "Left Key Expression",
+                "Diagnostic left key expression metadata; left keys use the leftKeySelector resource.",
+                RoutingCompositionResourceNames.LeftKeySelector),
+            ExpressionOption(
+                "rightKeyExpression",
+                "Right Key Expression",
+                "Diagnostic right key expression metadata; right keys use the rightKeySelector resource.",
+                RoutingCompositionResourceNames.RightKeySelector),
             ExpressionIdOption(),
             ExpressionNameOption(),
             InputTypeOption("leftInputType", "Left Input Type"),
@@ -289,7 +336,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             ValueType = new ComponentValueTypeHint(valueType),
             IsRequired = true,
             Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
-                ResourceDesignMetadataAttributeValues.Delegate)
+                ResourceDesignMetadataAttributeValues.Delegate,
+                keyPattern: "delegate:{name}")
         };
 
     private static ResourceDesignMetadata ClockResource(int order) => new()
@@ -300,7 +348,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         Summary = new ComponentMetadataText("Optional keyed clock for deterministic routing timing, timeouts, and diagnostics."),
         ValueType = new ComponentValueTypeHint(nameof(TimeProvider)),
         Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
-            ResourceDesignMetadataAttributeValues.Clock)
+            ResourceDesignMetadataAttributeValues.Clock,
+            keyPattern: "clock:{name}")
     };
 
     private static OptionDesignMetadata EngineOption() => new()
@@ -308,18 +357,29 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         Name = new ComponentOptionName("engine"),
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Engine"),
-        HelperText = new ComponentMetadataText("Diagnostic engine metadata; composition DI selection uses host-owned selector resources.")
+        HelperText = new ComponentMetadataText("Diagnostic engine metadata; composition DI selection uses host-owned selector resources."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Diagnostics",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata ExpressionOption(
         string name,
         string displayName,
-        string helperText) => new()
+        string helperText,
+        string relatedResource) => new()
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Expression,
             DisplayName = new ComponentMetadataText(displayName),
-            HelperText = new ComponentMetadataText(helperText)
+            HelperText = new ComponentMetadataText(helperText),
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: "Selection",
+                importance: OptionDesignMetadataAttributeValues.Advanced,
+                editor: OptionDesignMetadataAttributeValues.Expression,
+                syntax: OptionDesignMetadataAttributeValues.Expression,
+                relatedResource: relatedResource)
         };
 
     private static OptionDesignMetadata ExpressionIdOption() => new()
@@ -327,7 +387,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         Name = new ComponentOptionName("expressionId"),
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Expression ID"),
-        HelperText = new ComponentMetadataText("Optional diagnostic identifier emitted with routing diagnostics.")
+        HelperText = new ComponentMetadataText("Optional diagnostic identifier emitted with routing diagnostics."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Diagnostics",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata ExpressionNameOption() => new()
@@ -335,7 +399,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         Name = new ComponentOptionName("expressionName"),
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Expression Name"),
-        HelperText = new ComponentMetadataText("Optional diagnostic name emitted with routing diagnostics.")
+        HelperText = new ComponentMetadataText("Optional diagnostic name emitted with routing diagnostics."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Diagnostics",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata InputTypeOption(
@@ -346,46 +414,64 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             Kind = OptionValueKind.Text,
             DisplayName = new ComponentMetadataText(displayName ?? "Input Type"),
             DefaultValue = SwitchRoutingOptions.ObjectTypeName,
-            HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR type comes from the closed registration.")
+            HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR type comes from the closed registration."),
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: "Type Metadata",
+                importance: OptionDesignMetadataAttributeValues.Advanced,
+                editor: OptionDesignMetadataAttributeValues.Text)
         };
 
     private static OptionDesignMetadata JsonOption(
         string name,
         string displayName,
         string helperText,
-        bool isRequired = false) => new()
+        bool isRequired = false,
+        string importance = OptionDesignMetadataAttributeValues.Advanced) => new()
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Json,
             DisplayName = new ComponentMetadataText(displayName),
             HelperText = new ComponentMetadataText(helperText),
-            IsRequired = isRequired
+            IsRequired = isRequired,
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: "Routing",
+                importance: importance,
+                editor: OptionDesignMetadataAttributeValues.Json)
         };
 
     private static OptionDesignMetadata TextOption(
         string name,
         string displayName,
-        string defaultValue,
-        string helperText) => new()
+        string? defaultValue,
+        string helperText,
+        string section = "Matching") => new()
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Text,
             DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
-            HelperText = new ComponentMetadataText(helperText)
+            HelperText = new ComponentMetadataText(helperText),
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: section,
+                importance: OptionDesignMetadataAttributeValues.Advanced,
+                editor: OptionDesignMetadataAttributeValues.Text)
         };
 
     private static OptionDesignMetadata BoolOption(
         string name,
         string displayName,
         bool defaultValue,
-        string helperText) => new()
+        string helperText,
+        string section = "Matching") => new()
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Boolean,
             DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
-            HelperText = new ComponentMetadataText(helperText)
+            HelperText = new ComponentMetadataText(helperText),
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: section,
+                importance: OptionDesignMetadataAttributeValues.Advanced)
         };
 
     private static OptionDesignMetadata NumberOption(
@@ -393,14 +479,20 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         string displayName,
         int defaultValue,
         double min,
-        string helperText) => new()
+        string helperText,
+        string section = "Runtime",
+        string importance = OptionDesignMetadataAttributeValues.Advanced) => new()
         {
             Name = new ComponentOptionName(name),
             Kind = OptionValueKind.Number,
             DisplayName = new ComponentMetadataText(displayName),
             DefaultValue = defaultValue,
             Min = min,
-            HelperText = new ComponentMetadataText(helperText)
+            HelperText = new ComponentMetadataText(helperText),
+            Attributes = OptionDesignMetadataAttributes.CreateMap(
+                section: section,
+                importance: importance,
+                editor: OptionDesignMetadataAttributeValues.Number)
         };
 
     private static OptionDesignMetadata BoundedCapacityOption() => new()
@@ -410,7 +502,11 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = 128,
         Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued input messages.")
+        HelperText = new ComponentMetadataText("Maximum queued input messages."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Runtime",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Number)
     };
 
     private static void AddInputPort(

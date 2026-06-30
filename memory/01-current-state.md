@@ -23,9 +23,9 @@ Date: 2026-06-30
   design-time value types. Package-owned metadata providers are in place across
   composition packages, with shared metadata helpers and stronger validation.
 - The active narrow track is richer Designer metadata hints. Mapping was the
-  pilot; Control, Assertions, State, Observability, and Validation followed.
-  Routing is a reasonable later package-family candidate, but it should be
-  planned separately.
+  pilot; Control, Assertions, State, Observability, Validation, and Routing
+  followed. Any further package-family metadata hint work should be planned
+  separately.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

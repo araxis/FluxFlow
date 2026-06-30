@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Routing.Composition 1.3.0
+
+Adds richer Designer hints for the routing metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.switch`, `flow.fork`, `flow.merge`, `flow.window`,
+  `flow.correlation`, and `flow.join` options.
+- Adds host-owned resource key patterns for routing selector delegate and clock
+  resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Validation.Composition 1.3.0
 
 Adds richer Designer hints for the validation metadata provider.
