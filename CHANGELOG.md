@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.Composition 1.4.0
+
+Adds richer Designer hints for the MQTT metadata provider.
+
+- Adds option section, importance, and editor hints for `mqtt.publish` and
+  `mqtt.trigger` options.
+- Adds host-owned resource key patterns for the `publisher`, `triggerSource`,
+  and `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Sessions.Composition 1.5.0
 
 Adds richer Designer hints for the Sessions metadata provider.

@@ -157,13 +157,17 @@ Latest local commits:
   - Applied the option/resource hint pattern to Sessions metadata for recorder,
     replay, and query nodes.
   - Bumped Sessions Composition to `1.5.0`.
+- `Add mqtt designer metadata hints`
+  - Applied the option/resource hint pattern to MQTT metadata for publish and
+    trigger nodes.
+  - Bumped MQTT Composition to `1.4.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
 Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
-Projections, Metrics, Expectations, HTTP, FileSystem, Storage, and Sessions
-hint passes:
+Projections, Metrics, Expectations, HTTP, FileSystem, Storage, Sessions, and
+MQTT hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -184,6 +188,7 @@ hint passes:
 - FileSystem composition tests.
 - Storage composition tests.
 - Sessions composition tests.
+- MQTT composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -197,7 +202,7 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the Sessions hint pass closeout. The
+Local graph output was refreshed after the MQTT hint pass closeout. The
 local HTML graph was skipped because the graph exceeds the visualization size
 limit.
 
@@ -217,5 +222,5 @@ limit.
 ## Suggested Next Pass
 
 Continue any further package-family metadata hint work as a separately planned
-local pass. MQTT is the next likely component-family candidate if the
-rollout continues.
+local pass. Do not start another convention or package-family pass without a
+bounded plan.

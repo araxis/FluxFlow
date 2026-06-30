@@ -1021,6 +1021,15 @@ Date: 2026-05-31
   (`84`), and the controlled solution build with 0 warnings and 0 errors after
   build-server shutdown. Local graph output was refreshed after the memory
   closeout. See [[171-sessions-designer-metadata-hints]].
+- Completed the MQTT Designer metadata hint pass. The MQTT composition provider
+  now includes option section, importance, and editor hints for `mqtt.publish`
+  and `mqtt.trigger`, plus host-owned resource key patterns for the required
+  `publisher`, required `triggerSource`, and optional `clock` resources. The
+  MQTT composition package is bumped to `1.4.0`; README, changelog, and focused
+  metadata tests were updated. Verification passed for MQTT composition tests
+  (`10`), Designer tests (`93`), release tests (`84`), and the controlled
+  solution build with 0 warnings and 0 errors. Local graph output was refreshed
+  after the memory closeout. See [[172-mqtt-designer-metadata-hints]].
 
 ## Remaining
 

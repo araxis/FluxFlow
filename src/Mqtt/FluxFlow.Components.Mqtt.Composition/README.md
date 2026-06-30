@@ -80,8 +80,9 @@ maps `MqttReceivedMessage` to `MqttPublishRequest` before linking into
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for
 `mqtt.publish` and `mqtt.trigger` so hosts can build palettes, editors,
 validation hints, or documentation without copying package descriptors. The
-metadata describes the existing MQTT node option records, host-owned resources,
-and fixed ports. `mqtt.publish` requires `publisher`; `mqtt.trigger` requires
+metadata describes the existing MQTT node option records with section,
+importance, and editor hints; fixed ports; and resource picker hints with key
+patterns. `mqtt.publish` requires `publisher`; `mqtt.trigger` requires
 `triggerSource`; both can reference an optional `clock`. Resource metadata is
 descriptive only, so `IMqttPublisher`, `IMqttTriggerSource`, and optional keyed
 `TimeProvider` clocks remain host-owned and are not modeled as editable node
