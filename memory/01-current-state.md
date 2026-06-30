@@ -24,8 +24,8 @@ Date: 2026-06-30
   composition packages, with shared metadata helpers and stronger validation.
 - The active narrow track is richer Designer metadata hints. Mapping was the
   pilot; Control, Assertions, State, Observability, Validation, Routing,
-  Timers, and Sources followed. Any further package-family metadata hint work
-  should be planned separately.
+  Timers, Sources, and Serialization followed. Any further package-family
+  metadata hint work should be planned separately.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

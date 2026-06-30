@@ -105,7 +105,67 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType();
 
         foreach (var item in metadata.Values)
+        {
             AssertSharedOptions(item);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_shared_serialization_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var options = OptionsByName(item);
+
+            AssertOptionHints(
+                options["boundedCapacity"],
+                "Runtime",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number);
+            AssertOptionHints(
+                options["defaultEncoding"],
+                "Encoding",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(
+                options["maxInputBytes"],
+                "Runtime",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number);
+            AssertOptionHints(
+                options["maxOutputBytes"],
+                "Runtime",
+                OptionDesignMetadataAttributeValues.Advanced,
+                OptionDesignMetadataAttributeValues.Number);
+            AssertOptionHints(
+                options["writeIndented"],
+                "JSON",
+                OptionDesignMetadataAttributeValues.Advanced);
+            AssertOptionHints(
+                options["allowTrailingCommas"],
+                "JSON",
+                OptionDesignMetadataAttributeValues.Advanced);
+            AssertOptionHints(
+                options["skipComments"],
+                "JSON",
+                OptionDesignMetadataAttributeValues.Advanced);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_serialization_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            AssertResourceHints(
+                item.Resources.ShouldHaveSingleItem(),
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
     }
 
     [Fact]
@@ -325,6 +385,12 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertDesignPorts<TInput, TOutput>(
         ComponentDesignMetadata metadata)
     {
@@ -412,6 +478,34 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         option.Min.ShouldBe(min);
     }
 
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
@@ -422,6 +516,24 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(
         string nodeType,

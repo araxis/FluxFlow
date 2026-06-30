@@ -86,7 +86,8 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed clock for deterministic serialization diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
         AddSharedOptions(builder);
         AddSerializationPorts(builder, inputType, outputType);
@@ -126,43 +127,77 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "defaultEncoding",
                 OptionValueKind.Text,
                 displayName: "Default Encoding",
                 helperText: "Encoding name used when a request does not specify one.",
-                defaultValue: Defaults.DefaultEncoding)
+                defaultValue: Defaults.DefaultEncoding,
+                attributes: OptionAttributes(
+                    "Encoding",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "maxInputBytes",
                 OptionValueKind.Number,
                 displayName: "Max Input Bytes",
                 helperText: "Maximum input payload size accepted by the node.",
                 defaultValue: Defaults.MaxInputBytes,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxOutputBytes",
                 OptionValueKind.Number,
                 displayName: "Max Output Bytes",
                 helperText: "Maximum output payload size emitted by the node.",
                 defaultValue: Defaults.MaxOutputBytes,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "writeIndented",
                 OptionValueKind.Boolean,
                 displayName: "Write Indented",
                 helperText: "Write formatted JSON where the node emits JSON text.",
-                defaultValue: Defaults.WriteIndented)
+                defaultValue: Defaults.WriteIndented,
+                attributes: OptionAttributes(
+                    "JSON",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "allowTrailingCommas",
                 OptionValueKind.Boolean,
                 displayName: "Allow Trailing Commas",
                 helperText: "Allow trailing commas while parsing JSON.",
-                defaultValue: Defaults.AllowTrailingCommas)
+                defaultValue: Defaults.AllowTrailingCommas,
+                attributes: OptionAttributes(
+                    "JSON",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "skipComments",
                 OptionValueKind.Boolean,
                 displayName: "Skip Comments",
                 helperText: "Skip comments while parsing JSON.",
-                defaultValue: Defaults.SkipComments);
+                defaultValue: Defaults.SkipComments,
+                attributes: OptionAttributes(
+                    "JSON",
+                    OptionDesignMetadataAttributeValues.Advanced));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 }
