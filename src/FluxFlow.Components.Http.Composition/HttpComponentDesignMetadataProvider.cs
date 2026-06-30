@@ -39,33 +39,52 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxResponseBodyBytes",
                 OptionValueKind.Number,
                 displayName: "Max Response Body Bytes",
                 helperText: "Maximum response body bytes read before truncating.",
                 defaultValue: Defaults.MaxResponseBodyBytes,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Limits",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "treatNonSuccessStatusAsError",
                 OptionValueKind.Boolean,
                 displayName: "Treat Non-Success Status As Error",
                 helperText: "Emit non-2xx HTTP responses through Errors instead of Output.",
-                defaultValue: Defaults.TreatNonSuccessStatusAsError)
+                defaultValue: Defaults.TreatNonSuccessStatusAsError,
+                attributes: OptionAttributes(
+                    "Response",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "maxDegreeOfParallelism",
                 OptionValueKind.Number,
                 displayName: "Max Degree Of Parallelism",
                 helperText: "Maximum concurrent HTTP sends handled by the node.",
                 defaultValue: Defaults.MaxDegreeOfParallelism,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "defaultTimeoutMilliseconds",
                 OptionValueKind.Number,
                 displayName: "Default Timeout Milliseconds",
                 helperText: "Optional per-request timeout used when the input message omits one.",
-                min: 1);
+                min: 1,
+                attributes: OptionAttributes(
+                    "Timeouts",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number));
 
     private static void AddClientResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -77,7 +96,8 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 valueType: nameof(HttpClient),
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Client))
+                    ResourceDesignMetadataAttributeValues.Client,
+                    keyPattern: "http-client:{name}"))
             .AddResource(
                 HttpCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -85,7 +105,17 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 summary: "Optional keyed clock for deterministic request timeouts and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddClientPorts(ComponentDesignMetadataBuilder builder)
         => builder

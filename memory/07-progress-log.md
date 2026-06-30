@@ -981,6 +981,15 @@ Date: 2026-05-31
   0 errors after a scoped build-server shutdown and rerun. Local graph output
   was refreshed after the memory closeout. See
   [[167-expectations-designer-metadata-hints]].
+- Completed the HTTP Designer metadata hint pass. The HTTP composition provider
+  now includes option section, importance, and editor hints for `http.client`,
+  plus host-owned resource key patterns for the required `client` and optional
+  `clock` resources. The HTTP composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for HTTP composition tests (`14`), Designer tests (`93`), release
+  tests (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[168-http-designer-metadata-hints]].
 
 ## Remaining
 
