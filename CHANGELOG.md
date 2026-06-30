@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Timers.Composition 1.5.0
+
+Adds richer Designer hints for the timers metadata provider.
+
+- Adds option section, importance, and editor hints for `timer.interval`,
+  `timer.schedule`, `timer.delay`, `timer.throttle`, and `timer.debounce`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Routing.Composition 1.3.0
 
 Adds richer Designer hints for the routing metadata provider.

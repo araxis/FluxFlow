@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Timers.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Timers.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers.Composition</RootNamespace>
-    <Version>1.4.2</Version>
+    <Version>1.5.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone timer source and transform nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;timers;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Refactors the timer Designer metadata provider through the shared component design metadata builder while preserving the same public timer metadata.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds richer Designer option hints and a host-owned clock resource key pattern for timer composition metadata while preserving runtime behavior.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

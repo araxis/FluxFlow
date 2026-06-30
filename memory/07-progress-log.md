@@ -916,6 +916,15 @@ Date: 2026-05-31
   (`84`), and the controlled solution build with 0 warnings and 0 errors.
   Local graph output was refreshed after the memory closeout. See
   [[160-routing-designer-metadata-hints]].
+- Completed the Timers Designer metadata hint pass. The Timers composition
+  provider now includes option section, importance, and editor hints for
+  Interval, Schedule, Delay, Throttle, and Debounce, plus a host-owned resource
+  key pattern for the `clock` resource. The Timers composition package is
+  bumped to `1.5.0`; README, changelog, and focused metadata tests were
+  updated. Verification passed for Timers composition tests (`14`), Designer
+  tests (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout. See [[161-timers-designer-metadata-hints]].
 
 ## Remaining
 

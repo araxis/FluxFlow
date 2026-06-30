@@ -113,11 +113,15 @@ Latest local commits:
   - Applied the option/resource hint pattern to Routing metadata for Switch,
     Fork, Merge, Window, Correlation, and Join nodes.
   - Bumped Routing Composition to `1.3.0`.
+- `Add timers designer metadata hints`
+  - Applied the option/resource hint pattern to Timers metadata for Interval,
+    Schedule, Delay, Throttle, and Debounce nodes.
+  - Bumped Timers Composition to `1.5.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
-Observability, Validation, and Routing hint passes:
+Observability, Validation, Routing, and Timers hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -127,6 +131,7 @@ Observability, Validation, and Routing hint passes:
 - Observability composition tests.
 - Validation composition tests.
 - Routing composition tests.
+- Timers composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -140,7 +145,7 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the Routing hint pass closeout. The
+Local graph output was refreshed after the Timers hint pass closeout. The
 local HTML graph was skipped because the graph exceeds the visualization size
 limit.
 
