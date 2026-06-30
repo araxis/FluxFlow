@@ -22,41 +22,71 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 "schema",
                 OptionValueKind.Json,
                 displayName: "Schema",
-                helperText: "Inline JSON schema compiled during composition build.")
+                helperText: "Inline JSON schema compiled during composition build.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Schema",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Json))
             .AddOption(
                 "schemaPath",
                 OptionValueKind.Text,
                 displayName: "Schema Path",
-                helperText: "Path to a JSON schema file read during composition build.")
+                helperText: "Path to a JSON schema file read during composition build.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Schema",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "schemaId",
                 OptionValueKind.Text,
                 displayName: "Schema ID",
-                helperText: "Optional schema identifier used in results and diagnostics.")
+                helperText: "Optional schema identifier used in results and diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: JsonSchemaValidatorOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.")
+                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "valueSelector",
                 OptionValueKind.Text,
                 displayName: "Value Selector",
                 defaultValue: JsonSchemaValidatorOptions.DefaultValueSelector,
-                helperText: "Selector name passed to the optional host-owned selector resource.")
+                helperText: "Selector name passed to the optional host-owned selector resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Selection",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text,
+                    relatedResource: ValidationCompositionResourceNames.Selector))
             .AddOption(
                 "payloadSelector",
                 OptionValueKind.Text,
                 displayName: "Payload Selector",
-                helperText: "Compatibility alias used when valueSelector is not configured.")
+                helperText: "Compatibility alias used when valueSelector is not configured.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Selection",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text,
+                    relatedResource: ValidationCompositionResourceNames.Selector))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: 128,
-                min: 1)
+                min: 1,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number))
             .AddResource(
                 ValidationCompositionResourceNames.Selector,
                 displayName: "Selector",
@@ -64,7 +94,8 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 summary: "Optional keyed JSON schema value selector used to choose the value to validate.",
                 valueType: "IJsonSchemaValueSelector<TInput>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Selector))
+                    ResourceDesignMetadataAttributeValues.Selector,
+                    keyPattern: "selector:{name}"))
             .AddResource(
                 ValidationCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -72,7 +103,8 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 summary: "Optional keyed clock for deterministic validation results and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock))
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"))
             .AddInputPort(
                 ValidationCompositionPortNames.Input,
                 displayName: "Input",

@@ -105,11 +105,15 @@ Latest local commits:
   - Applied the option/resource hint pattern to Observability metadata for
     Counter, Logger, and Metrics nodes.
   - Bumped Observability Composition to `1.3.0`.
+- `Add validation designer metadata hints`
+  - Applied the option/resource hint pattern to Validation metadata for the JSON
+    schema validator node.
+  - Bumped Validation Composition to `1.3.0`.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
-and Observability hint passes:
+Observability, and Validation hint passes:
 
 - Designer tests.
 - Mapping composition tests.
@@ -117,6 +121,7 @@ and Observability hint passes:
 - Assertions composition tests.
 - State composition tests.
 - Observability composition tests.
+- Validation composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -149,5 +154,5 @@ HTML graph was skipped because the graph exceeds the visualization size limit.
 ## Suggested Next Pass
 
 Continue the richer Designer metadata hint rollout one package family at a
-time. Validation or Routing is a reasonable later candidate, but the next pass
-should be planned separately.
+time. Routing is a reasonable later candidate, but the next pass should be
+planned separately.

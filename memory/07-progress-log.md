@@ -896,12 +896,21 @@ Date: 2026-05-31
   0 errors after shutting down stale build servers from the timed-out first
   attempt. Local graph output was refreshed after the memory closeout. See
   [[158-observability-designer-metadata-hints]].
+- Completed the Validation Designer metadata hint pass. The Validation
+  composition provider now includes option section, importance, editor, and
+  related-resource hints for the JSON schema validator node, plus host-owned
+  resource key patterns for `selector` and `clock`. The Validation composition
+  package is bumped to `1.3.0`; README, changelog, and focused metadata tests
+  were updated. Verification passed for Validation composition tests (`15`),
+  Designer tests (`93`), release tests (`84`), and the controlled solution
+  build with 0 warnings and 0 errors. Local graph output was refreshed after
+  the memory closeout. See
+  [[159-validation-designer-metadata-hints]].
 
 ## Remaining
 
 - Continue the Designer metadata hint rollout one package family at a time.
-  Validation or Routing is a reasonable later candidate, but it should be planned
-  separately.
+  Routing is a reasonable later candidate, but it should be planned separately.
 - Keep future work bounded: one package family or one convention pass per local
   commit, with focused tests, release convention tests, and the controlled
   solution build.
