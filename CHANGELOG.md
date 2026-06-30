@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Metrics.Composition 1.3.0
+
+Adds richer Designer hints for the metrics aggregate metadata provider.
+
+- Adds option section, importance, and editor hints for `metrics.aggregate`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Projections.Composition 1.3.0
 
 Adds richer Designer hints for the event projection metadata provider.

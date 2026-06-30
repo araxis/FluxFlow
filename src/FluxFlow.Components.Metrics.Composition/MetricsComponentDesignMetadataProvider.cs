@@ -38,56 +38,87 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Rate Window Seconds",
                 helperText: "Rolling window in seconds for current-rate calculations.",
                 defaultValue: Defaults.RateWindowSeconds,
-                min: 0.000001)
+                min: 0.000001,
+                attributes: OptionAttributes(
+                    "Rate",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxGroups",
                 OptionValueKind.Number,
                 displayName: "Max Groups",
                 helperText: "Maximum number of per-group snapshots to track.",
                 defaultValue: Defaults.MaxGroups,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Grouping",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "emitEverySample",
                 OptionValueKind.Boolean,
                 displayName: "Emit Every Sample",
                 helperText: "Emit a snapshot after every accepted sample instead of only at completion.",
-                defaultValue: Defaults.EmitEverySample)
+                defaultValue: Defaults.EmitEverySample,
+                attributes: OptionAttributes(
+                    "Emission",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "trackLatest",
                 OptionValueKind.Boolean,
                 displayName: "Track Latest",
                 helperText: "Include the latest metric sample in snapshots.",
-                defaultValue: Defaults.TrackLatest)
+                defaultValue: Defaults.TrackLatest,
+                attributes: OptionAttributes(
+                    "Snapshot",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "trackMinMax",
                 OptionValueKind.Boolean,
                 displayName: "Track Min/Max",
                 helperText: "Track minimum and maximum numeric values.",
-                defaultValue: Defaults.TrackMinMax)
+                defaultValue: Defaults.TrackMinMax,
+                attributes: OptionAttributes(
+                    "Snapshot",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "trackSize",
                 OptionValueKind.Boolean,
                 displayName: "Track Size",
                 helperText: "Track total size when samples include size values.",
-                defaultValue: Defaults.TrackSize)
+                defaultValue: Defaults.TrackSize,
+                attributes: OptionAttributes(
+                    "Snapshot",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "groupByTag",
                 OptionValueKind.Text,
                 displayName: "Group By Tag",
-                helperText: "Optional tag key used for grouping instead of the sample group.")
+                helperText: "Optional tag key used for grouping instead of the sample group.",
+                attributes: OptionAttributes(
+                    "Grouping",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "treatMissingValueAsZero",
                 OptionValueKind.Boolean,
                 displayName: "Treat Missing Value As Zero",
                 helperText: "Count missing numeric values as zero-valued observations.",
-                defaultValue: Defaults.TreatMissingValueAsZero);
+                defaultValue: Defaults.TreatMissingValueAsZero,
+                attributes: OptionAttributes(
+                    "Aggregation",
+                    OptionDesignMetadataAttributeValues.Advanced));
 
     private static void AddAggregateResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
@@ -97,7 +128,17 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
             summary: "Optional keyed clock for deterministic metric timestamps and diagnostics.",
             valueType: nameof(TimeProvider),
             attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                ResourceDesignMetadataAttributeValues.Clock));
+                ResourceDesignMetadataAttributeValues.Clock,
+                keyPattern: "clock:{name}"));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddAggregatePorts(ComponentDesignMetadataBuilder builder)
         => builder
