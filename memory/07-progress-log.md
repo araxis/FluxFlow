@@ -944,6 +944,15 @@ Date: 2026-05-31
   Designer tests (`93`), release tests (`84`), and the controlled solution
   build with 0 warnings and 0 errors. Local graph output was refreshed after
   the memory closeout. See [[163-serialization-designer-metadata-hints]].
+- Completed the Payloads Designer metadata hint pass. The Payloads composition
+  provider now includes option section, importance, and editor hints for
+  `payload.inspect`, plus a host-owned resource key pattern for the `clock`
+  resource. The Payloads composition package is bumped to `1.3.0`; README,
+  changelog, and focused metadata tests were updated. Verification passed for
+  Payloads composition tests (`13`), Designer tests (`93`), release tests
+  (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[164-payloads-designer-metadata-hints]].
 
 ## Remaining
 

@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Payloads.Composition 1.3.0
+
+Adds richer Designer hints for the payload inspection metadata provider.
+
+- Adds option section, importance, and editor hints for `payload.inspect`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.Serialization.Composition 1.3.0
 
 Adds richer Designer hints for the serialization metadata provider.

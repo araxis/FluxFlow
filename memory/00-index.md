@@ -291,6 +291,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   Designer metadata hint pass: JSON/Text/Base64 option grouping/editor hints,
   host-owned clock resource key pattern, package `1.3.0`, focused
   verification, and next candidate note.
+- `164-payloads-designer-metadata-hints.md`: Payloads composition Designer
+  metadata hint pass: payload inspection option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

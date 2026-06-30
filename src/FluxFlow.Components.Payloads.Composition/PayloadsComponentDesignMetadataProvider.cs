@@ -38,46 +38,71 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 displayName: "Max Input Bytes",
                 helperText: "Maximum input payload size to inspect.",
                 defaultValue: Defaults.MaxInputBytes,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Limits",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxPreviewBytes",
                 OptionValueKind.Number,
                 displayName: "Max Preview Bytes",
                 helperText: "Maximum text preview size in bytes.",
                 defaultValue: Defaults.MaxPreviewBytes,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Preview",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "maxFormattedChars",
                 OptionValueKind.Number,
                 displayName: "Max Formatted Chars",
                 helperText: "Maximum formatted preview size in characters.",
                 defaultValue: Defaults.MaxFormattedChars,
-                min: 1)
+                min: 1,
+                attributes: OptionAttributes(
+                    "Preview",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "detectBase64",
                 OptionValueKind.Boolean,
                 displayName: "Detect Base64",
                 helperText: "Detect and summarize base64 text payloads.",
-                defaultValue: Defaults.DetectBase64)
+                defaultValue: Defaults.DetectBase64,
+                attributes: OptionAttributes(
+                    "Detection",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "formatJson",
                 OptionValueKind.Boolean,
                 displayName: "Format JSON",
                 helperText: "Create formatted previews for JSON payloads.",
-                defaultValue: Defaults.FormatJson)
+                defaultValue: Defaults.FormatJson,
+                attributes: OptionAttributes(
+                    "Formatting",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "formatXml",
                 OptionValueKind.Boolean,
                 displayName: "Format XML",
                 helperText: "Create formatted previews for XML payloads.",
-                defaultValue: Defaults.FormatXml)
+                defaultValue: Defaults.FormatXml,
+                attributes: OptionAttributes(
+                    "Formatting",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1);
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number));
 
     private static void AddPayloadInspectResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
@@ -87,7 +112,17 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
             summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
             valueType: nameof(TimeProvider),
             attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                ResourceDesignMetadataAttributeValues.Clock));
+                ResourceDesignMetadataAttributeValues.Clock,
+                keyPattern: "clock:{name}"));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddPayloadInspectPorts(ComponentDesignMetadataBuilder builder)
         => builder
