@@ -1,6 +1,6 @@
 # Composition And Designer Progress
 
-Date: 2026-06-29
+Date: 2026-06-30
 
 ## Current Direction
 
@@ -101,17 +101,22 @@ Latest local commits:
   - Applied the option/resource hint pattern to State metadata for the reducer
     node.
   - Bumped State Composition to `1.3.0`.
+- `Add observability designer metadata hints`
+  - Applied the option/resource hint pattern to Observability metadata for
+    Counter, Logger, and Metrics nodes.
+  - Bumped Observability Composition to `1.3.0`.
 
 ## Verification Notes
 
-Recent focused verification passed for the Mapping, Control, Assertions, and
-State hint passes:
+Recent focused verification passed for the Mapping, Control, Assertions, State,
+and Observability hint passes:
 
 - Designer tests.
 - Mapping composition tests.
 - Control composition tests.
 - Assertions composition tests.
 - State composition tests.
+- Observability composition tests.
 - Release convention tests with public API baselines updated where intended.
 - Full solution build using the reliable controlled command:
 
@@ -144,6 +149,5 @@ HTML graph was skipped because the graph exceeds the visualization size limit.
 ## Suggested Next Pass
 
 Continue the richer Designer metadata hint rollout one package family at a
-time. Observability is the next reasonable candidate because it already has
-expression-related counter options and host-owned selector, context factory,
-and clock resources, but the next pass should be planned separately.
+time. Validation or Routing is a reasonable later candidate, but the next pass
+should be planned separately.

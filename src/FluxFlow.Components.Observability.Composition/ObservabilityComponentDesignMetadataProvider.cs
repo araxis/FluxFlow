@@ -105,32 +105,60 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Optional counter name included in snapshots and diagnostics.")
+                helperText: "Optional counter name included in snapshots and diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Counter",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "engine",
                 OptionValueKind.Text,
                 displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.")
+                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "predicate",
                 OptionValueKind.Expression,
                 displayName: "Predicate",
-                helperText: "Optional boolean expression used to accept or reject inputs.")
+                helperText: "Optional boolean expression used to accept or reject inputs.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Filtering",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: ObservabilityCompositionResourceNames.Engine))
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,
                 displayName: "Expression",
-                helperText: "Compatibility alias used when predicate is not configured.")
+                helperText: "Compatibility alias used when predicate is not configured.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Filtering",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: ObservabilityCompositionResourceNames.Engine))
             .AddOption(
                 "expressionId",
                 OptionValueKind.Text,
                 displayName: "Expression ID",
-                helperText: "Optional diagnostic identifier emitted with counter diagnostics.")
+                helperText: "Optional diagnostic identifier emitted with counter diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "expressionName",
                 OptionValueKind.Text,
                 displayName: "Expression Name",
-                helperText: "Optional diagnostic name emitted with counter diagnostics.")
+                helperText: "Optional diagnostic name emitted with counter diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(BoundedCapacityOption(CounterDefaults.BoundedCapacity));
 
     private static void AddLoggerOptions(ComponentDesignMetadataBuilder builder)
@@ -142,24 +170,39 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Level",
                 helperText: "Log level applied to emitted entries.",
                 defaultValue: LoggerDefaults.Level,
-                choices: LogLevelChoices())
+                choices: LogLevelChoices(),
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Logging",
+                    importance: OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "category",
                 OptionValueKind.Text,
                 displayName: "Category",
                 helperText: "Log category included in emitted entries.",
-                defaultValue: LoggerDefaults.Category)
+                defaultValue: LoggerDefaults.Category,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Logging",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "messageTemplate",
                 OptionValueKind.MultilineText,
                 displayName: "Message Template",
-                helperText: "Template rendered with selected attributes, inputType, category, level, sequence, and input.")
+                helperText: "Template rendered with selected attributes, inputType, category, level, sequence, and input.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Logging",
+                    importance: OptionDesignMetadataAttributeValues.Primary))
             .AddOption(
                 "attributeSelectors",
                 OptionValueKind.Json,
                 displayName: "Attribute Selectors",
                 helperText: "Array of selector names resolved from host-owned attribute:{name} resources.",
-                defaultValue: LoggerDefaults.AttributeSelectors)
+                defaultValue: LoggerDefaults.AttributeSelectors,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Attributes",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Json,
+                    relatedResource: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}"))
             .AddOption(BoundedCapacityOption(LoggerDefaults.BoundedCapacity));
 
     private static void AddMetricsOptions(ComponentDesignMetadataBuilder builder)
@@ -169,12 +212,21 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Optional metric name included in snapshots and diagnostics.")
+                helperText: "Optional metric name included in snapshots and diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Metrics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "sizeSelector",
                 OptionValueKind.Text,
                 displayName: "Size Selector",
-                helperText: "Diagnostic selector metadata; composition DI selection uses the sizeSelector resource.")
+                helperText: "Diagnostic selector metadata; composition DI selection uses the sizeSelector resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Metrics",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Text,
+                    relatedResource: ObservabilityCompositionResourceNames.SizeSelector))
             .AddOption(BoundedCapacityOption(MetricsDefaults.BoundedCapacity));
 
     private static void AddCounterResources(ComponentDesignMetadataBuilder builder)
@@ -187,6 +239,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 valueType: nameof(IFlowExpressionEngine),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    keyPattern: "expression-engine:{name}",
                     requiredWhenAnyOption: "predicate,expression"))
             .AddResource(
                 ObservabilityCompositionResourceNames.ContextFactory,
@@ -195,7 +248,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
                 valueType: "IFlowMapContextFactory<TInput>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.ContextFactory))
+                    ResourceDesignMetadataAttributeValues.ContextFactory,
+                    keyPattern: "context-factory:{name}"))
             .AddResource(
                 ObservabilityCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -203,7 +257,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
     private static void AddLoggerResources(ComponentDesignMetadataBuilder builder)
         => builder
@@ -214,7 +269,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock))
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"))
             .AddResource(
                 ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
                 displayName: "Attribute Selector",
@@ -235,7 +291,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed selector used to calculate message size metrics.",
                 valueType: "IObservabilityValueSelector<TInput>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Selector))
+                    ResourceDesignMetadataAttributeValues.Selector,
+                    keyPattern: "selector:{name}"))
             .AddResource(
                 ObservabilityCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -243,7 +300,8 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 summary: "Optional keyed clock for deterministic observability timestamps and diagnostics.",
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                    ResourceDesignMetadataAttributeValues.Clock));
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 
     private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
     {
@@ -251,7 +309,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         Kind = OptionValueKind.Text,
         DisplayName = new ComponentMetadataText("Input Type"),
         DefaultValue = defaultValue,
-        HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR input type comes from the closed registration.")
+        HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR input type comes from the closed registration."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Type Metadata",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Text)
     };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
@@ -261,7 +323,11 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
         DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = new ComponentMetadataText("Maximum queued input messages.")
+        HelperText = new ComponentMetadataText("Maximum queued input messages."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Runtime",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Number)
     };
 
     private static IReadOnlyList<OptionChoiceMetadata> LogLevelChoices()

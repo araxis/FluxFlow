@@ -267,6 +267,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `157-state-designer-metadata-hints.md`: State composition Designer metadata
   hint pass: state reducer option grouping/editor hints, host-owned resource key
   patterns, package `1.3.0`, focused verification, and next candidate note.
+- `158-observability-designer-metadata-hints.md`: Observability composition
+  Designer metadata hint pass: Counter/Logger/Metrics option grouping/editor
+  hints, host-owned resource key patterns, package `1.3.0`, focused
+  verification, and next candidate note.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

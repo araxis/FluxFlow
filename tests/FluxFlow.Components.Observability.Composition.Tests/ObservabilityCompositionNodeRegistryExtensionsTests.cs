@@ -218,6 +218,110 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_observability_option_hints()
+    {
+        var metadata = MetadataByType();
+
+        var counterOptions = metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(counterOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["name"], "Counter", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            counterOptions["predicate"],
+            "Filtering",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: ObservabilityCompositionResourceNames.Engine);
+        AssertOptionHints(
+            counterOptions["expression"],
+            "Filtering",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: ObservabilityCompositionResourceNames.Engine);
+        AssertOptionHints(counterOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var loggerOptions = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(loggerOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(loggerOptions["level"], "Logging", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(loggerOptions["category"], "Logging", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(loggerOptions["messageTemplate"], "Logging", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(
+            loggerOptions["attributeSelectors"],
+            "Attributes",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Json,
+            relatedResource: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        AssertOptionHints(loggerOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var metricsOptions = metadata[ObservabilityCompositionNodeTypes.Metrics]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(metricsOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(metricsOptions["name"], "Metrics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            metricsOptions["sizeSelector"],
+            "Metrics",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text,
+            relatedResource: ObservabilityCompositionResourceNames.SizeSelector);
+        AssertOptionHints(metricsOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_observability_resource_picker_hints()
+    {
+        var metadata = MetadataByType();
+
+        var counterResources = metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.Engine],
+            ResourceDesignMetadataAttributeValues.ExpressionEngine,
+            "expression-engine:{name}");
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.ContextFactory],
+            ResourceDesignMetadataAttributeValues.ContextFactory,
+            "context-factory:{name}");
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        var loggerResources = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            loggerResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+        AssertResourceHints(
+            loggerResources[ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}"],
+            ResourceDesignMetadataAttributeValues.Selector,
+            ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+
+        var metricsResources = metadata[ObservabilityCompositionNodeTypes.Metrics]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            metricsResources[ObservabilityCompositionResourceNames.SizeSelector],
+            ResourceDesignMetadataAttributeValues.Selector,
+            "selector:{name}");
+        AssertResourceHints(
+            metricsResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new ObservabilityComponentDesignMetadataProvider();
@@ -680,6 +784,71 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             resource.IsRequired,
             resource.ValueType?.Value!)).ShouldBe(expected);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task AssertFactoryDiagnosticAsync(
         string nodeType,

@@ -885,11 +885,22 @@ Date: 2026-05-31
   tests (`93`), release tests (`84`), and the controlled solution build with 0
   warnings and 0 errors. Local graph output was refreshed after the memory
   closeout. See [[157-state-designer-metadata-hints]].
+- Completed the Observability Designer metadata hint pass. The Observability
+  composition provider now includes option section, importance, editor, syntax,
+  and related-resource hints for Counter, Logger, and Metrics, plus host-owned
+  resource key patterns for expression engine, context factory, selector, and
+  clock resources. The Observability composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Observability composition tests (`22`), Designer tests (`93`),
+  release tests (`84`), and the controlled solution build with 0 warnings and
+  0 errors after shutting down stale build servers from the timed-out first
+  attempt. Local graph output was refreshed after the memory closeout. See
+  [[158-observability-designer-metadata-hints]].
 
 ## Remaining
 
 - Continue the Designer metadata hint rollout one package family at a time.
-  Observability is the next reasonable candidate, but it should be planned
+  Validation or Routing is a reasonable later candidate, but it should be planned
   separately.
 - Keep future work bounded: one package family or one convention pass per local
   commit, with focused tests, release convention tests, and the controlled

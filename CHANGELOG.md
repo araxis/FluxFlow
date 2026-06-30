@@ -7,6 +7,16 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Observability.Composition 1.3.0
+
+Adds richer Designer hints for the observability metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.counter`, `flow.logger`, and `flow.metrics` options.
+- Adds host-owned resource key patterns for expression engine, context factory,
+  selector, and clock resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
 ## FluxFlow.Components.State.Composition 1.3.0
 
 Adds richer Designer hints for the state reducer metadata provider.
