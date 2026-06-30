@@ -74,9 +74,10 @@ configuration.
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for `event.projection` so hosts can build palettes, editors, validation hints,
 or documentation without copying package descriptors. The metadata describes the
-existing event projection option record, fixed ports, and optional `clock`
-resource hint. Optional keyed `TimeProvider` clocks remain host-owned resources
-and are not modeled as editable node options.
+existing event projection option record, option grouping/editor hints, fixed
+ports, and optional `clock` resource picker hint. Optional keyed `TimeProvider`
+clocks remain host-owned resources with a key-pattern hint and are not modeled
+as editable node options.
 The metadata is authored through the shared validated Designer metadata builder
 while preserving the same public metadata contracts consumed by hosts.
 

@@ -123,6 +123,58 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_projection_option_hints()
+    {
+        var metadata = ProjectionDesignMetadata();
+        var options = OptionsByName(metadata);
+
+        AssertOptionHints(
+            options["name"],
+            "Diagnostics",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            options["filter"],
+            "Filtering",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(
+            options["rateWindowSeconds"],
+            "Rate",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["emitEveryMatch"],
+            "Emission",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["emitFinalSnapshot"],
+            "Emission",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["maxPreviewChars"],
+            "Preview",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_projection_resource_picker_hints()
+    {
+        var metadata = ProjectionDesignMetadata();
+
+        AssertResourceHints(
+            metadata.Resources.ShouldHaveSingleItem(),
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new ProjectionsComponentDesignMetadataProvider();
@@ -314,6 +366,12 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ShouldHaveSingleItem();
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertOption(
         ComponentDesignMetadata metadata,
         string name,
@@ -327,6 +385,34 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         option.Min.ShouldBe(min);
     }
 
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
@@ -337,6 +423,24 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
         Func<

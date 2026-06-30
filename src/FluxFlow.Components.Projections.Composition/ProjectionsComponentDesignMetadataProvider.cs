@@ -36,46 +36,72 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 "name",
                 OptionValueKind.Text,
                 displayName: "Name",
-                helperText: "Optional snapshot name included in emitted projection snapshots.")
+                helperText: "Optional snapshot name included in emitted projection snapshots.",
+                attributes: OptionAttributes(
+                    "Diagnostics",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Text))
             .AddOption(
                 "filter",
                 OptionValueKind.Json,
                 displayName: "Filter",
                 helperText: "Event filter object for matching projection events.",
-                defaultValue: Defaults.Filter)
+                defaultValue: Defaults.Filter,
+                attributes: OptionAttributes(
+                    "Filtering",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Json))
             .AddOption(
                 "rateWindowSeconds",
                 OptionValueKind.Number,
                 displayName: "Rate Window Seconds",
                 helperText: "Rolling rate window in seconds; must be greater than zero.",
                 defaultValue: Defaults.RateWindowSeconds,
-                min: 0.000001)
+                min: 0.000001,
+                attributes: OptionAttributes(
+                    "Rate",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "emitEveryMatch",
                 OptionValueKind.Boolean,
                 displayName: "Emit Every Match",
                 helperText: "Emit a snapshot after each matching event.",
-                defaultValue: Defaults.EmitEveryMatch)
+                defaultValue: Defaults.EmitEveryMatch,
+                attributes: OptionAttributes(
+                    "Emission",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "emitFinalSnapshot",
                 OptionValueKind.Boolean,
                 displayName: "Emit Final Snapshot",
                 helperText: "Direct-node lifecycle option for final snapshots; composition runtime stop uses normal completion.",
-                defaultValue: Defaults.EmitFinalSnapshot)
+                defaultValue: Defaults.EmitFinalSnapshot,
+                attributes: OptionAttributes(
+                    "Emission",
+                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(
                 "maxPreviewChars",
                 OptionValueKind.Number,
                 displayName: "Max Preview Chars",
                 helperText: "Maximum latest payload preview characters; zero disables previews.",
                 defaultValue: Defaults.MaxPreviewChars,
-                min: 0)
+                min: 0,
+                attributes: OptionAttributes(
+                    "Preview",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number))
             .AddOption(
                 "boundedCapacity",
                 OptionValueKind.Number,
                 displayName: "Bounded Capacity",
                 helperText: "Maximum queued input messages.",
                 defaultValue: Defaults.BoundedCapacity,
-                min: 1);
+                min: 1,
+                attributes: OptionAttributes(
+                    "Runtime",
+                    OptionDesignMetadataAttributeValues.Advanced,
+                    OptionDesignMetadataAttributeValues.Number));
 
     private static void AddEventProjectionResources(ComponentDesignMetadataBuilder builder)
         => builder.AddResource(
@@ -85,7 +111,17 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
             summary: "Optional keyed clock for deterministic projection snapshot timestamps and diagnostics.",
             valueType: nameof(TimeProvider),
             attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                ResourceDesignMetadataAttributeValues.Clock));
+                ResourceDesignMetadataAttributeValues.Clock,
+                keyPattern: "clock:{name}"));
+
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
     private static void AddEventProjectionPorts(ComponentDesignMetadataBuilder builder)
         => builder
