@@ -6,7 +6,8 @@ Date: 2026-06-30
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is clean as of the 2026-06-30 MQTT metadata refresh.
+- The tracked worktree is clean as of the 2026-06-30 Designer metadata hint
+  convention closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -25,8 +26,11 @@ Date: 2026-06-30
 - The active narrow track is richer Designer metadata hints. Mapping was the
   pilot; Control, Assertions, State, Observability, Validation, Routing,
   Timers, Sources, Serialization, Payloads, Projections, Metrics,
-  Expectations, HTTP, FileSystem, Storage, Sessions, and MQTT followed. Any
-  further package-family metadata hint work should be planned separately.
+  Expectations, HTTP, FileSystem, Storage, Sessions, and MQTT followed. Release
+  convention tests now guard option section/importance hints, contract-valued
+  editor/syntax hints, same-node related resources, and host-owned resource key
+  patterns. Any further package-family or convention metadata hint work should
+  be planned separately.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

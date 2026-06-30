@@ -196,6 +196,37 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Component_composition_designer_metadata_option_hints_follow_designer_contract()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+
+            foreach (var metadata in provider.GetMetadata())
+            {
+                var nodeType = metadata.Type.ToString();
+                var resourceNames = metadata.Resources
+                    .Select(resource => resource.Name.Value)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                foreach (var option in metadata.Options)
+                {
+                    AssertDesignerOptionHintMetadata(
+                        entry,
+                        nodeType,
+                        option,
+                        resourceNames);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void Component_composition_designer_metadata_providers_use_named_collection_helpers()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -1785,6 +1816,56 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string message)
         => string.IsNullOrWhiteSpace(value).ShouldBeFalse(message);
 
+    private static void AssertDesignerOptionHintMetadata(
+        PackageManifestEntry entry,
+        string nodeType,
+        OptionDesignMetadata option,
+        IReadOnlySet<string> resourceNames)
+    {
+        var optionName = option.Name.ToString();
+        var section = ReadRequiredDesignerAttribute(
+            option.Attributes,
+            OptionDesignMetadataAttributeNames.Section,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare an option section.");
+
+        AssertRequiredDesignerText(
+            section,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare a non-empty option section.");
+
+        var importance = ReadRequiredDesignerAttribute(
+            option.Attributes,
+            OptionDesignMetadataAttributeNames.Importance,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare option importance.");
+
+        AssertAllowedDesignerAttributeValue(
+            importance,
+            OptionImportanceAttributeValues,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option importance '{importance}'.");
+
+        AssertOptionalDesignerAttributeValue(
+            option.Attributes,
+            OptionDesignMetadataAttributeNames.Editor,
+            OptionEditorAttributeValues,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option editor.");
+
+        AssertOptionalDesignerAttributeValue(
+            option.Attributes,
+            OptionDesignMetadataAttributeNames.Syntax,
+            OptionEditorAttributeValues,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' uses unsupported option syntax.");
+
+        var relatedResourceKey = new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource);
+        if (!option.Attributes.TryGetValue(relatedResourceKey, out var relatedResource))
+            return;
+
+        AssertRequiredDesignerText(
+            relatedResource.Value,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' must declare a non-empty related resource.");
+        resourceNames.Contains(relatedResource.Value)
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' option '{optionName}' related resource '{relatedResource.Value}' must match a resource on the same metadata node.");
+    }
+
     private static void AssertHostOwnedResourcePickerMetadata(
         PackageManifestEntry entry,
         string nodeType,
@@ -1807,17 +1888,55 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             pickerKind.Value,
             $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a non-empty resource picker kind.");
 
-        if (!resource.Name.Value.Contains('{', StringComparison.Ordinal))
-            return;
-
         var keyPatternKey = new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern);
         resource.Attributes.TryGetValue(keyPatternKey, out var keyPattern)
             .ShouldBeTrue(
-                $"{entry.PackageId} Designer metadata for '{nodeType}' pattern resource '{resource.Name.Value}' must declare a key pattern.");
-        keyPattern!.Value.ShouldBe(
-            resource.Name.Value,
-            $"{entry.PackageId} Designer metadata for '{nodeType}' pattern resource '{resource.Name.Value}' must match its resource key pattern.");
+                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a resource key pattern.");
+        AssertRequiredDesignerText(
+            keyPattern!.Value,
+            $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' must declare a non-empty resource key pattern.");
+        keyPattern.Value.Contains("{name}", StringComparison.Ordinal)
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must include the host resource name placeholder.");
+        (
+            keyPattern.Value.Contains(pickerKind.Value, StringComparison.Ordinal) ||
+            string.Equals(keyPattern.Value, resource.Name.Value, StringComparison.Ordinal)
+        )
+            .ShouldBeTrue(
+                $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must align with picker kind '{pickerKind.Value}' or its named resource pattern.");
     }
+
+    private static string ReadRequiredDesignerAttribute(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name,
+        string message)
+    {
+        attributes.TryGetValue(new ComponentAttributeName(name), out var value)
+            .ShouldBeTrue(message);
+        AssertRequiredDesignerText(value!.Value, message);
+
+        return value.Value;
+    }
+
+    private static void AssertOptionalDesignerAttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name,
+        IReadOnlyCollection<string> allowedValues,
+        string message)
+    {
+        if (!attributes.TryGetValue(new ComponentAttributeName(name), out var value))
+            return;
+
+        AssertRequiredDesignerText(value.Value, message);
+        AssertAllowedDesignerAttributeValue(value.Value, allowedValues, $"{message} Value: '{value.Value}'.");
+    }
+
+    private static void AssertAllowedDesignerAttributeValue(
+        string value,
+        IReadOnlyCollection<string> allowedValues,
+        string message)
+        => allowedValues.Contains(value, StringComparer.Ordinal)
+            .ShouldBeTrue(message);
 
     private static void AssertStableMetadataOrder(
         IEnumerable<(string Name, int Order)> items,
@@ -2375,6 +2494,20 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     {
         public bool IsReferenced => UsesRequiredLookup || UsesOptionalLookup;
     }
+
+    private static readonly string[] OptionImportanceAttributeValues =
+    [
+        OptionDesignMetadataAttributeValues.Primary,
+        OptionDesignMetadataAttributeValues.Advanced
+    ];
+
+    private static readonly string[] OptionEditorAttributeValues =
+    [
+        OptionDesignMetadataAttributeValues.Text,
+        OptionDesignMetadataAttributeValues.Number,
+        OptionDesignMetadataAttributeValues.Expression,
+        OptionDesignMetadataAttributeValues.Json
+    ];
 
     private static readonly Type[] RegistryGenericArgumentTypes =
     [

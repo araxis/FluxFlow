@@ -1030,6 +1030,15 @@ Date: 2026-05-31
   (`10`), Designer tests (`93`), release tests (`84`), and the controlled
   solution build with 0 warnings and 0 errors. Local graph output was refreshed
   after the memory closeout. See [[172-mqtt-designer-metadata-hints]].
+- Closed the Designer metadata hint convention pass. Release convention tests
+  now require option section/importance hints, validate current Designer
+  option hint values, require same-node related resources, and require
+  host-owned resource key patterns containing `{name}`. No runtime behavior,
+  provider metadata content, public APIs, package versions, package docs, or
+  changelog entries changed. Verification passed for release tests (`85`),
+  Designer tests (`93`), and the controlled solution build with 0 warnings and
+  0 errors. Local graph output was refreshed after the memory closeout. See
+  [[173-designer-metadata-hint-conventions]].
 
 ## Remaining
 

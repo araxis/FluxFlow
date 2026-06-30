@@ -327,6 +327,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   hint pass: publish/trigger option grouping/editor hints, host-owned
   publisher, trigger source, and clock resource key patterns, package `1.4.0`,
   focused verification, and next-planning note.
+- `173-designer-metadata-hint-conventions.md`: Designer metadata hint
+  convention closeout: release-test guardrails for option section/importance
+  hints, contract-valued editor/syntax hints, same-node related resources, and
+  host-owned resource key patterns.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

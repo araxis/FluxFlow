@@ -161,13 +161,19 @@ Latest local commits:
   - Applied the option/resource hint pattern to MQTT metadata for publish and
     trigger nodes.
   - Bumped MQTT Composition to `1.4.0`.
+- `Add designer metadata hint conventions`
+  - Added release-test convention coverage for option section/importance hints,
+    contract-valued editor/syntax hints, same-node related resources, and
+    host-owned resource key patterns.
+  - Left provider metadata content, runtime behavior, public APIs, package
+    versions, package docs, and changelog entries unchanged.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
 Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
 Projections, Metrics, Expectations, HTTP, FileSystem, Storage, Sessions, and
-MQTT hint passes:
+MQTT hint passes, plus the Designer metadata hint convention closeout:
 
 - Designer tests.
 - Mapping composition tests.
@@ -190,6 +196,9 @@ MQTT hint passes:
 - Sessions composition tests.
 - MQTT composition tests.
 - Release convention tests with public API baselines updated where intended.
+- Release convention tests now enforce option section/importance hints,
+  contract-valued editor/syntax hints, same-node related resources, and
+  host-owned resource key patterns.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -202,9 +211,9 @@ to stop only FluxFlow-owned stale build parents, run
 `dotnet build-server shutdown`, and rerun the controlled command above. Do not
 stop unrelated `dotnet` processes from other workspaces.
 
-Local graph output was refreshed after the MQTT hint pass closeout. The
-local HTML graph was skipped because the graph exceeds the visualization size
-limit.
+Local graph output was refreshed after the Designer metadata hint convention
+closeout. The local HTML graph was skipped when the graph exceeded the
+visualization size limit.
 
 ## Current Constraints
 
@@ -221,6 +230,6 @@ limit.
 
 ## Suggested Next Pass
 
-Continue any further package-family metadata hint work as a separately planned
-local pass. Do not start another convention or package-family pass without a
-bounded plan.
+Continue any further package-family or convention metadata hint work as a
+separately planned local pass. Do not start another pass without a bounded
+plan.
