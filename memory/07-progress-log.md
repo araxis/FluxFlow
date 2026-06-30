@@ -990,6 +990,17 @@ Date: 2026-05-31
   tests (`84`), and the controlled solution build with 0 warnings and 0 errors.
   Local graph output was refreshed after the memory closeout. See
   [[168-http-designer-metadata-hints]].
+- Completed the FileSystem Designer metadata hint pass. The FileSystem
+  composition provider now includes option section, importance, and editor hints
+  for `file.read`, `file.write`, `directory.enumerate`, and `file.watch`, plus
+  a host-owned resource key pattern for the optional `clock` resource. The
+  FileSystem composition package is bumped to `1.4.0`; README, changelog, and
+  focused metadata tests were updated. Verification passed for FileSystem
+  composition tests (`27`), Designer tests (`93`), release tests (`84`), and
+  the controlled solution build with 0 warnings and 0 errors after stopping one
+  lingering FluxFlow-owned build process and shutting down build servers. Local
+  graph output was refreshed after the memory closeout. See
+  [[169-filesystem-designer-metadata-hints]].
 
 ## Remaining
 

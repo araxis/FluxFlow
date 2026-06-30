@@ -25,9 +25,9 @@ Date: 2026-06-30
 - The active narrow track is richer Designer metadata hints. Mapping was the
   pilot; Control, Assertions, State, Observability, Validation, Routing,
   Timers, Sources, Serialization, Payloads, Projections, Metrics, and
-  Expectations, and HTTP followed. Any further package-family metadata hint
-  work, starting with FileSystem if the rollout continues, should be planned
-  separately.
+  Expectations, HTTP, and FileSystem followed. Any further package-family
+  metadata hint work, starting with Storage if the rollout continues, should be
+  planned separately.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

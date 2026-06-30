@@ -219,6 +219,158 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_file_system_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var read = OptionsByName(metadata[FileSystemCompositionNodeTypes.Read]);
+        AssertOptionHints(
+            read["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            read["baseDirectory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            read["allowAbsolutePaths"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            read["defaultEncoding"],
+            "Encoding",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            read["maxBytes"],
+            "Limits",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var write = OptionsByName(metadata[FileSystemCompositionNodeTypes.Write]);
+        AssertOptionHints(
+            write["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            write["baseDirectory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            write["allowAbsolutePaths"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            write["defaultEncoding"],
+            "Encoding",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+
+        var enumerate = OptionsByName(metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate]);
+        AssertOptionHints(
+            enumerate["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            enumerate["directory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            enumerate["filter"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            enumerate["includeSubdirectories"],
+            "Traversal",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            enumerate["includeFiles"],
+            "Traversal",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            enumerate["includeDirectories"],
+            "Traversal",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            enumerate["baseDirectory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            enumerate["allowAbsolutePaths"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            enumerate["maxEntries"],
+            "Limits",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var watch = OptionsByName(metadata[FileSystemCompositionNodeTypes.Watch]);
+        AssertOptionHints(
+            watch["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            watch["directory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            watch["baseDirectory"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            watch["allowAbsolutePaths"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            watch["filter"],
+            "Paths",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            watch["includeSubdirectories"],
+            "Traversal",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            watch["notifyFilters"],
+            "Watching",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(
+            watch["internalBufferSize"],
+            "Watching",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_file_system_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var resource = item.Resources.ShouldHaveSingleItem();
+
+            AssertResourceHints(
+                resource,
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new FileSystemComponentDesignMetadataProvider();
@@ -594,6 +746,12 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertTransformPorts<TInput, TOutput>(
         ComponentDesignMetadata metadata)
     {
@@ -668,6 +826,52 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         resource.IsRequired.ShouldBeFalse();
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {

@@ -86,8 +86,9 @@ host receives a `FactoryFailed` diagnostic with the relevant option name.
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes. The metadata describes fixed
 request/result ports, source outputs, the existing FileSystem option records,
-and optional `clock` resource hints for hosts that build palettes, editors,
-validators, or documentation views.
+option section/importance/editor hints, and optional host-owned `clock`
+resource picker hints for hosts that build palettes, editors, validators, or
+documentation views.
 
 Path safety remains runtime configuration through `baseDirectory` and
 `allowAbsolutePaths`. The optional `clock` resource remains host-owned and is
