@@ -331,6 +331,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   convention closeout: release-test guardrails for option section/importance
   hints, contract-valued editor/syntax hints, same-node related resources, and
   host-owned resource key patterns.
+- `174-designer-metadata-hint-release-readiness.md`: Designer metadata hint
+  release-readiness record: broad verification, all impacted package
+  preflights, Designer dry-run success, and composition dry-run dependency
+  source blocker.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

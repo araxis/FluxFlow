@@ -1039,14 +1039,25 @@ Date: 2026-05-31
   Designer tests (`93`), and the controlled solution build with 0 warnings and
   0 errors. Local graph output was refreshed after the memory closeout. See
   [[173-designer-metadata-hint-conventions]].
+- Ran the Designer metadata hint release-readiness pass. Release tests
+  (`85`), Designer tests (`93`), controlled Debug build, controlled Release
+  build, and all impacted package preflights passed. The Designer package
+  `2.16.0` fast dry-run passed from a temp package source. The first
+  composition dry-run (`components-mapping-composition` `1.3.0`) packed but
+  failed consumer restore because current dependency packages such as
+  `FluxFlow.Composition` `1.0.9`, `FluxFlow.Composition.Hosting` `1.0.5`,
+  `FluxFlow.Mapping` `1.0.2`, and `FluxFlow.Components.Mapping` `3.0.1` are
+  not present in the isolated package source or public feed. No package source
+  changes were made; a separate dependency-source readiness pass is needed. See
+  [[174-designer-metadata-hint-release-readiness]].
 
 ## Remaining
 
-- Continue any further Designer metadata hint rollout one package family at a
-  time, with each package-family pass planned separately.
-- Keep future work bounded: one package family or one convention pass per local
-  commit, with focused tests, release convention tests, and the controlled
-  solution build.
+- Plan a separate release-dependency readiness pass before publishing the
+  composition metadata packages.
+- Keep future work bounded: one package family, one convention pass, or one
+  release-readiness pass per local commit, with focused tests, release
+  convention tests, and the controlled solution build.
 - Keep local graph output updated after repo changes and keep it out of git.
   See [[140-local-graph-maintenance]].
 - Hot reload semantics, renderer behavior, resource picker UI, runtime lifecycle

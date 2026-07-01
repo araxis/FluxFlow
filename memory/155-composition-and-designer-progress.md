@@ -167,13 +167,20 @@ Latest local commits:
     host-owned resource key patterns.
   - Left provider metadata content, runtime behavior, public APIs, package
     versions, package docs, and changelog entries unchanged.
+- `Record designer metadata hint release readiness`
+  - Recorded broad verification, all impacted package preflight success, and
+    `components-designer` `2.16.0` fast dry-run success.
+  - Recorded the composition dry-run blocker: current dependency packages for
+    composition packages are not all available in the isolated local package
+    source or public feed.
 
 ## Verification Notes
 
 Recent focused verification passed for the Mapping, Control, Assertions, State,
 Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
 Projections, Metrics, Expectations, HTTP, FileSystem, Storage, Sessions, and
-MQTT hint passes, plus the Designer metadata hint convention closeout:
+MQTT hint passes, plus the Designer metadata hint convention closeout and
+release-readiness pass:
 
 - Designer tests.
 - Mapping composition tests.
@@ -199,6 +206,14 @@ MQTT hint passes, plus the Designer metadata hint convention closeout:
 - Release convention tests now enforce option section/importance hints,
   contract-valued editor/syntax hints, same-node related resources, and
   host-owned resource key patterns.
+- All impacted package release preflights passed for the Designer metadata hint
+  package set.
+- `components-designer` `2.16.0` fast package dry-run passed from a temp
+  package source.
+- `components-mapping-composition` `1.3.0` packed successfully, then failed
+  consumer restore because current dependencies are not all present in the
+  isolated package source or public feed. Treat this as a release dependency
+  sequencing/source-seeding blocker, not as a metadata implementation failure.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -230,6 +245,7 @@ visualization size limit.
 
 ## Suggested Next Pass
 
-Continue any further package-family or convention metadata hint work as a
-separately planned local pass. Do not start another pass without a bounded
-plan.
+Plan a release-dependency readiness pass for the Designer metadata hint package
+train. Do not publish, tag, push, or change release scripts until that pass
+decides how current dependency packages should be supplied to composition
+package dry-runs.
