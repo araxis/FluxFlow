@@ -193,6 +193,11 @@ Latest local commits:
     `d7da08e5bad380e243cdd49988808285292d66de`.
   - Skipped the 2 already-present runtime dependency tags and did not push tags
     or publish packages.
+- `Record designer metadata hint tag push`
+  - Pushed the 42 local annotated release tags to the configured remote in
+    dependency order.
+  - Verified each pushed tag resolves remotely to release target
+    `d7da08e5bad380e243cdd49988808285292d66de`.
 
 ## Verification Notes
 
@@ -254,6 +259,10 @@ release-readiness pass:
   `d7da08e5bad380e243cdd49988808285292d66de`. The two already-present runtime
   dependency tags were skipped. No tags were pushed and no packages were
   published.
+- The tag push pass verified the 42 local tags were absent from the configured
+  remote, pushed them in dependency order, and confirmed their remote peeled
+  targets resolve to the same release target. The two already-present runtime
+  dependency tags remained present remotely. No packages were published.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -286,7 +295,6 @@ limit.
 
 ## Suggested Next Pass
 
-Push release tags only after a separate explicit release request. Preserve the
+Package publication remains a separate explicit release step. Preserve the
 recorded dependency order, optionally rerun dry-runs with a complete seeded
-source for freshness, push the 42 local tags created by the local tag execution
-pass, and continue to skip already-present tags.
+source for freshness, and continue to skip already-present tags.

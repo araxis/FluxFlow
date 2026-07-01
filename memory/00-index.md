@@ -350,6 +350,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   local tag execution: controlled Release build, full temp source seeding, 42
   local annotated tags created at the release target, and 2 existing tags
   skipped.
+- `179-designer-metadata-hint-tag-push.md`: Designer metadata hint tag push:
+  42 dependency-ordered release tags pushed to the configured remote, 2
+  existing tags skipped, and remote targets verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -1083,13 +1083,19 @@ Date: 2026-05-31
   no packages were published, and no package source, release script, changelog,
   README, version, or public API baseline files changed. See
   [[178-designer-metadata-hint-local-tag-execution]].
+- Pushed the Designer metadata hint release tags. Pre-push verification found
+  the 42 local tags on release target
+  `d7da08e5bad380e243cdd49988808285292d66de`, absent from the configured
+  remote, with the 2 skipped runtime dependency tags already present remotely.
+  All 42 tags were pushed in dependency order and their remote peeled targets
+  now resolve to the release target. No packages were published, and no
+  package source, release script, changelog, README, version, or public API
+  baseline files changed. See [[179-designer-metadata-hint-tag-push]].
 
 ## Remaining
 
-- Push release tags only after a separate explicit release request; preserve
-  the recorded dependency order and skip already-present tags. The next release
-  execution pass can push the 42 local tags created by the local tag execution
-  pass.
+- Package publication remains a separate explicit release step. Preserve the
+  recorded dependency order and continue to skip already-present tags.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
