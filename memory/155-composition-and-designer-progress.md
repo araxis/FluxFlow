@@ -183,6 +183,11 @@ Latest local commits:
     templates for the Designer metadata hint train.
   - Verified release preflight and tag prepare-only checks for the 44-alias
     dependency closure, with local and configured-remote tag availability notes.
+- `Record designer metadata hint final release rehearsal`
+  - Seeded a fresh complete current-branch temp package source from all
+    `eng/packages.json` entries.
+  - Verified all 44 dependency-ordered aliases with release preflight, fast
+    dry-run against the seeded source, and tag prepare-only checks.
 
 ## Verification Notes
 
@@ -234,6 +239,10 @@ release-readiness pass:
   checks found `components-serialization-v3.0.0` and
   `components-payloads-v3.0.0` already present locally and on the configured
   remote; the rest of the recorded release tags were absent.
+- A final no-publish rehearsal seeded a fresh complete temp package source and
+  reran release preflight, fast dry-run, and tag prepare-only checks for all 44
+  dependency-ordered aliases. All checks passed. Tag availability remained 42
+  absent tags and 2 already-present runtime dependency tags.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -267,5 +276,5 @@ limit.
 ## Suggested Next Pass
 
 Execute publication only after a separate explicit release request. Preserve
-the recorded dependency order, rerun dry-runs with a complete seeded source,
-and skip already-present tags.
+the recorded dependency order, optionally rerun dry-runs with a complete seeded
+source for freshness, and skip already-present tags.

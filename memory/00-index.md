@@ -342,6 +342,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `176-designer-metadata-hint-publication-sequencing.md`: Designer metadata
   hint publication-sequencing handoff: dependency-aware order, release-helper
   command templates, prepare-only checks, and tag availability notes.
+- `177-designer-metadata-hint-final-release-rehearsal.md`: Designer metadata
+  hint final no-publish release rehearsal: fresh full temp source, all
+  dependency-ordered dry-runs, prepare-only checks, and final release execution
+  recommendation.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

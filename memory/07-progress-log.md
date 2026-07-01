@@ -1066,11 +1066,20 @@ Date: 2026-05-31
   2 already-present runtime dependency tags. No tags, pushes, package source,
   release script, changelog, README, version, or public API baseline changes
   were made. See [[176-designer-metadata-hint-publication-sequencing]].
+- Ran the final no-publish release rehearsal for the Designer metadata hint
+  train. A fresh temp package source was seeded with all 55 packages after a
+  controlled Release build. All 44 dependency-ordered aliases passed release
+  preflight, fast package dry-run against the seeded source, and tag
+  prepare-only checks. Tag checks again found 42 absent tags and 2
+  already-present runtime dependency tags. No tags, pushes, package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[177-designer-metadata-hint-final-release-rehearsal]].
 
 ## Remaining
 
 - Execute publication only after a separate explicit release request; preserve
-  the recorded dependency order and skip already-present tags.
+  the recorded dependency order and skip already-present tags. The next release
+  execution pass can create and optionally push the 42 absent tags.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
