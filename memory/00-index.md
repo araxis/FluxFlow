@@ -339,6 +339,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   metadata hint dependency-source readiness record: full temp package source
   seeding, all impacted package preflights, and all impacted fast dry-run
   success.
+- `176-designer-metadata-hint-publication-sequencing.md`: Designer metadata
+  hint publication-sequencing handoff: dependency-aware order, release-helper
+  command templates, prepare-only checks, and tag availability notes.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

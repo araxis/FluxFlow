@@ -1058,11 +1058,19 @@ Date: 2026-05-31
   source plus the public feed for external dependencies. No package source,
   release script, changelog, README, version, or public API baseline changes
   were made. See [[175-designer-metadata-hint-dependency-source-readiness]].
+- Recorded the Designer metadata hint publication-sequencing handoff. The note
+  lists the dependency-aware order for `components-designer`, current shared and
+  runtime dependency packages, and the metadata hint composition packages.
+  Release preflight and tag prepare-only checks passed for all 44 aliases in
+  the closure; local and configured-remote tag checks found 42 absent tags and
+  2 already-present runtime dependency tags. No tags, pushes, package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[176-designer-metadata-hint-publication-sequencing]].
 
 ## Remaining
 
-- Plan publication or handoff separately before publishing the composition
-  metadata packages.
+- Execute publication only after a separate explicit release request; preserve
+  the recorded dependency order and skip already-present tags.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

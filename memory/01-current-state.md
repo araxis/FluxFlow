@@ -34,7 +34,8 @@ Date: 2026-06-30
 - Release-readiness preflight and fast dry-runs passed for the impacted
   Designer metadata hint package set after seeding a complete current-branch
   temp package source outside the repo. Publication remains a separate planned
-  step and should preserve dependency ordering.
+  step and should preserve dependency ordering. Publication sequencing is now
+  recorded in `176-designer-metadata-hint-publication-sequencing.md`.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
