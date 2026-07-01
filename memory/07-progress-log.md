@@ -1050,11 +1050,19 @@ Date: 2026-05-31
   not present in the isolated package source or public feed. No package source
   changes were made; a separate dependency-source readiness pass is needed. See
   [[174-designer-metadata-hint-release-readiness]].
+- Ran the Designer metadata hint dependency-source readiness pass. A fresh temp
+  source outside the repo was seeded with all 55 packages from
+  `eng/packages.json` after a controlled Release build. Release tests (`85`),
+  Designer tests (`93`), controlled Debug and Release builds, all 20 impacted
+  package preflights, and all 20 impacted fast dry-runs passed with the seeded
+  source plus the public feed for external dependencies. No package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[175-designer-metadata-hint-dependency-source-readiness]].
 
 ## Remaining
 
-- Plan a separate release-dependency readiness pass before publishing the
-  composition metadata packages.
+- Plan publication or handoff separately before publishing the composition
+  metadata packages.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

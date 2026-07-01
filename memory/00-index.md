@@ -335,6 +335,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   release-readiness record: broad verification, all impacted package
   preflights, Designer dry-run success, and composition dry-run dependency
   source blocker.
+- `175-designer-metadata-hint-dependency-source-readiness.md`: Designer
+  metadata hint dependency-source readiness record: full temp package source
+  seeding, all impacted package preflights, and all impacted fast dry-run
+  success.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

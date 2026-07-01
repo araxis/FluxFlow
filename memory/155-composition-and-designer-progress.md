@@ -173,6 +173,11 @@ Latest local commits:
   - Recorded the composition dry-run blocker: current dependency packages for
     composition packages are not all available in the isolated local package
     source or public feed.
+- `Record designer metadata hint dependency readiness`
+  - Seeded a complete current-branch temp package source from all
+    `eng/packages.json` entries.
+  - Verified all 20 impacted package preflights and all 20 impacted fast
+    dry-runs against that source.
 
 ## Verification Notes
 
@@ -214,6 +219,11 @@ release-readiness pass:
   consumer restore because current dependencies are not all present in the
   isolated package source or public feed. Treat this as a release dependency
   sequencing/source-seeding blocker, not as a metadata implementation failure.
+- A follow-up dependency-source readiness pass seeded a complete temp package
+  source with all 55 current branch packages and reran release readiness for
+  the impacted package set. All 20 impacted preflights and all 20 impacted
+  fast dry-runs passed with that source plus the public feed for external
+  dependencies.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -227,8 +237,9 @@ to stop only FluxFlow-owned stale build parents, run
 stop unrelated `dotnet` processes from other workspaces.
 
 Local graph output was refreshed after the Designer metadata hint convention
-closeout. The local HTML graph was skipped when the graph exceeded the
-visualization size limit.
+closeout and again after the dependency-source readiness memory closeout. The
+local HTML graph was skipped when the graph exceeded the visualization size
+limit.
 
 ## Current Constraints
 
@@ -245,7 +256,6 @@ visualization size limit.
 
 ## Suggested Next Pass
 
-Plan a release-dependency readiness pass for the Designer metadata hint package
-train. Do not publish, tag, push, or change release scripts until that pass
-decides how current dependency packages should be supplied to composition
-package dry-runs.
+Plan publication sequencing or handoff for the Designer metadata hint package
+train. Do not publish, tag, push, or change release scripts without an explicit
+separate request.
