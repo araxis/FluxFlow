@@ -1074,12 +1074,22 @@ Date: 2026-05-31
   already-present runtime dependency tags. No tags, pushes, package source,
   release script, changelog, README, version, or public API baseline changes
   were made. See [[177-designer-metadata-hint-final-release-rehearsal]].
+- Executed the local tag step for the Designer metadata hint train. The
+  worktree was clean at release target
+  `d7da08e5bad380e243cdd49988808285292d66de`; the controlled Release build
+  passed; a fresh temp source was seeded with all 55 packages; and 42 local
+  annotated release tags were created at the target commit. The two
+  already-present runtime dependency tags were skipped. No tags were pushed,
+  no packages were published, and no package source, release script, changelog,
+  README, version, or public API baseline files changed. See
+  [[178-designer-metadata-hint-local-tag-execution]].
 
 ## Remaining
 
-- Execute publication only after a separate explicit release request; preserve
+- Push release tags only after a separate explicit release request; preserve
   the recorded dependency order and skip already-present tags. The next release
-  execution pass can create and optionally push the 42 absent tags.
+  execution pass can push the 42 local tags created by the local tag execution
+  pass.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

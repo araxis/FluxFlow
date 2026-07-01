@@ -188,6 +188,11 @@ Latest local commits:
     `eng/packages.json` entries.
   - Verified all 44 dependency-ordered aliases with release preflight, fast
     dry-run against the seeded source, and tag prepare-only checks.
+- `Record designer metadata hint local tag execution`
+  - Created 42 local annotated release tags at release target
+    `d7da08e5bad380e243cdd49988808285292d66de`.
+  - Skipped the 2 already-present runtime dependency tags and did not push tags
+    or publish packages.
 
 ## Verification Notes
 
@@ -243,6 +248,12 @@ release-readiness pass:
   reran release preflight, fast dry-run, and tag prepare-only checks for all 44
   dependency-ordered aliases. All checks passed. Tag availability remained 42
   absent tags and 2 already-present runtime dependency tags.
+- The local tag execution pass then reran a controlled Release build, seeded a
+  fresh complete temp package source with all 55 current packages, and created
+  the 42 absent local annotated tags at release target
+  `d7da08e5bad380e243cdd49988808285292d66de`. The two already-present runtime
+  dependency tags were skipped. No tags were pushed and no packages were
+  published.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -275,6 +286,7 @@ limit.
 
 ## Suggested Next Pass
 
-Execute publication only after a separate explicit release request. Preserve
-the recorded dependency order, optionally rerun dry-runs with a complete seeded
-source for freshness, and skip already-present tags.
+Push release tags only after a separate explicit release request. Preserve the
+recorded dependency order, optionally rerun dry-runs with a complete seeded
+source for freshness, push the 42 local tags created by the local tag execution
+pass, and continue to skip already-present tags.

@@ -1,13 +1,13 @@
 # Current State
 
-Date: 2026-06-30
+Date: 2026-07-01
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
 - The tracked worktree is clean as of the 2026-07-01 Designer metadata hint
-  final no-publish release rehearsal record.
+  local tag execution record.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -37,7 +37,12 @@ Date: 2026-06-30
   step and should preserve dependency ordering. Publication sequencing is now
   recorded in `176-designer-metadata-hint-publication-sequencing.md`, and a
   final no-publish rehearsal is recorded in
-  `177-designer-metadata-hint-final-release-rehearsal.md`.
+  `177-designer-metadata-hint-final-release-rehearsal.md`. The local tag
+  execution pass created 42 annotated local tags at release target
+  `d7da08e5bad380e243cdd49988808285292d66de` and skipped the two
+  already-present runtime dependency tags; no tags were pushed and no packages
+  were published. See
+  `178-designer-metadata-hint-local-tag-execution.md`.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

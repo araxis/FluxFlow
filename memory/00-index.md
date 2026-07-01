@@ -346,6 +346,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   hint final no-publish release rehearsal: fresh full temp source, all
   dependency-ordered dry-runs, prepare-only checks, and final release execution
   recommendation.
+- `178-designer-metadata-hint-local-tag-execution.md`: Designer metadata hint
+  local tag execution: controlled Release build, full temp source seeding, 42
+  local annotated tags created at the release target, and 2 existing tags
+  skipped.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
