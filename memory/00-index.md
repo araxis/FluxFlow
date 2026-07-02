@@ -353,6 +353,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `179-designer-metadata-hint-tag-push.md`: Designer metadata hint tag push:
   42 dependency-ordered release tags pushed to the configured remote, 2
   existing tags skipped, and remote targets verified.
+- `180-designer-metadata-hint-release-workflow-recovery.md`: Designer metadata
+  hint release workflow recovery: Linux release-test path normalization fix,
+  42 dependency-ordered tags retargeted to the fixed commit, release workflows
+  completed, and public package-feed visibility verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

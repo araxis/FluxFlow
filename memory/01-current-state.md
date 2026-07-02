@@ -1,13 +1,13 @@
 # Current State
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is clean as of the 2026-07-01 Designer metadata hint
-  tag push record.
+- The tracked worktree is expected clean after the 2026-07-02 Designer
+  metadata hint release workflow recovery closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -33,18 +33,19 @@ Date: 2026-07-01
   be planned separately.
 - Release-readiness preflight and fast dry-runs passed for the impacted
   Designer metadata hint package set after seeding a complete current-branch
-  temp package source outside the repo. Publication remains a separate planned
-  step and should preserve dependency ordering. Publication sequencing is now
-  recorded in `176-designer-metadata-hint-publication-sequencing.md`, and a
-  final no-publish rehearsal is recorded in
-  `177-designer-metadata-hint-final-release-rehearsal.md`. The local tag
-  execution pass created 42 annotated local tags at release target
-  `d7da08e5bad380e243cdd49988808285292d66de` and skipped the two
-  already-present runtime dependency tags. The follow-up tag push pass pushed
-  those 42 tags to the configured remote and verified their remote peeled
-  targets. No packages were published. See
-  `178-designer-metadata-hint-local-tag-execution.md` and
-  `179-designer-metadata-hint-tag-push.md`.
+  temp package source outside the repo. Publication sequencing is recorded in
+  `176-designer-metadata-hint-publication-sequencing.md`, the final no-publish
+  rehearsal is recorded in
+  `177-designer-metadata-hint-final-release-rehearsal.md`, local tag execution
+  is recorded in `178-designer-metadata-hint-local-tag-execution.md`, and tag
+  push is recorded in `179-designer-metadata-hint-tag-push.md`. The release
+  workflow recovery fixed the Linux release-test path normalization issue,
+  retargeted the 42 dependency-ordered tags from
+  `d7da08e5bad380e243cdd49988808285292d66de` to
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`, and verified every release
+  workflow, release asset set, and public package-feed version. The two
+  already-present runtime dependency tags remained skipped. See
+  `180-designer-metadata-hint-release-workflow-recovery.md`.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies

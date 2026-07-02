@@ -198,6 +198,17 @@ Latest local commits:
     dependency order.
   - Verified each pushed tag resolves remotely to release target
     `d7da08e5bad380e243cdd49988808285292d66de`.
+- `Fix release test project reference paths`
+  - Fixed release-test project-reference path normalization for Linux runners by
+    normalizing both `/` and `\` before combining referenced project paths.
+  - Added focused regression coverage for Windows-style project-reference
+    paths.
+- `Record designer metadata hint release workflow recovery`
+  - Recorded the release workflow recovery, including retargeting the 42
+    dependency-ordered tags to fixed commit
+    `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`.
+  - Verified successful release workflows, release assets, and public
+    package-feed visibility for all 42 packages.
 
 ## Verification Notes
 
@@ -263,6 +274,15 @@ release-readiness pass:
   remote, pushed them in dependency order, and confirmed their remote peeled
   targets resolve to the same release target. The two already-present runtime
   dependency tags remained present remotely. No packages were published.
+- The release workflow recovery pass fixed the Linux-only release-test path
+  normalization issue, reran local release tests (`86`) and the controlled
+  solution build, confirmed the 42 tag names had no release assets or package
+  versions already visible, then retargeted and pushed each tag to fixed commit
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77` one at a time. All 42 latest
+  tag-push release workflow runs succeeded, all releases have package assets,
+  and all package versions are visible on the public package feed. Three
+  transient full-suite test failures required one workflow rerun each before
+  the train continued.
 - Full solution build using the reliable controlled command:
 
 ```powershell
@@ -295,6 +315,5 @@ limit.
 
 ## Suggested Next Pass
 
-Package publication remains a separate explicit release step. Preserve the
-recorded dependency order, optionally rerun dry-runs with a complete seeded
-source for freshness, and continue to skip already-present tags.
+The Designer metadata hint release train is published and indexed. Plan any
+next package-family, convention, or release work as a separate bounded pass.

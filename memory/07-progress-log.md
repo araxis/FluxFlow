@@ -1091,11 +1091,23 @@ Date: 2026-05-31
   now resolve to the release target. No packages were published, and no
   package source, release script, changelog, README, version, or public API
   baseline files changed. See [[179-designer-metadata-hint-tag-push]].
+- Recovered the Designer metadata hint release workflows. The release-test
+  project-reference path helper now normalizes both `/` and `\`, fixing the
+  Linux-only release-test failure; local release tests passed (`86`), and the
+  controlled solution build passed after a scoped build-server shutdown. All
+  42 dependency-ordered tags were verified unpublished, retargeted from
+  `d7da08e5bad380e243cdd49988808285292d66de` to
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`, pushed one at a time, and
+  watched to successful release workflow completion. Each release has package
+  assets and each package version is visible on the public package feed. Three
+  workflow runs needed one rerun after transient full-suite test failures, then
+  passed before the train continued. See
+  [[180-designer-metadata-hint-release-workflow-recovery]].
 
 ## Remaining
 
-- Package publication remains a separate explicit release step. Preserve the
-  recorded dependency order and continue to skip already-present tags.
+- The Designer metadata hint release train is published and indexed. Future
+  release or package-family work should be planned as a separate bounded pass.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
