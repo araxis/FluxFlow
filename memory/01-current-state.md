@@ -7,7 +7,7 @@ Date: 2026-07-02
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
 - The tracked worktree is expected clean after the 2026-07-02 package binary
-  compatibility readiness helper closeout.
+  compatibility baseline feed-alignment blocker closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -63,10 +63,18 @@ Date: 2026-07-02
 - Package binary compatibility readiness tooling now exists as
   `eng/package-binary-compat-preflight.ps1`. It validates a built package
   against a published baseline package through .NET SDK package validation.
-  `components-designer` `2.16.0` passed the new helper end to end, but the
-  same-version all-package loop is blocked because
-  `FluxFlow.Components.Configuration` `1.5.0` is not visible on the public
-  package feed. See `184-package-binary-compat-readiness.md`.
+  `components-designer` `2.16.0` passed the new helper end to end. A baseline
+  feed-alignment pass then found nine current manifest package versions missing
+  from the public feed, but stopped on the first tag-triggered workflow:
+  `components-http-aspnetcore-v1.0.4` now exists locally and on `origin` at
+  `2d24d5b076550281e070294c82cce4fedd6dece9`, while workflow run
+  `28611193314` failed in the Test step before pack/publish because the
+  binary-compat release-test fixture uses a CRLF shebang on Linux. No GitHub
+  release or NuGet package exists for
+  `FluxFlow.Components.Http.AspNetCore` `1.0.4`, and the remaining eight
+  baseline feed-alignment tags were not pushed. See
+  `184-package-binary-compat-readiness.md` and
+  `185-package-binary-compat-baseline-feed-alignment-blocker.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

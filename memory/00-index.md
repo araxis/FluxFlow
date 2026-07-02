@@ -372,6 +372,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   readiness helper and docs, with one successful published-baseline validation
   and an all-package loop blocker on an unpublished current support-package
   version.
+- `185-package-binary-compat-baseline-feed-alignment-blocker.md`: attempted
+  baseline feed-alignment release pass, stopped by a Linux release-test fixture
+  newline blocker before package publication.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

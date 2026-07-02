@@ -1140,6 +1140,19 @@ Date: 2026-05-31
   baseline: `FluxFlow.Components.Configuration` `1.5.0` is not on the public
   feed, with NuGet reporting nearest version `1.0.0`. See
   [[184-package-binary-compat-readiness]].
+- Started the binary compatibility baseline feed-alignment release pass. The
+  nine missing current-version tags, releases, and feed versions were absent,
+  local release tests passed (`91`), and the controlled Release and Debug
+  builds passed. `components-http-aspnetcore` `1.0.4` preflight and fast
+  dry-run passed, and tag `components-http-aspnetcore-v1.0.4` was pushed at
+  `2d24d5b076550281e070294c82cce4fedd6dece9`, but tag workflow run
+  `28611193314` failed in the Test step before pack/publish. The Linux runner
+  hit a binary-compat release-test fixture CRLF shebang error
+  (`/usr/bin/env: 'bash\r': No such file or directory`). No GitHub release or
+  package-feed version exists for `FluxFlow.Components.Http.AspNetCore`
+  `1.0.4`, the remaining eight package tags were not pushed, and source/tooling
+  edits were deferred to a separate recovery pass. See
+  [[185-package-binary-compat-baseline-feed-alignment-blocker]].
 
 ## Remaining
 
@@ -1153,8 +1166,12 @@ Date: 2026-05-31
   be scoped to a concrete stale section, package family, or user-facing
   publication requirement.
 - Package binary compatibility preflight tooling exists, but same-version
-  all-package readiness is blocked until missing current package versions are
-  published or a separate pass chooses explicit older baseline versions.
+  all-package readiness is blocked by a Linux release-test fixture newline
+  issue in the binary-compat helper tests. The first feed-alignment tag
+  `components-http-aspnetcore-v1.0.4` exists at
+  `2d24d5b076550281e070294c82cce4fedd6dece9`, but no release or package was
+  published; fix the test fixture and recover that tag before continuing the
+  remaining baseline feed-alignment packages.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
