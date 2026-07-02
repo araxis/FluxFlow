@@ -132,6 +132,15 @@ public sealed class ComponentPackageBoundaryTests
     }
 
     [Fact]
+    public void Project_reference_paths_normalize_to_the_current_platform()
+    {
+        NormalizePath(@"..\FluxFlow.Mapping\FluxFlow.Mapping.csproj")
+            .ShouldBe(Path.Combine("..", "FluxFlow.Mapping", "FluxFlow.Mapping.csproj"));
+        NormalizePath("../FluxFlow.Mapping/FluxFlow.Mapping.csproj")
+            .ShouldBe(Path.Combine("..", "FluxFlow.Mapping", "FluxFlow.Mapping.csproj"));
+    }
+
+    [Fact]
     public void Non_composition_component_readmes_document_their_composition_boundary()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -199,7 +208,8 @@ public sealed class ComponentPackageBoundaryTests
             var include = reference.Attribute("Include")?.Value;
             include.ShouldNotBeNullOrWhiteSpace();
 
-            var referencedProjectPath = Path.GetFullPath(Path.Combine(projectDirectory, include!));
+            var referencedProjectPath = Path.GetFullPath(
+                Path.Combine(projectDirectory, NormalizePath(include!)));
             var referencedProject = XDocument.Load(referencedProjectPath);
             yield return ReadRequiredProperty(
                 referencedProject,
@@ -235,5 +245,7 @@ public sealed class ComponentPackageBoundaryTests
     }
 
     private static string NormalizePath(string path)
-        => path.Replace('/', Path.DirectorySeparatorChar);
+        => path
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
 }
