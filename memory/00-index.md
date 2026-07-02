@@ -361,6 +361,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   `FluxFlow.Components.Mqtt.MqttNet` `1.1.7` and
   `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` tagged, published, and verified
   on the public package feed.
+- `182-public-package-consumer-validation.md`: public package consumer
+  validation for the published Designer metadata hint release train and MQTT
+  adapter releases: all 44 package-feed checks plus a combined temp consumer
+  restore/build passed.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

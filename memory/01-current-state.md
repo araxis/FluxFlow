@@ -6,8 +6,8 @@ Date: 2026-07-02
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is expected clean after the 2026-07-02 Designer
-  metadata hint release workflow recovery closeout.
+- The tracked worktree is expected clean after the 2026-07-02 public package
+  consumer validation closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -45,7 +45,12 @@ Date: 2026-07-02
   `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`, and verified every release
   workflow, release asset set, and public package-feed version. The two
   already-present runtime dependency tags remained skipped. See
-  `180-designer-metadata-hint-release-workflow-recovery.md`.
+  `180-designer-metadata-hint-release-workflow-recovery.md`. The published
+  Designer metadata hint release train plus the current MQTT adapter releases
+  were then consumer-validated from the public package feed: all 44
+  package-feed checks passed and a temporary `net8.0` consumer project with all
+  44 direct package references restored and built successfully. See
+  `182-public-package-consumer-validation.md`.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
@@ -130,7 +135,9 @@ Date: 2026-07-02
   `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` are now published and indexed
   for the adapter-local DI registration, hosted lifecycle, Pulse MQTT `2.5.0`
   lifecycle, manual acknowledgement, and registration-name hardening work. See
-  `181-mqtt-adapter-package-release.md`.
+  `181-mqtt-adapter-package-release.md`. These adapter versions were also
+  included in the public package consumer validation recorded in
+  `182-public-package-consumer-validation.md`.
   `FluxFlow.Components.Mqtt.Composition` is now added as an optional
   composition adapter package for `mqtt.publish` and `mqtt.trigger` node
   factories over keyed `IMqttPublisher` / `IMqttTriggerSource` resources; core

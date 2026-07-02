@@ -1113,13 +1113,22 @@ Date: 2026-05-31
   remote, watched through successful first-attempt release workflows, and
   verified with release assets plus public package-feed restores. See
   [[181-mqtt-adapter-package-release]].
+- Consumer-validated the published package set from the Designer metadata hint
+  release train and current MQTT adapter releases. Release tests (`86`) passed;
+  the controlled solution build passed after a scoped build-server shutdown
+  cleared stale local output locks; all 44 package-feed checks passed; and a
+  temporary `net8.0` consumer project with all 44 direct package references
+  restored from the public package feed and built with 0 warnings and 0 errors.
+  See [[182-public-package-consumer-validation]].
 
 ## Remaining
 
-- The Designer metadata hint release train is published and indexed. Future
-  release or package-family work should be planned as a separate bounded pass.
-- The current concrete MQTT adapter package updates are published and indexed.
-  Future MQTT adapter work should be planned as a separate bounded pass.
+- The Designer metadata hint release train is published, indexed, and
+  consumer-validated. Future release or package-family work should be planned
+  as a separate bounded pass.
+- The current concrete MQTT adapter package updates are published, indexed, and
+  consumer-validated. Future MQTT adapter work should be planned as a separate
+  bounded pass.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
