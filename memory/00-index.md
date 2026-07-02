@@ -378,6 +378,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `186-package-binary-compat-feed-alignment-recovery.md`: release-test fixture
   newline recovery, nine missing baseline package publications, and all-package
   binary compatibility preflight success.
+- `187-full-public-package-consumer-validation.md`: full public package consumer
+  validation for all 55 current manifest packages, including package-feed
+  checks and a combined temp consumer restore/build.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
