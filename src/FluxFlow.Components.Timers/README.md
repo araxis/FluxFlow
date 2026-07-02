@@ -103,8 +103,8 @@ windows, and debounce quiet periods without real-time waits.
 
 The optional `FluxFlow.Components.Timers.Composition` package registers timer
 factories for `FluxFlow.Composition`. It binds the existing timer settings from
-node configuration and resolves an optional keyed `TimeProvider` resource owned
-by the host.
+node configuration and resolves an optional host-owned keyed `TimeProvider`
+resource.
 
 ```csharp
 services
@@ -120,6 +120,6 @@ services
 Use custom node type strings for multiple transform input shapes, for example
 `timer.delay.order` and `timer.debounce.http`. Schedule composition uses the
 existing `TimerScheduleSettings` model; this adapter does not add time zone id
-conversion.
+conversion or own clock lifetime.
 Invalid timer settings fail during composition build and surface as factory
 diagnostics when build failures are configured as diagnostics.

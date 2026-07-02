@@ -69,9 +69,10 @@ separate concern from the node. This package is just the node.
 
 Add `FluxFlow.Components.Http.Composition` when a host wants to instantiate
 `HttpClientNode` from `FluxFlow.Composition` fluent/config definitions. That
-optional package registers the `http.client` factory and resolves a keyed
-`HttpClient` resource named `client`; the host still owns the client lifetime
-and transport policy.
+optional package registers the `http.client` factory and resolves a host-owned
+keyed `HttpClient` resource named `client`; the host still owns the client
+lifetime and transport policy. An optional host-owned keyed `TimeProvider`
+resource named `clock` can provide deterministic response/error timestamps.
 
 The optional composition package also exposes
 `HttpComponentDesignMetadataProvider` for neutral Designer metadata over the

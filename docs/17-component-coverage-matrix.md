@@ -77,6 +77,8 @@ Release tests currently enforce these consistency rules:
   `FluxFlow.Components.Designer`
 - support-only packages stay free of node runtime references and node classes
 - normal component package READMEs document their composition boundary
+- package READMEs have been reviewed for clear examples and host-owned resource
+  boundary wording after the Designer metadata hint and MQTT adapter releases
 - composition packages expose registry methods, node-type constants, port and
   resource constants, Designer metadata providers, and package docs
 - Designer metadata validates, is catalog-ready, and stays aligned with
@@ -87,7 +89,6 @@ Release tests currently enforce these consistency rules:
 
 Future work should be explicit and narrow. Good candidates:
 
-- run a full package README pass for clarity and examples without changing APIs
 - expand the public API baseline into binary compatibility checks only if that
   becomes a release requirement
 - plan a Designer UI host or resource-picker layer outside component packages

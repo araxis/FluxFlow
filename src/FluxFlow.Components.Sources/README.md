@@ -87,8 +87,8 @@ timestamps come from the configured clock's timeline.
 
 The optional `FluxFlow.Components.Sources.Composition` package registers source
 factories for `FluxFlow.Composition`. It binds the existing source options from
-node configuration, resolves an optional keyed `TimeProvider` resource owned by
-the host, and deserializes `source.generated` inline `items` into the closed
+node configuration, resolves an optional host-owned keyed `TimeProvider`
+resource, and deserializes `source.generated` inline `items` into the closed
 generic output type registered by the host.
 
 ```csharp
@@ -102,4 +102,6 @@ services
 Use custom node type strings for multiple generated output shapes, for example
 `source.generated.order` and `source.generated.http`. `OutputType` remains
 diagnostic metadata; the CLR output port type comes from the closed generic
-registration.
+registration. The composition adapter does not own generated item sources,
+clock lifetime, or source lifecycle beyond the composed runtime start/stop
+contract.

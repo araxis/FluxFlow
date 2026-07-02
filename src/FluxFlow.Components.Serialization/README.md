@@ -68,7 +68,7 @@ optional `TimeProvider`, post `FlowMessage<TRequest>` to `Input`, and link
 The optional `FluxFlow.Components.Serialization.Composition` package registers
 serialization factories for `FluxFlow.Composition`. It binds the existing
 `SerializationNodeOptions` from node configuration and resolves an optional
-keyed `TimeProvider` resource owned by the host.
+host-owned keyed `TimeProvider` resource.
 
 ```csharp
 services
@@ -83,4 +83,6 @@ services
 ```
 
 The request/result CLR types are fixed by the serialization contracts; no type
-alias or string-to-type resolution is needed.
+alias or string-to-type resolution is needed. Encoding fallback, JSON parsing,
+and size limits remain normal node options rather than composition-owned
+resource behavior.

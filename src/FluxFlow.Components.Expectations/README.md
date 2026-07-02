@@ -114,7 +114,9 @@ services
 ```
 
 The composition adapter binds `EventExpectationOptions` from node configuration
-and can resolve an optional keyed `TimeProvider` resource named `clock`.
+and can resolve optional host-owned keyed `TimeProvider` and evaluator
+resources. Rule evaluation, fail-fast behavior, and result inclusion remain
+normal node behavior controlled by `EventExpectationOptions`.
 
 The optional composition package also exposes
 `ExpectationsComponentDesignMetadataProvider` for neutral Designer metadata over

@@ -200,14 +200,16 @@ That optional package registers explicit `mqtt.publish` and `mqtt.trigger`
 factories while this core package stays focused on standalone nodes and neutral
 MQTT contracts.
 
-Composition node factories resolve adapter-owned keyed resources:
+Composition node factories resolve host-owned adapter resources by key:
 
 - `publisher` maps to a keyed `IMqttPublisher`.
 - `triggerSource` maps to a keyed `IMqttTriggerSource`.
 - `clock` optionally maps to a keyed `TimeProvider`.
 
 Concrete adapter packages or the host still own broker settings, credentials,
-connection lifetime, reconnect behavior, and any client-specific features.
+connection lifetime, reconnect behavior, and any client-specific features. The
+composition package only consumes those resources; it does not create,
+connect, reconnect, or dispose MQTT clients.
 
 The optional composition package also exposes
 `MqttComponentDesignMetadataProvider` for neutral Designer metadata over the

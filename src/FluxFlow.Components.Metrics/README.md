@@ -105,7 +105,9 @@ services
 ```
 
 The composition adapter binds `MetricsAggregateOptions` from node configuration
-and can resolve an optional keyed `TimeProvider` resource named `clock`.
+and can resolve an optional host-owned keyed `TimeProvider` resource named
+`clock`. Group tracking, aggregation windows, and snapshot emission remain
+normal node behavior controlled by `MetricsAggregateOptions`.
 
 The optional composition package also exposes
 `MetricsComponentDesignMetadataProvider` for neutral Designer metadata over the

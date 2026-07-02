@@ -40,7 +40,8 @@ logical trigger.
 
 This package does not expose `FluxFlow.Composition` node factories. It owns the
 ASP.NET Core endpoint and trigger DI integration through `AddFluxFlowHttpTrigger`
-and `MapFluxFlowTrigger`.
+and `MapFluxFlowTrigger`; the host owns the ASP.NET Core app, route selection,
+request body policy, and host-owned trigger lifetime registration.
 
 Use `FluxFlow.Components.Http.Composition` only for outbound `http.client`
 composition. Config-composed inbound HTTP trigger factories are intentionally

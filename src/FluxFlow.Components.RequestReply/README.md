@@ -55,9 +55,10 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 
 ## Composition
 
-This package does not expose standalone nodes or `FluxFlow.Composition`
-factories. It is support infrastructure for transport adapters that need to
-bridge inbound request/reply behavior into one-way workflow graphs.
+This support-only package does not expose standalone nodes or
+`FluxFlow.Composition` factories. It is infrastructure for transport adapters
+that need to bridge inbound request/reply behavior into one-way workflow
+graphs.
 
 HTTP and MQTT trigger packages own their transport-specific integration. Normal
 composition packages consume those adapters or their host-owned resources rather

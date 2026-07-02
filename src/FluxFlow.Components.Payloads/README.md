@@ -106,5 +106,7 @@ services
 ```
 
 The composition adapter binds `PayloadInspectOptions` from node configuration
-and can resolve an optional keyed `TimeProvider` resource named `clock`. The
-request/result contracts and node behavior stay the same.
+and can resolve an optional host-owned keyed `TimeProvider` resource named
+`clock`. The request/result contracts and node behavior stay the same; the
+adapter does not add transport fields, payload sources, or formatting policy
+outside the existing options.

@@ -161,6 +161,7 @@ services
 ```
 
 The composition adapter binds existing FileSystem option records from node
-configuration and can resolve an optional keyed `TimeProvider` resource named
-`clock`. Base-directory and absolute-path behavior remain normal node options;
-the adapter does not add a separate path-resource or sandbox model.
+configuration and can resolve an optional host-owned keyed `TimeProvider`
+resource named `clock`. Base-directory and absolute-path behavior remain normal
+node options; the adapter does not add a separate path-resource or sandbox
+model, and it does not own file-system policy outside those options.

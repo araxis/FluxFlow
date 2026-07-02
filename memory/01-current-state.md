@@ -6,8 +6,8 @@ Date: 2026-07-02
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is expected clean after the 2026-07-02 public package
-  consumer validation closeout.
+- The tracked worktree is expected clean after the 2026-07-02 package README
+  clarity closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -53,6 +53,13 @@ Date: 2026-07-02
   `182-public-package-consumer-validation.md`.
 - See `155-composition-and-designer-progress.md` for the current summary and
   verification notes.
+- Package README clarity was completed across all 55 manifest packages after
+  the release and consumer-validation work. Runtime, composition, adapter, and
+  support-package READMEs now state host/resource ownership boundaries more
+  clearly where needed; no source APIs, runtime behavior, package versions,
+  release notes, changelog entries, public API baselines, tags, publishing
+  workflow, or release scripts changed. See
+  `183-package-readme-clarity-pass.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

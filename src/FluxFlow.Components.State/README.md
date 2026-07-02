@@ -95,7 +95,8 @@ services
 ```
 
 The composition adapter binds `StateReducerOptions` from node configuration,
-resolves the required expression engine from the keyed `engine` resource, and
-can resolve an optional keyed `TimeProvider` resource named `clock`.
+resolves the required expression engine from the host-owned keyed `engine`
+resource, and can resolve an optional host-owned keyed `TimeProvider` resource
+named `clock`.
 `StateReducerOptions.Engine` remains diagnostic/config metadata; it is not used
 for DI selection by the composition adapter.

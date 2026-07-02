@@ -1120,6 +1120,15 @@ Date: 2026-05-31
   temporary `net8.0` consumer project with all 44 direct package references
   restored from the public package feed and built with 0 warnings and 0 errors.
   See [[182-public-package-consumer-validation]].
+- Completed a documentation-only package README clarity pass. Inventory found
+  all 55 manifest package READMEs present with matching package-ID headings.
+  Runtime, composition, adapter, and support-package boundary wording was
+  tightened where stale or vague, and the component coverage matrix now records
+  the pass as complete. Release tests (`86`), the controlled solution build,
+  `git diff --check`, and graph refresh passed. No source APIs, runtime
+  behavior, package versions, release notes, changelog entries, public API
+  baselines, tags, publishing workflow, or release scripts changed. See
+  [[183-package-readme-clarity-pass]].
 
 ## Remaining
 
@@ -1129,6 +1138,9 @@ Date: 2026-05-31
 - The current concrete MQTT adapter package updates are published, indexed, and
   consumer-validated. Future MQTT adapter work should be planned as a separate
   bounded pass.
+- The package README clarity pass is complete. Future documentation work should
+  be scoped to a concrete stale section, package family, or user-facing
+  publication requirement.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

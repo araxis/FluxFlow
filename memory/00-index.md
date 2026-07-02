@@ -365,6 +365,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   validation for the published Designer metadata hint release train and MQTT
   adapter releases: all 44 package-feed checks plus a combined temp consumer
   restore/build passed.
+- `183-package-readme-clarity-pass.md`: documentation-only package README
+  clarity pass across all 55 manifest packages, with boundary wording tightened
+  for runtime, composition, adapter, and support packages.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
