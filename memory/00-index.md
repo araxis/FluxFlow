@@ -384,6 +384,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `188-designer-resource-picker-hint-contracts.md`: Designer resource picker
   hint contracts: additive `2.17.0` host helper APIs for reading host-owned
   resource picker hints from component metadata without owning resources or UI.
+- `189-designer-resource-picker-hint-package-release.md`: Designer resource
+  picker hint package release: `FluxFlow.Components.Designer` `2.17.0` tagged,
+  published, release-asset verified, and public-feed verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

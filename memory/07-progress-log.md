@@ -1186,13 +1186,25 @@ Date: 2026-05-31
   controlled Release and Debug builds, binary compatibility preflight against
   `2.16.0`, package release preflight, and fast release dry-run passed. See
   [[188-designer-resource-picker-hint-contracts]].
+- Published `FluxFlow.Components.Designer` `2.17.0`. Pre-release checks
+  confirmed the worktree was clean at
+  `738f2e1cf38aaff083e6534004a7baa342020904`, the tag
+  `components-designer-v2.17.0` was absent locally and on `origin`, and the
+  public feed did not yet contain `2.17.0`. Designer tests (`97`), release
+  tests (`92`), controlled Release and Debug builds, binary compatibility
+  preflight against `2.16.0`, release preflight, and fast dry-run passed. The
+  tag was pushed, workflow run `28622249640` completed successfully, the GitHub
+  release has `.nupkg` and `.snupkg` assets, local and remote peeled tags point
+  at `738f2e1cf38aaff083e6534004a7baa342020904`, and public feed verification
+  passed. See [[189-designer-resource-picker-hint-package-release]].
 
 ## Remaining
 
 - The Designer metadata hint release train is published, indexed, and
   consumer-validated. Designer now also has neutral resource picker hint
-  contracts; future renderer UI or package-family work should be planned as a
-  separate bounded pass.
+  contracts published in `FluxFlow.Components.Designer` `2.17.0`; future
+  renderer UI or package-family work should be planned as a separate bounded
+  pass.
 - The current concrete MQTT adapter package updates are published, indexed, and
   consumer-validated. Future MQTT adapter work should be planned as a separate
   bounded pass.

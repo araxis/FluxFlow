@@ -7,7 +7,7 @@ Date: 2026-07-02
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
 - The tracked worktree is expected clean after the 2026-07-02 Designer resource
-  picker hint contract closeout.
+  picker hint package release closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -93,6 +93,11 @@ Date: 2026-07-02
   It does not render UI, enumerate resource instances, resolve keyed services,
   or own resource lifetimes. See
   `188-designer-resource-picker-hint-contracts.md`.
+- `FluxFlow.Components.Designer` `2.17.0` is published from
+  `738f2e1cf38aaff083e6534004a7baa342020904` with tag
+  `components-designer-v2.17.0`. Release workflow run `28622249640` passed,
+  release assets exist, and public package-feed verification passed. See
+  `189-designer-resource-picker-hint-package-release.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
