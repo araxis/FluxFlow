@@ -1103,11 +1103,23 @@ Date: 2026-05-31
   workflow runs needed one rerun after transient full-suite test failures, then
   passed before the train continued. See
   [[180-designer-metadata-hint-release-workflow-recovery]].
+- Published the current concrete MQTT adapter packages. Pre-release checks
+  confirmed both release tags and package-feed versions were absent. Focused
+  MQTTnet tests (`33`), Pulse MQTT tests (`22`), core MQTT tests (`58`),
+  release tests (`86`), the controlled solution build, package preflights, and
+  fast dry-runs passed. Tags `components-mqtt-mqttnet-v1.1.7` and
+  `components-mqtt-pulsemqtt-v2.0.7` were created at
+  `9108abdf4c1aad1216163dd9ae36c4b51f9055df`, pushed to the configured
+  remote, watched through successful first-attempt release workflows, and
+  verified with release assets plus public package-feed restores. See
+  [[181-mqtt-adapter-package-release]].
 
 ## Remaining
 
 - The Designer metadata hint release train is published and indexed. Future
   release or package-family work should be planned as a separate bounded pass.
+- The current concrete MQTT adapter package updates are published and indexed.
+  Future MQTT adapter work should be planned as a separate bounded pass.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

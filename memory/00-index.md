@@ -357,6 +357,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   hint release workflow recovery: Linux release-test path normalization fix,
   42 dependency-ordered tags retargeted to the fixed commit, release workflows
   completed, and public package-feed visibility verified.
+- `181-mqtt-adapter-package-release.md`: MQTT adapter package release:
+  `FluxFlow.Components.Mqtt.MqttNet` `1.1.7` and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` tagged, published, and verified
+  on the public package feed.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -116,7 +116,7 @@ Date: 2026-07-02
   now uses the upstream MQTT-named `ConnectAsync` / `DisconnectAsync` lifecycle
   APIs internally while keeping its adapter-level `StartAsync` / `StopAsync`
   host lifecycle helpers.
-- MQTT pilot release set is published and indexed on NuGet:
+- MQTT pilot release set is published and indexed on the public package feed:
   `FluxFlow.Components.RequestReply` `1.1.0`,
   `FluxFlow.Components.Mqtt` `4.0.0`,
   `FluxFlow.Components.Mqtt.MqttNet` `1.0.0`, and
@@ -126,12 +126,11 @@ Date: 2026-07-02
   successfully. The package feed was explicitly verified after publication.
   Current source keeps core `FluxFlow.Components.Mqtt` pure at `4.0.0` with no
   client capability descriptor or cross-adapter registration package.
-  `FluxFlow.Components.Mqtt.MqttNet` is bumped to `1.1.0` for adapter-local DI
-  registration and optional hosted connect/disconnect lifetime.
-  `FluxFlow.Components.Mqtt.PulseMqtt` is bumped to `1.1.0` for Pulse MQTT
-  `2.5.0` manual acknowledgement support, adapter-local DI registration,
-  optional hosted startup, and optional Pulse message/session store hooks. These
-  FluxFlow package changes have not yet been published.
+  `FluxFlow.Components.Mqtt.MqttNet` `1.1.7` and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` are now published and indexed
+  for the adapter-local DI registration, hosted lifecycle, Pulse MQTT `2.5.0`
+  lifecycle, manual acknowledgement, and registration-name hardening work. See
+  `181-mqtt-adapter-package-release.md`.
   `FluxFlow.Components.Mqtt.Composition` is now added as an optional
   composition adapter package for `mqtt.publish` and `mqtt.trigger` node
   factories over keyed `IMqttPublisher` / `IMqttTriggerSource` resources; core
