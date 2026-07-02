@@ -78,6 +78,19 @@ Accept an intentional baseline update by setting
 `PublicApiBaselineTests`. Do this only after package version, changelog, and docs
 changes are correct for the public API change.
 
+## Binary Compatibility Preflight
+
+The source-declaration baseline is not a binary compatibility tool. For package
+release readiness, run `eng/package-binary-compat-preflight.ps1` after a
+controlled Release build. The helper resolves the package through
+`eng/packages.json` and uses .NET SDK package validation during `dotnet pack` to
+compare the current package assembly against a published baseline package
+version.
+
+Use the current project version as the baseline version for same-version
+release-readiness checks. Use an explicit older baseline only when validating a
+new package version against the previous published stable package.
+
 ## Release Checklist
 
 Before publishing:
@@ -88,8 +101,10 @@ Before publishing:
 3. Run build and tests locally.
 4. Run the sample app when docs, JSON, links, lifecycle, or package authoring
    behavior changed.
-5. Create the release from a clean commit.
-6. Verify the package can be restored from the public package feed.
+5. Run package binary compatibility preflight when the release must be checked
+   against a published baseline.
+6. Create the release from a clean commit.
+7. Verify the package can be restored from the public package feed.
 
 ## Independent Packages
 

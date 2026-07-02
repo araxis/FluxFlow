@@ -72,6 +72,8 @@ Release tests currently enforce these consistency rules:
 - every manifest package has release metadata, changelog coverage, and a
   package-local README packed as `README.md`
 - every package README starts with an H1 matching its package id
+- package binary compatibility preflight is available for release-readiness
+  checks against published package baselines
 - non-composition component packages stay free of `FluxFlow.Engine`,
   `FluxFlow.Composition`, `FluxFlow.Composition.Hosting`, and
   `FluxFlow.Components.Designer`
@@ -89,8 +91,6 @@ Release tests currently enforce these consistency rules:
 
 Future work should be explicit and narrow. Good candidates:
 
-- expand the public API baseline into binary compatibility checks only if that
-  becomes a release requirement
 - plan a Designer UI host or resource-picker layer outside component packages
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node

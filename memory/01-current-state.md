@@ -6,8 +6,8 @@ Date: 2026-07-02
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is expected clean after the 2026-07-02 package README
-  clarity closeout.
+- The tracked worktree is expected clean after the 2026-07-02 package binary
+  compatibility readiness helper closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -60,6 +60,13 @@ Date: 2026-07-02
   release notes, changelog entries, public API baselines, tags, publishing
   workflow, or release scripts changed. See
   `183-package-readme-clarity-pass.md`.
+- Package binary compatibility readiness tooling now exists as
+  `eng/package-binary-compat-preflight.ps1`. It validates a built package
+  against a published baseline package through .NET SDK package validation.
+  `components-designer` `2.16.0` passed the new helper end to end, but the
+  same-version all-package loop is blocked because
+  `FluxFlow.Components.Configuration` `1.5.0` is not visible on the public
+  package feed. See `184-package-binary-compat-readiness.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

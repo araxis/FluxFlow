@@ -368,6 +368,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `183-package-readme-clarity-pass.md`: documentation-only package README
   clarity pass across all 55 manifest packages, with boundary wording tightened
   for runtime, composition, adapter, and support packages.
+- `184-package-binary-compat-readiness.md`: package binary compatibility
+  readiness helper and docs, with one successful published-baseline validation
+  and an all-package loop blocker on an unpublished current support-package
+  version.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -14,6 +14,11 @@ This is not a full binary compatibility tool. It is a review checkpoint that
 catches accidental public declaration drift and forces intentional versioning,
 changelog, and documentation decisions.
 
+For binary package compatibility readiness, use
+`eng/package-binary-compat-preflight.ps1` after a controlled Release build. That
+helper runs .NET SDK package validation during `dotnet pack` and compares the
+current package artifact with a published baseline package version.
+
 ## Updating
 
 When a public declaration change is intentional:

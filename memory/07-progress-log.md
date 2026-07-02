@@ -1129,6 +1129,17 @@ Date: 2026-05-31
   behavior, package versions, release notes, changelog entries, public API
   baselines, tags, publishing workflow, or release scripts changed. See
   [[183-package-readme-clarity-pass]].
+- Added a package binary compatibility readiness helper. The new release script
+  resolves package aliases and versions through the existing manifest/resolver,
+  restores the baseline package into the NuGet global package cache outside the
+  repo, and runs `dotnet pack --no-build` with SDK package validation enabled.
+  Release tests passed at `91`; the controlled Release build passed; manifest
+  enumeration found 55 packages; and `components-designer` `2.16.0` passed
+  binary compatibility validation against its published same-version baseline.
+  The all-package loop stopped at the first missing published same-version
+  baseline: `FluxFlow.Components.Configuration` `1.5.0` is not on the public
+  feed, with NuGet reporting nearest version `1.0.0`. See
+  [[184-package-binary-compat-readiness]].
 
 ## Remaining
 
@@ -1141,6 +1152,9 @@ Date: 2026-05-31
 - The package README clarity pass is complete. Future documentation work should
   be scoped to a concrete stale section, package family, or user-facing
   publication requirement.
+- Package binary compatibility preflight tooling exists, but same-version
+  all-package readiness is blocked until missing current package versions are
+  published or a separate pass chooses explicit older baseline versions.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
