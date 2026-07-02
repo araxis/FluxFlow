@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.17.0
+
+Adds neutral resource picker hint contracts for host Designer integrations.
+
+- Adds `ComponentResourcePickerHint` and `ComponentResourcePickerHints` so hosts
+  can read host-owned resource picker metadata from validated component design
+  metadata.
+- Parses conditional resource option hints into typed option names.
+- Keeps rendering, resource catalogs, keyed resource resolution, and resource
+  lifetimes host-owned.
+
 ## FluxFlow.Components.Mqtt.Composition 1.4.0
 
 Adds richer Designer hints for the MQTT metadata provider.

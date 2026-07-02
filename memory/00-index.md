@@ -381,6 +381,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `187-full-public-package-consumer-validation.md`: full public package consumer
   validation for all 55 current manifest packages, including package-feed
   checks and a combined temp consumer restore/build.
+- `188-designer-resource-picker-hint-contracts.md`: Designer resource picker
+  hint contracts: additive `2.17.0` host helper APIs for reading host-owned
+  resource picker hints from component metadata without owning resources or UI.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

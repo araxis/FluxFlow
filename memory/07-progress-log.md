@@ -1175,12 +1175,24 @@ Date: 2026-05-31
   release notes, README files, changelog entries, public API baselines, release
   scripts, tags, or publishing state changed. See
   [[187-full-public-package-consumer-validation]].
+- Added neutral Designer resource picker hint contracts.
+  `ComponentResourcePickerHint` and `ComponentResourcePickerHints.Create(...)`
+  let hosts read host-owned resource picker metadata from one metadata item or a
+  validated catalog, including key patterns, related options, required flags,
+  value type/display fields, and parsed conditional option names. The Designer
+  package moves to `2.17.0`; renderer UI, resource catalogs, keyed resolution,
+  resource lifetimes, component metadata content, runtime behavior, and hot
+  reload remain out of scope. Designer tests (`97`), release tests (`92`),
+  controlled Release and Debug builds, binary compatibility preflight against
+  `2.16.0`, package release preflight, and fast release dry-run passed. See
+  [[188-designer-resource-picker-hint-contracts]].
 
 ## Remaining
 
 - The Designer metadata hint release train is published, indexed, and
-  consumer-validated. Future release or package-family work should be planned
-  as a separate bounded pass.
+  consumer-validated. Designer now also has neutral resource picker hint
+  contracts; future renderer UI or package-family work should be planned as a
+  separate bounded pass.
 - The current concrete MQTT adapter package updates are published, indexed, and
   consumer-validated. Future MQTT adapter work should be planned as a separate
   bounded pass.
@@ -1199,5 +1211,6 @@ Date: 2026-05-31
   convention tests, and the controlled solution build.
 - Keep local graph output updated after repo changes and keep it out of git.
   See [[140-local-graph-maintenance]].
-- Hot reload semantics, renderer behavior, resource picker UI, runtime lifecycle
-  hooks, and request/reply redesign remain deferred until separately planned.
+- Hot reload semantics, renderer behavior, resource catalog UI, runtime
+  lifecycle hooks, and request/reply redesign remain deferred until separately
+  planned.

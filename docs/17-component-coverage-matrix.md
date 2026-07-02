@@ -83,15 +83,15 @@ Release tests currently enforce these consistency rules:
   boundary wording after the Designer metadata hint and MQTT adapter releases
 - composition packages expose registry methods, node-type constants, port and
   resource constants, Designer metadata providers, and package docs
-- Designer metadata validates, is catalog-ready, and stays aligned with
-  registry metadata, bound options, required resources, ports, defaults, and
-  enum choices
+- Designer metadata validates, is catalog-ready, exposes neutral host-owned
+  resource picker hint helpers, and stays aligned with registry metadata, bound
+  options, required resources, ports, defaults, and enum choices
 
 ## Next Isolated Plans
 
 Future work should be explicit and narrow. Good candidates:
 
-- plan a Designer UI host or resource-picker layer outside component packages
+- plan a Designer UI host layer outside component packages
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node
   surface is explicitly needed

@@ -901,6 +901,8 @@ Main types:
 - `OptionDesignMetadataAttributeValues`
 - `OptionDesignMetadataAttributes`
 - `ResourceDesignMetadata`
+- `ComponentResourcePickerHint`
+- `ComponentResourcePickerHints`
 - `PortDesignMetadata`
 - `PortDirection`
 - `IComponentDesignMetadataProvider`
@@ -947,6 +949,11 @@ related-resource hints without owning host rendering or editor behavior.
 attribute helpers so package metadata can declare resource ownership, picker
 kind, key pattern, related option, and conditional requiredness without owning
 the host resource catalog.
+`ComponentResourcePickerHints` reads those existing host-owned resource
+attributes from one metadata item or a catalog and returns ordered
+`ComponentResourcePickerHint` values for host resource-picker integrations. It
+does not render controls, enumerate resource instances, resolve keyed services,
+or own resource lifetimes.
 `ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
 metadata providers and a singleton validated catalog in host DI, while leaving
 palette rendering, localization, and resource pickers owned by the host.

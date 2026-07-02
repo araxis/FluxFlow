@@ -38,6 +38,9 @@ component without depending on a specific rendering framework.
   more providers.
 - `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
   for registering providers and resolving one validated catalog.
+- `ComponentResourcePickerHint` and `ComponentResourcePickerHints`: neutral
+  host-side helpers for reading host-owned resource picker hints from metadata
+  without resolving resources or rendering UI.
 - `ResourceDesignMetadataAttributeNames`,
   `ResourceDesignMetadataAttributeValues`, and
   `ResourceDesignMetadataAttributes`: shared names, values, and helpers for
@@ -99,6 +102,13 @@ needs to describe a host-owned resource picker. The shared attribute names cover
 resource ownership, picker kind, key pattern, related option, and conditional
 requiredness. They are only hints for hosts; the host still owns resource
 catalogs, keyed registrations, secrets, lifetimes, and disposal.
+
+Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
+of the host-owned picker hints from one component metadata item or a validated
+catalog. The helper filters to host-owned resources with picker kinds, preserves
+resource order within each component, and parses conditional option names such
+as `predicate,expression` into typed option names. It does not enumerate,
+validate, resolve, create, or dispose host resources.
 
 ## Example
 
