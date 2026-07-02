@@ -387,6 +387,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `189-designer-resource-picker-hint-package-release.md`: Designer resource
   picker hint package release: `FluxFlow.Components.Designer` `2.17.0` tagged,
   published, release-asset verified, and public-feed verified.
+- `190-full-public-package-consumer-validation-after-designer-2-17.md`: full
+  public package consumer validation after Designer `2.17.0`: all 55 package
+  feed checks and combined temp consumer restore/build passed.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

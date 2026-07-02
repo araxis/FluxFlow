@@ -6,8 +6,8 @@ Date: 2026-07-02
 
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
-- The tracked worktree is expected clean after the 2026-07-02 Designer resource
-  picker hint package release closeout.
+- The tracked worktree is expected clean after the 2026-07-02 full public
+  package consumer validation after Designer `2.17.0` closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -98,6 +98,11 @@ Date: 2026-07-02
   `components-designer-v2.17.0`. Release workflow run `28622249640` passed,
   release assets exist, and public package-feed verification passed. See
   `189-designer-resource-picker-hint-package-release.md`.
+- Full public package consumer validation passed after Designer `2.17.0`: all
+  55 package-feed checks passed, and a temporary `net8.0` consumer project
+  outside the repository with all 55 direct package references restored from the
+  public package feed and built successfully. See
+  `190-full-public-package-consumer-validation-after-designer-2-17.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

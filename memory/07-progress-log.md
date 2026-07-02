@@ -1197,6 +1197,15 @@ Date: 2026-05-31
   release has `.nupkg` and `.snupkg` assets, local and remote peeled tags point
   at `738f2e1cf38aaff083e6534004a7baa342020904`, and public feed verification
   passed. See [[189-designer-resource-picker-hint-package-release]].
+- Consumer-validated the full current manifest package set after publishing
+  Designer `2.17.0`. Release tests passed (`92`), the controlled Debug solution
+  build passed with 0 warnings and 0 errors, all 55 package-feed checks passed
+  against the public package feed, and a temporary `net8.0` consumer project
+  outside the repository with all 55 direct package references restored with
+  `--no-cache` and built in Release configuration with 0 warnings and 0 errors.
+  No package source, versions, release notes, README files, changelog entries,
+  public API baselines, release scripts, tags, or publishing state changed. See
+  [[190-full-public-package-consumer-validation-after-designer-2-17]].
 
 ## Remaining
 
@@ -1216,8 +1225,9 @@ Date: 2026-05-31
   compatibility preflight passed for all 55 manifest packages. Future package
   release readiness should include the helper after a controlled Release build.
 - All 55 current manifest packages are public-feed visible and validated by a
-  combined temporary consumer restore/build. Future consumer validation should
-  be rerun after package version changes or publication batches.
+  combined temporary consumer restore/build after the Designer `2.17.0`
+  publication. Future consumer validation should be rerun after package version
+  changes or publication batches.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
