@@ -1153,6 +1153,19 @@ Date: 2026-05-31
   `1.0.4`, the remaining eight package tags were not pushed, and source/tooling
   edits were deferred to a separate recovery pass. See
   [[185-package-binary-compat-baseline-feed-alignment-blocker]].
+- Recovered the binary compatibility baseline feed-alignment release pass. The
+  release-test fixture now writes the fake Unix `dotnet` script with LF line
+  endings and guards the generated shebang script against carriage-return
+  bytes. Release tests passed (`92`), and the controlled Release and Debug
+  builds passed with 0 warnings and 0 errors. The failed
+  `components-http-aspnetcore-v1.0.4` tag was retargeted to
+  `a62c96888f92bde4dbe303bb15eac4c1632e8da0`; the remaining eight baseline
+  tags were created at the same fixed commit. All nine release workflows
+  completed successfully, each release has two assets, every package-feed check
+  passed, and all 55 manifest packages passed
+  `eng/package-binary-compat-preflight.ps1` against their published
+  same-version baselines. See
+  [[186-package-binary-compat-feed-alignment-recovery]].
 
 ## Remaining
 
@@ -1165,13 +1178,10 @@ Date: 2026-05-31
 - The package README clarity pass is complete. Future documentation work should
   be scoped to a concrete stale section, package family, or user-facing
   publication requirement.
-- Package binary compatibility preflight tooling exists, but same-version
-  all-package readiness is blocked by a Linux release-test fixture newline
-  issue in the binary-compat helper tests. The first feed-alignment tag
-  `components-http-aspnetcore-v1.0.4` exists at
-  `2d24d5b076550281e070294c82cce4fedd6dece9`, but no release or package was
-  published; fix the test fixture and recover that tag before continuing the
-  remaining baseline feed-alignment packages.
+- Package binary compatibility preflight tooling exists, the missing current
+  baseline package versions are published, and same-version binary
+  compatibility preflight passed for all 55 manifest packages. Future package
+  release readiness should include the helper after a controlled Release build.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

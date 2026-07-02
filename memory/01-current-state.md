@@ -7,7 +7,7 @@ Date: 2026-07-02
 - `D:\Projects\FluxFlow` is currently on local branch
   `work/designer-value-type-hint-contract`.
 - The tracked worktree is expected clean after the 2026-07-02 package binary
-  compatibility baseline feed-alignment blocker closeout.
+  compatibility feed-alignment recovery closeout.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -63,18 +63,24 @@ Date: 2026-07-02
 - Package binary compatibility readiness tooling now exists as
   `eng/package-binary-compat-preflight.ps1`. It validates a built package
   against a published baseline package through .NET SDK package validation.
-  `components-designer` `2.16.0` passed the new helper end to end. A baseline
-  feed-alignment pass then found nine current manifest package versions missing
-  from the public feed, but stopped on the first tag-triggered workflow:
-  `components-http-aspnetcore-v1.0.4` now exists locally and on `origin` at
-  `2d24d5b076550281e070294c82cce4fedd6dece9`, while workflow run
-  `28611193314` failed in the Test step before pack/publish because the
-  binary-compat release-test fixture uses a CRLF shebang on Linux. No GitHub
-  release or NuGet package exists for
-  `FluxFlow.Components.Http.AspNetCore` `1.0.4`, and the remaining eight
-  baseline feed-alignment tags were not pushed. See
-  `184-package-binary-compat-readiness.md` and
-  `185-package-binary-compat-baseline-feed-alignment-blocker.md`.
+  `components-designer` `2.16.0` passed the helper end to end, then the
+  baseline feed-alignment recovery fixed the Linux release-test fixture newline
+  issue, retargeted `components-http-aspnetcore-v1.0.4`, and published the nine
+  current manifest package versions that were missing from the public feed:
+  `FluxFlow.Components.Http.AspNetCore` `1.0.4`, `FluxFlow.Engine` `2.0.1`,
+  `FluxFlow.Components.Expressions` `2.1.2`,
+  `FluxFlow.Components.Resources` `1.6.0`,
+  `FluxFlow.Components.Secrets` `1.6.0`,
+  `FluxFlow.Components.Configuration` `1.5.0`,
+  `FluxFlow.Components.Journal` `2.3.5`,
+  `FluxFlow.Components.Storage.FileSystem` `3.3.4`, and
+  `FluxFlow.Components.Storage.SqlFile` `3.3.4`. All nine release workflows
+  completed successfully with release assets and public feed verification, and
+  all 55 manifest packages passed same-version binary compatibility preflight
+  against their published baselines. See
+  `184-package-binary-compat-readiness.md`,
+  `185-package-binary-compat-baseline-feed-alignment-blocker.md`, and
+  `186-package-binary-compat-feed-alignment-recovery.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
