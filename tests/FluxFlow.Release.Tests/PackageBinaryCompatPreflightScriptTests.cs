@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Xml.Linq;
 using Shouldly;
 using Xunit;
@@ -157,6 +158,16 @@ public sealed class PackageBinaryCompatPreflightScriptTests
         dotnetArguments.ShouldContain($"-p:PackageValidationBaselineVersion={fixture.Version}");
     }
 
+    [Fact]
+    public void Fake_dotnet_unix_script_uses_lf_line_endings()
+    {
+        var script = CreateFakeUnixDotnetScript();
+        var bytes = Encoding.UTF8.GetBytes(script);
+
+        script.ShouldStartWith("#!/usr/bin/env bash\n");
+        bytes.ShouldNotContain((byte)'\r');
+    }
+
     private static PackageManifestEntry GetConfigurationPackage(string root)
         => PackageManifest
             .Read(root)
@@ -193,11 +204,7 @@ public sealed class PackageBinaryCompatPreflightScriptTests
         }
 
         var scriptPath = Path.Combine(directory, "dotnet");
-        File.WriteAllText(scriptPath, """
-            #!/usr/bin/env bash
-            printf '%s\n' "$*" >> "$DOTNET_ARGUMENTS_FILE"
-            exit 0
-            """);
+        File.WriteAllText(scriptPath, CreateFakeUnixDotnetScript());
 
         File.SetUnixFileMode(
             scriptPath,
@@ -207,6 +214,13 @@ public sealed class PackageBinaryCompatPreflightScriptTests
 
         return directory;
     }
+
+    private static string CreateFakeUnixDotnetScript()
+        => """
+            #!/usr/bin/env bash
+            printf '%s\n' "$*" >> "$DOTNET_ARGUMENTS_FILE"
+            exit 0
+            """.ReplaceLineEndings("\n");
 
     private sealed class BinaryCompatFixture : IDisposable
     {
