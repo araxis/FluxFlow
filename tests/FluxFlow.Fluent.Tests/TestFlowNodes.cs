@@ -1,3 +1,4 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Fluent.Tests;
@@ -97,6 +98,30 @@ internal sealed class IntSourceNode(int count) : FlowSource<int>
             Emit(FlowMessage.Create(value));
         }
 
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Routes each int to one of two typed output ports by parity — used to exercise branching.</summary>
+internal sealed class EvenOddRouter : FlowNode<int, int>
+{
+    private readonly BroadcastBlock<FlowMessage<int>> _even;
+    private readonly BroadcastBlock<FlowMessage<int>> _odd;
+
+    public EvenOddRouter()
+    {
+        _even = AddOutput<FlowMessage<int>>();
+        _odd = AddOutput<FlowMessage<int>>();
+    }
+
+    public ISourceBlock<FlowMessage<int>> Even => _even;
+
+    public ISourceBlock<FlowMessage<int>> Odd => _odd;
+
+    protected override Task ProcessAsync(FlowMessage<int> message)
+    {
+        var port = message.Payload % 2 == 0 ? _even : _odd;
+        port.Post(message);
         return Task.CompletedTask;
     }
 }
