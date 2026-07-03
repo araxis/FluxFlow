@@ -1290,6 +1290,18 @@ Date: 2026-05-31
   source completes). Passes 60/60 in isolation; full `FluxFlow.Nodes.Tests`
   suite `36` passed. Test-only change; no `FluxFlow.Nodes` source or package
   version changed. See [[197-bounded-source-flaky-test-fix]].
+- 2026-07-03: Merged the accumulated work into `main` via PR #54 (clean
+  fast-forward, tags preserved by using a merge commit) and started the Designer
+  host layer renderer UI (docs/18 phase 5) on branch `work/designer-renderer-ui`
+  as `samples/FluxFlow.DesignerApp` — a Blazor WebAssembly + MudBlazor app
+  (net10.0) over `FluxFlow.DesignerHost`. First slice: component palette and
+  option/resource inspector from the real metadata catalog. Browser-verified via
+  the preview tooling (palette 23 components in 8 categories; `timer.interval`
+  inspector shows 6 options + the Clock resource with correct editors, ordering,
+  required/advanced markers, and picker/value-type/key-pattern). Added to
+  `FluxFlow.sln` and `docs/README.md`; full Release solution build and `92`
+  release tests pass. Canvas, persistence, and validation display are follow-on
+  slices. See [[198-designer-renderer-app-first-slice]].
 
 ## Remaining
 

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.9" PrivateAssets="all" />
+    <PackageReference Include="MudBlazor" Version="9.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.DesignerHost\FluxFlow.DesignerHost.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Timers.Composition\FluxFlow.Components.Timers.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Routing.Composition\FluxFlow.Components.Routing.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Http.Composition\FluxFlow.Components.Http.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Storage.Composition\FluxFlow.Components.Storage.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Control.Composition\FluxFlow.Components.Control.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Validation.Composition\FluxFlow.Components.Validation.Composition.csproj" />
+    <ProjectReference Include="..\..\src\FluxFlow.Components.Sources.Composition\FluxFlow.Components.Sources.Composition.csproj" />
+    <ProjectReference Include="..\..\src\Mqtt\FluxFlow.Components.Mqtt.Composition\FluxFlow.Components.Mqtt.Composition.csproj" />
+  </ItemGroup>
+
+</Project>

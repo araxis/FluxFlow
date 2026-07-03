@@ -253,6 +253,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.DesignerHost", "sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.DesignerHost.Tests", "tests\FluxFlow.DesignerHost.Tests\FluxFlow.DesignerHost.Tests.csproj", "{78560140-8F73-4E6B-A7F8-CB2DA756EB1B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxFlow.DesignerApp", "samples\FluxFlow.DesignerApp\FluxFlow.DesignerApp.csproj", "{64BA9455-0E0E-464F-800A-C3C5DCED40ED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1715,6 +1717,18 @@ Global
 		{78560140-8F73-4E6B-A7F8-CB2DA756EB1B}.Release|x64.Build.0 = Release|Any CPU
 		{78560140-8F73-4E6B-A7F8-CB2DA756EB1B}.Release|x86.ActiveCfg = Release|Any CPU
 		{78560140-8F73-4E6B-A7F8-CB2DA756EB1B}.Release|x86.Build.0 = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|x64.Build.0 = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Debug|x86.Build.0 = Debug|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|x64.ActiveCfg = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|x64.Build.0 = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|x86.ActiveCfg = Release|Any CPU
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1839,5 +1853,6 @@ Global
 		{2F119C97-4FDC-43F3-8C25-906294C1FF0C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{0FAA6A94-E11B-405B-8EA8-0025D8304EA7} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{78560140-8F73-4E6B-A7F8-CB2DA756EB1B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{64BA9455-0E0E-464F-800A-C3C5DCED40ED} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 	EndGlobalSection
 EndGlobal

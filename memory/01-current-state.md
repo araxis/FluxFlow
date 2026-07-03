@@ -146,10 +146,16 @@ Date: 2026-07-03
   `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and
   resource picker view models projected by `DesignerHostCatalog`; graph model
   with lossless `GraphDefinitionMapper` round-trips to composition
-  definitions; shared validation message mapping; 29 focused tests). Renderer
-  UI is the only remaining Designer host pass. See
-  `191-designer-host-layer-planning.md`, `193-designer-host-model-layer.md`,
-  and `194-designer-host-persistence-mapping.md`.
+  definitions; shared validation message mapping; 29 focused tests). Phase 5
+  (the renderer UI) is now started as `samples/FluxFlow.DesignerApp`, a Blazor
+  WebAssembly + MudBlazor app (net10.0, on branch `work/designer-renderer-ui`);
+  the first slice — component palette (23 components, grouped) and the
+  option/resource inspector — is browser-verified against the real metadata
+  catalog. The node canvas (Z.Blazor.Diagrams), graph persistence via
+  `GraphDefinitionMapper`, and validation display are the remaining renderer
+  slices. See `191-designer-host-layer-planning.md`,
+  `193-designer-host-model-layer.md`, `194-designer-host-persistence-mapping.md`,
+  and `198-designer-renderer-app-first-slice.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses

@@ -1,0 +1,62 @@
+@switch (Option.Editor)
+{
+    case OptionEditorKind.Toggle:
+        <MudSwitch T="bool" @bind-Value="_toggle" Color="Color.Primary" Label="@Label" />
+        @if (HelperText is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@HelperText</MudText>
+        }
+        break;
+
+    case OptionEditorKind.Number:
+        <MudNumericField T="double?" @bind-Value="_number" Label="@Label" Variant="Variant.Outlined"
+                         Margin="Margin.Dense" HelperText="@HelperText"
+                         Min="@Option.Min" Max="@Option.Max" />
+        break;
+
+    case OptionEditorKind.Select:
+        <MudSelect T="string" @bind-Value="_text" Label="@Label" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" HelperText="@HelperText">
+            @foreach (var choice in Option.Choices)
+            {
+                <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem>
+            }
+        </MudSelect>
+        break;
+
+    case OptionEditorKind.Secret:
+        <MudTextField T="string" @bind-Value="_text" Label="@Label" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" HelperText="@HelperText" InputType="InputType.Password"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Key" />
+        break;
+
+    case OptionEditorKind.MultilineText:
+    case OptionEditorKind.Json:
+    case OptionEditorKind.Expression:
+        <MudTextField T="string" @bind-Value="_text" Label="@Label" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" HelperText="@HelperText" Lines="3" />
+        break;
+
+    default: // Text, Duration
+        <MudTextField T="string" @bind-Value="_text" Label="@Label" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" HelperText="@HelperText"
+                      Placeholder="@(Option.Editor == OptionEditorKind.Duration ? "hh:mm:ss" : null)" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+
+    private string? _text;
+    private double? _number;
+    private bool _toggle;
+
+    private string Label => Option.IsRequired ? $"{Option.DisplayName} *" : Option.DisplayName;
+
+    private string? HelperText =>
+        Option.Syntax is null
+            ? Option.HelperText
+            : Option.HelperText is null
+                ? $"syntax: {Option.Syntax}"
+                : $"{Option.HelperText} · syntax: {Option.Syntax}";
+}

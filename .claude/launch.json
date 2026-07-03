@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "designer-app",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "samples/FluxFlow.DesignerApp", "--launch-profile", "http"],
+      "port": 5298
+    }
+  ]
+}

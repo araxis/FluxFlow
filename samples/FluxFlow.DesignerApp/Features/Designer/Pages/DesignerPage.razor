@@ -1,0 +1,22 @@
+@page "/"
+@inject DesignerCatalog Catalog
+
+<PageTitle>FluxFlow Designer</PageTitle>
+
+<div style="display: flex; gap: 8px; padding: 8px; height: calc(100vh - 64px); box-sizing: border-box;">
+    <ComponentPalette Items="Catalog.Palette" SelectedType="_selectedType" OnSelect="OnSelect" />
+    <div style="flex: 1; min-width: 0;">
+        <ComponentInspector Model="_inspector" />
+    </div>
+</div>
+
+@code {
+    private string? _selectedType;
+    private NodeInspectorModel? _inspector;
+
+    private void OnSelect(string componentType)
+    {
+        _selectedType = componentType;
+        _inspector = Catalog.Inspector(componentType);
+    }
+}

@@ -415,6 +415,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   flaky test — the bounded-source backpressure test was asserting an
   un-observable BroadcastBlock internal race; rewritten to the actual
   latest-wins delivery contract (test-only, no source/package change).
+- `198-designer-renderer-app-first-slice.md`: Designer host layer phase 5
+  started — `samples/FluxFlow.DesignerApp` (Blazor WASM + MudBlazor) renders the
+  palette and option/resource inspector from the real metadata catalog;
+  browser-verified. Canvas and persistence are follow-on slices.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
