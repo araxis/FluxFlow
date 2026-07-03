@@ -425,6 +425,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `200-designer-renderer-persistence-slice.md`: save/load the canvas graph as a
   FluxFlow.Composition definition (named-port link mapping) with validation
   feedback — completes the docs/18 phase 5 renderer; browser-verified.
+- `201-designer-renderer-option-editing.md`: inspector option editors write into
+  the selected node's configuration so saved composition JSON carries real
+  option values; value round-trip browser-verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

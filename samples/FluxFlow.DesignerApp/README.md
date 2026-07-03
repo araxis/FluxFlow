@@ -55,9 +55,18 @@ definition:
   a snackbar; a hard JSON error shows an error snackbar.
 - **Clear** empties the canvas.
 
+## Editing option values
+
+The inspector's option editors write into the selected node's configuration
+(`FlowNodeModel.Configuration`), so the saved composition JSON carries real
+option values (e.g. a timer's `interval`). Values round-trip through save/load
+and reappear in the inspector when the node is re-selected. Only options the
+user actually edits are written, so untouched nodes stay minimal.
+
 ## Status
 
 The full renderer is in place and browser-verified: component palette,
-option/resource inspector, node canvas (add-from-palette, select-to-inspect),
-and save/load persistence to composition JSON with validation feedback — all
-driven by the real metadata catalog and the `FluxFlow.DesignerHost` model layer.
+option/resource inspector with editable option values, node canvas
+(add-from-palette, select-to-inspect), and save/load persistence to composition
+JSON with validation feedback — all driven by the real metadata catalog and the
+`FluxFlow.DesignerHost` model layer.

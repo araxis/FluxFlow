@@ -1324,6 +1324,14 @@ Date: 2026-05-31
   -> Save (valid composition JSON) -> Clear -> Load restores both nodes with a
   success snackbar. Release tests `92` passed; full Release solution build
   clean. See [[200-designer-renderer-persistence-slice]].
+- 2026-07-03: Made the renderer produce configured compositions. The inspector
+  option editors now write into the selected `FlowNodeModel.Configuration`
+  (seed on load, write on change via `@bind-Value:after`); `DesignerGraphMapper`
+  emits/consumes `GraphNodeModel.Options`. Editors are `@key`-ed by node so
+  switching selection reseeds them. Browser-verified: set a timer's `Interval`
+  to `00:00:05` -> Save carries `configuration.interval` -> Clear -> Load
+  restores it and the inspector shows it. Full Release solution build clean.
+  See [[201-designer-renderer-option-editing]].
 
 ## Remaining
 

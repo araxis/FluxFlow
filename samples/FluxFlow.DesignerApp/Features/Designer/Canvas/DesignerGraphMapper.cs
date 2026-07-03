@@ -23,6 +23,7 @@ public static class DesignerGraphMapper
             {
                 Name = node.NodeName,
                 ComponentType = node.ComponentType,
+                Options = new Dictionary<string, System.Text.Json.JsonElement>(node.Configuration, StringComparer.Ordinal),
                 Layout = new GraphLayoutModel { X = node.Position.X, Y = node.Position.Y },
             })
             .ToArray();
@@ -72,6 +73,11 @@ public static class DesignerGraphMapper
             }
 
             var model = new FlowNodeModel(node.Name, item, new Point(node.Layout.X, node.Layout.Y));
+            foreach (var option in node.Options)
+            {
+                model.Configuration[option.Key] = option.Value;
+            }
+
             diagram.Nodes.Add(model);
             byName[node.Name] = model;
         }

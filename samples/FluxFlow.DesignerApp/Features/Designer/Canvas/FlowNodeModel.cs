@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models;
 using FluxFlow.DesignerHost;
@@ -43,4 +44,7 @@ public sealed class FlowNodeModel : NodeModel
     public IReadOnlyList<string> InputPortNames { get; }
 
     public IReadOnlyList<string> OutputPortNames { get; }
+
+    /// <summary>Per-node option values the inspector edits; persisted as the node configuration.</summary>
+    public Dictionary<string, JsonElement> Configuration { get; } = new(StringComparer.Ordinal);
 }

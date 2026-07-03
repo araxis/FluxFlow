@@ -41,6 +41,8 @@
     </MudPaper>
 
     <div style="width: 360px; min-width: 360px;">
-        <ComponentInspector Model="_inspector" />
+        <ComponentInspector Model="_inspector"
+                            Configuration="Graph.SelectedNode?.Configuration"
+                            NodeKey="Graph.SelectedNode?.NodeName" />
     </div>
 </div>

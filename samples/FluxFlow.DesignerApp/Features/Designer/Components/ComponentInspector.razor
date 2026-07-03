@@ -27,9 +27,9 @@ else
                 <MudStack Spacing="3" Class="mb-2">
                     @foreach (var option in section.Options)
                     {
-                        <div @key="option.Name" class="d-flex align-start" style="gap: 8px;">
+                        <div @key="(NodeKey, option.Name)" class="d-flex align-start" style="gap: 8px;">
                             <div style="flex: 1;">
-                                <OptionEditorField Option="option" />
+                                <OptionEditorField @key="(NodeKey, option.Name)" Option="option" Configuration="Configuration!" />
                             </div>
                             @if (option.IsAdvanced)
                             {
@@ -74,4 +74,10 @@ else
 
 @code {
     [Parameter] public NodeInspectorModel? Model { get; set; }
+
+    /// <summary>The selected node's configuration the option editors read and write.</summary>
+    [Parameter] public IDictionary<string, System.Text.Json.JsonElement>? Configuration { get; set; }
+
+    /// <summary>Identity of the selected node; re-keys the option editors when the selection changes.</summary>
+    [Parameter] public string? NodeKey { get; set; }
 }
