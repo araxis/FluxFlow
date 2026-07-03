@@ -411,6 +411,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   remaining 33 manifest packages (Designer, core component packages, Mapping,
   Engine, MQTT adapters) so all 55 current packages carry the shared icon; a
   second known-flaky test surfaced and was worked around by retry.
+- `197-bounded-source-flaky-test-fix.md`: deterministic fix for that second
+  flaky test — the bounded-source backpressure test was asserting an
+  un-observable BroadcastBlock internal race; rewritten to the actual
+  latest-wins delivery contract (test-only, no source/package change).
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

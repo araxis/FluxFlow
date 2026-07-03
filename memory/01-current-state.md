@@ -127,7 +127,12 @@ Date: 2026-07-03
   (`FlowMultiOutputAndSourceTests.Source_EmitAsync_WaitsWhenBoundedOutputIsFull`
   in `FluxFlow.Nodes.Tests`, unrelated to any session change) hit ~13% of
   release CI runs; the user approved standing auto-retry for that exact
-  signature, and all affected releases passed on retry. Pushing `origin/main`
+  signature, and all affected releases passed on retry. That test has since
+  been made deterministic (rewritten to the actual latest-wins delivery
+  contract as
+  `Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes`, 60/60
+  isolated passes, test-only change). See
+  `197-bounded-source-flaky-test-fix.md`. Pushing `origin/main`
   itself remains a separate operator step; only the `work/designer-host-model`
   branch carrying the release commits was pushed. See
   `195-nuget-icon-and-hygiene-release-prep.md` and
