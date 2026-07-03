@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Fluent</PackageId>
     <AssemblyName>FluxFlow.Fluent</AssemblyName>
     <RootNamespace>FluxFlow.Fluent</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
     <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>First release: Flow.From/Then/Tap/Branch/To/Build over the FluxFlow.Nodes kit, reusing the FluxFlow.Composition runtime for lifecycle, error/event aggregation, and disposal.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds OnError/OnEvent handlers on FlowBuilder, FlowTerminal, and FlowGraph to observe the flow's aggregated error and event streams (handler-isolated, torn down with the graph).</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

@@ -64,6 +64,24 @@ in more than one branch fans them into that node. Each node completes once all o
 its upstream sources finish, so fan-in drains correctly rather than being
 completed early by the first branch.
 
+## Observing errors and events
+
+```csharp
+await using var flow = Flow
+    .From(new WordSource(["alpha", "beta"]))
+    .Then(new RiskyNode())
+    .To(new CollectSink(collector))
+    .OnError(error => logger.LogError(error.Exception, "{Message}", error.Message))
+    .OnEvent(@event => logger.LogInformation("{Name}", @event.Name))
+    .Build();
+```
+
+`OnError`/`OnEvent` observe the flow's aggregated error/event streams. They are
+also available on the built `FlowGraph` (returning an `IDisposable` you can
+dispose to unsubscribe). Observation is best-effort (the underlying stream is a
+latest-wins broadcast), a throwing handler is isolated so it cannot break
+observation, and subscriptions are torn down with the graph.
+
 ## Sample
 
 ```sh

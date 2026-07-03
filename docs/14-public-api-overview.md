@@ -145,7 +145,9 @@ the main line; `Branch` starts a typed sub-pipeline from a node's output port,
 and passing the same node instance to more than one branch fans them in. The
 built `FlowGraph` reuses the `FluxFlow.Composition` runtime for start, stop,
 completion, aggregated errors/events, and disposal; each node completes once all
-of its upstream sources finish, so fan-in drains before completing.
+of its upstream sources finish, so fan-in drains before completing. `OnError` and
+`OnEvent` (on the builder, terminal, or graph) observe the flow's aggregated
+error/event streams; handlers are isolated and torn down with the graph.
 
 ## HTTP Composition
 
