@@ -1332,6 +1332,18 @@ Date: 2026-05-31
   to `00:00:05` -> Save carries `configuration.interval` -> Clear -> Load
   restores it and the inspector shows it. Full Release solution build clean.
   See [[201-designer-renderer-option-editing]].
+- 2026-07-03: Merged the renderer to `main` via PR #55 (clean fast-forward;
+  build-test CI green, confirming the WASM app builds on the Linux runner).
+  Fixed a palette layout bug (MudDivider ships `flex-grow:1`; as a direct
+  flex-column child it grew to ~422px and pushed the list to the bottom — wrapped
+  the header block so the list fills). Then added editor polish on branch
+  `work/designer-editor-polish`: `DesignerGraphState.DeleteSelected` + a Delete
+  toolbar button and link-creation validation (reject self-links and
+  non-output→input via `link.TargetAttached`, with an `ISnackbar` reason).
+  Browser-verified: delete removes the selected node; a valid output→input drag
+  creates `interval-2.Output -> putRecord-3.Input`; an output→output drag is
+  rejected with the snackbar and not persisted. See
+  [[202-designer-renderer-editor-polish]].
 
 ## Remaining
 
