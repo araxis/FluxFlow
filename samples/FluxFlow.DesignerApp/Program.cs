@@ -14,4 +14,7 @@ builder.Services.AddMudServices();
 // providers. The renderer only reads it — it never owns resources or runtime.
 builder.Services.AddSingleton<DesignerCatalog>();
 
+// Canvas/editor state (the BlazorDiagram and current selection) is per-user UI state.
+builder.Services.AddScoped<DesignerGraphState>();
+
 await builder.Build().RunAsync();

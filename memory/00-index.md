@@ -419,6 +419,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   started — `samples/FluxFlow.DesignerApp` (Blazor WASM + MudBlazor) renders the
   palette and option/resource inspector from the real metadata catalog;
   browser-verified. Canvas and persistence are follow-on slices.
+- `199-designer-renderer-canvas-slice.md`: Z.Blazor.Diagrams node canvas in the
+  renderer app — add-from-palette, node rendering with ports, and
+  canvas-selection-drives-inspector; browser-verified. Persistence remains.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

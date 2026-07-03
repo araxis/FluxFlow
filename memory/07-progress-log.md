@@ -1302,6 +1302,17 @@ Date: 2026-05-31
   `FluxFlow.sln` and `docs/README.md`; full Release solution build and `92`
   release tests pass. Canvas, persistence, and validation display are follow-on
   slices. See [[198-designer-renderer-app-first-slice]].
+- 2026-07-03: Added the node canvas slice to `samples/FluxFlow.DesignerApp`
+  using `Z.Blazor.Diagrams` `3.0.4.1` (API verified by reflecting over the
+  packaged assemblies since no XML docs ship). `Features/Designer/Canvas/`:
+  `FlowNodeModel : NodeModel` (component identity + input/output ports),
+  `DesignerGraphState` (owns the single `BlazorDiagram` and selection).
+  `DesignerPage` is now a three-pane palette | canvas | inspector layout;
+  palette click adds a node, canvas selection drives the inspector, plus
+  zoom-to-fit and an empty-state prompt. Browser-verified: adding
+  `timer.interval` and `storage.put` renders two titled nodes; selecting a node
+  switches the inspector to its component type. Full `FluxFlow.sln` Release
+  build clean. See [[199-designer-renderer-canvas-slice]].
 
 ## Remaining
 

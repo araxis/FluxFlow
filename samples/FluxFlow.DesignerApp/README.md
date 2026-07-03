@@ -29,9 +29,22 @@ dotnet run --project samples/FluxFlow.DesignerApp --launch-profile http
 
 Then open the printed `http://localhost:5298` URL.
 
+## Canvas
+
+`Features/Designer/Canvas/` adds a Z.Blazor.Diagrams node canvas:
+
+- Clicking a palette component adds a `FlowNodeModel` to the canvas with
+  input/output ports (left/right) derived from the component's port metadata.
+- Selecting a node on the canvas drives the inspector for that component type.
+- `DesignerGraphState` owns the single `BlazorDiagram` and the current
+  selection; the page reads that state and never touches the diagram directly.
+- Zoom-to-fit toolbar action; empty-state prompt over the canvas.
+
 ## Status
 
-First slice: palette + inspector, driven end to end by the real metadata
-catalog. The node canvas (Z.Blazor.Diagrams), graph persistence to
-`FluxFlow.Composition` definitions via `GraphDefinitionMapper`, and validation
-display are the follow-on slices.
+- Done: component palette, option/resource inspector, and the node canvas
+  (add-from-palette, select-to-inspect), all driven by the real metadata
+  catalog and verified in the browser.
+- Follow-on: graph persistence to `FluxFlow.Composition` definitions via
+  `GraphDefinitionMapper` (save/load, including named-port links), and
+  validation display via `ValidationMessageModel`.
