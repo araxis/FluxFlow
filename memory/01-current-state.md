@@ -108,9 +108,18 @@ Date: 2026-07-03
   `FluxFlow.Composition.Hosting` context extensions are obsolete delegating
   wrappers (`1.1.0`), and all 19 `.Composition` adapter packages no longer
   reference `FluxFlow.Composition.Hosting`. `FluxFlow.Nodes` (`1.2.0`) gained
-  `FlowNodeOptions.Clock` for deterministic safety-net error timestamps.
-  Adapter package version bumps for the dependency change are deferred to the
-  next release prep. See `192-composition-resource-helper-relocation.md`.
+  `FlowNodeOptions.Clock` for deterministic safety-net error timestamps. See
+  `192-composition-resource-helper-relocation.md`.
+- A shared "Fanout" NuGet package icon is wired repo-wide via
+  `Directory.Build.targets` (`assets/icon.svg` source, `assets/icon.png`
+  256x256 raster); every package with an explicit `PackageId` picks it up at
+  its next release. The 19 `FluxFlow.Components.*.Composition` adapters are
+  minor-bumped for the Hosting-dependency removal plus the icon, with CHANGELOG
+  and release notes. The release set (3 core + 19 adapters) is validated by
+  dry-runs but not tagged or published: local `main` is 448 commits ahead of
+  `origin/main` and the branch push was permission-blocked, so publishing via
+  `eng/package-release-tag.ps1 -Push` in dependency-wave order is an operator
+  step. See `195-nuget-icon-and-hygiene-release-prep.md`.
 - The Designer host layer is planned in `docs/18-designer-host-layer.md` and
   phases 1, 2, and 4 are now implemented as the headless host-model layer in
   `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and

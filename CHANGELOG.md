@@ -7,6 +7,177 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Mapping.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Control.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Assertions.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Sources.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Routing.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Validation.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.FileSystem.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Observability.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Timers.Composition 1.6.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Payloads.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Http.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Serialization.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Metrics.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Projections.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Expectations.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Sessions.Composition 1.6.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.State.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Storage.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
 ## FluxFlow.Composition 1.1.0
 
 Moves the keyed-resource helpers onto the factory context.
@@ -17,6 +188,7 @@ Moves the keyed-resource helpers onto the factory context.
   keyed service resolution.
 - Composition adapters no longer need a `FluxFlow.Composition.Hosting`
   reference to resolve host-owned keyed resources.
+- Adds the shared FluxFlow package icon.
 
 ## FluxFlow.Composition.Hosting 1.1.0
 
@@ -27,6 +199,7 @@ Deprecates the keyed-resource context extensions.
   in `FluxFlow.Composition`.
 - The extensions delegate to the instance methods, so existing callers keep
   the same behavior.
+- Adds the shared FluxFlow package icon.
 
 ## FluxFlow.Nodes 1.2.0
 
@@ -36,6 +209,7 @@ Adds an optional node clock for deterministic error timestamps.
   `TimeProvider.System`).
 - `FlowNode` stamps its safety-net error (`ProcessAsync` throw) with the
   configured clock instead of `DateTimeOffset.UtcNow`.
+- Adds the shared FluxFlow package icon.
 
 ## FluxFlow.Components.Designer 2.17.0
 

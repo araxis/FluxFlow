@@ -402,6 +402,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `194-designer-host-persistence-mapping.md`: host graph model with lossless
   mapping to and from composition definitions plus shared validation message
   mapping; renderer UI is the only remaining Designer host pass.
+- `195-nuget-icon-and-hygiene-release-prep.md`: shared Fanout NuGet icon wired
+  repo-wide via Directory.Build.targets, 19 composition adapters bumped for the
+  Hosting-dependency removal plus icon, validated dry-runs, and the operator
+  publish handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

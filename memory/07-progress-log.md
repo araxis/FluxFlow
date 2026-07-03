@@ -1250,6 +1250,18 @@ Date: 2026-05-31
   metadata errors plus composition diagnostics. Host tests now `29` passed.
   Renderer UI is the only remaining Designer host pass. See
   [[194-designer-host-persistence-mapping]].
+- 2026-07-03: Added a shared "Fanout" NuGet package icon
+  (`assets/icon.svg`/`assets/icon.png`) wired repo-wide through
+  `Directory.Build.targets`, and prepared the composition hygiene pass for
+  release: minor-bumped the 19 `FluxFlow.Components.*.Composition` adapters for
+  the `FluxFlow.Composition.Hosting` dependency removal plus the icon, with
+  CHANGELOG and release notes. Validated with a clean Release build, `92`
+  release tests, and full `DRY_RUN_OK` dry-runs for `nodes`, `composition`,
+  `composition-hosting`, and `components-timers-composition` (icon confirmed in
+  the nupkg, Hosting dependency confirmed gone). Nothing tagged or published;
+  publishing is an operator step because `origin/main` is 448 commits behind
+  and the branch push was permission-blocked. See
+  [[195-nuget-icon-and-hygiene-release-prep]].
 
 ## Remaining
 
@@ -1272,9 +1284,12 @@ Date: 2026-05-31
   combined temporary consumer restore/build after the Designer `2.17.0`
   publication. Future consumer validation should be rerun after package version
   changes or publication batches.
-- Composition adapter packages still declare a `FluxFlow.Composition.Hosting`
-  dependency in their last published versions; bump each adapter version at
-  the next release prep so the dependency removal ships.
+- Composition adapter packages are bumped for the
+  `FluxFlow.Composition.Hosting` dependency removal (release prep done in
+  `195`); the bumped versions are validated by dry-run but not yet published.
+  Publishing the release set (3 core + 19 adapters) via
+  `eng/package-release-tag.ps1 -Push` in dependency-wave order is the pending
+  operator step, blocked on syncing `origin/main`.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.
