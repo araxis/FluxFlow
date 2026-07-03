@@ -409,6 +409,18 @@ Drops the FluxFlow.Composition.Hosting dependency and adds the shared package ic
 - Adds the shared FluxFlow package icon.
 - Composition runtime and Designer metadata behavior are unchanged.
 
+## FluxFlow.Fluent 1.1.0
+
+Adds error and event observation to the fluent DSL.
+
+- Adds `OnError(Action<FlowError>)` and `OnEvent(Action<FlowEvent>)` on
+  `FlowBuilder<T>` and `FlowTerminal` (chainable, wired when the graph is built)
+  and on `FlowGraph` (returns an `IDisposable` subscription).
+- Handlers observe the flow's aggregated error/event broadcasts; a throwing
+  handler is isolated so it cannot break observation or fault the flow, and
+  subscriptions are torn down with the graph.
+- Additive only; existing builder/graph API is unchanged.
+
 ## FluxFlow.Fluent 1.0.0
 
 First release: a type-safe, code-first fluent DSL for composing standalone nodes.

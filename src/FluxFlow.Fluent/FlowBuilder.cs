@@ -80,6 +80,28 @@ public sealed class FlowBuilder<T>
         return new FlowTerminal(_graph);
     }
 
+    /// <summary>
+    /// Observe every error the flow's nodes raise. The handler is wired to the flow's aggregated
+    /// error stream when the graph is built and torn down with it. Chainable; see
+    /// <see cref="FlowGraph.OnError"/> for the best-effort/handler-isolation semantics.
+    /// </summary>
+    public FlowBuilder<T> OnError(Action<FlowError> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        _graph.OnError(handler);
+        return this;
+    }
+
+    /// <summary>Observe every event the flow's nodes raise. Chainable; see <see cref="FlowGraph.OnEvent"/>.</summary>
+    public FlowBuilder<T> OnEvent(Action<FlowEvent> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        _graph.OnEvent(handler);
+        return this;
+    }
+
     /// <summary>Build the runnable graph, leaving the current output unlinked.</summary>
     public FlowGraph Build() => _graph.Build();
 }

@@ -125,3 +125,21 @@ internal sealed class EvenOddRouter : FlowNode<int, int>
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Throws for every message; the node's safety net turns the throw into a FlowError.</summary>
+internal sealed class FaultingNode(string errorMessage) : FlowNode<string, string>
+{
+    protected override Task ProcessAsync(FlowMessage<string> message)
+        => throw new InvalidOperationException(errorMessage);
+}
+
+/// <summary>Emits a named event for each message, then passes the message through unchanged.</summary>
+internal sealed class EventNode(string eventName) : FlowNode<string, string>
+{
+    protected override Task ProcessAsync(FlowMessage<string> message)
+    {
+        EmitEvent(new FlowEvent { Name = eventName, CorrelationId = message.CorrelationId });
+        Emit(message);
+        return Task.CompletedTask;
+    }
+}
