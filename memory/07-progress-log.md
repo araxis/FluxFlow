@@ -1380,3 +1380,16 @@ Date: 2026-05-31
 - Hot reload semantics, renderer behavior, resource catalog UI, runtime
   lifecycle hooks, and request/reply redesign remain deferred until separately
   planned.
+- `FluxFlow.Fluent` DSL built on branch `work/fluent-dsl` (plan in `203`):
+  `Flow.From(source).Then(node).Tap(side).Branch(port, sub).To(sink).Build()`
+  with compile-time-checked wiring, fan-out, branching from typed ports, and
+  fan-in (share a node instance across branches). Reuses `CompositionRuntime`
+  via a new additive public seam `CompositionRuntime.Create(nodes, links,
+  entryNodes)` (Composition `1.1.0 -> 1.2.0`). Links are wired without
+  `PropagateCompletion`; each node completes when all upstreams finish (correct
+  fan-in). Shipped as `FluxFlow.Fluent 1.0.0` (manifest, changelog, docs/14,
+  baseline `55|21`, README, shared icon) with `samples/FluxFlow.FluentSample`.
+  9 tests (branch/fan-in flake-checked 30x), full release suite green (92),
+  Release pack verified. Not yet merged to `main`. Optional follow-ons left
+  deliberately unbuilt (KISS): `.OnError` sugar, DI factory overloads, a
+  separate hosted-runner package, reusable sub-flows.

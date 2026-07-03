@@ -110,3 +110,22 @@ add a `samples/FluxFlow.FluentSample` and list it in `docs/README.md`.
 - Branching type-safety ergonomics (keep it fluent AND typed).
 - The reuse seam is additive but changes `FluxFlow.Composition`'s public API.
 - Naming: `Flow` / `FlowBuilder` / `FlowGraph`.
+
+## Status (2026-07-03, branch `work/fluent-dsl`)
+
+Built and shipped as `FluxFlow.Fluent 1.0.0` across three commits: (1) the seam +
+linear `From/Then/To/Build` + `Tap`; (2) `Branch` from typed ports + fan-in via
+shared node instances, with the explicit "complete a node once all upstreams
+finish" model replacing per-link `PropagateCompletion` (the correct choice for
+fan-in); (3) packaging (manifest, changelog, docs/14, baseline `55|21`, README,
+icon) + `samples/FluxFlow.FluentSample`. Public surface: `Flow`, `FlowBuilder<T>`,
+`FlowTerminal`, `FlowGraph`. 9 tests, branch/fan-in flake-checked 30x, full
+release suite green (92). Naming resolved to `Flow`/`FlowBuilder`/`FlowTerminal`/
+`FlowGraph`. Not yet merged to `main`.
+
+Deliberately NOT built (KISS / library-focus, see [[designer-ui-low-priority]]):
+`.OnError` sugar (the graph already exposes `Errors`), `Flow.From(sp => ...)` DI
+factory overloads (users already pass constructed nodes), a hosted-runner
+(belongs in a separate `FluxFlow.Fluent.Hosting` package like
+`Composition.Hosting`), and reusable named sub-flows. All are additive follow-ons
+if a real need appears.
