@@ -1393,6 +1393,9 @@ Date: 2026-05-31
   Release pack verified. Merged to `main` via PR #57 (CI green) and released to
   nuget.org: `composition-v1.2.0` and `fluent-v1.0.0` (both published + indexed,
   GitHub releases created; consumer smoke/feed-verify green, no indexing flake).
-  Optional follow-ons left deliberately unbuilt (KISS): `.OnError` sugar, DI
-  factory overloads, a
-  separate hosted-runner package, reusable sub-flows.
+  Follow-on shipped as `FluxFlow.Fluent 1.1.0` (PR #59, `fluent-v1.1.0`,
+  published + indexed): `OnError`/`OnEvent` observation on
+  `FlowBuilder`/`FlowTerminal`/`FlowGraph` over the aggregated error/event
+  broadcasts (handler-isolated, torn down with the graph; 6 new tests, baseline
+  `55|29`). Still deliberately unbuilt (KISS): DI factory overloads, a separate
+  hosted-runner package, reusable sub-flows.

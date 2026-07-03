@@ -125,9 +125,14 @@ release suite green (92). Naming resolved to `Flow`/`FlowBuilder`/`FlowTerminal`
 `composition-v1.2.0` + `fluent-v1.0.0` (published, indexed, GitHub releases
 created).
 
+Follow-on shipped: `OnError`/`OnEvent` observation on
+`FlowBuilder`/`FlowTerminal`/`FlowGraph` (handler-isolated, torn down with the
+graph) — released to nuget.org as `FluxFlow.Fluent 1.1.0` (`fluent-v1.1.0`,
+PR #59; baseline `55|29`).
+
 Deliberately NOT built (KISS / library-focus, see [[designer-ui-low-priority]]):
-`.OnError` sugar (the graph already exposes `Errors`), `Flow.From(sp => ...)` DI
-factory overloads (users already pass constructed nodes), a hosted-runner
+`Flow.From(sp => ...)` DI factory overloads (users already pass constructed
+nodes), a hosted-runner
 (belongs in a separate `FluxFlow.Fluent.Hosting` package like
 `Composition.Hosting`), and reusable named sub-flows. All are additive follow-ons
 if a real need appears.
