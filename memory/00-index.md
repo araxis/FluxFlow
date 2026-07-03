@@ -390,6 +390,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `190-full-public-package-consumer-validation-after-designer-2-17.md`: full
   public package consumer validation after Designer `2.17.0`: all 55 package
   feed checks and combined temp consumer restore/build passed.
+- `191-designer-host-layer-planning.md`: documentation-only Designer host
+  layer plan covering host-owned palette, inspector, option editor, resource
+  picker, validation, persistence, and runtime-mapping responsibilities.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

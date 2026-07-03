@@ -1206,14 +1206,27 @@ Date: 2026-05-31
   No package source, versions, release notes, README files, changelog entries,
   public API baselines, release scripts, tags, or publishing state changed. See
   [[190-full-public-package-consumer-validation-after-designer-2-17]].
+- Planned the Designer host layer as documentation-only follow-up work. Added
+  `docs/18-designer-host-layer.md` to define how a future host can consume
+  `ComponentDesignMetadataCatalog`, option hints, resource metadata attributes,
+  and `ComponentResourcePickerHints.Create(...)` for palette, inspector,
+  resource picker, validation, persistence, and runtime-mapping concerns. No
+  source APIs, renderer behavior, resource ownership, hot reload, runtime
+  behavior, package versions, tags, or publishing state changed. Release tests
+  passed (`92`), and the controlled Debug solution build passed after
+  `dotnet build-server shutdown` cleared generated assembly file locks.
+  `graphify update . --force` refreshed `graphify-out/` with 12447 nodes,
+  22705 edges, and 976 communities; `graph.html` was skipped because the graph
+  exceeds the local HTML visualization limit. See
+  [[191-designer-host-layer-planning]].
 
 ## Remaining
 
 - The Designer metadata hint release train is published, indexed, and
   consumer-validated. Designer now also has neutral resource picker hint
-  contracts published in `FluxFlow.Components.Designer` `2.17.0`; future
-  renderer UI or package-family work should be planned as a separate bounded
-  pass.
+  contracts published in `FluxFlow.Components.Designer` `2.17.0`; the Designer
+  host layer is planned in `docs/18-designer-host-layer.md`, and any renderer
+  UI prototype or package-family work should be a separate bounded pass.
 - The current concrete MQTT adapter package updates are published, indexed, and
   consumer-validated. Future MQTT adapter work should be planned as a separate
   bounded pass.

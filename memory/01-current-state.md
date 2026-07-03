@@ -1,6 +1,6 @@
 # Current State
 
-Date: 2026-07-02
+Date: 2026-07-03
 
 ## Repository
 
@@ -103,6 +103,12 @@ Date: 2026-07-02
   outside the repository with all 55 direct package references restored from the
   public package feed and built successfully. See
   `190-full-public-package-consumer-validation-after-designer-2-17.md`.
+- The Designer host layer is now planned in `docs/18-designer-host-layer.md`.
+  The plan keeps component packages source-only for metadata and leaves palette
+  models, node inspectors, option editor mapping, resource picker catalog
+  binding, validation/status display, persistence mapping, and runtime adapter
+  mapping to a future host-owned implementation pass. See
+  `191-designer-host-layer-planning.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
