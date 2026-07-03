@@ -1266,9 +1266,31 @@ Date: 2026-05-31
   icon endpoint returns `200`, and a fresh temporary consumer project
   referencing all 22 packages restored and built cleanly. See
   [[195-nuget-icon-and-hygiene-release-prep]].
+- 2026-07-03: Extended the shared icon to the remaining 33 manifest packages
+  (patch-only: Designer `2.17.1`, all core non-.Composition component
+  packages, `Mapping` `1.0.3`, `Engine` `2.0.2`, and the two MQTT adapters) so
+  all 55 current packages carry it. Released in 3 dependency-derived waves
+  (17/14/2). Updated one release-notes fixture test that hardcoded content
+  tied to `Configuration`'s previous version. Hit a second pre-existing flaky
+  test (`Source_EmitAsync_WaitsWhenBoundedOutputIsFull` in
+  `FluxFlow.Nodes.Tests`) on 4 of the first 31 release runs; confirmed
+  unrelated to any session change (2/5 local isolated reruns failed), got user
+  approval to auto-retry that exact signature, and all affected releases
+  passed on retry. Verified: all 55 packages independently confirmed on the
+  nuget.org flat-container index, icon endpoint returns `200`, and a fresh
+  temporary consumer referencing all 55 packages restored and built cleanly.
+  See [[196-full-icon-rollout-completion]].
 
 ## Remaining
 
+- `FluxFlow.Nodes.Tests.FlowMultiOutputAndSourceTests
+  .Source_EmitAsync_WaitsWhenBoundedOutputIsFull` is a second confirmed flaky
+  test (alongside the one fixed in `133-expectations-deterministic-timeout-test.md`)
+  — a race in a `BoundedCapacity=1` backpressure assertion, reproduced locally
+  at roughly 2/5 failure rate in isolation. It was worked around by retry
+  during the `196-full-icon-rollout-completion.md` release wave, not fixed.
+  Deterministic hardening (matching the pattern used for the Expectations
+  timeout test) is a candidate for a future focused pass.
 - The Designer metadata hint release train is published, indexed, and
   consumer-validated. Designer now also has neutral resource picker hint
   contracts published in `FluxFlow.Components.Designer` `2.17.0`; the Designer

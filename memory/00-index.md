@@ -407,6 +407,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   (FluxFlow.Nodes 1.2.0, FluxFlow.Composition 1.1.0,
   FluxFlow.Composition.Hosting 1.1.0, and 19 components-*-composition
   adapters) published and verified live on the public NuGet feed.
+- `196-full-icon-rollout-completion.md`: icon-only patch release for the
+  remaining 33 manifest packages (Designer, core component packages, Mapping,
+  Engine, MQTT adapters) so all 55 current packages carry the shared icon; a
+  second known-flaky test surfaced and was worked around by retry.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
