@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FluxFlow.Fluent</RootNamespace>
+    <AssemblyName>FluxFlow.Fluent</AssemblyName>
+    <!-- Not yet packable: the DSL is under active development. Flipped to a real
+         package (PackageId + manifest + public-API baseline wiring) once stable. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
+    <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+</Project>

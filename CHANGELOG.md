@@ -409,6 +409,18 @@ Drops the FluxFlow.Composition.Hosting dependency and adds the shared package ic
 - Adds the shared FluxFlow package icon.
 - Composition runtime and Designer metadata behavior are unchanged.
 
+## FluxFlow.Composition 1.2.0
+
+Adds a code-first runtime construction seam.
+
+- Adds `CompositionRuntime.Create(nodes, links, entryNodes)`, a public factory
+  that builds a runtime directly from composed node descriptors and their links,
+  without a `CompositionDefinition`, registry, or node names.
+- Lets code-first builders (such as the new fluent DSL) reuse the composition
+  runtime's lifecycle: source start, aggregated errors/events, completion
+  propagation, and ordered disposal.
+- Additive only; existing definition/registry-based construction is unchanged.
+
 ## FluxFlow.Composition 1.1.0
 
 Moves the keyed-resource helpers onto the factory context.
