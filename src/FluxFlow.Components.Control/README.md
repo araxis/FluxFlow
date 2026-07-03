@@ -48,6 +48,10 @@ filter.Output.LinkTo(evenSink, new DataflowLinkOptions { PropagateCompletion = f
 await filter.Input.SendAsync(FlowMessage.Create(2));
 ```
 
+Expression-backed constructors require a non-empty `Expression`, non-empty
+`InputType`, and `BoundedCapacity` greater than zero. Invalid options fail fast
+during node construction before the input pipeline is created.
+
 ### Custom mapping context
 
 By default the predicate sees the payload as the `input` and `value` variables.
@@ -64,6 +68,10 @@ you do not want the node to own compilation:
 ```csharp
 var node = new WhenNode<int>(options, myPredicate, engineName: "my-engine");
 ```
+
+The compiled-predicate constructors do not require `Expression`, but they still
+validate `InputType` and `BoundedCapacity` because those values drive
+diagnostics and queue sizing.
 
 ## Behavior
 
@@ -109,8 +117,11 @@ registry
     .RegisterWhen<HttpResponseOutput>("flow.when.http-response");
 ```
 
-Composition resolves the expression engine from the keyed `engine` resource.
-Optional keyed `contextFactory` and `clock` resources can provide custom
-expression variables and deterministic diagnostics. The configured `InputType`
-remains diagnostic metadata; CLR port types come from the closed generic
-registration.
+Composition resolves the expression engine from the host-owned keyed `engine`
+resource. Optional host-owned keyed `contextFactory` and `clock` resources can
+provide custom expression variables and deterministic diagnostics. The
+configured `InputType` remains diagnostic metadata; CLR port types come from
+the closed generic registration. Invalid `ControlExpressionOptions`, such as a
+missing expression, blank `inputType`, or non-positive `boundedCapacity`, fail
+during composition build and surface as factory diagnostics when build failures
+are configured as diagnostics.

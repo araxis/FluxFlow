@@ -3,6 +3,18 @@
 The minimal base every FluxFlow node is built on. A node is a self-contained TPL
 Dataflow processor — you `new` it and link it; no engine, registry, or runtime.
 
+## When To Use It
+
+Use this package when you are authoring reusable nodes or linking node instances
+directly in code. It owns the message envelope, node/source base classes, common
+error and event contracts, and the bounded Dataflow plumbing shared by component
+packages.
+
+Do not use it as an application workspace model or resource registry. Hosts own
+workflow files, resource lookup, concrete clients, stores, and any UI or
+dashboard projection. Add `FluxFlow.Composition` only when a host wants fluent or
+configuration-driven node composition.
+
 ## Messages
 
 Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
@@ -10,6 +22,8 @@ Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
 `Headers` bag). It's immutable, so a broadcast can hand the same instance to many
 consumers. Transform the payload with `With`, which keeps the correlation id and
 headers — so correlation flows through a graph with no node copying it by hand.
+Assigned header dictionaries are copied with ordinal key comparison, so later
+caller mutations cannot change an existing envelope.
 
 ```csharp
 var message = FlowMessage.Create("hello");        // mints a CorrelationId
@@ -51,10 +65,17 @@ killing the pump. `Complete()` drains the input and completes the outputs;
 
 ## Design notes
 
-- **Outputs are broadcast** (latest-wins, no backpressure): a consumer that keeps
-  up sees every message; one that falls badly behind may miss some. That is the
-  deliberate trade for simplicity. A graph that genuinely must not drop should
-  bridge that edge through its own bounded buffer (or a dedicated no-loss node).
+- **Outputs are broadcast** (latest-wins): a consumer that keeps up sees every
+  message; one that falls badly behind may miss some. That is the deliberate
+  trade for simplicity.
+- **Options validate on assignment**: `FlowNodeOptions` rejects non-positive
+  input capacity and max-degree-of-parallelism values, and `FlowSourceOptions`
+  rejects invalid output capacities while allowing `UnboundedOutputCapacity`.
+- **Sources can opt into bounded broadcast output** with
+  `FlowSourceOptions.OutputCapacity` and `EmitAsync`. Source loops should await
+  `EmitAsync` when they expose a capacity option, but this is still broadcast
+  output, not a durable queue or no-loss delivery guarantee. Callback-driven
+  sources can keep using nonblocking `Emit`.
 - **Inputs are a bounded buffer**, so a node throttles its own intake.
 - The kit owns no domain logic and no engine concepts — just the plumbing every
   node shares.

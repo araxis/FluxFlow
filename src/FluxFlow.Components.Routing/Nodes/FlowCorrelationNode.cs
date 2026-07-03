@@ -43,50 +43,30 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
         Func<TInput, string?> sideSelector,
         string? engineName = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), keySelector, sideSelector, engineName, clock)
     {
-        _options = options;
+    }
+
+    private FlowCorrelationNode(
+        ValidatedOptions options,
+        Func<TInput, string?> keySelector,
+        Func<TInput, string?> sideSelector,
+        string? engineName,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.CorrelationOptions;
         _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
         _sideSelector = sideSelector ?? throw new ArgumentNullException(nameof(sideSelector));
         _engineName = engineName;
         _clock = clock ?? TimeProvider.System;
-        if (options.TimeoutMilliseconds <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.correlation timeout must be greater than zero.");
-        }
 
-        if (options.MaxPending <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.correlation max pending count must be greater than zero.");
-        }
-
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "flow.correlation bounded capacity must be greater than zero.");
-        }
-
-        _comparer = options.CaseSensitive
+        _comparer = options.CorrelationOptions.CaseSensitive
             ? StringComparer.Ordinal
             : StringComparer.OrdinalIgnoreCase;
-        _requestSide = options.RequestSide.Trim();
-        _responseSide = options.ResponseSide.Trim();
-        if (_comparer.Equals(_requestSide, _responseSide))
-        {
-            throw new ArgumentException(
-                "flow.correlation request side and response side must be different.",
-                nameof(options));
-        }
-
-        _timeout = TimeSpan.FromMilliseconds(options.TimeoutMilliseconds);
+        _requestSide = options.RequestSide;
+        _responseSide = options.ResponseSide;
+        _timeout = TimeSpan.FromMilliseconds(options.CorrelationOptions.TimeoutMilliseconds);
         _pending = new Dictionary<string, PendingPair>(_comparer);
         _timeouts = AddOutput<FlowMessage<FlowCorrelationTimeout<TInput>>>();
     }
@@ -643,5 +623,80 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
         public int Code { get; } = code;
         public string? Key { get; } = key;
         public string? Side { get; } = side;
+    }
+
+    private static ValidatedOptions ValidateOptions(CorrelationRoutingOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.correlation option 'inputType' cannot be empty.", nameof(options));
+        }
+
+        if (options.TimeoutMilliseconds <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.correlation option 'timeoutMilliseconds' must be greater than zero.");
+        }
+
+        if (options.MaxPending <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.correlation option 'maxPending' must be greater than zero.");
+        }
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "flow.correlation option 'boundedCapacity' must be greater than zero.");
+        }
+
+        var requestSide = options.RequestSide?.Trim();
+        if (string.IsNullOrWhiteSpace(requestSide))
+        {
+            throw new ArgumentException(
+                "flow.correlation option 'requestSide' cannot be empty.", nameof(options));
+        }
+
+        var responseSide = options.ResponseSide?.Trim();
+        if (string.IsNullOrWhiteSpace(responseSide))
+        {
+            throw new ArgumentException(
+                "flow.correlation option 'responseSide' cannot be empty.", nameof(options));
+        }
+
+        var comparer = options.CaseSensitive
+            ? StringComparer.Ordinal
+            : StringComparer.OrdinalIgnoreCase;
+        if (comparer.Equals(requestSide, responseSide))
+        {
+            throw new ArgumentException(
+                "flow.correlation request side and response side must be different.",
+                nameof(options));
+        }
+
+        return new ValidatedOptions(options, requestSide, responseSide);
+    }
+
+    private sealed class ValidatedOptions(
+        CorrelationRoutingOptions correlationOptions,
+        string requestSide,
+        string responseSide)
+    {
+        public CorrelationRoutingOptions CorrelationOptions { get; } = correlationOptions;
+
+        public string RequestSide { get; } = requestSide;
+
+        public string ResponseSide { get; } = responseSide;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = correlationOptions.BoundedCapacity
+        };
     }
 }

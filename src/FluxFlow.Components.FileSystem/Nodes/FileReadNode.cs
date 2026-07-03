@@ -26,29 +26,42 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
     public FileReadNode(
         FileReadOptions? options = null,
         TimeProvider? clock = null)
+        : this(new ResolvedFileReadOptions(ResolveOptions(options)), clock)
+    {
+    }
+
+    private FileReadNode(
+        ResolvedFileReadOptions resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new FileReadOptions()).BoundedCapacity,
+            InputCapacity = resolved.Options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options ?? new FileReadOptions();
+        _options = resolved.Options;
         _clock = clock ?? TimeProvider.System;
-        if (_options.BoundedCapacity <= 0)
+    }
+
+    private static FileReadOptions ResolveOptions(FileReadOptions? options)
+    {
+        var resolved = options ?? new FileReadOptions();
+        if (resolved.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File read bounded capacity must be greater than zero.");
+                "file.read option 'boundedCapacity' must be greater than zero.");
         }
 
-        if (_options.MaxBytes is <= 0)
+        if (resolved.MaxBytes is <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "File read 'maxBytes' must be greater than zero when set.");
+                "file.read option 'maxBytes' must be greater than zero when set.");
         }
 
-        ValidateDefaultEncoding(_options.DefaultEncoding);
+        ValidateDefaultEncoding(resolved.DefaultEncoding);
+        return resolved;
     }
 
     protected override async Task ProcessAsync(FlowMessage<FileReadRequest> message)
@@ -392,6 +405,8 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
     }
 
     private sealed record ResolvedRead(string Path, Encoding? Encoding, string? EncodingName);
+
+    private sealed record ResolvedFileReadOptions(FileReadOptions Options);
 
     private sealed class FileReadNodeException : Exception
     {

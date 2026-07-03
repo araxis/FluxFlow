@@ -51,6 +51,37 @@ public sealed class PackageManifestTests
         missingProjects.ShouldBeEmpty("all source package projects must be listed in the release manifest.");
     }
 
+    [Fact]
+    public void Public_api_overview_mentions_every_manifest_package()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = PackageManifest.Read(root);
+        var overview = File.ReadAllText(Path.Combine(root, "docs", "14-public-api-overview.md"));
+
+        var missingPackageIds = entries
+            .Where(entry => !overview.Contains(entry.PackageId, StringComparison.Ordinal))
+            .Select(entry => entry.PackageId)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        missingPackageIds.ShouldBeEmpty(
+            "docs/14-public-api-overview.md must mention every shipped package id from eng/packages.json.");
+    }
+
+    [Fact]
+    public void Package_versioning_docs_keep_project_files_and_manifest_as_source_of_truth()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var text = File.ReadAllText(Path.Combine(root, "docs", "11-package-versioning.md"));
+
+        text.ShouldContain("Each packable project owns its own `<Version>`.");
+        text.ShouldContain("`eng/packages.json` lists the shipped packages");
+        text.ShouldContain("Packages in this repository move independently.");
+        text.ShouldNotContain("Current stable engine and component release line");
+        text.ShouldNotContain("Current stable pattern");
+        text.ShouldNotContain("FluxFlow.Components.*        1.0.0");
+    }
+
     private static void AssertManifestEntry(string root, string changelog, PackageManifestEntry entry)
     {
         entry.Alias.ShouldSatisfyAllConditions(
@@ -130,10 +161,18 @@ public sealed class PackageManifestTests
             });
 
         packedReadme.ShouldNotBeNull($"{packageId} must pack {readmeFile}.");
+        NormalizePath(packedReadme.Include!).ShouldBe(
+            readmeFile,
+            $"{packageId} must pack a package-local {readmeFile}, not a shared repository README.");
         packedReadme.PackagePath.ShouldBe("\\");
 
         var readmePath = Path.GetFullPath(Path.Combine(projectDirectory, NormalizePath(packedReadme.Include!)));
         File.Exists(readmePath).ShouldBeTrue($"{packageId} readme file does not exist at {readmePath}");
+
+        var heading = File
+            .ReadLines(readmePath)
+            .FirstOrDefault(line => line.StartsWith("# ", StringComparison.Ordinal));
+        heading.ShouldBe($"# {packageId}", $"{packageId} README must start with the package id.");
     }
 
     private static string ReadRequiredProperty(XDocument project, string name, string packageId)

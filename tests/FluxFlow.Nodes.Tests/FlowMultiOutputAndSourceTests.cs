@@ -65,6 +65,38 @@ public sealed class FlowMultiOutputAndSourceTests
         source.Completion.IsFaulted.ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes()
+    {
+        await using var source = new BoundedCountingSource();
+        var received = new List<int>();
+        var sink = new ActionBlock<FlowMessage<int>>(message => received.Add(message.Payload));
+        source.Output.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
+
+        await source.StartAsync();
+        await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        await sink.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        // A bounded source output is latest-wins (see FlowSourceOptions.OutputCapacity),
+        // not a no-loss queue: intermediate values may coalesce under load. The
+        // deterministic contract is that delivery stays ordered and the final emitted
+        // value always arrives last. (The previous test asserted an instantaneous
+        // "the second emit is blocked right now" state, which a bounded BroadcastBlock
+        // does not expose deterministically — that made it flaky.)
+        received.ShouldNotBeEmpty();
+        received.ShouldBe(received.OrderBy(payload => payload).ToList());
+        received[^1].ShouldBe(2);
+    }
+
+    [Fact]
+    public void Source_RejectsInvalidOutputCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new InvalidCapacitySource());
+
+        exception.Message.ShouldContain("OutputCapacity");
+    }
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();
@@ -122,5 +154,22 @@ public sealed class FlowMultiOutputAndSourceTests
                 }
             }
         }
+    }
+
+    // A source with a single-capacity (latest-wins) output that emits 1 then 2.
+    private sealed class BoundedCountingSource()
+        : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 1 })
+    {
+        protected override async Task RunAsync(CancellationToken cancellationToken)
+        {
+            await EmitAsync(FlowMessage.Create(1), cancellationToken).ConfigureAwait(false);
+            await EmitAsync(FlowMessage.Create(2), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private sealed class InvalidCapacitySource()
+        : FlowSource<int>(new FlowSourceOptions { OutputCapacity = 0 })
+    {
+        protected override Task RunAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

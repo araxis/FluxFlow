@@ -30,7 +30,7 @@ public static class SecretRedactor
     {
         ArgumentNullException.ThrowIfNull(values);
 
-        var keys = protectedKeys?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var keys = NormalizeProtectedKeys(protectedKeys);
         return values.ToDictionary(
             pair => pair.Key,
             pair => ShouldRedact(pair.Key, keys) ? RedactedText : pair.Value,
@@ -46,5 +46,20 @@ public static class SecretRedactor
             return true;
 
         return SensitiveFragments.Any(fragment => key.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static HashSet<string>? NormalizeProtectedKeys(IEnumerable<string>? protectedKeys)
+    {
+        if (protectedKeys is null)
+            return null;
+
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in protectedKeys)
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+                keys.Add(key.Trim());
+        }
+
+        return keys;
     }
 }

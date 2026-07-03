@@ -14,6 +14,9 @@ runtime is the right fit for a host.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
 - `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
+- `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
+  component design metadata into palette, inspector, and resource picker view
+  models (no UI, no resource ownership).
 
 ## Contents
 
@@ -33,6 +36,8 @@ runtime is the right fit for a host.
 14. [Public API Overview](14-public-api-overview.md)
 15. [Engine Compatibility](15-engine-compatibility.md)
 16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
+17. [Component Coverage Matrix](17-component-coverage-matrix.md)
+18. [Designer Host Layer](18-designer-host-layer.md)
 
 Pages 2 and later still describe engine-era APIs where named. Treat those as
 optional advanced runtime guidance, not the default component-package contract.

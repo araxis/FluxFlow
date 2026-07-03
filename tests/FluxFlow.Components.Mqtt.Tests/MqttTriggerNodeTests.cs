@@ -62,6 +62,34 @@ public sealed class MqttTriggerNodeTests
     }
 
     [Fact]
+    public async Task TriggerNode_ReportsInvalidReceivedContextAndContinues()
+    {
+        var triggerSource = new RecordingMqttClientAdapter();
+        await using var node = new MqttTriggerNode(
+            triggerSource,
+            new MqttTriggerOptions { TopicFilter = "devices/+" });
+
+        var messages = MqttTestContext.Sink(node.Output);
+        var errors = MqttTestContext.Sink(node.Errors);
+
+        await node.StartAsync();
+        await triggerSource.Subscribed.WaitAsync(TimeSpan.FromSeconds(5));
+
+        triggerSource.PushContext(null);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        error.Code.ShouldBe(MqttErrorCodes.TriggerFailed);
+        error.Message.ShouldContain("null message context");
+        node.Completion.IsCompleted.ShouldBeFalse();
+
+        triggerSource.PushMessage(CreateMessage("devices/a", "m2"));
+        var received = await messages.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        received.Payload.Topic.ShouldBe("devices/a");
+        received.CorrelationId.ShouldBe(new CorrelationId("m2"));
+    }
+
+    [Fact]
     public async Task TriggerNode_AcknowledgesOnEmitWhenConfigured()
     {
         var triggerSource = new RecordingMqttClientAdapter();
@@ -300,6 +328,17 @@ public sealed class MqttTriggerNodeTests
                 TopicFilter = "devices/+",
                 Acknowledgement = (MqttTriggerAcknowledgement)99
             }));
+
+    [Fact]
+    public void TriggerNode_RejectsInvalidBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(() => new MqttTriggerNode(
+            new RecordingMqttClientAdapter(),
+            new MqttTriggerOptions
+            {
+                TopicFilter = "devices/+",
+                BoundedCapacity = 0
+            }))
+        .Message.ShouldContain("bounded capacity");
 
     [Theory]
     [InlineData(null)]

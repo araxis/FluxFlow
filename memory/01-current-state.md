@@ -1,13 +1,155 @@
 # Current State
 
-Date: 2026-06-21
+Date: 2026-07-03
 
 ## Repository
 
-- `D:\Projects\FluxFlow` has `main` matching `origin/main`.
-- Private remote: `https://github.com/araxis/FluxFlow`.
+- `D:\Projects\FluxFlow` is currently on local branch
+  `work/designer-host-model` (stacked on `work/composition-hygiene-pass`).
+  Local `main` was fast-forwarded to the published Designer host layer
+  planning state (`88027c7`); pushing `origin/main` remains an operator step.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
+- Current architecture direction: standalone nodes are the default,
+  `FluxFlow.Composition` is the optional standalone composition layer, component
+  `.Composition` packages own factory registration and optional Designer
+  metadata, and `FluxFlow.Engine` remains optional advanced runtime
+  infrastructure.
+- Composition adapters now exist for the normal standalone component families:
+  HTTP, Mapping, Control, Assertions, Validation, Timers, Sources, Routing,
+  Serialization, Payloads, Observability, Projections, Metrics, Expectations,
+  FileSystem, State, Storage, Sessions, and MQTT. Request/reply is intentionally
+  skipped as a normal component-family adapter; Journal remains support-only.
+- Designer has been decoupled from engine identifiers and now owns its own
+  design-time value types. Package-owned metadata providers are in place across
+  composition packages, with shared metadata helpers and stronger validation.
+- The active narrow track is richer Designer metadata hints. Mapping was the
+  pilot; Control, Assertions, State, Observability, Validation, Routing,
+  Timers, Sources, Serialization, Payloads, Projections, Metrics,
+  Expectations, HTTP, FileSystem, Storage, Sessions, and MQTT followed. Release
+  convention tests now guard option section/importance hints, contract-valued
+  editor/syntax hints, same-node related resources, and host-owned resource key
+  patterns. Any further package-family or convention metadata hint work should
+  be planned separately.
+- Release-readiness preflight and fast dry-runs passed for the impacted
+  Designer metadata hint package set after seeding a complete current-branch
+  temp package source outside the repo. Publication sequencing is recorded in
+  `176-designer-metadata-hint-publication-sequencing.md`, the final no-publish
+  rehearsal is recorded in
+  `177-designer-metadata-hint-final-release-rehearsal.md`, local tag execution
+  is recorded in `178-designer-metadata-hint-local-tag-execution.md`, and tag
+  push is recorded in `179-designer-metadata-hint-tag-push.md`. The release
+  workflow recovery fixed the Linux release-test path normalization issue,
+  retargeted the 42 dependency-ordered tags from
+  `d7da08e5bad380e243cdd49988808285292d66de` to
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`, and verified every release
+  workflow, release asset set, and public package-feed version. The two
+  already-present runtime dependency tags remained skipped. See
+  `180-designer-metadata-hint-release-workflow-recovery.md`. The published
+  Designer metadata hint release train plus the current MQTT adapter releases
+  were then consumer-validated from the public package feed: all 44
+  package-feed checks passed and a temporary `net8.0` consumer project with all
+  44 direct package references restored and built successfully. See
+  `182-public-package-consumer-validation.md`.
+- See `155-composition-and-designer-progress.md` for the current summary and
+  verification notes.
+- Package README clarity was completed across all 55 manifest packages after
+  the release and consumer-validation work. Runtime, composition, adapter, and
+  support-package READMEs now state host/resource ownership boundaries more
+  clearly where needed; no source APIs, runtime behavior, package versions,
+  release notes, changelog entries, public API baselines, tags, publishing
+  workflow, or release scripts changed. See
+  `183-package-readme-clarity-pass.md`.
+- Package binary compatibility readiness tooling now exists as
+  `eng/package-binary-compat-preflight.ps1`. It validates a built package
+  against a published baseline package through .NET SDK package validation.
+  `components-designer` `2.16.0` passed the helper end to end, then the
+  baseline feed-alignment recovery fixed the Linux release-test fixture newline
+  issue, retargeted `components-http-aspnetcore-v1.0.4`, and published the nine
+  current manifest package versions that were missing from the public feed:
+  `FluxFlow.Components.Http.AspNetCore` `1.0.4`, `FluxFlow.Engine` `2.0.1`,
+  `FluxFlow.Components.Expressions` `2.1.2`,
+  `FluxFlow.Components.Resources` `1.6.0`,
+  `FluxFlow.Components.Secrets` `1.6.0`,
+  `FluxFlow.Components.Configuration` `1.5.0`,
+  `FluxFlow.Components.Journal` `2.3.5`,
+  `FluxFlow.Components.Storage.FileSystem` `3.3.4`, and
+  `FluxFlow.Components.Storage.SqlFile` `3.3.4`. All nine release workflows
+  completed successfully with release assets and public feed verification, and
+  all 55 manifest packages passed same-version binary compatibility preflight
+  against their published baselines. See
+  `184-package-binary-compat-readiness.md`,
+  `185-package-binary-compat-baseline-feed-alignment-blocker.md`, and
+  `186-package-binary-compat-feed-alignment-recovery.md`.
+- Full public package consumer validation passed for the current manifest set:
+  all 55 package-feed checks passed, and a temporary `net8.0` consumer project
+  outside the repository with all 55 direct package references restored from the
+  public package feed and built successfully. See
+  `187-full-public-package-consumer-validation.md`.
+- `FluxFlow.Components.Designer` now includes neutral resource picker hint
+  contracts in `2.17.0`. `ComponentResourcePickerHints.Create(...)` reads
+  existing host-owned resource attributes from component metadata or a validated
+  catalog and returns ordered `ComponentResourcePickerHint` values for hosts.
+  It does not render UI, enumerate resource instances, resolve keyed services,
+  or own resource lifetimes. See
+  `188-designer-resource-picker-hint-contracts.md`.
+- `FluxFlow.Components.Designer` `2.17.0` is published from
+  `738f2e1cf38aaff083e6534004a7baa342020904` with tag
+  `components-designer-v2.17.0`. Release workflow run `28622249640` passed,
+  release assets exist, and public package-feed verification passed. See
+  `189-designer-resource-picker-hint-package-release.md`.
+- Full public package consumer validation passed after Designer `2.17.0`: all
+  55 package-feed checks passed, and a temporary `net8.0` consumer project
+  outside the repository with all 55 direct package references restored from the
+  public package feed and built successfully. See
+  `190-full-public-package-consumer-validation-after-designer-2-17.md`.
+- Keyed resource resolution now lives as `CompositionNodeFactoryContext`
+  instance methods in `FluxFlow.Composition` (`1.1.0`); the
+  `FluxFlow.Composition.Hosting` context extensions are obsolete delegating
+  wrappers (`1.1.0`), and all 19 `.Composition` adapter packages no longer
+  reference `FluxFlow.Composition.Hosting`. `FluxFlow.Nodes` (`1.2.0`) gained
+  `FlowNodeOptions.Clock` for deterministic safety-net error timestamps. See
+  `192-composition-resource-helper-relocation.md`.
+- A shared "Fanout" NuGet package icon is wired repo-wide via
+  `Directory.Build.targets` (`assets/icon.svg` source, `assets/icon.png`
+  256x256 raster); every package with an explicit `PackageId` picks it up at
+  its next release. **All 55 current manifest packages now carry the icon**:
+  the composition hygiene release set (`FluxFlow.Nodes` `1.2.0`,
+  `FluxFlow.Composition` `1.1.0`, `FluxFlow.Composition.Hosting` `1.1.0`, 19
+  `FluxFlow.Components.*.Composition` adapters) published first, then the
+  remaining 33 packages (Designer `2.17.1`, core component packages, `Mapping`
+  `1.0.3`, `Engine` `2.0.2`, the two MQTT adapters) were patch-bumped
+  icon-only and published across 3 dependency waves (17/14/2). All 55 are
+  independently verified live on the public NuGet feed (flat-container
+  listing, embedded icon endpoint returns `200`, and a full temporary consumer
+  project referencing all 55 packages restored and built cleanly). A
+  pre-existing flaky test
+  (`FlowMultiOutputAndSourceTests.Source_EmitAsync_WaitsWhenBoundedOutputIsFull`
+  in `FluxFlow.Nodes.Tests`, unrelated to any session change) hit ~13% of
+  release CI runs; the user approved standing auto-retry for that exact
+  signature, and all affected releases passed on retry. That test has since
+  been made deterministic (rewritten to the actual latest-wins delivery
+  contract as
+  `Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes`, 60/60
+  isolated passes, test-only change). See
+  `197-bounded-source-flaky-test-fix.md`. Syncing `origin/main`
+  itself remains a pending operator step: PR #54
+  (`https://github.com/araxis/FluxFlow/pull/54`,
+  `work/designer-host-model` -> `main`) is open and is a clean fast-forward
+  (516 commits, no divergence), but merging it into the default branch is
+  gated as a human-review action and was not auto-merged. Only the
+  `work/designer-host-model` branch carrying the release commits was pushed.
+  See `195-nuget-icon-and-hygiene-release-prep.md` and
+  `196-full-icon-rollout-completion.md`.
+- The Designer host layer is planned in `docs/18-designer-host-layer.md` and
+  phases 1, 2, and 4 are now implemented as the headless host-model layer in
+  `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and
+  resource picker view models projected by `DesignerHostCatalog`; graph model
+  with lossless `GraphDefinitionMapper` round-trips to composition
+  definitions; shared validation message mapping; 29 focused tests). Renderer
+  UI is the only remaining Designer host pass. See
+  `191-designer-host-layer-planning.md`, `193-designer-host-model-layer.md`,
+  and `194-designer-host-persistence-mapping.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
@@ -76,7 +218,7 @@ Date: 2026-06-21
   now uses the upstream MQTT-named `ConnectAsync` / `DisconnectAsync` lifecycle
   APIs internally while keeping its adapter-level `StartAsync` / `StopAsync`
   host lifecycle helpers.
-- MQTT pilot release set is published and indexed on NuGet:
+- MQTT pilot release set is published and indexed on the public package feed:
   `FluxFlow.Components.RequestReply` `1.1.0`,
   `FluxFlow.Components.Mqtt` `4.0.0`,
   `FluxFlow.Components.Mqtt.MqttNet` `1.0.0`, and
@@ -86,12 +228,13 @@ Date: 2026-06-21
   successfully. The package feed was explicitly verified after publication.
   Current source keeps core `FluxFlow.Components.Mqtt` pure at `4.0.0` with no
   client capability descriptor or cross-adapter registration package.
-  `FluxFlow.Components.Mqtt.MqttNet` is bumped to `1.1.0` for adapter-local DI
-  registration and optional hosted connect/disconnect lifetime.
-  `FluxFlow.Components.Mqtt.PulseMqtt` is bumped to `1.1.0` for Pulse MQTT
-  `2.5.0` manual acknowledgement support, adapter-local DI registration,
-  optional hosted startup, and optional Pulse message/session store hooks. These
-  FluxFlow package changes have not yet been published.
+  `FluxFlow.Components.Mqtt.MqttNet` `1.1.7` and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` are now published and indexed
+  for the adapter-local DI registration, hosted lifecycle, Pulse MQTT `2.5.0`
+  lifecycle, manual acknowledgement, and registration-name hardening work. See
+  `181-mqtt-adapter-package-release.md`. These adapter versions were also
+  included in the public package consumer validation recorded in
+  `182-public-package-consumer-validation.md`.
   `FluxFlow.Components.Mqtt.Composition` is now added as an optional
   composition adapter package for `mqtt.publish` and `mqtt.trigger` node
   factories over keyed `IMqttPublisher` / `IMqttTriggerSource` resources; core

@@ -18,16 +18,69 @@ fresh correlation id per record. Domain failures surface on the broadcast `Error
 (`FlowError`, with the original correlation id where one exists) and the pump keeps
 processing later messages; diagnostics go to `Events` (`FlowEvent`).
 
+`BoundedCapacity` configures bounded input capacity for recorder/query nodes and
+bounded source output capacity for replay. Replay awaits source output
+acceptance while replay pacing remains deterministic. Output remains
+broadcast/latest-wins; use a dedicated durable buffer if replay delivery must
+guarantee no loss.
+
+Session option records normalize optional text and copy tag maps at assignment.
+Invalid capacity, replay range, replay mode, pacing, and query limit values are
+rejected when assigned, so invalid configuration fails during node or factory
+construction.
+Recorder, replay, and query constructors resolve validated options and required
+stores before creating their node/source pipelines, keeping fail-fast option
+errors clear and preventing partially initialized nodes.
+
 ## Storage
 
 Storage is injected by the host through `ISessionStore`, passed directly to each node's
 constructor. This keeps database paths, schemas, workspace ownership, and retention
 policy outside the component package. Hosts that need deterministic recording or replay
 timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
+Hosts that need explicit open/close ownership can wrap stores with
+`ISessionStoreFactory`, `SessionStoreContext`, and `SessionStoreLease`.
+`SessionComponentOptions` provides direct-code helpers for shared stores,
+factory-backed stores, and a shared clock.
+Hosts using keyed DI can register already-owned direct stores or store
+factories without a composition dependency:
+
+```csharp
+services
+    .AddFluxFlowSessionStore("sessions", store)
+    .AddFluxFlowSessionStoreFactory("session-factory", sessionStoreFactory);
+```
+
+The direct registration overloads reject null stores and store factories. The
+provider overloads fail with clear diagnostics if they return null.
+Keyed DI helper names are trimmed before registration, matching the store-name
+normalization used by `SessionStoreContext` and session options.
+
+Stores are expected to honor the non-null parts of `ISessionStore`; when a store
+returns a null session, record, query result, or replay stream where the contract
+requires a value, the node reports a clear session error instead of surfacing an
+ambiguous null-reference failure.
+Query results are also validated against the normalized query request. A store
+that returns sessions outside the requested filters, or more sessions than the
+requested limit, is reported through the query error port.
 
 ```csharp
 ISessionStore store = new MySessionStore(...);
 TimeProvider clock = TimeProvider.System;
+```
+
+```csharp
+var options = new SessionComponentOptions()
+    .UseSharedStore(store)
+    .UseClock(clock);
+
+await using var lease = await options.StoreFactory.OpenAsync(
+    new SessionStoreContext
+    {
+        StoreName = "sessions",
+        SessionId = "sample-session",
+        Clock = options.Clock
+    });
 ```
 
 ## Recorder
@@ -111,10 +164,19 @@ The package owns the recording and replay contracts:
 - `SessionQueryResult`
 - `SessionStartRequest`, `SessionAppendRequest`, `SessionCompleteRequest`, `SessionReadRequest`
 - `ISessionStore`
+- `ISessionStoreFactory`
+- `SessionStoreContext`
+- `SessionStoreLease`
+- `SessionComponentOptions`
 
 Records carry neutral fields: session id, sequence, timestamp, type, name, payload,
 content type, and string attributes. Hosts can map their own envelope or event types
 into these contracts.
+
+Contract records normalize optional text by trimming it and treating blank values as
+absent. Tag and attribute maps are copied with ordinal key comparison when assigned,
+and nested session/input values are copied by the request/result contracts that carry
+them.
 
 ## Composition
 
@@ -126,7 +188,7 @@ Use `FluxFlow.Components.Sessions.Composition` when a `FluxFlow.Composition`
 host should register the optional session factories:
 
 ```csharp
-services.AddKeyedSingleton<ISessionStore>("sessions", sessionStore);
+services.AddFluxFlowSessionStoreFactory("sessions", sessionStoreFactory);
 
 services
     .AddFluxFlowComposition(configuration)
@@ -137,9 +199,12 @@ services
 ```
 
 The composition adapter binds the existing session option records from node
-configuration, resolves the required store from the keyed `store` resource, and
-can resolve an optional keyed `TimeProvider` resource named `clock`. Store
-implementation, retention policy, and persistence setup remain host concerns.
+configuration, resolves the required store from either a keyed `ISessionStore`
+or keyed `ISessionStoreFactory` resource, and can resolve an optional keyed
+`TimeProvider` resource named `clock`. Direct stores remain host-owned; factory
+leases are opened during composition build and disposed with composed nodes.
+Store implementation, retention policy, and persistence setup remain host
+concerns.
 
 The optional composition package also exposes
 `SessionsComponentDesignMetadataProvider` for neutral Designer metadata over the

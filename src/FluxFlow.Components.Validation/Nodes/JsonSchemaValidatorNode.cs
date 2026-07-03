@@ -51,10 +51,26 @@ public sealed class JsonSchemaValidatorNode<TInput>
         string? schemaPath = null,
         TimeProvider? clock = null,
         JsonSchemaValidatorOptions? options = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? JsonSchemaValidatorOptions.Default).BoundedCapacity
-        })
+        : this(
+            schema,
+            selector,
+            valueSelector,
+            schemaId,
+            schemaPath,
+            clock,
+            ValidateOptions(options))
+    {
+    }
+
+    private JsonSchemaValidatorNode(
+        JsonSchema schema,
+        IJsonSchemaValueSelector<TInput>? selector,
+        string? valueSelector,
+        string? schemaId,
+        string? schemaPath,
+        TimeProvider? clock,
+        ValidatedOptions options)
+        : base(options.FlowNodeOptions)
     {
         _schema = schema ?? throw new ArgumentNullException(nameof(schema));
         _selector = selector ?? DefaultValueSelector.Instance;
@@ -341,6 +357,34 @@ public sealed class JsonSchemaValidatorNode<TInput>
         }
 
         return string.Join("; ", values);
+    }
+
+    private static ValidatedOptions ValidateOptions(JsonSchemaValidatorOptions? options)
+    {
+        var resolved = options ?? JsonSchemaValidatorOptions.Default;
+        if (string.IsNullOrWhiteSpace(resolved.InputType))
+        {
+            throw new ArgumentException(
+                "json.schema-validator option 'inputType' cannot be empty.",
+                nameof(options));
+        }
+
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "json.schema-validator option 'boundedCapacity' must be greater than zero.");
+        }
+
+        return new ValidatedOptions(resolved);
+    }
+
+    private sealed class ValidatedOptions(JsonSchemaValidatorOptions validatorOptions)
+    {
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = validatorOptions.BoundedCapacity
+        };
     }
 
     private sealed class DefaultValueSelector : IJsonSchemaValueSelector<TInput>

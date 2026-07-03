@@ -2,17 +2,36 @@ namespace FluxFlow.Composition;
 
 public sealed record PortReference
 {
-    public string? Workflow { get; init; }
+    private string? _workflow;
+    private string _node = string.Empty;
+    private string _port = string.Empty;
 
-    public required string Node { get; init; }
+    public string? Workflow
+    {
+        get => _workflow;
+        init => _workflow = NormalizeOptional(value);
+    }
 
-    public required string Port { get; init; }
+    public required string Node
+    {
+        get => _node;
+        init => _node = NormalizeRequired(value);
+    }
+
+    public required string Port
+    {
+        get => _port;
+        init => _port = NormalizeRequired(value);
+    }
 
     public static PortReference Parse(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
 
-        var parts = value.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var parts = value.Split('.', StringSplitOptions.TrimEntries);
+        if (parts.Any(string.IsNullOrWhiteSpace))
+            throw new FormatException("Port references cannot contain empty segments.");
+
         return parts.Length switch
         {
             2 => new PortReference { Node = parts[0], Port = parts[1] },
@@ -31,4 +50,10 @@ public sealed record PortReference
 
     public override string ToString()
         => string.IsNullOrWhiteSpace(Workflow) ? $"{Node}.{Port}" : $"{Workflow}.{Node}.{Port}";
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeRequired(string? value)
+        => value?.Trim() ?? string.Empty;
 }

@@ -14,184 +14,208 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
             CreateWhenMetadata()
         ];
 
-    private static ComponentDesignMetadata CreateFilterMetadata() => new()
+    private static ComponentDesignMetadata CreateFilterMetadata()
+        => CreateControlMetadata(
+            ControlCompositionNodeTypes.Filter,
+            "Filter",
+            "Forwards input messages only when an expression matches.",
+            "filter",
+            "filter",
+            builder =>
+            {
+                AddInputPort(builder);
+                AddOutputPort(
+                    builder,
+                    ControlCompositionPortNames.Output,
+                    "Output",
+                    "Messages",
+                    1,
+                    "Input message when the expression matches.",
+                    isPrimary: true);
+            });
+
+    private static ComponentDesignMetadata CreateWhenMetadata()
+        => CreateControlMetadata(
+            ControlCompositionNodeTypes.When,
+            "When",
+            "Routes input messages to true and false branches.",
+            "branch",
+            "when",
+            builder =>
+            {
+                AddInputPort(builder);
+                AddOutputPort(
+                    builder,
+                    ControlCompositionPortNames.Output,
+                    "Output",
+                    "Messages",
+                    1,
+                    "Primary true-branch output alias.",
+                    isPrimary: true,
+                    attributes: new Dictionary<string, string>
+                    {
+                        ["aliasOf"] = ControlCompositionPortNames.WhenTrue
+                    });
+                AddOutputPort(
+                    builder,
+                    ControlCompositionPortNames.WhenTrue,
+                    "When True",
+                    "Branches",
+                    2,
+                    "Input message when the expression matches.");
+                AddOutputPort(
+                    builder,
+                    ControlCompositionPortNames.WhenFalse,
+                    "When False",
+                    "Branches",
+                    3,
+                    "Input message when the expression does not match.");
+            });
+
+    private static ComponentDesignMetadata CreateControlMetadata(
+        string type,
+        string displayName,
+        string summary,
+        string iconKey,
+        string preferredNodeName,
+        Action<ComponentDesignMetadataBuilder> configurePorts)
     {
-        Type = new ComponentType(ControlCompositionNodeTypes.Filter),
-        DisplayName = "Filter",
-        Category = "Control",
-        Summary = "Forwards input messages only when an expression matches.",
-        IconKey = "filter",
-        PreferredNodeName = "filter",
-        SuggestedEditorWidth = 420,
-        Options = CreateExpressionOptions(),
-        Resources = CreateExpressionResources(),
-        Ports =
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Input message.",
-                ValueType = "TInput",
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Messages",
-                Order = 1,
-                Summary = "Input message when the expression matches.",
-                ValueType = "TInput",
-                IsPrimary = true
-            }
-        ]
-    };
+        var builder = new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "Control",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: 420);
 
-    private static ComponentDesignMetadata CreateWhenMetadata() => new()
-    {
-        Type = new ComponentType(ControlCompositionNodeTypes.When),
-        DisplayName = "When",
-        Category = "Control",
-        Summary = "Routes input messages to true and false branches.",
-        IconKey = "branch",
-        PreferredNodeName = "when",
-        SuggestedEditorWidth = 420,
-        Options = CreateExpressionOptions(),
-        Resources = CreateExpressionResources(),
-        Ports =
-        [
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Input),
-                Direction = PortDirection.Input,
-                DisplayName = "Input",
-                Group = "Messages",
-                Order = 0,
-                Summary = "Input message.",
-                ValueType = "TInput",
-                IsPrimary = true
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.Output),
-                Direction = PortDirection.Output,
-                DisplayName = "Output",
-                Group = "Messages",
-                Order = 1,
-                Summary = "Primary true-branch output alias.",
-                ValueType = "TInput",
-                IsPrimary = true,
-                Attributes = new Dictionary<string, string>
-                {
-                    ["aliasOf"] = ControlCompositionPortNames.WhenTrue
-                }
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.WhenTrue),
-                Direction = PortDirection.Output,
-                DisplayName = "When True",
-                Group = "Branches",
-                Order = 2,
-                Summary = "Input message when the expression matches.",
-                ValueType = "TInput"
-            },
-            new PortDesignMetadata
-            {
-                Name = new ComponentPortName(ControlCompositionPortNames.WhenFalse),
-                Direction = PortDirection.Output,
-                DisplayName = "When False",
-                Group = "Branches",
-                Order = 3,
-                Summary = "Input message when the expression does not match.",
-                ValueType = "TInput"
-            }
-        ]
-    };
+        AddExpressionOptions(builder);
+        AddExpressionResources(builder);
+        configurePorts(builder);
 
-    private static IReadOnlyList<OptionDesignMetadata> CreateExpressionOptions()
-        =>
-        [
-            new OptionDesignMetadata
-            {
-                Name = "expression",
-                Kind = OptionValueKind.Expression,
-                DisplayName = "Expression",
-                HelperText = "Boolean expression evaluated for each input message.",
-                IsRequired = true
-            },
-            new OptionDesignMetadata
-            {
-                Name = "expressionId",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Expression ID",
-                HelperText = "Optional diagnostic identifier emitted with control diagnostics."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "expressionName",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Expression Name",
-                HelperText = "Optional diagnostic name emitted with control diagnostics."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "engine",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Engine",
-                HelperText = "Diagnostic engine metadata; composition DI selection uses the engine resource."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "inputType",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Input Type",
-                DefaultValue = ControlExpressionOptions.ObjectTypeName,
-                HelperText = "Diagnostic input type metadata; CLR input type comes from the closed registration."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "boundedCapacity",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Bounded Capacity",
-                DefaultValue = 128,
-                Min = 1,
-                HelperText = "Maximum queued input messages."
-            }
-        ];
+        return builder.Build();
+    }
 
-    private static IReadOnlyList<ResourceDesignMetadata> CreateExpressionResources()
-        =>
-        [
-            new ResourceDesignMetadata
-            {
-                Name = ControlCompositionResourceNames.Engine,
-                DisplayName = "Engine",
-                Order = 0,
-                Summary = "Keyed expression engine used to evaluate control expressions.",
-                ValueType = nameof(IFlowExpressionEngine),
-                IsRequired = true
-            },
-            new ResourceDesignMetadata
-            {
-                Name = ControlCompositionResourceNames.ContextFactory,
-                DisplayName = "Context Factory",
-                Order = 1,
-                Summary = "Optional keyed input context factory for custom expression variables.",
-                ValueType = "IFlowMapContextFactory<TInput>"
-            },
-            new ResourceDesignMetadata
-            {
-                Name = ControlCompositionResourceNames.Clock,
-                DisplayName = "Clock",
-                Order = 2,
-                Summary = "Optional keyed clock for deterministic diagnostics.",
-                ValueType = nameof(TimeProvider)
-            }
-        ];
+    private static void AddInputPort(ComponentDesignMetadataBuilder builder)
+        => builder.AddInputPort(
+            ControlCompositionPortNames.Input,
+            displayName: "Input",
+            group: "Messages",
+            order: 0,
+            summary: "Input message.",
+            valueType: "TInput",
+            isPrimary: true);
+
+    private static void AddOutputPort(
+        ComponentDesignMetadataBuilder builder,
+        string name,
+        string displayName,
+        string group,
+        int order,
+        string summary,
+        bool isPrimary = false,
+        IReadOnlyDictionary<string, string>? attributes = null)
+        => builder.AddOutputPort(
+            name,
+            displayName: displayName,
+            group: group,
+            order: order,
+            summary: summary,
+            valueType: "TInput",
+            isPrimary: isPrimary,
+            attributes: attributes);
+
+    private static void AddExpressionOptions(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddOption(
+                "expression",
+                OptionValueKind.Expression,
+                displayName: "Expression",
+                helperText: "Boolean expression evaluated for each input message.",
+                isRequired: true,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Control",
+                    importance: OptionDesignMetadataAttributeValues.Primary,
+                    editor: OptionDesignMetadataAttributeValues.Expression,
+                    syntax: OptionDesignMetadataAttributeValues.Expression,
+                    relatedResource: ControlCompositionResourceNames.Engine))
+            .AddOption(
+                "expressionId",
+                OptionValueKind.Text,
+                displayName: "Expression ID",
+                helperText: "Optional diagnostic identifier emitted with control diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
+            .AddOption(
+                "expressionName",
+                OptionValueKind.Text,
+                displayName: "Expression Name",
+                helperText: "Optional diagnostic name emitted with control diagnostics.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
+            .AddOption(
+                "engine",
+                OptionValueKind.Text,
+                displayName: "Engine",
+                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Diagnostics",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
+            .AddOption(
+                "inputType",
+                OptionValueKind.Text,
+                displayName: "Input Type",
+                defaultValue: ControlExpressionOptions.ObjectTypeName,
+                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Type Metadata",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Text))
+            .AddOption(
+                "boundedCapacity",
+                OptionValueKind.Number,
+                displayName: "Bounded Capacity",
+                helperText: "Maximum queued input messages.",
+                defaultValue: 128,
+                min: 1,
+                attributes: OptionDesignMetadataAttributes.Create(
+                    section: "Runtime",
+                    importance: OptionDesignMetadataAttributeValues.Advanced,
+                    editor: OptionDesignMetadataAttributeValues.Number));
+
+    private static void AddExpressionResources(ComponentDesignMetadataBuilder builder)
+        => builder
+            .AddResource(
+                ControlCompositionResourceNames.Engine,
+                displayName: "Engine",
+                order: 0,
+                summary: "Keyed expression engine used to evaluate control expressions.",
+                valueType: nameof(IFlowExpressionEngine),
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                    keyPattern: "expression-engine:{name}"))
+            .AddResource(
+                ControlCompositionResourceNames.ContextFactory,
+                displayName: "Context Factory",
+                order: 1,
+                summary: "Optional keyed input context factory for custom expression variables.",
+                valueType: "IFlowMapContextFactory<TInput>",
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.ContextFactory,
+                    keyPattern: "context-factory:{name}"))
+            .AddResource(
+                ControlCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 2,
+                summary: "Optional keyed clock for deterministic diagnostics.",
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
 }

@@ -76,14 +76,29 @@ strings such as `flow.counter.order`.
 ```
 
 Each node binds its existing options record from composition configuration.
+Invalid observability options, such as blank `inputType`, non-positive
+`boundedCapacity`, or unsupported logger `level`, fail during composition build
+and surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 ## Design Metadata
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
 for `flow.counter`, `flow.logger`, and `flow.metrics` so hosts can build
 palettes, editors, validation hints, or documentation without copying package
-descriptors. The metadata describes the existing observability option records
-and fixed ports. Expression engines, context factories, selectors, and optional
-keyed `TimeProvider` clocks remain host-owned resources; option fields such as
+descriptors. The metadata describes the existing observability option records,
+fixed ports, option grouping/editor hints, and host-owned resource hints.
+Counter metadata exposes the `engine`, `contextFactory`, and `clock` resources,
+with `engine` marked as conditionally required when `predicate` or `expression`
+is configured. Logger metadata exposes `clock` and the dynamic
+`attribute:{name}` selector resource pattern used by `attributeSelectors`.
+Metrics metadata exposes `sizeSelector` and `clock`. Host-owned resource
+metadata also includes key-pattern hints for expression engines, context
+factories, selectors, and clocks.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.
+
+Expression engines, context factories, selectors, and optional keyed
+`TimeProvider` clocks remain host-owned resources; option fields such as
 `engine`, `attributeSelectors`, and `sizeSelector` only carry the existing
 configuration metadata used by the nodes and factories.

@@ -71,11 +71,12 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Storage");
+            item.Category.ShouldBe(new ComponentCategory("Storage"));
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
-                option.Name == StorageCompositionResourceNames.Store ||
-                option.Name == StorageCompositionResourceNames.Clock);
+                option.Name.Value == StorageCompositionResourceNames.Store ||
+                option.Name.Value == StorageCompositionResourceNames.Clock);
+            AssertResources(item);
         }
     }
 
@@ -116,7 +117,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             putDefaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             nameof(StorageWriteMode.Upsert),
             nameof(StorageWriteMode.Create),
             nameof(StorageWriteMode.Replace)
@@ -201,6 +202,118 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_storage_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var put = OptionsByName(metadata[StorageCompositionNodeTypes.Put]);
+        AssertOptionHints(
+            put["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            put["mode"],
+            "Write",
+            OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(
+            put["emitStoredRecord"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            put["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var get = OptionsByName(metadata[StorageCompositionNodeTypes.Get]);
+        AssertOptionHints(
+            get["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            get["includeExpired"],
+            "Expiration",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            get["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var query = OptionsByName(metadata[StorageCompositionNodeTypes.Query]);
+        AssertOptionHints(
+            query["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            query["includeExpired"],
+            "Expiration",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["offset"],
+            "Query",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            query["limit"],
+            "Query",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            query["emitRecordsInResult"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["emitRecordOutputs"],
+            "Records",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            query["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var delete = OptionsByName(metadata[StorageCompositionNodeTypes.Delete]);
+        AssertOptionHints(
+            delete["collection"],
+            "Collection",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            delete["emitMissingAsResult"],
+            "Results",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            delete["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_storage_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var resources = ResourcesByName(item);
+
+            AssertResourceHints(
+                resources[StorageCompositionResourceNames.Store],
+                ResourceDesignMetadataAttributeValues.Store,
+                "storage-store:{name}");
+            AssertResourceHints(
+                resources[StorageCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new StorageComponentDesignMetadataProvider();
@@ -210,11 +323,11 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(StorageCompositionNodeTypes.Put),
             out var putMetadata).ShouldBeTrue();
-        putMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Put");
+        putMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Storage Put");
         catalog.TryGet(
             new ComponentType(StorageCompositionNodeTypes.Query),
             out var queryMetadata).ShouldBeTrue();
-        queryMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Storage Query");
+        queryMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Storage Query");
     }
 
     [Fact]
@@ -265,6 +378,44 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                 services.AddKeyedSingleton<IStorageStore>("store", store);
                 services.AddKeyedSingleton<TimeProvider>("fixed", clock);
             });
+    }
+
+    [Fact]
+    public async Task Hosted_put_can_resolve_store_factory_resource_and_dispose_owned_lease()
+    {
+        var store = new InMemoryStorageStore();
+        var factory = new RecordingStorageStoreFactory(store);
+
+        await WithNodeAsync(
+            StorageCompositionNodeTypes.Put,
+            async descriptor =>
+            {
+                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
+                    .ShouldBeOfType<CompositionInputPort<StoragePutRequest>>();
+                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
+                    .ShouldBeOfType<CompositionOutputPort<StorageResult>>();
+                var results = Link(output.Source);
+                var message = FlowMessage.Create(
+                    new StoragePutRequest { Key = "a", Value = "one" },
+                    new CorrelationId("factory-put"));
+
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+
+                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                result.CorrelationId.ShouldBe(message.CorrelationId);
+                result.Payload.Collection.ShouldBe("items");
+                result.Payload.Key.ShouldBe("a");
+            },
+            node => node
+                .Resource(StorageCompositionResourceNames.Store, "factory")
+                .Configure("collection", "items"),
+            services => services.AddKeyedSingleton<IStorageStoreFactory>("factory", factory));
+
+        factory.OpenCount.ShouldBe(1);
+        factory.Context.ShouldNotBeNull();
+        factory.Context.StoreName.ShouldBe("factory");
+        factory.Context.Collection.ShouldBe("items");
+        store.DisposeCount.ShouldBe(1);
     }
 
     [Fact]
@@ -444,8 +595,11 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
     [Theory]
     [InlineData(StorageCompositionNodeTypes.Put, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageCompositionNodeTypes.Get, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(StorageCompositionNodeTypes.Query, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(StorageCompositionNodeTypes.Query, "limit", 0, "limit")]
     [InlineData(StorageCompositionNodeTypes.Query, "offset", -1, "offset")]
+    [InlineData(StorageCompositionNodeTypes.Delete, "boundedCapacity", 0, "boundedCapacity")]
     public async Task Invalid_configuration_surfaces_factory_diagnostic(
         string nodeType,
         string optionName,
@@ -563,6 +717,18 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertTransformPorts<TInput, TOutput>(
         ComponentDesignMetadata metadata)
     {
@@ -572,14 +738,14 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(StorageCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(StorageCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -588,7 +754,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         metadata.Ports.Count.ShouldBe(4);
 
         metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageGetRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(StorageGetRequest));
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
@@ -615,7 +781,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         metadata.Ports.Count.ShouldBe(3);
 
         metadata.Ports[0].Name.Value.ShouldBe(StorageCompositionPortNames.Input);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(StorageQueryRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(StorageQueryRequest));
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
@@ -642,14 +808,14 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         port.Name.Value.ShouldBe(name);
         port.Direction.ShouldBe(PortDirection.Output);
         port.Order.ShouldBe(order);
-        port.ValueType.ShouldBe(valueType);
+        port.ValueType?.Value.ShouldBe(valueType);
         port.IsPrimary.ShouldBe(isPrimary);
     }
 
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         params string[] names)
-        => metadata.Options.Select(option => option.Name)
+        => metadata.Options.Select(option => option.Name.Value)
             .ShouldBe(names, ignoreOrder: false);
 
     private static OptionDesignMetadata AssertOption(
@@ -659,12 +825,70 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         object? defaultValue = null,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         return option;
     }
+
+    private static void AssertResources(ComponentDesignMetadata metadata)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name.Value,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType?.Value)).ShouldBe([
+            (StorageCompositionResourceNames.Store, 0, true, $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)}"),
+            (StorageCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {
@@ -691,12 +915,13 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             Value = value
         });
 
-    private sealed class InMemoryStorageStore : IStorageStore
+    private sealed class InMemoryStorageStore : IStorageStore, IAsyncDisposable
     {
         private readonly object _gate = new();
         private readonly Dictionary<(string Collection, string Key), StorageRecord> _records = [];
 
         public int FailuresRemaining { get; set; }
+        public int DisposeCount { get; private set; }
         public int RecordCount
         {
             get
@@ -854,5 +1079,27 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             => source is null
                 ? []
                 : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingStorageStoreFactory(IStorageStore store) : IStorageStoreFactory
+    {
+        public int OpenCount { get; private set; }
+        public StorageStoreContext? Context { get; private set; }
+
+        public ValueTask<StorageStoreLease> OpenAsync(
+            StorageStoreContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            OpenCount++;
+            Context = context;
+            return ValueTask.FromResult(StorageStoreLease.Owned(store));
+        }
     }
 }

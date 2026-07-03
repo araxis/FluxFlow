@@ -50,6 +50,30 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task RequestReplyMode_EmitsPublishedEventAfterRequestReachesOutput()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var events = Sink(bridge.Events);
+        var context = new FakeContext("hello");
+
+        await bridge.Incoming.SendAsync(context);
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await bridge.Responses.SendAsync(request.With("world"));
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+
+        var received = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var published = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var replied = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        received.Name.ShouldBe(RequestReplyEvents.Received);
+        received.CorrelationId.ShouldBe(request.CorrelationId);
+        published.Name.ShouldBe(RequestReplyEvents.Published);
+        published.CorrelationId.ShouldBe(request.CorrelationId);
+        replied.Name.ShouldBe(RequestReplyEvents.Replied);
+        replied.CorrelationId.ShouldBe(request.CorrelationId);
+    }
+
+    [Fact]
     public async Task EndToEnd_GraphHandler_RepliesThroughBridge()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
@@ -102,6 +126,57 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task NullRequestContext_ReportsError_AndContinues()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
+
+        await bridge.Incoming.SendAsync(null!);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidRequestContext);
+        error.CorrelationId.ShouldBeNull();
+        flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
+        flowEvent.Level.ShouldBe(FlowEventLevel.Error);
+
+        var context = new FakeContext("valid");
+        await bridge.Incoming.SendAsync(context);
+
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        request.Payload.ShouldBe("valid");
+        await bridge.Responses.SendAsync(request.With("ok"));
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Replied.ShouldBe("ok");
+    }
+
+    [Fact]
+    public async Task NullResponseMessage_ReportsError_AndContinues()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var errors = Sink(bridge.Errors);
+        var events = Sink(bridge.Events);
+
+        await bridge.Responses.SendAsync(null!);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var flowEvent = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(RequestReplyErrorCodes.InvalidResponseMessage);
+        error.CorrelationId.ShouldBeNull();
+        flowEvent.Name.ShouldBe(RequestReplyEvents.Invalid);
+        flowEvent.Level.ShouldBe(FlowEventLevel.Error);
+
+        var context = new FakeContext("valid");
+        await bridge.Incoming.SendAsync(context);
+        var request = await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        await bridge.Responses.SendAsync(request.With("ok"));
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Replied.ShouldBe("ok");
+    }
+
+    [Fact]
     public async Task Fault_FailsInFlightCallers_AndFaultsCompletion()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
@@ -122,10 +197,91 @@ public sealed class RequestReplyCoordinatorTests
     }
 
     [Fact]
+    public async Task Complete_FailsInFlightCallers_AndSettlesCompletion()
+    {
+        await using var bridge = new RequestReplyCoordinator<string, string>();
+        var context = new FakeContext("pending");
+        await bridge.Incoming.SendAsync(context);
+        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        bridge.Complete();
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Failed.ShouldBeOfType<OperationCanceledException>();
+        context.Replied.ShouldBeNull();
+        await bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task DisposeAsync_FailsInFlightCallers_AndSettlesCompletion()
+    {
+        var bridge = new RequestReplyCoordinator<string, string>();
+        var context = new FakeContext("pending");
+        await bridge.Incoming.SendAsync(context);
+        await bridge.Output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        await bridge.DisposeAsync();
+
+        await context.Settled.WaitAsync(TimeSpan.FromSeconds(30));
+        context.Failed.ShouldBeOfType<OperationCanceledException>();
+        context.Replied.ShouldBeNull();
+        await bridge.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
     public async Task Coordinator_IsAFlowNode()
     {
         await using var bridge = new RequestReplyCoordinator<string, string>();
         bridge.ShouldBeAssignableTo<IFlowNode>();
+    }
+
+    [Fact]
+    public void Constructor_rejects_invalid_options()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Mode = (RequestReplyMode)999 }))
+            .Message.ShouldContain("mode", Case.Insensitive);
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Capacity = 0 }))
+            .Message.ShouldContain("Capacity");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions { Timeout = TimeSpan.Zero }))
+            .Message.ShouldContain("Timeout");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new RequestReplyCoordinator<string, string>(
+                new RequestReplyOptions
+                {
+                    Mode = RequestReplyMode.FireAndForget,
+                    SweepInterval = TimeSpan.Zero
+                }))
+            .Message.ShouldContain("Sweep interval");
+    }
+
+    [Fact]
+    public void RequestReplyOptions_reject_invalid_values_when_assigned()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Mode = (RequestReplyMode)999
+        }).Message.ShouldContain("mode", Case.Insensitive);
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Capacity = 0
+        }).Message.ShouldContain("Capacity");
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            Timeout = TimeSpan.Zero
+        }).Message.ShouldContain("Timeout");
+        Should.Throw<ArgumentOutOfRangeException>(() => new RequestReplyOptions
+        {
+            SweepInterval = TimeSpan.Zero
+        }).Message.ShouldContain("Sweep interval");
     }
 
     [Fact]

@@ -13,7 +13,6 @@ The stable engine surface includes:
 - public types in `FluxFlow.Engine`
 - public types in `FluxFlow.Engine.Components`
 - public types in `FluxFlow.Engine.Definitions`
-- public types in `FluxFlow.Engine.Mapping`
 - public types in `FluxFlow.Engine.Runtime`
 - executable definition JSON shape
 - validation and runtime build error codes
@@ -89,8 +88,10 @@ keeps application-specific schema migrations outside the engine package.
 
 ## Expression Compatibility
 
-`FluxFlow.Engine` owns `IFlowExpressionEngine` and expression predicate
-contracts. It does not own concrete expression languages.
+`FluxFlow.Mapping` owns `IFlowExpressionEngine`, expression predicates, mappers,
+and expression context contracts. `FluxFlow.Engine` consumes those contracts for
+conditional links, but does not own concrete expression languages or the mapping
+abstraction.
 
 Applications that persist link `when` expressions own:
 

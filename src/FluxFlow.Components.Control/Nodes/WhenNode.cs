@@ -36,12 +36,18 @@ public sealed class WhenNode<TInput> : FlowNode<TInput, TInput>
         IFlowPredicate<TInput> predicate,
         string? engineName = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = RequireCapacity(options)
-        })
+        : this(ValidateOptions(options, requireExpression: false), predicate, engineName, clock)
     {
-        _options = options;
+    }
+
+    private WhenNode(
+        ValidatedOptions options,
+        IFlowPredicate<TInput> predicate,
+        string? engineName,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
+    {
+        _options = options.ControlOptions;
         _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
         _engineName = engineName ?? string.Empty;
         _clock = clock ?? TimeProvider.System;
@@ -57,9 +63,18 @@ public sealed class WhenNode<TInput> : FlowNode<TInput, TInput>
         IFlowExpressionEngine expressionEngine,
         IFlowMapContextFactory<TInput>? contextFactory = null,
         TimeProvider? clock = null)
+        : this(ValidateOptions(options, requireExpression: true), expressionEngine, contextFactory, clock)
+    {
+    }
+
+    private WhenNode(
+        ValidatedOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IFlowMapContextFactory<TInput>? contextFactory,
+        TimeProvider? clock)
         : this(
             options,
-            BuildPredicate(options, expressionEngine, contextFactory),
+            BuildPredicate(options.Expression!, expressionEngine, contextFactory),
             EngineName(expressionEngine),
             clock)
     {
@@ -133,42 +148,63 @@ public sealed class WhenNode<TInput> : FlowNode<TInput, TInput>
         });
     }
 
-    private static int RequireCapacity(ControlExpressionOptions options)
+    private static ValidatedOptions ValidateOptions(
+        ControlExpressionOptions? options,
+        bool requireExpression)
     {
         ArgumentNullException.ThrowIfNull(options);
+
+        if (requireExpression && string.IsNullOrWhiteSpace(options.Expression))
+        {
+            throw new ArgumentException(
+                "flow.when requires configuration value 'expression'.", nameof(options));
+        }
+
+        if (string.IsNullOrWhiteSpace(options.InputType))
+        {
+            throw new ArgumentException(
+                "flow.when option 'inputType' cannot be empty.", nameof(options));
+        }
+
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(options),
-                "When bounded capacity must be greater than zero.");
+                "flow.when option 'boundedCapacity' must be greater than zero.");
         }
 
-        return options.BoundedCapacity;
+        return new ValidatedOptions(options);
     }
 
     private static IFlowPredicate<TInput> BuildPredicate(
-        ControlExpressionOptions options,
+        string expression,
         IFlowExpressionEngine expressionEngine,
         IFlowMapContextFactory<TInput>? contextFactory)
     {
-        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(expressionEngine);
-        if (string.IsNullOrWhiteSpace(options.Expression))
-        {
-            throw new ArgumentException(
-                "flow.when requires a non-empty expression.", nameof(options));
-        }
 
         // Compile the predicate expression once here (build time); the node only
         // evaluates the compiled form per message.
         return contextFactory is null
-            ? new ExpressionFlowPredicate<TInput>(options.Expression, expressionEngine)
-            : new ExpressionFlowPredicate<TInput>(options.Expression, expressionEngine, contextFactory);
+            ? new ExpressionFlowPredicate<TInput>(expression, expressionEngine)
+            : new ExpressionFlowPredicate<TInput>(expression, expressionEngine, contextFactory);
     }
 
     private static string EngineName(IFlowExpressionEngine expressionEngine)
     {
         ArgumentNullException.ThrowIfNull(expressionEngine);
         return expressionEngine.Name;
+    }
+
+    private sealed class ValidatedOptions(ControlExpressionOptions controlOptions)
+    {
+        public ControlExpressionOptions ControlOptions { get; } = controlOptions;
+
+        public string? Expression { get; } = controlOptions.Expression;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = controlOptions.BoundedCapacity
+        };
     }
 }

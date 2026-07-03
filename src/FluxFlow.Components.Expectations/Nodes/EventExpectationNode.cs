@@ -49,17 +49,15 @@ public sealed class EventExpectationNode : FlowNode<ProjectionEvent, EventExpect
         TimeProvider? clock = null)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new EventExpectationOptions()).BoundedCapacity,
+            InputCapacity = ResolveOptions(options).BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        _options = options ?? new EventExpectationOptions();
+        _options = ResolveOptions(options);
         // A null filter means match-all (the matcher and the result copy both expect a value).
         _filter = _options.Filter ?? new EventFilter();
         _clock = clock ?? TimeProvider.System;
         _kind = _options.Kind;
-
-        Validate(_options);
 
         _timeout = _options.TimeoutMilliseconds.HasValue
             ? TimeSpan.FromMilliseconds(_options.TimeoutMilliseconds.Value)
@@ -360,29 +358,40 @@ public sealed class EventExpectationNode : FlowNode<ProjectionEvent, EventExpect
             : value[.._options.MaxPreviewChars];
     }
 
+    private static EventExpectationOptions ResolveOptions(EventExpectationOptions? options)
+    {
+        var resolved = options ?? new EventExpectationOptions();
+        Validate(resolved);
+        return resolved;
+    }
+
     private static void Validate(EventExpectationOptions options)
     {
         if (options.TimeoutMilliseconds.HasValue && options.TimeoutMilliseconds.Value <= 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "event expectation option 'timeoutMilliseconds' must be greater than zero when set.");
         }
 
         if (options.MaxObservedEvents < 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "event expectation option 'maxObservedEvents' must be zero or greater.");
         }
 
         if (options.MaxPreviewChars < 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "event expectation option 'maxPreviewChars' must be zero or greater.");
         }
 
         if (options.BoundedCapacity <= 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "event expectation option 'boundedCapacity' must be greater than zero.");
         }
     }

@@ -18,12 +18,48 @@ component without depending on a specific rendering framework.
   required flag, value type hint, summary, and attributes.
 - `PortDesignMetadata`: port name, direction, display name, group, order, summary,
   value type, primary flag, and attributes.
-- `ComponentType` and `ComponentPortName`: Designer-owned identifiers for
-  component types and ports. They do not depend on engine definition types.
+- `ComponentType`, `ComponentCategory`, `ComponentIconKey`,
+  `ComponentPreferredNodeName`, `ComponentOptionName`,
+  `ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`,
+  `ComponentPortGroup`, `ComponentAttributeName`,
+  `ComponentAttributeValue`, `ComponentMetadataText`, and
+  `ComponentValueTypeHint`:
+  Designer-owned value types for component types, palette categories, palette
+  icon keys, preferred node names, editable options, option choices, metadata
+  display text,
+  host-owned resource slots, ports, port groups, metadata attribute keys,
+  metadata attribute values, and value type hints. They do not depend on engine
+  definition types.
 - `IComponentDesignMetadataProvider`: package-owned metadata provider contract
   for reusable component packages.
+- `ComponentDesignMetadataBuilder`: fluent authoring helper over the same
+  metadata contracts.
 - `ComponentDesignMetadataCatalog`: validates and composes metadata from one or
   more providers.
+- `ComponentDesignMetadataServiceCollectionExtensions`: optional host DI helpers
+  for registering providers and resolving one validated catalog.
+- `ComponentResourcePickerHint` and `ComponentResourcePickerHints`: neutral
+  host-side helpers for reading host-owned resource picker hints from metadata
+  without resolving resources or rendering UI.
+- `ResourceDesignMetadataAttributeNames`,
+  `ResourceDesignMetadataAttributeValues`, and
+  `ResourceDesignMetadataAttributes`: shared names, values, and helpers for
+  describing host-owned resource picker hints.
+- `OptionDesignMetadataAttributeNames`,
+  `OptionDesignMetadataAttributeValues`, and
+  `OptionDesignMetadataAttributes`: shared names, values, and helpers for
+  describing option editor, section, importance, syntax, and related-resource
+  hints.
+
+`ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
+options and ports, duplicate primary ports per direction, invalid option
+kind and port direction values, invalid option defaults, invalid min/max usage,
+invalid choices, invalid resource and port order values, invalid resources,
+invalid attributes, and null-bound metadata collections as validation errors
+before metadata is registered.
+`ComponentDesignMetadataCatalog` snapshots registered metadata after validation,
+including nested choices and typed attribute maps, so later mutations to
+provider-owned collections do not change the catalog.
 
 ## Option Kinds
 
@@ -42,12 +78,37 @@ The option kind contract supports:
 Enum options must provide at least one choice. Choice lists are reserved for
 enum options; non-enum options should use their value kind plus optional
 constraints such as `Min` and `Max`.
+Default values should match the option kind: text-like options use strings,
+numbers use numeric values, booleans use `bool`, durations use `TimeSpan`, and
+enum defaults use either a choice value string or an enum value whose name
+matches a choice. `Min` and `Max` apply only to number and duration options.
+
+## Option Metadata
+
+Options can carry host-facing editor hints through typed attributes. Use
+`OptionDesignMetadataAttributes.Create(...)` when a provider needs to describe
+an option's section, importance, editor kind, syntax, or related resource. These
+attributes are metadata only; hosts still choose their forms, grouping,
+validation UI, and expression editors.
 
 ## Resource Metadata
 
 Resources describe host-owned dependencies such as keyed clients, stores,
 expression engines, or clocks. They are metadata only; this package does not
 register, resolve, validate, or dispose those resources.
+
+Use `ResourceDesignMetadataAttributes.CreateHostOwned(...)` when a provider
+needs to describe a host-owned resource picker. The shared attribute names cover
+resource ownership, picker kind, key pattern, related option, and conditional
+requiredness. They are only hints for hosts; the host still owns resource
+catalogs, keyed registrations, secrets, lifetimes, and disposal.
+
+Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
+of the host-owned picker hints from one component metadata item or a validated
+catalog. The helper filters to host-owned resources with picker kinds, preserves
+resource order within each component, and parses conditional option names such
+as `predicate,expression` into typed option names. It does not enumerate,
+validate, resolve, create, or dispose host resources.
 
 ## Example
 
@@ -58,31 +119,52 @@ using FluxFlow.Components.Designer.Contracts;
 var metadata = new ComponentDesignMetadata
 {
     Type = new ComponentType("sample.transform"),
-    DisplayName = "Sample Transform",
-    Category = "Samples",
-    Summary = "Transforms a sample value.",
-    IconKey = "transform",
-    PreferredNodeName = "transform",
+    DisplayName = new ComponentMetadataText("Sample Transform"),
+    Category = new ComponentCategory("Samples"),
+    Summary = new ComponentMetadataText("Transforms a sample value."),
+    IconKey = new ComponentIconKey("transform"),
+    PreferredNodeName = new ComponentPreferredNodeName("transform"),
     SuggestedEditorWidth = 420,
     Options =
     [
         new OptionDesignMetadata
         {
-            Name = "expression",
+            Name = new ComponentOptionName("expression"),
             Kind = OptionValueKind.Expression,
-            DisplayName = "Expression",
+            DisplayName = new ComponentMetadataText("Expression"),
             IsRequired = true
+        },
+        new OptionDesignMetadata
+        {
+            Name = new ComponentOptionName("mode"),
+            Kind = OptionValueKind.Enum,
+            DefaultValue = "strict",
+            Choices =
+            [
+                new OptionChoiceMetadata
+                {
+                    Value = new ComponentOptionChoiceValue("strict"),
+                    DisplayName = new ComponentMetadataText("Strict")
+                },
+                new OptionChoiceMetadata
+                {
+                    Value = new ComponentOptionChoiceValue("relaxed"),
+                    DisplayName = new ComponentMetadataText("Relaxed")
+                }
+            ]
         }
     ],
     Resources =
     [
         new ResourceDesignMetadata
         {
-            Name = "engine",
-            DisplayName = "Engine",
+            Name = new ComponentResourceName("engine"),
+            DisplayName = new ComponentMetadataText("Engine"),
             Order = 0,
-            ValueType = "IExpressionEngine",
-            IsRequired = true
+            ValueType = new ComponentValueTypeHint("IExpressionEngine"),
+            IsRequired = true,
+            Attributes = ResourceDesignMetadataAttributes.CreateHostOwnedMap(
+                ResourceDesignMetadataAttributeValues.ExpressionEngine)
         }
     ],
     Ports =
@@ -101,10 +183,51 @@ var metadata = new ComponentDesignMetadata
             Order = 0,
             IsPrimary = true
         }
-    ]
+    ],
+    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>
+    {
+        [new ComponentAttributeName("shape")] = new ComponentAttributeValue("transform")
+    }
 };
 
 var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+```
+
+The fluent builder can author the same validated metadata shape with less
+boilerplate. Component-level attributes can be added one at a time or as a
+range through `AddAttribute` and `AddAttributes`:
+
+```csharp
+var built = new ComponentDesignMetadataBuilder("sample.transform")
+    .WithDisplay(
+        displayName: "Sample Transform",
+        category: "Samples",
+        summary: "Transforms a sample value.",
+        iconKey: "transform",
+        preferredNodeName: "transform",
+        suggestedEditorWidth: 420)
+    .AddOption("expression", OptionValueKind.Expression, isRequired: true)
+    .AddOption(
+        "label",
+        OptionValueKind.Text,
+        attributes: OptionDesignMetadataAttributes.Create(
+            section: "General",
+            importance: OptionDesignMetadataAttributeValues.Primary,
+            editor: OptionDesignMetadataAttributeValues.Text))
+    .AddResource(
+        "engine",
+        order: 0,
+        valueType: "IExpressionEngine",
+        isRequired: true,
+        attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+            ResourceDesignMetadataAttributeValues.ExpressionEngine))
+    .AddInputPort("Input", order: 0, isPrimary: true)
+    .AddOutputPort("Output", order: 0, isPrimary: true)
+    .AddAttributes(new Dictionary<string, string>
+    {
+        ["shape"] = "transform"
+    })
+    .Build();
 ```
 
 ## Package Providers
@@ -114,6 +237,23 @@ returns metadata for their public node type constants. Hosts compose those
 providers into a `ComponentDesignMetadataCatalog` to build palettes, editors,
 validation views, and generated documentation without duplicating package
 descriptors.
+Providers must return a non-null metadata collection; catalog loading reports a
+clear provider error when that contract is violated.
+`ComponentDesignMetadataModule` is a small provider helper that validates,
+rejects duplicate component types, and snapshots the metadata it receives.
+`ComponentDesignMetadataBuilder` is a small authoring helper for providers that
+want to build those same contracts fluently before returning them. The builder
+validates null fluent option, resource, port, enum-choice, and attribute
+arguments immediately, then still runs the same metadata validation path during
+`Build()` for blank values, duplicates, invalid directions, and shape errors.
+
+Hosts that use DI can register package-owned providers and one shared catalog:
+
+```csharp
+services
+    .AddComponentDesignMetadataProvider<MyPackageMetadataProvider>()
+    .AddComponentDesignMetadataCatalog();
+```
 
 Hosts can layer app-specific behavior, localization, resource pickers, and
 rendering hints separately from package-owned metadata.

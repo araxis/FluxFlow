@@ -25,11 +25,13 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
     private readonly CancellationTokenSource _stopping = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TimeProvider _clock;
     private int _disposed;
 
     protected FlowNode(FlowNodeOptions? options = null)
     {
         options ??= new FlowNodeOptions();
+        _clock = options.Clock ?? TimeProvider.System;
         if (options.InputCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -182,7 +184,7 @@ public abstract class FlowNode<TInput, TOutput> : IFlowNode
             // with the in-flight correlation id), never a dead pump.
             EmitError(new FlowError
             {
-                Timestamp = DateTimeOffset.UtcNow,
+                Timestamp = _clock.GetUtcNow(),
                 CorrelationId = message.CorrelationId,
                 Message = exception.Message,
                 Exception = exception

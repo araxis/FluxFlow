@@ -9,7 +9,10 @@ public sealed class ComponentDesignMetadataModule : IComponentDesignMetadataProv
     public ComponentDesignMetadataModule(IEnumerable<ComponentDesignMetadata> metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        _metadata = metadata.ToArray();
+        _metadata = new ComponentDesignMetadataCatalog()
+            .AddRange(metadata)
+            .All
+            .ToArray();
     }
 
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata() => _metadata;

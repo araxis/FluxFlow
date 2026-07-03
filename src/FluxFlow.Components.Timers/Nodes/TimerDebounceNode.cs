@@ -37,28 +37,10 @@ public sealed class TimerDebounceNode<TInput> : FlowNode<TInput, TInput>
     public TimerDebounceNode(
         TimerDebounceSettings settings,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (settings ?? throw new ArgumentNullException(nameof(settings))).BoundedCapacity,
-            // Serial intake: a newer arrival must supersede the previous pending item in
-            // strict arrival order, so handlers must not run concurrently.
-            MaxDegreeOfParallelism = 1
-        })
+        : base(BuildNodeOptions(settings))
     {
-        _settings = settings;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _clock = clock ?? TimeProvider.System;
-
-        if (_settings.QuietPeriod <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.debounce 'QuietPeriod' must be greater than zero.");
-        }
-
-        if (_settings.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.debounce 'BoundedCapacity' must be greater than zero.");
-        }
     }
 
     protected override Task ProcessAsync(FlowMessage<TInput> message)
@@ -213,4 +195,29 @@ public sealed class TimerDebounceNode<TInput> : FlowNode<TInput, TInput>
             $"name={_settings.Name}",
             $"inputType={_inputType}",
             $"quietPeriodMilliseconds={_settings.QuietPeriod.TotalMilliseconds}");
+
+    private static FlowNodeOptions BuildNodeOptions(TimerDebounceSettings? settings)
+    {
+        var resolved = settings ?? throw new ArgumentNullException(nameof(settings));
+
+        if (resolved.QuietPeriod <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.debounce 'QuietPeriod' must be greater than zero.");
+        }
+
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.debounce 'BoundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowNodeOptions
+        {
+            InputCapacity = resolved.BoundedCapacity,
+            // Serial intake: a newer arrival must supersede the previous pending item in
+            // strict arrival order, so handlers must not run concurrently.
+            MaxDegreeOfParallelism = 1
+        };
+    }
 }

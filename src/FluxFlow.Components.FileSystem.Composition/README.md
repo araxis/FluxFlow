@@ -77,15 +77,21 @@ Path safety is still configured through the existing node options such as
 The adapter binds the existing FileSystem option records from composition
 configuration. `CompositionRuntime.StartAsync()` starts `directory.enumerate`
 and `file.watch`; normal runtime stop/dispose stops `file.watch`.
+Invalid option values fail during composition build through the node factory. If
+build failures are configured as diagnostics, the runtime is not created and the
+host receives a `FactoryFailed` diagnostic with the relevant option name.
 
 ## Design Metadata
 
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes. The metadata describes fixed
-request/result ports, source outputs, and the existing FileSystem option
-records for hosts that build palettes, editors, validators, or documentation
-views.
+request/result ports, source outputs, the existing FileSystem option records,
+option section/importance/editor hints, and optional host-owned `clock`
+resource picker hints for hosts that build palettes, editors, validators, or
+documentation views.
 
 Path safety remains runtime configuration through `baseDirectory` and
 `allowAbsolutePaths`. The optional `clock` resource remains host-owned and is
 not represented as an editable node option.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts.

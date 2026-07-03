@@ -13,6 +13,97 @@ namespace FluxFlow.Composition.Hosting.Tests;
 public sealed class CompositionRuntimeHostTests
 {
     [Fact]
+    public void Hosting_registration_rejects_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+        var definition = new CompositionDefinition();
+        var configuration = new ConfigurationBuilder().Build();
+
+        var servicesException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowCompositionHostingServiceCollectionExtensions.AddFluxFlowComposition(
+                null!,
+                definition));
+        var definitionException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((CompositionDefinition)null!));
+        var configurationException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((IConfiguration)null!));
+        var sectionNameException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition(configuration, null!));
+        var sectionException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowCompositionSection(null!));
+        var sourceException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowComposition((ICompositionDefinitionSource)null!));
+
+        servicesException.ParamName.ShouldBe("services");
+        definitionException.ParamName.ShouldBe("definition");
+        configurationException.ParamName.ShouldBe("configuration");
+        sectionNameException.ParamName.ShouldBe("sectionName");
+        sectionException.ParamName.ShouldBe("configurationSection");
+        sourceException.ParamName.ShouldBe("definitionSource");
+    }
+
+    [Fact]
+    public void Hosting_builder_rejects_null_delegates()
+    {
+        var builder = new ServiceCollection()
+            .AddFluxFlowComposition(new CompositionDefinition());
+
+        var nodesException = Should.Throw<ArgumentNullException>(() =>
+            builder.RegisterNodes(null!));
+        var contributorException = Should.Throw<ArgumentNullException>(() =>
+            builder.RegisterNodeContributor(null!));
+        var configureException = Should.Throw<ArgumentNullException>(() =>
+            builder.Configure(null!));
+
+        nodesException.ParamName.ShouldBe("configure");
+        contributorException.ParamName.ShouldBe("contributor");
+        configureException.ParamName.ShouldBe("configure");
+    }
+
+    [Fact]
+    public void Definition_sources_reject_null_inputs()
+    {
+        var definitionException = Should.Throw<ArgumentNullException>(() =>
+            new StaticCompositionDefinitionSource(null!));
+        var configurationException = Should.Throw<ArgumentNullException>(() =>
+            new ConfigurationCompositionDefinitionSource(null!));
+        var sectionNameException = Should.Throw<ArgumentNullException>(() =>
+            new ConfigurationCompositionDefinitionSource(new ConfigurationBuilder().Build(), null!));
+
+        definitionException.ParamName.ShouldBe("definition");
+        configurationException.ParamName.ShouldBe("configuration");
+        sectionNameException.ParamName.ShouldBe("sectionName");
+    }
+
+    [Fact]
+    public void Hosting_exception_snapshots_diagnostics()
+    {
+        var diagnostics = new List<CompositionDiagnostic>
+        {
+            new()
+            {
+                Code = CompositionDiagnosticCode.UnknownNodeType,
+                Message = "Unknown node type."
+            }
+        };
+
+        var exception = new CompositionHostingException("Build failed.", diagnostics);
+
+        diagnostics.Clear();
+
+        exception.Diagnostics.ShouldHaveSingleItem()
+            .Message.ShouldBe("Unknown node type.");
+    }
+
+    [Fact]
+    public void Hosting_exception_treats_null_diagnostics_as_empty()
+    {
+        var exception = new CompositionHostingException("Build failed.", null!);
+
+        exception.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Hosted_runtime_resolves_keyed_resources_and_runs_definition()
     {
         var collector = new TextCollector();
@@ -32,6 +123,114 @@ public sealed class CompositionRuntimeHostTests
 
         collector.Items.ShouldBe(["ALPHA", "BETA"]);
         host.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Hosted_runtime_registers_node_contributor_type()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        services
+            .AddFluxFlowComposition(CreateDefinition(["type"], includeResource: true))
+            .RegisterNodeContributor<TestNodesContributor>();
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["TYPE"]);
+        host.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Hosted_runtime_registers_node_contributor_instance()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        services
+            .AddFluxFlowComposition(CreateDefinition(["instance"], includeResource: true))
+            .RegisterNodeContributor(new TestNodesContributor());
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["INSTANCE"]);
+        host.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Hosting_builder_skips_duplicate_contributor_implementation_types()
+    {
+        var contributor = new TestNodesContributor();
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(new CompositionDefinition())
+            .RegisterNodeContributor<TestNodesContributor>()
+            .RegisterNodeContributor<TestNodesContributor>()
+            .RegisterNodeContributor(contributor)
+            .RegisterNodeContributor(contributor);
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetServices<ICompositionNodeRegistryContributor>()
+            .OfType<TestNodesContributor>()
+            .Count()
+            .ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Hosted_runtime_trims_configured_resource_keys()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        services
+            .AddFluxFlowComposition(CreateDefinition(["spaced"], includeResource: true, resourceKey: " primary "))
+            .RegisterNodes(RegisterTestNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["SPACED"]);
+        host.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resource_helpers_trim_resource_slot_names_and_keys()
+    {
+        var collector = new TextCollector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ITextCollector>("primary", collector);
+        using var provider = services.BuildServiceProvider();
+        var context = new CompositionNodeFactoryContext(
+            provider,
+            "main",
+            "sink",
+            new NodeDefinition
+            {
+                Type = "test.hosting.sink",
+                Resources =
+                {
+                    ["collector"] = " primary "
+                }
+            });
+
+        context.GetRequiredResourceKey(" collector ").ShouldBe("primary");
+        context.GetRequiredResource<ITextCollector>(" collector ").ShouldBeSameAs(collector);
+        context.GetResource<ITextCollector>(" collector ").ShouldBeSameAs(collector);
     }
 
     [Fact]
@@ -115,6 +314,47 @@ public sealed class CompositionRuntimeHostTests
     }
 
     [Fact]
+    public async Task Hosted_runtime_start_is_idempotent()
+    {
+        var source = new CountingSourceNode();
+        var services = new ServiceCollection();
+        services.AddSingleton(source);
+        services
+            .AddFluxFlowComposition(CreateLifecycleDefinition())
+            .RegisterNodes(RegisterLifecycleNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        await hostedService.StartAsync(CancellationToken.None);
+
+        source.StartCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Hosted_runtime_stop_is_idempotent()
+    {
+        var source = new CountingSourceNode();
+        var services = new ServiceCollection();
+        services.AddSingleton(source);
+        services
+            .AddFluxFlowComposition(CreateLifecycleDefinition())
+            .RegisterNodes(RegisterLifecycleNodes);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+        await hostedService.StopAsync(CancellationToken.None);
+        await hostedService.StopAsync(CancellationToken.None);
+        await hostedService.StartAsync(CancellationToken.None);
+
+        source.StartCount.ShouldBe(1);
+        source.CompleteCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Hosted_runtime_surfaces_diagnostics_without_throwing_when_configured()
     {
         var services = new ServiceCollection();
@@ -155,7 +395,10 @@ public sealed class CompositionRuntimeHostTests
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed);
     }
 
-    private static CompositionDefinition CreateDefinition(string[] messages, bool includeResource)
+    private static CompositionDefinition CreateDefinition(
+        string[] messages,
+        bool includeResource,
+        string resourceKey = "primary")
         => CompositionDefinitionBuilder
             .Create()
             .Workflow("main", workflow =>
@@ -165,10 +408,16 @@ public sealed class CompositionRuntimeHostTests
                     .Node("sink", "test.hosting.sink", node =>
                     {
                         if (includeResource)
-                            node.Resource("collector", "primary");
+                            node.Resource("collector", resourceKey);
                     })
                     .Link("source.Output", "sink.Input");
             })
+            .Build();
+
+    private static CompositionDefinition CreateLifecycleDefinition()
+        => CompositionDefinitionBuilder
+            .Create()
+            .Workflow("main", workflow => workflow.Node("source", "test.hosting.lifecycle-source"))
             .Build();
 
     private static void RegisterTestNodes(CompositionNodeRegistry registry)
@@ -200,6 +449,25 @@ public sealed class CompositionRuntimeHostTests
                         errors: node.Errors));
                 },
                 inputs: [CompositionPorts.Metadata<string>("Input")]);
+    }
+
+    private static void RegisterLifecycleNodes(CompositionNodeRegistry registry)
+    {
+        registry.Register(
+            "test.hosting.lifecycle-source",
+            context =>
+            {
+                var node = context.Services.GetRequiredService<CountingSourceNode>();
+                return ValueTask.FromResult(ComposedNode.Create(node));
+            });
+    }
+
+    private sealed class TestNodesContributor : ICompositionNodeRegistryContributor
+    {
+        public void Configure(CompositionNodeRegistry registry)
+        {
+            RegisterTestNodes(registry);
+        }
     }
 
     private sealed record SourceOptions
@@ -249,6 +517,49 @@ public sealed class CompositionRuntimeHostTests
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CountingSourceNode : IFlowSource
+    {
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _completeCount;
+        private int _disposeCount;
+        private int _startCount;
+
+        public int CompleteCount => _completeCount;
+
+        public int DisposeCount => _disposeCount;
+
+        public int StartCount => _startCount;
+
+        public Task Completion => _completion.Task;
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _startCount);
+            return Task.CompletedTask;
+        }
+
+        public void Complete()
+        {
+            Interlocked.Increment(ref _completeCount);
+            _completion.TrySetResult();
+        }
+
+        public void Fault(Exception exception)
+        {
+            ArgumentNullException.ThrowIfNull(exception);
+            _completion.TrySetException(exception);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _disposeCount);
+            _completion.TrySetResult();
+            return ValueTask.CompletedTask;
         }
     }
 

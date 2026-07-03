@@ -75,7 +75,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         ]);
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
         metadata.SelectMany(item => item.Options)
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ShouldNotContain(TimersCompositionResourceNames.Clock);
         foreach (var item in metadata)
         {
@@ -119,8 +119,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                 ("boundedCapacity", OptionValueKind.Number, 128, false)
             ]);
         metadata[TimersCompositionNodeTypes.Schedule].Options
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ShouldNotContain("timeZone");
+        metadata[TimersCompositionNodeTypes.Schedule]
+            .Attributes[new ComponentAttributeName("omittedOptions")]
+            .Value.ShouldBe("timeZone");
         AssertOptions(
             metadata[TimersCompositionNodeTypes.Delay],
             [
@@ -146,8 +149,62 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
 
         metadata.Values
             .SelectMany(item => item.Options)
-            .Where(option => option.Name == "boundedCapacity" || option.Name == "maxTicks")
+            .Where(option => option.Name.Value == "boundedCapacity" || option.Name.Value == "maxTicks")
             .ShouldAllBe(option => option.Min == 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_timer_option_hints()
+    {
+        var metadata = MetadataByType();
+
+        var intervalOptions = OptionsByName(metadata[TimersCompositionNodeTypes.Interval]);
+        AssertOptionHints(intervalOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(intervalOptions["interval"], "Timing", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(intervalOptions["initialDelay"], "Timing", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(intervalOptions["emitImmediately"], "Timing", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(intervalOptions["maxTicks"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(intervalOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var schedule = metadata[TimersCompositionNodeTypes.Schedule];
+        var scheduleOptions = OptionsByName(schedule);
+        AssertOptionHints(scheduleOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(scheduleOptions["cron"], "Schedule", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(scheduleOptions["maxTicks"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(scheduleOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AttributeValue(schedule.Attributes, "omittedOptions").ShouldBe("timeZone");
+        AttributeValue(schedule.Attributes, "omittedOptionsReason")
+            .ShouldBe("TimerScheduleSettings.TimeZone requires typed configuration; this adapter does not add time-zone id conversion.");
+
+        var delayOptions = OptionsByName(metadata[TimersCompositionNodeTypes.Delay]);
+        AssertOptionHints(delayOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(delayOptions["delay"], "Timing", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(delayOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var throttleOptions = OptionsByName(metadata[TimersCompositionNodeTypes.Throttle]);
+        AssertOptionHints(throttleOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(throttleOptions["interval"], "Timing", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(throttleOptions["emitFirstImmediately"], "Timing", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(throttleOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var debounceOptions = OptionsByName(metadata[TimersCompositionNodeTypes.Debounce]);
+        AssertOptionHints(debounceOptions["name"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(debounceOptions["quietPeriod"], "Timing", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(debounceOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_timer_resource_picker_hints()
+    {
+        var metadata = MetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            AssertResourceHints(
+                item.Resources.ShouldHaveSingleItem(),
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
     }
 
     [Fact]
@@ -389,26 +446,51 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Invalid_timer_configuration_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
                 .Create()
                 .Workflow("main", workflow => workflow.Node(
                     "poll",
                     TimersCompositionNodeTypes.Interval,
                     node => node.Configure("interval", TimeSpan.Zero)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterTimerInterval())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+                .Build(),
+            registry => registry.RegisterTimerInterval(),
+            "Interval");
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "delay",
+                    TimersCompositionNodeTypes.Delay,
+                    node => node.Configure("delay", TimeSpan.FromMilliseconds(-1))))
+                .Build(),
+            registry => registry.RegisterTimerDelay<InputMessage>(),
+            "Delay");
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("Interval", StringComparison.Ordinal));
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "throttle",
+                    TimersCompositionNodeTypes.Throttle,
+                    node => node
+                        .Configure("interval", TimeSpan.FromMilliseconds(1))
+                        .Configure("boundedCapacity", 0)))
+                .Build(),
+            registry => registry.RegisterTimerThrottle<InputMessage>(),
+            "BoundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "debounce",
+                    TimersCompositionNodeTypes.Debounce,
+                    node => node.Configure("quietPeriod", TimeSpan.Zero)))
+                .Build(),
+            registry => registry.RegisterTimerDebounce<InputMessage>(),
+            "QuietPeriod");
     }
 
     private static void AssertTransformMetadata(
@@ -428,6 +510,12 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertSourcePorts(
         ComponentDesignMetadata metadata,
         string outputType)
@@ -437,7 +525,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, outputType)
         ]);
     }
@@ -449,7 +537,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
         ]);
@@ -459,11 +547,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(TimersCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.Name.Value.ShouldBe(TimersCompositionResourceNames.Clock);
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertOptions(
@@ -471,11 +559,57 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         IReadOnlyList<(string Name, OptionValueKind Kind, object? DefaultValue, bool IsRequired)> expected)
     {
         metadata.Options.Select(option => (
-            option.Name,
+            option.Name.Value,
             option.Kind,
             option.DefaultValue,
             option.IsRequired)).ShouldBe(expected);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static IServiceCollection CreateTransformServices(
         string nodeType,
@@ -503,6 +637,27 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
         await hostedService.StartAsync(CancellationToken.None);
+    }
+
+    private static async Task AssertFactoryDiagnosticAsync(
+        CompositionDefinition definition,
+        Action<CompositionNodeRegistry> registerNodes,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(definition)
+            .RegisterNodes(registerNodes)
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
     }
 
     private static (

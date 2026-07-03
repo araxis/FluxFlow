@@ -49,11 +49,11 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("MQTT");
+            item.Category.ShouldBe(new ComponentCategory("MQTT"));
             item.Options.ShouldNotContain(option =>
-                option.Name == MqttCompositionResourceNames.Publisher ||
-                option.Name == MqttCompositionResourceNames.TriggerSource ||
-                option.Name == MqttCompositionResourceNames.Clock);
+                option.Name.Value == MqttCompositionResourceNames.Publisher ||
+                option.Name.Value == MqttCompositionResourceNames.TriggerSource ||
+                option.Name.Value == MqttCompositionResourceNames.Clock);
         }
     }
 
@@ -63,13 +63,13 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Publish];
         var defaults = new MqttPublishOptions();
 
-        metadata.DisplayName.ShouldBe("MQTT Publish");
+        metadata.DisplayName?.Value.ShouldBe("MQTT Publish");
         metadata.SuggestedEditorWidth.ShouldBe(420);
         AssertPorts<MqttPublishRequest, MqttPublishResult>(
             metadata,
             MqttCompositionPortNames.Input);
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "publishTimeoutMilliseconds",
             "boundedCapacity"
         ], ignoreOrder: false);
@@ -97,13 +97,13 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var metadata = DesignMetadataByType()[MqttCompositionNodeTypes.Trigger];
         var defaults = new MqttTriggerOptions();
 
-        metadata.DisplayName.ShouldBe("MQTT Trigger");
+        metadata.DisplayName?.Value.ShouldBe("MQTT Trigger");
         metadata.SuggestedEditorWidth.ShouldBe(460);
         AssertPorts<MqttTriggerResponse, MqttReceivedMessage>(
             metadata,
             MqttCompositionPortNames.Responses);
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "topicFilter",
             "qualityOfService",
             "receiveRetainedMessages",
@@ -126,7 +126,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "qualityOfService",
             OptionValueKind.Enum,
             defaults.QualityOfService.ToString());
-        qualityOfService.Choices.Select(choice => choice.Value).ShouldBe([
+        qualityOfService.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttQualityOfService.AtMostOnce.ToString(),
             MqttQualityOfService.AtLeastOnce.ToString(),
             MqttQualityOfService.ExactlyOnce.ToString()
@@ -154,7 +154,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             defaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttTriggerMode.FireAndForget.ToString(),
             MqttTriggerMode.RequestReply.ToString()
         ], ignoreOrder: false);
@@ -164,7 +164,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             "acknowledgement",
             OptionValueKind.Enum,
             defaults.Acknowledgement.ToString());
-        acknowledgement.Choices.Select(choice => choice.Value).ShouldBe([
+        acknowledgement.Choices.Select(choice => choice.Value.Value).ShouldBe([
             MqttTriggerAcknowledgement.None.ToString(),
             MqttTriggerAcknowledgement.OnEmit.ToString(),
             MqttTriggerAcknowledgement.OnSuccessfulResponse.ToString()
@@ -183,6 +183,86 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_mqtt_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var publish = OptionsByName(metadata[MqttCompositionNodeTypes.Publish]);
+        AssertOptionHints(
+            publish["publishTimeoutMilliseconds"],
+            "Publishing",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            publish["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+
+        var trigger = OptionsByName(metadata[MqttCompositionNodeTypes.Trigger]);
+        AssertOptionHints(
+            trigger["topicFilter"],
+            "Subscription",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            trigger["qualityOfService"],
+            "Subscription",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            trigger["receiveRetainedMessages"],
+            "Subscription",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            trigger["retainAsPublished"],
+            "Subscription",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            trigger["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            trigger["mode"],
+            "Delivery",
+            OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(
+            trigger["acknowledgement"],
+            "Delivery",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            trigger["responseTimeout"],
+            "Timeouts",
+            OptionDesignMetadataAttributeValues.Advanced);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_mqtt_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var publish = ResourcesByName(metadata[MqttCompositionNodeTypes.Publish]);
+        AssertResourceHints(
+            publish[MqttCompositionResourceNames.Publisher],
+            ResourceDesignMetadataAttributeValues.Publisher,
+            "mqtt-publisher:{name}");
+        AssertResourceHints(
+            publish[MqttCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        var trigger = ResourcesByName(metadata[MqttCompositionNodeTypes.Trigger]);
+        AssertResourceHints(
+            trigger[MqttCompositionResourceNames.TriggerSource],
+            ResourceDesignMetadataAttributeValues.TriggerSource,
+            "mqtt-trigger-source:{name}");
+        AssertResourceHints(
+            trigger[MqttCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new MqttComponentDesignMetadataProvider();
@@ -196,8 +276,8 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             new ComponentType(MqttCompositionNodeTypes.Trigger),
             out var triggerMetadata).ShouldBeTrue();
 
-        publishMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Publish");
-        triggerMetadata.ShouldNotBeNull().DisplayName.ShouldBe("MQTT Trigger");
+        publishMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("MQTT Publish");
+        triggerMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("MQTT Trigger");
     }
 
     [Fact]
@@ -364,14 +444,14 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(inputPortName));
         input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(MqttCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }
@@ -383,12 +463,24 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         return option;
     }
+
+    private static IReadOnlyDictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static IReadOnlyDictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
 
     private static void AssertResources(
         ComponentDesignMetadata metadata,
@@ -399,12 +491,58 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         for (var index = 0; index < expected.Length; index++)
         {
             var resource = metadata.Resources[index];
-            resource.Name.ShouldBe(expected[index].Name);
+            resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(index);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private sealed class RecordingMqttAdapter :
         IMqttPublisher,

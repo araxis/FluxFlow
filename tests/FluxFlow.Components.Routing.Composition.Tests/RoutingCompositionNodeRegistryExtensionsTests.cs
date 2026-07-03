@@ -93,7 +93,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         metadata.SelectMany(ComponentDesignMetadataValidator.Validate).ShouldBeEmpty();
 
         var optionNames = metadata.SelectMany(item => item.Options)
-            .Select(option => option.Name)
+            .Select(option => option.Name.Value)
             .ToArray();
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.Clock);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.RouteKeySelector);
@@ -101,6 +101,37 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.SideSelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.LeftKeySelector);
         optionNames.ShouldNotContain(RoutingCompositionResourceNames.RightKeySelector);
+
+        var byType = metadata.ToDictionary(item => item.Type.Value, StringComparer.Ordinal);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Switch],
+            [
+                (RoutingCompositionResourceNames.RouteKeySelector, 0, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+            ]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Fork],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Merge],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Window],
+            [(RoutingCompositionResourceNames.Clock, 0, false, nameof(TimeProvider))]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Correlation],
+            [
+                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
+        AssertResources(
+            byType[RoutingCompositionNodeTypes.Join],
+            [
+                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<TLeft,string?>"),
+                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<TRight,string?>"),
+                (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
     }
 
     [Fact]
@@ -120,8 +151,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         metadata[RoutingCompositionNodeTypes.Switch].Ports
             .Select(port => port.Name.Value)
             .ShouldNotContain("Priority");
-        metadata[RoutingCompositionNodeTypes.Switch].Attributes["dynamicOutputsOption"]
-            .ShouldBe("routeOutputs");
+        metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
+            .Value.ShouldBe("routeOutputs");
 
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Fork],
@@ -129,8 +160,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
                 (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
             ]);
-        metadata[RoutingCompositionNodeTypes.Fork].Attributes["dynamicOutputsOption"]
-            .ShouldBe("outputs");
+        metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
+            .Value.ShouldBe("outputs");
 
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Merge],
@@ -260,6 +291,172 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         {
             AssertOption(item, "boundedCapacity", OptionValueKind.Number, 128, 1);
         }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_routing_option_hints()
+    {
+        var metadata = MetadataByType();
+
+        var switchOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Switch]);
+        AssertOptionHints(switchOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            switchOptions["expression"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: RoutingCompositionResourceNames.RouteKeySelector);
+        AssertOptionHints(switchOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(switchOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(switchOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(switchOptions["routes"], "Routing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(switchOptions["routeOutputs"], "Routing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(switchOptions["defaultRoute"], "Routing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(switchOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(switchOptions["emitMatchedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(switchOptions["emitDefaultInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(switchOptions["emitRouteEnvelope"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(switchOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var forkOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Fork]);
+        AssertOptionHints(forkOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(forkOptions["outputs"], "Routing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(forkOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var mergeOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Merge]);
+        AssertOptionHints(mergeOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(mergeOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var windowOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Window]);
+        AssertOptionHints(windowOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(windowOptions["maxItems"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(windowOptions["timeMilliseconds"], "Windowing", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(windowOptions["emitPartialOnCompletion"], "Windowing", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(windowOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var correlationOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Correlation]);
+        AssertOptionHints(correlationOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            correlationOptions["keyExpression"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: RoutingCompositionResourceNames.KeySelector);
+        AssertOptionHints(
+            correlationOptions["sideExpression"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: RoutingCompositionResourceNames.SideSelector);
+        AssertOptionHints(correlationOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(correlationOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(correlationOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(correlationOptions["requestSide"], "Matching", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(correlationOptions["responseSide"], "Matching", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(correlationOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(correlationOptions["timeoutMilliseconds"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(correlationOptions["maxPending"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(correlationOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var joinOptions = OptionsByName(metadata[RoutingCompositionNodeTypes.Join]);
+        AssertOptionHints(joinOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            joinOptions["leftKeyExpression"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: RoutingCompositionResourceNames.LeftKeySelector);
+        AssertOptionHints(
+            joinOptions["rightKeyExpression"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: RoutingCompositionResourceNames.RightKeySelector);
+        AssertOptionHints(joinOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(joinOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(joinOptions["leftInputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(joinOptions["rightInputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(joinOptions["caseSensitive"], "Matching", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(joinOptions["timeoutMilliseconds"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(joinOptions["maxPending"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(joinOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_routing_resource_picker_hints()
+    {
+        var metadata = MetadataByType();
+
+        AttributeValue(metadata[RoutingCompositionNodeTypes.Switch].Attributes, "dynamicOutputsOption")
+            .ShouldBe("routeOutputs");
+        AttributeValue(metadata[RoutingCompositionNodeTypes.Switch].Attributes, "requiredResource")
+            .ShouldBe(RoutingCompositionResourceNames.RouteKeySelector);
+        var switchResources = ResourcesByName(metadata[RoutingCompositionNodeTypes.Switch]);
+        switchResources[RoutingCompositionResourceNames.RouteKeySelector].IsRequired.ShouldBeTrue();
+        AssertResourceHints(
+            switchResources[RoutingCompositionResourceNames.RouteKeySelector],
+            ResourceDesignMetadataAttributeValues.Delegate,
+            "delegate:{name}");
+        AssertResourceHints(
+            switchResources[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        AttributeValue(metadata[RoutingCompositionNodeTypes.Fork].Attributes, "dynamicOutputsOption")
+            .ShouldBe("outputs");
+        AssertResourceHints(
+            ResourcesByName(metadata[RoutingCompositionNodeTypes.Fork])[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+        AssertResourceHints(
+            ResourcesByName(metadata[RoutingCompositionNodeTypes.Merge])[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+        AssertResourceHints(
+            ResourcesByName(metadata[RoutingCompositionNodeTypes.Window])[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        AttributeValue(metadata[RoutingCompositionNodeTypes.Correlation].Attributes, "requiredResources")
+            .ShouldBe($"{RoutingCompositionResourceNames.KeySelector},{RoutingCompositionResourceNames.SideSelector}");
+        var correlationResources = ResourcesByName(metadata[RoutingCompositionNodeTypes.Correlation]);
+        correlationResources[RoutingCompositionResourceNames.KeySelector].IsRequired.ShouldBeTrue();
+        correlationResources[RoutingCompositionResourceNames.SideSelector].IsRequired.ShouldBeTrue();
+        AssertResourceHints(
+            correlationResources[RoutingCompositionResourceNames.KeySelector],
+            ResourceDesignMetadataAttributeValues.Delegate,
+            "delegate:{name}");
+        AssertResourceHints(
+            correlationResources[RoutingCompositionResourceNames.SideSelector],
+            ResourceDesignMetadataAttributeValues.Delegate,
+            "delegate:{name}");
+        AssertResourceHints(
+            correlationResources[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        AttributeValue(metadata[RoutingCompositionNodeTypes.Join].Attributes, "requiredResources")
+            .ShouldBe($"{RoutingCompositionResourceNames.LeftKeySelector},{RoutingCompositionResourceNames.RightKeySelector}");
+        var joinResources = ResourcesByName(metadata[RoutingCompositionNodeTypes.Join]);
+        joinResources[RoutingCompositionResourceNames.LeftKeySelector].IsRequired.ShouldBeTrue();
+        joinResources[RoutingCompositionResourceNames.RightKeySelector].IsRequired.ShouldBeTrue();
+        AssertResourceHints(
+            joinResources[RoutingCompositionResourceNames.LeftKeySelector],
+            ResourceDesignMetadataAttributeValues.Delegate,
+            "delegate:{name}");
+        AssertResourceHints(
+            joinResources[RoutingCompositionResourceNames.RightKeySelector],
+            ResourceDesignMetadataAttributeValues.Delegate,
+            "delegate:{name}");
+        AssertResourceHints(
+            joinResources[RoutingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
     }
 
     [Fact]
@@ -695,6 +892,87 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains("built-in", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Invalid_routing_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "switch",
+                    RoutingCompositionNodeTypes.Switch,
+                    node => node
+                        .Resource(RoutingCompositionResourceNames.RouteKeySelector, "route")
+                        .Configure("boundedCapacity", 0)))
+                .Build(),
+            services => services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                "route",
+                input => input.Route),
+            registry => registry.RegisterSwitch<InputMessage>(),
+            "boundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "fork",
+                    RoutingCompositionNodeTypes.Fork,
+                    node => node
+                        .Configure("outputs", new[] { "Audit" })
+                        .Configure("inputType", " ")))
+                .Build(),
+            null,
+            registry => registry.RegisterFork<InputMessage>(),
+            "inputType");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "merge",
+                    RoutingCompositionNodeTypes.Merge,
+                    node => node.Configure("boundedCapacity", 0)))
+                .Build(),
+            null,
+            registry => registry.RegisterMerge<InputMessage>(),
+            "boundedCapacity");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "window",
+                    RoutingCompositionNodeTypes.Window,
+                    node => node.Configure("maxItems", -1)))
+                .Build(),
+            null,
+            registry => registry.RegisterWindow<InputMessage>(),
+            "maxItems");
+
+        await AssertFactoryDiagnosticAsync(
+            CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "correlate",
+                    RoutingCompositionNodeTypes.Correlation,
+                    node => node
+                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
+                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
+                        .Configure("timeoutMilliseconds", 0)))
+                .Build(),
+            services =>
+            {
+                services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                    "key",
+                    input => input.Id);
+                services.AddKeyedSingleton<Func<InputMessage, string?>>(
+                    "side",
+                    input => input.Route);
+            },
+            registry => registry.RegisterCorrelation<InputMessage>(),
+            "timeoutMilliseconds");
+    }
+
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
         => new RoutingComponentDesignMetadataProvider()
             .GetMetadata()
@@ -709,15 +987,27 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType!)).ShouldBe(expected);
+            port.ValueType?.Value!)).ShouldBe(expected);
     }
 
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         IReadOnlyList<string> expected)
     {
-        metadata.Options.Select(option => option.Name).ShouldBe(expected);
+        metadata.Options.Select(option => option.Name.Value).ShouldBe(expected);
     }
+
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
 
     private static void AssertOption(
         ComponentDesignMetadata metadata,
@@ -727,7 +1017,7 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         double? min = null,
         bool? isRequired = null)
     {
-        var option = metadata.Options.Single(option => option.Name == optionName);
+        var option = metadata.Options.Single(option => option.Name.Value == optionName);
         option.Kind.ShouldBe(kind);
 
         if (defaultValue is not null)
@@ -746,10 +1036,109 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         }
     }
 
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name.Value,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType?.Value!)).ShouldBe(expected);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
+
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {
         var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
         await hostedService.StartAsync(CancellationToken.None);
+    }
+
+    private static async Task AssertFactoryDiagnosticAsync(
+        CompositionDefinition definition,
+        Action<IServiceCollection>? configureServices,
+        Action<CompositionNodeRegistry> registerNodes,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        configureServices?.Invoke(services);
+        services
+            .AddFluxFlowComposition(definition)
+            .RegisterNodes(registerNodes)
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
     }
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)

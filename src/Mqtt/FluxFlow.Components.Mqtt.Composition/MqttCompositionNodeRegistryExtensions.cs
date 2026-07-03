@@ -2,7 +2,6 @@ using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Nodes;
 using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 

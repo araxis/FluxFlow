@@ -55,11 +55,11 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
-        metadata.DisplayName.ShouldBe("Mapper");
-        metadata.Category.ShouldBe("Mapping");
-        metadata.PreferredNodeName.ShouldBe("map");
+        metadata.DisplayName?.Value.ShouldBe("Mapper");
+        metadata.Category.ShouldBe(new ComponentCategory("Mapping"));
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("map"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("expression", OptionValueKind.Expression),
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
@@ -69,23 +69,75 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             ("targetType", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number)
         ]);
-        metadata.Options.Single(option => option.Name == "expression")
+        metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(MappingCompositionResourceNames.ContextFactory);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(MappingCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (MappingCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
             (MappingCompositionResourceNames.ContextFactory, 1, false, nameof(IMappingContextFactory)),
             (MappingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
         ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_mapper_option_hints()
+    {
+        var metadata = new MappingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        var options = metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertOptionHints(
+            options["expression"],
+            "Mapping",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: MappingCompositionResourceNames.Engine);
+        AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["outputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["targetType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_mapper_resource_picker_hints()
+    {
+        var metadata = new MappingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+        var resources = metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertResourceHints(
+            resources[MappingCompositionResourceNames.Engine],
+            ResourceDesignMetadataAttributeValues.ExpressionEngine,
+            "expression-engine:{name}");
+        AssertResourceHints(
+            resources[MappingCompositionResourceNames.ContextFactory],
+            ResourceDesignMetadataAttributeValues.ContextFactory,
+            "context-factory:{name}");
+        AssertResourceHints(
+            resources[MappingCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
     }
 
     [Fact]
@@ -100,7 +152,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "TOutput"),
             (MappingCompositionPortNames.Failed, PortDirection.Output, 2, false, "TInput")
@@ -305,9 +357,98 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                 StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Invalid_mapper_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine());
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "map",
+                    MappingCompositionNodeTypes.Mapper,
+                    node => node
+                        .Resource(MappingCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "map")
+                        .Configure("boundedCapacity", 0)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterMapper<object, object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("Mapper bounded capacity", StringComparison.Ordinal));
+    }
+
     private sealed record InputMessage(string Value);
 
     private sealed record OutputMessage(string Value);
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string editor,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+            .ShouldBe(editor);
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private sealed class CustomMappingContextFactory : IMappingContextFactory
     {

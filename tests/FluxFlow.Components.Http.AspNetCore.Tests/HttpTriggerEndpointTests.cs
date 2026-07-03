@@ -4,6 +4,7 @@ using FluxFlow.Components.RequestReply;
 using FluxFlow.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -105,6 +106,137 @@ public sealed class HttpTriggerEndpointTests
     }
 
     [Fact]
+    public async Task DiComposition_TrimsKeyedTriggerNames()
+    {
+        using var host = await new HostBuilder()
+            .ConfigureWebHost(web => web
+                .UseTestServer()
+                .ConfigureServices(services =>
+                {
+                    services.AddRouting();
+                    services.AddFluxFlowHttpTrigger(" echo ", trigger =>
+                    {
+                        var handler = new ActionBlock<FlowMessage<HttpTriggerRequest>>(request =>
+                            trigger.Responses.Post(request.With(HttpTriggerReply.Text(
+                                $"trimmed:{Encoding.UTF8.GetString(request.Payload.Body ?? [])}"))));
+                        trigger.Output.LinkTo(handler);
+                    });
+                })
+                .Configure(app =>
+                {
+                    app.UseRouting();
+                    app.UseEndpoints(endpoints => endpoints.MapFluxFlowTrigger("/echo", " echo "));
+                }))
+            .StartAsync();
+        var client = host.GetTestClient();
+
+        var response = await client.PostAsync("/echo", new StringContent("hi"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldBe("trimmed:hi");
+    }
+
+    [Fact]
+    public void AddFluxFlowHttpTrigger_RejectsInvalidRegistrationArguments()
+    {
+        var services = new ServiceCollection();
+
+        var servicesException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowHttpTriggerServiceCollectionExtensions.AddFluxFlowHttpTrigger(
+                null!,
+                "echo",
+                _ => { }));
+        var nameException = Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowHttpTrigger(" ", _ => { }));
+        var configureException = Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowHttpTrigger("echo", null!));
+
+        servicesException.ParamName.ShouldBe("services");
+        nameException.ParamName.ShouldBe("name");
+        configureException.ParamName.ShouldBe("configure");
+    }
+
+    [Fact]
+    public async Task MapFluxFlowTrigger_RejectsInvalidEndpointArguments()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>();
+        var routeBuilder = new TestEndpointRouteBuilder(provider);
+
+        var endpointsException = Should.Throw<ArgumentNullException>(() =>
+            FluxFlowTriggerEndpointExtensions.MapFluxFlowTrigger(null!, "/echo", "echo"));
+        var keyedPatternException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger(" ", "echo"));
+        var keyedNameException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger("/echo", " "));
+        var directPatternException = Should.Throw<ArgumentException>(() =>
+            routeBuilder.MapFluxFlowTrigger(" ", bridge));
+        var coordinatorException = Should.Throw<ArgumentNullException>(() =>
+            routeBuilder.MapFluxFlowTrigger("/echo", (RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>)null!));
+
+        endpointsException.ParamName.ShouldBe("endpoints");
+        keyedPatternException.ParamName.ShouldBe("pattern");
+        keyedNameException.ParamName.ShouldBe("name");
+        directPatternException.ParamName.ShouldBe("pattern");
+        coordinatorException.ParamName.ShouldBe("coordinator");
+    }
+
+    [Fact]
+    public async Task AddFluxFlowHttpTrigger_RegistersKeyedSourceNodeAndHostedLifetime()
+    {
+        var services = new ServiceCollection();
+        var configured = false;
+        services.AddFluxFlowHttpTrigger("echo", _ => configured = true);
+
+        await using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<HttpTriggerSource>("echo").ShouldNotBeNull();
+        configured.ShouldBeFalse();
+
+        var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await lifetime.StartAsync(CancellationToken.None);
+
+        configured.ShouldBeTrue();
+        provider.GetRequiredKeyedService<HttpTriggerNode>("echo").ShouldNotBeNull();
+
+        await lifetime.StopAsync(CancellationToken.None);
+        if (lifetime is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task AddFluxFlowHttpTrigger_StopCompletesKeyedSource()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowHttpTrigger("echo", _ => { });
+
+        await using var provider = services.BuildServiceProvider();
+        var lifetime = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await lifetime.StartAsync(CancellationToken.None);
+        var source = provider.GetRequiredKeyedService<HttpTriggerSource>("echo");
+
+        await lifetime.StopAsync(CancellationToken.None);
+
+        var accepted = await source.SubmitAsync(new FakeRequestContext());
+        accepted.ShouldBeFalse();
+
+        if (lifetime is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public void HttpTriggerSource_RejectsNonPositiveCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(() => new HttpTriggerSource(0));
+
+        exception.ParamName.ShouldBe("capacity");
+    }
+
+    [Fact]
     public async Task FireAndForget_Returns202Accepted_AndPublishesToGraphWithoutWaiting()
     {
         await using var bridge = new RequestReplyCoordinator<HttpTriggerRequest, HttpTriggerReply>(
@@ -136,4 +268,33 @@ public sealed class HttpTriggerEndpointTests
                     app.UseEndpoints(endpoints => endpoints.MapFluxFlowTrigger("/echo", bridge));
                 }))
             .StartAsync();
+
+    private sealed class TestEndpointRouteBuilder(IServiceProvider serviceProvider) : IEndpointRouteBuilder
+    {
+        public IServiceProvider ServiceProvider { get; } = serviceProvider;
+
+        public ICollection<EndpointDataSource> DataSources { get; } = [];
+
+        public IApplicationBuilder CreateApplicationBuilder() => new ApplicationBuilder(ServiceProvider);
+    }
+
+    private sealed class FakeRequestContext : IRequestContext<HttpTriggerRequest, HttpTriggerReply>
+    {
+        public HttpTriggerRequest Request { get; } = new()
+        {
+            Method = "GET",
+            Path = "/echo"
+        };
+
+        public CorrelationId? CorrelationId => null;
+
+        public Task ReplyAsync(HttpTriggerReply response, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task AcknowledgeAsync(CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task FailAsync(Exception error, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+    }
 }

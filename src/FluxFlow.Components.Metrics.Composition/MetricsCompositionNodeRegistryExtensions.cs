@@ -2,7 +2,6 @@ using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Nodes;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 
 namespace FluxFlow.Components.Metrics.Composition;
 

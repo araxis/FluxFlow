@@ -53,14 +53,52 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         foreach (var item in metadata.Values)
         {
-            item.Category.ShouldBe("Observability");
+            item.Category.ShouldBe(new ComponentCategory("Observability"));
             item.SuggestedEditorWidth.ShouldBe(460);
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
             item.Options.ShouldNotContain(option =>
-                option.Name == ObservabilityCompositionResourceNames.Clock ||
-                option.Name == ObservabilityCompositionResourceNames.ContextFactory ||
-                option.Name.StartsWith("attribute:", StringComparison.Ordinal));
+                option.Name.Value == ObservabilityCompositionResourceNames.Clock ||
+                option.Name.Value == ObservabilityCompositionResourceNames.ContextFactory ||
+                option.Name.Value.StartsWith("attribute:", StringComparison.Ordinal));
         }
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Counter],
+            [
+                (ObservabilityCompositionResourceNames.Engine, 0, false, nameof(IFlowExpressionEngine)),
+                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<TInput>"),
+                (ObservabilityCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
+            ]);
+        metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Resources
+            .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.Engine)
+            .Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.RequiredWhenAnyOption)]
+            .Value.ShouldBe("predicate,expression");
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Logger],
+            [
+                (ObservabilityCompositionResourceNames.Clock, 0, false, nameof(TimeProvider)),
+                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<TInput>")
+            ]);
+        var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Resources
+            .Single(resource => resource.Name.Value == ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Ownership)]
+            .Value.ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
+            .Value.ShouldBe(ResourceDesignMetadataAttributeValues.Selector);
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.KeyPattern)]
+            .Value.ShouldBe(ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        attributeSelector.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.Option)]
+            .Value.ShouldBe("attributeSelectors");
+
+        AssertResources(
+            metadata[ObservabilityCompositionNodeTypes.Metrics],
+            [
+                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, "IObservabilityValueSelector<TInput>"),
+                (ObservabilityCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+            ]);
     }
 
     [Fact]
@@ -85,7 +123,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Counter];
         var defaults = new FlowCounterOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "name",
             "engine",
@@ -117,7 +155,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Logger];
         var defaults = new FlowLoggerOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "level",
             "category",
@@ -128,10 +166,10 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
 
-        var level = metadata.Options.Single(option => option.Name == "level");
+        var level = metadata.Options.Single(option => option.Name.Value == "level");
         level.Kind.ShouldBe(OptionValueKind.Enum);
         level.DefaultValue.ShouldBe(defaults.Level);
-        level.Choices.Select(choice => choice.Value).ShouldBe([
+        level.Choices.Select(choice => choice.Value.Value).ShouldBe([
             FlowLogLevel.Trace.ToString(),
             FlowLogLevel.Debug.ToString(),
             FlowLogLevel.Information.ToString(),
@@ -143,7 +181,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         AssertOption(metadata, "category", OptionValueKind.Text, defaults.Category);
         AssertOption(metadata, "messageTemplate", OptionValueKind.MultilineText, defaultValue: null);
 
-        var selectors = metadata.Options.Single(option => option.Name == "attributeSelectors");
+        var selectors = metadata.Options.Single(option => option.Name.Value == "attributeSelectors");
         selectors.Kind.ShouldBe(OptionValueKind.Json);
         selectors.DefaultValue.ShouldBeOfType<string[]>().ShouldBeEmpty();
 
@@ -161,7 +199,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Metrics];
         var defaults = new FlowMetricsOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "inputType",
             "name",
             "sizeSelector",
@@ -177,6 +215,110 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             OptionValueKind.Number,
             defaults.BoundedCapacity,
             min: 1);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_observability_option_hints()
+    {
+        var metadata = MetadataByType();
+
+        var counterOptions = metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(counterOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["name"], "Counter", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            counterOptions["predicate"],
+            "Filtering",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: ObservabilityCompositionResourceNames.Engine);
+        AssertOptionHints(
+            counterOptions["expression"],
+            "Filtering",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: ObservabilityCompositionResourceNames.Engine);
+        AssertOptionHints(counterOptions["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(counterOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var loggerOptions = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(loggerOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(loggerOptions["level"], "Logging", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(loggerOptions["category"], "Logging", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(loggerOptions["messageTemplate"], "Logging", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(
+            loggerOptions["attributeSelectors"],
+            "Attributes",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Json,
+            relatedResource: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+        AssertOptionHints(loggerOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var metricsOptions = metadata[ObservabilityCompositionNodeTypes.Metrics]
+            .Options
+            .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
+        AssertOptionHints(metricsOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(metricsOptions["name"], "Metrics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            metricsOptions["sizeSelector"],
+            "Metrics",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Text,
+            relatedResource: ObservabilityCompositionResourceNames.SizeSelector);
+        AssertOptionHints(metricsOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_observability_resource_picker_hints()
+    {
+        var metadata = MetadataByType();
+
+        var counterResources = metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.Engine],
+            ResourceDesignMetadataAttributeValues.ExpressionEngine,
+            "expression-engine:{name}");
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.ContextFactory],
+            ResourceDesignMetadataAttributeValues.ContextFactory,
+            "context-factory:{name}");
+        AssertResourceHints(
+            counterResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+
+        var loggerResources = metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            loggerResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+        AssertResourceHints(
+            loggerResources[ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}"],
+            ResourceDesignMetadataAttributeValues.Selector,
+            ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}");
+
+        var metricsResources = metadata[ObservabilityCompositionNodeTypes.Metrics]
+            .Resources
+            .ToDictionary(resource => resource.Name.Value, StringComparer.Ordinal);
+        AssertResourceHints(
+            metricsResources[ObservabilityCompositionResourceNames.SizeSelector],
+            ResourceDesignMetadataAttributeValues.Selector,
+            "selector:{name}");
+        AssertResourceHints(
+            metricsResources[ObservabilityCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
     }
 
     [Fact]
@@ -196,9 +338,9 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             new ComponentType(ObservabilityCompositionNodeTypes.Metrics),
             out var metrics).ShouldBeTrue();
 
-        counter.ShouldNotBeNull().DisplayName.ShouldBe("Counter");
-        logger.ShouldNotBeNull().DisplayName.ShouldBe("Logger");
-        metrics.ShouldNotBeNull().DisplayName.ShouldBe("Metrics");
+        counter.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Counter");
+        logger.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Logger");
+        metrics.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Metrics");
     }
 
     [Fact]
@@ -552,6 +694,36 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             "level");
     }
 
+    [Fact]
+    public async Task Invalid_counter_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Counter,
+            registry => registry.RegisterCounter<TestMessage>(),
+            node => node.Configure("boundedCapacity", 0),
+            "boundedCapacity");
+    }
+
+    [Fact]
+    public async Task Invalid_logger_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Logger,
+            registry => registry.RegisterLogger<TestMessage>(),
+            node => node.Configure("inputType", " "),
+            "inputType");
+    }
+
+    [Fact]
+    public async Task Invalid_metrics_options_surface_factory_diagnostic()
+    {
+        await AssertFactoryDiagnosticAsync(
+            ObservabilityCompositionNodeTypes.Metrics,
+            registry => registry.RegisterMetrics<TestMessage>(),
+            node => node.Configure("boundedCapacity", 0),
+            "boundedCapacity");
+    }
+
     private static void AssertMetadata<TOutput>(
         CompositionNodeRegistry registry,
         string nodeType)
@@ -578,14 +750,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe("TInput");
+        input.ValueType?.Value.ShouldBe("TInput");
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(outputType);
+        output.ValueType?.Value.ShouldBe(outputType);
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -596,11 +768,87 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
     }
+
+    private static void AssertResources(
+        ComponentDesignMetadata metadata,
+        IReadOnlyList<(string Name, int Order, bool IsRequired, string ValueType)> expected)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name.Value,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType?.Value!)).ShouldBe(expected);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task AssertFactoryDiagnosticAsync(
         string nodeType,

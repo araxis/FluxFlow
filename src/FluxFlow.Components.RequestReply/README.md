@@ -37,3 +37,29 @@ host caller ◀── context.ReplyAsync ◀── Responses ◀── FlowMessa
 - Everything is keyed on `CorrelationId` from `FluxFlow.Nodes` — the same envelope id
   that flows through the whole graph.
 - Inject a `TimeProvider` for deterministic timeout tests.
+- `Events` emits `Received` when a request is accepted for processing,
+  `Published` after it reaches the graph-facing `Output`, and `Replied`,
+  `TimedOut`, `Unmatched`, or `Invalid` for the corresponding terminal or
+  diagnostic state.
+- `RequestReplyOptions` and `CorrelatedRequestTrackerOptions` validate simple
+  invariants when values are assigned. Unsupported modes, non-positive capacity,
+  non-positive timeout, and non-positive sweep interval fail fast before
+  dataflow blocks or timers are created.
+- Invalid null request contexts and null response messages are reported through
+  `Errors` and `Events` without faulting the coordinator, so later valid
+  messages can still flow. `CorrelatedRequestTracker` rejects null contexts
+  before storing them as pending requests.
+- `Complete()` and `DisposeAsync()` close both coordinator inputs and fail any
+  in-flight callers with `OperationCanceledException`, so `Completion` can be
+  awaited without leaving callers hanging.
+
+## Composition
+
+This support-only package does not expose standalone nodes or
+`FluxFlow.Composition` factories. It is infrastructure for transport adapters
+that need to bridge inbound request/reply behavior into one-way workflow
+graphs.
+
+HTTP and MQTT trigger packages own their transport-specific integration. Normal
+composition packages consume those adapters or their host-owned resources rather
+than composing `RequestReplyCoordinator<TRequest, TResponse>` directly.

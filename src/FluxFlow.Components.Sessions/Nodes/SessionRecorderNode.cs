@@ -35,20 +35,20 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
         SessionRecorderOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : this(ResolveArguments(options, store), clock)
+    {
+    }
+
+    private SessionRecorderNode(
+        ResolvedSessionRecorderArguments resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+            InputCapacity = resolved.Options.BoundedCapacity
         })
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.recorder bounded capacity must be greater than zero.");
-        }
-
-        _options = options;
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -94,8 +94,7 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                     Timestamp = timestamp
                 },
                 Stopping).ConfigureAwait(false);
-
-            ValidateRecord(record, session.SessionId, sequence);
+            record = ValidateRecord(record, session.SessionId, sequence);
         }
         catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
@@ -143,7 +142,7 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
 
         try
         {
-            await _store.CompleteSessionAsync(
+            var completed = await _store.CompleteSessionAsync(
                 new SessionCompleteRequest
                 {
                     Session = session,
@@ -151,6 +150,12 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                     MessageCount = _sequence
                 },
                 CancellationToken.None).ConfigureAwait(false);
+            if (completed is null)
+            {
+                throw new InvalidOperationException(
+                    "session.recorder store returned a null completed session.");
+            }
+
             _completed.TrySetResult();
         }
         catch (Exception exception)
@@ -176,6 +181,12 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
                 Tags = CopyDictionary(_options.Tags)
             },
             Stopping).ConfigureAwait(false);
+
+        if (session is null)
+        {
+            throw new InvalidOperationException(
+                "session.recorder store returned a null session.");
+        }
 
         if (string.IsNullOrWhiteSpace(session.SessionId))
         {
@@ -224,11 +235,17 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
         });
     }
 
-    private static void ValidateRecord(
-        SessionRecord record,
+    private static SessionRecord ValidateRecord(
+        SessionRecord? record,
         string expectedSessionId,
         long expectedSequence)
     {
+        if (record is null)
+        {
+            throw new InvalidOperationException(
+                "session.recorder store returned a null record.");
+        }
+
         if (string.IsNullOrWhiteSpace(record.SessionId))
         {
             throw new InvalidOperationException(
@@ -246,6 +263,8 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
             throw new InvalidOperationException(
                 "session.recorder store returned a record with an invalid sequence.");
         }
+
+        return record;
     }
 
     private static SessionRecordInput CopyInput(SessionRecordInput input, DateTimeOffset timestamp)
@@ -313,4 +332,25 @@ public sealed class SessionRecorderNode : FlowNode<SessionRecordInput, SessionRe
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ResolvedSessionRecorderArguments ResolveArguments(
+        SessionRecorderOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.recorder bounded capacity must be greater than zero.");
+        }
+
+        return new ResolvedSessionRecorderArguments(options, store);
+    }
+
+    private sealed record ResolvedSessionRecorderArguments(
+        SessionRecorderOptions Options,
+        ISessionStore Store);
 }

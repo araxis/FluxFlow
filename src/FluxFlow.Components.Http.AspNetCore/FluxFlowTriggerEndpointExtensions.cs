@@ -22,9 +22,10 @@ public static class FluxFlowTriggerEndpointExtensions
         string? correlationHeader = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(pattern);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var source = endpoints.ServiceProvider.GetRequiredKeyedService<HttpTriggerSource>(name);
+        var source = endpoints.ServiceProvider.GetRequiredKeyedService<HttpTriggerSource>(name.Trim());
         return MapCore(endpoints, pattern, (request, ct) => source.SubmitAsync(request, ct), correlationHeader);
     }
 
@@ -39,6 +40,7 @@ public static class FluxFlowTriggerEndpointExtensions
         string? correlationHeader = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentException.ThrowIfNullOrWhiteSpace(pattern);
         ArgumentNullException.ThrowIfNull(coordinator);
 
         return MapCore(endpoints, pattern, (request, ct) => coordinator.Incoming.SendAsync(request, ct), correlationHeader);

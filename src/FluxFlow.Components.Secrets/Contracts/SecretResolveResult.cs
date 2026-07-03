@@ -17,15 +17,24 @@ public sealed record SecretResolveResult
         SecretReference reference,
         SecretDescriptor descriptor,
         SecretValue value)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(value);
+
+        return new()
         {
             Reference = reference,
             Descriptor = descriptor,
             Value = value
         };
+    }
 
     public static SecretResolveResult Missing(SecretReference reference)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        return new()
         {
             Reference = reference,
             Diagnostic = new SecretDiagnostic
@@ -39,11 +48,16 @@ public sealed record SecretResolveResult
                 Reference = reference
             }
         };
+    }
 
     public static SecretResolveResult Ambiguous(
         SecretReference reference,
         IReadOnlyCollection<SecretDescriptor> matches)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(matches);
+
+        return new()
         {
             Reference = reference,
             Diagnostic = new SecretDiagnostic
@@ -60,9 +74,14 @@ public sealed record SecretResolveResult
                 }
             }
         };
+    }
 
     public static SecretResolveResult KindMismatch(SecretReference reference, SecretDescriptor descriptor)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        return new()
         {
             Reference = reference,
             Descriptor = descriptor,
@@ -77,9 +96,14 @@ public sealed record SecretResolveResult
                 Reference = reference
             }
         };
+    }
 
     public static SecretResolveResult AccessDenied(SecretReference reference, string message)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        return new()
         {
             Reference = reference,
             Diagnostic = new SecretDiagnostic
@@ -93,9 +117,14 @@ public sealed record SecretResolveResult
                 Reference = reference
             }
         };
+    }
 
     public static SecretResolveResult Failed(SecretReference reference, string message)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        return new()
         {
             Reference = reference,
             Diagnostic = new SecretDiagnostic
@@ -109,4 +138,5 @@ public sealed record SecretResolveResult
                 Reference = reference
             }
         };
+    }
 }

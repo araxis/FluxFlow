@@ -503,9 +503,12 @@ public sealed class MqttNetClient :
             return;
         }
 
+        var payload = lastWill.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
+
         builder
             .WithWillTopic(lastWill.Topic)
-            .WithWillPayload(lastWill.Payload)
+            .WithWillPayload(payload.ToArray())
             .WithWillQualityOfServiceLevel(
                 MqttNetMessageMapper.ToMqttNetQualityOfService(lastWill.QualityOfService))
             .WithWillRetain(lastWill.Retain);
@@ -526,7 +529,12 @@ public sealed class MqttNetClient :
             builder.WithWillResponseTopic(lastWill.Properties.ResponseTopic);
         }
 
-        foreach (var (name, value) in lastWill.Properties?.UserProperties ?? [])
+        if (lastWill.Properties?.UserProperties is null)
+        {
+            return;
+        }
+
+        foreach (var (name, value) in lastWill.Properties.UserProperties)
         {
             if (!string.IsNullOrWhiteSpace(name))
             {

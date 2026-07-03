@@ -1,0 +1,319 @@
+# Composition And Designer Progress
+
+Date: 2026-06-30
+
+## Current Direction
+
+FluxFlow is now following the standalone-node-first architecture:
+
+- `FluxFlow.Nodes` and pure component runtime packages define standalone nodes.
+- `FluxFlow.Composition` is the default optional composition layer for fluent
+  and configuration-driven standalone workflows.
+- `FluxFlow.Composition.Hosting` is the optional host bridge for keyed resource
+  resolution and hosted runtime lifecycle.
+- Component `.Composition` packages own node registration and optional Designer
+  metadata for their component family.
+- `FluxFlow.Engine` remains optional advanced runtime infrastructure, not the
+  required composition path.
+- Host or backend adapters own concrete clients, stores, credentials, policies,
+  and lifetimes. Composition packages consume those services through named
+  resources.
+
+## Implemented Since The First Composition Adapter
+
+The composition adapter sweep has moved beyond the initial MQTT package. The
+normal standalone component families now have optional `.Composition` packages
+with explicit factory registration, typed ports, resource names, focused tests,
+package wiring, and README guidance:
+
+- HTTP
+- Mapping
+- Control
+- Assertions
+- Validation
+- Timers
+- Sources
+- Routing
+- Serialization
+- Payloads
+- Observability
+- Projections
+- Metrics
+- Expectations
+- FileSystem
+- State
+- Storage
+- Sessions
+- MQTT
+
+Request/reply was intentionally skipped as a normal component-family adapter.
+Journal remains support-only because it exposes store/support contracts rather
+than a normal composition node surface.
+
+The adapter model stayed consistent:
+
+- Closed generic registrations define CLR payload types where needed.
+- Dynamic behavior, such as routing ports, is resolved at factory/build time.
+- Host-owned resources are resolved by named keyed DI entries.
+- Component runtime packages remain free of composition and engine dependencies.
+- No hot reload or renderer behavior was added as part of the adapter passes.
+
+## Designer Boundary
+
+`FluxFlow.Components.Designer` was decoupled from engine identifiers and now
+owns its own design-time value types. The Designer package is composition and
+engine neutral.
+
+Important follow-up work already exists:
+
+- Package-owned Designer metadata providers were added across composition
+  packages.
+- Shared metadata builder/helper APIs were introduced to reduce provider
+  duplication.
+- Provider validation and release convention coverage were strengthened.
+- Resource metadata helpers and picker hints were added while keeping actual
+  resource ownership in the host.
+- Option hint helpers were added in Designer:
+  `OptionDesignMetadataAttributeNames`,
+  `OptionDesignMetadataAttributeValues`, and
+  `OptionDesignMetadataAttributes`.
+
+## Latest Local Work
+
+The latest local branch is `work/designer-value-type-hint-contract`.
+
+Latest local commits:
+
+- `95384c9 Add mapping designer metadata hints`
+  - Added first-class option hint helpers in Designer.
+  - Enriched Mapping composition metadata with option sections, importance,
+    editor/syntax hints, related resource hints, and resource key patterns.
+  - Bumped Designer to `2.16.0` and Mapping Composition to `1.3.0`.
+- `abba963 Add control designer metadata hints`
+  - Applied the same option/resource hint pattern to Control metadata for
+    filter and when nodes.
+  - Bumped Control Composition to `1.3.0`.
+- `Add assertions designer metadata hints`
+  - Applied the option/resource hint pattern to Assertions metadata for the
+    assertion node.
+  - Bumped Assertions Composition to `1.3.0`.
+- `Add state designer metadata hints`
+  - Applied the option/resource hint pattern to State metadata for the reducer
+    node.
+  - Bumped State Composition to `1.3.0`.
+- `Add observability designer metadata hints`
+  - Applied the option/resource hint pattern to Observability metadata for
+    Counter, Logger, and Metrics nodes.
+  - Bumped Observability Composition to `1.3.0`.
+- `Add validation designer metadata hints`
+  - Applied the option/resource hint pattern to Validation metadata for the JSON
+    schema validator node.
+  - Bumped Validation Composition to `1.3.0`.
+- `Add routing designer metadata hints`
+  - Applied the option/resource hint pattern to Routing metadata for Switch,
+    Fork, Merge, Window, Correlation, and Join nodes.
+  - Bumped Routing Composition to `1.3.0`.
+- `Add timers designer metadata hints`
+  - Applied the option/resource hint pattern to Timers metadata for Interval,
+    Schedule, Delay, Throttle, and Debounce nodes.
+  - Bumped Timers Composition to `1.5.0`.
+- `Add sources designer metadata hints`
+  - Applied the option/resource hint pattern to Sources metadata for Generated
+    Source and Sequence Source nodes.
+  - Bumped Sources Composition to `1.4.0`.
+- `Add serialization designer metadata hints`
+  - Applied the option/resource hint pattern to Serialization metadata for
+    JSON, text, and Base64 nodes.
+  - Bumped Serialization Composition to `1.3.0`.
+- `Add payloads designer metadata hints`
+  - Applied the option/resource hint pattern to Payloads metadata for the
+    payload inspection node.
+  - Bumped Payloads Composition to `1.3.0`.
+- `Add projections designer metadata hints`
+  - Applied the option/resource hint pattern to Projections metadata for the
+    event projection node.
+  - Bumped Projections Composition to `1.3.0`.
+- `Add metrics designer metadata hints`
+  - Applied the option/resource hint pattern to Metrics metadata for the
+    metrics aggregate node.
+  - Bumped Metrics Composition to `1.3.0`.
+- `Add expectations designer metadata hints`
+  - Applied the option/resource hint pattern to Expectations metadata for the
+    event expectation node.
+  - Bumped Expectations Composition to `1.3.0`.
+- `Add http designer metadata hints`
+  - Applied the option/resource hint pattern to HTTP metadata for the client
+    node.
+  - Bumped HTTP Composition to `1.3.0`.
+- `Add filesystem designer metadata hints`
+  - Applied the option/resource hint pattern to FileSystem metadata for file
+    read, file write, directory enumerate, and file watch nodes.
+  - Bumped FileSystem Composition to `1.4.0`.
+- `Add storage designer metadata hints`
+  - Applied the option/resource hint pattern to Storage metadata for put, get,
+    query, and delete nodes.
+  - Bumped Storage Composition to `1.4.0`.
+- `Add sessions designer metadata hints`
+  - Applied the option/resource hint pattern to Sessions metadata for recorder,
+    replay, and query nodes.
+  - Bumped Sessions Composition to `1.5.0`.
+- `Add mqtt designer metadata hints`
+  - Applied the option/resource hint pattern to MQTT metadata for publish and
+    trigger nodes.
+  - Bumped MQTT Composition to `1.4.0`.
+- `Add designer metadata hint conventions`
+  - Added release-test convention coverage for option section/importance hints,
+    contract-valued editor/syntax hints, same-node related resources, and
+    host-owned resource key patterns.
+  - Left provider metadata content, runtime behavior, public APIs, package
+    versions, package docs, and changelog entries unchanged.
+- `Record designer metadata hint release readiness`
+  - Recorded broad verification, all impacted package preflight success, and
+    `components-designer` `2.16.0` fast dry-run success.
+  - Recorded the composition dry-run blocker: current dependency packages for
+    composition packages are not all available in the isolated local package
+    source or public feed.
+- `Record designer metadata hint dependency readiness`
+  - Seeded a complete current-branch temp package source from all
+    `eng/packages.json` entries.
+  - Verified all 20 impacted package preflights and all 20 impacted fast
+    dry-runs against that source.
+- `Record designer metadata hint publication sequencing`
+  - Recorded the dependency-aware publication order and release-helper command
+    templates for the Designer metadata hint train.
+  - Verified release preflight and tag prepare-only checks for the 44-alias
+    dependency closure, with local and configured-remote tag availability notes.
+- `Record designer metadata hint final release rehearsal`
+  - Seeded a fresh complete current-branch temp package source from all
+    `eng/packages.json` entries.
+  - Verified all 44 dependency-ordered aliases with release preflight, fast
+    dry-run against the seeded source, and tag prepare-only checks.
+- `Record designer metadata hint local tag execution`
+  - Created 42 local annotated release tags at release target
+    `d7da08e5bad380e243cdd49988808285292d66de`.
+  - Skipped the 2 already-present runtime dependency tags and did not push tags
+    or publish packages.
+- `Record designer metadata hint tag push`
+  - Pushed the 42 local annotated release tags to the configured remote in
+    dependency order.
+  - Verified each pushed tag resolves remotely to release target
+    `d7da08e5bad380e243cdd49988808285292d66de`.
+- `Fix release test project reference paths`
+  - Fixed release-test project-reference path normalization for Linux runners by
+    normalizing both `/` and `\` before combining referenced project paths.
+  - Added focused regression coverage for Windows-style project-reference
+    paths.
+- `Record designer metadata hint release workflow recovery`
+  - Recorded the release workflow recovery, including retargeting the 42
+    dependency-ordered tags to fixed commit
+    `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`.
+  - Verified successful release workflows, release assets, and public
+    package-feed visibility for all 42 packages.
+
+## Verification Notes
+
+Recent focused verification passed for the Mapping, Control, Assertions, State,
+Observability, Validation, Routing, Timers, Sources, Serialization, Payloads,
+Projections, Metrics, Expectations, HTTP, FileSystem, Storage, Sessions, and
+MQTT hint passes, plus the Designer metadata hint convention closeout and
+release-readiness pass:
+
+- Designer tests.
+- Mapping composition tests.
+- Control composition tests.
+- Assertions composition tests.
+- State composition tests.
+- Observability composition tests.
+- Validation composition tests.
+- Routing composition tests.
+- Timers composition tests.
+- Sources composition tests.
+- Serialization composition tests.
+- Payloads composition tests.
+- Projections composition tests.
+- Metrics composition tests.
+- Expectations composition tests.
+- HTTP composition tests.
+- FileSystem composition tests.
+- Storage composition tests.
+- Sessions composition tests.
+- MQTT composition tests.
+- Release convention tests with public API baselines updated where intended.
+- Release convention tests now enforce option section/importance hints,
+  contract-valued editor/syntax hints, same-node related resources, and
+  host-owned resource key patterns.
+- All impacted package release preflights passed for the Designer metadata hint
+  package set.
+- `components-designer` `2.16.0` fast package dry-run passed from a temp
+  package source.
+- `components-mapping-composition` `1.3.0` packed successfully, then failed
+  consumer restore because current dependencies are not all present in the
+  isolated package source or public feed. Treat this as a release dependency
+  sequencing/source-seeding blocker, not as a metadata implementation failure.
+- A follow-up dependency-source readiness pass seeded a complete temp package
+  source with all 55 current branch packages and reran release readiness for
+  the impacted package set. All 20 impacted preflights and all 20 impacted
+  fast dry-runs passed with that source plus the public feed for external
+  dependencies.
+- A publication-sequencing handoff pass verified all 44 dependency-closure
+  aliases with release preflight and tag prepare-only checks. Tag availability
+  checks found `components-serialization-v3.0.0` and
+  `components-payloads-v3.0.0` already present locally and on the configured
+  remote; the rest of the recorded release tags were absent.
+- A final no-publish rehearsal seeded a fresh complete temp package source and
+  reran release preflight, fast dry-run, and tag prepare-only checks for all 44
+  dependency-ordered aliases. All checks passed. Tag availability remained 42
+  absent tags and 2 already-present runtime dependency tags.
+- The local tag execution pass then reran a controlled Release build, seeded a
+  fresh complete temp package source with all 55 current packages, and created
+  the 42 absent local annotated tags at release target
+  `d7da08e5bad380e243cdd49988808285292d66de`. The two already-present runtime
+  dependency tags were skipped. No tags were pushed and no packages were
+  published.
+- The tag push pass verified the 42 local tags were absent from the configured
+  remote, pushed them in dependency order, and confirmed their remote peeled
+  targets resolve to the same release target. The two already-present runtime
+  dependency tags remained present remotely. No packages were published.
+- The release workflow recovery pass fixed the Linux-only release-test path
+  normalization issue, reran local release tests (`86`) and the controlled
+  solution build, confirmed the 42 tag names had no release assets or package
+  versions already visible, then retargeted and pushed each tag to fixed commit
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77` one at a time. All 42 latest
+  tag-push release workflow runs succeeded, all releases have package assets,
+  and all package versions are visible on the public package feed. Three
+  transient full-suite test failures required one workflow rerun each before
+  the train continued.
+- Full solution build using the reliable controlled command:
+
+```powershell
+dotnet build FluxFlow.sln --no-restore --disable-build-servers /m:1 /nodeReuse:false -p:UseSharedCompilation=false -clp:ErrorsOnly
+```
+
+Build verification can appear unreliable when stale local build parent
+processes survive timed-out verification attempts. The safe recovery pattern is
+to stop only FluxFlow-owned stale build parents, run
+`dotnet build-server shutdown`, and rerun the controlled command above. Do not
+stop unrelated `dotnet` processes from other workspaces.
+
+Local graph output was refreshed after the Designer metadata hint convention
+closeout and again after the dependency-source readiness memory closeout. The
+local HTML graph was skipped when the graph exceeded the visualization size
+limit.
+
+## Current Constraints
+
+- Keep passes narrow and locally committed.
+- Do not push, open PRs, or merge unless explicitly requested.
+- Do not restart a broad component-family implementation sweep without a
+  bounded plan.
+- Do not add engine dependencies to pure component packages or `.Composition`
+  packages.
+- Do not move concrete resource/client/store ownership into composition.
+- Do not add renderer behavior, resource pickers, hot reload, or runtime
+  lifecycle extensions during metadata hint passes.
+- Keep project-visible names and user-facing text neutral.
+
+## Suggested Next Pass
+
+The Designer metadata hint release train is published and indexed. Plan any
+next package-family, convention, or release work as a separate bounded pass.

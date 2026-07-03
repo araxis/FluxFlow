@@ -12,12 +12,23 @@ component packages to a concrete owner or lifecycle model.
 - `ResourceReference`: a name plus optional kind and attributes.
 - `ResourceDescriptor`: a declared resource name, optional kind, display fields,
   and metadata.
+- `ResourceKind` and `ResourceMetadataText`: small value types for code-authored
+  descriptor kind, display-name, and summary values.
+- `IResourceDescriptorProvider`: a small metadata enumeration abstraction for
+  declared resources.
 - `IResourceLookup`: a small lookup abstraction hosts can back with their own
-  resource lifecycle.
+  resource lifecycle; it also exposes declared descriptors.
+- `ResourceServiceCollectionExtensions`: keyed DI registration helpers for
+  host-owned lookups and descriptor providers.
+- `ResourceDescriptorCatalogBuilder`: a fluent helper that creates
+  `ResourceDescriptor` snapshots or a validated `ResourceDescriptorCatalog`.
 - `ResourceLookupResult`: lookup outcome plus a structured diagnostic when a
   resource cannot be used.
 - `ResourceDiagnostic`: stable diagnostics for missing, duplicate, unused, kind
   mismatch, and invalid resources.
+
+`ResourceLookupResult` factory helpers reject null references or descriptors at
+the public boundary so invalid lookup outcomes fail with clear argument names.
 
 ## Example
 
@@ -48,6 +59,43 @@ var result = await catalog.LookupAsync(new ResourceReference
 Console.WriteLine(result.Found);
 ```
 
+Code that only needs declared resource metadata can depend on
+`IResourceDescriptorProvider` without performing lookups:
+
+```csharp
+foreach (var descriptor in descriptorProvider.GetResources())
+    Console.WriteLine(descriptor.Name);
+```
+
+Fluent descriptor construction is available when code wants the same descriptor
+shape with less object setup:
+
+```csharp
+var catalog = new ResourceDescriptorCatalogBuilder()
+    .Add(
+        "primary-profile",
+        kind: "profile",
+        displayName: "Primary Profile",
+        metadata: new Dictionary<string, string>
+        {
+            ["owner"] = "runtime"
+        })
+    .BuildCatalog();
+```
+
+Code-authored descriptors can use value types at the builder boundary while the
+underlying DTOs remain configuration-friendly:
+
+```csharp
+var catalog = new ResourceDescriptorCatalogBuilder()
+    .Add(
+        new ResourceName("primary-profile"),
+        kind: new ResourceKind("profile"),
+        displayName: new ResourceMetadataText("Primary Profile"),
+        summary: new ResourceMetadataText("Runtime profile."))
+    .BuildCatalog();
+```
+
 ## Diagnostics
 
 Use `ResourceDiagnostics` to:
@@ -57,10 +105,51 @@ Use `ResourceDiagnostics` to:
 - find missing references
 - find unused descriptors
 
+Metadata and attribute maps are validated as part of descriptors and references;
+null maps are reported as structured invalid-resource diagnostics.
+Null descriptor entries and null reference entries inside helper collections are
+reported or ignored by the relevant diagnostic helpers instead of surfacing
+accidental null-reference failures.
+`ResourceDiagnostic` copies assigned metadata, treats null diagnostic metadata
+as empty, and formats as a metadata-safe one-line summary.
+
+`ResourceName`, resource `Kind`, `DisplayName`, and `Summary` trim surrounding
+whitespace when assigned. `ResourceKind` and `ResourceMetadataText` provide the
+same trimming for code-authored descriptors and reject empty values at the
+builder boundary. The descriptor/reference DTOs still keep their string-shaped
+fields so configuration-bound invalid text can be reported as structured
+diagnostics instead of throwing during binding.
+
+Valid metadata and attribute maps trim surrounding whitespace from keys and
+values when assigned. Maps with null values, blank keys or values, or duplicate
+keys after trimming are preserved so `ResourceDiagnostics` can report structured
+invalid-resource diagnostics.
+
 ## Boundaries
 
 This package only defines resource contracts and helper logic. Hosts decide how
 resources are created, secured, refreshed, shared, disposed, and displayed.
+`IResourceDescriptorProvider` separates resource metadata enumeration from
+lookup call sites that resolve a specific `ResourceReference`.
+`ResourceDescriptorCatalogBuilder` is only an authoring helper over the same
+descriptor and catalog contracts; it does not create or own concrete resources.
+
+Hosts using keyed DI can register resource lookups and descriptor providers
+directly:
+
+```csharp
+services
+    .AddFluxFlowResourceLookup("resources", catalog)
+    .AddFluxFlowResourceDescriptorProvider("declared-resources", descriptorProvider);
+```
+
+Keyed DI helper names are trimmed before registration, matching the normalization
+used by `ResourceName` and catalog lookups.
+
+Registering an `IResourceLookup` also exposes it as an
+`IResourceDescriptorProvider` with the same key. These helpers only register
+already-owned services; they do not create clients, stores, secrets, or
+composition node factories.
 
 ## Composition
 

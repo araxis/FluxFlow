@@ -24,6 +24,16 @@ the correlation id of each input message they re-emit. Errors surface on the
 tick contracts only — hosts decide whether ticks drive polling, health checks,
 metrics, file work, message publishing, or other activity.
 
+For interval and schedule sources, `BoundedCapacity` configures source output
+capacity. Tick loops await source output acceptance. Output remains
+broadcast/latest-wins; use a dedicated durable buffer if a workflow edge must
+guarantee no loss. Delay, throttle, and debounce keep using `BoundedCapacity`
+as their bounded input capacity.
+
+Construction validates settings before the node pipeline is created. Invalid
+interval, delay, throttle, debounce, and capacity settings fail fast with
+timer-specific construction errors.
+
 ## Interval
 
 ```csharp
@@ -93,8 +103,8 @@ windows, and debounce quiet periods without real-time waits.
 
 The optional `FluxFlow.Components.Timers.Composition` package registers timer
 factories for `FluxFlow.Composition`. It binds the existing timer settings from
-node configuration and resolves an optional keyed `TimeProvider` resource owned
-by the host.
+node configuration and resolves an optional host-owned keyed `TimeProvider`
+resource.
 
 ```csharp
 services
@@ -110,4 +120,6 @@ services
 Use custom node type strings for multiple transform input shapes, for example
 `timer.delay.order` and `timer.debounce.http`. Schedule composition uses the
 existing `TimerScheduleSettings` model; this adapter does not add time zone id
-conversion.
+conversion or own clock lifetime.
+Invalid timer settings fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.

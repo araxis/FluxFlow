@@ -2,11 +2,11 @@ namespace FluxFlow.Components.Designer.Contracts;
 
 public sealed record ResourceDesignMetadata
 {
-    public required string Name { get; init; }
-    public string? DisplayName { get; init; }
+    public required ComponentResourceName Name { get; init; }
+    public ComponentMetadataText? DisplayName { get; init; }
     public int Order { get; init; }
-    public string? Summary { get; init; }
-    public string? ValueType { get; init; }
+    public ComponentMetadataText? Summary { get; init; }
+    public ComponentValueTypeHint? ValueType { get; init; }
     public bool IsRequired { get; init; }
-    public IReadOnlyDictionary<string, string> Attributes { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Attributes { get; init; } = new Dictionary<ComponentAttributeName, ComponentAttributeValue>();
 }

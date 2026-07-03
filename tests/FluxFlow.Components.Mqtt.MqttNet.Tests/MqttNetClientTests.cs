@@ -8,6 +8,22 @@ namespace FluxFlow.Components.Mqtt.MqttNet.Tests;
 public sealed class MqttNetClientTests
 {
     [Fact]
+    public void LastWillOptions_snapshots_payload()
+    {
+        var payload = new byte[] { 1, 2, 3 };
+
+        var options = new MqttNetLastWillOptions
+        {
+            Topic = "devices/a",
+            Payload = payload
+        };
+
+        payload[0] = 9;
+
+        options.Payload.ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
     public void Constructor_RejectsMissingHost()
         => Should.Throw<ArgumentException>(() => new MqttNetClient(
             new MqttNetClientOptions { Host = "" }));

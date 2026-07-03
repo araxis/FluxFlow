@@ -55,6 +55,9 @@ The snapshot includes:
 - latest matching event summary
 - latest payload preview with a configured length limit
 
+`EventProjectionOptions` validates at construction: non-positive
+`RateWindowSeconds` or `BoundedCapacity` fails fast as an argument exception.
+
 ## Filters
 
 `EventFilter` supports:
@@ -112,7 +115,9 @@ services
 ```
 
 The composition adapter binds `EventProjectionOptions` from node configuration
-and can resolve an optional keyed `TimeProvider` resource named `clock`.
+and can resolve an optional host-owned keyed `TimeProvider` resource named
+`clock`. Filtering, rolling rate calculation, and final snapshot behavior remain
+normal node behavior controlled by `EventProjectionOptions`.
 
 The optional composition package also exposes
 `ProjectionsComponentDesignMetadataProvider` for neutral Designer metadata over
@@ -121,6 +126,6 @@ remains free of Designer, Composition, and Engine dependencies.
 
 ## Boundaries
 
-This package has no UI dependency and no host-specific resource assumptions. It
-depends only on `FluxFlow.Nodes`. Hosts decide how snapshots are displayed, stored,
-tested, or forwarded.
+This package has no UI dependency and no concrete resource ownership. It
+depends only on `FluxFlow.Nodes`. Hosts decide how snapshots are displayed,
+stored, tested, or forwarded.

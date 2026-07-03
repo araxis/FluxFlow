@@ -14,7 +14,11 @@ This package owns:
 - building the runtime through `CompositionRuntimeBuilder`
 - starting and stopping the runtime through `IHostedService`
 - exposing build diagnostics through `ICompositionRuntimeHost`
-- resolving named node resources from keyed DI services
+
+Named node resources resolve through the `CompositionNodeFactoryContext`
+instance methods in `FluxFlow.Composition`; this package's role is registering
+the composition runtime against the host's keyed services. The older context
+extension methods in this package remain as obsolete delegating wrappers.
 
 It does not own resource creation policies. Adapter packages still own concrete
 clients, stores, reconnect behavior, secrets, hosted client lifetime, and
@@ -40,6 +44,19 @@ services
         inputs: [CompositionPorts.Metadata<string>("Input")]));
 ```
 
+Reusable packages or hosts can also register explicit contributor classes or
+instances:
+
+```csharp
+services
+    .AddFluxFlowComposition(configuration)
+    .RegisterNodeContributor<AppCompositionNodes>();
+```
+
+Contributor registration is explicit and duplicate-safe by implementation type.
+The hosting package does not scan assemblies or discover node factories
+implicitly.
+
 Configuration records the resource reference by name:
 
 ```json
@@ -61,6 +78,9 @@ Configuration records the resource reference by name:
 
 The node factory asks for the local resource slot (`store`), and hosting
 resolves the keyed service named `primary`.
+Resource slot names passed to the factory helpers and configured keyed service
+references are trimmed before lookup, so incidental surrounding whitespace does
+not change which host-owned service is resolved.
 
 ## Runtime Access
 
@@ -75,5 +95,15 @@ foreach (var diagnostic in host.Diagnostics)
 
 By default the hosted service builds and starts the runtime with the host and
 throws `CompositionHostingException` if the composition cannot be built.
+`CompositionHostingException.Diagnostics` is a construction-time snapshot, so
+callers can safely keep the exception as stable build-failure evidence.
+Hosted and manual start/stop calls are idempotent at the hosting boundary: a
+runtime that is already started is not started again, and a runtime that has
+already been stopped is not completed or started again.
 
 If you already have the exact section, call `AddFluxFlowCompositionSection(...)`.
+The hosting registration APIs reject null service collections, definitions,
+configuration roots, definition sources, node registration delegates, and options
+configuration delegates. A null section name is rejected explicitly; pass an
+empty string only when the supplied configuration object is already the exact
+composition section.

@@ -37,6 +37,21 @@ internal static class StorageNodeSupport
         return key.Trim();
     }
 
+    public static StorageWriteMode ResolveWriteMode(
+        string nodeType,
+        StorageWriteMode? requestMode,
+        StorageWriteMode defaultMode)
+    {
+        var mode = requestMode ?? defaultMode;
+        if (!Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"{nodeType} request write mode '{mode}' is not supported.");
+        }
+
+        return mode;
+    }
+
     public static StorageResult CreateRecordResult(
         string operation,
         StorageRecord record,

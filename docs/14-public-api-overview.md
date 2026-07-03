@@ -6,6 +6,42 @@ FluxFlow's default public surface is standalone-node-first:
 - `FluxFlow.Composition` for fluent/config composition of standalone nodes.
 - `FluxFlow.Engine` for the optional advanced engine runtime.
 
+The release tests maintain a lightweight public API baseline for package source
+declarations. Treat baseline changes as a prompt to review package versioning,
+changelog entries, and documentation before accepting the new public surface.
+
+## Node Kit
+
+Namespace:
+
+```text
+FluxFlow.Nodes
+```
+
+Main types:
+
+- `FlowMessage<T>`
+- `CorrelationId`
+- `FlowNode<TInput,TOutput>`
+- `FlowNodeOptions`
+- `FlowSource<TOutput>`
+- `FlowSourceOptions`
+- `IFlowNode`
+- `IFlowSource`
+- `FlowError`
+- `FlowEvent`
+- `FlowEventLevel`
+
+Use these types to author standalone nodes directly. `FlowNodeOptions`
+configures bounded transform intake and validates non-positive capacities and
+parallelism values when assigned. `FlowSourceOptions` lets source nodes opt into
+bounded broadcast output and awaitable output-block acceptance while sources
+that do not pass options keep the original unbounded broadcast behavior. It
+allows `UnboundedOutputCapacity` and validates other output capacities when
+assigned. `FlowMessage<T>` headers and `FlowEvent` attributes copy assigned
+dictionaries with ordinal key comparison, keeping broadcast envelopes and
+diagnostics stable after creation.
+
 ## Composition
 
 Namespace:
@@ -38,7 +74,20 @@ Main types:
 - `ICompositionReloadPlanner`
 
 Use these types when the host wants direct standalone-node composition from
-fluent C# or `IConfiguration` JSON without depending on the engine.
+fluent C# or `IConfiguration` JSON without depending on the engine. Definition
+DTO collection properties copy assigned dictionaries and lists with ordinal key
+comparison so caller-owned collections cannot mutate a built definition.
+Workflow, node, configuration, and resource dictionary keys are trimmed when
+assigned or built fluently; duplicate keys after trimming are rejected.
+Node and port references trim assigned segments and reject empty dotted segments
+when parsed from fluent or configuration link strings.
+Node definition types, node registration types, and composition port metadata
+names are trimmed at the public boundary so configuration and adapter
+registrations agree on stable identifiers.
+`ComposedNode` disposal attempts node disposal and descriptor cleanup hooks
+independently, and reports both failures together when both paths fail.
+Runtime builder cancellation disposes partially built nodes and links before
+rethrowing cancellation.
 
 ## Composition Hosting
 
@@ -63,6 +112,15 @@ Main types:
 Use these types when a .NET host wants DI to load, build, start, stop, and
 observe a composition runtime. Resource helpers resolve named node resource
 references from keyed DI services; adapter packages still own the resources.
+Resource helper slot names and configured keyed service references are trimmed
+before lookup so configuration whitespace does not change resource identity.
+`CompositionHostingBuilder` supports direct delegate registration through
+`RegisterNodes(...)` and explicit reusable contributor registration through
+`RegisterNodeContributor<TContributor>()` or `RegisterNodeContributor(...)`;
+it does not scan assemblies or discover node factories implicitly.
+Hosted and manual lifecycle calls are idempotent at this boundary, so repeated
+start or stop requests do not start or complete the same runtime more than
+once. A stopped runtime is not restarted by the host.
 
 ## HTTP Composition
 
@@ -83,12 +141,41 @@ Main types:
 Use `RegisterHttpNodes()` from the optional
 `FluxFlow.Components.Http.Composition` package when a composition host wants an
 `http.client` node factory. The factory resolves a keyed `HttpClient` resource;
-the host still owns client lifetime and transport policy.
+the host still owns client lifetime and transport policy. Invalid numeric
+`HttpClientNodeOptions` values fail during build as factory diagnostics when the
+host is configured to collect build failures.
 
 `HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for the
 HTTP client composition node, including existing options, fixed ports, and
 resource hints for the required `client` resource and optional `clock`
 resource. `HttpClient` instances and clocks remain host-owned keyed resources.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
+
+## HTTP Trigger Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Http.AspNetCore
+```
+
+Main types:
+
+- `FluxFlowHttpTriggerServiceCollectionExtensions`
+- `FluxFlowTriggerEndpointExtensions`
+- `HttpRequestContext`
+- `HttpTriggerNode`
+- `HttpTriggerSource`
+
+Use `AddFluxFlowHttpTrigger(...)` and `MapFluxFlowTrigger(...)` when a web host
+wants an inbound HTTP endpoint to feed a request/reply graph.
+The adapter owns endpoint glue, keyed trigger source/node registration, and
+hosted trigger lifetime. `MapFluxFlowTrigger(...)` rejects missing route
+patterns before delegating to framework routing, and validates the keyed trigger
+name or direct coordinator argument at the package boundary. The hosted lifetime
+completes the keyed request source during stop so endpoint submissions are
+rejected once the trigger is no longer consuming.
 
 ## Mapping Composition
 
@@ -110,13 +197,15 @@ Use `RegisterMapper<TInput,TOutput>()` from the optional
 `FluxFlow.Components.Mapping.Composition` package when a composition host wants
 closed generic `flow.mapper` node factories. The factory resolves a keyed
 `IFlowExpressionEngine` resource; optional keyed context factory and clock
-resources stay host-owned.
+resources stay host-owned. Invalid mapper options fail during build as factory
+diagnostics when the host is configured to collect build failures.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.mapper` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata includes editable options, ports, and resource hints for the required
-`engine` resource plus optional `contextFactory` and `clock` resources.
+metadata includes editable options with section/editor hints, ports, and
+host-owned resource picker hints for the required `engine` resource plus
+optional `contextFactory` and `clock` resources.
 
 ## Assertions Composition
 
@@ -166,13 +255,16 @@ Use `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` from the optional
 `FluxFlow.Components.Control.Composition` package when a composition host wants
 closed generic `flow.filter` and `flow.when` node factories. The factories
 resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
-factory and clock resources stay host-owned.
+factory and clock resources stay host-owned. Invalid control options fail
+during build as factory diagnostics when the host is configured to collect
+build failures.
 
 `ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.filter` and `flow.when` composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata includes editable options, ports, and resource hints for the
-required `engine` resource plus optional `contextFactory` and `clock` resources.
+The metadata includes editable options with section/editor hints, ports, and
+host-owned resource picker hints for the required `engine` resource plus
+optional `contextFactory` and `clock` resources.
 
 ## Validation Composition
 
@@ -196,6 +288,8 @@ wants closed generic `json.schema-validator` node factories. The factory binds
 `JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
 composition build, and resolves optional keyed typed selector and clock
 resources through the host.
+Invalid validator options fail during build as factory diagnostics when the host
+is configured to collect build failures.
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `json.schema-validator` composition node so hosts can compose palette,
@@ -225,13 +319,16 @@ Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
 `FluxFlow.Components.Timers.Composition` package when a composition host wants
 timer source and transform node factories. The factories bind existing timer
 settings and resolve optional keyed `TimeProvider` resources through the host.
+Invalid timer settings fail during build as factory diagnostics when the host is
+configured to collect build failures.
 
 `TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the five timer composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes editable options, fixed ports, and a resource hint for the
 optional `clock` resource. It does not add schedule time-zone string
-conversion.
+conversion; schedule metadata declares `timeZone` as an omitted editable option
+because that setting requires typed `TimeZoneInfo` configuration.
 
 ## Sources Composition
 
@@ -254,12 +351,17 @@ optional `FluxFlow.Components.Sources.Composition` package when a composition
 host wants generated or sequence source factories. The generated factory
 deserializes inline `items` into the closed output type; both factories resolve
 optional keyed `TimeProvider` resources through the host.
+Invalid source option values fail during composition build through the factory
+path, so hosts that collect build diagnostics receive `FactoryFailed` entries
+instead of a partially created runtime.
 
 `SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
 generated and sequence source composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata includes inline generated `items` as JSON node configuration,
 fixed output ports, and a resource hint for the optional `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Observability Composition
 
@@ -282,12 +384,18 @@ Use `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
 `FluxFlow.Components.Observability.Composition` package when a composition host
 wants counter, logger, or metrics node factories. The factories bind existing
 observability options and resolve host-owned keyed expression, selector,
-context, and clock resources.
+context, and clock resources. Invalid observability options fail during build
+as factory diagnostics when the host is configured to collect build failures.
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the three observability composition nodes, including existing option records
-and fixed ports. Expression engines, context factories, selectors, and clocks
-remain host-owned keyed resources.
+fixed ports, and host-owned resource hints. Counter metadata includes the
+conditionally required expression engine plus optional context factory and
+clock resources. Logger metadata includes the dynamic `attribute:{name}`
+selector resource pattern, and metrics metadata includes the optional
+`sizeSelector` and `clock` resources. Expression engines, context factories,
+selectors, and clocks remain host-owned keyed resources. The provider authors
+that metadata through the shared validated Designer metadata builder.
 
 ## Metrics Composition
 
@@ -314,6 +422,8 @@ resource through the host.
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `metrics.aggregate` composition node, including existing metrics aggregate
 options, fixed ports, and a resource hint for the optional `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Routing Composition
 
@@ -338,12 +448,16 @@ optional `FluxFlow.Components.Routing.Composition` package when a composition
 host wants routing node factories. Switch, correlation, and join factories
 resolve host-owned keyed selector delegates; all factories can resolve an
 optional keyed `TimeProvider` resource through the host.
+Invalid routing options fail during build as factory diagnostics when the host
+is configured to collect build failures.
 
 `RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the six routing composition nodes so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata describes built-in ports and option-defined dynamic output surfaces
-while keeping selector delegates and `clock` as host-owned resources.
+plus host-owned resource hints for selector delegates and `clock`.
+The provider authors that metadata through the shared validated Designer
+metadata builder, including built-in input and output port descriptors.
 
 ## Serialization Composition
 
@@ -374,6 +488,8 @@ metadata for the six serialization composition nodes so hosts can compose
 palette, editor, validation, or documentation hints without copying package
 descriptors. The metadata includes shared options, fixed ports, and a resource
 hint for the optional `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Payloads Composition
 
@@ -402,6 +518,8 @@ the `payload.inspect` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes options, fixed ports, and a resource hint for the optional
 `clock` resource.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## FileSystem Composition
 
@@ -425,12 +543,16 @@ Use `RegisterFileRead()`, `RegisterFileWrite()`,
 wants file-system node factories. The factories bind existing file-system
 options and can resolve an optional keyed `TimeProvider` resource through the
 host.
+Invalid file-system option values fail during composition build through the
+factory path, so hosts that collect build diagnostics receive `FactoryFailed`
+entries instead of a partially created runtime.
 
 `FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the four file-system composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata keeps path policy as node configuration and `clock` as a
-host-owned resource.
+The metadata keeps path policy as node configuration and includes a resource
+hint for the optional `clock` resource. The provider authors that metadata
+through the shared validated Designer metadata builder.
 
 ## State Composition
 
@@ -455,9 +577,11 @@ resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
 keyed `TimeProvider` resource through the host.
 
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reducer`, including the existing reducer options and fixed ports.
-Expression engines and clocks remain host-owned keyed resources; the `engine`
-option is diagnostic/config metadata, not DI selection.
+`state.reducer`, including the existing reducer options, fixed ports, and
+resource hints for the required `engine` resource plus optional `clock`
+resource. The `engine` option is diagnostic/config metadata, not DI selection.
+The provider authors that metadata through the shared validated Designer
+metadata builder.
 
 ## Storage Composition
 
@@ -479,12 +603,17 @@ Use `RegisterStoragePut()`, `RegisterStorageGet()`,
 `RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
 `FluxFlow.Components.Storage.Composition` package when a composition host wants
 storage node factories. The factories bind existing storage options, resolve a
-required keyed `IStorageStore`, and can resolve an optional keyed
-`TimeProvider` resource through the host.
+required keyed `IStorageStore` or `IStorageStoreFactory`, and can resolve an
+optional keyed `TimeProvider` resource through the host. Factory resources are
+opened during composition build and released with composed node disposal; direct
+stores remain host-owned.
 
 `StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the four storage composition nodes, including existing storage options and fixed
-ports. Concrete stores and clocks remain host-owned keyed resources.
+ports, plus resource hints for the required `store` resource and optional
+`clock` resource. The `store` resource may point at either a keyed
+`IStorageStore` or keyed `IStorageStoreFactory`. The provider authors that
+metadata through the shared validated Designer metadata builder.
 
 ## Sessions Composition
 
@@ -502,17 +631,37 @@ Main types:
 - `SessionsCompositionResourceNames`
 - `SessionsComponentDesignMetadataProvider`
 
+Related base Sessions types:
+
+- `SessionStoreServiceCollectionExtensions`
+- `ISessionStoreFactory`
+- `SessionStoreContext`
+- `SessionStoreLease`
+- `SessionComponentOptions`
+
 Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 `RegisterSessionQuery()` from the optional
 `FluxFlow.Components.Sessions.Composition` package when a composition host wants
 session node factories. The factories bind existing session options, resolve a
-required keyed `ISessionStore`, and can resolve an optional keyed
-`TimeProvider` resource through the host.
+required keyed `ISessionStore` or `ISessionStoreFactory`, and can resolve an
+optional keyed `TimeProvider` resource through the host. Factory resources are
+opened during composition build and released with composed node disposal; direct
+stores remain host-owned.
+Invalid session option values fail during composition build through the factory
+path, so hosts that collect build diagnostics receive `FactoryFailed` entries
+instead of a partially created runtime.
 
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the three session composition nodes, including existing session options and fixed
-ports. Session stores and clocks remain host-owned keyed resources; the `store`
-option is diagnostic/config metadata, not DI selection.
+ports, plus resource hints for the required `store` resource and optional
+`clock` resource. The `store` resource may point at either a keyed
+`ISessionStore` or keyed `ISessionStoreFactory`; the `store` option is
+diagnostic/config metadata, not DI selection. The provider authors that
+metadata through the shared validated Designer metadata builder.
+
+The base Sessions package owns the neutral store factory, context, lease,
+component option, and keyed DI registration helpers used by direct hosts and
+composition adapters; it still does not own any concrete persistence backend.
 
 ## Projections Composition
 
@@ -539,8 +688,9 @@ resource through the host.
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.projection` composition node, including existing projection
 options, fixed ports, and a resource hint for the optional `clock` resource.
-The final snapshot lifecycle remains a direct node API in this composition
-pass.
+The provider authors that metadata through the shared validated Designer
+metadata builder. The final snapshot lifecycle remains a direct node API in
+this composition pass.
 
 ## Expectations Composition
 
@@ -567,7 +717,49 @@ resource through the host.
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.expectation` composition node, including existing expectation
 options, fixed ports, and a resource hint for the optional `clock` resource.
-Completion result flushing remains a direct node API in this composition pass.
+The provider authors that metadata through the shared validated Designer
+metadata builder. Completion result flushing remains a direct node API in this
+composition pass.
+
+## MQTT Core
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt
+FluxFlow.Components.Mqtt.Contracts
+FluxFlow.Components.Mqtt.Nodes
+FluxFlow.Components.Mqtt.Options
+```
+
+Main types:
+
+- `IMqttPublisher`
+- `IMqttTriggerSource`
+- `IMqttSubscription`
+- `IMqttReceivedContext`
+- `IMqttClientHealthSource`
+- `MqttPublishNode`
+- `MqttTriggerNode`
+- `MqttPublishRequest`
+- `MqttPublishResult`
+- `MqttPublishProperties`
+- `MqttReceivedMessage`
+- `MqttTriggerOptions`
+- `MqttTriggerResponse`
+- `MqttClientHealthEvent`
+- `MqttTopicValidator`
+
+Use `FluxFlow.Components.Mqtt` when a host wants standalone MQTT publish and
+trigger nodes over neutral contracts. Concrete MQTT clients stay behind
+adapter-owned `IMqttPublisher` and `IMqttTriggerSource` implementations.
+`MqttPublishProperties.UserProperties`,
+`MqttReceivedMessage.UserProperties`, and
+`MqttClientHealthEvent.Attributes` snapshot assigned dictionaries with ordinal
+key comparison, and treat null maps as empty. `MqttPublishRequest.Payload`,
+`MqttReceivedMessage.Payload`, and `MqttReceivedMessage.CorrelationData`
+snapshot assigned byte arrays while preserving the existing byte-array public
+contract.
 
 ## MQTT Composition
 
@@ -589,13 +781,93 @@ Use `RegisterMqttNodes()` from the optional
 `FluxFlow.Components.Mqtt.Composition` package when a composition host wants
 `mqtt.publish` and `mqtt.trigger` node factories. The factories resolve keyed
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
-the host still own broker/client registration.
+the host still own broker/client registration. MQTT adapter registration
+helpers reject invalid service/key/options arguments and null options factory
+results before creating keyed client sessions. At the standalone node layer,
+`MqttTriggerNode` reports malformed received contexts as trigger errors without
+stopping later valid subscription messages.
 
 `MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for the
 MQTT publish and trigger composition nodes, including existing options, fixed
 ports, and resource hints for `publisher`, `triggerSource`, and optional
 `clock` resources. Publisher, trigger source, and clock resources remain
-host-owned.
+host-owned. The provider authors that metadata through the shared validated
+Designer metadata builder.
+
+## MQTTnet Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt.MqttNet
+```
+
+Main types:
+
+- `FluxFlowMqttServiceCollectionExtensions`
+- `MqttClientRegistrationOptions`
+- `MqttNetClient`
+- `MqttNetClientOptions`
+- `MqttNetLastWillOptions`
+- `MqttNetMessageMapper`
+- `MqttNetReceivedContext`
+- `MqttNetSubscription`
+- `MqttNetTopicMatcher`
+
+`FluxFlow.Components.Mqtt.MqttNet` is the MQTTnet-backed adapter package for
+the neutral MQTT contracts. `MqttNetClient` implements `IMqttPublisher`,
+`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns MQTTnet client
+creation, broker connection, reconnect behavior, Last Will setup, publish
+mapping, trigger subscriptions, acknowledgement, and health events.
+
+`AddFluxFlowMqttClient()` registers one keyed `MqttNetClient` and exposes the
+same singleton through keyed MQTT publisher, trigger-source, and health-source
+contracts. Registration owns only the adapter client session. Workflow nodes
+are still created through standalone composition, and the host decides whether
+the adapter connects with hosted lifetime through `ConnectWithHost`.
+`MqttNetClientOptions.UserProperties` snapshots assigned dictionaries with
+ordinal key comparison, and treats null maps as empty.
+`MqttNetLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
+publish/Last Will mapping copies payload buffers before concrete client handoff.
+
+## Pulse MQTT Adapter
+
+Namespace:
+
+```text
+FluxFlow.Components.Mqtt.PulseMqtt
+```
+
+Main types:
+
+- `FluxFlowMqttServiceCollectionExtensions`
+- `MqttClientRegistrationOptions`
+- `PulseMqttClient`
+- `PulseMqttClientOptions`
+- `PulseMqttLastWillOptions`
+- `PulseMqttMessageMapper`
+- `PulseMqttReceivedContext`
+- `PulseMqttSubscription`
+- `RejectingMessageStore`
+
+`FluxFlow.Components.Mqtt.PulseMqtt` is the Pulse MQTT-backed adapter package
+for the neutral MQTT contracts. `PulseMqttClient` implements `IMqttPublisher`,
+`IMqttTriggerSource`, and `IMqttClientHealthSource`; it owns Pulse client
+creation, transport configuration, resilient start/stop, broker connection,
+Last Will setup, publish mapping, trigger subscriptions, acknowledgement, and
+health events.
+
+The adapter keeps FluxFlow publish behavior strict by default: publishing while
+disconnected fails unless the host explicitly enables
+`AllowOfflinePublishQueue`. Durable message and session stores are
+adapter-owned options on `PulseMqttClientOptions`, not core MQTT or composition
+features. `AddFluxFlowMqttClient()` registers one keyed client session and can
+optionally add hosted lifecycle through `StartWithHost`; `WaitForConnectedOnStart`
+is only valid with hosted start.
+`PulseMqttClientOptions.UserProperties` snapshots assigned dictionaries with
+ordinal key comparison, and treats null maps as empty.
+`PulseMqttLastWillOptions.Payload` snapshots assigned byte arrays, and adapter
+publish/Last Will mapping copies payload buffers before concrete client handoff.
 
 ## Designer Metadata
 
@@ -609,49 +881,153 @@ FluxFlow.Components.Designer.Contracts
 Main types:
 
 - `ComponentType`
+- `ComponentCategory`
+- `ComponentIconKey`
+- `ComponentPreferredNodeName`
+- `ComponentOptionName`
+- `ComponentOptionChoiceValue`
+- `ComponentResourceName`
 - `ComponentPortName`
+- `ComponentPortGroup`
+- `ComponentAttributeName`
+- `ComponentAttributeValue`
+- `ComponentMetadataText`
+- `ComponentValueTypeHint`
 - `ComponentDesignMetadata`
 - `OptionDesignMetadata`
 - `OptionChoiceMetadata`
 - `OptionValueKind`
+- `OptionDesignMetadataAttributeNames`
+- `OptionDesignMetadataAttributeValues`
+- `OptionDesignMetadataAttributes`
 - `ResourceDesignMetadata`
+- `ComponentResourcePickerHint`
+- `ComponentResourcePickerHints`
 - `PortDesignMetadata`
 - `PortDirection`
 - `IComponentDesignMetadataProvider`
+- `ComponentDesignMetadataBuilder`
 - `ComponentDesignMetadataCatalog`
 - `ComponentDesignMetadataModule`
+- `ComponentDesignMetadataServiceCollectionExtensions`
 - `ComponentDesignMetadataValidator`
 - `DesignerMetadataValidationError`
+- `ResourceDesignMetadataAttributeNames`
+- `ResourceDesignMetadataAttributeValues`
+- `ResourceDesignMetadataAttributes`
 
 Use these types when reusable packages want to describe neutral palette,
 editor, validation, and generated-doc metadata without depending on either the
 composition runtime or the engine runtime.
+`ComponentType`, `ComponentCategory`, `ComponentIconKey`,
+`ComponentPreferredNodeName`, `ComponentOptionName`,
+`ComponentOptionChoiceValue`, `ComponentResourceName`, `ComponentPortName`, and
+`ComponentPortGroup`, `ComponentAttributeName`, `ComponentAttributeValue`,
+`ComponentMetadataText`, and `ComponentValueTypeHint` are Designer-owned value
+types, keeping
+component, category, icon, preferred node name, option, option-choice, resource,
+port, port-group, metadata attribute-key, metadata attribute-value, metadata
+display text, and value type hint contracts independent from engine definition
+contracts.
 
 `ComponentDesignMetadataValidator` enforces identifier, option, choice,
 resource, port, and attribute consistency. Enum options must define choices,
-and choice lists are valid only on enum options.
+choice lists are valid only on enum options, option defaults must match their
+declared kind, and min/max constraints are limited to number and duration
+options.
+`ComponentDesignMetadataCatalog` validates and snapshots registered metadata so
+caller-owned option, resource, port, choice, and typed attribute collections
+cannot mutate catalog contents after registration.
+`ComponentDesignMetadataBuilder` is an authoring helper over the same contracts;
+it supports single and bulk component-level attributes through `AddAttribute`
+and `AddAttributes`, builds through the validated module path, and does not own
+rendering, localization, resource selection, or runtime mapping.
+`OptionDesignMetadataAttributes` provides shared option attribute helpers so
+package metadata can declare section, importance, editor, syntax, and
+related-resource hints without owning host rendering or editor behavior.
+`ResourceDesignMetadataAttributes` provides shared host-owned resource
+attribute helpers so package metadata can declare resource ownership, picker
+kind, key pattern, related option, and conditional requiredness without owning
+the host resource catalog.
+`ComponentResourcePickerHints` reads those existing host-owned resource
+attributes from one metadata item or a catalog and returns ordered
+`ComponentResourcePickerHint` values for host resource-picker integrations. It
+does not render controls, enumerate resource instances, resolve keyed services,
+or own resource lifetimes.
+`ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
+metadata providers and a singleton validated catalog in host DI, while leaving
+palette rendering, localization, and resource pickers owned by the host.
 
 ## Support Packages
 
 These packages are intentionally not standalone node composition adapters:
 
-- `FluxFlow.Components.Configuration` validates resource and secret references.
+- `FluxFlow.Components.Configuration` validates resource and secret references,
+  including trimmed resource option paths, typed `ConfigurationOptionPath`
+  values for code-authored validation requests, and resource option metadata
+  diagnostics with normalized valid metadata maps, request collection
+  snapshotting, and a fluent `ConfigurationValidationRequestBuilder` with
+  individual and range additions over the same validation DTOs. The builder
+  rejects null fluent resource and secret option paths while preserving blank
+  config-bound paths for structured validation diagnostics. It supports both
+  runtime validation through `IResourceLookup`/`ISecretResolver` and
+  descriptor-only validation through `IResourceDescriptorProvider` and
+  `ISecretDescriptorProvider`. Public validator entry points reject null
+  collaborator services, requests, and reference collections at the package
+  boundary while preserving request-owned null collections as structured
+  diagnostics.
 - `FluxFlow.Components.Resources` defines named resource contracts and lookup
+  diagnostics, including descriptor-provider separation, trimmed resource
+  names, code-authored `ResourceKind` and `ResourceMetadataText` values,
+  descriptor display text, and null-safe normalized metadata and attribute
+  validation, defensive diagnostic metadata copying, and a fluent
+  `ResourceDescriptorCatalogBuilder` over the existing descriptor/catalog
+  contracts, plus keyed DI registration helpers for host-owned lookups and
+  descriptor providers. Descriptor/reference DTOs keep string-shaped optional
+  text so configuration-bound invalid values can still be reported as
   diagnostics.
 - `FluxFlow.Components.Secrets` defines secret references, resolution results,
-  option helpers, and redaction helpers.
+  option helpers, redaction helpers, trimmed secret names, code-authored
+  `SecretVersion`, `SecretKind`, and `SecretMetadataText` values, option paths,
+  optional non-sensitive descriptor enumeration, null-safe normalized metadata
+  validation, defensive diagnostic metadata copying, and a fluent
+  `InMemorySecretResolverBuilder` for local secret record authoring, plus keyed
+  DI registration helpers for host-owned resolvers and descriptor providers.
+  Descriptor/reference DTOs keep string-shaped optional text so
+  configuration-bound invalid values can still be reported as diagnostics.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
-  services.
-- `FluxFlow.Components.Journal` provides journal store contracts and
-  in-memory support for hosts.
+  services, explicit expression registry argument guards, deterministic
+  most-specific context factory lookup, and keyed DI registration helpers for
+  host-owned expression engines and typed map context factories.
+- `FluxFlow.Components.Journal` provides runtime-neutral journal event input,
+  fluent event input authoring, record mapping, store contracts, store
+  factory/context/lease helpers, keyed DI registration helpers, retention
+  option validation, and named in-memory store factory support for hosts.
+  Its keyed registration helpers reject invalid service/key/provider arguments
+  and null provider results before creating keyed store resources.
 - `FluxFlow.Components.RequestReply` remains a direct-code coordinator package
-  and is intentionally not covered by composition adapters in this pass.
+  with self-validating request/reply and tracker option contracts, and is
+  intentionally not covered by composition adapters in this pass. Its
+  coordinator reports invalid null request contexts and response messages as
+  diagnostics without stopping later valid messages, and emits `Received`,
+  `Published`, and terminal/diagnostic events around correlated request
+  publication and reply handling.
+- `FluxFlow.Components.Storage` provides storage nodes and host-owned store
+  contracts, including normalized `StorageStoreContext` values for backend
+  factories plus normalized request, record, and result text for config-bound
+  callers. Storage node options normalize default collections and fail fast for
+  invalid capacity, query paging, and write mode values.
 - `FluxFlow.Components.Designer` provides engine/composition-neutral design
   metadata contracts, catalogs, and package-owned provider interfaces.
 - `FluxFlow.Components.Storage.FileSystem` and
   `FluxFlow.Components.Storage.SqlFile` provide concrete `IStorageStore`
-  backend factories consumed by host-owned storage registration.
+  backends, backend factories, direct keyed store registration helpers, and
+  keyed factory registration helpers consumed by host-owned storage
+  registration. Those helpers reject invalid service/key/options arguments and
+  null options factory results before creating keyed stores or factories. The
+  backends also reject unsupported storage write modes and use deterministic
+  per-query expiration timestamps.
 
 Composition hosts consume these packages indirectly through adapter-owned
 resources or host setup. They should not add `FluxFlow.Composition` node
@@ -793,23 +1169,29 @@ error, or diagnostic patterns.
 Namespace:
 
 ```text
-FluxFlow.Engine.Mapping
+FluxFlow.Mapping
 ```
 
 Main types:
 
 - `IFlowExpressionEngine`
+- `IFlowCompiledExpression<T>`
 - `FlowMapContext`
 - `IFlowMapContextFactory<TInput>`
 - `IFlowPredicate<TInput>`
 - `ExpressionFlowPredicate<TInput>`
 - `DelegateFlowPredicate<TInput>`
 - `IFlowMapper<TInput,TOutput>`
+- `ExpressionFlowMapper<TInput,TOutput>`
 - `DelegateFlowMapper<TInput,TOutput>`
 
-The engine owns only the contracts. It does not ship a concrete expression
-language. Hosts and component packages provide expression engines and context
-factories.
+These contracts live in an engine-free leaf package. The engine and standalone
+component packages consume them, but concrete expression languages, expression
+validation, and context factory registration remain host-owned. `FlowMapContext`
+copies assigned variable dictionaries with ordinal key comparison so each
+per-message expression context is stable after creation. Expression mapper and
+predicate adapters compile during construction and fail fast when a host engine
+returns an invalid null compiled expression.
 
 ## Stability Notes
 

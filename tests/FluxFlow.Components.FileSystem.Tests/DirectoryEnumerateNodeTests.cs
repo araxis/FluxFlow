@@ -176,12 +176,16 @@ public sealed class DirectoryEnumerateNodeTests
 
     [Fact]
     public void DirectoryEnumerate_RejectsInvalidBoundedCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions
             {
                 Directory = ".",
                 BoundedCapacity = 0
             }));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
 
     [Fact]
     public void DirectoryEnumerate_RejectsDisabledEntryTypes()
@@ -198,12 +202,16 @@ public sealed class DirectoryEnumerateNodeTests
 
     [Fact]
     public void DirectoryEnumerate_RejectsInvalidMaxEntries()
-        => Should.Throw<ArgumentOutOfRangeException>(
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
             () => new DirectoryEnumerateNode(new DirectoryEnumerateOptions
             {
                 Directory = ".",
                 MaxEntries = 0
             }));
+
+        exception.Message.ShouldContain("maxEntries");
+    }
 
     private static async Task<List<FlowEvent>> DrainEventsAsync(BufferBlock<FlowEvent> events)
     {

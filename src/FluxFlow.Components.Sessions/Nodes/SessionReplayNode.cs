@@ -34,12 +34,31 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         SessionReplayOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : this(ResolveArguments(options, store), clock)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+    }
+
+    private SessionReplayNode(
+        ResolvedSessionReplayArguments resolved,
+        TimeProvider? clock)
+        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
+    {
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
-        _sessionId = Normalize(options.SessionId)
+        _sessionId = resolved.SessionId;
+    }
+
+    private static ResolvedSessionReplayArguments ResolveArguments(
+        SessionReplayOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        var sessionId = Normalize(options.SessionId)
             ?? throw new ArgumentException("session.replay requires a session id.", nameof(options));
+
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -74,6 +93,8 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
                 nameof(options),
                 "session.replay speed multiplier must be greater than zero.");
         }
+
+        return new ResolvedSessionReplayArguments(options, store, sessionId);
     }
 
     protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -104,6 +125,19 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
             throw missing;
         }
 
+        try
+        {
+            ValidateSession(session);
+        }
+        catch (Exception exception)
+        {
+            ReportReplayError(
+                SessionsErrorCodes.ReplayFailed,
+                $"session.replay failed: {exception.Message}",
+                exception);
+            throw;
+        }
+
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -117,31 +151,40 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         SessionRecord? previous = null;
         try
         {
-            await foreach (var record in _store.ReadMessagesAsync(
-                               new SessionReadRequest
-                               {
-                                   SessionId = _sessionId,
-                                   StartSequence = _options.StartSequence,
-                                   MaxMessages = _options.MaxMessages
-                               },
-                               cancellationToken).WithCancellation(cancellationToken)
+            var records = _store.ReadMessagesAsync(
+                new SessionReadRequest
+                {
+                    SessionId = _sessionId,
+                    StartSequence = _options.StartSequence,
+                    MaxMessages = _options.MaxMessages
+                },
+                cancellationToken);
+            if (records is null)
+            {
+                throw new InvalidOperationException(
+                    "session.replay store returned a null message stream.");
+            }
+
+            await foreach (var record in records.WithCancellation(cancellationToken)
                                .ConfigureAwait(false))
             {
-                await DelayForRecordAsync(previous, record, cancellationToken).ConfigureAwait(false);
-                if (!Emit(FlowMessage.Create(CopyRecord(record))))
+                var copiedRecord = ValidateAndCopyRecord(record);
+                await DelayForRecordAsync(previous, copiedRecord, cancellationToken).ConfigureAwait(false);
+                if (!await EmitAsync(FlowMessage.Create(copiedRecord), cancellationToken)
+                        .ConfigureAwait(false))
                 {
                     break;
                 }
 
                 emitted++;
-                previous = record;
+                previous = copiedRecord;
                 EmitEvent(new FlowEvent
                 {
                     Timestamp = _clock.GetUtcNow(),
                     Name = ReplayEmitted,
                     Level = FlowEventLevel.Information,
                     Message = "session.replay emitted message.",
-                    Attributes = CreateRecordAttributes(record, emitted)
+                    Attributes = CreateRecordAttributes(copiedRecord, emitted)
                 });
             }
         }
@@ -219,13 +262,48 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
         });
     }
 
-    private static SessionRecord CopyRecord(SessionRecord record)
-        => record with
+    private void ValidateSession(SessionMetadata session)
+    {
+        if (string.IsNullOrWhiteSpace(session.SessionId))
+        {
+            throw new InvalidOperationException(
+                "session.replay store returned a session without a session id.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(session.SessionId, _sessionId))
+        {
+            throw new InvalidOperationException(
+                "session.replay store returned a different session.");
+        }
+    }
+
+    private SessionRecord ValidateAndCopyRecord(SessionRecord? record)
+    {
+        if (record is null)
+        {
+            throw new InvalidOperationException(
+                "session.replay store returned a null record.");
+        }
+
+        if (string.IsNullOrWhiteSpace(record.SessionId))
+        {
+            throw new InvalidOperationException(
+                "session.replay store returned a record without a session id.");
+        }
+
+        if (!StringComparer.Ordinal.Equals(record.SessionId, _sessionId))
+        {
+            throw new InvalidOperationException(
+                "session.replay store returned a record for a different session.");
+        }
+
+        return record with
         {
             Attributes = record.Attributes is null
                 ? []
                 : new Dictionary<string, string>(record.Attributes, StringComparer.Ordinal)
         };
+    }
 
     private Dictionary<string, object?> CreateReplayAttributes(SessionMetadata? session = null)
     {
@@ -283,4 +361,9 @@ public sealed class SessionReplayNode : FlowSource<SessionRecord>
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed record ResolvedSessionReplayArguments(
+        SessionReplayOptions Options,
+        ISessionStore Store,
+        string SessionId);
 }

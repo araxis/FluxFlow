@@ -2,7 +2,6 @@ using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 
 namespace FluxFlow.Components.Timers.Composition;
 

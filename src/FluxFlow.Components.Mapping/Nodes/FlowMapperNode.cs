@@ -36,31 +36,26 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNode<TInput, TOutput>
         IFlowExpressionEngine expressionEngine,
         IMappingContextFactory? contextFactory = null,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
-        })
+        : this(ValidateOptions(options), expressionEngine, contextFactory, clock)
+    {
+    }
+
+    private FlowMapperNode(
+        ValidatedOptions options,
+        IFlowExpressionEngine expressionEngine,
+        IMappingContextFactory? contextFactory,
+        TimeProvider? clock)
+        : base(options.FlowNodeOptions)
     {
         ArgumentNullException.ThrowIfNull(expressionEngine);
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "Mapper bounded capacity must be greater than zero.");
-        }
 
-        if (string.IsNullOrWhiteSpace(options.Expression))
-        {
-            throw new ArgumentException("flow.mapper requires an expression.", nameof(options));
-        }
-
-        _options = options;
+        _options = options.MapperOptions;
         _engineName = expressionEngine.Name;
         _contextFactory = contextFactory ?? DefaultMappingContextFactory.Instance;
         _clock = clock ?? TimeProvider.System;
         _nodeContext = new MappingNodeContext
         {
-            Options = options,
+            Options = _options,
             InputType = typeof(TInput),
             OutputType = typeof(TOutput)
         };
@@ -190,5 +185,36 @@ public sealed class FlowMapperNode<TInput, TOutput> : FlowNode<TInput, TOutput>
         }
 
         return string.Join("; ", values);
+    }
+
+    private static ValidatedOptions ValidateOptions(MapperOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Mapper bounded capacity must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Expression))
+        {
+            throw new ArgumentException("flow.mapper requires an expression.", nameof(options));
+        }
+
+        return new ValidatedOptions(options);
+    }
+
+    private sealed class ValidatedOptions(MapperOptions mapperOptions)
+    {
+        public MapperOptions MapperOptions { get; } = mapperOptions;
+
+        public string Expression { get; } = mapperOptions.Expression!;
+
+        public FlowNodeOptions FlowNodeOptions { get; } = new()
+        {
+            InputCapacity = mapperOptions.BoundedCapacity
+        };
     }
 }

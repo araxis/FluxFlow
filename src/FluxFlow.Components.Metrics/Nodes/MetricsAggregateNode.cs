@@ -45,17 +45,29 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     public MetricsAggregateNode(
         MetricsAggregateOptions? options = null,
         TimeProvider? clock = null)
+        : this(ResolveOptions(options), clock, validated: true)
+    {
+    }
+
+    private MetricsAggregateNode(
+        MetricsAggregateOptions options,
+        TimeProvider? clock,
+        bool validated)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? new MetricsAggregateOptions()).BoundedCapacity,
+            InputCapacity = options.BoundedCapacity,
             MaxDegreeOfParallelism = 1
         })
     {
-        // BoundedCapacity flows to the kit's input-buffer capacity, which the base
-        // constructor validates (> 0) before this body runs.
-        _options = options ?? new MetricsAggregateOptions();
+        _options = options;
         _timeProvider = clock ?? TimeProvider.System;
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+    }
+
+    private static MetricsAggregateOptions ResolveOptions(MetricsAggregateOptions? options)
+    {
+        var resolved = options ?? new MetricsAggregateOptions();
+        return resolved;
     }
 
     protected override Task ProcessAsync(FlowMessage<MetricSampleInput> message)

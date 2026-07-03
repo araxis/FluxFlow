@@ -7,7 +7,7 @@ public readonly record struct ResourceName
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Resource name cannot be empty.", nameof(value));
 
-        Value = value;
+        Value = value.Trim();
     }
 
     public string Value { get; }

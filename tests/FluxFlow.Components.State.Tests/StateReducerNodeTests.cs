@@ -207,6 +207,34 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
+    public async Task Reducer_ReportsUnsupportedOperationAsInvalidMessageAndContinues()
+    {
+        await using var node = new StateReducerNode(
+            new StateReducerOptions { Reducer = "count" },
+            new SampleExpressionEngine());
+        var output = Sink(node.Output);
+        var errors = Sink(node.Errors);
+
+        var bad = FlowMessage.Create(new StateReducerInput
+        {
+            Key = "a",
+            Operation = (StateReducerOperation)999
+        });
+        await node.Input.SendAsync(bad);
+        await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        error.Code.ShouldBe(StateErrorCodes.InvalidMessage);
+        error.CorrelationId.ShouldBe(bad.CorrelationId);
+        error.Message.ShouldContain("not supported");
+        result.Payload.Key.ShouldBe("a");
+        result.Payload.Version.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Reducer_RespectsMaxKeyLimit()
     {
         await using var node = new StateReducerNode(
@@ -284,14 +312,47 @@ public sealed class StateReducerNodeTests
     }
 
     [Fact]
-    public void Reducer_RejectsInvalidOptions()
+    public void Reducer_RejectsMissingReducer()
     {
-        var exception = Should.Throw<InvalidOperationException>(
+        var exception = Should.Throw<ArgumentException>(
             () => new StateReducerNode(
                 new StateReducerOptions { Reducer = "", BoundedCapacity = 1 },
                 new SampleExpressionEngine()));
 
         exception.Message.ShouldContain("reducer");
+    }
+
+    [Fact]
+    public void Reducer_RejectsEmptyKeyExpression()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", KeyExpression = " " },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("keyExpression");
+    }
+
+    [Fact]
+    public void Reducer_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", BoundedCapacity = 0 },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("boundedCapacity");
+    }
+
+    [Fact]
+    public void Reducer_RejectsInvalidMaxKeys()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new StateReducerNode(
+                new StateReducerOptions { Reducer = "count", MaxKeys = -1 },
+                new SampleExpressionEngine()));
+
+        exception.Message.ShouldContain("maxKeys");
     }
 
     [Fact]

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Serialization.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Serialization.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Serialization.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.4.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone serialization and encoding nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;serialization;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds Designer resource metadata for serialization clock resources while keeping serialization runtime behavior and host-owned clocks unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -23,7 +23,6 @@
     <ProjectReference Include="..\FluxFlow.Components.Serialization\FluxFlow.Components.Serialization.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

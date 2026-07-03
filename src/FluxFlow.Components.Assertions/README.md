@@ -40,8 +40,8 @@ await node.Input.SendAsync(FlowMessage.Create(new AppMessage(score: 12)));
 ```
 
 `AssertionOptions` validates at construction: a missing `Expression`, an empty
-`InputType`, or a non-positive `BoundedCapacity` throws
-`InvalidOperationException` — configuration mistakes fail fast.
+`InputType`, or a non-positive `BoundedCapacity` fails fast as an argument
+exception.
 
 ## Mapping context
 
@@ -94,8 +94,8 @@ registry
     .RegisterAssertion<HttpResponseOutput>("flow.assert.http-response");
 ```
 
-Composition resolves the expression engine from the keyed `engine` resource.
-Optional keyed `contextFactory` and `clock` resources can provide custom
-expression variables and deterministic result/diagnostic timestamps. The
-configured `InputType` remains diagnostic metadata; CLR port types come from the
-closed generic registration.
+Composition resolves the expression engine from the host-owned keyed `engine`
+resource. Optional host-owned keyed `contextFactory` and `clock` resources can
+provide custom expression variables and deterministic result/diagnostic
+timestamps. The configured `InputType` remains diagnostic metadata; CLR port
+types come from the closed generic registration.

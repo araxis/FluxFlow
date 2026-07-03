@@ -26,6 +26,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
         IMqttTriggerSource triggerSource,
         MqttTriggerOptions? options = null,
         TimeProvider? clock = null)
+        : base(BuildSourceOptions(options))
     {
         _triggerSource = triggerSource ?? throw new ArgumentNullException(nameof(triggerSource));
         _options = options ?? new MqttTriggerOptions();
@@ -138,7 +139,21 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 .WithCancellation(cancellationToken)
                 .ConfigureAwait(false))
             {
-                await ProcessReceivedAsync(context, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await ProcessReceivedAsync(context, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    ReportTriggerError(
+                        MqttErrorCodes.TriggerFailed,
+                        $"MQTT trigger message handling failed: {exception.Message}",
+                        exception);
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -154,13 +169,30 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
     }
 
     private async Task ProcessReceivedAsync(
-        IMqttReceivedContext context,
+        IMqttReceivedContext? context,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(context.Message);
+        if (context is null)
+        {
+            ReportTriggerError(
+                MqttErrorCodes.TriggerFailed,
+                "MQTT trigger received a null message context.",
+                new ArgumentNullException(nameof(context)),
+                FlowEventLevel.Warning);
+            return;
+        }
 
         var message = context.Message;
+        if (message is null)
+        {
+            ReportTriggerError(
+                MqttErrorCodes.TriggerFailed,
+                "MQTT trigger received a null message payload.",
+                new ArgumentNullException(nameof(context.Message)),
+                FlowEventLevel.Warning);
+            return;
+        }
+
         var envelope = FlowMessage.Create(message, ToCorrelationId(message.CorrelationId));
         EmitReceivedEvent(envelope);
 
@@ -199,7 +231,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 return;
             }
 
-            if (!Emit(envelope))
+            if (!await EmitAsync(envelope, cancellationToken).ConfigureAwait(false))
             {
                 tracker.TryRemove(envelope.CorrelationId, out _);
                 var exception = new InvalidOperationException("MQTT trigger output is not accepting messages.");
@@ -222,7 +254,7 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
             return;
         }
 
-        if (!Emit(envelope))
+        if (!await EmitAsync(envelope, cancellationToken).ConfigureAwait(false))
         {
             var exception = new InvalidOperationException("MQTT trigger output is not accepting messages.");
             ReportTriggerError(
@@ -580,6 +612,20 @@ public sealed class MqttTriggerNode : FlowSource<MqttReceivedMessage>
                 "Acknowledging on successful response requires MQTT trigger request/reply mode.",
                 nameof(options));
         }
+    }
+
+    private static FlowSourceOptions BuildSourceOptions(MqttTriggerOptions? options)
+    {
+        options ??= new MqttTriggerOptions();
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.BoundedCapacity,
+                "MQTT trigger bounded capacity must be greater than zero.");
+        }
+
+        return new FlowSourceOptions { OutputCapacity = options.BoundedCapacity };
     }
 
     private static TimeSpan CreateSweepInterval(TimeSpan timeout)

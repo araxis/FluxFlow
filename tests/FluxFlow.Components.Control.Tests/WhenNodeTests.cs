@@ -191,6 +191,41 @@ public sealed class WhenNodeTests
         => Should.Throw<ArgumentNullException>(
             () => new WhenNode<int>(Options("route"), predicate: null!));
 
+    [Fact]
+    public void Constructor_RequiresNonEmptyExpression()
+        => Should.Throw<ArgumentException>(
+            () => new WhenNode<int>(
+                new ControlExpressionOptions { Expression = "  " },
+                new RecordingExpressionEngine()));
+
+    [Fact]
+    public void Constructor_WithCompiledPredicate_DoesNotRequireExpression()
+        => Should.NotThrow(() => new WhenNode<int>(
+            new ControlExpressionOptions(),
+            new DelegateFlowPredicate<int>(_ => true)));
+
+    [Fact]
+    public void Constructor_RequiresNonEmptyInputType()
+        => Should.Throw<ArgumentException>(
+            () => new WhenNode<int>(
+                new ControlExpressionOptions
+                {
+                    Expression = "route",
+                    InputType = " "
+                },
+                new RecordingExpressionEngine()));
+
+    [Fact]
+    public void Constructor_RequiresPositiveBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new WhenNode<int>(
+                new ControlExpressionOptions
+                {
+                    Expression = "route",
+                    BoundedCapacity = 0
+                },
+                new RecordingExpressionEngine()));
+
     private static ControlExpressionOptions Options(
         string expression,
         string? expressionId = null,

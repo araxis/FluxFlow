@@ -52,11 +52,13 @@ five timer composition nodes. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options, ports, and a resource hint for the
-optional `clock` resource. The clock remains a host-owned composition resource
-and is not exposed as an editable node option. Schedule metadata covers
-cron/default UTC composition behavior; this package still does not add time
-zone id conversion.
+The provider describes node options, ports, option grouping/editor hints, and a
+resource picker hint for the optional `clock` resource. The clock remains a
+host-owned composition resource with a clock key-pattern hint and is not exposed
+as an editable node option. Schedule metadata covers cron/default UTC
+composition behavior. It declares `timeZone` as an omitted editable option
+because `TimerScheduleSettings.TimeZone` requires typed configuration and this
+package still does not add time-zone id conversion.
 
 ## Configuration
 
@@ -101,3 +103,6 @@ zone id conversion.
 Timer settings bind to the existing settings records. `timer.schedule` uses the
 existing `TimerScheduleSettings` shape; no additional time zone id conversion is
 added by this adapter.
+Invalid timer settings, such as non-positive intervals, negative delays, or
+non-positive `boundedCapacity`, fail during composition build and surface as
+factory diagnostics when build failures are configured as diagnostics.

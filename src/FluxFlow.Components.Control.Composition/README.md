@@ -73,6 +73,10 @@ For `flow.when`, `Output` is an alias for the node's primary `WhenTrue` stream.
 `ControlExpressionOptions.InputType` remains diagnostic metadata. The actual
 composition port type comes from the closed generic registration selected by the
 host.
+Invalid `ControlExpressionOptions`, such as a missing expression, blank
+`inputType`, or non-positive `boundedCapacity`, fail during composition build
+and surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 ## Design Metadata
 
@@ -83,5 +87,11 @@ views, or generated documentation.
 
 The provider describes editable options, host-owned resources, and ports.
 `engine` is required; `contextFactory` and `clock` are optional. Resource
-metadata is descriptive only, so hosts still own keyed service registration,
-selection, lifetime, and disposal.
+metadata includes host-owned picker hints and key patterns for the `engine`,
+`contextFactory`, and `clock` resources.
+
+The control option metadata includes section, importance, editor, syntax, and
+related-resource hints so hosts can build more useful inspectors without
+hard-coding control-specific UI rules. All option and resource metadata is
+descriptive only, so hosts still own keyed service registration, selection,
+lifetime, rendering, validation UI, and disposal.

@@ -850,18 +850,479 @@ Date: 2026-05-31
   `graphify update . --force`: 8563 nodes, 12734 edges, and 831 communities.
   `graph.html` was skipped because the graph exceeds the local HTML
   visualization limit.
+- Recorded the current composition and Designer progress snapshot. Since the
+  first MQTT composition adapter, optional `.Composition` adapters have been
+  added for the normal standalone component families: HTTP, Mapping, Control,
+  Assertions, Validation, Timers, Sources, Routing, Serialization, Payloads,
+  Observability, Projections, Metrics, Expectations, FileSystem, State,
+  Storage, Sessions, and MQTT. Request/reply remains intentionally skipped as a
+  normal component-family adapter, and Journal remains support-only.
+- Recorded the Designer boundary and metadata state. Designer is now engine
+  neutral, package-owned metadata providers exist across composition packages,
+  shared metadata helpers and validation are in place, and the latest local work
+  added richer option/resource hints first to Mapping and then to Control. The
+  suggested next narrow pass is Assertions metadata hints. See
+  [[155-composition-and-designer-progress]].
+- Refreshed local graph output after the memory snapshot update: 11609 nodes,
+  19587 edges, and 1081 communities. The local HTML graph was skipped because
+  the graph exceeds the visualization size limit.
+- Completed the Assertions Designer metadata hint pass. The Assertions
+  composition provider now includes option section, importance, editor, syntax,
+  and related-resource hints, plus host-owned resource key patterns for
+  `engine`, `contextFactory`, and `clock`. The Assertions composition package is
+  bumped to `1.3.0`; README, changelog, and focused metadata tests were updated.
+  Verification passed for Assertions composition tests (`12`), Designer tests
+  (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout: 11622 nodes, 19610 edges, and 1076 communities. See
+  [[156-assertions-designer-metadata-hints]].
+- Completed the State Designer metadata hint pass. The State composition
+  provider now includes option section, importance, editor, syntax, and
+  related-resource hints for the state reducer node, plus host-owned resource
+  key patterns for `engine` and `clock`. The State composition package is
+  bumped to `1.3.0`; README, changelog, and focused metadata tests were
+  updated. Verification passed for State composition tests (`15`), Designer
+  tests (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout. See [[157-state-designer-metadata-hints]].
+- Completed the Observability Designer metadata hint pass. The Observability
+  composition provider now includes option section, importance, editor, syntax,
+  and related-resource hints for Counter, Logger, and Metrics, plus host-owned
+  resource key patterns for expression engine, context factory, selector, and
+  clock resources. The Observability composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Observability composition tests (`22`), Designer tests (`93`),
+  release tests (`84`), and the controlled solution build with 0 warnings and
+  0 errors after shutting down stale build servers from the timed-out first
+  attempt. Local graph output was refreshed after the memory closeout. See
+  [[158-observability-designer-metadata-hints]].
+- Completed the Validation Designer metadata hint pass. The Validation
+  composition provider now includes option section, importance, editor, and
+  related-resource hints for the JSON schema validator node, plus host-owned
+  resource key patterns for `selector` and `clock`. The Validation composition
+  package is bumped to `1.3.0`; README, changelog, and focused metadata tests
+  were updated. Verification passed for Validation composition tests (`15`),
+  Designer tests (`93`), release tests (`84`), and the controlled solution
+  build with 0 warnings and 0 errors. Local graph output was refreshed after
+  the memory closeout. See
+  [[159-validation-designer-metadata-hints]].
+- Completed the Routing Designer metadata hint pass. The Routing composition
+  provider now includes option section, importance, editor, syntax, and
+  related-resource hints for Switch, Fork, Merge, Window, Correlation, and Join,
+  plus host-owned resource key patterns for selector delegate and clock
+  resources. The Routing composition package is bumped to `1.3.0`; README,
+  changelog, and focused metadata tests were updated. Verification passed for
+  Routing composition tests (`17`), Designer tests (`93`), release tests
+  (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[160-routing-designer-metadata-hints]].
+- Completed the Timers Designer metadata hint pass. The Timers composition
+  provider now includes option section, importance, and editor hints for
+  Interval, Schedule, Delay, Throttle, and Debounce, plus a host-owned resource
+  key pattern for the `clock` resource. The Timers composition package is
+  bumped to `1.5.0`; README, changelog, and focused metadata tests were
+  updated. Verification passed for Timers composition tests (`14`), Designer
+  tests (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors. Local graph output was refreshed after the memory
+  closeout. See [[161-timers-designer-metadata-hints]].
+- Completed the Sources Designer metadata hint pass. The Sources composition
+  provider now includes option section, importance, and editor hints for
+  Generated Source and Sequence Source metadata, plus a host-owned resource key
+  pattern for the `clock` resource. The Sources composition package is bumped
+  to `1.4.0`; README, changelog, and focused metadata tests were updated.
+  Verification passed for Sources composition tests (`22`), Designer tests
+  (`93`), release tests (`84`), and the controlled solution build with 0
+  warnings and 0 errors after a scoped build-server shutdown and rerun. Local
+  graph output was refreshed after the memory closeout. See
+  [[162-sources-designer-metadata-hints]].
+- Completed the Serialization Designer metadata hint pass. The Serialization
+  composition provider now includes option section, importance, and editor
+  hints for the shared JSON/Text/Base64 option surface, plus a host-owned
+  resource key pattern for the `clock` resource. The Serialization composition
+  package is bumped to `1.3.0`; README, changelog, and focused metadata tests
+  were updated. Verification passed for Serialization composition tests (`16`),
+  Designer tests (`93`), release tests (`84`), and the controlled solution
+  build with 0 warnings and 0 errors. Local graph output was refreshed after
+  the memory closeout. See [[163-serialization-designer-metadata-hints]].
+- Completed the Payloads Designer metadata hint pass. The Payloads composition
+  provider now includes option section, importance, and editor hints for
+  `payload.inspect`, plus a host-owned resource key pattern for the `clock`
+  resource. The Payloads composition package is bumped to `1.3.0`; README,
+  changelog, and focused metadata tests were updated. Verification passed for
+  Payloads composition tests (`13`), Designer tests (`93`), release tests
+  (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[164-payloads-designer-metadata-hints]].
+- Completed the Projections Designer metadata hint pass. The Projections
+  composition provider now includes option section, importance, and editor
+  hints for `event.projection`, plus a host-owned resource key pattern for the
+  `clock` resource. The Projections composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Projections composition tests (`11`), Designer tests (`93`),
+  release tests (`84`), and the controlled solution build with 0 warnings and
+  0 errors. Local graph output was refreshed after the memory closeout. See
+  [[165-projections-designer-metadata-hints]].
+- Completed the Metrics Designer metadata hint pass. The Metrics composition
+  provider now includes option section, importance, and editor hints for
+  `metrics.aggregate`, plus a host-owned resource key pattern for the `clock`
+  resource. The Metrics composition package is bumped to `1.3.0`; README,
+  changelog, and focused metadata tests were updated. Verification passed for
+  Metrics composition tests (`13`), Designer tests (`93`), release tests
+  (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[166-metrics-designer-metadata-hints]].
+- Completed the Expectations Designer metadata hint pass. The Expectations
+  composition provider now includes option section, importance, and editor
+  hints for `event.expectation`, plus a host-owned resource key pattern for the
+  `clock` resource. The Expectations composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Expectations composition tests (`15`), Designer tests (`93`),
+  release tests (`84`), and the controlled solution build with 0 warnings and
+  0 errors after a scoped build-server shutdown and rerun. Local graph output
+  was refreshed after the memory closeout. See
+  [[167-expectations-designer-metadata-hints]].
+- Completed the HTTP Designer metadata hint pass. The HTTP composition provider
+  now includes option section, importance, and editor hints for `http.client`,
+  plus host-owned resource key patterns for the required `client` and optional
+  `clock` resources. The HTTP composition package is bumped to `1.3.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for HTTP composition tests (`14`), Designer tests (`93`), release
+  tests (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[168-http-designer-metadata-hints]].
+- Completed the FileSystem Designer metadata hint pass. The FileSystem
+  composition provider now includes option section, importance, and editor hints
+  for `file.read`, `file.write`, `directory.enumerate`, and `file.watch`, plus
+  a host-owned resource key pattern for the optional `clock` resource. The
+  FileSystem composition package is bumped to `1.4.0`; README, changelog, and
+  focused metadata tests were updated. Verification passed for FileSystem
+  composition tests (`27`), Designer tests (`93`), release tests (`84`), and
+  the controlled solution build with 0 warnings and 0 errors after stopping one
+  lingering FluxFlow-owned build process and shutting down build servers. Local
+  graph output was refreshed after the memory closeout. See
+  [[169-filesystem-designer-metadata-hints]].
+- Completed the Storage Designer metadata hint pass. The Storage composition
+  provider now includes option section, importance, and editor hints for
+  `storage.put`, `storage.get`, `storage.query`, and `storage.delete`, plus
+  host-owned resource key patterns for the required `store` and optional
+  `clock` resources. The Storage composition package is bumped to `1.4.0`;
+  README, changelog, and focused metadata tests were updated. Verification
+  passed for Storage composition tests (`20`), Designer tests (`93`), release
+  tests (`84`), and the controlled solution build with 0 warnings and 0 errors.
+  Local graph output was refreshed after the memory closeout. See
+  [[170-storage-designer-metadata-hints]].
+- Completed the Sessions Designer metadata hint pass. The Sessions composition
+  provider now includes option section, importance, and editor hints for
+  `session.recorder`, `session.replay`, and `session.query`, plus host-owned
+  resource key patterns for the required `store` and optional `clock`
+  resources. The Sessions composition package is bumped to `1.5.0`; README,
+  changelog, and focused metadata tests were updated. Verification passed for
+  Sessions composition tests (`25`), Designer tests (`93`), release tests
+  (`84`), and the controlled solution build with 0 warnings and 0 errors after
+  build-server shutdown. Local graph output was refreshed after the memory
+  closeout. See [[171-sessions-designer-metadata-hints]].
+- Completed the MQTT Designer metadata hint pass. The MQTT composition provider
+  now includes option section, importance, and editor hints for `mqtt.publish`
+  and `mqtt.trigger`, plus host-owned resource key patterns for the required
+  `publisher`, required `triggerSource`, and optional `clock` resources. The
+  MQTT composition package is bumped to `1.4.0`; README, changelog, and focused
+  metadata tests were updated. Verification passed for MQTT composition tests
+  (`10`), Designer tests (`93`), release tests (`84`), and the controlled
+  solution build with 0 warnings and 0 errors. Local graph output was refreshed
+  after the memory closeout. See [[172-mqtt-designer-metadata-hints]].
+- Closed the Designer metadata hint convention pass. Release convention tests
+  now require option section/importance hints, validate current Designer
+  option hint values, require same-node related resources, and require
+  host-owned resource key patterns containing `{name}`. No runtime behavior,
+  provider metadata content, public APIs, package versions, package docs, or
+  changelog entries changed. Verification passed for release tests (`85`),
+  Designer tests (`93`), and the controlled solution build with 0 warnings and
+  0 errors. Local graph output was refreshed after the memory closeout. See
+  [[173-designer-metadata-hint-conventions]].
+- Ran the Designer metadata hint release-readiness pass. Release tests
+  (`85`), Designer tests (`93`), controlled Debug build, controlled Release
+  build, and all impacted package preflights passed. The Designer package
+  `2.16.0` fast dry-run passed from a temp package source. The first
+  composition dry-run (`components-mapping-composition` `1.3.0`) packed but
+  failed consumer restore because current dependency packages such as
+  `FluxFlow.Composition` `1.0.9`, `FluxFlow.Composition.Hosting` `1.0.5`,
+  `FluxFlow.Mapping` `1.0.2`, and `FluxFlow.Components.Mapping` `3.0.1` are
+  not present in the isolated package source or public feed. No package source
+  changes were made; a separate dependency-source readiness pass is needed. See
+  [[174-designer-metadata-hint-release-readiness]].
+- Ran the Designer metadata hint dependency-source readiness pass. A fresh temp
+  source outside the repo was seeded with all 55 packages from
+  `eng/packages.json` after a controlled Release build. Release tests (`85`),
+  Designer tests (`93`), controlled Debug and Release builds, all 20 impacted
+  package preflights, and all 20 impacted fast dry-runs passed with the seeded
+  source plus the public feed for external dependencies. No package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[175-designer-metadata-hint-dependency-source-readiness]].
+- Recorded the Designer metadata hint publication-sequencing handoff. The note
+  lists the dependency-aware order for `components-designer`, current shared and
+  runtime dependency packages, and the metadata hint composition packages.
+  Release preflight and tag prepare-only checks passed for all 44 aliases in
+  the closure; local and configured-remote tag checks found 42 absent tags and
+  2 already-present runtime dependency tags. No tags, pushes, package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[176-designer-metadata-hint-publication-sequencing]].
+- Ran the final no-publish release rehearsal for the Designer metadata hint
+  train. A fresh temp package source was seeded with all 55 packages after a
+  controlled Release build. All 44 dependency-ordered aliases passed release
+  preflight, fast package dry-run against the seeded source, and tag
+  prepare-only checks. Tag checks again found 42 absent tags and 2
+  already-present runtime dependency tags. No tags, pushes, package source,
+  release script, changelog, README, version, or public API baseline changes
+  were made. See [[177-designer-metadata-hint-final-release-rehearsal]].
+- Executed the local tag step for the Designer metadata hint train. The
+  worktree was clean at release target
+  `d7da08e5bad380e243cdd49988808285292d66de`; the controlled Release build
+  passed; a fresh temp source was seeded with all 55 packages; and 42 local
+  annotated release tags were created at the target commit. The two
+  already-present runtime dependency tags were skipped. No tags were pushed,
+  no packages were published, and no package source, release script, changelog,
+  README, version, or public API baseline files changed. See
+  [[178-designer-metadata-hint-local-tag-execution]].
+- Pushed the Designer metadata hint release tags. Pre-push verification found
+  the 42 local tags on release target
+  `d7da08e5bad380e243cdd49988808285292d66de`, absent from the configured
+  remote, with the 2 skipped runtime dependency tags already present remotely.
+  All 42 tags were pushed in dependency order and their remote peeled targets
+  now resolve to the release target. No packages were published, and no
+  package source, release script, changelog, README, version, or public API
+  baseline files changed. See [[179-designer-metadata-hint-tag-push]].
+- Recovered the Designer metadata hint release workflows. The release-test
+  project-reference path helper now normalizes both `/` and `\`, fixing the
+  Linux-only release-test failure; local release tests passed (`86`), and the
+  controlled solution build passed after a scoped build-server shutdown. All
+  42 dependency-ordered tags were verified unpublished, retargeted from
+  `d7da08e5bad380e243cdd49988808285292d66de` to
+  `31800f5b3ecb0a5985e2eb7d32be6dd2d6221f77`, pushed one at a time, and
+  watched to successful release workflow completion. Each release has package
+  assets and each package version is visible on the public package feed. Three
+  workflow runs needed one rerun after transient full-suite test failures, then
+  passed before the train continued. See
+  [[180-designer-metadata-hint-release-workflow-recovery]].
+- Published the current concrete MQTT adapter packages. Pre-release checks
+  confirmed both release tags and package-feed versions were absent. Focused
+  MQTTnet tests (`33`), Pulse MQTT tests (`22`), core MQTT tests (`58`),
+  release tests (`86`), the controlled solution build, package preflights, and
+  fast dry-runs passed. Tags `components-mqtt-mqttnet-v1.1.7` and
+  `components-mqtt-pulsemqtt-v2.0.7` were created at
+  `9108abdf4c1aad1216163dd9ae36c4b51f9055df`, pushed to the configured
+  remote, watched through successful first-attempt release workflows, and
+  verified with release assets plus public package-feed restores. See
+  [[181-mqtt-adapter-package-release]].
+- Consumer-validated the published package set from the Designer metadata hint
+  release train and current MQTT adapter releases. Release tests (`86`) passed;
+  the controlled solution build passed after a scoped build-server shutdown
+  cleared stale local output locks; all 44 package-feed checks passed; and a
+  temporary `net8.0` consumer project with all 44 direct package references
+  restored from the public package feed and built with 0 warnings and 0 errors.
+  See [[182-public-package-consumer-validation]].
+- Completed a documentation-only package README clarity pass. Inventory found
+  all 55 manifest package READMEs present with matching package-ID headings.
+  Runtime, composition, adapter, and support-package boundary wording was
+  tightened where stale or vague, and the component coverage matrix now records
+  the pass as complete. Release tests (`86`), the controlled solution build,
+  `git diff --check`, and graph refresh passed. No source APIs, runtime
+  behavior, package versions, release notes, changelog entries, public API
+  baselines, tags, publishing workflow, or release scripts changed. See
+  [[183-package-readme-clarity-pass]].
+- Added a package binary compatibility readiness helper. The new release script
+  resolves package aliases and versions through the existing manifest/resolver,
+  restores the baseline package into the NuGet global package cache outside the
+  repo, and runs `dotnet pack --no-build` with SDK package validation enabled.
+  Release tests passed at `91`; the controlled Release build passed; manifest
+  enumeration found 55 packages; and `components-designer` `2.16.0` passed
+  binary compatibility validation against its published same-version baseline.
+  The all-package loop stopped at the first missing published same-version
+  baseline: `FluxFlow.Components.Configuration` `1.5.0` is not on the public
+  feed, with NuGet reporting nearest version `1.0.0`. See
+  [[184-package-binary-compat-readiness]].
+- Started the binary compatibility baseline feed-alignment release pass. The
+  nine missing current-version tags, releases, and feed versions were absent,
+  local release tests passed (`91`), and the controlled Release and Debug
+  builds passed. `components-http-aspnetcore` `1.0.4` preflight and fast
+  dry-run passed, and tag `components-http-aspnetcore-v1.0.4` was pushed at
+  `2d24d5b076550281e070294c82cce4fedd6dece9`, but tag workflow run
+  `28611193314` failed in the Test step before pack/publish. The Linux runner
+  hit a binary-compat release-test fixture CRLF shebang error
+  (`/usr/bin/env: 'bash\r': No such file or directory`). No GitHub release or
+  package-feed version exists for `FluxFlow.Components.Http.AspNetCore`
+  `1.0.4`, the remaining eight package tags were not pushed, and source/tooling
+  edits were deferred to a separate recovery pass. See
+  [[185-package-binary-compat-baseline-feed-alignment-blocker]].
+- Recovered the binary compatibility baseline feed-alignment release pass. The
+  release-test fixture now writes the fake Unix `dotnet` script with LF line
+  endings and guards the generated shebang script against carriage-return
+  bytes. Release tests passed (`92`), and the controlled Release and Debug
+  builds passed with 0 warnings and 0 errors. The failed
+  `components-http-aspnetcore-v1.0.4` tag was retargeted to
+  `a62c96888f92bde4dbe303bb15eac4c1632e8da0`; the remaining eight baseline
+  tags were created at the same fixed commit. All nine release workflows
+  completed successfully, each release has two assets, every package-feed check
+  passed, and all 55 manifest packages passed
+  `eng/package-binary-compat-preflight.ps1` against their published
+  same-version baselines. See
+  [[186-package-binary-compat-feed-alignment-recovery]].
+- Consumer-validated the full current manifest package set from the public
+  package feed. Release tests passed (`92`), the controlled Debug solution build
+  passed with 0 warnings and 0 errors, all 55 package-feed checks passed, and a
+  temporary `net8.0` consumer project outside the repository with all 55 direct
+  package references restored with `--no-cache` and built in Release
+  configuration with 0 warnings and 0 errors. No package source, versions,
+  release notes, README files, changelog entries, public API baselines, release
+  scripts, tags, or publishing state changed. See
+  [[187-full-public-package-consumer-validation]].
+- Added neutral Designer resource picker hint contracts.
+  `ComponentResourcePickerHint` and `ComponentResourcePickerHints.Create(...)`
+  let hosts read host-owned resource picker metadata from one metadata item or a
+  validated catalog, including key patterns, related options, required flags,
+  value type/display fields, and parsed conditional option names. The Designer
+  package moves to `2.17.0`; renderer UI, resource catalogs, keyed resolution,
+  resource lifetimes, component metadata content, runtime behavior, and hot
+  reload remain out of scope. Designer tests (`97`), release tests (`92`),
+  controlled Release and Debug builds, binary compatibility preflight against
+  `2.16.0`, package release preflight, and fast release dry-run passed. See
+  [[188-designer-resource-picker-hint-contracts]].
+- Published `FluxFlow.Components.Designer` `2.17.0`. Pre-release checks
+  confirmed the worktree was clean at
+  `738f2e1cf38aaff083e6534004a7baa342020904`, the tag
+  `components-designer-v2.17.0` was absent locally and on `origin`, and the
+  public feed did not yet contain `2.17.0`. Designer tests (`97`), release
+  tests (`92`), controlled Release and Debug builds, binary compatibility
+  preflight against `2.16.0`, release preflight, and fast dry-run passed. The
+  tag was pushed, workflow run `28622249640` completed successfully, the GitHub
+  release has `.nupkg` and `.snupkg` assets, local and remote peeled tags point
+  at `738f2e1cf38aaff083e6534004a7baa342020904`, and public feed verification
+  passed. See [[189-designer-resource-picker-hint-package-release]].
+- Consumer-validated the full current manifest package set after publishing
+  Designer `2.17.0`. Release tests passed (`92`), the controlled Debug solution
+  build passed with 0 warnings and 0 errors, all 55 package-feed checks passed
+  against the public package feed, and a temporary `net8.0` consumer project
+  outside the repository with all 55 direct package references restored with
+  `--no-cache` and built in Release configuration with 0 warnings and 0 errors.
+  No package source, versions, release notes, README files, changelog entries,
+  public API baselines, release scripts, tags, or publishing state changed. See
+  [[190-full-public-package-consumer-validation-after-designer-2-17]].
+- Planned the Designer host layer as documentation-only follow-up work. Added
+  `docs/18-designer-host-layer.md` to define how a future host can consume
+  `ComponentDesignMetadataCatalog`, option hints, resource metadata attributes,
+  and `ComponentResourcePickerHints.Create(...)` for palette, inspector,
+  resource picker, validation, persistence, and runtime-mapping concerns. No
+  source APIs, renderer behavior, resource ownership, hot reload, runtime
+  behavior, package versions, tags, or publishing state changed. Release tests
+  passed (`92`), and the controlled Debug solution build passed after
+  `dotnet build-server shutdown` cleared generated assembly file locks.
+  `graphify update . --force` refreshed `graphify-out/` with 12447 nodes,
+  22705 edges, and 976 communities; `graph.html` was skipped because the graph
+  exceeds the local HTML visualization limit. See
+  [[191-designer-host-layer-planning]].
+- 2026-07-03: Completed the composition dependency-hygiene pass. Keyed
+  resource resolution moved onto `CompositionNodeFactoryContext` instance
+  methods in `FluxFlow.Composition` (`1.1.0`), the
+  `FluxFlow.Composition.Hosting` context extensions became obsolete delegating
+  wrappers (`1.1.0`), all 19 `.Composition` adapters dropped their
+  `FluxFlow.Composition.Hosting` reference, and `FluxFlow.Nodes` (`1.2.0`)
+  gained `FlowNodeOptions.Clock` for deterministic safety-net error
+  timestamps. The public API baseline was re-accepted through the documented
+  flow; changelog and package release notes were updated. Local `main` was
+  fast-forwarded to `88027c7`; pushing `origin/main` remains an operator step.
+  Verification: controlled Release build with 0 warnings/0 errors, release
+  tests `92` passed, and the full no-build Release suite `1707` passed across
+  59 assemblies. See [[192-composition-resource-helper-relocation]].
+- 2026-07-03: Implemented Designer host layer phases 1-2 as the headless
+  host-model layer `samples/FluxFlow.DesignerHost` with
+  `tests/FluxFlow.DesignerHost.Tests` (20 tests): palette, inspector, option
+  editor, and resource picker view models projected from
+  `ComponentDesignMetadataCatalog` by a single explicit `DesignerHostCatalog`
+  adapter, with conservative editor fallbacks and host-owned-only resource
+  prompts. Both projects joined `FluxFlow.sln`; the sample is listed in
+  `docs/README.md`, and the coverage matrix candidate note was updated. No
+  package source, versions, or publishing state changed. See
+  [[193-designer-host-model-layer]].
+- 2026-07-03: Implemented Designer host layer phase 4 in
+  `samples/FluxFlow.DesignerHost`: `GraphModel` (nodes, raw JSON option
+  values, resource references, links with optional cross-workflow segments,
+  host-only layout), `GraphDefinitionMapper` with lossless JSON-verified
+  round-trips to `CompositionDefinition`, and `ValidationMessageMapper` for
+  metadata errors plus composition diagnostics. Host tests now `29` passed.
+  Renderer UI is the only remaining Designer host pass. See
+  [[194-designer-host-persistence-mapping]].
+- 2026-07-03: Added a shared "Fanout" NuGet package icon
+  (`assets/icon.svg`/`assets/icon.png`) wired repo-wide through
+  `Directory.Build.targets`, minor-bumped the 19
+  `FluxFlow.Components.*.Composition` adapters for the
+  `FluxFlow.Composition.Hosting` dependency removal plus the icon, and
+  published the full 22-package release set (`FluxFlow.Nodes` `1.2.0`,
+  `FluxFlow.Composition` `1.1.0`, `FluxFlow.Composition.Hosting` `1.1.0`, and
+  the 19 adapters). The `main` branch push stayed permission-blocked but
+  `work/designer-host-model` pushed successfully, unblocking release tags.
+  First-pass downstream workflows hit the known nuget.org indexing-lag flake
+  (`NU1102` at the pre-publish smoke gate, nothing partially published);
+  re-running after each dependency indexed brought all 22 packages to
+  `success`. Verified live: all 22 on the flat-container index, the embedded
+  icon endpoint returns `200`, and a fresh temporary consumer project
+  referencing all 22 packages restored and built cleanly. See
+  [[195-nuget-icon-and-hygiene-release-prep]].
+- 2026-07-03: Extended the shared icon to the remaining 33 manifest packages
+  (patch-only: Designer `2.17.1`, all core non-.Composition component
+  packages, `Mapping` `1.0.3`, `Engine` `2.0.2`, and the two MQTT adapters) so
+  all 55 current packages carry it. Released in 3 dependency-derived waves
+  (17/14/2). Updated one release-notes fixture test that hardcoded content
+  tied to `Configuration`'s previous version. Hit a second pre-existing flaky
+  test (`Source_EmitAsync_WaitsWhenBoundedOutputIsFull` in
+  `FluxFlow.Nodes.Tests`) on 4 of the first 31 release runs; confirmed
+  unrelated to any session change (2/5 local isolated reruns failed), got user
+  approval to auto-retry that exact signature, and all affected releases
+  passed on retry. Verified: all 55 packages independently confirmed on the
+  nuget.org flat-container index, icon endpoint returns `200`, and a fresh
+  temporary consumer referencing all 55 packages restored and built cleanly.
+  See [[196-full-icon-rollout-completion]].
+- 2026-07-03: Fixed the second flaky test found during the icon release wave.
+  `FlowMultiOutputAndSourceTests.Source_EmitAsync_WaitsWhenBoundedOutputIsFull`
+  asserted an un-observable BroadcastBlock internal-scheduling race; diagnosed
+  the latest-wins/coalescing behavior empirically (two wrong fix attempts
+  failed 28/30 and 40/40 before the correct diagnosis), then rewrote it as
+  `Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes` verifying
+  the design's real contract (ordered delivery, final value always arrives,
+  source completes). Passes 60/60 in isolation; full `FluxFlow.Nodes.Tests`
+  suite `36` passed. Test-only change; no `FluxFlow.Nodes` source or package
+  version changed. See [[197-bounded-source-flaky-test-fix]].
 
 ## Remaining
 
-- 2.0 GA line is fully published. (The `1.0.0` component release track is also
-  complete.)
-- Standalone-node line is merged, tagged, and published. `FluxFlow.Composition`
-  now provides the default standalone composition path. Next architecture items
-  are hot reload semantics for composition definitions and optional adapter
-  packages where a host needs richer per-adapter node factory registration.
+- The Designer metadata hint release train is published, indexed, and
+  consumer-validated. Designer now also has neutral resource picker hint
+  contracts published in `FluxFlow.Components.Designer` `2.17.0`; the Designer
+  host layer is planned in `docs/18-designer-host-layer.md`, and any renderer
+  UI prototype or package-family work should be a separate bounded pass.
+- The current concrete MQTT adapter package updates are published, indexed, and
+  consumer-validated. Future MQTT adapter work should be planned as a separate
+  bounded pass.
+- The package README clarity pass is complete. Future documentation work should
+  be scoped to a concrete stale section, package family, or user-facing
+  publication requirement.
+- Package binary compatibility preflight tooling exists, the missing current
+  baseline package versions are published, and same-version binary
+  compatibility preflight passed for all 55 manifest packages. Future package
+  release readiness should include the helper after a controlled Release build.
+- All 55 current manifest packages are public-feed visible and validated by a
+  combined temporary consumer restore/build after the Designer `2.17.0`
+  publication. Future consumer validation should be rerun after package version
+  changes or publication batches.
+- Composition adapter packages are bumped for the
+  `FluxFlow.Composition.Hosting` dependency removal (release prep done in
+  `195`); the bumped versions are validated by dry-run but not yet published.
+  Publishing the release set (3 core + 19 adapters) via
+  `eng/package-release-tag.ps1 -Push` in dependency-wave order is the pending
+  operator step, blocked on syncing `origin/main`.
+- Keep future work bounded: one package family, one convention pass, or one
+  release-readiness pass per local commit, with focused tests, release
+  convention tests, and the controlled solution build.
 - Keep local graph output updated after repo changes and keep it out of git.
   See [[140-local-graph-maintenance]].
-- MQTT connection pilot is merged and published. Review the final result before
-  broadening the pattern. The shared extraction so far is only
-  correlation/timeout tracking, not a generic transport acknowledgement policy.
-- Publish the MQTTnet and Pulse MQTT adapter `1.1.0` package updates together.
+- Hot reload semantics, renderer behavior, resource catalog UI, runtime
+  lifecycle hooks, and request/reply redesign remain deferred until separately
+  planned.

@@ -60,7 +60,7 @@ public sealed class InMemoryJournalStore : IJournalStore
         ArgumentNullException.ThrowIfNull(query);
         cancellationToken.ThrowIfCancellationRequested();
 
-        ValidateQuery(query);
+        JournalQueryMatcher.Validate(query);
         List<JournalEntry> snapshot;
         lock (gate)
         {
@@ -182,7 +182,7 @@ public sealed class InMemoryJournalStore : IJournalStore
     }
 
     private static string? NormalizeOptional(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value;
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static IReadOnlyDictionary<string, string> NormalizeAttributes(
         IReadOnlyDictionary<string, string>? attributes)
@@ -200,23 +200,20 @@ public sealed class InMemoryJournalStore : IJournalStore
                 throw new ArgumentException("Journal record attribute keys are required.");
             }
 
-            normalized[key] = value;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException("Journal record attribute values are required.");
+            }
+
+            var normalizedKey = key.Trim();
+            if (!normalized.TryAdd(normalizedKey, value.Trim()))
+            {
+                throw new ArgumentException(
+                    $"Journal record attribute '{normalizedKey}' is declared more than once.");
+            }
         }
 
         return normalized;
-    }
-
-    private static void ValidateQuery(JournalQuery query)
-    {
-        if (query.Offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(query), "Journal query offset cannot be negative.");
-        }
-
-        if (query.Limit is <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(query), "Journal query limit must be positive.");
-        }
     }
 
     private static DateTimeOffset? ValidateRetention(JournalRetentionOptions options)

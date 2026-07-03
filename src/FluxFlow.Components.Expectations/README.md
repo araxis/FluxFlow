@@ -36,6 +36,10 @@ satisfied when none arrives. The node resolves on the first of three triggers:
 - a configured timeout (armed over the injected `TimeProvider`),
 - input completion via `CompleteWithResultAsync()`.
 
+`EventExpectationOptions` validates at construction: non-positive
+`TimeoutMilliseconds`, negative `MaxObservedEvents`, negative `MaxPreviewChars`,
+or non-positive `BoundedCapacity` fails fast as an argument exception.
+
 ## Ports
 
 | Port | Block | Purpose |
@@ -110,7 +114,9 @@ services
 ```
 
 The composition adapter binds `EventExpectationOptions` from node configuration
-and can resolve an optional keyed `TimeProvider` resource named `clock`.
+and can resolve optional host-owned keyed `TimeProvider` and evaluator
+resources. Rule evaluation, fail-fast behavior, and result inclusion remain
+normal node behavior controlled by `EventExpectationOptions`.
 
 The optional composition package also exposes
 `ExpectationsComponentDesignMetadataProvider` for neutral Designer metadata over

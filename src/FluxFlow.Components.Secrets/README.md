@@ -12,17 +12,32 @@ is controlled, how values are refreshed, and how ownership is handled.
 
 - `SecretReference`: a name plus optional version, kind, and attributes.
 - `SecretDescriptor`: non-sensitive metadata for a declared secret.
+- `SecretVersion`, `SecretKind`, and `SecretMetadataText`: small value types
+  for code-authored descriptor version, kind, display-name, and summary values.
 - `SecretValue`: resolved value wrapper with redacted string formatting.
 - `ISecretResolver`: runtime abstraction for resolving a reference.
+- `ISecretDescriptorProvider`: optional capability for resolvers that can list
+  non-sensitive secret descriptors.
 - `SecretResolveResult`: resolved value or structured diagnostic.
 - `SecretOptionReference`: an option path plus optional secret reference.
 - `SecretOptionResolver`: helper for resolving required or optional secret
   option references through a host-provided resolver.
+- `InMemorySecretResolverBuilder`: a fluent helper for declaring local
+  `SecretRecord` values and creating an `InMemorySecretResolver`.
+- `SecretServiceCollectionExtensions`: keyed DI helpers for registering
+  host-owned `ISecretResolver` and `ISecretDescriptorProvider` services.
 - `SecretOptionResolution`: option-level resolved value, missing state, or
   structured diagnostic.
 - `SecretDiagnostic`: stable diagnostics for missing, duplicate, ambiguous,
   kind mismatch, denied, failed, and invalid secret references.
 - `SecretRedactor`: helper for redacting text and sensitive attribute values.
+
+`SecretResolveResult` factory helpers reject null references, descriptors, values,
+match collections, and blank diagnostic messages at the public boundary so
+invalid resolution outcomes fail with clear argument names.
+`SecretOptionResolution` factory helpers reject null option references,
+resolution results, and diagnostics at the same boundary so option-level
+outcomes fail with clear argument names.
 
 ## Example
 
@@ -52,6 +67,61 @@ var result = await resolver.ResolveAsync(new SecretReference
 Console.WriteLine(result.Resolved);
 Console.WriteLine(result.Value);
 ```
+
+Resolvers that can safely list declared non-sensitive descriptors can implement
+`ISecretDescriptorProvider`:
+
+```csharp
+if (resolver is ISecretDescriptorProvider descriptorProvider)
+{
+    foreach (var descriptor in descriptorProvider.GetDescriptors())
+        Console.WriteLine(descriptor.Name);
+}
+```
+
+Fluent in-memory resolver construction is available for local hosts and tests:
+
+```csharp
+var resolver = new InMemorySecretResolverBuilder()
+    .Add(
+        "primary-token",
+        "value-from-host",
+        kind: "profile",
+        displayName: "Primary Token")
+    .BuildResolver();
+```
+
+Code-authored in-memory records can use value types at the builder boundary
+while the underlying DTOs remain configuration-friendly:
+
+```csharp
+var resolver = new InMemorySecretResolverBuilder()
+    .Add(
+        new SecretName("primary-token"),
+        "value-from-host",
+        version: new SecretVersion("v1"),
+        kind: new SecretKind("profile"),
+        displayName: new SecretMetadataText("Primary Token"),
+        summary: new SecretMetadataText("Runtime credential."))
+    .BuildResolver();
+```
+
+Hosts that use keyed service registration can register resolvers and descriptor
+providers explicitly:
+
+```csharp
+services
+    .AddFluxFlowSecretResolver("secrets", resolver)
+    .AddFluxFlowSecretDescriptorProvider("declared-secrets", descriptorProvider);
+```
+
+Keyed DI helper names are trimmed before registration, matching the normalization
+used by `SecretName` and configuration-bound secret references.
+
+Resolver registration does not automatically register a descriptor provider
+because descriptor enumeration is optional. Register
+`ISecretDescriptorProvider` separately when a resolver can safely expose
+non-sensitive declarations.
 
 ## Component Options
 
@@ -93,6 +163,32 @@ Use `SecretDiagnostics` to:
 - find duplicate declarations
 - find references that cannot be resolved
 
+Metadata and attribute maps are validated as part of records, references, and
+option references; null maps are reported as structured invalid-secret
+diagnostics.
+Null record entries, null reference entries, and null option entries inside
+batch helpers are reported as structured invalid-secret diagnostics instead of
+surfacing accidental null-reference failures.
+`SecretDiagnostic` copies assigned metadata, treats null diagnostic metadata as
+empty, and formats without exposing metadata values.
+
+`SecretName`, secret `Version`, `Kind`, `DisplayName`, `Summary`, and secret
+option paths trim surrounding whitespace when assigned. `SecretVersion`,
+`SecretKind`, and `SecretMetadataText` provide the same trimming for
+code-authored in-memory records and reject empty values at the builder
+boundary. The descriptor/reference DTOs still keep their string-shaped fields
+so configuration-bound invalid text can be reported as structured diagnostics
+instead of throwing during binding.
+
+`SecretRedactor.RedactValues(...)` copies the input map and normalizes explicit
+protected keys before matching them, so caller-owned maps and padded protected
+key configuration cannot change redaction results after the call.
+
+Valid metadata, attribute, and option metadata maps trim surrounding whitespace
+from keys and values when assigned. Maps with null values, blank keys or values,
+or duplicate keys after trimming are preserved so `SecretDiagnostics` can report
+structured invalid-secret diagnostics.
+
 Secret declarations are unique by name plus optional version. When multiple
 versions exist, callers should provide `Version` or another narrowing field
 such as `Kind`.
@@ -102,6 +198,13 @@ such as `Kind`.
 This package does not own concrete secret storage. It only defines neutral
 contracts and helper logic. Hosts own persistence, access control, refresh,
 rotation, auditing, and disposal.
+`ISecretDescriptorProvider` is intentionally separate from `ISecretResolver` so
+resolvers can support runtime resolution without exposing descriptor
+enumeration.
+`InMemorySecretResolverBuilder` only creates in-memory records and resolver
+instances; it is not a storage, refresh, or access-control model.
+Keyed DI helpers only register already host-owned services. They do not create
+stores, load values, rotate credentials, audit access, or own disposal policy.
 
 ## Composition
 

@@ -7,6 +7,2971 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.17.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.FileSystem 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Http 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Journal 2.3.6
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Metrics 3.0.4
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Payloads 3.0.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Projections 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.RequestReply 1.1.6
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Resources 1.6.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Secrets 1.6.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Serialization 3.0.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Sessions 3.3.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Sources 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage 3.0.10
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Timers 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Validation 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Mapping 1.0.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Assertions 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Configuration 1.5.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Control 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Expectations 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Expressions 2.1.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mapping 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt 4.1.4
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Observability 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Routing 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.State 3.0.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Engine 2.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.8
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.8
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Mapping.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Control.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Assertions.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Sources.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Routing.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Validation.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.FileSystem.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Observability.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Timers.Composition 1.6.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Payloads.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Http.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Serialization.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Metrics.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Projections.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Expectations.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Sessions.Composition 1.6.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.State.Composition 1.4.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Components.Storage.Composition 1.5.0
+
+Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.
+
+- Resolves host-owned keyed resources through the FluxFlow.Composition factory
+  context, so this package no longer depends on FluxFlow.Composition.Hosting.
+- Adds the shared FluxFlow package icon.
+- Composition runtime and Designer metadata behavior are unchanged.
+
+## FluxFlow.Composition 1.1.0
+
+Moves the keyed-resource helpers onto the factory context.
+
+- Adds `GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+  `GetResource<TResource>` as `CompositionNodeFactoryContext` instance methods.
+- Adds a `Microsoft.Extensions.DependencyInjection.Abstractions` reference for
+  keyed service resolution.
+- Composition adapters no longer need a `FluxFlow.Composition.Hosting`
+  reference to resolve host-owned keyed resources.
+- Adds the shared FluxFlow package icon.
+
+## FluxFlow.Composition.Hosting 1.1.0
+
+Deprecates the keyed-resource context extensions.
+
+- Marks `CompositionNodeFactoryContextResourceExtensions` obsolete; the
+  implementations now live as `CompositionNodeFactoryContext` instance methods
+  in `FluxFlow.Composition`.
+- The extensions delegate to the instance methods, so existing callers keep
+  the same behavior.
+- Adds the shared FluxFlow package icon.
+
+## FluxFlow.Nodes 1.2.0
+
+Adds an optional node clock for deterministic error timestamps.
+
+- Adds `FlowNodeOptions.Clock` (`TimeProvider`, defaults to
+  `TimeProvider.System`).
+- `FlowNode` stamps its safety-net error (`ProcessAsync` throw) with the
+  configured clock instead of `DateTimeOffset.UtcNow`.
+- Adds the shared FluxFlow package icon.
+
+## FluxFlow.Components.Designer 2.17.0
+
+Adds neutral resource picker hint contracts for host Designer integrations.
+
+- Adds `ComponentResourcePickerHint` and `ComponentResourcePickerHints` so hosts
+  can read host-owned resource picker metadata from validated component design
+  metadata.
+- Parses conditional resource option hints into typed option names.
+- Keeps rendering, resource catalogs, keyed resource resolution, and resource
+  lifetimes host-owned.
+
+## FluxFlow.Components.Mqtt.Composition 1.4.0
+
+Adds richer Designer hints for the MQTT metadata provider.
+
+- Adds option section, importance, and editor hints for `mqtt.publish` and
+  `mqtt.trigger` options.
+- Adds host-owned resource key patterns for the `publisher`, `triggerSource`,
+  and `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Sessions.Composition 1.5.0
+
+Adds richer Designer hints for the Sessions metadata provider.
+
+- Adds option section, importance, and editor hints for `session.recorder`,
+  `session.replay`, and `session.query` options.
+- Adds host-owned resource key patterns for the `store` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Storage.Composition 1.4.0
+
+Adds richer Designer hints for the Storage metadata provider.
+
+- Adds option section, importance, and editor hints for `storage.put`,
+  `storage.get`, `storage.query`, and `storage.delete` options.
+- Adds host-owned resource key patterns for the `store` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.FileSystem.Composition 1.4.0
+
+Adds richer Designer hints for the FileSystem metadata provider.
+
+- Adds option section, importance, and editor hints for `file.read`,
+  `file.write`, `directory.enumerate`, and `file.watch` options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Http.Composition 1.3.0
+
+Adds richer Designer hints for the HTTP client metadata provider.
+
+- Adds option section, importance, and editor hints for `http.client` options.
+- Adds host-owned resource key patterns for the `client` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Expectations.Composition 1.3.0
+
+Adds richer Designer hints for the event expectation metadata provider.
+
+- Adds option section, importance, and editor hints for `event.expectation`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Metrics.Composition 1.3.0
+
+Adds richer Designer hints for the metrics aggregate metadata provider.
+
+- Adds option section, importance, and editor hints for `metrics.aggregate`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Projections.Composition 1.3.0
+
+Adds richer Designer hints for the event projection metadata provider.
+
+- Adds option section, importance, and editor hints for `event.projection`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Payloads.Composition 1.3.0
+
+Adds richer Designer hints for the payload inspection metadata provider.
+
+- Adds option section, importance, and editor hints for `payload.inspect`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Serialization.Composition 1.3.0
+
+Adds richer Designer hints for the serialization metadata provider.
+
+- Adds option section, importance, and editor hints for `json.parse`,
+  `json.stringify`, `text.encode`, `text.decode`, `base64.encode`, and
+  `base64.decode` shared options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Sources.Composition 1.4.0
+
+Adds richer Designer hints for the sources metadata provider.
+
+- Adds option section, importance, and editor hints for `source.generated` and
+  `source.sequence` options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Timers.Composition 1.5.0
+
+Adds richer Designer hints for the timers metadata provider.
+
+- Adds option section, importance, and editor hints for `timer.interval`,
+  `timer.schedule`, `timer.delay`, `timer.throttle`, and `timer.debounce`
+  options.
+- Adds a host-owned resource key pattern for the `clock` resource hint.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Routing.Composition 1.3.0
+
+Adds richer Designer hints for the routing metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.switch`, `flow.fork`, `flow.merge`, `flow.window`,
+  `flow.correlation`, and `flow.join` options.
+- Adds host-owned resource key patterns for routing selector delegate and clock
+  resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Validation.Composition 1.3.0
+
+Adds richer Designer hints for the validation metadata provider.
+
+- Adds option section, importance, editor, and related-resource hints for
+  `json.schema-validator` options.
+- Adds host-owned resource key patterns for the `selector` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Observability.Composition 1.3.0
+
+Adds richer Designer hints for the observability metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.counter`, `flow.logger`, and `flow.metrics` options.
+- Adds host-owned resource key patterns for expression engine, context factory,
+  selector, and clock resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.State.Composition 1.3.0
+
+Adds richer Designer hints for the state reducer metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `state.reducer` options.
+- Adds host-owned resource key patterns for the `engine` and `clock` resource
+  hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Assertions.Composition 1.3.0
+
+Adds richer Designer hints for the assertion metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.assert` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Mapping.Composition 1.3.0
+
+Adds richer Designer hints for the mapper metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.mapper` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Control.Composition 1.3.0
+
+Adds richer Designer hints for the control metadata provider.
+
+- Adds option section, importance, editor, syntax, and related-resource hints
+  for `flow.filter` and `flow.when` options.
+- Adds host-owned resource key patterns for the `engine`, `contextFactory`, and
+  `clock` resource hints.
+- Keeps the hints descriptive only; composition runtime behavior is unchanged.
+
+## FluxFlow.Components.Designer 2.16.0
+
+Adds shared option metadata attribute helpers.
+
+- Adds `OptionDesignMetadataAttributeNames`,
+  `OptionDesignMetadataAttributeValues`, and
+  `OptionDesignMetadataAttributes`.
+- Supports section, importance, editor, syntax, and related-resource option
+  hints while keeping Designer metadata engine/composition neutral.
+- Keeps option hints metadata-only; hosts still own rendering, validation UI,
+  localization, and expression editor behavior.
+
+## FluxFlow.Engine 2.0.1
+
+Adds a package-local Engine README and keeps the package readme aligned with the
+optional advanced runtime boundary.
+
+- Documents `FluxFlow.Engine` as the optional `ApplicationDefinition` runtime,
+  not the default standalone component composition path.
+- Packs the Engine package's own `README.md` instead of the repository root
+  README.
+
+## FluxFlow.Components.Configuration 1.5.0
+
+Adds typed option-path authoring for configuration validation requests.
+
+- Adds `ConfigurationOptionPath` for non-empty, trimmed code-authored resource
+  and secret option paths.
+- Adds `ConfigurationValidationRequestBuilder` overloads that accept typed
+  option paths plus typed resource and secret authoring values.
+- Keeps the request DTOs string-shaped so configuration-bound blank paths can
+  still be reported as structured diagnostics.
+
+## FluxFlow.Components.Resources 1.6.0
+
+Adds typed resource descriptor authoring helpers.
+
+- Adds `ResourceKind` for non-empty, trimmed code-authored resource kind values.
+- Adds `ResourceMetadataText` for non-empty, trimmed descriptor display names
+  and summaries.
+- Adds a `ResourceDescriptorCatalogBuilder.Add(...)` overload that accepts
+  `ResourceName`, optional `ResourceKind`, and optional `ResourceMetadataText`
+  values while keeping the descriptor DTOs configuration-friendly for
+  structured diagnostics.
+
+## FluxFlow.Components.Secrets 1.6.0
+
+Adds typed in-memory secret descriptor authoring helpers.
+
+- Adds `SecretVersion` for non-empty, trimmed code-authored secret versions.
+- Adds `SecretKind` for non-empty, trimmed code-authored secret kind values.
+- Adds `SecretMetadataText` for non-empty, trimmed descriptor display names and
+  summaries.
+- Adds `InMemorySecretResolverBuilder.Add(...)` overloads that accept
+  `SecretName`, optional `SecretVersion`, optional `SecretKind`, and optional
+  `SecretMetadataText` values while keeping the descriptor/reference DTOs
+  configuration-friendly for structured diagnostics.
+
+## FluxFlow.Components.Designer 2.15.0
+
+Adds shared host-owned resource metadata attribute helpers.
+
+- Adds `ResourceDesignMetadataAttributeNames`,
+  `ResourceDesignMetadataAttributeValues`, and
+  `ResourceDesignMetadataAttributes` for resource picker metadata.
+- Standardizes host-owned resource ownership, picker kind, key pattern, related
+  option, and conditional requiredness hints across composition metadata
+  providers.
+- Keeps Designer metadata engine/composition neutral; hosts still own resource
+  catalogs, keyed registrations, secrets, lifetimes, and disposal.
+
+## FluxFlow.Components.Designer 2.14.0
+
+Adds a Designer-owned metadata text value type.
+
+- Adds `ComponentMetadataText` for non-empty Designer display names,
+  summaries, option helper text, and option-choice helper text.
+- Changes Designer metadata display-name, summary, and helper-text properties
+  from `string?` to `ComponentMetadataText?` across component, option,
+  option-choice, resource, and port metadata.
+- Keeps `ComponentDesignMetadataBuilder` accepting string display, summary, and
+  helper-text arguments so provider authoring stays concise while stored
+  metadata is typed.
+
+## FluxFlow.Components.Designer 2.13.0
+
+Adds a Designer-owned metadata attribute value identifier.
+
+- Adds `ComponentAttributeValue` for non-empty metadata attribute values.
+- Changes Designer metadata `Attributes` dictionaries from `string` values to
+  `ComponentAttributeValue` values across component, option, option-choice,
+  resource, and port metadata.
+- Keeps `ComponentDesignMetadataBuilder` accepting string-keyed string-valued
+  attribute maps and string `AddAttribute(...)` calls so provider authoring
+  stays concise while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.12.0
+
+Adds a Designer-owned value type hint identifier.
+
+- Adds `ComponentValueTypeHint` for non-empty resource and port value type
+  hints.
+- Changes `ResourceDesignMetadata.ValueType` and `PortDesignMetadata.ValueType`
+  from `string?` to `ComponentValueTypeHint?`.
+- Keeps `ComponentDesignMetadataBuilder` accepting string `valueType`
+  arguments so provider authoring stays concise while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.11.0
+
+Adds a Designer-owned metadata attribute key identifier.
+
+- Adds `ComponentAttributeName` for non-empty metadata attribute keys.
+- Changes Designer metadata `Attributes` dictionaries from `string` keys to
+  `ComponentAttributeName` keys across component, option, option-choice,
+  resource, and port metadata.
+- Keeps `ComponentDesignMetadataBuilder` accepting string-keyed attribute maps
+  and string `AddAttribute(...)` calls so provider authoring stays concise
+  while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.10.0
+
+Adds a Designer-owned option-choice value identifier.
+
+- Adds `ComponentOptionChoiceValue` for non-empty enum option choice values.
+- Changes `OptionChoiceMetadata.Value` from `string` to
+  `ComponentOptionChoiceValue`, aligning enum choice metadata with
+  Designer-owned component, category, icon, preferred node-name, option,
+  resource, port, and port-group identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddEnumOption(...)` accepting string
+  choice values so provider authoring stays concise while stored metadata is
+  typed.
+
+## FluxFlow.Components.Designer 2.9.0
+
+Adds a Designer-owned port-group identifier.
+
+- Adds `ComponentPortGroup` for non-empty port group names.
+- Changes `PortDesignMetadata.Group` from `string?` to `ComponentPortGroup?`,
+  aligning port grouping metadata with Designer-owned component, category,
+  icon, preferred node-name, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddInputPort(...)`,
+  `AddOutputPort(...)`, and `AddPort(...)` accepting string group names so
+  provider authoring stays concise while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.8.0
+
+Adds a Designer-owned preferred node-name identifier.
+
+- Adds `ComponentPreferredNodeName` for non-empty preferred node names that do
+  not contain `.`.
+- Changes `ComponentDesignMetadata.PreferredNodeName` from `string?` to
+  `ComponentPreferredNodeName?`, aligning palette node-name hints with
+  Designer-owned component, category, icon, option, resource, and port
+  identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  preferred node name so provider authoring stays concise while stored metadata
+  is typed.
+
+## FluxFlow.Components.Designer 2.7.0
+
+Adds a Designer-owned icon-key identifier.
+
+- Adds `ComponentIconKey` for non-empty palette icon keys.
+- Changes `ComponentDesignMetadata.IconKey` from `string?` to
+  `ComponentIconKey?`, aligning icon metadata with Designer-owned component,
+  category, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  icon key so provider authoring stays concise while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.6.0
+
+Adds a Designer-owned category identifier.
+
+- Adds `ComponentCategory` for non-empty palette category names.
+- Changes `ComponentDesignMetadata.Category` from `string?` to
+  `ComponentCategory?`, aligning category metadata with Designer-owned
+  component, option, resource, and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.WithDisplay(...)` accepting a string
+  category so provider authoring stays concise while stored metadata is typed.
+
+## FluxFlow.Components.Designer 2.5.0
+
+Adds a Designer-owned option identifier.
+
+- Adds `ComponentOptionName` for non-empty editable option names.
+- Changes `OptionDesignMetadata.Name` from `string` to `ComponentOptionName`,
+  aligning option metadata with Designer-owned component, resource, and port
+  identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddOption(...)` and
+  `AddEnumOption(...)` string overloads so provider authoring stays concise
+  while still producing typed option names.
+
+## FluxFlow.Components.Designer 2.4.0
+
+Adds a Designer-owned resource identifier.
+
+- Adds `ComponentResourceName` for non-empty host-owned resource slot names.
+- Changes `ResourceDesignMetadata.Name` from `string` to
+  `ComponentResourceName`, aligning resource hints with Designer-owned
+  component and port identifiers.
+- Keeps `ComponentDesignMetadataBuilder.AddResource(...)` string overloads so
+  provider authoring stays concise while still producing typed resource names.
+
+## FluxFlow.Composition 1.0.9
+
+Normalizes composition DTO dictionary keys.
+
+- Workflow, node, configuration, and resource dictionary keys are trimmed when
+  assigned to composition DTOs.
+- Fluent workflow, node, configuration, and resource names are trimmed before
+  they are stored.
+- Duplicate keys after trimming now fail at the DTO/fluent boundary instead of
+  surfacing later as link or resource lookup mismatches.
+
+## FluxFlow.Composition 1.0.8
+
+Normalizes composition registration identifiers.
+
+- `CompositionNodeRegistration` now trims node type identifiers before
+  registration.
+- `CompositionPortMetadata` now trims port names before metadata dictionaries are
+  built, so duplicate checks use normalized names.
+- `NodeDefinition.Type` and fluent node type assignment now trim node type
+  values so configuration-bound types match registered adapter types.
+
+## FluxFlow.Composition.Hosting 1.0.5
+
+Adds explicit node-registry contributor registration.
+
+- Adds `CompositionHostingBuilder.RegisterNodeContributor<TContributor>()`
+  for registering reusable contributor classes without reflection or scanning.
+- Adds `CompositionHostingBuilder.RegisterNodeContributor(...)` for registering
+  explicit contributor instances.
+- Keeps `RegisterNodes(...)` as the direct delegate path for narrow host-local
+  registration.
+
+## FluxFlow.Components.Designer 2.3.3
+
+Adds Designer provider service registration helpers.
+
+- Adds `AddComponentDesignMetadataProvider<TProvider>()` for registering
+  package-owned metadata providers with duplicate-safe service collection
+  semantics.
+- Adds `AddComponentDesignMetadataProvider(...)` for registering provider
+  instances.
+- Adds `AddComponentDesignMetadataCatalog()` so hosts can resolve one validated
+  `ComponentDesignMetadataCatalog` from registered providers.
+
+## FluxFlow.Components.Secrets 1.5.5
+
+Hardens keyed secret service registration.
+
+- `AddFluxFlowSecretResolver(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSecretDescriptorProvider(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving secret services through normalized
+  keys.
+
+## FluxFlow.Components.Sessions 3.3.2
+
+Hardens keyed session store registration.
+
+- `AddFluxFlowSessionStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSessionStoreFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving session stores and factories through
+  normalized keys.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.4
+
+Hardens keyed HTTP trigger registration.
+
+- `AddFluxFlowHttpTrigger(...)` now trims trigger names before keyed DI
+  registration.
+- `MapFluxFlowTrigger(...)` now trims trigger names before keyed source lookup.
+- Adds TestServer coverage for configuration-bound trigger names with
+  surrounding whitespace.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.7
+
+Hardens keyed MQTTnet adapter registration.
+
+- `AddFluxFlowMqttClient(...)` now trims client names before keyed DI
+  registration.
+- Hosted client lifetime uses the same normalized key.
+- Adds regression coverage for resolving MQTTnet client contracts through
+  normalized keys.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.7
+
+Hardens keyed Pulse MQTT adapter registration.
+
+- `AddFluxFlowMqttClient(...)` now trims client names before keyed DI
+  registration.
+- Hosted client lifetime uses the same normalized key.
+- Adds regression coverage for resolving Pulse MQTT client contracts through
+  normalized keys.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.4
+
+Hardens keyed file-system storage registration.
+
+- `AddFluxFlowFileSystemStorageStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowFileSystemStorageStoreFactory(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving file-system stores and factories
+  through normalized keys.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.4
+
+Hardens keyed SQL-file storage registration.
+
+- `AddFluxFlowSqlFileStorageStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowSqlFileStorageStoreFactory(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving SQL-file stores and factories through
+  normalized keys.
+
+## FluxFlow.Components.Journal 2.3.5
+
+Hardens keyed journal service registration.
+
+- `AddFluxFlowJournalStore(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowJournalStoreFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving journal stores and factories through
+  normalized keys.
+
+## FluxFlow.Components.Resources 1.5.3
+
+Hardens keyed resource service registration.
+
+- `AddFluxFlowResourceLookup(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowResourceDescriptorProvider(...)` now trims keyed service names
+  before registration.
+- Adds regression coverage for resolving resource services through normalized
+  keys.
+
+## FluxFlow.Components.Expressions 2.1.2
+
+Hardens keyed expression service registration.
+
+- `AddFluxFlowExpressionEngine(...)` now trims keyed service names before
+  registration.
+- `AddFluxFlowMapContextFactory(...)` now trims keyed service names before
+  registration.
+- Adds regression coverage for resolving expression services through normalized
+  keys.
+
+## FluxFlow.Components.Secrets 1.5.4
+
+Hardens secret redaction guardrails.
+
+- `SecretRedactor.RedactValues(...)` now trims explicit protected keys before
+  matching them.
+- Blank and null protected key entries are ignored.
+- Adds regression coverage for protected-key normalization and redacted map
+  snapshot behavior.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.6
+
+Hardens MQTT adapter payload ownership.
+
+- `MqttNetLastWillOptions.Payload` now copies assigned byte arrays.
+- Publish and Last Will mapping copy payload buffers before concrete client handoff.
+- Adds focused payload snapshot and adapter handoff coverage.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.6
+
+Hardens MQTT adapter payload ownership.
+
+- `PulseMqttLastWillOptions.Payload` now copies assigned byte arrays.
+- Publish and Last Will mapping copy payload buffers before concrete client handoff.
+- Adds focused payload snapshot and adapter handoff coverage.
+
+## FluxFlow.Components.Mqtt 4.1.3
+
+Hardens MQTT contract payload snapshots.
+
+- `MqttPublishRequest.Payload`, `MqttReceivedMessage.Payload`, and
+  `MqttReceivedMessage.CorrelationData` now copy assigned byte arrays.
+- Preserves existing byte-array public contracts while preventing caller-owned
+  buffers from altering contracts after creation.
+- Adds focused contract coverage for caller-owned payload mutation.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.5
+
+Hardens MQTT adapter client option user-property snapshots.
+
+- `MqttNetClientOptions.UserProperties` now copies assigned dictionaries with
+  ordinal key comparison.
+- Null assigned maps are treated as empty, preserving optional configuration
+  binding behavior.
+- Adds focused option contract coverage for caller-owned dictionary mutation.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.5
+
+Hardens MQTT adapter client option user-property snapshots.
+
+- `PulseMqttClientOptions.UserProperties` now copies assigned dictionaries with
+  ordinal key comparison.
+- Null assigned maps are treated as empty, preserving optional configuration
+  binding behavior.
+- Adds focused option contract coverage for caller-owned dictionary mutation.
+
+## FluxFlow.Components.Mqtt 4.1.2
+
+Hardens MQTT contract dictionary snapshots.
+
+- `MqttPublishProperties.UserProperties`,
+  `MqttReceivedMessage.UserProperties`, and
+  `MqttClientHealthEvent.Attributes` now copy assigned dictionaries with ordinal
+  key comparison.
+- Null assigned maps are treated as empty, preserving optional config-bound
+  behavior.
+- Adds focused contract coverage for caller-owned dictionary mutation.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.4
+
+Hardens MQTT adapter user-property mapping.
+
+- Outbound publish mapping now treats null user-property maps as empty instead
+  of dereferencing them.
+- Named user properties with null values now fail with an explicit `value`
+  argument exception.
+- Adds regression coverage for optional maps and malformed values.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.4
+
+Hardens MQTT adapter user-property mapping.
+
+- Outbound publish mapping continues to treat null user-property maps as empty.
+- Named user properties with null values now fail with an explicit `value`
+  argument exception.
+- Adds regression coverage for optional maps and malformed values.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.3
+
+Hardens MQTTnet mapper text encoding guardrails.
+
+- `MqttNetMessageMapper.ToUtf8Memory` now rejects null values with an explicit
+  `value` argument exception before encoding MQTT credentials, correlation
+  data, or user properties.
+- Adds regression coverage for invalid mapper text input.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.3
+
+Hardens Pulse MQTT mapper text encoding guardrails.
+
+- `PulseMqttMessageMapper.ToUtf8Memory` now rejects null values with an
+  explicit `value` argument exception before encoding MQTT credentials,
+  correlation data, or user properties.
+- Adds regression coverage for invalid mapper text input.
+
+## FluxFlow.Components.Secrets 1.5.3
+
+Hardens secret option resolution factory guardrails.
+
+- `SecretOptionResolution` factories now reject null option references,
+  resolution results, and diagnostics with explicit argument exceptions.
+- Adds regression coverage for invalid option resolution factory arguments.
+
+## FluxFlow.Components.Journal 2.3.4
+
+Hardens journal query result guardrails.
+
+- `JournalQueryResult` now rejects null record entries when assigning query
+  result record collections.
+- Null query result record collections still produce empty result lists,
+  preserving the existing optional assignment behavior.
+- Adds regression coverage for invalid query result record entries.
+
+## FluxFlow.Components.Configuration 1.4.4
+
+Hardens configuration validation report guardrails.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- `ConfigurationValidationReport` now rejects null diagnostic entries when
+  assigning diagnostics or building reports from diagnostic sequences.
+- Null diagnostic collections still produce empty reports, preserving the
+  existing optional assignment behavior.
+- Adds regression coverage for invalid report diagnostic entries.
+
+## FluxFlow.Components.Resources 1.5.2
+
+Hardens resource lookup result factory guardrails.
+
+- `ResourceLookupResult` factories now reject null references and descriptors
+  with explicit argument exceptions instead of relying on later dereferences.
+- Adds regression coverage for invalid result factory arguments.
+
+## FluxFlow.Components.Secrets 1.5.2
+
+Hardens secret resolve result factory guardrails.
+
+- `SecretResolveResult` factories now reject null references, descriptors,
+  values, and match collections with explicit argument exceptions.
+- Failed and access-denied result factories now reject blank diagnostic
+  messages.
+- Adds regression coverage for invalid result factory arguments.
+
+## FluxFlow.Composition.Hosting 1.0.4
+
+Hardens composition hosting exception diagnostics.
+
+- `CompositionHostingException` now snapshots diagnostics at construction so
+  later caller-side collection mutations cannot change exception evidence.
+- Null diagnostics passed to the exception constructor now produce an empty
+  diagnostic collection.
+
+## FluxFlow.Composition 1.0.7
+
+Hardens composition definition validation for malformed mutable DTO entries.
+
+- `CompositionValidator` now reports `InvalidDefinition` diagnostics for null
+  workflows, nodes, links, or link endpoints instead of dereferencing them.
+- Adds regression coverage for hand-built malformed definition models.
+
+## FluxFlow.Composition 1.0.6
+
+Restores explicit composition port metadata deconstruction.
+
+- `CompositionPortMetadata` now keeps tuple-style deconstruction while retaining
+  the validated constructor introduced in 1.0.5.
+- Adds regression coverage for deconstructing port metadata.
+
+## FluxFlow.Composition 1.0.5
+
+Hardens composition port metadata registration guardrails.
+
+- `CompositionPortMetadata` now rejects null or blank names and null message
+  types at construction.
+- Node registrations now reject null input/output metadata entries explicitly.
+- Adds regression coverage for invalid port metadata arguments.
+
+## FluxFlow.Components.Designer 2.3.2
+
+Hardens fluent component design metadata builder guardrails.
+
+- Fluent option, resource, and port overloads now reject null names at the
+  builder boundary.
+- Enum option authoring now rejects null choice values before metadata
+  validation.
+- Adds regression coverage for null primitive builder arguments.
+
+## FluxFlow.Components.Configuration 1.4.3
+
+Hardens fluent configuration validation request builder contracts.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- Fluent resource and secret overloads now validate option paths before
+  constructing resource or secret references.
+- Adds regression coverage for mixed invalid path/name arguments.
+
+## FluxFlow.Components.Journal 2.3.3
+
+Hardens keyed journal store registration helper validation.
+
+- Direct journal store and store-factory overloads now validate the service
+  collection and journal key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
+## FluxFlow.Components.Resources 1.5.1
+
+Hardens resource keyed DI registration helper validation.
+
+- Direct resource lookup and descriptor-provider overloads now validate the
+  service collection and resource key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
+## FluxFlow.Components.Secrets 1.5.1
+
+Hardens secret keyed DI registration helper validation.
+
+- Direct secret resolver and descriptor-provider overloads now validate the
+  service collection and secret key before captured instances.
+- Adds regression coverage for mixed invalid direct-registration arguments.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.3
+
+Hardens file-system storage adapter registration helpers.
+
+- `UseFileSystemStorage(string rootDirectory)` now rejects null or blank root
+  directories before creating the backend store factory.
+- Adds adapter-registration coverage for the string helper path and invalid
+  registration arguments.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.3
+
+Hardens SQL-file storage adapter registration helpers.
+
+- `UseSqlFileStorage(string databasePath)` now rejects null or blank database
+  paths before creating the backend store factory.
+- Adds adapter-registration coverage for the string helper path and invalid
+  registration arguments.
+
+## FluxFlow.Components.Configuration 1.4.2
+
+Documents and verifies Configuration validator argument contracts.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- Adds focused coverage for null resource lookups, secret resolvers,
+  descriptor providers, validation requests, and reference collections across
+  the public `ConfigurationValidator` entry points.
+- Updates package notes and README wording to match the explicit validator
+  guardrails.
+
+## FluxFlow.Components.Journal 2.3.2
+
+Documents and verifies the full keyed journal store registration contract.
+
+- Covers service collection, key name, direct store/factory, provider delegate,
+  DI dependency access, and null provider-result failures for keyed journal
+  stores and store factories.
+- Updates package notes and README wording to match the explicit registration
+  guardrails.
+
+## FluxFlow.Components.Mqtt 4.1.1
+
+Hardens MQTT trigger message handling.
+
+- `MqttTriggerNode` now reports malformed received contexts as trigger errors
+  without stopping the subscription pump.
+- Adds regression coverage proving a later valid MQTT message still flows after
+  an invalid adapter delivery.
+
+## FluxFlow.Components.RequestReply 1.1.5
+
+Hardens request/reply publication observability.
+
+- `RequestReplyCoordinator<TRequest,TResponse>` now emits
+  `RequestReplyEvents.Published` after a request/reply-mode request reaches the
+  graph-facing `Output`, matching fire-and-forget publication diagnostics.
+- Adds regression coverage for the `Received` -> `Published` -> `Replied` event
+  sequence in request/reply mode.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.3
+
+Hardens HTTP trigger shutdown.
+
+- The hosted trigger lifetime now completes the keyed request source during
+  stop, so late endpoint submissions are rejected instead of accepted into an
+  inactive trigger.
+- Adds regression coverage for keyed source shutdown through
+  `AddFluxFlowHttpTrigger(...)`.
+
+## FluxFlow.Components.Expressions 2.1.1
+
+Documents and verifies expression engine registry argument contracts.
+
+- Adds focused coverage for non-blank registry scope names, non-null engine
+  instances, non-blank engine names, and non-null resolver delegates.
+- Updates package notes, README, and public API overview wording to match the
+  explicit registry guardrails.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.2
+
+Documents and verifies the full keyed MQTT adapter registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures before keyed client-session creation.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.2
+
+Documents and verifies the full keyed MQTT adapter registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures before keyed client-session creation.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.2
+
+Documents and verifies the full keyed storage backend registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures for direct store and store-factory registrations.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.2
+
+Documents and verifies the full keyed storage backend registration contract.
+
+- Covers service collection, key name, direct options, options factory, and null
+  factory-result failures for direct store and store-factory registrations.
+- Updates package notes and README wording to match the explicit argument
+  contract.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.2
+
+Hardens HTTP trigger endpoint authoring.
+
+- `MapFluxFlowTrigger(...)` now rejects blank route patterns for keyed trigger
+  and direct coordinator overloads before delegating to framework routing.
+- Documents the HTTP trigger adapter in the public API overview.
+
+## FluxFlow.Components.Designer 2.3.1
+
+Improves fluent Designer metadata authoring.
+
+- Adds `ComponentDesignMetadataBuilder.AddAttributes(...)` for bulk
+  component-level attribute authoring.
+- Adds explicit null argument checks for fluent attribute keys and values.
+
+## FluxFlow.Components.Configuration 1.4.1
+
+Hardens fluent validation request authoring.
+
+This update applies to `FluxFlow.Components.Configuration`.
+
+- `ConfigurationValidationRequestBuilder` now rejects null resource paths and
+  secret option paths immediately.
+- Blank paths still flow through the DTO validation path as structured
+  configuration diagnostics for config-bound data.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.1
+
+Hardens adapter-local MQTT client DI registration.
+
+- Rejects null direct `MqttNetClientOptions` registrations immediately.
+- Reports a clear registration error when an options factory returns null
+  before the keyed client session is created.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.1
+
+Hardens adapter-local MQTT client DI registration.
+
+- Rejects null direct `PulseMqttClientOptions` registrations immediately.
+- Reports a clear registration error when an options factory returns null
+  before the keyed client session is created.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.1
+
+Hardens keyed storage backend DI registration.
+
+- Reports a clear registration error when options factories return null before
+  creating keyed direct stores or keyed store factories.
+- Keeps direct options overloads strict and documented.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.1
+
+Hardens keyed storage backend DI registration.
+
+- Reports a clear registration error when options factories return null before
+  creating keyed direct stores or keyed store factories.
+- Keeps direct options overloads strict and documented.
+
+## FluxFlow.Components.Journal 2.3.1
+
+Hardens keyed journal store DI registration diagnostics.
+
+- Direct store provider failures now clearly report null store provider results.
+- Store-factory provider failures remain explicit and are covered by focused
+  tests.
+
+## FluxFlow.Components.Sessions 3.3.1
+
+Hardens keyed session store DI registration diagnostics.
+
+- Direct store provider failures now clearly report null store provider results.
+- Store-factory provider failures remain explicit and are covered by focused
+  tests.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.1
+
+Documents and verifies the HTTP trigger DI registration contract.
+
+- Adds focused coverage for invalid registration arguments, keyed source and
+  trigger node registration, hosted trigger lifetime, and source capacity
+  validation.
+- Documents that trigger source capacity comes from `RequestReplyOptions`.
+
+## FluxFlow.Composition.Hosting 1.0.3
+
+Hardens composition hosting registration contracts.
+
+- Public definition source constructors now reject null definitions,
+  configuration roots, and section names immediately.
+- `AddFluxFlowComposition(...)` now rejects null section names explicitly
+  instead of treating them as the root section.
+- Adds focused registration and builder null-argument coverage.
+
+## FluxFlow.Components.Resources 1.5.0
+
+Adds keyed resource registration helpers.
+
+- Adds `AddFluxFlowResourceLookup(...)` for registering host-owned
+  `IResourceLookup` services in keyed DI.
+- Adds `AddFluxFlowResourceDescriptorProvider(...)` for registering host-owned
+  `IResourceDescriptorProvider` services in keyed DI.
+- Registers keyed resource lookups as descriptor providers under the same key
+  so metadata-only consumers can reuse lookup-backed catalogs.
+
+## FluxFlow.Components.Configuration 1.4.0
+
+Adds descriptor-only configuration reference validation to
+`FluxFlow.Components.Configuration`.
+
+- Adds `ValidateDeclaredReferences(...)`,
+  `ValidateDeclaredResources(...)`, and `ValidateDeclaredSecrets(...)` for
+  checking configuration resource and secret references against descriptor
+  providers.
+- Lets design/config hosts validate declared resources and secrets without
+  opening resources, resolving secret values, or owning runtime lifecycle.
+- Preserves the existing runtime validation path that uses `IResourceLookup`
+  and `ISecretResolver`.
+
+## FluxFlow.Components.RequestReply 1.1.4
+
+Hardens invalid request/reply input handling.
+
+- Reports null request contexts as `InvalidRequestContext` errors and
+  `requestreply.invalid` events without faulting the coordinator.
+- Reports null response messages as `InvalidResponseMessage` errors and
+  `requestreply.invalid` events without stopping later valid responses.
+- Rejects null lower-level tracker contexts before they can be stored as
+  pending requests.
+
+## FluxFlow.Components.Secrets 1.5.0
+
+Adds keyed secret registration helpers.
+
+- Adds `AddFluxFlowSecretResolver(...)` for registering host-owned
+  `ISecretResolver` services in keyed DI.
+- Adds `AddFluxFlowSecretDescriptorProvider(...)` for registering host-owned
+  `ISecretDescriptorProvider` services in keyed DI.
+- Keeps concrete secret storage, access control, refresh, rotation, auditing,
+  and disposal ownership with hosts.
+
+## FluxFlow.Components.Expressions 2.1.0
+
+Adds keyed expression service registration helpers.
+
+- Adds `AddFluxFlowExpressionEngine(...)` for registering host-owned
+  `IFlowExpressionEngine` resources in keyed DI.
+- Adds `AddFluxFlowMapContextFactory<TInput>(...)` for registering host-owned
+  typed `IFlowMapContextFactory<TInput>` resources in keyed DI.
+- Keeps expression language selection, expression compilation, context
+  construction, and resource ownership with the host.
+
+## FluxFlow.Components.Sessions 3.3.0
+
+Adds keyed session store registration helpers.
+
+- Adds `AddFluxFlowSessionStore(...)` and
+  `AddFluxFlowSessionStoreFactory(...)` for registering host-owned
+  `ISessionStore` and `ISessionStoreFactory` resources in keyed DI.
+- Keeps concrete store implementation, lifetime, retention, and persistence
+  setup with the host.
+
+## FluxFlow.Components.Journal 2.3.0
+
+Adds keyed journal store registration helpers.
+
+- Adds `AddFluxFlowJournalStore(...)` and
+  `AddFluxFlowJournalStoreFactory(...)` for registering host-owned
+  `IJournalStore` and `IJournalStoreFactory` resources in keyed DI.
+- Keeps event collection, persistence, retention, and store lifetime ownership
+  with hosts.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.0
+
+Adds direct keyed file-system storage store registration.
+
+- Adds `AddFluxFlowFileSystemStorageStore(...)` for registering a keyed
+  `IStorageStore` directly in composition and resource hosts.
+- Keeps `AddFluxFlowFileSystemStorageStoreFactory(...)` for factory-backed
+  store leases and shared file-system store caching.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.0
+
+Adds direct keyed SQL-file storage store registration.
+
+- Adds `AddFluxFlowSqlFileStorageStore(...)` for registering a keyed
+  `IStorageStore` directly in composition and resource hosts.
+- Keeps `AddFluxFlowSqlFileStorageStoreFactory(...)` for factory-backed owned
+  store leases.
+
+## FluxFlow.Components.Resources 1.4.0
+
+Adds resource descriptor provider separation.
+
+- Adds `IResourceDescriptorProvider` to `FluxFlow.Components.Resources` for
+  consumers that only need declared `ResourceDescriptor` metadata.
+- Keeps `IResourceLookup` compatible while making descriptor enumeration a
+  named resource capability.
+
+## FluxFlow.Components.Secrets 1.4.0
+
+Adds optional secret descriptor enumeration.
+
+- Adds `ISecretDescriptorProvider` to `FluxFlow.Components.Secrets` for
+  resolvers that can safely list non-sensitive `SecretDescriptor` metadata.
+- Keeps `ISecretResolver` focused on runtime resolution and leaves descriptor
+  enumeration as an optional capability.
+
+## FluxFlow.Components.Configuration 1.3.0
+
+Adds range helpers to the configuration validation request builder.
+
+- Adds `ConfigurationValidationRequestBuilder.AddResources(...)` and
+  `AddSecrets(...)` to `FluxFlow.Components.Configuration` for appending
+  existing resource and secret validation reference collections.
+- Keeps resource lookup, secret resolution, validation behavior, and request
+  DTO ownership unchanged.
+
+## FluxFlow.Components.Sessions 3.2.0
+
+Adds session store factory support.
+
+- Adds `ISessionStoreFactory`, `SessionStoreContext`, `SessionStoreLease`, and
+  `SessionComponentOptions` for explicit host-owned session store opening and
+  lease ownership.
+
+## FluxFlow.Components.Journal 2.2.0
+
+Adds fluent journal event input building.
+
+- Adds `JournalEventInputBuilder` for declaring neutral journal events and
+  mapping them through the existing `JournalRecordMapper`.
+- Keeps event collection, persistence, retention, store lookup, and store
+  lifetime ownership with hosts.
+
+## FluxFlow.Components.Configuration 1.2.0
+
+Adds fluent configuration validation request building.
+
+- Adds `ConfigurationValidationRequestBuilder` to
+  `FluxFlow.Components.Configuration` for declaring resource and secret
+  validation references with the existing validation DTOs.
+- Keeps resource lookup, secret resolution, ownership, and validation behavior
+  unchanged.
+
+## FluxFlow.Components.Resources 1.3.0
+
+Adds fluent resource descriptor catalog building.
+
+- Adds `ResourceDescriptorCatalogBuilder` to
+  `FluxFlow.Components.Resources` for declaring resource descriptors with the
+  existing descriptor and catalog contracts.
+- Keeps resource creation, lifecycle, lookup ownership, and diagnostic
+  validation behavior unchanged.
+
+## FluxFlow.Components.Secrets 1.3.0
+
+Adds fluent in-memory secret resolver building.
+
+- Adds `InMemorySecretResolverBuilder` to `FluxFlow.Components.Secrets` for
+  declaring local secret records with the existing resolver and diagnostic
+  contracts.
+- Keeps concrete secret storage, access control, refresh, rotation, auditing,
+  and disposal ownership with hosts.
+
+## FluxFlow.Components.Designer 2.3.0
+
+Adds fluent component design metadata building.
+
+- Adds `ComponentDesignMetadataBuilder` to
+  `FluxFlow.Components.Designer` for authoring validated Designer metadata with
+  the existing metadata contracts.
+- Keeps catalog validation, provider loading, metadata snapshotting, rendering,
+  localization, and runtime mapping ownership unchanged.
+
+## FluxFlow.Components.Mapping.Composition 1.2.2
+
+Uses the shared Designer metadata builder for mapper metadata.
+
+- Refactors `MappingComponentDesignMetadataProvider` to author its metadata
+  through `ComponentDesignMetadataBuilder`.
+- Preserves the existing `flow.mapper` options, resources, ports, validation,
+  catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Control.Composition 1.2.2
+
+Uses the shared Designer metadata builder for control metadata.
+
+- Refactors `ControlComponentDesignMetadataProvider` to author `flow.filter`
+  and `flow.when` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing control options, resources, port metadata, `flow.when`
+  output alias metadata, validation, catalog loading, and runtime composition
+  behavior.
+
+## FluxFlow.Components.Assertions.Composition 1.2.1
+
+Uses the shared Designer metadata builder for assertion metadata.
+
+- Refactors `AssertionsComponentDesignMetadataProvider` to author
+  `flow.assert` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing assertion options, resources, ports, validation, catalog
+  loading, and runtime composition behavior.
+
+## FluxFlow.Components.Validation.Composition 1.2.2
+
+Uses the shared Designer metadata builder for validation metadata.
+
+- Refactors `ValidationComponentDesignMetadataProvider` to author
+  `json.schema-validator` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing JSON schema validator options, resources, ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Timers.Composition 1.4.2
+
+Uses the shared Designer metadata builder for timer metadata.
+
+- Refactors `TimersComponentDesignMetadataProvider` to author interval,
+  schedule, delay, throttle, and debounce metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing timer options, clock resources, ports, schedule
+  omitted-option attributes, validation, catalog loading, and runtime
+  composition behavior.
+
+## FluxFlow.Components.Sources.Composition 1.3.2
+
+Uses the shared Designer metadata builder for source metadata.
+
+- Refactors `SourcesComponentDesignMetadataProvider` to author generated and
+  sequence source metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing source options, clock resources, output port metadata,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Serialization.Composition 1.2.1
+
+Uses the shared Designer metadata builder for serialization metadata.
+
+- Refactors `SerializationComponentDesignMetadataProvider` to author JSON,
+  text, and base64 metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing serialization options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Http.Composition 1.2.2
+
+Uses the shared Designer metadata builder for HTTP client metadata.
+
+- Refactors `HttpComponentDesignMetadataProvider` to author `http.client`
+  metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing HTTP client options, client and clock resources, fixed
+  ports, validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Routing.Composition 1.2.3
+
+Routes built-in Designer port metadata through the shared metadata builder.
+
+- Refactors `RoutingComponentDesignMetadataProvider` built-in port authoring to
+  use `ComponentDesignMetadataBuilder.AddInputPort()` and `AddOutputPort()`.
+- Preserves existing routing options, selector and clock resources, built-in
+  ports, dynamic-output attributes, validation, catalog loading, and runtime
+  composition behavior.
+
+## FluxFlow.Components.Routing.Composition 1.2.2
+
+Uses the shared Designer metadata builder for routing metadata.
+
+- Refactors `RoutingComponentDesignMetadataProvider` to build switch, fork,
+  merge, window, correlation, and join metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing routing options, selector and clock resources, built-in
+  ports, dynamic-output attributes, validation, catalog loading, and runtime
+  composition behavior.
+
+## FluxFlow.Components.Payloads.Composition 1.2.1
+
+Uses the shared Designer metadata builder for payload inspection metadata.
+
+- Refactors `PayloadsComponentDesignMetadataProvider` to author
+  `payload.inspect` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing payload inspection options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Observability.Composition 1.2.2
+
+Uses the shared Designer metadata builder for observability metadata.
+
+- Refactors `ObservabilityComponentDesignMetadataProvider` to author counter,
+  logger, and metrics metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing observability options, resources, fixed ports, validation,
+  catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Projections.Composition 1.2.1
+
+Uses the shared Designer metadata builder for event projection metadata.
+
+- Refactors `ProjectionsComponentDesignMetadataProvider` to author
+  `event.projection` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing event projection options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Metrics.Composition 1.2.1
+
+Uses the shared Designer metadata builder for metrics aggregate metadata.
+
+- Refactors `MetricsComponentDesignMetadataProvider` to author
+  `metrics.aggregate` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing metrics aggregate options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Expectations.Composition 1.2.1
+
+Uses the shared Designer metadata builder for event expectation metadata.
+
+- Refactors `ExpectationsComponentDesignMetadataProvider` to author
+  `event.expectation` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing event expectation options, clock resources, fixed ports,
+  validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.FileSystem.Composition 1.3.2
+
+Uses the shared Designer metadata builder for file-system metadata.
+
+- Refactors `FileSystemComponentDesignMetadataProvider` to author file read,
+  file write, directory enumerate, and file watch metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing file-system options, clock resources, fixed ports, source
+  outputs, validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.State.Composition 1.2.1
+
+Uses the shared Designer metadata builder for state reducer metadata.
+
+- Refactors `StateComponentDesignMetadataProvider` to author
+  `state.reducer` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing state reducer options, engine and clock resources, fixed
+  ports, validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Storage.Composition 1.3.1
+
+Uses the shared Designer metadata builder for storage metadata.
+
+- Refactors `StorageComponentDesignMetadataProvider` to author `storage.put`,
+  `storage.get`, `storage.query`, and `storage.delete` metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing storage options, resource hints, fixed ports, validation,
+  catalog loading, direct store and store-factory resources, and runtime
+  composition behavior.
+
+## FluxFlow.Components.Journal 2.1.0
+
+Adds journal store factory support.
+
+- Adds `IJournalStoreFactory`, `JournalStoreContext`, `JournalStoreLease`, and
+  `JournalComponentOptions` for explicit host-owned journal store opening and
+  lease ownership.
+- Adds `InMemoryJournalStoreFactory` for named shared in-memory journal stores.
+
+## FluxFlow.Components.Sessions.Composition 1.4.1
+
+Uses the shared Designer metadata builder for session metadata.
+
+- Refactors `SessionsComponentDesignMetadataProvider` to author
+  `session.recorder`, `session.replay`, and `session.query` metadata through
+  `ComponentDesignMetadataBuilder`.
+- Preserves existing session options, resource hints, fixed ports, validation,
+  catalog loading, direct store and store-factory resources, and runtime
+  composition behavior.
+
+## FluxFlow.Components.Mqtt.Composition 1.3.1
+
+Uses the shared Designer metadata builder for MQTT metadata.
+
+- Refactors `MqttComponentDesignMetadataProvider` to author `mqtt.publish` and
+  `mqtt.trigger` metadata through `ComponentDesignMetadataBuilder`.
+- Preserves existing publish and trigger options, required resource hints,
+  fixed ports, validation, catalog loading, and runtime composition behavior.
+
+## FluxFlow.Components.Sessions.Composition 1.4.0
+
+Adds session resource factory support.
+
+- Sessions composition can now resolve the required `store` resource from
+  either a keyed `ISessionStore` or a keyed `ISessionStoreFactory`.
+- Factory-backed stores are opened during composition build and disposed through
+  composed node cleanup; direct keyed stores remain host-owned.
+
+## FluxFlow.Components.Storage.Composition 1.3.0
+
+Adds storage resource factory support.
+
+- Storage composition can now resolve the required `store` resource from either
+  a keyed `IStorageStore` or a keyed `IStorageStoreFactory`.
+- Factory-backed stores are opened during composition build and disposed through
+  composed node cleanup; direct keyed stores remain host-owned.
+
+## FluxFlow.Components.Storage.FileSystem 3.2.0
+
+Adds keyed store factory registration for resource hosts.
+
+- Adds `AddFluxFlowFileSystemStorageStoreFactory(...)` for registering a keyed
+  `IStorageStoreFactory`.
+
+## FluxFlow.Components.Storage.SqlFile 3.2.0
+
+Adds keyed store factory registration for resource hosts.
+
+- Adds `AddFluxFlowSqlFileStorageStoreFactory(...)` for registering a keyed
+  `IStorageStoreFactory`.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.0
+
+Breaking: keyed client DI registration no longer starts the client with the host
+by default. Set `StartWithHost = true` when the host should start and stop the
+client session.
+
+## FluxFlow.Components.Designer 2.2.8
+
+Hardens component design metadata module construction.
+
+- `ComponentDesignMetadataModule` now validates, rejects duplicate component
+  types, and stores defensive snapshots of supplied metadata.
+- Adds module coverage for snapshotting and duplicate component type rejection.
+
+## FluxFlow.Components.Designer 2.2.7
+
+Hardens component design metadata provider catalog loading.
+
+- `ComponentDesignMetadataCatalog.FromProviders(...)` now reports a clear
+  provider contract error when a provider returns a null metadata collection.
+- Adds catalog coverage for invalid provider metadata collection results.
+
+## FluxFlow.Components.Designer 2.2.6
+
+Hardens component design metadata ordering validation.
+
+- `ComponentDesignMetadataValidator` now reports negative or duplicate resource
+  order values.
+- Port order values must now be non-negative and unique within each port
+  direction.
+- Adds validator coverage for invalid resource and port order metadata.
+
+## FluxFlow.Components.Designer 2.2.5
+
+Hardens component design metadata enum validation.
+
+- `ComponentDesignMetadataValidator` now reports unsupported `OptionValueKind`
+  and `PortDirection` values.
+- Adds validator coverage for invalid numeric enum casts in option and port
+  metadata.
+
+## FluxFlow.Components.Designer 2.2.4
+
+Hardens component design metadata port validation.
+
+- `ComponentDesignMetadataValidator` now reports duplicate primary ports within
+  the same direction, keeping Designer metadata to one preferred input and one
+  preferred output.
+- Adds validator coverage for duplicate primary input and output ports.
+
+## FluxFlow.Components.Designer 2.2.3
+
+Hardens component design metadata option validation.
+
+- `ComponentDesignMetadataValidator` now validates option default values
+  against the declared `OptionValueKind` for text-like, number, boolean,
+  duration, and enum options.
+- Enum defaults must be strings or enum values and must match a declared choice
+  when choices are available.
+- `Min` and `Max` metadata are now reported as invalid unless the option kind is
+  number or duration.
+- Adds validator coverage for accepted defaults, mismatched defaults, and
+  invalid min/max usage.
+
+## FluxFlow.Components.Designer 2.2.2
+
+Hardens component design metadata catalog registration.
+
+- `ComponentDesignMetadataCatalog.Add(...)` now stores a defensive snapshot of
+  registered metadata after validation.
+- Top-level metadata collections, nested option choices, and attribute maps are
+  copied so later mutations to provider-owned collections cannot change catalog
+  contents.
+- Adds catalog snapshot coverage for options, choices, resources, ports, and
+  attributes.
+
+## FluxFlow.Components.RequestReply 1.1.3
+
+Hardens request/reply option contracts.
+
+- `RequestReplyOptions` now rejects unsupported modes, non-positive capacity,
+  non-positive timeout, and non-positive sweep interval values when assigned.
+- `CorrelatedRequestTrackerOptions` now rejects non-positive timeout and sweep
+  interval values when assigned.
+- Adds direct option contract tests while keeping coordinator and tracker
+  constructor validation as defensive guardrails.
+
+## FluxFlow.Components.Journal 2.0.3
+
+Hardens journal retention option contracts.
+
+- `JournalRetentionOptions.MaxRecords` now rejects negative values when
+  assigned.
+- `JournalRetentionOptions.MaxAge` now rejects zero or negative durations when
+  assigned.
+- Adds direct retention option tests while keeping cross-field validation, such
+  as requiring `ReferenceTime` with `MaxAge`, in `InMemoryJournalStore`.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.4
+
+Hardens file-system storage query expiration filtering.
+
+- `FileSystemStorageStore.QueryAsync()` now captures one clock timestamp per
+  query and uses it for every record match.
+- Adds deterministic coverage with an advancing clock so one query cannot split
+  near-expiration records across multiple effective timestamps.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.4
+
+Hardens SQL-file storage query expiration filtering.
+
+- `SqlFileStorageStore.QueryAsync()` now captures one clock timestamp per query
+  and uses it for both SQL-side expiration filtering and in-memory matching.
+- Adds deterministic coverage with an advancing clock so database filtering and
+  attribute-aware in-memory filtering stay aligned.
+
+## FluxFlow.Composition.Hosting 1.0.2
+
+Hardens hosted resource reference lookup.
+
+- `GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+  `GetResource<TResource>` now trim local resource slot names before reading
+  node resource references.
+- Configured keyed service references are trimmed before keyed DI lookup, so
+  incidental configuration whitespace no longer changes resource identity.
+- Adds hosted and direct resource-helper coverage for required and optional
+  resource resolution through normalized keys.
+
+## FluxFlow.Composition 1.0.4
+
+Hardens composition reference parsing.
+
+- `NodeReference.Parse` and `PortReference.Parse` now reject empty dotted
+  segments instead of accepting malformed values such as `source..Output`.
+- Assigned workflow, node, and port reference segments now trim surrounding
+  whitespace, and blank workflow assignments are treated as absent.
+- Adds direct reference parsing and formatting coverage for valid, trimmed, and
+  malformed node and port references.
+
+## FluxFlow.Nodes 1.1.2
+
+Hardens node option validation.
+
+- `FlowNodeOptions` now rejects non-positive input capacity and
+  max-degree-of-parallelism values when assigned.
+- `FlowSourceOptions` now rejects invalid output capacity values when assigned,
+  while still allowing `UnboundedOutputCapacity`.
+- Adds direct option contract tests for default values, valid source output
+  capacity choices, and invalid capacity assignments.
+
+## FluxFlow.Mapping 1.0.2
+
+Hardens mapping adapter guardrails.
+
+- `ExpressionFlowMapper<TInput,TOutput>` and `ExpressionFlowPredicate<TInput>`
+  now fail at construction with a clear error when an expression engine returns
+  a null compiled expression.
+- Adds direct tests for delegate and expression mapper/predicate adapters,
+  including compile-once expression behavior, default predicate context values,
+  custom context factories, and public null guardrails.
+- Corrects the public API overview so the internal compiled-expression wrapper
+  is no longer listed as a public type.
+
+## FluxFlow.Components.Expressions 2.0.3
+
+Hardens context factory registry resolution.
+
+- `FlowContextFactoryRegistry<TFactory>` now evaluates matching registrations
+  as one set and returns the single most specific registration when one exists.
+- Ambiguous context factory matches now produce deterministic diagnostics that
+  list the matching registration types.
+- Adds explicit public guardrail coverage for null default factories,
+  registrations, and lookup input types.
+
+## FluxFlow.Components.Configuration 1.1.5
+
+Hardens configuration validation request contracts.
+
+- `ConfigurationValidationRequest` now copies assigned resource and secret
+  collections so caller list mutations cannot change what a constructed request
+  represents.
+- Updates `FluxFlow.Components.Configuration` request contracts without changing
+  validation ownership.
+- Null resource and secret collection assignments are still preserved so
+  `ConfigurationValidator.ValidateAsync` can report structured invalid request
+  diagnostics.
+
+## FluxFlow.Components.Secrets 1.2.6
+
+Hardens secret diagnostic metadata handling.
+
+- `SecretDiagnostic` now copies assigned metadata so callers cannot mutate a
+  diagnostic after construction by changing the source dictionary.
+- Null diagnostic metadata assignments now produce an empty metadata map.
+- Existing diagnostic string formatting remains metadata-safe.
+
+## FluxFlow.Components.Resources 1.2.5
+
+Hardens resource diagnostic metadata handling.
+
+- `ResourceDiagnostic` now copies assigned metadata so callers cannot mutate a
+  diagnostic after construction by changing the source dictionary.
+- Null diagnostic metadata assignments now produce an empty metadata map.
+- `ResourceDiagnostic.ToString()` now returns a metadata-safe one-line summary.
+
+## FluxFlow.Components.Sources 3.1.1
+
+Aligns source constructor validation with the standalone node conventions.
+
+- `GeneratedSourceNode<TOutput>` and `SequenceSourceNode` now validate all
+  construction options before their source pipelines are created.
+- Invalid capacities, negative timing settings, generated loop/max item
+  settings, sequence counts, and zero steps remain fail-fast construction
+  errors.
+- Runtime source lifecycle, timing, diagnostics, and correlation propagation
+  are unchanged.
+
+## FluxFlow.Components.Sources.Composition 1.3.1
+
+Hardens config-bound source option diagnostics.
+
+- Invalid generated and sequence source options now fail during composition
+  build through the matching factories.
+- Adds hosted composition coverage proving invalid timing, capacity,
+  loop/max-item, count, and step values surface as factory diagnostics when
+  build failures are configured as diagnostics.
+
+## FluxFlow.Components.Sessions 3.1.5
+
+Aligns Sessions constructor validation with the standalone node conventions.
+
+- `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode` now
+  resolve validated options and required stores before their node/source
+  pipelines are created.
+- Replay session id and pacing checks remain fail-fast construction errors.
+- Runtime store ownership, replay pacing, query validation, diagnostics, and
+  correlation propagation are unchanged.
+
+## FluxFlow.Components.Sessions.Composition 1.3.1
+
+Hardens config-bound Sessions option diagnostics.
+
+- Invalid recorder, replay, and query options now fail during composition build
+  through the matching factories.
+- Adds hosted composition coverage proving invalid replay mode and existing
+  numeric/query option failures surface as factory diagnostics when build
+  failures are configured as diagnostics.
+
+## FluxFlow.Components.FileSystem 3.1.1
+
+Aligns FileSystem constructor option validation with the standalone node
+conventions.
+
+- `DirectoryEnumerateNode` and `FileWatchNode` now validate all construction
+  options before their source pipelines are created.
+- `FileReadNode` and `FileWriteNode` keep their existing fail-fast option
+  behavior with simpler constructor paths.
+- Runtime path-policy handling, file IO behavior, source lifecycle, events,
+  errors, and correlation propagation are unchanged.
+
+## FluxFlow.Components.FileSystem.Composition 1.3.1
+
+Hardens config-bound FileSystem option diagnostics.
+
+- Invalid read/write/default-encoding, directory enumeration, and file-watch
+  options now fail during composition build through the matching factories.
+- Adds hosted composition coverage proving invalid option values surface as
+  factory diagnostics when build failures are configured as diagnostics.
+
+## FluxFlow.Components.Timers 3.1.1
+
+Aligns timer transform constructor option validation with the standalone node
+conventions.
+
+- `TimerDelayNode<TInput>`, `TimerThrottleNode<TInput>`, and
+  `TimerDebounceNode<TInput>` now validate settings before their base node
+  pipelines are created.
+- Invalid duration settings and non-positive `BoundedCapacity` values now fail
+  with timer-specific construction errors.
+- Runtime timing behavior, correlation propagation, and source node behavior are
+  unchanged.
+
+## FluxFlow.Components.Timers.Composition 1.4.1
+
+Hardens config-bound timer option diagnostics.
+
+- Invalid timer settings now fail during composition build through the
+  `timer.interval`, `timer.delay`, `timer.throttle`, and `timer.debounce`
+  factories covered by this pass.
+- Adds hosted composition coverage proving invalid transform durations and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
+## FluxFlow.Components.Validation 3.0.1
+
+Aligns JSON schema validator constructor option validation with the standalone
+node conventions.
+
+- `JsonSchemaValidatorNode<TInput>` now validates `JsonSchemaValidatorOptions`
+  before the base node pipeline is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  `json.schema-validator` construction errors.
+- Runtime validation behavior, schema evaluation, and routing through
+  `Valid`/`Invalid` are unchanged.
+
+## FluxFlow.Components.Validation.Composition 1.2.1
+
+Hardens config-bound validation option diagnostics.
+
+- Invalid `JsonSchemaValidatorOptions` values now fail during composition build
+  through the `json.schema-validator` factory.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
+## FluxFlow.Components.Routing 3.0.1
+
+Aligns routing node constructor option validation with the standalone node
+conventions.
+
+- `FlowSwitchNode<TInput>`, `FlowForkNode<TInput>`,
+  `FlowMergeNode<TInput>`, `FlowWindowNode<TInput>`, and
+  `FlowCorrelationNode<TInput>` now validate options before the base node
+  pipeline is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  routing-specific construction errors.
+- Window and correlation-specific limits now fail fast with node-specific
+  validation errors.
+
+## FluxFlow.Components.Routing.Composition 1.2.1
+
+Hardens config-bound routing option diagnostics.
+
+- Invalid routing options now fail during composition build through the
+  `flow.switch`, `flow.fork`, `flow.merge`, `flow.window`, and
+  `flow.correlation` factories.
+- Adds hosted composition coverage proving invalid `inputType`,
+  `boundedCapacity`, window, and correlation values surface as factory
+  diagnostics when build failures are configured as diagnostics.
+
+## FluxFlow.Components.Observability 3.0.1
+
+Aligns observability node constructor option validation with the standalone
+node conventions.
+
+- `FlowCounterNode<TInput>`, `FlowLoggerNode<TInput>`, and
+  `FlowMetricsNode<TInput>` now validate options before the base node pipeline
+  is created.
+- Blank `InputType` and non-positive `BoundedCapacity` values now fail with
+  observability-specific construction errors.
+- Logger level validation remains fail-fast during construction.
+
+## FluxFlow.Components.Observability.Composition 1.2.1
+
+Hardens config-bound observability option diagnostics.
+
+- Invalid observability options now fail during composition build through the
+  `flow.counter`, `flow.logger`, and `flow.metrics` factories.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
+## FluxFlow.Components.Control 3.0.1
+
+Aligns control node constructor option validation with the standalone node
+conventions.
+
+- Expression-backed `FilterNode<TInput>` and `WhenNode<TInput>` constructors
+  now require a non-empty `Expression`.
+- All control node constructors now reject blank `InputType` and non-positive
+  `BoundedCapacity` values before the node pipeline is created.
+- Compiled-predicate constructors remain available without an expression.
+
+## FluxFlow.Components.Control.Composition 1.2.1
+
+Hardens config-bound control option diagnostics.
+
+- Invalid `ControlExpressionOptions` values now fail during composition build
+  through the `flow.filter` and `flow.when` factories.
+- Adds hosted composition coverage proving invalid `inputType` and
+  `boundedCapacity` values surface as factory diagnostics when build failures
+  are configured as diagnostics.
+
+## FluxFlow.Components.Mapping 3.0.1
+
+Hardens mapper option validation.
+
+- `FlowMapperNode<TInput,TOutput>` now validates `MapperOptions` before the
+  base node pipeline is created.
+- Non-positive `BoundedCapacity` now fails with a mapper-specific construction
+  error.
+- Adds direct standalone mapper tests for invalid capacity.
+
+## FluxFlow.Components.Mapping.Composition 1.2.1
+
+Hardens config-bound mapper option diagnostics.
+
+- Invalid `MapperOptions` values now fail during composition build through the
+  `flow.mapper` factory.
+- Adds hosted composition coverage proving invalid `boundedCapacity` surfaces
+  as a factory diagnostic when build failures are configured as diagnostics.
+
+## FluxFlow.Components.Http 3.0.1
+
+Hardens HTTP client node option validation.
+
+- `HttpClientNode` now rejects non-positive `BoundedCapacity`,
+  `MaxResponseBodyBytes`, and `MaxDegreeOfParallelism` during construction.
+- `DefaultTimeoutMilliseconds`, when configured, must now be greater than zero.
+- Adds direct standalone node tests for invalid option values.
+
+## FluxFlow.Components.Http.Composition 1.2.1
+
+Hardens config-bound HTTP client option diagnostics.
+
+- Invalid numeric `HttpClientNodeOptions` values now fail during composition
+  build through the `http.client` factory.
+- Adds hosted composition tests proving invalid config surfaces as factory
+  diagnostics when build failures are configured as diagnostics.
+
+## FluxFlow.Composition 1.0.3
+
+Hardens runtime builder cancellation cleanup.
+
+- `CompositionRuntimeBuilder.BuildAsync()` now disposes partially built nodes
+  and links before rethrowing cancellation or unexpected build exceptions.
+- Factory-thrown `OperationCanceledException` propagates when the build
+  cancellation token is already canceled instead of becoming a factory
+  diagnostic.
+- Adds a regression test proving cancellation after node creation disposes the
+  already-created node.
+
+## FluxFlow.Composition 1.0.2
+
+Hardens composed node cleanup.
+
+- `ComposedNode.DisposeAsync()` now attempts the descriptor cleanup hook even
+  when the wrapped node disposal path fails.
+- If both node disposal and the descriptor cleanup hook fail, the failures are
+  reported together as an aggregate exception.
+- Adds direct composed-node disposal tests so adapter-owned cleanup hooks remain
+  reliable during build failure cleanup and runtime disposal paths.
+
+## FluxFlow.Composition.Hosting 1.0.1
+
+Hardens hosted runtime lifecycle transitions.
+
+- `CompositionRuntimeHost` now serializes build/start/stop transitions through
+  the host lifecycle gate.
+- Repeated hosted or manual start calls no longer start the same runtime more
+  than once.
+- Repeated stop calls no longer complete an already stopped runtime again.
+- A runtime that has been stopped is not started again by the host.
+- Adds direct hosting tests with a non-idempotent source to prove the host owns
+  this lifecycle guarantee.
+
+## FluxFlow.Composition 1.0.1
+
+Hardens composition definition collection assignment.
+
+- `CompositionDefinition`, `WorkflowDefinition`, and `NodeDefinition` now copy
+  assigned dictionaries and lists so caller mutations cannot change a built
+  definition through the original collection references.
+- Definition dictionaries now normalize assigned collection comparers back to
+  ordinal key comparison.
+- Adds direct composition DTO tests for workflow, node, link, configuration,
+  and resource collection copy behavior.
+
+## FluxFlow.Nodes 1.1.1
+
+Hardens node envelope and diagnostic metadata snapshots.
+
+- `FlowMessage<T>.Headers` now copies assigned dictionaries so caller mutations
+  cannot change an existing message envelope.
+- `FlowEvent.Attributes` now copies assigned dictionaries so diagnostics remain
+  stable after creation.
+- Header and attribute snapshots use ordinal key comparison for deterministic
+  lookup across hosts.
+
+## FluxFlow.Mapping 1.0.1
+
+Hardens mapping context variable snapshots.
+
+- `FlowMapContext` now copies assigned variable dictionaries so caller
+  mutations cannot change an existing per-message context.
+- Assigned variables now use ordinal key comparison, keeping expression
+  variable lookup deterministic across hosts.
+- Adds direct `FluxFlow.Mapping` tests for context variable copy semantics.
+
+## FluxFlow.Components.Expressions 2.0.2
+
+Hardens expression engine registry name normalization.
+
+- `FlowExpressionEngineRegistry` now trims resolver lookup names before
+  invoking custom resolvers.
+- Blank resolver lookup names are normalized to the default-engine `null`
+  lookup, matching the built-in registry behavior.
+- Unknown-engine diagnostics now report the normalized engine name.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.3
+
+Hardens file-system storage backend options and lease caching.
+
+- `FileSystemStorageStoreOptions` now trims root, store name, and default
+  collection text when assigned.
+- Invalid `MaxValueBytes` values are rejected at option assignment.
+- Shared store leases now compare root paths with operating-system path
+  case-sensitivity instead of uppercasing paths before caching.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.3
+
+Hardens SQL-file storage backend options.
+
+- `SqlFileStorageStoreOptions` now trims database path, store name, and default
+  collection text when assigned.
+- Invalid `MaxValueBytes` and `BusyTimeoutMilliseconds` values are rejected at
+  option assignment.
+
+## FluxFlow.Components.Journal 2.0.2
+
+Hardens journal contract normalization.
+
+- `JournalRecord`, `JournalEventInput`, and `JournalQuery` now trim text fields
+  when assigned.
+- Attribute maps are normalized and copied on assignment so caller mutations do
+  not leak into records, event inputs, or queries.
+- `JournalQueryResult` now copies assigned record collections so returned
+  results remain stable after caller list mutations.
+- `JournalQueryMatcher.Validate()` now owns shared query validation for
+  invalid paging and inverted `From`/`To` time ranges, and the in-memory store
+  uses the same validator before matching records.
+
+## FluxFlow.Components.Configuration 1.1.4
+
+Hardens configuration diagnostic contracts.
+
+- Updates `FluxFlow.Components.Configuration` diagnostic and report contracts.
+- `ConfigurationDiagnostic` now trims text fields and treats blank optional
+  path/name/kind values as absent.
+- Diagnostic metadata is copied on assignment so later caller mutations do not
+  leak into diagnostics.
+- `ConfigurationValidationReport` now copies assigned diagnostic collections
+  and treats null assignments as an empty report.
+
+## FluxFlow.Components.Secrets 1.2.5
+
+Hardens secret collection diagnostics.
+
+- Null secret records are now reported as structured `InvalidSecret`
+  diagnostics at their collection index.
+- Unresolved-secret and option-resolution batch helpers now tolerate null
+  reference or option entries and return structured failed diagnostics.
+- Duplicate-secret checks now ignore null entries instead of surfacing
+  accidental null-reference failures.
+
+## FluxFlow.Components.Resources 1.2.4
+
+Hardens resource collection diagnostics.
+
+- Null resource descriptors are now reported as structured `InvalidResource`
+  diagnostics at their collection index.
+- Missing-resource and unused-resource helpers now tolerate null reference or
+  descriptor entries instead of surfacing accidental null-reference failures.
+
+## FluxFlow.Components.Metrics 3.0.3
+
+Hardens metrics option normalization and validation.
+
+- `MetricsAggregateOptions.GroupByTag` now trims surrounding whitespace and
+  treats blank values as absent.
+- Invalid rate windows, bounded capacities, and group limits are rejected at
+  option assignment.
+
+## FluxFlow.Components.Metrics 3.0.2
+
+Hardens metrics contract normalization.
+
+- `MetricSampleInput`, `MetricSnapshotOutput`, and `MetricGroupSnapshot` now
+  trim optional text values when assigned.
+- Tags, latest samples, and group snapshot maps are copied with ordinal key
+  comparison so later caller mutations do not leak into contracts.
+
+## FluxFlow.Components.State 3.0.4
+
+Hardens state reducer per-message operation validation.
+
+- Unsupported `StateReducerInput.Operation` values now emit `InvalidMessage`
+  errors instead of generic reducer failures.
+- Later valid messages continue processing after an unsupported operation.
+
+## FluxFlow.Components.State 3.0.3
+
+Hardens state reducer option normalization and validation.
+
+- `StateReducerOptions` now trims diagnostic text fields when assigned.
+- Missing reducers, empty key expressions, non-positive bounded capacities, and
+  negative max-key values are rejected at option assignment.
+
+## FluxFlow.Components.State 3.0.2
+
+Hardens state reducer contract normalization.
+
+- `StateReducerInput` and `StateReducerResult` now trim key text when assigned.
+- `StateReducerInput.Variables` is copied with ordinal key comparison so later
+  caller mutations do not leak into the message contract.
+
+## FluxFlow.Components.Sessions 3.1.4
+
+Hardens session query response validation.
+
+- `SessionQueryNode` now validates store-returned sessions against the
+  normalized name, prefix, tag, date range, active/completed, and limit filters.
+- Store results outside the query filter or above the requested limit now emit a
+  `QueryFailed` error instead of being silently emitted or truncated.
+
+## FluxFlow.Components.Sessions 3.1.3
+
+Hardens session store response validation.
+
+- `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode` now report
+  clear failures when a host store returns null sessions, records, query
+  results, or replay streams where `ISessionStore` requires a value.
+- Recorder and query nodes keep later-message continuation for recoverable store
+  contract failures.
+
+## FluxFlow.Components.Sessions 3.1.2
+
+Hardens session option normalization and validation.
+
+- `SessionRecorderOptions`, `SessionReplayOptions`, and `SessionQueryOptions`
+  now trim optional text and copy tag maps with ordinal key comparison.
+- Invalid bounded capacities, query limits, replay ranges, replay modes, and
+  timing values are rejected at option assignment.
+
+## FluxFlow.Components.Sessions 3.1.1
+
+Hardens session contract normalization.
+
+- Session request, record, metadata, and query result contracts now trim optional
+  text values and treat blank optional text as absent.
+- Tag and attribute maps are copied with ordinal key comparison when assigned.
+- Nested session/input contracts in append, complete, and query-result payloads
+  are copied so later caller mutations do not leak into the contract object.
+
+## FluxFlow.Components.Storage 3.0.9
+
+Hardens storage store non-null result handling.
+
+- `StoragePutNode`, `StorageQueryNode`, and `StorageDeleteNode` now report clear
+  operation failures when an injected store returns a null result where the
+  `IStorageStore` contract requires a value.
+- `StorageQueryNode` now also reports null records inside returned query
+  collections as `QueryFailed` errors.
+
+## FluxFlow.Components.Storage 3.0.8
+
+Hardens storage query response validation.
+
+- `StorageQueryNode` now rejects store query results that contain records outside
+  the normalized query filter.
+- Stores that return more records than the requested limit are now reported as
+  `QueryFailed` errors instead of being silently truncated.
+
+## FluxFlow.Components.Storage 3.0.7
+
+Hardens storage get response validation.
+
+- `StorageGetNode` now rejects store records returned for a different
+  collection or key.
+- Mismatched get records are reported as `GetFailed` errors instead of being
+  emitted on `Output` or `Found`.
+
+## FluxFlow.Components.Storage 3.0.6
+
+Hardens per-message storage write-mode validation.
+
+- `StoragePutNode` now reports unsupported `StoragePutRequest.Mode` values as
+  `InvalidRequest` errors.
+- Invalid write-mode messages no longer reach the injected store.
+- Later valid put messages continue processing normally.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.2
+
+Hardens file-system storage write-mode validation.
+
+- Direct `FileSystemStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.2
+
+Hardens SQL-file storage write-mode validation.
+
+- Direct `SqlFileStorageStore.PutAsync(...)` calls now reject unsupported
+  `StoragePutRequest.Mode` values.
+- Unsupported write modes are no longer treated as upserts.
+
+## FluxFlow.Components.Storage 3.0.5
+
+Hardens storage node option normalization and validation.
+
+- `StoragePutOptions`, `StorageGetOptions`, `StorageQueryOptions`, and
+  `StorageDeleteOptions` now trim default collections when assigned.
+- Blank default collections are treated as absent.
+- Non-positive bounded capacities are rejected at option assignment.
+- `StorageQueryOptions` now rejects negative offsets and non-positive limits.
+- `StoragePutOptions` now rejects unsupported write-mode values.
+
+## FluxFlow.Components.Storage 3.0.4
+
+Hardens storage output contract normalization.
+
+- `StorageRecord`, `StorageResult`, and `StorageQueryResult` now trim textual
+  identity and diagnostic fields when assigned.
+- Blank optional content-type, message, and correlation values are treated as
+  absent.
+- Output attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- `StorageQueryResult.Records` now copies assigned record lists so later caller
+  mutations do not change the result.
+
+## FluxFlow.Components.Storage 3.0.3
+
+Hardens storage request contract normalization.
+
+- `StoragePutRequest`, `StorageGetRequest`, `StorageQueryRequest`, and
+  `StorageDeleteRequest` now trim optional text fields when assigned.
+- Blank optional collection, key-prefix, content-type, and correlation values
+  are treated as absent.
+- Request attribute dictionaries are copied on assignment, use ordinal key
+  comparison, and treat null as empty.
+- Keeps required collection/key validation in nodes and stores so invalid
+  workflow messages still surface as storage errors.
+
+## FluxFlow.Components.Storage 3.0.2
+
+Hardens storage store context normalization.
+
+- `StorageStoreContext.StoreName` and `StorageStoreContext.Collection` now trim
+  surrounding whitespace when assigned.
+- Blank store names and collections are treated as absent before delegate-backed
+  factories receive the context.
+- Assigning a null `StorageStoreContext.Clock` now falls back to
+  `TimeProvider.System`.
+- Keeps store ownership, backend factories, storage nodes, and request
+  contracts unchanged.
+
+## FluxFlow.Components.RequestReply 1.1.2
+
+Hardens request/reply coordinator option validation.
+
+- `RequestReplyCoordinator<TRequest,TResponse>` now validates
+  `RequestReplyOptions.Mode` before creating dataflow blocks.
+- Capacity, timeout, and sweep interval validation now use one fail-fast
+  coordinator options path.
+- Invalid sweep intervals are rejected consistently, including fire-and-forget
+  mode where no tracker is created.
+- Keeps request correlation, fire-and-forget behavior, lifecycle completion,
+  and transport ownership unchanged.
+
+## FluxFlow.Components.Secrets 1.2.4
+
+Hardens secret metadata and attribute map normalization.
+
+- Secret descriptor metadata, secret reference attributes, and secret option
+  metadata now trim valid keys and values when assigned.
+- Duplicate map keys after trimming are reported as structured `InvalidSecret`
+  diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps secret resolution, redaction, option resolution, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.3
+
+Hardens resource metadata and attribute map normalization.
+
+- Resource descriptor metadata and resource reference attributes now trim valid
+  keys and values when assigned.
+- Duplicate map keys after trimming are reported as structured
+  `InvalidResource` diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps resource lookup, kind matching, and host-owned resource ownership
+  unchanged.
+
+## FluxFlow.Components.Configuration 1.1.3
+
+Hardens configuration resource option metadata normalization.
+
+- Updates `FluxFlow.Components.Configuration` validation contracts.
+- Resource option metadata now trims valid keys and values when assigned.
+- Duplicate metadata keys after trimming are reported as structured
+  configuration diagnostics.
+- Invalid maps are preserved for validation so null maps, blank keys, and blank
+  values still produce diagnostics instead of construction failures.
+- Keeps resource and secret lookup ownership unchanged.
+
+## FluxFlow.Components.Secrets 1.2.3
+
+Hardens secret scalar text normalization for config-bound callers.
+
+- Secret descriptors and references now trim version, kind, display name, and
+  summary fields when assigned.
+- Secret option references and option resolution results now trim option paths.
+- Secret resolution and duplicate detection now treat padded versions and kinds
+  as the same logical values.
+- Keeps secret values, redaction, metadata maps, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.2
+
+Hardens resource scalar text normalization for config-bound callers.
+
+- Resource descriptors and references now trim kind, display name, and summary
+  fields when assigned.
+- Resource lookup now treats padded kinds as the same logical kind.
+- Keeps resource names, metadata maps, attributes, and host-owned resource
+  ownership unchanged.
+
+## FluxFlow.Components.Configuration 1.1.2
+
+Hardens configuration option path normalization.
+
+- Updates `FluxFlow.Components.Configuration` validation contracts.
+- `ConfigurationResourceReference.Path` now trims surrounding whitespace when
+  assigned.
+- Resource diagnostics and option metadata now report the normalized option
+  path.
+- Keeps validation ownership, lookup behavior, and diagnostic codes unchanged.
+
+## FluxFlow.Components.Secrets 1.2.2
+
+Hardens secret name handling for config-bound callers.
+
+- `SecretName` now trims surrounding whitespace at construction.
+- Secret records and references whose names differ only by padding now resolve
+  to the same logical name.
+- Duplicate secret detection now catches padded forms of the same name.
+- Keeps secret values, versions, kinds, redaction, and host-owned resolver
+  behavior unchanged.
+
+## FluxFlow.Components.Resources 1.2.1
+
+Hardens resource name handling for config-bound callers.
+
+- `ResourceName` now trims surrounding whitespace at construction.
+- Resource descriptors and references whose names differ only by padding now
+  resolve to the same logical name.
+- Duplicate resource detection now catches padded forms of the same name.
+- Keeps resource kinds, metadata, attributes, and host-owned resource ownership
+  unchanged.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.1
+
+Hardens file-system storage attribute handling.
+
+- Normalizes attribute keys and values before persistence and query matching.
+- Rejects blank attribute keys/values and duplicate attribute keys after
+  trimming.
+- Keeps file layout, value serialization, store factory sharing, and host-owned
+  storage setup unchanged.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.1
+
+Hardens SQL-file storage attribute handling.
+
+- Normalizes attribute keys and values before persistence and query matching.
+- Rejects blank attribute keys/values and duplicate attribute keys after
+  trimming.
+- Keeps database schema, value serialization, owned lease behavior, and
+  host-owned storage setup unchanged.
+
+## FluxFlow.Components.Journal 2.0.1
+
+Hardens journal record normalization.
+
+- Trims optional journal record and event-mapped text fields consistently.
+- Normalizes journal attribute keys and values, rejects blank attribute values,
+  and reports duplicate attribute keys after trimming.
+- Keeps journal storage, query, retention, and runtime-neutral contracts
+  unchanged.
+
+## FluxFlow.Components.Configuration 1.1.1
+
+Hardens configuration validation for null config-bound collections.
+
+- Updates `FluxFlow.Components.Configuration` validation helpers.
+- Reports null `Resources` and `Secrets` collections on
+  `ConfigurationValidationRequest` as structured configuration diagnostics.
+- Reports null resource or secret validation entries by index instead of
+  throwing during validation.
+- Keeps resource and secret lookup ownership unchanged.
+
+## FluxFlow.Components.Storage 3.0.1
+
+Hardens delegate-backed storage factory registration.
+
+- `StorageComponentOptions.UseStore(...)` now rejects a null context before
+  invoking the host delegate and reports a clear error when the delegate returns
+  a null lease.
+- `UseSharedStore(Func<StorageStoreContext,IStorageStore>)` now reports a clear
+  error when the delegate returns a null store.
+- Keeps store ownership and backend adapter behavior unchanged.
+
+## FluxFlow.Components.Secrets 1.2.1
+
+Hardens secret option batch resolution contracts.
+
+- `SecretOptionResolver.ResolveAllAsync(...)` now validates the resolver
+  argument before returning an empty result.
+- Keeps secret resolution, redaction, and host-owned secret ownership
+  unchanged.
+
+## FluxFlow.Components.Resources 1.2.0
+
+Hardens resource metadata validation for config-bound callers.
+
+- Reports null descriptor metadata and reference attributes as structured
+  `InvalidResource` diagnostics instead of throwing.
+- Keeps resource lookup, duplicate detection, and host-owned resource ownership
+  unchanged.
+
+## FluxFlow.Components.Expressions 2.0.1
+
+Fixes named-only expression engine registration.
+
+- `FlowExpressionEngineRegistry.Use(engine, useAsDefault: false)` no longer
+  makes the first registered engine the default fallback.
+- Named resolution still works for named-only engines.
+- Existing default engines remain unchanged when later named-only engines are
+  registered.
+
+## FluxFlow.Components.Designer 2.2.1
+
+Hardens component design metadata validation for config-bound callers.
+
+- Reports null top-level option, resource, port, and attribute collections as
+  validation diagnostics instead of throwing.
+- Reports null nested option choices, attributes, and list entries as validation
+  diagnostics.
+- Keeps the Designer contracts engine/composition neutral.
+
+## FluxFlow.Components.RequestReply 1.1.1
+
+Fixes request/reply coordinator lifecycle completion.
+
+- `RequestReplyCoordinator<TRequest,TResponse>.Complete()` now closes both
+  coordinator inputs, completes output/diagnostic ports, and fails in-flight
+  callers with `OperationCanceledException`.
+- `DisposeAsync()` now settles `Completion` instead of leaving awaiters blocked
+  on the response input block.
+- Keeps fault semantics unchanged: `Fault(exception)` still faults dataflow
+  blocks and fails in-flight callers with the original exception.
+
+## FluxFlow.Components.Secrets 1.2.0
+
+Hardens secret metadata validation for config-bound callers.
+
+- Reports null descriptor metadata, reference attributes, and option metadata as
+  structured `InvalidSecret` diagnostics instead of throwing.
+- Keeps secret resolution, redaction, and host-owned secret ownership unchanged.
+
+## FluxFlow.Components.Configuration 1.1.0
+
+Hardens configuration resource-option metadata validation.
+
+- Updates `FluxFlow.Components.Configuration` validation helpers.
+- Reports null, empty-key, and empty-value resource option metadata as
+  structured `InvalidResourceReference` diagnostics.
+- Keeps resource and secret lookup ownership unchanged; this package still only
+  normalizes validation reports.
+
+## FluxFlow.Components.Journal 2.0.0
+
+Breaking support-package boundary cleanup.
+
+- Removes the Journal package dependency on `FluxFlow.Engine`.
+- Replaces the engine-specific `FlowEventJournalRecordMapper` API with neutral
+  `JournalEventInput` and `JournalRecordMapper` contracts.
+- Keeps journal records, queries, retention, `IJournalStore`, and
+  `InMemoryJournalStore` behavior unchanged.
+
+## FluxFlow.Components.Storage.FileSystem 3.1.0
+
+Fixes context-aware file-system store factory sharing.
+
+- Includes default collection and clock identity in the shared store cache key,
+  preventing later leases for the same root and store name from inheriting the
+  first opened context defaults.
+- Keeps the shared-lease model for same-context opens so in-process optimistic
+  concurrency remains coordinated by one store instance.
+- Corrects file-system storage docs to use `StorageStoreContext.Collection` and
+  describe shared factory leases.
+
+## FluxFlow.Components.Storage.SqlFile 3.1.0
+
+Clarifies SQL-file store context scoping and path policy.
+
+- Adds regression coverage for rejecting absolute database paths when
+  `AllowAbsoluteDatabasePath` is disabled.
+- Verifies factory-opened stores keep context collection values ahead of option
+  defaults while returning owned leases.
+- Corrects SQL-file storage docs to use `StorageStoreContext.Collection` and
+  document owned per-open leases.
+
+## FluxFlow.Nodes 1.1.0
+
+Adds bounded source-output support for standalone source nodes.
+
+- Adds `FlowSourceOptions` with explicit output capacity configuration.
+- Adds awaitable `FlowSource<TOutput>` emission so source loops can await
+  bounded broadcast output acceptance.
+- Keeps existing source behavior unbounded by default for sources that do not
+  pass `FlowSourceOptions`.
+- Updates loop-driven source components to wire their existing
+  `BoundedCapacity` options into the shared source output contract.
+
+## FluxFlow.Components.Sources 3.1.0
+
+Wires source bounded-capacity options into the shared source-output contract.
+
+- `source.generated` and `source.sequence` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Loop-driven source emission awaits bounded broadcast output acceptance.
+- Output remains broadcast/latest-wins; use a dedicated durable buffer when a
+  workflow edge must guarantee no loss.
+- Keeps item materialization, timing, fresh correlation ids, diagnostics, and
+  standalone construction behavior unchanged.
+
+## FluxFlow.Components.Timers 3.1.0
+
+Wires timer source bounded-capacity options into the shared source-output
+contract.
+
+- `timer.interval` and `timer.schedule` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Timer source loops await bounded broadcast output acceptance.
+- Output remains broadcast/latest-wins; use a dedicated durable buffer when a
+  workflow edge must guarantee no loss.
+- Transform timer nodes keep their existing bounded input behavior.
+
+## FluxFlow.Components.FileSystem 3.1.0
+
+Wires file-system source bounded-capacity options into the shared source-output
+contract.
+
+- `directory.enumerate` and `file.watch` now pass `boundedCapacity` to
+  `FluxFlow.Nodes` source output configuration.
+- Directory enumeration awaits bounded broadcast output acceptance.
+- Source outputs remain broadcast/latest-wins; use a dedicated durable buffer
+  when a workflow edge must guarantee no loss.
+- File watching keeps nonblocking watcher callbacks while using the configured
+  bounded source output.
+
+## FluxFlow.Components.Sessions 3.1.0
+
+Wires session replay bounded-capacity options into the shared source-output
+contract.
+
+- `session.replay` now passes `boundedCapacity` to `FluxFlow.Nodes` source
+  output configuration.
+- Replay awaits bounded broadcast output acceptance while preserving store
+  ownership, replay pacing, correlation, diagnostics, and standalone
+  construction behavior.
+
+## FluxFlow.Components.Mqtt 4.1.0
+
+Wires MQTT trigger bounded-capacity options into the shared source-output
+contract.
+
+- `mqtt.trigger` now passes `boundedCapacity` to `FluxFlow.Nodes` bounded
+  broadcast source output.
+- Trigger receive processing awaits output-block acceptance before
+  `OnEmit` acknowledgement.
+- The same `boundedCapacity` option continues to bound the request/reply
+  `Responses` target capacity.
+
+## FluxFlow.Components.Mqtt.Composition 1.3.0
+
+Aligns MQTT trigger composition packaging with the `FluxFlow.Components.Mqtt`
+4.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated trigger behavior for hosts using `mqtt.trigger` through
+  `FluxFlow.Composition`.
+
+## FluxFlow.Components.Sources.Composition 1.3.0
+
+Aligns source composition packaging with the `FluxFlow.Components.Sources`
+3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated `source.generated` and `source.sequence` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.Timers.Composition 1.4.0
+
+Aligns timer composition packaging with the `FluxFlow.Components.Timers` 3.1.0
+bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, and Designer metadata
+  unchanged.
+- Packages the updated `timer.interval` and `timer.schedule` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.FileSystem.Composition 1.3.0
+
+Aligns file-system composition packaging with the
+`FluxFlow.Components.FileSystem` 3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, path policy, and
+  Designer metadata unchanged.
+- Packages the updated `directory.enumerate` and `file.watch` source-output
+  capacity behavior for composition hosts.
+
+## FluxFlow.Components.Sessions.Composition 1.3.0
+
+Aligns sessions composition packaging with the `FluxFlow.Components.Sessions`
+3.1.0 bounded source-output capacity support.
+
+- Keeps composition registration APIs, resources, ports, store ownership, and
+  Designer metadata unchanged.
+- Packages the updated `session.replay` source-output capacity behavior for
+  composition hosts.
+
 ## FluxFlow.Components.Designer 2.2.0
 
 Adds neutral resource metadata contracts for package-owned design metadata.
@@ -93,6 +3058,16 @@ timeout core for transport nodes that own their own ports and acknowledgement po
 `RequestReplyCoordinator<TRequest, TResponse>` now uses the tracker internally without changing
 its public coordinator behavior.
 
+## FluxFlow.Components.Assertions 3.0.1
+
+Aligns assertion node constructor option validation with the standalone node
+family.
+
+- Reports missing `expression` and empty `inputType` as `ArgumentException`.
+- Reports non-positive `boundedCapacity` as `ArgumentOutOfRangeException`.
+- Leaves runtime assertion evaluation, routing, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Assertions 3.0.0
 
 Engine-free standalone rewrite over the FluxFlow.Nodes kit. The assertion node is a
@@ -152,6 +3127,17 @@ factories, binds `ControlExpressionOptions` from composition configuration, and
 resolves keyed `IFlowExpressionEngine`, `IFlowMapContextFactory<TInput>`, and
 `TimeProvider` resources through `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Expectations 3.0.1
+
+Aligns event expectation constructor option validation with the standalone node
+family.
+
+- Reports invalid `timeoutMilliseconds`, `maxObservedEvents`,
+  `maxPreviewChars`, and `boundedCapacity` as
+  `ArgumentOutOfRangeException`.
+- Leaves expectation matching, timeout resolution, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Expectations 3.0.0
 
 Engine-free standalone rewrite. The expectation node is a `FlowNode` with a deterministic
@@ -181,10 +3167,30 @@ factory, binds `EventExpectationOptions` from composition configuration, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.FileSystem 3.0.1
+
+Aligns file-system constructor option validation with the standalone node
+family.
+
+- Reports invalid `boundedCapacity` with FileSystem node option names for
+  `file.read`, `file.write`, `directory.enumerate`, and `file.watch`.
+- Ensures `file.read` validates `maxBytes` before base-node setup.
+- Leaves file reading, writing, enumeration, watching, path policy, diagnostics,
+  and error-port behavior unchanged for valid options.
+
 ## FluxFlow.Components.FileSystem 3.0.0
 
 Engine-free standalone rewrite. Read/write are `FlowNode`s; directory-enumerate and file-watch
 are `FlowSource`s (the watcher is disposed in `OnDisposeAsync`). Engine glue removed.
+
+## FluxFlow.Components.FileSystem.Composition 1.2.0
+
+Adds Designer resource metadata for file-system composition nodes.
+
+- Describes the optional `clock` resource separately from editable file-system
+  options.
+- Keeps runtime behavior unchanged; hosts still own keyed clock registration
+  and lifetime.
 
 ## FluxFlow.Components.FileSystem.Composition 1.1.0
 
@@ -260,6 +3266,17 @@ mapper nodes. The package registers explicit `flow.mapper` factories, binds
 `IFlowExpressionEngine`, `IMappingContextFactory`, and `TimeProvider` resources
 through `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Metrics 3.0.1
+
+Aligns metrics aggregate constructor option validation with the standalone node
+family.
+
+- Reports invalid `rateWindowSeconds`, `boundedCapacity`, and `maxGroups` as
+  `ArgumentOutOfRangeException` with metrics option names.
+- Rejects non-finite rate windows before rate calculations are configured.
+- Leaves aggregation, grouping, diagnostics, and error-port behavior unchanged
+  for valid options.
+
 ## FluxFlow.Components.Metrics 3.0.0
 
 Engine-free standalone rewrite. The aggregate node is a `FlowNode`; in coalesce mode the single
@@ -319,6 +3336,18 @@ Targets Pulse MQTT `2.0.0`, using explicit broker subscriptions plus local route
 
 Engine-free standalone rewrite. Logger/counter/metrics are `FlowNode` transforms over the kit.
 Engine glue removed.
+
+## FluxFlow.Components.Observability.Composition 1.2.0
+
+Adds Designer resource metadata for observability composition nodes.
+
+- Describes the counter `engine`, `contextFactory`, and `clock` resources,
+  including the conditional engine requirement for predicate/expression
+  configuration.
+- Describes logger `clock` plus the dynamic `attribute:{name}` selector
+  resource pattern.
+- Describes metrics `sizeSelector` and `clock` resources separately from
+  editable observability node options.
 
 ## FluxFlow.Components.Observability.Composition 1.1.0
 
@@ -389,6 +3418,16 @@ factory, binds `PayloadInspectOptions` from composition configuration, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.Projections 3.0.1
+
+Aligns event projection constructor option validation with the standalone node
+family.
+
+- Reports non-positive `boundedCapacity` as `ArgumentOutOfRangeException` with
+  the projection option name.
+- Leaves projection counting, rate calculation, diagnostics, and error-port
+  behavior unchanged.
+
 ## FluxFlow.Components.Projections 3.0.0
 
 Engine-free standalone rewrite. The event-projection node is a `FlowNode` over a
@@ -423,6 +3462,16 @@ resolves optional keyed `TimeProvider` resources through
 Engine-free standalone rewrite. Switch/Fork/Correlation/Window are `FlowNode`s (multi-output via
 `AddOutput`), Merge fans in to a single Input, and Join is a self-contained two-input node over
 the kit's envelope/error/event primitives. Engine glue removed.
+
+## FluxFlow.Components.Routing.Composition 1.2.0
+
+Adds Designer resource metadata for routing composition nodes.
+
+- Describes selector delegate resources required by `flow.switch`,
+  `flow.correlation`, and `flow.join`.
+- Describes the optional `clock` resource for all routing node factories.
+- Keeps dynamic switch/fork output options as editable configuration because
+  those ports are created after factory option binding.
 
 ## FluxFlow.Components.Routing.Composition 1.1.0
 
@@ -478,6 +3527,15 @@ Engine-free standalone rewrite. Recorder is a `FlowNode`, replay is a `FlowSourc
 injected `TimeProvider`), query fans out via `AddOutput`. A mid-stream store failure reports
 `ReplayFailed` before faulting. Engine glue removed.
 
+## FluxFlow.Components.Sessions.Composition 1.2.0
+
+Adds Designer resource metadata for session composition nodes.
+
+- Describes the required `store` resource and optional `clock` resource
+  separately from editable session options.
+- Keeps runtime behavior unchanged; hosts still own keyed session store and
+  clock registration and lifetime.
+
 ## FluxFlow.Components.Sessions.Composition 1.1.0
 
 Adds package-owned Designer metadata for `session.recorder`, `session.replay`,
@@ -523,10 +3581,30 @@ deserializes inline generated `items` into closed generic output types, and
 resolves optional keyed `TimeProvider` resources through
 `FluxFlow.Composition.Hosting`.
 
+## FluxFlow.Components.State 3.0.1
+
+Aligns state reducer constructor option validation with the standalone node
+family.
+
+- Reports missing `reducer` and empty `keyExpression` as `ArgumentException`.
+- Reports non-positive `boundedCapacity` and negative `maxKeys` as
+  `ArgumentOutOfRangeException`.
+- Leaves reducer execution, state updates, diagnostics, and error-port behavior
+  unchanged.
+
 ## FluxFlow.Components.State 3.0.0
 
 Engine-free standalone rewrite. The reducer node is a `FlowNode` over the kit, timed against an
 injected `TimeProvider`. Engine glue removed.
+
+## FluxFlow.Components.State.Composition 1.2.0
+
+Adds Designer resource metadata for `state.reducer`.
+
+- Describes the required `engine` resource and optional `clock` resource
+  separately from editable reducer options.
+- Keeps runtime behavior unchanged; hosts still own keyed expression engine and
+  clock registration and lifetime.
 
 ## FluxFlow.Components.State.Composition 1.1.0
 
@@ -549,6 +3627,15 @@ Engine-free standalone rewrite. Put/get/query/delete are `FlowNode`s taking an i
 `IStorageStore` (the host owns the store lifetime, like `HttpClient`); the in-graph
 storage-connection resource node is removed. Get/query fan out via `AddOutput`. The
 `IStorageStore` contract + store context/lease/factory are preserved for the adapters.
+
+## FluxFlow.Components.Storage.Composition 1.2.0
+
+Adds Designer resource metadata for storage composition nodes.
+
+- Describes the required `store` resource and optional `clock` resource
+  separately from editable storage options.
+- Keeps runtime behavior unchanged; hosts still own keyed storage store and
+  clock registration and lifetime.
 
 ## FluxFlow.Components.Storage.Composition 1.1.0
 
@@ -585,6 +3672,17 @@ Engine-free standalone rewrite. Interval/schedule are `FlowSource`s; delay/throt
 `FlowNode`s, all timed against an injected `TimeProvider`. Delay preserves constant-offset-from-
 arrival burst semantics; debounce flushes its pending item via the drain hook. Engine glue
 removed.
+
+## FluxFlow.Components.Timers.Composition 1.3.0
+
+Adds explicit Designer metadata for the intentionally omitted schedule
+`timeZone` option.
+
+- Marks `timeZone` as omitted from editable schedule metadata because
+  `TimerScheduleSettings.TimeZone` requires typed `TimeZoneInfo`
+  configuration.
+- Keeps runtime behavior unchanged; the composition adapter still does not add
+  time-zone id conversion.
 
 ## FluxFlow.Components.Timers.Composition 1.2.0
 

@@ -14,6 +14,11 @@ public sealed class MqttNetMessageMapperTests
     [Fact]
     public void ToApplicationMessage_MapsPublishMetadata()
     {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "alpha"
+        };
+
         var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
         {
             Topic = "devices/a",
@@ -25,10 +30,7 @@ public sealed class MqttNetMessageMapperTests
             {
                 CorrelationId = "corr-1",
                 ResponseTopic = "devices/a/reply",
-                UserProperties =
-                {
-                    ["tenant"] = "alpha"
-                }
+                UserProperties = userProperties
             }
         });
 
@@ -41,6 +43,59 @@ public sealed class MqttNetMessageMapperTests
         message.ResponseTopic.ShouldBe("devices/a/reply");
         message.UserProperties.Single().Name.ShouldBe("tenant");
         message.UserProperties.Single().ReadValueAsString().ShouldBe("alpha");
+    }
+
+    [Fact]
+    public void ToApplicationMessage_copies_payload_for_adapter_handoff()
+    {
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1, 2, 3]
+        };
+
+        var message = MqttNetMessageMapper.ToApplicationMessage(request);
+
+        request.Payload[0] = 9;
+
+        ToArray(message.Payload).ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
+    public void ToApplicationMessage_treats_null_user_property_maps_as_empty()
+    {
+        var message = MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1],
+            Properties = new MqttPublishProperties
+            {
+                UserProperties = null!
+            }
+        });
+
+        (message.UserProperties?.Count ?? 0).ShouldBe(0);
+    }
+
+    [Fact]
+    public void ToApplicationMessage_rejects_null_named_user_property_values()
+    {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = null!
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
+            MqttNetMessageMapper.ToApplicationMessage(new MqttPublishRequest
+            {
+                Topic = "devices/a",
+                Payload = [1],
+                Properties = new MqttPublishProperties
+                {
+                    UserProperties = userProperties
+                }
+            }))
+            .ParamName.ShouldBe("value");
     }
 
     [Fact]
@@ -73,6 +128,12 @@ public sealed class MqttNetMessageMapperTests
         received.CorrelationData.ShouldBe(Encoding.UTF8.GetBytes("corr-2"));
         received.UserProperties["source"].ShouldBe("sensor");
     }
+
+    [Fact]
+    public void ToUtf8Memory_rejects_null_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            MqttNetMessageMapper.ToUtf8Memory(null!))
+            .ParamName.ShouldBe("value");
 
     private static byte[] ToArray(ReadOnlySequence<byte> payload)
     {

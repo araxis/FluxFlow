@@ -8,6 +8,13 @@ internal static class ReleaseScriptRunner
         string root,
         string scriptName,
         params string[] arguments)
+        => await RunAsync(root, scriptName, environment: null, arguments);
+
+    public static async Task<ReleaseScriptResult> RunAsync(
+        string root,
+        string scriptName,
+        IReadOnlyDictionary<string, string?>? environment,
+        params string[] arguments)
     {
         var executable = ReleaseTestPaths.FindScriptHost();
         var scriptPath = Path.Combine(root, "eng", scriptName);
@@ -17,6 +24,17 @@ internal static class ReleaseScriptRunner
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
+
+        if (environment is not null)
+        {
+            foreach (var entry in environment)
+            {
+                if (entry.Value is null)
+                    startInfo.Environment.Remove(entry.Key);
+                else
+                    startInfo.Environment[entry.Key] = entry.Value;
+            }
+        }
 
         startInfo.ArgumentList.Add("-NoLogo");
         startInfo.ArgumentList.Add("-NoProfile");

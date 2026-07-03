@@ -12,11 +12,12 @@ internal static class MqttNetMessageMapper
     public static MqttApplicationMessage ToApplicationMessage(MqttPublishRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(request.Payload);
+        var payload = request.Payload;
+        ArgumentNullException.ThrowIfNull(payload);
 
         var builder = new MqttApplicationMessageBuilder()
             .WithTopic(request.Topic)
-            .WithPayload(request.Payload)
+            .WithPayload(payload.ToArray())
             .WithQualityOfServiceLevel(ToMqttNetQualityOfService(request.QualityOfService))
             .WithRetainFlag(request.Retain);
 
@@ -100,6 +101,11 @@ internal static class MqttNetMessageMapper
             builder.WithResponseTopic(properties.ResponseTopic);
         }
 
+        if (properties.UserProperties is null)
+        {
+            return;
+        }
+
         foreach (var (name, value) in properties.UserProperties)
         {
             if (!string.IsNullOrWhiteSpace(name))
@@ -135,7 +141,10 @@ internal static class MqttNetMessageMapper
     }
 
     public static ReadOnlyMemory<byte> ToUtf8Memory(string value)
-        => Encoding.UTF8.GetBytes(value);
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return Encoding.UTF8.GetBytes(value);
+    }
 
     private static byte[] ToArray(ReadOnlySequence<byte> payload)
     {

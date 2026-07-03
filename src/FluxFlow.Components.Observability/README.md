@@ -19,6 +19,10 @@ and diagnostics flow on `Events`. The package emits neutral contracts only — h
 decide whether those entries or snapshots become app logs, dashboards, files,
 telemetry, or test assertions.
 
+All observability nodes require a non-empty `InputType` and `BoundedCapacity`
+greater than zero. Invalid options fail fast during node construction before the
+input pipeline is created. Logger `Level` is also validated during construction.
+
 ## Counter
 
 ```csharp
@@ -106,6 +110,10 @@ The composition adapter binds the existing options records from node
 configuration. It resolves host-owned keyed resources for `clock`, counter
 `engine` and `contextFactory`, metrics `sizeSelector`, and logger attribute
 selectors named as `attribute:{name}`.
+Invalid observability options, such as blank `inputType`, non-positive
+`boundedCapacity`, or unsupported logger `level`, fail during composition build
+and surface as factory diagnostics when build failures are configured as
+diagnostics.
 
 The optional composition package also exposes
 `ObservabilityComponentDesignMetadataProvider` for neutral Designer metadata

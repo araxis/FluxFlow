@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.FileSystem.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem.Composition</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.5.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow.Composition registration helpers for standalone file system nodes over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;files;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds package-owned Designer metadata for file system composition nodes while keeping file-system runtime behavior, path policy, and host-owned clock resources unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -23,7 +23,6 @@
     <ProjectReference Include="..\FluxFlow.Components.FileSystem\FluxFlow.Components.FileSystem.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

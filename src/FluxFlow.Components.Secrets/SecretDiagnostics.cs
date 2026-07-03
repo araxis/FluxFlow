@@ -16,6 +16,12 @@ public static class SecretDiagnostics
             var record = materialized[index];
             var path = $"secrets[{index}]";
 
+            if (record is null)
+            {
+                diagnostics.Add(Invalid(path, "Secret record is required."));
+                continue;
+            }
+
             if (record.Descriptor is null)
             {
                 diagnostics.Add(Invalid(path, "Secret descriptor is required."));
@@ -30,7 +36,7 @@ public static class SecretDiagnostics
             }
         }
 
-        diagnostics.AddRange(FindDuplicateSecrets(materialized.Where(record => record.Descriptor is not null)));
+        diagnostics.AddRange(FindDuplicateSecrets(materialized.OfType<SecretRecord>().Where(record => record.Descriptor is not null)));
         return diagnostics;
     }
 
@@ -111,6 +117,7 @@ public static class SecretDiagnostics
         ArgumentNullException.ThrowIfNull(records);
 
         return records
+            .OfType<SecretRecord>()
             .Where(record => record.Descriptor is not null)
             .Where(record => !string.IsNullOrWhiteSpace(record.Descriptor.Name.Value))
             .GroupBy(record => new SecretRecordKey(record.Descriptor.Name, record.Descriptor.Version))
@@ -137,20 +144,30 @@ public static class SecretDiagnostics
         ArgumentNullException.ThrowIfNull(references);
 
         var diagnostics = new List<SecretDiagnostic>();
+        var index = 0;
         foreach (var reference in references)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (reference is null)
+            {
+                diagnostics.Add(Invalid($"references[{index}]", "Secret reference is required."));
+                index++;
+                continue;
+            }
 
             var referenceDiagnostics = ValidateReference(reference);
             if (referenceDiagnostics.Count > 0)
             {
                 diagnostics.AddRange(referenceDiagnostics);
+                index++;
                 continue;
             }
 
             var result = await resolver.ResolveAsync(reference, cancellationToken).ConfigureAwait(false);
             if (result.Diagnostic is not null)
                 diagnostics.Add(result.Diagnostic);
+
+            index++;
         }
 
         return diagnostics;
@@ -202,10 +219,16 @@ public static class SecretDiagnostics
     }
 
     private static void ValidateMap(
-        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, string>? values,
         string path,
         ICollection<SecretDiagnostic> diagnostics)
     {
+        if (values is null)
+        {
+            diagnostics.Add(Invalid(path, "Map cannot be null."));
+            return;
+        }
+
         foreach (var value in values)
         {
             if (string.IsNullOrWhiteSpace(value.Key))
@@ -214,13 +237,19 @@ public static class SecretDiagnostics
             if (string.IsNullOrWhiteSpace(value.Value))
                 diagnostics.Add(Invalid($"{path}.{value.Key}", "Values are required."));
         }
+
+        foreach (var key in SecretContractMap.FindDuplicateNormalizedKeys(values))
+        {
+            diagnostics.Add(Invalid(path, $"Key '{key}' is declared more than once after trimming."));
+        }
     }
 
     private static IReadOnlyDictionary<string, string> AddPath(
-        IReadOnlyDictionary<string, string> metadata,
+        IReadOnlyDictionary<string, string>? metadata,
         string optionPath)
     {
-        var values = metadata.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var values = metadata?.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)
+            ?? new Dictionary<string, string>(StringComparer.Ordinal);
         if (values.TryGetValue("path", out var referencePath))
             values["referencePath"] = referencePath;
 

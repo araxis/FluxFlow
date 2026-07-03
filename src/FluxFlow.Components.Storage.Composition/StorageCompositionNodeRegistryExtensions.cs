@@ -2,7 +2,7 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Storage.Composition;
 
@@ -102,18 +102,16 @@ public static class StorageCompositionNodeRegistryExtensions
             ]);
     }
 
-    private static ValueTask<ComposedNode> CreateStoragePutNode(
+    private static async ValueTask<ComposedNode> CreateStoragePutNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StoragePutOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
-        var store = context.GetRequiredResource<IStorageStore>(
-            StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
             StorageCompositionResourceNames.Clock);
-        var node = new StoragePutNode(store, options, clock);
+        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
+        var node = new StoragePutNode(store.Store, options, clock);
 
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ComposedNode.Create(
             node,
             inputs:
             [
@@ -128,21 +126,20 @@ public static class StorageCompositionNodeRegistryExtensions
                     node.Output)
             ],
             events: node.Events,
-            errors: node.Errors));
+            errors: node.Errors,
+            disposeAsync: store.DisposeAsync);
     }
 
-    private static ValueTask<ComposedNode> CreateStorageGetNode(
+    private static async ValueTask<ComposedNode> CreateStorageGetNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageGetOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
-        var store = context.GetRequiredResource<IStorageStore>(
-            StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
             StorageCompositionResourceNames.Clock);
-        var node = new StorageGetNode(store, options, clock);
+        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
+        var node = new StorageGetNode(store.Store, options, clock);
 
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ComposedNode.Create(
             node,
             inputs:
             [
@@ -163,21 +160,20 @@ public static class StorageCompositionNodeRegistryExtensions
                     node.NotFound)
             ],
             events: node.Events,
-            errors: node.Errors));
+            errors: node.Errors,
+            disposeAsync: store.DisposeAsync);
     }
 
-    private static ValueTask<ComposedNode> CreateStorageQueryNode(
+    private static async ValueTask<ComposedNode> CreateStorageQueryNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageQueryOptions>();
-        ValidateQueryOptions(options);
-        var store = context.GetRequiredResource<IStorageStore>(
-            StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
             StorageCompositionResourceNames.Clock);
-        var node = new StorageQueryNode(store, options, clock);
+        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
+        var node = new StorageQueryNode(store.Store, options, clock);
 
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ComposedNode.Create(
             node,
             inputs:
             [
@@ -195,21 +191,20 @@ public static class StorageCompositionNodeRegistryExtensions
                     node.Records)
             ],
             events: node.Events,
-            errors: node.Errors));
+            errors: node.Errors,
+            disposeAsync: store.DisposeAsync);
     }
 
-    private static ValueTask<ComposedNode> CreateStorageDeleteNode(
+    private static async ValueTask<ComposedNode> CreateStorageDeleteNode(
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageDeleteOptions>();
-        ValidateBoundedCapacity(options.BoundedCapacity);
-        var store = context.GetRequiredResource<IStorageStore>(
-            StorageCompositionResourceNames.Store);
         var clock = context.GetResource<TimeProvider>(
             StorageCompositionResourceNames.Clock);
-        var node = new StorageDeleteNode(store, options, clock);
+        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
+        var node = new StorageDeleteNode(store.Store, options, clock);
 
-        return ValueTask.FromResult(ComposedNode.Create(
+        return ComposedNode.Create(
             node,
             inputs:
             [
@@ -224,32 +219,63 @@ public static class StorageCompositionNodeRegistryExtensions
                     node.Output)
             ],
             events: node.Events,
-            errors: node.Errors));
+            errors: node.Errors,
+            disposeAsync: store.DisposeAsync);
     }
 
-    private static void ValidateQueryOptions(StorageQueryOptions options)
+    private static async ValueTask<ResolvedStorageStore> ResolveStoreAsync(
+        CompositionNodeFactoryContext context,
+        string? collection)
     {
-        ValidateBoundedCapacity(options.BoundedCapacity);
+        var key = context.GetRequiredResourceKey(StorageCompositionResourceNames.Store);
+        var store = context.Services.GetKeyedService<IStorageStore>(key);
+        if (store is not null)
+            return ResolvedStorageStore.Shared(store);
 
-        if (options.Offset < 0)
+        var factory = context.Services.GetKeyedService<IStorageStoreFactory>(key);
+        if (factory is null)
         {
             throw new InvalidOperationException(
-                "storage.query configuration offset cannot be negative.");
+                $"Node '{context.WorkflowName}.{context.NodeName}' resource " +
+                $"'{StorageCompositionResourceNames.Store}' references '{key}', but no keyed " +
+                $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)} service is registered.");
         }
 
-        if (options.Limit <= 0)
-        {
-            throw new InvalidOperationException(
-                "storage.query configuration limit must be greater than zero.");
-        }
+        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
+        var lease = await factory
+            .OpenAsync(new StorageStoreContext
+            {
+                StoreName = key,
+                Collection = collection,
+                Clock = clock ?? TimeProvider.System
+            })
+            .ConfigureAwait(false);
+
+        return ResolvedStorageStore.Leased(lease);
     }
 
-    private static void ValidateBoundedCapacity(int boundedCapacity)
+    private sealed class ResolvedStorageStore
     {
-        if (boundedCapacity <= 0)
+        private readonly StorageStoreLease? _lease;
+
+        private ResolvedStorageStore(IStorageStore store, StorageStoreLease? lease)
         {
-            throw new InvalidOperationException(
-                "boundedCapacity must be greater than zero.");
+            Store = store ?? throw new ArgumentNullException(nameof(store));
+            _lease = lease;
         }
+
+        public IStorageStore Store { get; }
+
+        public static ResolvedStorageStore Shared(IStorageStore store)
+            => new(store, lease: null);
+
+        public static ResolvedStorageStore Leased(StorageStoreLease lease)
+        {
+            ArgumentNullException.ThrowIfNull(lease);
+            return new ResolvedStorageStore(lease.Store, lease);
+        }
+
+        public ValueTask DisposeAsync()
+            => _lease?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 }

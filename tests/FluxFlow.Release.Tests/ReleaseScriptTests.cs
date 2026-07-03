@@ -138,8 +138,8 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Stable component package boundary.");
-            notes.ShouldContain(package.PackageId);
+            notes.ShouldContain("Adds the shared FluxFlow package icon.");
+            notes.ShouldContain("No source, public API, dependency, or runtime behavior changes.");
             notes.ShouldNotContain("## ");
         }
         finally

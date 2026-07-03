@@ -104,6 +104,11 @@ runtime behavior such as timeout and bounded input capacity.
 `MqttPublishRequest.Properties` contains MQTT protocol metadata such as MQTT
 correlation id, response topic, and user properties. Workflow correlation stays on
 the surrounding `FlowMessage`.
+User-property dictionaries are snapshotted when assigned, and null maps are
+treated as empty so caller-owned mutable dictionaries cannot alter queued
+publish contracts after creation.
+Publish payload byte arrays are also copied when assigned, so mutating the
+caller-owned buffer after creating a request does not change the request.
 
 ## Trigger
 
@@ -121,6 +126,14 @@ The trigger source opens one `IMqttSubscription` and emits a
 implementation-supplied correlation id when present. The subscription is disposed
 when the source stops. Reconnect and resubscribe behavior belongs inside the supplied
 `IMqttTriggerSource` or concrete client adapter.
+Malformed received contexts from an adapter are reported on `Errors` and do not
+stop later valid subscription messages from flowing.
+
+`MqttTriggerOptions.BoundedCapacity` configures bounded broadcast source output.
+Trigger receive processing awaits output-block acceptance before `OnEmit`
+acknowledgement, while output still follows the kit's broadcast/latest-wins
+semantics. In request/reply mode, the same capacity also bounds the `Responses`
+target.
 
 For request/reply handling, configure the trigger and post the graph response back to
 `Responses` with the same correlation id:
@@ -167,6 +180,11 @@ nodes do not consume health directly.
 
 Incoming `MqttReceivedMessage.Timestamp` and adapter-provided
 `MqttClientHealthEvent.Timestamp` values stay adapter-owned.
+Received-message user properties and health-event attributes are snapshotted
+when assigned, matching the immutable-envelope behavior used across the node
+contract surface.
+Received payload and correlation-data byte arrays are copied when assigned so
+adapter-owned buffers cannot mutate a received-message contract after mapping.
 
 ## Runtime Timing
 
@@ -182,14 +200,16 @@ That optional package registers explicit `mqtt.publish` and `mqtt.trigger`
 factories while this core package stays focused on standalone nodes and neutral
 MQTT contracts.
 
-Composition node factories resolve adapter-owned keyed resources:
+Composition node factories resolve host-owned adapter resources by key:
 
 - `publisher` maps to a keyed `IMqttPublisher`.
 - `triggerSource` maps to a keyed `IMqttTriggerSource`.
 - `clock` optionally maps to a keyed `TimeProvider`.
 
 Concrete adapter packages or the host still own broker settings, credentials,
-connection lifetime, reconnect behavior, and any client-specific features.
+connection lifetime, reconnect behavior, and any client-specific features. The
+composition package only consumes those resources; it does not create,
+connect, reconnect, or dispose MQTT clients.
 
 The optional composition package also exposes
 `MqttComponentDesignMetadataProvider` for neutral Designer metadata over the

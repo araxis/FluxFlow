@@ -26,6 +26,39 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public async Task ResolveRequired_trims_option_path()
+    {
+        var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
+        var reference = new SecretReference
+        {
+            Name = new SecretName("primary")
+        };
+
+        var result = await SecretOptionResolver.ResolveRequiredAsync(resolver, reference, " credential ");
+
+        result.Resolved.ShouldBeTrue();
+        result.OptionPath.ShouldBe("credential");
+        result.ToString().ShouldBe("Resolved secret option 'credential'.");
+    }
+
+    [Fact]
+    public void Secret_option_metadata_trims_keys_and_values()
+    {
+        var option = new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Metadata = new Dictionary<string, string>
+            {
+                [" owner "] = " runtime "
+            }
+        };
+
+        option.Metadata.ContainsKey("owner").ShouldBeTrue();
+        option.Metadata["owner"].ShouldBe("runtime");
+        option.Metadata.ContainsKey(" owner ").ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task ResolveRequired_returns_diagnostic_when_reference_is_missing()
     {
         var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
@@ -83,6 +116,32 @@ public sealed class SecretOptionResolverTests
     }
 
     [Fact]
+    public async Task ResolveAll_rejects_null_resolver_even_when_options_are_empty()
+    {
+        var act = async () => await SecretOptionResolver.ResolveAllAsync(
+            null!,
+            []);
+
+        await act.ShouldThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task ResolveAll_returns_failed_result_for_null_option_entries()
+    {
+        var results = await SecretOptionResolver.ResolveAllAsync(
+            new InMemorySecretResolver([]),
+            [null!]);
+
+        results.Count.ShouldBe(1);
+        results[0].OptionPath.ShouldBe("options[0]");
+        results[0].Resolved.ShouldBeFalse();
+        var diagnostic = results[0].Diagnostic.ShouldNotBeNull();
+        diagnostic.Code.ShouldBe(SecretDiagnosticCode.InvalidSecret);
+        diagnostic.Metadata["path"].ShouldBe("options[0]");
+        diagnostic.Message.ShouldContain("Secret option reference is required.");
+    }
+
+    [Fact]
     public async Task ResolveAsync_returns_invalid_option_diagnostic_before_resolving()
     {
         var resolver = new CountingSecretResolver();
@@ -105,7 +164,7 @@ public sealed class SecretOptionResolverTests
     {
         var diagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
         {
-            OptionPath = "credential",
+            OptionPath = " credential ",
             Reference = new SecretReference { Name = default }
         });
 
@@ -114,6 +173,26 @@ public sealed class SecretOptionResolverTests
         diagnostics.Select(diagnostic => diagnostic.Metadata["path"]).ShouldAllBe(path => path == "credential");
         diagnostics.Select(diagnostic => diagnostic.Metadata["optionPath"]).ShouldAllBe(path => path == "credential");
         diagnostics.ShouldContain(diagnostic => diagnostic.Metadata["referencePath"] == "reference.name");
+    }
+
+    [Fact]
+    public void ValidateOptionReference_reports_duplicate_metadata_keys_after_trimming()
+    {
+        var diagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
+        {
+            OptionPath = "credential",
+            Required = false,
+            Metadata = new Dictionary<string, string>
+            {
+                ["owner"] = "runtime",
+                [" owner "] = "design"
+            }
+        });
+
+        diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == SecretDiagnosticCode.InvalidSecret
+            && diagnostic.Metadata["path"] == "option.metadata"
+            && diagnostic.Message.Contains("after trimming", StringComparison.Ordinal));
     }
 
     private static SecretRecord CreateRecord(

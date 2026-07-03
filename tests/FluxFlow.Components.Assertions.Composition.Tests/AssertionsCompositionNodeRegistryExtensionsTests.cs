@@ -61,11 +61,11 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
-        metadata.DisplayName.ShouldBe("Assertion");
-        metadata.Category.ShouldBe("Assertions");
-        metadata.PreferredNodeName.ShouldBe("assert");
+        metadata.DisplayName?.Value.ShouldBe("Assertion");
+        metadata.Category.ShouldBe(new ComponentCategory("Assertions"));
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("assert"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("expression", OptionValueKind.Expression),
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
@@ -77,17 +77,17 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             ("emitPassedInput", OptionValueKind.Boolean),
             ("emitFailedInput", OptionValueKind.Boolean)
         ]);
-        metadata.Options.Single(option => option.Name == "expression")
+        metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Single(option => option.Name == "description")
+        metadata.Options.Single(option => option.Name.Value == "description")
             .DefaultValue.ShouldBe("Flow assertion");
-        metadata.Options.Single(option => option.Name == "failureMessage")
+        metadata.Options.Single(option => option.Name.Value == "failureMessage")
             .DefaultValue.ShouldBe("Assertion failed.");
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(AssertionsCompositionResourceNames.ContextFactory);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(AssertionsCompositionResourceNames.Clock);
         AssertResources(
             metadata,
@@ -109,12 +109,64 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(FlowAssertionResult)),
             (AssertionsCompositionPortNames.Passed, PortDirection.Output, 2, false, "TInput"),
             (AssertionsCompositionPortNames.Failed, PortDirection.Output, 3, false, "TInput")
         ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_assertion_option_hints()
+    {
+        var metadata = new AssertionsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+        var options = metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertOptionHints(
+            options["expression"],
+            "Assertions",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Expression,
+            syntax: OptionDesignMetadataAttributeValues.Expression,
+            relatedResource: AssertionsCompositionResourceNames.Engine);
+        AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(options["description"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["failureMessage"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["emitPassedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(options["emitFailedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_assertion_resource_picker_hints()
+    {
+        var metadata = new AssertionsComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+        var resources = metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertResourceHints(
+            resources[AssertionsCompositionResourceNames.Engine],
+            ResourceDesignMetadataAttributeValues.ExpressionEngine,
+            "expression-engine:{name}");
+        AssertResourceHints(
+            resources[AssertionsCompositionResourceNames.ContextFactory],
+            ResourceDesignMetadataAttributeValues.ContextFactory,
+            "context-factory:{name}");
+        AssertResourceHints(
+            resources[AssertionsCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
     }
 
     [Fact]
@@ -140,12 +192,77 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         for (var index = 0; index < expected.Length; index++)
         {
             var resource = metadata.Resources[index];
-            resource.Name.ShouldBe(expected[index].Name);
+            resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(expected[index].Order);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     [Fact]
     public async Task Hosted_assertion_resolves_keyed_engine_and_routes_inputs()

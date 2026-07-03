@@ -10,7 +10,7 @@ public sealed class CompositionNodeRegistration
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
         Factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        Type = type;
+        Type = type.Trim();
         Inputs = ToPortDictionary(inputs);
         Outputs = ToPortDictionary(outputs);
     }
@@ -32,6 +32,7 @@ public sealed class CompositionNodeRegistration
 
         foreach (var port in ports)
         {
+            ArgumentNullException.ThrowIfNull(port);
             ArgumentException.ThrowIfNullOrWhiteSpace(port.Name);
             if (!result.TryAdd(port.Name, port))
                 throw new ArgumentException($"Duplicate port name '{port.Name}'.", nameof(ports));

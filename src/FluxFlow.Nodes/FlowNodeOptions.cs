@@ -6,7 +6,41 @@ namespace FluxFlow.Nodes;
 /// </summary>
 public sealed record FlowNodeOptions
 {
-    public int InputCapacity { get; init; } = 128;
+    private int _inputCapacity = 128;
+    private int _maxDegreeOfParallelism = 1;
 
-    public int MaxDegreeOfParallelism { get; init; } = 1;
+    public int InputCapacity
+    {
+        get => _inputCapacity;
+        init
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(InputCapacity),
+                    "InputCapacity must be greater than zero.");
+
+            _inputCapacity = value;
+        }
+    }
+
+    public int MaxDegreeOfParallelism
+    {
+        get => _maxDegreeOfParallelism;
+        init
+        {
+            if (value <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(MaxDegreeOfParallelism),
+                    "MaxDegreeOfParallelism must be greater than zero.");
+
+            _maxDegreeOfParallelism = value;
+        }
+    }
+
+    /// <summary>
+    /// Clock used for node-owned timestamps (currently the safety-net error stamp when
+    /// <c>ProcessAsync</c> throws). Defaults to <see cref="TimeProvider.System"/>; pass a
+    /// FakeTimeProvider for deterministic error timestamps in tests.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }

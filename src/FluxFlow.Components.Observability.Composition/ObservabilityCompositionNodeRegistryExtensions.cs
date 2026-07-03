@@ -2,7 +2,6 @@ using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Nodes;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Observability.Composition;

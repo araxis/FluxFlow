@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Nodes;
 
@@ -39,9 +40,41 @@ public sealed class ComposedNode
 
     public async ValueTask DisposeAsync()
     {
-        await Node.DisposeAsync().ConfigureAwait(false);
+        Exception? nodeException = null;
+        try
+        {
+            await Node.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            nodeException = exception;
+        }
+
+        Exception? hookException = null;
         if (_disposeAsync is not null)
-            await _disposeAsync().ConfigureAwait(false);
+        {
+            try
+            {
+                await _disposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                hookException = exception;
+            }
+        }
+
+        if (nodeException is null && hookException is null)
+            return;
+
+        if (nodeException is not null && hookException is not null)
+        {
+            throw new AggregateException(
+                "Composed node disposal failed for the node and descriptor cleanup hook.",
+                nodeException,
+                hookException);
+        }
+
+        ExceptionDispatchInfo.Capture(nodeException ?? hookException!).Throw();
     }
 
     public static ComposedNode Create(

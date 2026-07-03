@@ -13,6 +13,9 @@ public enum FlowEventLevel
 /// </summary>
 public sealed record FlowEvent
 {
+    private IReadOnlyDictionary<string, object?> _attributes =
+        new Dictionary<string, object?>(StringComparer.Ordinal);
+
     public DateTimeOffset Timestamp { get; init; }
 
     /// <summary>The correlation id of the message this event relates to, if any.</summary>
@@ -24,6 +27,15 @@ public sealed record FlowEvent
 
     public string? Message { get; init; }
 
-    public IReadOnlyDictionary<string, object?> Attributes { get; init; } =
-        new Dictionary<string, object?>();
+    public IReadOnlyDictionary<string, object?> Attributes
+    {
+        get => _attributes;
+        init => _attributes = CopyAttributes(value);
+    }
+
+    private static IReadOnlyDictionary<string, object?> CopyAttributes(
+        IReadOnlyDictionary<string, object?>? attributes)
+        => attributes is null
+            ? new Dictionary<string, object?>(StringComparer.Ordinal)
+            : new Dictionary<string, object?>(attributes, StringComparer.Ordinal);
 }

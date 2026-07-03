@@ -24,6 +24,28 @@ app.MapFluxFlowTrigger("/greet", "greet");   // endpoint feeds the keyed trigger
 `AddFluxFlowHttpTrigger` registers a keyed request source + a keyed `HttpTriggerNode`
 fed from it, and a hosted service that starts the trigger with the app (which wires the
 graph and starts consuming) and disposes it on shutdown.
+During stop the hosted lifetime completes the keyed request source before completing
+the node, so late endpoint submissions are rejected instead of accepted into an
+inactive trigger.
+The registration validates the service collection, trigger name, and graph
+configuration delegate. Trigger source capacity comes from `RequestReplyOptions`
+and must be greater than zero.
+`MapFluxFlowTrigger` validates the endpoint builder, route pattern, trigger name
+or direct coordinator before handing the route to framework routing.
+Trigger names are trimmed before keyed DI registration and endpoint lookup, so
+configuration-bound names with surrounding whitespace resolve to the same
+logical trigger.
+
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. It owns the
+ASP.NET Core endpoint and trigger DI integration through `AddFluxFlowHttpTrigger`
+and `MapFluxFlowTrigger`; the host owns the ASP.NET Core app, route selection,
+request body policy, and host-owned trigger lifetime registration.
+
+Use `FluxFlow.Components.Http.Composition` only for outbound `http.client`
+composition. Config-composed inbound HTTP trigger factories are intentionally
+outside this package boundary.
 
 ## Without DI
 

@@ -191,6 +191,20 @@ public sealed class GeneratedSourceNodeTests
                     ["one"]))
             .Message.ShouldContain("capacity");
 
+    [Theory]
+    [InlineData("initialDelayMilliseconds")]
+    [InlineData("intervalMilliseconds")]
+    public void Generated_ConstructorRejectsNegativeTiming(string optionName)
+    {
+        var options = optionName == "initialDelayMilliseconds"
+            ? new GeneratedSourceOptions { InitialDelayMilliseconds = -1 }
+            : new GeneratedSourceOptions { IntervalMilliseconds = -1 };
+
+        Should.Throw<ArgumentOutOfRangeException>(
+                () => new GeneratedSourceNode<string>(options, ["one"]))
+            .Message.ShouldContain(optionName);
+    }
+
     [Fact]
     public void Generated_ConstructorRejectsNullItems()
         => Should.Throw<ArgumentNullException>(

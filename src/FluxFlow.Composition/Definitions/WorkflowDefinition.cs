@@ -2,8 +2,18 @@ namespace FluxFlow.Composition;
 
 public sealed record WorkflowDefinition
 {
-    public Dictionary<string, NodeDefinition> Nodes { get; init; } =
-        new(StringComparer.Ordinal);
+    private Dictionary<string, NodeDefinition> _nodes = new(StringComparer.Ordinal);
+    private List<LinkDefinition> _links = [];
 
-    public List<LinkDefinition> Links { get; init; } = [];
+    public Dictionary<string, NodeDefinition> Nodes
+    {
+        get => _nodes;
+        init => _nodes = CompositionDictionary.NormalizeKeys(value, nameof(Nodes));
+    }
+
+    public List<LinkDefinition> Links
+    {
+        get => _links;
+        init => _links = value is null ? [] : [.. value];
+    }
 }

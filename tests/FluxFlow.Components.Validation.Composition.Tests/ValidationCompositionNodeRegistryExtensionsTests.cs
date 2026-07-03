@@ -63,11 +63,11 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator));
-        metadata.DisplayName.ShouldBe("JSON Schema Validator");
-        metadata.Category.ShouldBe("Validation");
-        metadata.PreferredNodeName.ShouldBe("validate");
+        metadata.DisplayName?.Value.ShouldBe("JSON Schema Validator");
+        metadata.Category.ShouldBe(new ComponentCategory("Validation"));
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("validate"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
-        metadata.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+        metadata.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
             ("schema", OptionValueKind.Json),
             ("schemaPath", OptionValueKind.Text),
             ("schemaId", OptionValueKind.Text),
@@ -76,19 +76,19 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             ("payloadSelector", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number)
         ]);
-        metadata.Options.Single(option => option.Name == "valueSelector")
+        metadata.Options.Single(option => option.Name.Value == "valueSelector")
             .DefaultValue.ShouldBe("input");
-        metadata.Options.Single(option => option.Name == "boundedCapacity")
+        metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(ValidationCompositionResourceNames.Selector);
-        metadata.Options.Select(option => option.Name)
+        metadata.Options.Select(option => option.Name.Value)
             .ShouldNotContain(ValidationCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (ValidationCompositionResourceNames.Selector, 0, false, "IJsonSchemaValueSelector<TInput>"),
             (ValidationCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
@@ -106,12 +106,61 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ValidationCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ValidationCompositionPortNames.Output, PortDirection.Output, 1, true, "JsonSchemaValidationResult<TInput>"),
             (ValidationCompositionPortNames.Valid, PortDirection.Output, 2, false, "TInput"),
             (ValidationCompositionPortNames.Invalid, PortDirection.Output, 3, false, "TInput")
         ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_json_schema_validator_option_hints()
+    {
+        var metadata = new ValidationComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+        var options = metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertOptionHints(options["schema"], "Schema", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(options["schemaPath"], "Schema", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["schemaId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            options["valueSelector"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text,
+            relatedResource: ValidationCompositionResourceNames.Selector);
+        AssertOptionHints(
+            options["payloadSelector"],
+            "Selection",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text,
+            relatedResource: ValidationCompositionResourceNames.Selector);
+        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_json_schema_validator_resource_picker_hints()
+    {
+        var metadata = new ValidationComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+        var resources = metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
+        AssertResourceHints(
+            resources[ValidationCompositionResourceNames.Selector],
+            ResourceDesignMetadataAttributeValues.Selector,
+            "selector:{name}");
+        AssertResourceHints(
+            resources[ValidationCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
     }
 
     [Fact]
@@ -424,6 +473,41 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains("schema", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData("boundedCapacity", 0, "boundedCapacity")]
+    [InlineData("inputType", " ", "inputType")]
+    public async Task Invalid_validator_options_surface_factory_diagnostic(
+        string optionName,
+        object optionValue,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "validate",
+                    ValidationCompositionNodeTypes.JsonSchemaValidator,
+                    node => node
+                        .Configure("schema", StringSchemaJson())
+                        .Configure(optionName, optionValue)))
+                .Build())
+            .RegisterNodes(registry =>
+                registry.RegisterJsonSchemaValidator<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static JsonElement OrderSchemaJson()
         => JsonSerializer.SerializeToElement(new
         {
@@ -444,6 +528,62 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         });
 
     private sealed record InputMessage(string Payload);
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string editor,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+            .ShouldBe(editor);
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private sealed class PayloadSelector : IJsonSchemaValueSelector<InputMessage>
     {

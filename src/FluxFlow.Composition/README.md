@@ -22,6 +22,31 @@ It does not own broker clients, stores, secrets, resource registration, file
 watching, YAML, live reload, assembly scanning, reflection discovery, or engine
 projection.
 
+Definition DTO collection properties copy assigned dictionaries and lists with
+ordinal key comparison. A host can still intentionally edit the model before
+validation/build, but caller-owned collections used during construction cannot
+mutate the definition later. Workflow, node, configuration, and resource
+dictionary keys are trimmed when assigned or built fluently; duplicate keys
+after trimming are rejected at the composition boundary.
+Node and port references trim assigned workflow/node/port segments and reject
+empty dotted segments when parsed from fluent or configuration link strings.
+Node definition types, node registration types, and composition port metadata
+names are trimmed at the public boundary so incidental configuration or
+registration whitespace does not create unknown node types or duplicate-looking
+ports. Composition port metadata rejects null or blank port names and null
+message types at the registration boundary. Node registrations also reject null
+port metadata entries before validation/build. `CompositionPortMetadata` also
+supports deconstruction for callers that prefer tuple-style reads.
+If mutable DTO collections are hand-built with null workflow, node, link, or
+link endpoint entries, validation reports `InvalidDefinition` diagnostics
+instead of throwing while walking the model.
+
+`ComposedNode` disposal always attempts both the node disposal path and the
+optional descriptor cleanup hook. If both fail, the failures are reported
+together so cleanup diagnostics do not hide an adapter-owned resource leak.
+If a build is canceled after nodes or links have been allocated, the runtime
+builder disposes the partially built graph before rethrowing cancellation.
+
 ## Fluent Composition
 
 ```csharp
@@ -99,10 +124,13 @@ var definition = new CompositionConfigurationLoader().Load(configuration);
 ```
 
 Resources are named references only. The host or adapter DI layer still owns
-the concrete resource registration and lifetime.
+the concrete resource registration and lifetime. Node factories resolve those
+references with the `CompositionNodeFactoryContext` instance methods
+`GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+`GetResource<TResource>` over the keyed services the host registered.
 
 Use `FluxFlow.Composition.Hosting` when DI should build and start the runtime
-and node factories should resolve those resource references from keyed services.
+with host lifecycle.
 
 ## Sample
 

@@ -63,7 +63,8 @@ provide:
 
 - one `IStorageStore` implementation
 - one `IStorageStoreFactory` implementation when useful
-- registration helpers such as `UseFileSystemStorage(...)`
+- registration helpers such as `UseFileSystemStorage(...)` and keyed
+  `IStorageStore` / `IStorageStoreFactory` service registration
 - adapter-specific options and validation
 - adapter-specific tests and README content
 
@@ -108,6 +109,10 @@ Expected public shape:
 - `FileSystemStorageStoreOptions`
 - `FileSystemStorageStoreFactory`
 - `UseFileSystemStorage(...)` registration helper
+- `AddFluxFlowFileSystemStorageStore(...)` keyed direct-store registration
+  helper
+- `AddFluxFlowFileSystemStorageStoreFactory(...)` keyed resource registration
+  helper
 
 Expected options:
 
@@ -119,9 +124,55 @@ Expected options:
 - `defaultCollection`
 - `flushOnWrite`
 
-The package uses `StorageStoreLease.Owned(...)` when it creates the store. Hosts
-can still pass a shared `FileSystemStorageStore` through the base storage package
-when they want to own the lifetime.
+The package uses shared leases from `FileSystemStorageStoreFactory` so multiple
+opens for the same root, store name, default collection, and clock share the same
+in-process lock. Hosts can still pass a shared `FileSystemStorageStore` through
+the base storage package when they want to own the lifetime directly, or
+register a keyed `IStorageStore` or `IStorageStoreFactory` for
+composition/resource hosts.
+
+## SQL File Adapter Package
+
+Package:
+
+```text
+FluxFlow.Components.Storage.SqlFile
+```
+
+Purpose:
+
+- provide a single-file SQL-backed `IStorageStore`
+- use the existing `storage.put`, `storage.get`, `storage.query`, and
+  `storage.delete` nodes
+- keep all host-specific app schema outside the package
+- provide durable local coordination without requiring a server database
+
+Expected public shape:
+
+- `SqlFileStorageStore`
+- `SqlFileStorageStoreOptions`
+- `SqlFileStorageStoreFactory`
+- `UseSqlFileStorage(...)` registration helper
+- `AddFluxFlowSqlFileStorageStore(...)` keyed direct-store registration helper
+- `AddFluxFlowSqlFileStorageStoreFactory(...)` keyed resource registration
+  helper
+
+Expected options:
+
+- `databasePath`
+- `storeName`
+- `createDatabase`
+- `createDirectory`
+- `allowAbsoluteDatabasePath`
+- `maxValueBytes`
+- `defaultCollection`
+- `busyTimeoutMilliseconds`
+
+The package uses owned leases from `SqlFileStorageStoreFactory`. Each open
+creates a store bound to the requested `StorageStoreContext`, so store name,
+default collection, and clock are scoped to that lease. Absolute database paths
+are allowed by default for explicit host configuration and can be rejected with
+`AllowAbsoluteDatabasePath = false`.
 
 ## Record Model
 

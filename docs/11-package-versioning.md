@@ -2,12 +2,9 @@
 
 Use semantic versions for published packages.
 
-Current stable engine and component release line:
-
-```text
-FluxFlow.Engine              1.0.0
-FluxFlow.Components.*        1.0.0
-```
+Packages in this repository move independently. Do not infer a package version
+from a family name such as `FluxFlow.Components.*` or from another package's
+release line.
 
 Prereleases use this shape:
 
@@ -26,9 +23,10 @@ components-mqtt-v1.0.0
 
 Each packable project owns its own `<Version>`.
 
-The release workflow reads the selected project version and refuses to publish
-when the requested version does not match the project file. This keeps package
-versions reviewable in source.
+`eng/packages.json` lists the shipped packages, their release aliases, tag
+prefixes, project paths, and changelog names. The release workflow reads the
+selected project version and refuses to publish when the requested version does
+not match the project file. This keeps package versions reviewable in source.
 
 ## Changelog
 
@@ -61,6 +59,38 @@ After 1.0:
 - minor: additive public API or behavior
 - patch: compatible fixes
 
+## Public API Baseline
+
+Release tests include a lightweight public API baseline for source declarations
+across the packages listed in `eng/packages.json`. The baseline is stored under
+`eng/public-api` and records a declaration count plus a normalized declaration
+hash for each package in manifest order.
+
+When the baseline changes, review the source diff before accepting it:
+
+- breaking public API changes require a major version after `1.0`
+- additive public API changes require a minor version after `1.0`
+- compatible fixes that keep the same public shape can stay patch-level
+- documentation-only changes should not update the baseline
+
+Accept an intentional baseline update by setting
+`FLUXFLOW_ACCEPT_PUBLIC_API_BASELINE=1` and rerunning
+`PublicApiBaselineTests`. Do this only after package version, changelog, and docs
+changes are correct for the public API change.
+
+## Binary Compatibility Preflight
+
+The source-declaration baseline is not a binary compatibility tool. For package
+release readiness, run `eng/package-binary-compat-preflight.ps1` after a
+controlled Release build. The helper resolves the package through
+`eng/packages.json` and uses .NET SDK package validation during `dotnet pack` to
+compare the current package assembly against a published baseline package
+version.
+
+Use the current project version as the baseline version for same-version
+release-readiness checks. Use an explicit older baseline only when validating a
+new package version against the previous published stable package.
+
 ## Release Checklist
 
 Before publishing:
@@ -71,28 +101,22 @@ Before publishing:
 3. Run build and tests locally.
 4. Run the sample app when docs, JSON, links, lifecycle, or package authoring
    behavior changed.
-5. Create the release from a clean commit.
-6. Verify the package can be restored from the public package feed.
+5. Run package binary compatibility preflight when the release must be checked
+   against a published baseline.
+6. Create the release from a clean commit.
+7. Verify the package can be restored from the public package feed.
 
-## Component Packages
+## Independent Packages
 
-Component packages move independently from the engine package. Keep their
-dependency range narrow at first, then loosen it only after real consumers prove
-compatibility.
+Runtime, composition, component, support, adapter, and metadata packages move
+independently. Keep dependency ranges narrow at first, then loosen them only
+after real consumers prove compatibility.
 
-When an engine prerelease moves public node-authoring types, republish every
-published component package that references the engine, even if the component
-behavior did not change. Use a patch prerelease bump and describe it as an
-engine compatibility rebuild.
-
-Current stable pattern:
-
-```text
-FluxFlow.Engine              1.0.0
-FluxFlow.Components.Example  1.0.0
-```
-
-Do not bump the engine version when only a component package changes.
+Do not bump the engine version when only a component, composition adapter,
+support package, or storage/client adapter changes. Do not bump a component
+package when only its optional composition adapter changes. When a shared
+contract package changes, republish only the packages that consume the changed
+contract and need a new package artifact.
 
 ## Keep Releases Small
 

@@ -9,6 +9,7 @@ public static class FileSystemStorageRegistrationExtensions
         string rootDirectory)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
         return options.UseFileSystemStorage(new FileSystemStorageStoreOptions
         {
             RootDirectory = rootDirectory

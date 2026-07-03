@@ -158,6 +158,18 @@ public sealed class FlowLoggerNodeTests
     public void Constructor_RequiresOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowLoggerNode<string>(null!));
 
+    [Fact]
+    public void Constructor_RequiresNonEmptyInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowLoggerNode<string>(
+                new FlowLoggerOptions { InputType = " " }));
+
+    [Fact]
+    public void Constructor_RequiresPositiveBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowLoggerNode<string>(
+                new FlowLoggerOptions { BoundedCapacity = 0 }));
+
     private static IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>> Selectors<TInput>(
         params (string Name, Func<TInput, object?> Select)[] selectors)
         => selectors.ToDictionary(

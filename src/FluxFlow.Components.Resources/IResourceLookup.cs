@@ -2,10 +2,8 @@ using FluxFlow.Components.Resources.Contracts;
 
 namespace FluxFlow.Components.Resources;
 
-public interface IResourceLookup
+public interface IResourceLookup : IResourceDescriptorProvider
 {
-    IReadOnlyCollection<ResourceDescriptor> GetResources();
-
     ValueTask<ResourceLookupResult> LookupAsync(
         ResourceReference reference,
         CancellationToken cancellationToken = default);

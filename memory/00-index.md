@@ -256,6 +256,165 @@ This folder records the extraction work for `FluxFlow.Engine`.
   names for keyed `IMqttPublisher` / `IMqttTriggerSource` / `TimeProvider`,
   broker-free MQTT composition sample, package/docs/manifest wiring, and
   verification.
+- `155-composition-and-designer-progress.md`: current snapshot after the
+  composition adapter sweep and Designer metadata work: standalone-node-first
+  architecture, completed component composition adapters, Designer boundary
+  cleanup, option/resource hint pilot state, reliable verification command, and
+  next suggested metadata hint pass.
+- `156-assertions-designer-metadata-hints.md`: Assertions composition Designer
+  metadata hint pass: option grouping/editor hints, host-owned resource key
+  patterns, package `1.3.0`, focused verification, and next candidate note.
+- `157-state-designer-metadata-hints.md`: State composition Designer metadata
+  hint pass: state reducer option grouping/editor hints, host-owned resource key
+  patterns, package `1.3.0`, focused verification, and next candidate note.
+- `158-observability-designer-metadata-hints.md`: Observability composition
+  Designer metadata hint pass: Counter/Logger/Metrics option grouping/editor
+  hints, host-owned resource key patterns, package `1.3.0`, focused
+  verification, and next candidate note.
+- `159-validation-designer-metadata-hints.md`: Validation composition Designer
+  metadata hint pass: JSON schema validator option grouping/editor hints,
+  host-owned resource key patterns, package `1.3.0`, focused verification, and
+  next candidate note.
+- `160-routing-designer-metadata-hints.md`: Routing composition Designer
+  metadata hint pass: Switch/Fork/Merge/Window/Correlation/Join option
+  grouping/editor hints, host-owned resource key patterns, package `1.3.0`,
+  focused verification, and next candidate note.
+- `161-timers-designer-metadata-hints.md`: Timers composition Designer
+  metadata hint pass: Interval/Schedule/Delay/Throttle/Debounce option
+  grouping/editor hints, host-owned clock resource key pattern, package
+  `1.5.0`, focused verification, and next candidate note.
+- `162-sources-designer-metadata-hints.md`: Sources composition Designer
+  metadata hint pass: Generated/Sequence option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.4.0`, focused
+  verification, and next candidate note.
+- `163-serialization-designer-metadata-hints.md`: Serialization composition
+  Designer metadata hint pass: JSON/Text/Base64 option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
+- `164-payloads-designer-metadata-hints.md`: Payloads composition Designer
+  metadata hint pass: payload inspection option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
+- `165-projections-designer-metadata-hints.md`: Projections composition
+  Designer metadata hint pass: event projection option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
+- `166-metrics-designer-metadata-hints.md`: Metrics composition Designer
+  metadata hint pass: metrics aggregate option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
+- `167-expectations-designer-metadata-hints.md`: Expectations composition
+  Designer metadata hint pass: event expectation option grouping/editor hints,
+  host-owned clock resource key pattern, package `1.3.0`, focused
+  verification, and next candidate note.
+- `168-http-designer-metadata-hints.md`: HTTP composition Designer metadata
+  hint pass: HTTP client option grouping/editor hints, host-owned client and
+  clock resource key patterns, package `1.3.0`, focused verification, and next
+  candidate note.
+- `169-filesystem-designer-metadata-hints.md`: FileSystem composition Designer
+  metadata hint pass: file read/write/enumerate/watch option grouping/editor
+  hints, host-owned clock resource key pattern, package `1.4.0`, focused
+  verification, and next candidate note.
+- `170-storage-designer-metadata-hints.md`: Storage composition Designer
+  metadata hint pass: put/get/query/delete option grouping/editor hints,
+  host-owned store and clock resource key patterns, package `1.4.0`, focused
+  verification, and next candidate note.
+- `171-sessions-designer-metadata-hints.md`: Sessions composition Designer
+  metadata hint pass: recorder/replay/query option grouping/editor hints,
+  host-owned store and clock resource key patterns, package `1.5.0`, focused
+  verification, and next candidate note.
+- `172-mqtt-designer-metadata-hints.md`: MQTT composition Designer metadata
+  hint pass: publish/trigger option grouping/editor hints, host-owned
+  publisher, trigger source, and clock resource key patterns, package `1.4.0`,
+  focused verification, and next-planning note.
+- `173-designer-metadata-hint-conventions.md`: Designer metadata hint
+  convention closeout: release-test guardrails for option section/importance
+  hints, contract-valued editor/syntax hints, same-node related resources, and
+  host-owned resource key patterns.
+- `174-designer-metadata-hint-release-readiness.md`: Designer metadata hint
+  release-readiness record: broad verification, all impacted package
+  preflights, Designer dry-run success, and composition dry-run dependency
+  source blocker.
+- `175-designer-metadata-hint-dependency-source-readiness.md`: Designer
+  metadata hint dependency-source readiness record: full temp package source
+  seeding, all impacted package preflights, and all impacted fast dry-run
+  success.
+- `176-designer-metadata-hint-publication-sequencing.md`: Designer metadata
+  hint publication-sequencing handoff: dependency-aware order, release-helper
+  command templates, prepare-only checks, and tag availability notes.
+- `177-designer-metadata-hint-final-release-rehearsal.md`: Designer metadata
+  hint final no-publish release rehearsal: fresh full temp source, all
+  dependency-ordered dry-runs, prepare-only checks, and final release execution
+  recommendation.
+- `178-designer-metadata-hint-local-tag-execution.md`: Designer metadata hint
+  local tag execution: controlled Release build, full temp source seeding, 42
+  local annotated tags created at the release target, and 2 existing tags
+  skipped.
+- `179-designer-metadata-hint-tag-push.md`: Designer metadata hint tag push:
+  42 dependency-ordered release tags pushed to the configured remote, 2
+  existing tags skipped, and remote targets verified.
+- `180-designer-metadata-hint-release-workflow-recovery.md`: Designer metadata
+  hint release workflow recovery: Linux release-test path normalization fix,
+  42 dependency-ordered tags retargeted to the fixed commit, release workflows
+  completed, and public package-feed visibility verified.
+- `181-mqtt-adapter-package-release.md`: MQTT adapter package release:
+  `FluxFlow.Components.Mqtt.MqttNet` `1.1.7` and
+  `FluxFlow.Components.Mqtt.PulseMqtt` `2.0.7` tagged, published, and verified
+  on the public package feed.
+- `182-public-package-consumer-validation.md`: public package consumer
+  validation for the published Designer metadata hint release train and MQTT
+  adapter releases: all 44 package-feed checks plus a combined temp consumer
+  restore/build passed.
+- `183-package-readme-clarity-pass.md`: documentation-only package README
+  clarity pass across all 55 manifest packages, with boundary wording tightened
+  for runtime, composition, adapter, and support packages.
+- `184-package-binary-compat-readiness.md`: package binary compatibility
+  readiness helper and docs, with one successful published-baseline validation
+  and an all-package loop blocker on an unpublished current support-package
+  version.
+- `185-package-binary-compat-baseline-feed-alignment-blocker.md`: attempted
+  baseline feed-alignment release pass, stopped by a Linux release-test fixture
+  newline blocker before package publication.
+- `186-package-binary-compat-feed-alignment-recovery.md`: release-test fixture
+  newline recovery, nine missing baseline package publications, and all-package
+  binary compatibility preflight success.
+- `187-full-public-package-consumer-validation.md`: full public package consumer
+  validation for all 55 current manifest packages, including package-feed
+  checks and a combined temp consumer restore/build.
+- `188-designer-resource-picker-hint-contracts.md`: Designer resource picker
+  hint contracts: additive `2.17.0` host helper APIs for reading host-owned
+  resource picker hints from component metadata without owning resources or UI.
+- `189-designer-resource-picker-hint-package-release.md`: Designer resource
+  picker hint package release: `FluxFlow.Components.Designer` `2.17.0` tagged,
+  published, release-asset verified, and public-feed verified.
+- `190-full-public-package-consumer-validation-after-designer-2-17.md`: full
+  public package consumer validation after Designer `2.17.0`: all 55 package
+  feed checks and combined temp consumer restore/build passed.
+- `191-designer-host-layer-planning.md`: documentation-only Designer host
+  layer plan covering host-owned palette, inspector, option editor, resource
+  picker, validation, persistence, and runtime-mapping responsibilities.
+- `192-composition-resource-helper-relocation.md`: keyed resource helper
+  relocation onto the composition factory context, adapter
+  Composition.Hosting reference removal, and the node kit clock option.
+- `193-designer-host-model-layer.md`: headless Designer host-model layer
+  (palette, inspector, option editor, and resource picker view models over the
+  metadata catalog) in `samples/FluxFlow.DesignerHost` with focused tests.
+- `194-designer-host-persistence-mapping.md`: host graph model with lossless
+  mapping to and from composition definitions plus shared validation message
+  mapping; renderer UI is the only remaining Designer host pass.
+- `195-nuget-icon-and-hygiene-release-prep.md`: shared Fanout NuGet icon wired
+  repo-wide via Directory.Build.targets; the composition hygiene pass
+  (FluxFlow.Nodes 1.2.0, FluxFlow.Composition 1.1.0,
+  FluxFlow.Composition.Hosting 1.1.0, and 19 components-*-composition
+  adapters) published and verified live on the public NuGet feed.
+- `196-full-icon-rollout-completion.md`: icon-only patch release for the
+  remaining 33 manifest packages (Designer, core component packages, Mapping,
+  Engine, MQTT adapters) so all 55 current packages carry the shared icon; a
+  second known-flaky test surfaced and was worked around by retry.
+- `197-bounded-source-flaky-test-fix.md`: deterministic fix for that second
+  flaky test — the bounded-source backpressure test was asserting an
+  un-observable BroadcastBlock internal race; rewritten to the actual
+  latest-wins delivery contract (test-only, no source/package change).
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

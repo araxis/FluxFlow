@@ -40,12 +40,12 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var metadata = MetricsDesignMetadata();
 
         metadata.Type.Value.ShouldBe(MetricsCompositionNodeTypes.Aggregate);
-        metadata.DisplayName.ShouldBe("Metrics Aggregate");
-        metadata.Category.ShouldBe("Metrics");
+        metadata.DisplayName?.Value.ShouldBe("Metrics Aggregate");
+        metadata.Category.ShouldBe(new ComponentCategory("Metrics"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name == MetricsCompositionResourceNames.Clock);
+            option.Name.Value == MetricsCompositionResourceNames.Clock);
         AssertClockResource(metadata);
     }
 
@@ -60,14 +60,14 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(MetricsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(nameof(MetricSampleInput));
+        input.ValueType?.Value.ShouldBe(nameof(MetricSampleInput));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(MetricsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(nameof(MetricSnapshotOutput));
+        output.ValueType?.Value.ShouldBe(nameof(MetricSnapshotOutput));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -77,7 +77,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var metadata = MetricsDesignMetadata();
         var defaults = new MetricsAggregateOptions();
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "rateWindowSeconds",
             "boundedCapacity",
             "maxGroups",
@@ -136,6 +136,65 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_metrics_option_hints()
+    {
+        var metadata = MetricsDesignMetadata();
+        var options = OptionsByName(metadata);
+
+        AssertOptionHints(
+            options["rateWindowSeconds"],
+            "Rate",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["maxGroups"],
+            "Grouping",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["emitEverySample"],
+            "Emission",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["trackLatest"],
+            "Snapshot",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["trackMinMax"],
+            "Snapshot",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["trackSize"],
+            "Snapshot",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["groupByTag"],
+            "Grouping",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(
+            options["treatMissingValueAsZero"],
+            "Aggregation",
+            OptionDesignMetadataAttributeValues.Advanced);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_metrics_resource_picker_hints()
+    {
+        var metadata = MetricsDesignMetadata();
+
+        AssertResourceHints(
+            metadata.Resources.ShouldHaveSingleItem(),
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new MetricsComponentDesignMetadataProvider();
@@ -146,7 +205,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             new ComponentType(MetricsCompositionNodeTypes.Aggregate),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Metrics Aggregate");
+            .DisplayName?.Value.ShouldBe("Metrics Aggregate");
     }
 
     [Fact]
@@ -328,6 +387,12 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ShouldHaveSingleItem();
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertOption(
         ComponentDesignMetadata metadata,
         string name,
@@ -335,22 +400,68 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
     }
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(MetricsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.Name.Value.ShouldBe(MetricsCompositionResourceNames.Clock);
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
         Func<

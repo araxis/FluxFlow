@@ -274,6 +274,22 @@ public sealed class JsonSchemaValidatorNodeTests
     public void Constructor_RequiresSchema()
         => Should.Throw<ArgumentNullException>(() => new JsonSchemaValidatorNode<JsonElement>(null!));
 
+    [Fact]
+    public void Constructor_RejectsInvalidBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new JsonSchemaValidatorNode<JsonElement>(
+                OrderSchema(),
+                options: new JsonSchemaValidatorOptions { BoundedCapacity = 0 }))
+            .Message.ShouldContain("boundedCapacity");
+
+    [Fact]
+    public void Constructor_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => new JsonSchemaValidatorNode<JsonElement>(
+                OrderSchema(),
+                options: new JsonSchemaValidatorOptions { InputType = " " }))
+            .Message.ShouldContain("inputType");
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

@@ -54,7 +54,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 existing = null;
             }
 
-            var mode = request.Mode ?? StorageWriteMode.Upsert;
+            var mode = ResolveWriteMode(request.Mode);
             if (mode == StorageWriteMode.Create && existing is not null)
             {
                 throw new InvalidOperationException("File-system storage record already exists.");
@@ -142,6 +142,7 @@ public sealed class FileSystemStorageStore : IStorageStore
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var now = _settings.Clock.GetUtcNow();
             var directory = GetCollectionPath(collection);
             if (!Directory.Exists(directory))
             {
@@ -168,7 +169,7 @@ public sealed class FileSystemStorageStore : IStorageStore
                 }
 
                 if (record is null ||
-                    !StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
+                    !StorageQueryMatcher.IsMatch(record, query, now))
                 {
                     continue;
                 }
@@ -244,6 +245,18 @@ public sealed class FileSystemStorageStore : IStorageStore
         }
 
         return key;
+    }
+
+    private static StorageWriteMode ResolveWriteMode(StorageWriteMode? value)
+    {
+        var mode = value ?? StorageWriteMode.Upsert;
+        if (!Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"File-system storage write mode '{mode}' is not supported.");
+        }
+
+        return mode;
     }
 
     private StoredJsonValue? CreateStoredValue(object? value)
@@ -409,9 +422,35 @@ public sealed class FileSystemStorageStore : IStorageStore
 
     private static Dictionary<string, string> CopyAttributes(
         Dictionary<string, string>? source)
-        => source is null
-            ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+    {
+        if (source is null)
+        {
+            return [];
+        }
+
+        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in source)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidOperationException("File-system storage attribute keys are required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException("File-system storage attribute values are required.");
+            }
+
+            var normalizedKey = key.Trim();
+            if (!copy.TryAdd(normalizedKey, value.Trim()))
+            {
+                throw new InvalidOperationException(
+                    $"File-system storage attribute '{normalizedKey}' is declared more than once.");
+            }
+        }
+
+        return copy;
+    }
 
     private static string? Normalize(string? value)
         => FileSystemStorageStoreOptions.Normalize(value);

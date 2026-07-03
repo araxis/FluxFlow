@@ -33,34 +33,20 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
         SessionQueryOptions options,
         ISessionStore store,
         TimeProvider? clock = null)
+        : this(ResolveArguments(options, store), clock)
+    {
+    }
+
+    private SessionQueryNode(
+        ResolvedSessionQueryArguments resolved,
+        TimeProvider? clock)
         : base(new FlowNodeOptions
         {
-            InputCapacity = (options ?? throw new ArgumentNullException(nameof(options))).BoundedCapacity
+            InputCapacity = resolved.Options.BoundedCapacity
         })
     {
-        if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.query bounded capacity must be greater than zero.");
-        }
-
-        if (options.Limit <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "session.query limit must be greater than zero.");
-        }
-
-        if (!options.IncludeActive && !options.IncludeCompleted)
-        {
-            throw new ArgumentException(
-                "session.query must include active sessions, completed sessions, or both.",
-                nameof(options));
-        }
-
-        _options = options;
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _options = resolved.Options;
+        _store = resolved.Store;
         _clock = clock ?? TimeProvider.System;
         _sessions = AddOutput<FlowMessage<SessionMetadata>>();
 
@@ -103,10 +89,20 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
         try
         {
             var sessions = await _store.QuerySessionsAsync(request, Stopping).ConfigureAwait(false);
+            if (sessions is null)
+            {
+                throw new InvalidOperationException(
+                    "session.query store returned a null session query result.");
+            }
+
             copiedSessions = sessions
-                .Select(ValidateAndCopySession)
-                .Take(request.Limit!.Value)
+                .Select(session => ValidateAndCopySession(request, session))
                 .ToArray();
+            if (copiedSessions.Count > request.Limit!.Value)
+            {
+                throw new InvalidOperationException(
+                    "session.query store returned more sessions than requested.");
+            }
         }
         catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
         {
@@ -189,19 +185,92 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
             CorrelationId = request.CorrelationId
         };
 
-    private static SessionMetadata ValidateAndCopySession(SessionMetadata session)
+    private static SessionMetadata ValidateAndCopySession(
+        SessionQueryRequest request,
+        SessionMetadata? session)
     {
+        if (session is null)
+        {
+            throw new InvalidOperationException(
+                "session.query store returned a null session.");
+        }
+
         if (string.IsNullOrWhiteSpace(session.SessionId))
         {
             throw new InvalidOperationException(
                 "session.query store returned a session without a session id.");
         }
 
+        ValidateSessionMatchesRequest(request, session);
         return session with
         {
             Tags = CopyDictionary(session.Tags)
         };
     }
+
+    private static void ValidateSessionMatchesRequest(
+        SessionQueryRequest request,
+        SessionMetadata session)
+    {
+        if (!string.IsNullOrWhiteSpace(request.Name) &&
+            !StringComparer.Ordinal.Equals(session.Name, request.Name))
+        {
+            ThrowStoreFilterViolation("name");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.NamePrefix) &&
+            session.Name?.StartsWith(request.NamePrefix, StringComparison.Ordinal) != true)
+        {
+            ThrowStoreFilterViolation("namePrefix");
+        }
+
+        foreach (var (key, value) in request.Tags)
+        {
+            if (!session.Tags.TryGetValue(key, out var actual) ||
+                !StringComparer.Ordinal.Equals(actual, value))
+            {
+                ThrowStoreFilterViolation($"tag '{key}'");
+            }
+        }
+
+        if (request.StartedFrom.HasValue &&
+            session.StartedAt < request.StartedFrom.Value)
+        {
+            ThrowStoreFilterViolation("startedFrom");
+        }
+
+        if (request.StartedTo.HasValue &&
+            session.StartedAt > request.StartedTo.Value)
+        {
+            ThrowStoreFilterViolation("startedTo");
+        }
+
+        if (request.EndedFrom.HasValue &&
+            (session.EndedAt is null || session.EndedAt.Value < request.EndedFrom.Value))
+        {
+            ThrowStoreFilterViolation("endedFrom");
+        }
+
+        if (request.EndedTo.HasValue &&
+            (session.EndedAt is null || session.EndedAt.Value > request.EndedTo.Value))
+        {
+            ThrowStoreFilterViolation("endedTo");
+        }
+
+        if (request.IncludeActive == false && session.EndedAt is null)
+        {
+            ThrowStoreFilterViolation("includeActive");
+        }
+
+        if (request.IncludeCompleted == false && session.EndedAt is not null)
+        {
+            ThrowStoreFilterViolation("includeCompleted");
+        }
+    }
+
+    private static void ThrowStoreFilterViolation(string filterName)
+        => throw new InvalidOperationException(
+            $"session.query store returned a session outside the query filter '{filterName}'.");
 
     private void ReportQueryError(
         int code,
@@ -331,4 +400,39 @@ public sealed class SessionQueryNode : FlowNode<SessionQueryRequest, SessionQuer
 
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static ResolvedSessionQueryArguments ResolveArguments(
+        SessionQueryOptions options,
+        ISessionStore store)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(store);
+
+        if (options.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.query bounded capacity must be greater than zero.");
+        }
+
+        if (options.Limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "session.query limit must be greater than zero.");
+        }
+
+        if (!options.IncludeActive && !options.IncludeCompleted)
+        {
+            throw new ArgumentException(
+                "session.query must include active sessions, completed sessions, or both.",
+                nameof(options));
+        }
+
+        return new ResolvedSessionQueryArguments(options, store);
+    }
+
+    private sealed record ResolvedSessionQueryArguments(
+        SessionQueryOptions Options,
+        ISessionStore Store);
 }

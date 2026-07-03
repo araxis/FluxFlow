@@ -7,7 +7,7 @@ public readonly record struct SecretName
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Secret name cannot be empty.", nameof(value));
 
-        Value = value;
+        Value = value.Trim();
     }
 
     public string Value { get; }

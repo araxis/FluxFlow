@@ -9,6 +9,7 @@ public static class SqlFileStorageRegistrationExtensions
         string databasePath)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
         return options.UseSqlFileStorage(new SqlFileStorageStoreOptions
         {
             DatabasePath = databasePath

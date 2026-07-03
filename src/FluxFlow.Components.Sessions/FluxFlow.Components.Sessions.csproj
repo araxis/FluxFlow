@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sessions</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.3.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as three standalone nodes over an injected ISessionStore and TimeProvider: SessionRecorderNode (FlowNode, input -> record), SessionReplayNode (FlowSource, stored records out), and SessionQueryNode (FlowNode, request -> result with an extra Sessions output). Every message is a FlowMessage&lt;T&gt; envelope carrying the correlation id; failures surface on the broadcast Errors port and diagnostics on Events. The node factory, component module, registration extensions, port/type constants, NodeDefinition options reader, and design-metadata provider are removed — construct a node directly and LinkTo the next one. The nodes depend only on FluxFlow.Nodes and run without the engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -21,6 +21,7 @@
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
   </ItemGroup>
   <ItemGroup>

@@ -315,6 +315,18 @@ public sealed class FlowCorrelationNodeTests
             .Message.ShouldContain("different");
 
     [Fact]
+    public void Correlation_RejectsInvalidCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => CreateNode(o => o with { BoundedCapacity = 0 }))
+            .Message.ShouldContain("boundedCapacity");
+
+    [Fact]
+    public void Correlation_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => CreateNode(o => o with { InputType = " " }))
+            .Message.ShouldContain("inputType");
+
+    [Fact]
     public void Correlation_RejectsNullOptions()
         => Should.Throw<ArgumentNullException>(
             () => new FlowCorrelationNode<CorrelationMessage>(null!, input => input.Key, input => input.Side));

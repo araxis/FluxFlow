@@ -100,6 +100,54 @@ public sealed class StorageGetNodeTests
     }
 
     [Fact]
+    public async Task Get_ReportsMismatchedStoreRecordCollectionAsError()
+    {
+        var store = new StaticGetStore(new StorageRecord
+        {
+            Collection = "other",
+            Key = "a",
+            Value = "wrong",
+            StoredAt = DateTimeOffset.UtcNow
+        });
+        await using var node = new StorageGetNode(store, new StorageGetOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var found = StorageTestSink.Link(node.Found);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        var request = FlowMessage.Create(new StorageGetRequest { Key = "a", CorrelationId = "c-mismatch" });
+        await node.Input.SendAsync(request);
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.GetFailed);
+        error.CorrelationId.ShouldBe(request.CorrelationId);
+        error.Message.ShouldContain("different collection");
+        output.TryReceive(out _).ShouldBeFalse();
+        found.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Get_ReportsMismatchedStoreRecordKeyAsError()
+    {
+        var store = new StaticGetStore(new StorageRecord
+        {
+            Collection = "items",
+            Key = "b",
+            Value = "wrong",
+            StoredAt = DateTimeOffset.UtcNow
+        });
+        await using var node = new StorageGetNode(store, new StorageGetOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "a" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.GetFailed);
+        error.Message.ShouldContain("different key");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Get_EmitsFoundEvent()
     {
         var store = new InMemoryStorageStore();
@@ -134,4 +182,27 @@ public sealed class StorageGetNodeTests
 
     private static async Task Seed(InMemoryStorageStore store, string collection, string key, object value)
         => await store.PutAsync(new StoragePutRequest { Collection = collection, Key = key, Value = value });
+
+    private sealed class StaticGetStore(StorageRecord? record) : IStorageStore
+    {
+        public Task<StorageRecord> PutAsync(
+            StoragePutRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageRecord?> GetAsync(
+            StorageGetRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(record);
+
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageResult> DeleteAsync(
+            StorageDeleteRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
 }

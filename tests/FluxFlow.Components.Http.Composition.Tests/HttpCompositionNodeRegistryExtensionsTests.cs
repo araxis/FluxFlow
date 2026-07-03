@@ -38,17 +38,17 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(HttpCompositionNodeTypes.Client));
-        metadata.DisplayName.ShouldBe("HTTP Client");
-        metadata.Category.ShouldBe("HTTP");
+        metadata.DisplayName?.Value.ShouldBe("HTTP Client");
+        metadata.Category.ShouldBe(new ComponentCategory("HTTP"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         metadata.Options.ShouldNotContain(option =>
-            option.Name == HttpCompositionResourceNames.Client ||
-            option.Name == HttpCompositionResourceNames.Clock);
+            option.Name.Value == HttpCompositionResourceNames.Client ||
+            option.Name.Value == HttpCompositionResourceNames.Clock);
         metadata.Resources.Select(resource => (
-            resource.Name,
+            resource.Name.Value,
             resource.Order,
             resource.IsRequired,
-            resource.ValueType)).ShouldBe([
+            resource.ValueType?.Value)).ShouldBe([
             (HttpCompositionResourceNames.Client, 0, true, nameof(HttpClient)),
             (HttpCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
@@ -64,14 +64,14 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Input));
         input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType.ShouldBe(nameof(HttpRequestInput));
+        input.ValueType?.Value.ShouldBe(nameof(HttpRequestInput));
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType.ShouldBe(nameof(HttpResponseOutput));
+        output.ValueType?.Value.ShouldBe(nameof(HttpResponseOutput));
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }
@@ -82,7 +82,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var metadata = GetClientDesignMetadata();
         var defaults = HttpClientNodeOptions.Default;
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "boundedCapacity",
             "maxResponseBodyBytes",
             "treatNonSuccessStatusAsError",
@@ -122,6 +122,54 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_http_client_option_hints()
+    {
+        var metadata = GetClientDesignMetadata();
+        var options = OptionsByName(metadata);
+
+        AssertOptionHints(
+            options["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["maxResponseBodyBytes"],
+            "Limits",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["treatNonSuccessStatusAsError"],
+            "Response",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["maxDegreeOfParallelism"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["defaultTimeoutMilliseconds"],
+            "Timeouts",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_http_client_resource_picker_hints()
+    {
+        var metadata = GetClientDesignMetadata();
+        var resources = ResourcesByName(metadata);
+
+        AssertResourceHints(
+            resources[HttpCompositionResourceNames.Client],
+            ResourceDesignMetadataAttributeValues.Client,
+            "http-client:{name}");
+        AssertResourceHints(
+            resources[HttpCompositionResourceNames.Clock],
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new HttpComponentDesignMetadataProvider();
@@ -131,7 +179,7 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(HttpCompositionNodeTypes.Client),
             out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull().DisplayName.ShouldBe("HTTP Client");
+        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("HTTP Client");
     }
 
     [Fact]
@@ -273,10 +321,62 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
                 StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("boundedCapacity", 0, "BoundedCapacity")]
+    [InlineData("maxResponseBodyBytes", 0, "MaxResponseBodyBytes")]
+    [InlineData("maxDegreeOfParallelism", 0, "MaxDegreeOfParallelism")]
+    [InlineData("defaultTimeoutMilliseconds", 0, "DefaultTimeoutMilliseconds")]
+    public async Task Invalid_client_options_surface_factory_diagnostic(
+        string optionName,
+        int optionValue,
+        string expectedMessage)
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton(
+            "primary",
+            (_, _) => new HttpClient(new RecordingHandler(
+                (_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"))));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "api",
+                    HttpCompositionNodeTypes.Client,
+                    node => node
+                        .Resource(HttpCompositionResourceNames.Client, "primary")
+                        .Configure(optionName, optionValue)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterHttpNodes())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
+    }
+
     private static ComponentDesignMetadata GetClientDesignMetadata()
         => new HttpComponentDesignMetadataProvider()
             .GetMetadata()
             .ShouldHaveSingleItem();
+
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static Dictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
 
     private static void AssertOption(
         ComponentDesignMetadata metadata,
@@ -285,11 +385,57 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static Task<HttpResponseMessage> Respond(
         HttpStatusCode status,

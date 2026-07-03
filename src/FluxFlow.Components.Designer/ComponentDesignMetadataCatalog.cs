@@ -17,7 +17,11 @@ public sealed class ComponentDesignMetadataCatalog
         foreach (var provider in providers)
         {
             ArgumentNullException.ThrowIfNull(provider);
-            foreach (var metadata in provider.GetMetadata())
+            var metadataItems = provider.GetMetadata()
+                ?? throw new InvalidOperationException(
+                    $"Design metadata provider '{provider.GetType().FullName}' returned a null metadata collection.");
+
+            foreach (var metadata in metadataItems)
                 catalog.Add(metadata);
         }
 
@@ -27,11 +31,12 @@ public sealed class ComponentDesignMetadataCatalog
     public ComponentDesignMetadataCatalog Add(ComponentDesignMetadata metadata)
     {
         ComponentDesignMetadataValidator.ThrowIfInvalid(metadata);
+        var snapshot = Snapshot(metadata);
 
-        if (!_metadata.TryAdd(metadata.Type, metadata))
+        if (!_metadata.TryAdd(snapshot.Type, snapshot))
         {
             throw new InvalidOperationException(
-                $"Design metadata for component type '{metadata.Type}' is already registered.");
+                $"Design metadata for component type '{snapshot.Type}' is already registered.");
         }
 
         return this;
@@ -49,4 +54,42 @@ public sealed class ComponentDesignMetadataCatalog
 
     public bool TryGet(ComponentType type, [NotNullWhen(true)] out ComponentDesignMetadata? metadata)
         => _metadata.TryGetValue(type, out metadata);
+
+    private static ComponentDesignMetadata Snapshot(ComponentDesignMetadata metadata)
+        => metadata with
+        {
+            Options = metadata.Options.Select(Snapshot).ToArray(),
+            Resources = metadata.Resources.Select(Snapshot).ToArray(),
+            Ports = metadata.Ports.Select(Snapshot).ToArray(),
+            Attributes = Snapshot(metadata.Attributes)
+        };
+
+    private static OptionDesignMetadata Snapshot(OptionDesignMetadata option)
+        => option with
+        {
+            Choices = option.Choices.Select(Snapshot).ToArray(),
+            Attributes = Snapshot(option.Attributes)
+        };
+
+    private static OptionChoiceMetadata Snapshot(OptionChoiceMetadata choice)
+        => choice with
+        {
+            Attributes = Snapshot(choice.Attributes)
+        };
+
+    private static ResourceDesignMetadata Snapshot(ResourceDesignMetadata resource)
+        => resource with
+        {
+            Attributes = Snapshot(resource.Attributes)
+        };
+
+    private static PortDesignMetadata Snapshot(PortDesignMetadata port)
+        => port with
+        {
+            Attributes = Snapshot(port.Attributes)
+        };
+
+    private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> Snapshot(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes)
+        => new Dictionary<ComponentAttributeName, ComponentAttributeValue>(attributes);
 }

@@ -2,6 +2,34 @@ namespace FluxFlow.Components.Journal.Contracts;
 
 public static class JournalQueryMatcher
 {
+    public static void Validate(JournalQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        if (query.Offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Journal query offset cannot be negative.");
+        }
+
+        if (query.Limit is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                "Journal query limit must be positive.");
+        }
+
+        if (query.From.HasValue &&
+            query.To.HasValue &&
+            query.From.Value > query.To.Value)
+        {
+            throw new ArgumentException(
+                "Journal query from cannot be later than to.",
+                nameof(query));
+        }
+    }
+
     public static bool IsMatch(JournalRecord record, JournalQuery? query)
     {
         ArgumentNullException.ThrowIfNull(record);

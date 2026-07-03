@@ -17,216 +17,234 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             CreateTriggerMetadata()
         ];
 
-    private static ComponentDesignMetadata CreatePublishMetadata() => new()
+    private static ComponentDesignMetadata CreatePublishMetadata()
     {
-        Type = new ComponentType(MqttCompositionNodeTypes.Publish),
-        DisplayName = "MQTT Publish",
-        Category = "MQTT",
-        Summary = "Publishes MQTT request messages through a host-owned publisher.",
-        IconKey = "send",
-        PreferredNodeName = "publishMqtt",
-        SuggestedEditorWidth = 420,
-        Options =
-        [
-            new OptionDesignMetadata
-            {
-                Name = "publishTimeoutMilliseconds",
-                Kind = OptionValueKind.Number,
-                DisplayName = "Publish Timeout Milliseconds",
-                DefaultValue = PublishDefaults.PublishTimeoutMilliseconds,
-                Min = 1,
-                HelperText = "Maximum time to wait for a publish operation."
-            },
-            BoundedCapacityOption(PublishDefaults.BoundedCapacity)
-        ],
-        Resources =
-        [
-            Resource(
-                MqttCompositionResourceNames.Publisher,
-                "Publisher",
-                nameof(IMqttPublisher),
-                "Keyed MQTT publisher used to send publish requests.",
-                isRequired: true,
-                order: 0),
-            Resource(
-                MqttCompositionResourceNames.Clock,
-                "Clock",
-                nameof(TimeProvider),
-                "Optional keyed clock for deterministic publish diagnostics.",
-                isRequired: false,
-                order: 1)
-        ],
-        Ports =
-        [
-            InputPort(
-                MqttCompositionPortNames.Input,
-                nameof(MqttPublishRequest),
-                "MQTT publish request."),
-            OutputPort(
-                MqttCompositionPortNames.Output,
-                nameof(MqttPublishResult),
-                "MQTT publish result.")
-        ]
-    };
+        var builder = CreateMqttMetadataBuilder(
+            MqttCompositionNodeTypes.Publish,
+            "MQTT Publish",
+            "Publishes MQTT request messages through a host-owned publisher.",
+            "send",
+            "publishMqtt",
+            suggestedEditorWidth: 420);
 
-    private static ComponentDesignMetadata CreateTriggerMetadata() => new()
-    {
-        Type = new ComponentType(MqttCompositionNodeTypes.Trigger),
-        DisplayName = "MQTT Trigger",
-        Category = "MQTT",
-        Summary = "Subscribes through a host-owned trigger source and emits received MQTT messages.",
-        IconKey = "radio-tower",
-        PreferredNodeName = "triggerMqtt",
-        SuggestedEditorWidth = 460,
-        Options =
-        [
-            new OptionDesignMetadata
-            {
-                Name = "topicFilter",
-                Kind = OptionValueKind.Text,
-                DisplayName = "Topic Filter",
-                IsRequired = true,
-                HelperText = "MQTT subscription filter to open through the trigger source."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "qualityOfService",
-                Kind = OptionValueKind.Enum,
-                DisplayName = "Quality Of Service",
-                DefaultValue = TriggerDefaults.QualityOfService.ToString(),
-                HelperText = "Requested subscription quality of service.",
-                Choices = QualityOfServiceChoices()
-            },
-            new OptionDesignMetadata
-            {
-                Name = "receiveRetainedMessages",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Receive Retained Messages",
-                DefaultValue = TriggerDefaults.ReceiveRetainedMessages,
-                HelperText = "Request retained messages when opening the subscription."
-            },
-            new OptionDesignMetadata
-            {
-                Name = "retainAsPublished",
-                Kind = OptionValueKind.Boolean,
-                DisplayName = "Retain As Published",
-                DefaultValue = TriggerDefaults.RetainAsPublished,
-                HelperText = "Request broker-provided retain flags exactly as published."
-            },
-            BoundedCapacityOption(TriggerDefaults.BoundedCapacity),
-            new OptionDesignMetadata
-            {
-                Name = "mode",
-                Kind = OptionValueKind.Enum,
-                DisplayName = "Mode",
-                DefaultValue = TriggerDefaults.Mode.ToString(),
-                HelperText = "Trigger delivery mode.",
-                Choices = TriggerModeChoices()
-            },
-            new OptionDesignMetadata
-            {
-                Name = "acknowledgement",
-                Kind = OptionValueKind.Enum,
-                DisplayName = "Acknowledgement",
-                DefaultValue = TriggerDefaults.Acknowledgement.ToString(),
-                HelperText = "Ack/nack policy for emitted messages.",
-                Choices = AcknowledgementChoices()
-            },
-            new OptionDesignMetadata
-            {
-                Name = "responseTimeout",
-                Kind = OptionValueKind.Duration,
-                DisplayName = "Response Timeout",
-                DefaultValue = TriggerDefaults.ResponseTimeout,
-                Min = 0.000001,
-                HelperText = "Timeout for request/reply responses; must be greater than zero."
-            }
-        ],
-        Resources =
-        [
-            Resource(
-                MqttCompositionResourceNames.TriggerSource,
-                "Trigger Source",
-                nameof(IMqttTriggerSource),
-                "Keyed MQTT trigger source used to open subscriptions.",
+        builder
+            .AddOption(
+                "publishTimeoutMilliseconds",
+                OptionValueKind.Number,
+                displayName: "Publish Timeout Milliseconds",
+                helperText: "Maximum time to wait for a publish operation.",
+                defaultValue: PublishDefaults.PublishTimeoutMilliseconds,
+                min: 1,
+                attributes: OptionAttributes(
+                    "Publishing",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Number))
+            .AddOption(BoundedCapacityOption(PublishDefaults.BoundedCapacity))
+            .AddResource(
+                MqttCompositionResourceNames.Publisher,
+                displayName: "Publisher",
+                order: 0,
+                summary: "Keyed MQTT publisher used to send publish requests.",
+                valueType: nameof(IMqttPublisher),
                 isRequired: true,
-                order: 0),
-            Resource(
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Publisher,
+                    keyPattern: "mqtt-publisher:{name}"))
+            .AddResource(
                 MqttCompositionResourceNames.Clock,
-                "Clock",
-                nameof(TimeProvider),
-                "Optional keyed clock for deterministic trigger diagnostics and response timeouts.",
-                isRequired: false,
-                order: 1)
-        ],
-        Ports =
-        [
-            InputPort(
-                MqttCompositionPortNames.Responses,
-                nameof(MqttTriggerResponse),
-                "Request/reply response message."),
-            OutputPort(
-                MqttCompositionPortNames.Output,
-                nameof(MqttReceivedMessage),
-                "Received MQTT message.")
-        ]
-    };
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic publish diagnostics.",
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
+
+        AddPorts(
+            builder,
+            MqttCompositionPortNames.Input,
+            nameof(MqttPublishRequest),
+            "MQTT publish request.",
+            nameof(MqttPublishResult),
+            "MQTT publish result.");
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadata CreateTriggerMetadata()
+    {
+        var builder = CreateMqttMetadataBuilder(
+            MqttCompositionNodeTypes.Trigger,
+            "MQTT Trigger",
+            "Subscribes through a host-owned trigger source and emits received MQTT messages.",
+            "radio-tower",
+            "triggerMqtt",
+            suggestedEditorWidth: 460);
+
+        builder
+            .AddOption(
+                "topicFilter",
+                OptionValueKind.Text,
+                displayName: "Topic Filter",
+                helperText: "MQTT subscription filter to open through the trigger source.",
+                isRequired: true,
+                attributes: OptionAttributes(
+                    "Subscription",
+                    OptionDesignMetadataAttributeValues.Primary,
+                    OptionDesignMetadataAttributeValues.Text))
+            .AddOption(
+                "qualityOfService",
+                OptionValueKind.Enum,
+                displayName: "Quality Of Service",
+                helperText: "Requested subscription quality of service.",
+                defaultValue: TriggerDefaults.QualityOfService.ToString(),
+                choices: QualityOfServiceChoices(),
+                attributes: OptionAttributes(
+                    "Subscription",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(
+                "receiveRetainedMessages",
+                OptionValueKind.Boolean,
+                displayName: "Receive Retained Messages",
+                helperText: "Request retained messages when opening the subscription.",
+                defaultValue: TriggerDefaults.ReceiveRetainedMessages,
+                attributes: OptionAttributes(
+                    "Subscription",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(
+                "retainAsPublished",
+                OptionValueKind.Boolean,
+                displayName: "Retain As Published",
+                helperText: "Request broker-provided retain flags exactly as published.",
+                defaultValue: TriggerDefaults.RetainAsPublished,
+                attributes: OptionAttributes(
+                    "Subscription",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(BoundedCapacityOption(TriggerDefaults.BoundedCapacity))
+            .AddOption(
+                "mode",
+                OptionValueKind.Enum,
+                displayName: "Mode",
+                helperText: "Trigger delivery mode.",
+                defaultValue: TriggerDefaults.Mode.ToString(),
+                choices: TriggerModeChoices(),
+                attributes: OptionAttributes(
+                    "Delivery",
+                    OptionDesignMetadataAttributeValues.Primary))
+            .AddOption(
+                "acknowledgement",
+                OptionValueKind.Enum,
+                displayName: "Acknowledgement",
+                helperText: "Ack/nack policy for emitted messages.",
+                defaultValue: TriggerDefaults.Acknowledgement.ToString(),
+                choices: AcknowledgementChoices(),
+                attributes: OptionAttributes(
+                    "Delivery",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddOption(
+                "responseTimeout",
+                OptionValueKind.Duration,
+                displayName: "Response Timeout",
+                helperText: "Timeout for request/reply responses; must be greater than zero.",
+                defaultValue: TriggerDefaults.ResponseTimeout,
+                min: 0.000001,
+                attributes: OptionAttributes(
+                    "Timeouts",
+                    OptionDesignMetadataAttributeValues.Advanced))
+            .AddResource(
+                MqttCompositionResourceNames.TriggerSource,
+                displayName: "Trigger Source",
+                order: 0,
+                summary: "Keyed MQTT trigger source used to open subscriptions.",
+                valueType: nameof(IMqttTriggerSource),
+                isRequired: true,
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.TriggerSource,
+                    keyPattern: "mqtt-trigger-source:{name}"))
+            .AddResource(
+                MqttCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic trigger diagnostics and response timeouts.",
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "clock:{name}"));
+
+        AddPorts(
+            builder,
+            MqttCompositionPortNames.Responses,
+            nameof(MqttTriggerResponse),
+            "Request/reply response message.",
+            nameof(MqttReceivedMessage),
+            "Received MQTT message.");
+
+        return builder.Build();
+    }
+
+    private static ComponentDesignMetadataBuilder CreateMqttMetadataBuilder(
+        string type,
+        string displayName,
+        string summary,
+        string iconKey,
+        string preferredNodeName,
+        int suggestedEditorWidth)
+        => new ComponentDesignMetadataBuilder(type)
+            .WithDisplay(
+                displayName: displayName,
+                category: "MQTT",
+                summary: summary,
+                iconKey: iconKey,
+                preferredNodeName: preferredNodeName,
+                suggestedEditorWidth: suggestedEditorWidth);
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {
-        Name = "boundedCapacity",
+        Name = new ComponentOptionName("boundedCapacity"),
         Kind = OptionValueKind.Number,
-        DisplayName = "Bounded Capacity",
+        DisplayName = new ComponentMetadataText("Bounded Capacity"),
         DefaultValue = defaultValue,
         Min = 1,
-        HelperText = "Maximum queued messages."
+        HelperText = new ComponentMetadataText("Maximum queued messages."),
+        Attributes = OptionDesignMetadataAttributes.CreateMap(
+            section: "Runtime",
+            importance: OptionDesignMetadataAttributeValues.Advanced,
+            editor: OptionDesignMetadataAttributeValues.Number)
     };
 
-    private static ResourceDesignMetadata Resource(
-        string name,
-        string displayName,
-        string valueType,
-        string summary,
-        bool isRequired,
-        int order) => new()
-        {
-            Name = name,
-            DisplayName = displayName,
-            Order = order,
-            Summary = summary,
-            ValueType = valueType,
-            IsRequired = isRequired
-        };
+    private static IReadOnlyDictionary<string, string> OptionAttributes(
+        string section,
+        string importance,
+        string? editor = null)
+        => OptionDesignMetadataAttributes.Create(
+            section: section,
+            importance: importance,
+            editor: editor);
 
-    private static PortDesignMetadata InputPort(
-        string name,
-        string valueType,
-        string summary) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Input,
-            DisplayName = name,
-            Group = "Messages",
-            Order = 0,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = true
-        };
-
-    private static PortDesignMetadata OutputPort(
-        string name,
-        string valueType,
-        string summary) => new()
-        {
-            Name = new ComponentPortName(name),
-            Direction = PortDirection.Output,
-            DisplayName = name,
-            Group = "Results",
-            Order = 1,
-            Summary = summary,
-            ValueType = valueType,
-            IsPrimary = true
-        };
+    private static void AddPorts(
+        ComponentDesignMetadataBuilder builder,
+        string inputPortName,
+        string inputType,
+        string inputSummary,
+        string outputType,
+        string outputSummary)
+        => builder
+            .AddInputPort(
+                inputPortName,
+                displayName: inputPortName,
+                group: "Messages",
+                order: 0,
+                summary: inputSummary,
+                valueType: inputType,
+                isPrimary: true)
+            .AddOutputPort(
+                MqttCompositionPortNames.Output,
+                displayName: MqttCompositionPortNames.Output,
+                group: "Results",
+                order: 1,
+                summary: outputSummary,
+                valueType: outputType,
+                isPrimary: true);
 
     private static IReadOnlyList<OptionChoiceMetadata> QualityOfServiceChoices()
         =>
@@ -259,7 +277,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
         where TEnum : struct, Enum
         => new()
         {
-            Value = value.ToString(),
-            DisplayName = displayName
+            Value = new ComponentOptionChoiceValue(value.ToString()),
+            DisplayName = new ComponentMetadataText(displayName)
         };
 }

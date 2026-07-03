@@ -69,7 +69,8 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
                 StateReducerOperation.Reduce => Reduce(key, input),
                 StateReducerOperation.Reset => Reset(key, input),
                 StateReducerOperation.Clear => Clear(key, input),
-                _ => throw new InvalidOperationException(
+                _ => throw new StateReducerException(
+                    StateErrorCodes.InvalidMessage,
                     $"state.reducer operation '{input.Operation}' is not supported.")
             };
 
@@ -392,26 +393,28 @@ public sealed class StateReducerNode : FlowNode<StateReducerInput, StateReducerR
         ArgumentNullException.ThrowIfNull(options);
         if (string.IsNullOrWhiteSpace(options.Reducer))
         {
-            throw new InvalidOperationException(
-                "state.reducer option 'reducer' is required.");
+            throw new ArgumentException("state.reducer option 'reducer' is required.", nameof(options));
         }
 
         if (options.KeyExpression is not null &&
             string.IsNullOrWhiteSpace(options.KeyExpression))
         {
-            throw new InvalidOperationException(
-                "state.reducer option 'keyExpression' cannot be empty when set.");
+            throw new ArgumentException(
+                "state.reducer option 'keyExpression' cannot be empty when set.",
+                nameof(options));
         }
 
         if (options.BoundedCapacity <= 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "state.reducer option 'boundedCapacity' must be greater than zero.");
         }
 
         if (options.MaxKeys < 0)
         {
-            throw new InvalidOperationException(
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
                 "state.reducer option 'maxKeys' must be zero or greater.");
         }
 

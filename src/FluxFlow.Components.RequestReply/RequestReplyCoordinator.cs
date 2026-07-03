@@ -30,15 +30,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     public RequestReplyCoordinator(RequestReplyOptions? options = null, TimeProvider? clock = null)
     {
         _options = options ?? new RequestReplyOptions();
-        if (_options.Capacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), "Capacity must be greater than zero.");
-        }
-
-        if (_options.Timeout <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), "Timeout must be greater than zero.");
-        }
+        ValidateOptions(_options);
 
         _clock = clock ?? TimeProvider.System;
         _tracker = _options.Mode == RequestReplyMode.RequestReply
@@ -101,9 +93,25 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
     /// <summary>In-flight request count (requests awaiting a response).</summary>
     public int InFlightCount => _tracker?.PendingCount ?? 0;
 
-    public Task Completion => Task.WhenAll(_incoming.Completion, _responses.Completion);
+    public Task Completion => Task.WhenAll(
+        _incoming.Completion,
+        _responses.Completion,
+        _output.Completion,
+        _errors.Completion,
+        _events.Completion);
 
-    public void Complete() => _incoming.Complete();
+    public void Complete()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
+        CompleteBlocks();
+        _ = FailInFlightAsync(new OperationCanceledException(
+                "The request/reply bridge was completed."))
+            .AsTask();
+    }
 
     public void Fault(Exception exception)
     {
@@ -121,10 +129,9 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             _ = _tracker.FailAllAsync(exception).AsTask();
         }
 
-        // Fault the data blocks so Completion surfaces the fault (Output first, so the
-        // _incoming-completion continuation's Complete() is a no-op against the faulted
-        // block); flush — not fault — the diagnostic ports so buffered Errors/Events
-        // survive, matching the kit's fault rule.
+        // Fault the data blocks so Completion surfaces the fault. Flush — not fault —
+        // the diagnostic ports so buffered Errors/Events survive, matching the kit's
+        // fault rule.
         ((IDataflowBlock)_output).Fault(exception);
         ((IDataflowBlock)_incoming).Fault(exception);
         ((IDataflowBlock)_responses).Fault(exception);
@@ -134,6 +141,13 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
 
     private async Task OnIncomingAsync(IRequestContext<TRequest, TResponse> context)
     {
+        if (context is null)
+        {
+            EmitError(RequestReplyErrorCodes.InvalidRequestContext, "Request context is required.", null);
+            EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
+            return;
+        }
+
         var id = context.CorrelationId ?? CorrelationId.New();
 
         if (_options.Mode == RequestReplyMode.FireAndForget)
@@ -200,11 +214,24 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             // Output closed (shutdown) before the request reached the graph.
             await SafeFailAsync(removed, new InvalidOperationException(
                 "The request/reply bridge is shutting down.")).ConfigureAwait(false);
+            return;
+        }
+
+        if (accepted)
+        {
+            EmitEvent(RequestReplyEvents.Published, id);
         }
     }
 
     private async Task OnResponseAsync(FlowMessage<TResponse> message)
     {
+        if (message is null)
+        {
+            EmitError(RequestReplyErrorCodes.InvalidResponseMessage, "Response message is required.", null);
+            EmitEvent(RequestReplyEvents.Invalid, null, FlowEventLevel.Error);
+            return;
+        }
+
         if (_tracker is null
             || !await _tracker.TryCompleteAsync(message, _stopping.Token).ConfigureAwait(false))
         {
@@ -279,7 +306,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         }
     }
 
-    private void EmitEvent(string name, CorrelationId id, FlowEventLevel level = FlowEventLevel.Information)
+    private void EmitEvent(string name, CorrelationId? id, FlowEventLevel level = FlowEventLevel.Information)
         => _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
@@ -288,7 +315,7 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
             Level = level
         });
 
-    private void EmitError(int code, string message, CorrelationId id, Exception? exception = null)
+    private void EmitError(int code, string message, CorrelationId? id, Exception? exception = null)
         => _errors.Post(new FlowError
         {
             Timestamp = _clock.GetUtcNow(),
@@ -304,16 +331,73 @@ public sealed class RequestReplyCoordinator<TRequest, TResponse> : IFlowNode
         {
             return;
         }
-        _incoming.Complete();
-        _stopping.Cancel();
+
+        CompleteBlocks();
+        await FailInFlightAsync(new OperationCanceledException(
+                "The request/reply bridge was disposed."))
+            .ConfigureAwait(false);
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Completion may surface a fault; disposal must still release resources.
+        }
+
         if (_tracker is not null)
         {
             await _tracker.DisposeAsync().ConfigureAwait(false);
         }
 
+        _stopping.Dispose();
+    }
+
+    private void CompleteBlocks()
+    {
+        _incoming.Complete();
+        _responses.Complete();
         _output.Complete();
         _errors.Complete();
         _events.Complete();
-        _stopping.Dispose();
+        _stopping.Cancel();
+    }
+
+    private ValueTask FailInFlightAsync(Exception exception)
+        => _tracker?.FailAllAsync(exception) ?? ValueTask.CompletedTask;
+
+    private static void ValidateOptions(RequestReplyOptions options)
+    {
+        if (!Enum.IsDefined(options.Mode))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Mode,
+                "Request/reply mode is not supported.");
+        }
+
+        if (options.Capacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Capacity,
+                "Capacity must be greater than zero.");
+        }
+
+        if (options.Timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.Timeout,
+                "Timeout must be greater than zero.");
+        }
+
+        if (options.SweepInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.SweepInterval,
+                "Sweep interval must be greater than zero.");
+        }
     }
 }

@@ -35,7 +35,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
         var collection = ResolveCollection(request.Collection);
         var key = ResolveKey(request.Key);
-        var mode = request.Mode ?? StorageWriteMode.Upsert;
+        var mode = ResolveWriteMode(request.Mode);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -171,17 +171,19 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
             await using var connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             ApplyBusyTimeout(connection);
+            var now = _settings.Clock.GetUtcNow();
 
             var records = await ReadCollectionAsync(
                     connection,
                     collection,
                     query,
                     pagingPushedDown,
+                    now,
                     cancellationToken)
                 .ConfigureAwait(false);
 
             var matches = records
-                .Where(record => StorageQueryMatcher.IsMatch(record, query, _settings.Clock.GetUtcNow()))
+                .Where(record => StorageQueryMatcher.IsMatch(record, query, now))
                 .OrderBy(record => record.StoredAt)
                 .ThenBy(record => record.Key, StringComparer.Ordinal);
             var page = pagingPushedDown
@@ -409,6 +411,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         string collection,
         StorageQueryRequest request,
         bool pagingPushedDown,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -453,7 +456,7 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         if (request.IncludeExpired != true)
         {
             text.AppendLine("  AND (expires_at_ms IS NULL OR expires_at_ms > $nowMs)");
-            Add(command, "$nowMs", _settings.Clock.GetUtcNow().ToUnixTimeMilliseconds());
+            Add(command, "$nowMs", now.ToUnixTimeMilliseconds());
         }
 
         text.AppendLine("ORDER BY stored_at_ms, record_key");
@@ -564,6 +567,18 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
         return key;
     }
 
+    private static StorageWriteMode ResolveWriteMode(StorageWriteMode? value)
+    {
+        var mode = value ?? StorageWriteMode.Upsert;
+        if (!Enum.IsDefined(mode))
+        {
+            throw new InvalidOperationException(
+                $"SQL file storage write mode '{mode}' is not supported.");
+        }
+
+        return mode;
+    }
+
     private bool IsExpired(StorageRecord record, bool? includeExpired)
         => record.ExpiresAt.HasValue &&
             record.ExpiresAt.Value <= _settings.Clock.GetUtcNow() &&
@@ -660,9 +675,35 @@ public sealed class SqlFileStorageStore : IStorageStore, IAsyncDisposable
 
     private static Dictionary<string, string> CopyAttributes(
         Dictionary<string, string>? source)
-        => source is null
-            ? []
-            : new Dictionary<string, string>(source, StringComparer.Ordinal);
+    {
+        if (source is null)
+        {
+            return [];
+        }
+
+        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in source)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidOperationException("SQL file storage attribute keys are required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException("SQL file storage attribute values are required.");
+            }
+
+            var normalizedKey = key.Trim();
+            if (!copy.TryAdd(normalizedKey, value.Trim()))
+            {
+                throw new InvalidOperationException(
+                    $"SQL file storage attribute '{normalizedKey}' is declared more than once.");
+            }
+        }
+
+        return copy;
+    }
 
     private static object? ConvertValue(string? valueJson)
     {

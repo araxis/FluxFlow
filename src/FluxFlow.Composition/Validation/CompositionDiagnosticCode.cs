@@ -17,5 +17,6 @@ public enum CompositionDiagnosticCode
     DescriptorPortMismatch,
     LinkFailed,
     CleanupFailed,
-    InvalidConfiguration
+    InvalidConfiguration,
+    InvalidDefinition
 }

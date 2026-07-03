@@ -14,6 +14,11 @@ public sealed class PulseMqttMessageMapperTests
     [Fact]
     public void ToPublishPacket_MapsPublishMetadata()
     {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "alpha"
+        };
+
         var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
         {
             Topic = "devices/a",
@@ -25,10 +30,7 @@ public sealed class PulseMqttMessageMapperTests
             {
                 CorrelationId = "corr-1",
                 ResponseTopic = "devices/a/reply",
-                UserProperties =
-                {
-                    ["tenant"] = "alpha"
-                }
+                UserProperties = userProperties
             }
         });
 
@@ -41,6 +43,59 @@ public sealed class PulseMqttMessageMapperTests
         packet.ResponseTopic.ShouldBe("devices/a/reply");
         packet.UserProperties.Single().Name.ShouldBe("tenant");
         packet.UserProperties.Single().Value.ShouldBe("alpha");
+    }
+
+    [Fact]
+    public void ToPublishPacket_copies_payload_for_adapter_handoff()
+    {
+        var request = new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1, 2, 3]
+        };
+
+        var packet = PulseMqttMessageMapper.ToPublishPacket(request);
+
+        request.Payload[0] = 9;
+
+        packet.Payload.ToArray().ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
+    public void ToPublishPacket_treats_null_user_property_maps_as_empty()
+    {
+        var packet = PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+        {
+            Topic = "devices/a",
+            Payload = [1],
+            Properties = new MqttPublishProperties
+            {
+                UserProperties = null!
+            }
+        });
+
+        packet.UserProperties.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ToPublishPacket_rejects_null_named_user_property_values()
+    {
+        var userProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = null!
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
+            PulseMqttMessageMapper.ToPublishPacket(new MqttPublishRequest
+            {
+                Topic = "devices/a",
+                Payload = [1],
+                Properties = new MqttPublishProperties
+                {
+                    UserProperties = userProperties
+                }
+            }))
+            .ParamName.ShouldBe("value");
     }
 
     [Fact]
@@ -72,4 +127,10 @@ public sealed class PulseMqttMessageMapperTests
         received.CorrelationData.ShouldBe(Encoding.UTF8.GetBytes("corr-2"));
         received.UserProperties["source"].ShouldBe("sensor");
     }
+
+    [Fact]
+    public void ToUtf8Memory_rejects_null_values()
+        => Should.Throw<ArgumentNullException>(() =>
+            PulseMqttMessageMapper.ToUtf8Memory(null!))
+            .ParamName.ShouldBe("value");
 }

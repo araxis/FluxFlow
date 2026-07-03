@@ -1,18 +1,11 @@
 using FluxFlow.Components.Storage.Contracts;
-using FluxFlow.Engine.Definitions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
 
 namespace FluxFlow.Components.Storage.FileSystem.Tests;
 
-// NOTE: The through-the-node round-trip integration tests
-// (Registration_StoresThroughStorageNode, Registration_QueriesThroughStorageNode,
-// Registration_PropagatesConfiguredClockToStoreContext) were removed pending the
-// Wave 3 store-open step. The logical storage operation nodes are now config-only
-// and report StoreNotAvailable at runtime (no store is opened yet), so driving a
-// real put/get/query through the registered node no longer round-trips. The
-// direct FileSystemStorageStore / factory coverage below remains valid.
 public sealed class FileSystemStorageStoreTests
 {
     [Fact]
@@ -122,6 +115,24 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_RejectsUnsupportedWriteMode()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => store.PutAsync(new StoragePutRequest
+            {
+                Collection = "items",
+                Key = "alpha",
+                Value = "one",
+                Mode = (StorageWriteMode)999
+            }));
+
+        exception.Message.ShouldContain("write mode");
+    }
+
+    [Fact]
     public async Task Get_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 2, 3, TimeSpan.Zero);
@@ -199,6 +210,81 @@ public sealed class FileSystemStorageStoreTests
     }
 
     [Fact]
+    public async Task Put_NormalizesAttributesAndQueryMatchesNormalizedAttributes()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+        await store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = " primary "
+            }
+        });
+
+        var loaded = await store.GetAsync(new StorageGetRequest
+        {
+            Collection = "items",
+            Key = "alpha"
+        });
+        var records = await store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = " primary "
+            }
+        });
+
+        loaded.ShouldNotBeNull();
+        loaded.Attributes.ContainsKey("tenant").ShouldBeTrue();
+        loaded.Attributes["tenant"].ShouldBe("primary");
+        records.ShouldHaveSingleItem().Key.ShouldBe("alpha");
+    }
+
+    [Fact]
+    public async Task Put_RejectsInvalidAttributes()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "blank-key",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" "] = "primary"
+            }
+        }));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "blank-value",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                ["tenant"] = " "
+            }
+        }));
+        await Should.ThrowAsync<InvalidOperationException>(() => store.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "duplicate-key",
+            Value = "one",
+            Attributes = new Dictionary<string, string>
+            {
+                [" tenant "] = "primary",
+                ["tenant"] = "secondary"
+            }
+        }));
+    }
+
+    [Fact]
     public async Task Query_HonorsExpiration()
     {
         var now = new DateTimeOffset(2026, 2, 3, 5, 3, 4, TimeSpan.Zero);
@@ -225,6 +311,38 @@ public sealed class FileSystemStorageStoreTests
 
         current.ShouldBeEmpty();
         expired.ShouldHaveSingleItem().Key.ShouldBe("expired");
+    }
+
+    [Fact]
+    public async Task Query_UsesSingleClockTimestampForExpirationFiltering()
+    {
+        var now = new DateTimeOffset(2026, 2, 3, 5, 4, 5, TimeSpan.Zero);
+        using var temp = TempDirectory.Create();
+        var writer = CreateStore(temp.Path, new FakeTimeProvider(now));
+        await writer.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "alpha",
+            Value = "first",
+            ExpiresAt = now.AddSeconds(1)
+        });
+        await writer.PutAsync(new StoragePutRequest
+        {
+            Collection = "items",
+            Key = "beta",
+            Value = "second",
+            ExpiresAt = now.AddSeconds(1)
+        });
+        var reader = CreateStore(
+            temp.Path,
+            new AdvancingTimeProvider(now, TimeSpan.FromSeconds(2)));
+
+        var records = await reader.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items"
+        });
+
+        records.Select(record => record.Key).ShouldBe(["alpha", "beta"]);
     }
 
     [Fact]
@@ -259,6 +377,34 @@ public sealed class FileSystemStorageStoreTests
         });
 
         records.ShouldHaveSingleItem().Key.ShouldBe("a-2");
+    }
+
+    [Fact]
+    public async Task Query_RejectsInvalidPaging()
+    {
+        using var temp = TempDirectory.Create();
+        var store = CreateStore(temp.Path);
+
+        var offset = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Offset = -1
+        }));
+        var limit = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            Limit = 0
+        }));
+        var range = await Should.ThrowAsync<InvalidOperationException>(() => store.QueryAsync(new StorageQueryRequest
+        {
+            Collection = "items",
+            StoredFrom = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero),
+            StoredTo = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        }));
+
+        offset.Message.ShouldContain("offset");
+        limit.Message.ShouldContain("limit");
+        range.Message.ShouldContain("storedFrom");
     }
 
     [Fact]
@@ -367,6 +513,238 @@ public sealed class FileSystemStorageStoreTests
         saved.Collection.ShouldBe("items");
         Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Service_registration_can_register_keyed_store_directly()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path,
+                    DefaultCollection = "items"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredKeyedService<IStorageStore>("items-store");
+
+        var saved = await store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        saved.Collection.ShouldBe("items");
+        Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Service_registration_can_register_keyed_store_factory()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path,
+                    DefaultCollection = "fallback"
+                });
+
+        await using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory");
+        await using var lease = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        });
+
+        var saved = await lease.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        lease.OwnsStore.ShouldBeFalse();
+        saved.Collection.ShouldBe("items");
+        Directory.GetFiles(temp.Path, "*.json", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void Service_registration_trims_keyed_store_and_factory_names()
+    {
+        using var temp = TempDirectory.Create();
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                " items-store ",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path
+                })
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                " items-factory ",
+                new FileSystemStorageStoreOptions
+                {
+                    RootDirectory = temp.Path
+                });
+
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<IStorageStore>("items-store").ShouldNotBeNull();
+        provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Service_registration_rejects_invalid_arguments()
+    {
+        var services = new ServiceCollection();
+        var options = new FileSystemStorageStoreOptions
+        {
+            RootDirectory = "data/storage"
+        };
+
+        Should.Throw<ArgumentNullException>(() =>
+            FileSystemStorageServiceCollectionExtensions.AddFluxFlowFileSystemStorageStore(
+                null!,
+                "items-store",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                (FileSystemStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                (Func<IServiceProvider, FileSystemStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
+
+        Should.Throw<ArgumentNullException>(() =>
+            FileSystemStorageServiceCollectionExtensions.AddFluxFlowFileSystemStorageStoreFactory(
+                null!,
+                "items-factory",
+                options))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(" ", options))
+            .ParamName.ShouldBe("name");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                (FileSystemStorageStoreOptions)null!))
+            .ParamName.ShouldBe("options");
+        Should.Throw<ArgumentNullException>(() =>
+            services.AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                (Func<IServiceProvider, FileSystemStorageStoreOptions>)null!))
+            .ParamName.ShouldBe("optionsFactory");
+    }
+
+    [Fact]
+    public async Task Service_registration_rejects_null_options_factory_result()
+    {
+        var services = new ServiceCollection()
+            .AddFluxFlowFileSystemStorageStore(
+                "items-store",
+                static _ => null!)
+            .AddFluxFlowFileSystemStorageStoreFactory(
+                "items-factory",
+                static _ => null!);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var storeException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IStorageStore>("items-store"));
+        var factoryException = Should.Throw<InvalidOperationException>(() =>
+            provider.GetRequiredKeyedService<IStorageStoreFactory>("items-factory"));
+
+        storeException.Message.ShouldBe("File-system storage options factory returned null.");
+        factoryException.Message.ShouldBe("File-system storage options factory returned null.");
+    }
+
+    [Fact]
+    public async Task Factory_DoesNotShareContextDefaultCollections()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+
+        await using var first = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "items"
+        });
+        await using var second = await factory.OpenAsync(new StorageStoreContext
+        {
+            StoreName = "tenant-a",
+            Collection = "orders"
+        });
+        await first.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+        await second.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "second"
+        });
+
+        var firstLoaded = await first.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+        var secondLoaded = await second.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+
+        first.Store.ShouldNotBeSameAs(second.Store);
+        firstLoaded.ShouldNotBeNull();
+        firstLoaded.Collection.ShouldBe("items");
+        firstLoaded.Value.ShouldBe("first");
+        secondLoaded.ShouldNotBeNull();
+        secondLoaded.Collection.ShouldBe("orders");
+        secondLoaded.Value.ShouldBe("second");
+    }
+
+    [Fact]
+    public async Task Factory_SharesSameContextDefaultCollection()
+    {
+        using var temp = TempDirectory.Create();
+        var factory = new FileSystemStorageStoreFactory(new FileSystemStorageStoreOptions
+        {
+            RootDirectory = temp.Path
+        });
+
+        await using var first = await factory.OpenAsync(CreateStoreContext());
+        await using var second = await factory.OpenAsync(CreateStoreContext());
+        await first.Store.PutAsync(new StoragePutRequest
+        {
+            Key = "alpha",
+            Value = "first"
+        });
+
+        var loaded = await second.Store.GetAsync(new StorageGetRequest
+        {
+            Key = "alpha"
+        });
+
+        first.Store.ShouldBeSameAs(second.Store);
+        loaded.ShouldNotBeNull();
+        loaded.Collection.ShouldBe("items");
+        loaded.Value.ShouldBe("first");
     }
 
     [Fact]
@@ -538,9 +916,30 @@ public sealed class FileSystemStorageStoreTests
             }));
     }
 
+    [Fact]
+    public void Options_NormalizeTextFieldsAndRejectInvalidValueLimit()
+    {
+        var options = new FileSystemStorageStoreOptions
+        {
+            RootDirectory = " data/storage ",
+            StoreName = " tenant-a ",
+            DefaultCollection = " items "
+        };
+
+        options.RootDirectory.ShouldBe("data/storage");
+        options.StoreName.ShouldBe("tenant-a");
+        options.DefaultCollection.ShouldBe("items");
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new FileSystemStorageStoreOptions
+            {
+                MaxValueBytes = 0
+            });
+    }
+
     private static FileSystemStorageStore CreateStore(
         string rootDirectory,
-        FakeTimeProvider? clock = null)
+        TimeProvider? clock = null)
         => new(new FileSystemStorageStoreOptions
         {
             RootDirectory = rootDirectory,
@@ -553,6 +952,20 @@ public sealed class FileSystemStorageStoreTests
             StoreName = "tenant-a",
             Collection = "items"
         };
+
+    private sealed class AdvancingTimeProvider(
+        DateTimeOffset start,
+        TimeSpan step) : TimeProvider
+    {
+        private DateTimeOffset _current = start;
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var current = _current;
+            _current = _current.Add(step);
+            return current;
+        }
+    }
 
     private sealed class TempDirectory : IDisposable
     {

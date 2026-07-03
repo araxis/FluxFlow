@@ -86,9 +86,9 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Control");
+            item.Category.ShouldBe(new ComponentCategory("Control"));
             item.SuggestedEditorWidth.ShouldBe(420);
-            item.Options.Select(option => (option.Name, option.Kind)).ShouldBe([
+            item.Options.Select(option => (option.Name.Value, option.Kind)).ShouldBe([
                 ("expression", OptionValueKind.Expression),
                 ("expressionId", OptionValueKind.Text),
                 ("expressionName", OptionValueKind.Text),
@@ -96,13 +96,13 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
                 ("inputType", OptionValueKind.Text),
                 ("boundedCapacity", OptionValueKind.Number)
             ]);
-            item.Options.Single(option => option.Name == "expression")
+            item.Options.Single(option => option.Name.Value == "expression")
                 .IsRequired.ShouldBeTrue();
-            item.Options.Single(option => option.Name == "boundedCapacity")
+            item.Options.Single(option => option.Name.Value == "boundedCapacity")
                 .Min.ShouldBe(1);
-            item.Options.Select(option => option.Name)
+            item.Options.Select(option => option.Name.Value)
                 .ShouldNotContain(ControlCompositionResourceNames.ContextFactory);
-            item.Options.Select(option => option.Name)
+            item.Options.Select(option => option.Name.Value)
                 .ShouldNotContain(ControlCompositionResourceNames.Clock);
             AssertResources(
                 item,
@@ -124,10 +124,64 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
         ]);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_control_option_hints()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata();
+
+        foreach (var item in metadata)
+        {
+            var options = item.Options.ToDictionary(
+                option => option.Name.Value,
+                StringComparer.Ordinal);
+
+            AssertOptionHints(
+                options["expression"],
+                "Control",
+                OptionDesignMetadataAttributeValues.Primary,
+                OptionDesignMetadataAttributeValues.Expression,
+                syntax: OptionDesignMetadataAttributeValues.Expression,
+                relatedResource: ControlCompositionResourceNames.Engine);
+            AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+            AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        }
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_control_resource_picker_hints()
+    {
+        var metadata = new ControlComponentDesignMetadataProvider()
+            .GetMetadata();
+
+        foreach (var item in metadata)
+        {
+            var resources = item.Resources.ToDictionary(
+                resource => resource.Name.Value,
+                StringComparer.Ordinal);
+
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.Engine],
+                ResourceDesignMetadataAttributeValues.ExpressionEngine,
+                "expression-engine:{name}");
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.ContextFactory],
+                ResourceDesignMetadataAttributeValues.ContextFactory,
+                "context-factory:{name}");
+            AssertResourceHints(
+                resources[ControlCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
     }
 
     [Fact]
@@ -142,14 +196,14 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             port.Direction,
             port.Order,
             port.IsPrimary,
-            port.ValueType)).ShouldBe([
+            port.ValueType?.Value)).ShouldBe([
             (ControlCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
             (ControlCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput"),
             (ControlCompositionPortNames.WhenTrue, PortDirection.Output, 2, false, "TInput"),
             (ControlCompositionPortNames.WhenFalse, PortDirection.Output, 3, false, "TInput")
         ]);
         metadata.Ports.Single(port => port.Name.Value == ControlCompositionPortNames.Output)
-            .Attributes["aliasOf"].ShouldBe(ControlCompositionPortNames.WhenTrue);
+            .Attributes[new ComponentAttributeName("aliasOf")].Value.ShouldBe(ControlCompositionPortNames.WhenTrue);
     }
 
     [Fact]
@@ -178,12 +232,68 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
         for (var index = 0; index < expected.Length; index++)
         {
             var resource = metadata.Resources[index];
-            resource.Name.ShouldBe(expected[index].Name);
+            resource.Name.Value.ShouldBe(expected[index].Name);
             resource.Order.ShouldBe(index);
             resource.IsRequired.ShouldBe(expected[index].IsRequired);
-            resource.ValueType.ShouldBe(expected[index].ValueType);
+            resource.ValueType?.Value.ShouldBe(expected[index].ValueType);
         }
     }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string editor,
+        string? syntax = null,
+        string? relatedResource = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+            .ShouldBe(editor);
+
+        if (syntax is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Syntax)
+                .ShouldBe(syntax);
+        }
+
+        if (relatedResource is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.RelatedResource)
+                .ShouldBe(relatedResource);
+        }
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     [Fact]
     public async Task Hosted_filter_resolves_keyed_engine_and_forwards_only_matches()
@@ -496,6 +606,102 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             diagnostic.Message.Contains(
                 ControlCompositionResourceNames.Engine,
                 StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Invalid_filter_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "filter",
+                    ControlCompositionNodeTypes.Filter,
+                    node => node
+                        .Resource(ControlCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "pass")
+                        .Configure("boundedCapacity", 0)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterFilter<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("boundedCapacity", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Missing_filter_expression_surfaces_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "filter",
+                    ControlCompositionNodeTypes.Filter,
+                    node => node.Resource(ControlCompositionResourceNames.Engine, "primary")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterFilter<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("expression", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Invalid_when_options_surface_factory_diagnostic()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "primary",
+            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "when",
+                    ControlCompositionNodeTypes.When,
+                    node => node
+                        .Resource(ControlCompositionResourceNames.Engine, "primary")
+                        .Configure("expression", "route")
+                        .Configure("inputType", " ")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterWhen<object>())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("inputType", StringComparison.Ordinal));
     }
 
     private sealed record InputMessage(int Value);

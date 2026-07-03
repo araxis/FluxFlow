@@ -8,14 +8,22 @@ public sealed record ResourceLookupResult
     public bool Found => Descriptor is not null && Diagnostic is null;
 
     public static ResourceLookupResult FoundResult(ResourceReference reference, ResourceDescriptor descriptor)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        return new()
         {
             Reference = reference,
             Descriptor = descriptor
         };
+    }
 
     public static ResourceLookupResult Missing(ResourceReference reference)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        return new()
         {
             Reference = reference,
             Diagnostic = new ResourceDiagnostic
@@ -28,9 +36,14 @@ public sealed record ResourceLookupResult
                 Reference = reference
             }
         };
+    }
 
     public static ResourceLookupResult KindMismatch(ResourceReference reference, ResourceDescriptor descriptor)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        return new()
         {
             Reference = reference,
             Descriptor = descriptor,
@@ -44,4 +57,5 @@ public sealed record ResourceLookupResult
                 Reference = reference
             }
         };
+    }
 }

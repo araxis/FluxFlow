@@ -40,12 +40,12 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var metadata = PayloadDesignMetadata();
 
         metadata.Type.Value.ShouldBe(PayloadsCompositionNodeTypes.Inspect);
-        metadata.DisplayName.ShouldBe("Payload Inspect");
-        metadata.Category.ShouldBe("Payloads");
+        metadata.DisplayName?.Value.ShouldBe("Payload Inspect");
+        metadata.Category.ShouldBe(new ComponentCategory("Payloads"));
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
-            option.Name == PayloadsCompositionResourceNames.Clock);
+            option.Name.Value == PayloadsCompositionResourceNames.Clock);
         AssertClockResource(metadata);
     }
 
@@ -60,14 +60,14 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(PayloadsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(nameof(PayloadInspectionRequest));
+        input.ValueType?.Value.ShouldBe(nameof(PayloadInspectionRequest));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(PayloadsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType.ShouldBe(nameof(PayloadInspectionResult));
+        output.ValueType?.Value.ShouldBe(nameof(PayloadInspectionResult));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -77,7 +77,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var metadata = PayloadDesignMetadata();
         var defaults = PayloadInspectOptions.Default;
 
-        metadata.Options.Select(option => option.Name).ShouldBe([
+        metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "maxInputBytes",
             "maxPreviewBytes",
             "maxFormattedChars",
@@ -129,6 +129,57 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_payload_option_hints()
+    {
+        var metadata = PayloadDesignMetadata();
+        var options = OptionsByName(metadata);
+
+        AssertOptionHints(
+            options["maxInputBytes"],
+            "Limits",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["maxPreviewBytes"],
+            "Preview",
+            OptionDesignMetadataAttributeValues.Primary,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["maxFormattedChars"],
+            "Preview",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(
+            options["detectBase64"],
+            "Detection",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["formatJson"],
+            "Formatting",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["formatXml"],
+            "Formatting",
+            OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(
+            options["boundedCapacity"],
+            "Runtime",
+            OptionDesignMetadataAttributeValues.Advanced,
+            OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_payload_resource_picker_hints()
+    {
+        var metadata = PayloadDesignMetadata();
+
+        AssertResourceHints(
+            metadata.Resources.ShouldHaveSingleItem(),
+            ResourceDesignMetadataAttributeValues.Clock,
+            "clock:{name}");
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new PayloadsComponentDesignMetadataProvider();
@@ -139,7 +190,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             new ComponentType(PayloadsCompositionNodeTypes.Inspect),
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull()
-            .DisplayName.ShouldBe("Payload Inspect");
+            .DisplayName?.Value.ShouldBe("Payload Inspect");
     }
 
     [Fact]
@@ -300,6 +351,12 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ShouldHaveSingleItem();
 
+    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
     private static void AssertOption(
         ComponentDesignMetadata metadata,
         string name,
@@ -307,22 +364,68 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         object? defaultValue,
         double? min = null)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
     }
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
 
-        resource.Name.ShouldBe(PayloadsCompositionResourceNames.Clock);
-        resource.DisplayName.ShouldBe("Clock");
+        resource.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
+        resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
         resource.IsRequired.ShouldBeFalse();
-        resource.ValueType.ShouldBe(nameof(TimeProvider));
+        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
         Func<

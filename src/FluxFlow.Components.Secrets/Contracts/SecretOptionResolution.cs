@@ -2,7 +2,14 @@ namespace FluxFlow.Components.Secrets.Contracts;
 
 public sealed record SecretOptionResolution
 {
-    public required string OptionPath { get; init; }
+    private string _optionPath = string.Empty;
+
+    public required string OptionPath
+    {
+        get => _optionPath;
+        init => _optionPath = value?.Trim() ?? string.Empty;
+    }
+
     public SecretReference? Reference { get; init; }
     public SecretDescriptor? Descriptor { get; init; }
     public SecretValue? Value { get; init; }
@@ -13,7 +20,11 @@ public sealed record SecretOptionResolution
     public static SecretOptionResolution FromResult(
         SecretOptionReference option,
         SecretResolveResult result)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        ArgumentNullException.ThrowIfNull(result);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference,
@@ -21,23 +32,33 @@ public sealed record SecretOptionResolution
             Value = result.Value,
             Diagnostic = result.Diagnostic
         };
+    }
 
     public static SecretOptionResolution NotProvidedResult(SecretOptionReference option)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference
         };
+    }
 
     public static SecretOptionResolution Failed(
         SecretOptionReference option,
         SecretDiagnostic diagnostic)
-        => new()
+    {
+        ArgumentNullException.ThrowIfNull(option);
+        ArgumentNullException.ThrowIfNull(diagnostic);
+
+        return new()
         {
             OptionPath = option.OptionPath,
             Reference = option.Reference,
             Diagnostic = diagnostic
         };
+    }
 
     public override string ToString()
     {

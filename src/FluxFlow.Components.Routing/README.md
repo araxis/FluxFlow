@@ -26,6 +26,11 @@ All nodes time off an injected `System.TimeProvider` (defaulting to `TimeProvide
 so windows, join timeouts, and correlation timeouts are deterministic under a
 `FakeTimeProvider` in tests.
 
+Construction validates required option shape before the node pipeline is
+created. Blank `InputType`, non-positive `BoundedCapacity`, invalid window
+boundaries, and invalid correlation limits fail fast with routing-specific
+construction errors.
+
 ## Switch
 
 ```csharp
@@ -152,3 +157,8 @@ Selector expressions are not compiled by the composition adapter; compile or
 create delegates in the host and expose them as keyed resources such as
 `routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`, and
 `rightKeySelector`.
+
+Invalid routing options, such as blank `inputType`, non-positive
+`boundedCapacity`, invalid window boundaries, or invalid correlation limits,
+fail during composition build and surface as factory diagnostics when build
+failures are configured as diagnostics.

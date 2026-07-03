@@ -15,19 +15,19 @@ public sealed class CompositionConfigurationLoaderTests
           "FluxFlow": {
             "Composition": {
               "workflows": {
-                "main": {
+                " main ": {
                   "nodes": {
-                    "source": {
+                    " source ": {
                       "type": "test.source",
                       "configuration": {
-                        "messages": [ "one", "two" ]
+                        " messages ": [ "one", "two" ]
                       },
                       "resources": {
-                        "store": "primary-store"
+                        " store ": "primary-store"
                       }
                     },
                     "sink": {
-                      "type": "test.sink"
+                      "type": " test.sink "
                     }
                   },
                   "links": [
@@ -48,7 +48,9 @@ public sealed class CompositionConfigurationLoaderTests
 
         definition.Workflows.ContainsKey("main").ShouldBeTrue();
         var workflow = definition.Workflows["main"];
+        workflow.Nodes.ContainsKey("source").ShouldBeTrue();
         workflow.Nodes["source"].Type.ShouldBe(TestNodeTypes.Source);
+        workflow.Nodes["sink"].Type.ShouldBe(TestNodeTypes.Sink);
         workflow.Nodes["source"].Resources["store"].ShouldBe("primary-store");
         workflow.Nodes["source"].Configuration["messages"].GetArrayLength().ShouldBe(2);
         workflow.Links.ShouldHaveSingleItem();

@@ -307,6 +307,14 @@ public sealed class FlowSwitchNodeTests
                 _ => "x"));
 
     [Fact]
+    public void Switch_RejectsBlankInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowSwitchNode<string>(
+                new SwitchRoutingOptions { InputType = " " },
+                _ => "x"))
+            .Message.ShouldContain("inputType");
+
+    [Fact]
     public async Task Switch_UsesConfiguredClockForEventTimestamp()
     {
         var timestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z");

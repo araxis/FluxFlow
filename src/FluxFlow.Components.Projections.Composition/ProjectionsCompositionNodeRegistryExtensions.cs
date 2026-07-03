@@ -2,7 +2,6 @@ using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Nodes;
 using FluxFlow.Components.Projections.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 
 namespace FluxFlow.Components.Projections.Composition;
 

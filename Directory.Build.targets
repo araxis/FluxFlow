@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Shared NuGet package icon. Applied to every project that sets an explicit
+    PackageId (the shipped packages); test and sample projects do not set one, so
+    they are left untouched. The icon rides along in each package's next release.
+  -->
+  <PropertyGroup Condition="'$(PackageId)' != ''">
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(PackageId)' != ''">
+    <None Include="$(MSBuildThisFileDirectory)assets\icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>

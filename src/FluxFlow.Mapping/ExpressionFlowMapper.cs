@@ -15,7 +15,9 @@ public sealed class ExpressionFlowMapper<TInput, TOutput> : IFlowMapper<TInput, 
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
         ArgumentNullException.ThrowIfNull(engine);
-        _compiled = engine.Compile<TOutput>(expression);
+        _compiled = engine.Compile<TOutput>(expression)
+            ?? throw new InvalidOperationException(
+                $"Expression engine '{engine.Name}' returned null compiled expression for mapper output type '{typeof(TOutput)}'.");
     }
 
     public TOutput Map(TInput input, FlowMapContext context)

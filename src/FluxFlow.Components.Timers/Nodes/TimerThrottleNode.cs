@@ -26,25 +26,10 @@ public sealed class TimerThrottleNode<TInput> : FlowNode<TInput, TInput>
     public TimerThrottleNode(
         TimerThrottleSettings settings,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (settings ?? throw new ArgumentNullException(nameof(settings))).BoundedCapacity
-        })
+        : base(BuildNodeOptions(settings))
     {
-        _settings = settings;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _clock = clock ?? TimeProvider.System;
-
-        if (_settings.Interval <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.throttle 'Interval' must be greater than zero.");
-        }
-
-        if (_settings.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.throttle 'BoundedCapacity' must be greater than zero.");
-        }
     }
 
     protected override async Task ProcessAsync(FlowMessage<TInput> message)
@@ -146,4 +131,26 @@ public sealed class TimerThrottleNode<TInput> : FlowNode<TInput, TInput>
             $"inputType={_inputType}",
             $"intervalMilliseconds={_settings.Interval.TotalMilliseconds}",
             $"emitFirstImmediately={_settings.EmitFirstImmediately}");
+
+    private static FlowNodeOptions BuildNodeOptions(TimerThrottleSettings? settings)
+    {
+        var resolved = settings ?? throw new ArgumentNullException(nameof(settings));
+
+        if (resolved.Interval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.throttle 'Interval' must be greater than zero.");
+        }
+
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.throttle 'BoundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowNodeOptions
+        {
+            InputCapacity = resolved.BoundedCapacity
+        };
+    }
 }

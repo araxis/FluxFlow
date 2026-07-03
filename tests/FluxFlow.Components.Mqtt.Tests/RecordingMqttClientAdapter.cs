@@ -108,6 +108,9 @@ internal sealed class RecordingMqttClientAdapter :
         return context;
     }
 
+    public void PushContext(IMqttReceivedContext? context)
+        => _incoming.Writer.TryWrite(context!);
+
     public void PushHealth(MqttClientHealthEvent health)
         => _health.Writer.TryWrite(health);
 

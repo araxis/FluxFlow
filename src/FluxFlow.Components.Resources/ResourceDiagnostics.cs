@@ -16,6 +16,12 @@ public static class ResourceDiagnostics
             var descriptor = materialized[index];
             var path = $"resources[{index}]";
 
+            if (descriptor is null)
+            {
+                diagnostics.Add(Invalid(path, "Resource descriptor is required."));
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(descriptor.Name.Value))
             {
                 diagnostics.Add(Invalid(path, "Resource name is required."));
@@ -27,7 +33,7 @@ public static class ResourceDiagnostics
             ValidateMap(descriptor.Metadata, $"{path}.metadata", diagnostics);
         }
 
-        diagnostics.AddRange(FindDuplicateResources(materialized));
+        diagnostics.AddRange(FindDuplicateResources(materialized.OfType<ResourceDescriptor>()));
         return diagnostics;
     }
 
@@ -61,6 +67,7 @@ public static class ResourceDiagnostics
         ArgumentNullException.ThrowIfNull(descriptors);
 
         return descriptors
+            .OfType<ResourceDescriptor>()
             .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.Name.Value))
             .GroupBy(descriptor => descriptor.Name, descriptor => descriptor, EqualityComparer<ResourceName>.Default)
             .Where(group => group.Count() > 1)
@@ -83,14 +90,22 @@ public static class ResourceDiagnostics
         ArgumentNullException.ThrowIfNull(references);
 
         var diagnostics = new List<ResourceDiagnostic>();
+        var index = 0;
         foreach (var reference in references)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (reference is null)
+            {
+                diagnostics.Add(Invalid($"references[{index}]", "Resource reference is required."));
+                index++;
+                continue;
+            }
 
             var referenceDiagnostics = ValidateReference(reference);
             if (referenceDiagnostics.Count > 0)
             {
                 diagnostics.AddRange(referenceDiagnostics);
+                index++;
                 continue;
             }
 
@@ -102,6 +117,8 @@ public static class ResourceDiagnostics
             {
                 diagnostics.Add(diagnostic);
             }
+
+            index++;
         }
 
         return diagnostics;
@@ -115,11 +132,13 @@ public static class ResourceDiagnostics
         ArgumentNullException.ThrowIfNull(references);
 
         var used = references
+            .OfType<ResourceReference>()
             .Where(reference => !string.IsNullOrWhiteSpace(reference.Name.Value))
             .Select(reference => reference.Name)
             .ToHashSet();
 
         return descriptors
+            .OfType<ResourceDescriptor>()
             .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.Name.Value))
             .Where(descriptor => !used.Contains(descriptor.Name))
             .Select(descriptor => new ResourceDiagnostic
@@ -164,10 +183,16 @@ public static class ResourceDiagnostics
     }
 
     private static void ValidateMap(
-        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, string>? values,
         string path,
         ICollection<ResourceDiagnostic> diagnostics)
     {
+        if (values is null)
+        {
+            diagnostics.Add(Invalid(path, "Map cannot be null."));
+            return;
+        }
+
         foreach (var value in values)
         {
             if (string.IsNullOrWhiteSpace(value.Key))
@@ -175,6 +200,11 @@ public static class ResourceDiagnostics
 
             if (string.IsNullOrWhiteSpace(value.Value))
                 diagnostics.Add(Invalid($"{path}.{value.Key}", "Values are required."));
+        }
+
+        foreach (var key in ResourceContractMap.FindDuplicateNormalizedKeys(values))
+        {
+            diagnostics.Add(Invalid(path, $"Key '{key}' is declared more than once after trimming."));
         }
     }
 }

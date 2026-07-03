@@ -52,6 +52,18 @@ By default, FluxFlow publish semantics stay strict: publishing while disconnecte
 throws `MqttClientUnavailableException`. Set
 `AllowOfflinePublishQueue = true` to opt into Pulse MQTT's offline publish queue.
 
+Mapper helpers reject null text before encoding MQTT credentials, correlation
+data, and user properties so malformed adapter input fails with clear argument
+names.
+User-property maps are optional: null maps are treated as empty, blank property
+names are ignored, and named properties with null values are rejected with a
+clear `value` argument error.
+`PulseMqttClientOptions.UserProperties` also snapshots assigned dictionaries, so
+caller-owned maps cannot alter CONNECT user properties after options creation.
+`PulseMqttLastWillOptions.Payload` snapshots the assigned byte array, and publish
+and Last Will payloads are copied before concrete client handoff so caller-owned
+buffers cannot alter queued client-library messages.
+
 ## Dependency Injection
 
 Register a named client session when the host wants DI-owned lifetime and keyed
@@ -68,23 +80,39 @@ services.AddFluxFlowMqttClient(
     });
 ```
 
-The extension registers one keyed `PulseMqttClient` and exposes the same singleton
-as keyed `IMqttPublisher`, `IMqttTriggerSource`, and `IMqttClientHealthSource`.
+The extension registers one keyed `PulseMqttClient` and exposes the same
+singleton as keyed `IMqttPublisher`, `IMqttTriggerSource`, and
+`IMqttClientHealthSource`.
+The registration helpers reject null service collections, blank keys, null
+direct options, null options factories, and null options factory results before
+creating the keyed client session.
+Keyed DI helper names are trimmed before registration, so configuration-bound
+client names with surrounding whitespace resolve to the same logical client.
 
-By default, the registration adds a hosted lifetime and starts the client with the
-host. Set `StartWithHost = false` when the composition layer will start the
-client explicitly:
+By default, the registration does not add hosted lifetime. Set
+`StartWithHost = true` when the host should start and stop the client session:
 
 ```csharp
 services.AddFluxFlowMqttClient(
     "primary",
     options,
-    new MqttClientRegistrationOptions { StartWithHost = false });
+    new MqttClientRegistrationOptions { StartWithHost = true });
 ```
 
 Use `WaitForConnectedOnStart = true` only when application startup should wait for
 an established connection. Workflow nodes should still be created and linked by the
 composition layer; the registration owns only the adapter client session.
+
+## Composition
+
+This package does not expose `FluxFlow.Composition` node factories. It owns the
+Pulse MQTT-backed client session, resilient connection lifecycle, durable store
+options, and DI registration only.
+
+Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
+composition. That package consumes host-owned `IMqttPublisher`,
+`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
+by this adapter package.
 
 ## Durable Stores
 

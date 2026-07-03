@@ -222,12 +222,34 @@ public sealed class FlowAssertionComponentTests
     [Fact]
     public void Constructor_RejectsMissingExpression()
     {
-        var exception = Should.Throw<InvalidOperationException>(
+        var exception = Should.Throw<ArgumentException>(
             () => new FlowAssertionComponent<object>(
                 new AssertionOptions(),
                 new RecordingExpressionEngine()));
 
         exception.Message.ShouldContain("expression");
+    }
+
+    [Fact]
+    public void Constructor_RejectsEmptyInputType()
+    {
+        var exception = Should.Throw<ArgumentException>(
+            () => new FlowAssertionComponent<object>(
+                new AssertionOptions { Expression = "assert", InputType = " " },
+                new RecordingExpressionEngine()));
+
+        exception.Message.ShouldContain("inputType");
+    }
+
+    [Fact]
+    public void Constructor_RejectsInvalidBoundedCapacity()
+    {
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowAssertionComponent<object>(
+                new AssertionOptions { Expression = "assert", BoundedCapacity = 0 },
+                new RecordingExpressionEngine()));
+
+        exception.Message.ShouldContain("boundedCapacity");
     }
 
     [Fact]

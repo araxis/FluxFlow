@@ -151,6 +151,18 @@ public sealed class FlowMetricsNodeTests
     public void Constructor_RequiresOptions()
         => Should.Throw<ArgumentNullException>(() => new FlowMetricsNode<string>(null!));
 
+    [Fact]
+    public void Constructor_RequiresNonEmptyInputType()
+        => Should.Throw<ArgumentException>(
+            () => new FlowMetricsNode<string>(
+                new FlowMetricsOptions { InputType = " " }));
+
+    [Fact]
+    public void Constructor_RequiresPositiveBoundedCapacity()
+        => Should.Throw<ArgumentOutOfRangeException>(
+            () => new FlowMetricsNode<string>(
+                new FlowMetricsOptions { BoundedCapacity = 0 }));
+
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
         var sink = new BufferBlock<T>();

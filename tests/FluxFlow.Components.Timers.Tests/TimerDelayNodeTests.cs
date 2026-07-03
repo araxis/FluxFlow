@@ -194,7 +194,8 @@ public sealed class TimerDelayNodeTests
                 {
                     Delay = TimeSpan.FromMilliseconds(1),
                     BoundedCapacity = 0
-                }));
+                }))
+            .Message.ShouldContain("BoundedCapacity");
 
     [Fact]
     public void Delay_RejectsNullSettings()

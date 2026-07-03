@@ -13,6 +13,8 @@ public sealed class CompositionRuntimeHost : ICompositionRuntimeHost, IHostedSer
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CompositionRuntime? _runtime;
     private IReadOnlyList<CompositionDiagnostic> _diagnostics = [];
+    private bool _started;
+    private bool _stopped;
     private bool _disposed;
 
     public CompositionRuntimeHost(
@@ -39,17 +41,7 @@ public sealed class CompositionRuntimeHost : ICompositionRuntimeHost, IHostedSer
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_runtime is not null)
-                return CompositionBuildResult.Success(_runtime);
-
-            var definition = await _definitionSource.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var result = await new CompositionRuntimeBuilder(_registry)
-                .BuildAsync(definition, _services, cancellationToken)
-                .ConfigureAwait(false);
-
-            _runtime = result.Runtime;
-            _diagnostics = result.Diagnostics;
-            return result;
+            return await BuildCoreAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -59,35 +51,60 @@ public sealed class CompositionRuntimeHost : ICompositionRuntimeHost, IHostedSer
 
     public async ValueTask StartRuntimeAsync(CancellationToken cancellationToken = default)
     {
-        var result = await BuildAsync(cancellationToken).ConfigureAwait(false);
-        if (!result.Succeeded || result.Runtime is null)
-            ThrowOrReturnOnBuildFailure(result.Diagnostics);
-
-        if (result.Runtime is not null)
-            await result.Runtime.StartAsync(cancellationToken).ConfigureAwait(false);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var result = await BuildCoreAsync(cancellationToken).ConfigureAwait(false);
+            await StartRuntimeCoreAsync(result, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async ValueTask StopRuntimeAsync(CancellationToken cancellationToken = default)
     {
-        var runtime = _runtime;
-        if (runtime is null)
-            return;
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (_options.Value.StopTimeout > TimeSpan.Zero)
-            timeout.CancelAfter(_options.Value.StopTimeout);
+            var runtime = _runtime;
+            if (runtime is null || !_started)
+                return;
 
-        await runtime.StopAsync(timeout.Token).ConfigureAwait(false);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_options.Value.StopTimeout > TimeSpan.Zero)
+                timeout.CancelAfter(_options.Value.StopTimeout);
+
+            await runtime.StopAsync(timeout.Token).ConfigureAwait(false);
+            _started = false;
+            _stopped = true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var result = await BuildAsync(cancellationToken).ConfigureAwait(false);
-        if (!result.Succeeded || result.Runtime is null)
-            ThrowOrReturnOnBuildFailure(result.Diagnostics);
-
-        if (_options.Value.StartRuntimeWithHost && result.Runtime is not null)
-            await result.Runtime.StartAsync(cancellationToken).ConfigureAwait(false);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var result = await BuildCoreAsync(cancellationToken).ConfigureAwait(false);
+            if (_options.Value.StartRuntimeWithHost)
+                await StartRuntimeCoreAsync(result, cancellationToken).ConfigureAwait(false);
+            else if (!result.Succeeded || result.Runtime is null)
+                ThrowOrReturnOnBuildFailure(result.Diagnostics);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -108,6 +125,8 @@ public sealed class CompositionRuntimeHost : ICompositionRuntimeHost, IHostedSer
                 return;
 
             _disposed = true;
+            _started = false;
+            _stopped = true;
             if (_runtime is not null)
                 await _runtime.DisposeAsync().ConfigureAwait(false);
         }
@@ -116,6 +135,35 @@ public sealed class CompositionRuntimeHost : ICompositionRuntimeHost, IHostedSer
             _gate.Release();
             _gate.Dispose();
         }
+    }
+
+    private async ValueTask<CompositionBuildResult> BuildCoreAsync(CancellationToken cancellationToken)
+    {
+        if (_runtime is not null)
+            return CompositionBuildResult.Success(_runtime);
+
+        var definition = await _definitionSource.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var result = await new CompositionRuntimeBuilder(_registry)
+            .BuildAsync(definition, _services, cancellationToken)
+            .ConfigureAwait(false);
+
+        _runtime = result.Runtime;
+        _diagnostics = result.Diagnostics;
+        return result;
+    }
+
+    private async ValueTask StartRuntimeCoreAsync(
+        CompositionBuildResult result,
+        CancellationToken cancellationToken)
+    {
+        if (!result.Succeeded || result.Runtime is null)
+            ThrowOrReturnOnBuildFailure(result.Diagnostics);
+
+        if (result.Runtime is null || _started || _stopped)
+            return;
+
+        await result.Runtime.StartAsync(cancellationToken).ConfigureAwait(false);
+        _started = true;
     }
 
     private void ThrowOrReturnOnBuildFailure(IReadOnlyList<CompositionDiagnostic> diagnostics)

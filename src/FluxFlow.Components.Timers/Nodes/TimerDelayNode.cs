@@ -34,25 +34,10 @@ public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
     public TimerDelayNode(
         TimerDelaySettings settings,
         TimeProvider? clock = null)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = (settings ?? throw new ArgumentNullException(nameof(settings))).BoundedCapacity
-        })
+        : base(BuildNodeOptions(settings))
     {
-        _settings = settings;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _clock = clock ?? TimeProvider.System;
-
-        if (_settings.Delay < TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.delay 'Delay' cannot be negative.");
-        }
-
-        if (_settings.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(settings), "timer.delay 'BoundedCapacity' must be greater than zero.");
-        }
 
         // Stage 2: serial + ordered so emission order matches arrival order even though all
         // items in a burst share one due time. Bounded so a slow delay line backpressures
@@ -164,6 +149,28 @@ public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
             ["inputType"] = _inputType,
             ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
         };
+
+    private static FlowNodeOptions BuildNodeOptions(TimerDelaySettings? settings)
+    {
+        var resolved = settings ?? throw new ArgumentNullException(nameof(settings));
+
+        if (resolved.Delay < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.delay 'Delay' cannot be negative.");
+        }
+
+        if (resolved.BoundedCapacity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settings), "timer.delay 'BoundedCapacity' must be greater than zero.");
+        }
+
+        return new FlowNodeOptions
+        {
+            InputCapacity = resolved.BoundedCapacity
+        };
+    }
 
     private readonly record struct PendingItem(FlowMessage<TInput> Message, DateTimeOffset DueAt);
 }

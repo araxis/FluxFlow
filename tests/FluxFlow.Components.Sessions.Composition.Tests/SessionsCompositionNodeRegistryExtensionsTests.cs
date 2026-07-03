@@ -61,10 +61,11 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         foreach (var item in metadata.Values)
         {
             ComponentDesignMetadataValidator.Validate(item).ShouldBeEmpty();
-            item.Category.ShouldBe("Sessions");
+            item.Category.ShouldBe(new ComponentCategory("Sessions"));
             item.SuggestedEditorWidth.ShouldBe(460);
             item.Options.ShouldNotContain(option =>
-                option.Name == SessionsCompositionResourceNames.Clock);
+                option.Name.Value == SessionsCompositionResourceNames.Clock);
+            AssertResources(item);
         }
     }
 
@@ -139,7 +140,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             "mode",
             OptionValueKind.Enum,
             replayDefaults.Mode.ToString());
-        mode.Choices.Select(choice => choice.Value).ShouldBe([
+        mode.Choices.Select(choice => choice.Value.Value).ShouldBe([
             nameof(SessionReplayMode.RealTime),
             nameof(SessionReplayMode.FixedInterval),
             nameof(SessionReplayMode.Multiplier),
@@ -215,6 +216,62 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void Design_metadata_provider_describes_sessions_option_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        var recorder = OptionsByName(metadata[SessionsCompositionNodeTypes.Recorder]);
+        AssertOptionHints(recorder["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["sessionId"], "Session", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["name"], "Session", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(recorder["notes"], "Session", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(recorder["tags"], "Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(recorder["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var replay = OptionsByName(metadata[SessionsCompositionNodeTypes.Replay]);
+        AssertOptionHints(replay["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(replay["sessionId"], "Session", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(replay["mode"], "Replay", OptionDesignMetadataAttributeValues.Primary);
+        AssertOptionHints(replay["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["startSequence"], "Replay", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["maxMessages"], "Replay", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["fixedIntervalMilliseconds"], "Timing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(replay["speedMultiplier"], "Timing", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+
+        var query = OptionsByName(metadata[SessionsCompositionNodeTypes.Query]);
+        AssertOptionHints(query["store"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["name"], "Filtering", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["namePrefix"], "Filtering", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
+        AssertOptionHints(query["tags"], "Filtering", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Json);
+        AssertOptionHints(query["includeActive"], "Filtering", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["includeCompleted"], "Filtering", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["limit"], "Results", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(query["emitSessionsInResult"], "Results", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["emitSessionOutputs"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(query["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+    }
+
+    [Fact]
+    public void Design_metadata_provider_describes_sessions_resource_picker_hints()
+    {
+        var metadata = DesignMetadataByType();
+
+        foreach (var item in metadata.Values)
+        {
+            var resources = ResourcesByName(item);
+
+            AssertResourceHints(
+                resources[SessionsCompositionResourceNames.Store],
+                ResourceDesignMetadataAttributeValues.Store,
+                "session-store:{name}");
+            AssertResourceHints(
+                resources[SessionsCompositionResourceNames.Clock],
+                ResourceDesignMetadataAttributeValues.Clock,
+                "clock:{name}");
+        }
+    }
+
+    [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
         var provider = new SessionsComponentDesignMetadataProvider();
@@ -224,11 +281,11 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         catalog.TryGet(
             new ComponentType(SessionsCompositionNodeTypes.Recorder),
             out var recorderMetadata).ShouldBeTrue();
-        recorderMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Recorder");
+        recorderMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Session Recorder");
         catalog.TryGet(
             new ComponentType(SessionsCompositionNodeTypes.Replay),
             out var replayMetadata).ShouldBeTrue();
-        replayMetadata.ShouldNotBeNull().DisplayName.ShouldBe("Session Replay");
+        replayMetadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Session Replay");
     }
 
     [Fact]
@@ -379,6 +436,53 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public async Task Hosted_recorder_can_resolve_store_factory_resource_and_dispose_owned_lease()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-06-21T09:30:00Z");
+        var clock = new FakeTimeProvider(timestamp);
+        var store = new TestSessionStore();
+        var factory = new RecordingSessionStoreFactory(store);
+
+        await WithNodeAsync(
+            SessionsCompositionNodeTypes.Recorder,
+            async descriptor =>
+            {
+                var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
+                    .ShouldBeOfType<CompositionInputPort<SessionRecordInput>>();
+                var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
+                    .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
+                var records = Link(output.Source);
+                var message = FlowMessage.Create(
+                    new SessionRecordInput { Name = "event", Payload = "payload" },
+                    new CorrelationId("factory-record"));
+
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+
+                var record = await records.ReceiveAsync().WaitAsync(Timeout);
+                record.CorrelationId.ShouldBe(message.CorrelationId);
+                record.Payload.SessionId.ShouldBe("session-1");
+                record.Payload.Timestamp.ShouldBe(timestamp);
+            },
+            node => node
+                .Resource(SessionsCompositionResourceNames.Store, "factory")
+                .Resource(SessionsCompositionResourceNames.Clock, "fixed")
+                .Configure("sessionId", "session-1"),
+            services =>
+            {
+                services.AddKeyedSingleton<ISessionStoreFactory>("factory", factory);
+                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
+            });
+
+        factory.OpenCount.ShouldBe(1);
+        factory.Context.ShouldNotBeNull();
+        factory.Context.StoreName.ShouldBe("factory");
+        factory.Context.SessionId.ShouldBe("session-1");
+        factory.Context.Clock.ShouldBe(clock);
+        store.CompletedSession.ShouldNotBeNull().SessionId.ShouldBe("session-1");
+        store.DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Hosted_query_emits_result_sessions_branch_and_uses_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-21T10:00:00Z");
@@ -480,11 +584,13 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Theory]
-    [InlineData(SessionsCompositionNodeTypes.Recorder, "boundedCapacity", 0, "InputCapacity")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "boundedCapacity", 0, "bounded capacity")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "startSequence", 0, "start sequence")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "maxMessages", 0, "max messages")]
-    [InlineData(SessionsCompositionNodeTypes.Replay, "speedMultiplier", 0, "speed multiplier")]
+    [InlineData(SessionsCompositionNodeTypes.Recorder, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "boundedCapacity", 0, "boundedCapacity")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "mode", 999, "mode")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "startSequence", 0, "startSequence")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "maxMessages", 0, "maxMessages")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "fixedIntervalMilliseconds", -1, "fixedIntervalMilliseconds")]
+    [InlineData(SessionsCompositionNodeTypes.Replay, "speedMultiplier", 0, "speedMultiplier")]
     [InlineData(SessionsCompositionNodeTypes.Query, "limit", 0, "limit")]
     public async Task Invalid_numeric_configuration_surfaces_factory_diagnostic(
         string nodeType,
@@ -512,6 +618,36 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             SessionsCompositionNodeTypes.Replay,
             node => node.Resource(SessionsCompositionResourceNames.Store, "sessions"),
             "session id");
+
+    [Fact]
+    public async Task Factory_failure_disposes_owned_store_lease()
+    {
+        var store = new TestSessionStore();
+        var factory = new RecordingSessionStoreFactory(store);
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<ISessionStoreFactory>("factory", factory);
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "replay",
+                    SessionsCompositionNodeTypes.Replay,
+                    node => node.Resource(SessionsCompositionResourceNames.Store, "factory")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterSessionReplay())
+            .Configure(options => options.ThrowOnBuildFailure = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        host.Runtime.ShouldBeNull();
+        host.Diagnostics.ShouldContain(diagnostic =>
+            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
+            diagnostic.Message.Contains("session id", StringComparison.OrdinalIgnoreCase));
+        factory.OpenCount.ShouldBe(1);
+        store.DisposeCount.ShouldBe(1);
+    }
 
     [Fact]
     public async Task Query_excluding_active_and_completed_surfaces_factory_diagnostic()
@@ -690,7 +826,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
@@ -722,7 +858,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         metadata.Ports[0].Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
         metadata.Ports[0].Order.ShouldBe(0);
-        metadata.Ports[0].ValueType.ShouldBe(nameof(SessionQueryRequest));
+        metadata.Ports[0].ValueType?.Value.ShouldBe(nameof(SessionQueryRequest));
         metadata.Ports[0].IsPrimary.ShouldBeTrue();
 
         AssertOutputPort(
@@ -748,14 +884,14 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         port.Name.Value.ShouldBe(name);
         port.Direction.ShouldBe(PortDirection.Output);
         port.Order.ShouldBe(order);
-        port.ValueType.ShouldBe(valueType);
+        port.ValueType?.Value.ShouldBe(valueType);
         port.IsPrimary.ShouldBe(isPrimary);
     }
 
     private static void AssertOptionNames(
         ComponentDesignMetadata metadata,
         params string[] names)
-        => metadata.Options.Select(option => option.Name)
+        => metadata.Options.Select(option => option.Name.Value)
             .ShouldBe(names, ignoreOrder: false);
 
     private static OptionDesignMetadata AssertOption(
@@ -766,13 +902,83 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         double? min = null,
         bool isRequired = false)
     {
-        var option = metadata.Options.Single(option => option.Name == name);
+        var option = metadata.Options.Single(option => option.Name.Value == name);
         option.Kind.ShouldBe(kind);
         option.DefaultValue.ShouldBe(defaultValue);
         option.Min.ShouldBe(min);
         option.IsRequired.ShouldBe(isRequired);
         return option;
     }
+
+    private static IReadOnlyDictionary<string, OptionDesignMetadata> OptionsByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
+
+    private static IReadOnlyDictionary<string, ResourceDesignMetadata> ResourcesByName(
+        ComponentDesignMetadata metadata)
+        => metadata.Resources.ToDictionary(
+            resource => resource.Name.Value,
+            StringComparer.Ordinal);
+
+    private static void AssertResources(ComponentDesignMetadata metadata)
+    {
+        metadata.Resources.Select(resource => (
+            resource.Name.Value,
+            resource.Order,
+            resource.IsRequired,
+            resource.ValueType?.Value)).ShouldBe([
+            (SessionsCompositionResourceNames.Store, 0, true, $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)}"),
+            (SessionsCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
+        ]);
+    }
+
+    private static void AssertOptionHints(
+        OptionDesignMetadata option,
+        string section,
+        string importance,
+        string? editor = null)
+    {
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Section)
+            .ShouldBe(section);
+        AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
+            .ShouldBe(importance);
+
+        if (editor is null)
+        {
+            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+                .ShouldBeFalse();
+        }
+        else
+        {
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
+                .ShouldBe(editor);
+        }
+
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            .ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            .ShouldBeFalse();
+    }
+
+    private static void AssertResourceHints(
+        ResourceDesignMetadata resource,
+        string pickerKind,
+        string keyPattern)
+    {
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+            .ShouldBe(pickerKind);
+        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+            .ShouldBe(keyPattern);
+    }
+
+    private static string AttributeValue(
+        IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
+        string name)
+        => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {
@@ -871,12 +1077,13 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             => new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    private sealed class TestSessionStore : ISessionStore
+    private sealed class TestSessionStore : ISessionStore, IAsyncDisposable
     {
         public List<SessionMetadata> Sessions { get; } = [];
         public List<SessionRecord> Records { get; } = [];
         public bool FailNextAppend { get; set; }
         public bool FailNextQuery { get; set; }
+        public int DisposeCount { get; private set; }
         public SessionMetadata? CompletedSession { get; private set; }
 
         public void AddSession(SessionMetadata session) => UpsertSession(session);
@@ -1061,5 +1268,27 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             => source is null
                 ? []
                 : new Dictionary<string, string>(source, StringComparer.Ordinal);
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingSessionStoreFactory(ISessionStore store) : ISessionStoreFactory
+    {
+        public int OpenCount { get; private set; }
+        public SessionStoreContext? Context { get; private set; }
+
+        public ValueTask<SessionStoreLease> OpenAsync(
+            SessionStoreContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            OpenCount++;
+            Context = context;
+            return ValueTask.FromResult(SessionStoreLease.Owned(store));
+        }
     }
 }

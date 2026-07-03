@@ -21,7 +21,9 @@ public sealed class ExpressionFlowPredicate<TInput> : IFlowPredicate<TInput>
         ArgumentNullException.ThrowIfNull(engine);
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         // Compile once here (build time); IsMatch only evaluates the compiled form.
-        _compiled = engine.Compile<bool>(expression);
+        _compiled = engine.Compile<bool>(expression)
+            ?? throw new InvalidOperationException(
+                $"Expression engine '{engine.Name}' returned null compiled expression for predicate output type '{typeof(bool)}'.");
     }
 
     public bool IsMatch(TInput input)

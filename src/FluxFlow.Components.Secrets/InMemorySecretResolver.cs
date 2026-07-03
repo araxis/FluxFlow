@@ -2,7 +2,7 @@ using FluxFlow.Components.Secrets.Contracts;
 
 namespace FluxFlow.Components.Secrets;
 
-public sealed class InMemorySecretResolver : ISecretResolver
+public sealed class InMemorySecretResolver : ISecretResolver, ISecretDescriptorProvider
 {
     private readonly IReadOnlyList<SecretRecord> _records;
 

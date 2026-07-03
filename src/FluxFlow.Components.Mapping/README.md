@@ -44,6 +44,8 @@ await node.Input.SendAsync(FlowMessage.Create(appInput));
 carries the descriptive metadata (`InputType`, `OutputType`/`targetType`,
 `ExpressionId`, `ExpressionName`) used in diagnostics and error context, plus the
 `Expression` itself and the input `BoundedCapacity`.
+`Expression` is required, and `BoundedCapacity` must be greater than zero.
+Invalid options fail fast during node construction.
 
 ## Mapping context
 

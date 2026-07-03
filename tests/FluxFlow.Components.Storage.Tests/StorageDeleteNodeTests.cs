@@ -101,6 +101,23 @@ public sealed class StorageDeleteNodeTests
     }
 
     [Fact]
+    public async Task Delete_ReportsNullStoreResultAsError()
+    {
+        await using var node = new StorageDeleteNode(
+            new NullDeleteStore(),
+            new StorageDeleteOptions { Collection = "items" });
+        var output = StorageTestSink.Link(node.Output);
+        var errors = StorageTestSink.Link(node.Errors);
+
+        await node.Input.SendAsync(FlowMessage.Create(new StorageDeleteRequest { Key = "a" }));
+
+        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        error.Code.ShouldBe(StorageErrorCodes.DeleteFailed);
+        error.Message.ShouldContain("null result");
+        output.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Delete_EmitsDeletedEvent()
     {
         var store = new InMemoryStorageStore();
@@ -148,4 +165,27 @@ public sealed class StorageDeleteNodeTests
 
     private static async Task Seed(InMemoryStorageStore store, string collection, string key, object value)
         => await store.PutAsync(new StoragePutRequest { Collection = collection, Key = key, Value = value });
+
+    private sealed class NullDeleteStore : IStorageStore
+    {
+        public Task<StorageRecord> PutAsync(
+            StoragePutRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageRecord?> GetAsync(
+            StorageGetRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StorageRecord>> QueryAsync(
+            StorageQueryRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StorageResult> DeleteAsync(
+            StorageDeleteRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult<StorageResult>(null!);
+    }
 }

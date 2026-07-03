@@ -63,12 +63,18 @@ the six routing composition nodes. Hosts can add it to a
 `ComponentDesignMetadataCatalog` to populate palettes, editors, validation
 views, or generated documentation.
 
-The provider describes node options and built-in ports only. Selector delegates
-such as `routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`,
-and `rightKeySelector` remain host-owned resources and are not exposed as
-editable node options. Switch `routeOutputs` and fork `outputs` are represented
-as configuration options because those dynamic ports are exposed after the
-composition factory binds node options.
+The provider describes node options, built-in ports, option grouping/editor
+hints, and host-owned resource picker hints. Selector delegates such as
+`routeKeySelector`, `keySelector`, `sideSelector`, `leftKeySelector`, and
+`rightKeySelector` are exposed as required resources for the nodes that need
+them, with delegate key-pattern hints for hosts. The optional `clock` resource
+is exposed separately from editable node options with a clock key-pattern hint.
+Switch `routeOutputs` and fork `outputs` are represented as configuration
+options because those dynamic ports are exposed after the composition factory
+binds node options.
+The metadata is authored through the shared validated Designer metadata builder
+while preserving the same public metadata contracts consumed by hosts. Built-in
+input and output port descriptors are also added through the builder.
 
 ## Configuration
 
@@ -104,3 +110,8 @@ composition factory binds node options.
 
 Dynamic output names for switch and fork composition must be simple identifiers
 and cannot collide with built-in composition ports.
+
+Invalid routing options, such as blank `inputType`, non-positive
+`boundedCapacity`, invalid window boundaries, or invalid correlation limits,
+fail during composition build and surface as factory diagnostics when build
+failures are configured as diagnostics.

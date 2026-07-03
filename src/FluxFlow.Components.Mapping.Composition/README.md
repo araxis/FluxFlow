@@ -69,6 +69,9 @@ for deterministic diagnostics.
 `MapperOptions.InputType`, `OutputType`, and `targetType` remain diagnostic
 metadata. The actual composition port types come from the closed generic
 registration selected by the host.
+Invalid `MapperOptions`, such as a missing expression or non-positive
+`boundedCapacity`, fail during composition build and surface as factory
+diagnostics when build failures are configured as diagnostics.
 
 ## Design Metadata
 
@@ -79,5 +82,12 @@ views, or generated documentation.
 
 The provider describes editable options, host-owned resources, and ports. The
 `engine` resource is required; `contextFactory` and `clock` are optional.
-Resource metadata is descriptive only, so hosts still own registration,
-selection, lifetime, and disposal of those keyed services.
+The mapper option metadata includes section, importance, editor, syntax, and
+related-resource hints so hosts can build more useful inspectors without
+hard-coding mapper-specific UI rules. Resource metadata includes host-owned
+picker hints and key patterns for the `engine`, `contextFactory`, and `clock`
+resources.
+
+All option and resource metadata is descriptive only. Hosts still own
+registration, selection, lifetime, rendering, validation UI, and disposal of
+keyed services.
