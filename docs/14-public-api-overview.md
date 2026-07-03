@@ -122,6 +122,31 @@ Hosted and manual lifecycle calls are idempotent at this boundary, so repeated
 start or stop requests do not start or complete the same runtime more than
 once. A stopped runtime is not restarted by the host.
 
+## Fluent DSL
+
+Namespace:
+
+```text
+FluxFlow.Fluent
+```
+
+Main types:
+
+- `Flow`
+- `FlowBuilder<T>`
+- `FlowTerminal`
+- `FlowGraph`
+
+Use these types to compose standalone nodes in C# with compile-time-checked
+wiring: `Flow.From(source).Then(node).To(sink).Build()`. The generic parameter
+tracks the payload type between nodes, so `Then` only accepts a node whose input
+matches the current output. `Tap` fans a payload to a side node without changing
+the main line; `Branch` starts a typed sub-pipeline from a node's output port,
+and passing the same node instance to more than one branch fans them in. The
+built `FlowGraph` reuses the `FluxFlow.Composition` runtime for start, stop,
+completion, aggregated errors/events, and disposal; each node completes once all
+of its upstream sources finish, so fan-in drains before completing.
+
 ## HTTP Composition
 
 Namespace:

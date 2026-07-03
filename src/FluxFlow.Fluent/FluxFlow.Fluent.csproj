@@ -4,16 +4,16 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>FluxFlow.Composition</PackageId>
-    <AssemblyName>FluxFlow.Composition</AssemblyName>
-    <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>1.2.0</Version>
+    <PackageId>FluxFlow.Fluent</PackageId>
+    <AssemblyName>FluxFlow.Fluent</AssemblyName>
+    <RootNamespace>FluxFlow.Fluent</RootNamespace>
+    <Version>1.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional standalone-first FluxFlow composition layer for building linked node workflows from fluent C# or Microsoft.Extensions.Configuration without depending on FluxFlow.Engine.</Description>
-    <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
+    <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
+    <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds CompositionRuntime.Create, a public code-first factory that builds a runtime from composed node descriptors and links without a definition or registry (used by the fluent DSL).</PackageReleaseNotes>
+    <PackageReleaseNotes>First release: Flow.From/Then/Tap/Branch/To/Build over the FluxFlow.Nodes kit, reusing the FluxFlow.Composition runtime for lifecycle, error/event aggregation, and disposal.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -22,11 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
   </ItemGroup>

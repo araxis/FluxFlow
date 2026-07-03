@@ -432,6 +432,13 @@ This folder records the extraction work for `FluxFlow.Engine`.
   (node/link, toolbar + Del key) and link-creation validation (reject self-links
   and non-output→input, with snackbar); browser-verified. Renderer merged to
   main via PR #55.
+- `203-fluent-dsl-plan.md`: plan for `FluxFlow.Fluent` — a type-safe, code-first
+  DSL (`Flow.From(...).Then(...).To(...)`) over the standalone nodes, reusing
+  `CompositionRuntime` via a new additive public seam
+  `CompositionRuntime.Create(nodes, links, entryNodes)` (Composition 1.2.0).
+  Foundation built on `work/fluent-dsl`: linear `From/Then/To/Build` + `Tap`
+  fan-out, `FlowGraph` lifecycle, 7 passing tests (30× flake-checked). Branching,
+  fan-in, DI/hosting, sample, and package release wiring are the next slices.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

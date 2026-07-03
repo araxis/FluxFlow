@@ -383,5 +383,12 @@
     "packageId": "FluxFlow.Components.Storage.SqlFile",
     "project": "src/FluxFlow.Components.Storage.SqlFile/FluxFlow.Components.Storage.SqlFile.csproj",
     "notesName": "FluxFlow.Components.Storage.SqlFile"
+  },
+  {
+    "alias": "fluent",
+    "tagPrefix": "fluent",
+    "packageId": "FluxFlow.Fluent",
+    "project": "src/FluxFlow.Fluent/FluxFlow.Fluent.csproj",
+    "notesName": "FluxFlow.Fluent"
   }
 ]

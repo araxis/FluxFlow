@@ -32,6 +32,46 @@ public sealed class CompositionRuntime : IAsyncDisposable
         Completion = CompleteWhenNodesCompleteAsync();
     }
 
+    /// <summary>
+    /// Builds a runtime directly from already-composed node descriptors and the links wiring
+    /// them together, without a <see cref="CompositionDefinition"/>, registry, or node names.
+    /// Intended for code-first builders (for example the fluent DSL) that construct and link
+    /// nodes themselves. <paramref name="entryNodes"/> are the source nodes with no incoming
+    /// link: the runtime starts every <see cref="IFlowSource"/> and, on <see cref="StopAsync"/>,
+    /// completes the entry nodes so completion propagates downstream. All three collections are
+    /// captured by the runtime, which then owns the nodes' disposal.
+    /// </summary>
+    public static CompositionRuntime Create(
+        IReadOnlyList<ComposedNode> nodes,
+        IReadOnlyList<IDisposable> links,
+        IReadOnlyList<ComposedNode> entryNodes)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+        ArgumentNullException.ThrowIfNull(links);
+        ArgumentNullException.ThrowIfNull(entryNodes);
+
+        var entry = new HashSet<ComposedNode>(entryNodes);
+        var runtimeNodes = new List<CompositionRuntimeNode>(nodes.Count);
+        var nodesWithIncomingLinks = new HashSet<RuntimeNodeKey>();
+
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            var descriptor = nodes[index]
+                ?? throw new ArgumentException("Composed nodes cannot be null.", nameof(nodes));
+
+            // Names/definitions are synthetic here: a code-first graph has no registry type or
+            // node name, and the runtime lifecycle only reads the descriptor + entry set.
+            var key = new RuntimeNodeKey("flow", $"node-{index}");
+            var definition = new NodeDefinition { Type = descriptor.Node.GetType().Name };
+            runtimeNodes.Add(new CompositionRuntimeNode(key, definition, descriptor));
+
+            if (!entry.Contains(descriptor))
+                nodesWithIncomingLinks.Add(key);
+        }
+
+        return new CompositionRuntime(runtimeNodes, links, nodesWithIncomingLinks);
+    }
+
     public IReadOnlyList<CompositionRuntimeNode> Nodes { get; }
 
     public ISourceBlock<FlowEvent> Events => _events;

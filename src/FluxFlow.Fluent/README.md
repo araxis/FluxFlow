@@ -1,0 +1,71 @@
+# FluxFlow.Fluent
+
+Type-safe, code-first fluent DSL for composing `FluxFlow.Nodes`.
+
+Use this package when you want to wire standalone nodes into a runnable graph in
+C# with the compiler checking every connection, instead of the string/JSON
+`CompositionDefinition` path. It reuses the `FluxFlow.Composition` runtime for
+lifecycle, error/event aggregation, and disposal.
+
+## Why
+
+`Flow.From(...).Then(...).To(...)` reads as a pipeline, and the generic type
+parameter tracks the payload type flowing between nodes: `Then` only accepts a
+node whose input matches the current output, so a mis-wired graph is a compile
+error, not a runtime diagnostic. The `FlowMessage<T>` envelope stays hidden — you
+work in payload types.
+
+## Boundary
+
+`FluxFlow.Fluent` owns:
+
+- the fluent builder (`Flow`, `FlowBuilder<T>`, `FlowTerminal`)
+- compile-time-checked linear chains, fan-out (`Tap`), branching (`Branch` from a
+  typed output port), and fan-in (share one node instance across branches)
+- the built `FlowGraph` (start, stop, completion, error/event streams, disposal)
+
+It does not own node implementations, the runtime, a registry, JSON/config
+loading, or persistence — nodes come from `FluxFlow.Nodes` (and the component
+packages), and the runtime comes from `FluxFlow.Composition`.
+
+## Linear pipeline
+
+```csharp
+await using var flow = Flow
+    .From(new WordSource(["alpha", "beta"]))   // FlowSource<string>
+    .Then(new UppercaseNode())                 // FlowNode<string, string>
+    .To(new CollectSink(collector))            // FlowNode<string, _>
+    .Build();
+
+await flow.StartAsync();
+await flow.Completion;
+```
+
+## Fan-out, branching, and fan-in
+
+```csharp
+var sink = new CollectSink(collector);
+var router = new EvenOddRouter();              // FlowNode<int, int> with Even/Odd ports
+
+await using var flow = Flow
+    .From(new CountSource(6))
+    .Then(router)
+    .Tap(new AuditNode())                                          // fan-out, main line unchanged
+    .Branch(router.Even, even => even.Then(new LabelNode("even")).To(sink))
+    .Branch(router.Odd,  odd  => odd.Then(new LabelNode("odd")).To(sink))  // both fan into one sink
+    .Build();
+
+await flow.StartAsync();
+await flow.Completion;
+```
+
+Branches share the flow's graph; passing the same node instance to `Then`/`To`
+in more than one branch fans them into that node. Each node completes once all of
+its upstream sources finish, so fan-in drains correctly rather than being
+completed early by the first branch.
+
+## Sample
+
+```sh
+dotnet run --project samples/FluxFlow.FluentSample/FluxFlow.FluentSample.csproj
+```
