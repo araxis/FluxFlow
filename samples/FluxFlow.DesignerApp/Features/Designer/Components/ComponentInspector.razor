@@ -1,0 +1,83 @@
+@if (Model is null)
+{
+    <MudPaper Elevation="0" Class="d-flex flex-column align-center justify-center" Style="height: 100%;">
+        <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Large" Class="mud-text-secondary mb-2" />
+        <MudText Typo="Typo.subtitle1">Select a component</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">Pick a component from the palette to inspect its options and resources.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Elevation="1" Class="pa-4" Style="height: 100%; overflow-y: auto;">
+        <MudText Typo="Typo.h6">@Model.ComponentType</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @Model.Sections.Sum(section => section.Options.Count) options · @Model.ResourcePrompts.Count resources
+        </MudText>
+        <MudDivider Class="my-3" />
+
+        @if (Model.Sections.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">This component has no configurable options.</MudText>
+        }
+        else
+        {
+            foreach (var section in Model.Sections)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">@section.Name</MudText>
+                <MudStack Spacing="3" Class="mb-2">
+                    @foreach (var option in section.Options)
+                    {
+                        <div @key="(NodeKey, option.Name)" class="d-flex align-start" style="gap: 8px;">
+                            <div style="flex: 1;">
+                                <OptionEditorField @key="(NodeKey, option.Name)" Option="option" Configuration="Configuration!" />
+                            </div>
+                            @if (option.IsAdvanced)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default" Class="mt-2">advanced</MudChip>
+                            }
+                        </div>
+                    }
+                </MudStack>
+            }
+        }
+
+        @if (Model.ResourcePrompts.Count > 0)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Resources</MudText>
+            @foreach (var prompt in Model.ResourcePrompts)
+            {
+                <MudPaper Outlined="true" Class="pa-2 mb-2" Elevation="0">
+                    <div class="d-flex align-center" style="gap: 8px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" Class="mud-text-secondary" />
+                        <MudText Typo="Typo.body2">@prompt.DisplayName</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text">@prompt.PickerKind</MudChip>
+                        @if (prompt.IsRequired)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">required</MudChip>
+                        }
+                        <MudSpacer />
+                        @if (prompt.ValueType is not null)
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@prompt.ValueType</MudText>
+                        }
+                    </div>
+                    @if (prompt.KeyPattern is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">key: @prompt.KeyPattern</MudText>
+                    }
+                </MudPaper>
+            }
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public NodeInspectorModel? Model { get; set; }
+
+    /// <summary>The selected node's configuration the option editors read and write.</summary>
+    [Parameter] public IDictionary<string, System.Text.Json.JsonElement>? Configuration { get; set; }
+
+    /// <summary>Identity of the selected node; re-keys the option editors when the selection changes.</summary>
+    [Parameter] public string? NodeKey { get; set; }
+}

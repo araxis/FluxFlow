@@ -415,6 +415,19 @@ This folder records the extraction work for `FluxFlow.Engine`.
   flaky test — the bounded-source backpressure test was asserting an
   un-observable BroadcastBlock internal race; rewritten to the actual
   latest-wins delivery contract (test-only, no source/package change).
+- `198-designer-renderer-app-first-slice.md`: Designer host layer phase 5
+  started — `samples/FluxFlow.DesignerApp` (Blazor WASM + MudBlazor) renders the
+  palette and option/resource inspector from the real metadata catalog;
+  browser-verified. Canvas and persistence are follow-on slices.
+- `199-designer-renderer-canvas-slice.md`: Z.Blazor.Diagrams node canvas in the
+  renderer app — add-from-palette, node rendering with ports, and
+  canvas-selection-drives-inspector; browser-verified. Persistence remains.
+- `200-designer-renderer-persistence-slice.md`: save/load the canvas graph as a
+  FluxFlow.Composition definition (named-port link mapping) with validation
+  feedback — completes the docs/18 phase 5 renderer; browser-verified.
+- `201-designer-renderer-option-editing.md`: inspector option editors write into
+  the selected node's configuration so saved composition JSON carries real
+  option values; value round-trip browser-verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

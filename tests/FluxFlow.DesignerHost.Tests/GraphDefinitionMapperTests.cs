@@ -19,6 +19,29 @@ public sealed class GraphDefinitionMapperTests
     }
 
     [Fact]
+    public void Definition_survives_a_json_serialize_deserialize_round_trip()
+    {
+        var original = CreateSampleDefinition();
+        var options = CompositionDefinitionJson.CreateSerializerOptions();
+
+        var json = JsonSerializer.Serialize(original, options);
+        var restored = JsonSerializer.Deserialize<CompositionDefinition>(json, options)
+            .ShouldNotBeNull();
+
+        // The renderer app saves via serialize and loads via deserialize, so the
+        // definition must survive JSON on its own, not only the model mappers.
+        SerializeDefinition(restored).ShouldBe(SerializeDefinition(original));
+
+        var mainGraph = GraphDefinitionMapper.FromDefinition(restored, "main");
+        mainGraph.Nodes.Select(node => node.Name).ShouldBe(["source", "sink"], ignoreOrder: true);
+        var link = mainGraph.Links.ShouldHaveSingleItem();
+        link.FromNode.ShouldBe("source");
+        link.FromPort.ShouldBe("Output");
+        link.ToNode.ShouldBe("sink");
+        link.ToPort.ShouldBe("Input");
+    }
+
+    [Fact]
     public void Graph_to_definition_to_graph_preserves_nodes_and_links()
     {
         var graph = new GraphModel

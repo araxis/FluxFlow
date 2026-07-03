@@ -1290,6 +1290,48 @@ Date: 2026-05-31
   source completes). Passes 60/60 in isolation; full `FluxFlow.Nodes.Tests`
   suite `36` passed. Test-only change; no `FluxFlow.Nodes` source or package
   version changed. See [[197-bounded-source-flaky-test-fix]].
+- 2026-07-03: Merged the accumulated work into `main` via PR #54 (clean
+  fast-forward, tags preserved by using a merge commit) and started the Designer
+  host layer renderer UI (docs/18 phase 5) on branch `work/designer-renderer-ui`
+  as `samples/FluxFlow.DesignerApp` — a Blazor WebAssembly + MudBlazor app
+  (net10.0) over `FluxFlow.DesignerHost`. First slice: component palette and
+  option/resource inspector from the real metadata catalog. Browser-verified via
+  the preview tooling (palette 23 components in 8 categories; `timer.interval`
+  inspector shows 6 options + the Clock resource with correct editors, ordering,
+  required/advanced markers, and picker/value-type/key-pattern). Added to
+  `FluxFlow.sln` and `docs/README.md`; full Release solution build and `92`
+  release tests pass. Canvas, persistence, and validation display are follow-on
+  slices. See [[198-designer-renderer-app-first-slice]].
+- 2026-07-03: Added the node canvas slice to `samples/FluxFlow.DesignerApp`
+  using `Z.Blazor.Diagrams` `3.0.4.1` (API verified by reflecting over the
+  packaged assemblies since no XML docs ship). `Features/Designer/Canvas/`:
+  `FlowNodeModel : NodeModel` (component identity + input/output ports),
+  `DesignerGraphState` (owns the single `BlazorDiagram` and selection).
+  `DesignerPage` is now a three-pane palette | canvas | inspector layout;
+  palette click adds a node, canvas selection drives the inspector, plus
+  zoom-to-fit and an empty-state prompt. Browser-verified: adding
+  `timer.interval` and `storage.put` renders two titled nodes; selecting a node
+  switches the inspector to its component type. Full `FluxFlow.sln` Release
+  build clean. See [[199-designer-renderer-canvas-slice]].
+- 2026-07-03: Completed the docs/18 phase 5 renderer with the persistence
+  slice. `DesignerGraphMapper` maps the `BlazorDiagram` to/from the host-model
+  `GraphModel` (link endpoints resolved back to named ports); `DesignerGraphState`
+  gained `ToJson`/`LoadJson`/`Clear` over `GraphDefinitionMapper` and
+  `CompositionDefinitionJson`; a `GraphJsonDialog` plus Save/Load/Clear toolbar
+  actions surface load warnings/errors via `ISnackbar`. Added a
+  serialize/deserialize round-trip test to the DesignerHost tests
+  (DesignerHost suite `30` passed). Browser-verified full round-trip: two nodes
+  -> Save (valid composition JSON) -> Clear -> Load restores both nodes with a
+  success snackbar. Release tests `92` passed; full Release solution build
+  clean. See [[200-designer-renderer-persistence-slice]].
+- 2026-07-03: Made the renderer produce configured compositions. The inspector
+  option editors now write into the selected `FlowNodeModel.Configuration`
+  (seed on load, write on change via `@bind-Value:after`); `DesignerGraphMapper`
+  emits/consumes `GraphNodeModel.Options`. Editors are `@key`-ed by node so
+  switching selection reseeds them. Browser-verified: set a timer's `Interval`
+  to `00:00:05` -> Save carries `configuration.interval` -> Clear -> Load
+  restores it and the inspector shows it. Full Release solution build clean.
+  See [[201-designer-renderer-option-editing]].
 
 ## Remaining
 

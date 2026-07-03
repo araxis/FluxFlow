@@ -1,0 +1,114 @@
+@using System.Text.Json
+
+@switch (Option.Editor)
+{
+    case OptionEditorKind.Toggle:
+        <MudSwitch T="bool" @bind-Value="_toggle" @bind-Value:after="WriteBool" Color="Color.Primary" Label="@Label" />
+        @if (HelperText is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@HelperText</MudText>
+        }
+        break;
+
+    case OptionEditorKind.Number:
+        <MudNumericField T="double?" @bind-Value="_number" @bind-Value:after="WriteNumber" Label="@Label"
+                         Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@HelperText"
+                         Min="@Option.Min" Max="@Option.Max" />
+        break;
+
+    case OptionEditorKind.Select:
+        <MudSelect T="string" @bind-Value="_text" @bind-Value:after="WriteText" Label="@Label"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@HelperText">
+            @foreach (var choice in Option.Choices)
+            {
+                <MudSelectItem T="string" Value="@choice.Value">@choice.DisplayName</MudSelectItem>
+            }
+        </MudSelect>
+        break;
+
+    case OptionEditorKind.Secret:
+        <MudTextField T="string" @bind-Value="_text" @bind-Value:after="WriteText" Label="@Label"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@HelperText"
+                      InputType="InputType.Password" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Key" />
+        break;
+
+    case OptionEditorKind.MultilineText:
+    case OptionEditorKind.Json:
+    case OptionEditorKind.Expression:
+        <MudTextField T="string" @bind-Value="_text" @bind-Value:after="WriteText" Label="@Label"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@HelperText" Lines="3" />
+        break;
+
+    default: // Text, Duration
+        <MudTextField T="string" @bind-Value="_text" @bind-Value:after="WriteText" Label="@Label"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@HelperText"
+                      Placeholder="@(Option.Editor == OptionEditorKind.Duration ? "hh:mm:ss" : null)" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public OptionEditorModel Option { get; set; } = default!;
+
+    [Parameter, EditorRequired] public IDictionary<string, JsonElement> Configuration { get; set; } = default!;
+
+    private string? _text;
+    private double? _number;
+    private bool _toggle;
+
+    protected override void OnInitialized()
+    {
+        // Seed the editor from the node's stored configuration (e.g. after a load).
+        if (!Configuration.TryGetValue(Option.Name, out var value))
+        {
+            return;
+        }
+
+        switch (Option.Editor)
+        {
+            case OptionEditorKind.Toggle:
+                _toggle = value.ValueKind is JsonValueKind.True or JsonValueKind.False && value.GetBoolean();
+                break;
+            case OptionEditorKind.Number:
+                _number = value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) ? number : null;
+                break;
+            default:
+                _text = value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
+                break;
+        }
+    }
+
+    private void WriteText()
+    {
+        if (string.IsNullOrEmpty(_text))
+        {
+            Configuration.Remove(Option.Name);
+        }
+        else
+        {
+            Configuration[Option.Name] = JsonSerializer.SerializeToElement(_text);
+        }
+    }
+
+    private void WriteNumber()
+    {
+        if (_number is null)
+        {
+            Configuration.Remove(Option.Name);
+        }
+        else
+        {
+            Configuration[Option.Name] = JsonSerializer.SerializeToElement(_number.Value);
+        }
+    }
+
+    private void WriteBool() => Configuration[Option.Name] = JsonSerializer.SerializeToElement(_toggle);
+
+    private string Label => Option.IsRequired ? $"{Option.DisplayName} *" : Option.DisplayName;
+
+    private string? HelperText =>
+        Option.Syntax is null
+            ? Option.HelperText
+            : Option.HelperText is null
+                ? $"syntax: {Option.Syntax}"
+                : $"{Option.HelperText} · syntax: {Option.Syntax}";
+}

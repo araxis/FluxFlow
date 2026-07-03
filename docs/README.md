@@ -17,6 +17,9 @@ runtime is the right fit for a host.
 - `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
   component design metadata into palette, inspector, and resource picker view
   models (no UI, no resource ownership).
+- `samples/FluxFlow.DesignerApp`: Blazor WebAssembly + MudBlazor renderer over
+  the Designer host-model layer — component palette and option/resource
+  inspector driven by the real package metadata catalog.
 
 ## Contents
 

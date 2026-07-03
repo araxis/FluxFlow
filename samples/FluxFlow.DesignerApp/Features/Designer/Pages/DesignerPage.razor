@@ -1,0 +1,48 @@
+@page "/"
+@implements IDisposable
+@inject DesignerCatalog Catalog
+@inject DesignerGraphState Graph
+
+<PageTitle>FluxFlow Designer</PageTitle>
+
+<div style="display: flex; gap: 8px; padding: 8px; height: calc(100vh - 64px); box-sizing: border-box;">
+    <ComponentPalette Items="Catalog.Palette" OnSelect="AddNode" />
+
+    <MudPaper Elevation="1" Class="d-flex flex-column" Style="flex: 1; min-width: 0; overflow: hidden;">
+        <div class="d-flex align-center pa-1" style="gap: 4px; border-bottom: 1px solid var(--mud-palette-lines-default);">
+            <MudText Typo="Typo.subtitle2" Class="px-2">Canvas</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@Graph.NodeCount nodes</MudText>
+            <MudSpacer />
+            <MudTooltip Text="Save (show composition JSON)">
+                <MudIconButton Icon="@Icons.Material.Filled.Save" Size="Size.Small" Disabled="@(Graph.NodeCount == 0)" OnClick="Save" />
+            </MudTooltip>
+            <MudTooltip Text="Load composition JSON">
+                <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" OnClick="Load" />
+            </MudTooltip>
+            <MudTooltip Text="Clear canvas">
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small" Disabled="@(Graph.NodeCount == 0)" OnClick="Clear" />
+            </MudTooltip>
+            <MudTooltip Text="Zoom to fit">
+                <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Small" OnClick="ZoomToFit" />
+            </MudTooltip>
+        </div>
+        <div style="flex: 1; position: relative; overflow: hidden;">
+            <CascadingValue Value="Graph.Diagram" IsFixed="true">
+                <DiagramCanvas />
+            </CascadingValue>
+            @if (Graph.NodeCount == 0)
+            {
+                <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Class="mud-text-secondary mb-2" />
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Click a component in the palette to add it to the canvas.</MudText>
+                </div>
+            }
+        </div>
+    </MudPaper>
+
+    <div style="width: 360px; min-width: 360px;">
+        <ComponentInspector Model="_inspector"
+                            Configuration="Graph.SelectedNode?.Configuration"
+                            NodeKey="Graph.SelectedNode?.NodeName" />
+    </div>
+</div>

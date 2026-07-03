@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-3" />
+        <MudText Typo="Typo.h6">FluxFlow Designer</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">Component palette &amp; inspector</MudText>
+    </MudAppBar>
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>

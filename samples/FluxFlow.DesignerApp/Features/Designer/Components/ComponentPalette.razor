@@ -1,0 +1,33 @@
+<MudPaper Elevation="1" Class="d-flex flex-column" Style="width: 300px; height: 100%; overflow: hidden;">
+    <div style="flex: 0 0 auto;">
+        <MudText Typo="Typo.subtitle1" Class="pa-3 pb-1">Palette</MudText>
+        <MudText Typo="Typo.caption" Class="px-3 pb-2 mud-text-secondary">@Items.Count components</MudText>
+        <MudDivider />
+    </div>
+    <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto;" class="pa-2">
+        @foreach (var group in Items.GroupBy(item => item.Category).OrderBy(group => group.Key, StringComparer.Ordinal))
+        {
+            <MudText Typo="Typo.overline" Class="px-2 mt-2 mud-text-secondary">@group.Key</MudText>
+            @foreach (var item in group)
+            {
+                <MudButton FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Widgets"
+                           Variant="@(item.ComponentType == SelectedType ? Variant.Filled : Variant.Text)"
+                           Color="@(item.ComponentType == SelectedType ? Color.Primary : Color.Default)"
+                           Style="justify-content: flex-start; text-transform: none;"
+                           OnClick="@(() => OnSelect.InvokeAsync(item.ComponentType))">
+                    <div class="d-flex flex-column align-start" style="overflow: hidden;">
+                        <span>@item.DisplayName</span>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="text-transform: none;">@item.ComponentType</MudText>
+                    </div>
+                </MudButton>
+            }
+        }
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<PaletteItemModel> Items { get; set; } = [];
+    [Parameter] public string? SelectedType { get; set; }
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+}
