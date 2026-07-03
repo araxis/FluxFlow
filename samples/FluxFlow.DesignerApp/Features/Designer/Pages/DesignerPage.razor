@@ -13,6 +13,15 @@
             <MudText Typo="Typo.subtitle2" Class="px-2">Canvas</MudText>
             <MudText Typo="Typo.caption" Class="mud-text-secondary">@Graph.NodeCount nodes</MudText>
             <MudSpacer />
+            <MudTooltip Text="Save (show composition JSON)">
+                <MudIconButton Icon="@Icons.Material.Filled.Save" Size="Size.Small" Disabled="@(Graph.NodeCount == 0)" OnClick="Save" />
+            </MudTooltip>
+            <MudTooltip Text="Load composition JSON">
+                <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" OnClick="Load" />
+            </MudTooltip>
+            <MudTooltip Text="Clear canvas">
+                <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small" Disabled="@(Graph.NodeCount == 0)" OnClick="Clear" />
+            </MudTooltip>
             <MudTooltip Text="Zoom to fit">
                 <MudIconButton Icon="@Icons.Material.Filled.FitScreen" Size="Size.Small" OnClick="ZoomToFit" />
             </MudTooltip>

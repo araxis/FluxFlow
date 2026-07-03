@@ -1,0 +1,37 @@
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string" @bind-Value="_json"
+                      Label="Composition definition (JSON)"
+                      Variant="Variant.Outlined" Lines="18" ReadOnly="ReadOnly"
+                      Style="min-width: 560px; font-family: monospace;" />
+    </DialogContent>
+    <DialogActions>
+        @if (ReadOnly)
+        {
+            <MudButton OnClick="Close">Close</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Load</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter] public string Json { get; set; } = string.Empty;
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private string _json = string.Empty;
+
+    protected override void OnInitialized() => _json = Json;
+
+    private void Submit() => Dialog.Close(DialogResult.Ok(_json));
+
+    private void Cancel() => Dialog.Cancel();
+
+    private void Close() => Dialog.Close();
+}

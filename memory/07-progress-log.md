@@ -1313,6 +1313,17 @@ Date: 2026-05-31
   `timer.interval` and `storage.put` renders two titled nodes; selecting a node
   switches the inspector to its component type. Full `FluxFlow.sln` Release
   build clean. See [[199-designer-renderer-canvas-slice]].
+- 2026-07-03: Completed the docs/18 phase 5 renderer with the persistence
+  slice. `DesignerGraphMapper` maps the `BlazorDiagram` to/from the host-model
+  `GraphModel` (link endpoints resolved back to named ports); `DesignerGraphState`
+  gained `ToJson`/`LoadJson`/`Clear` over `GraphDefinitionMapper` and
+  `CompositionDefinitionJson`; a `GraphJsonDialog` plus Save/Load/Clear toolbar
+  actions surface load warnings/errors via `ISnackbar`. Added a
+  serialize/deserialize round-trip test to the DesignerHost tests
+  (DesignerHost suite `30` passed). Browser-verified full round-trip: two nodes
+  -> Save (valid composition JSON) -> Clear -> Load restores both nodes with a
+  success snackbar. Release tests `92` passed; full Release solution build
+  clean. See [[200-designer-renderer-persistence-slice]].
 
 ## Remaining
 

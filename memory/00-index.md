@@ -422,6 +422,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `199-designer-renderer-canvas-slice.md`: Z.Blazor.Diagrams node canvas in the
   renderer app — add-from-palette, node rendering with ports, and
   canvas-selection-drives-inspector; browser-verified. Persistence remains.
+- `200-designer-renderer-persistence-slice.md`: save/load the canvas graph as a
+  FluxFlow.Composition definition (named-port link mapping) with validation
+  feedback — completes the docs/18 phase 5 renderer; browser-verified.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

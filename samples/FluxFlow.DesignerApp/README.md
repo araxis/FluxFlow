@@ -40,11 +40,24 @@ Then open the printed `http://localhost:5298` URL.
   selection; the page reads that state and never touches the diagram directly.
 - Zoom-to-fit toolbar action; empty-state prompt over the canvas.
 
+## Persistence
+
+The canvas toolbar saves and loads the graph as a `FluxFlow.Composition`
+definition:
+
+- **Save** shows the graph serialized to composition JSON.
+  `DesignerGraphMapper.ToGraph` reads the canvas nodes and links (resolving link
+  endpoints back to named ports), then `GraphDefinitionMapper.ToDefinition`
+  produces the `CompositionDefinition`.
+- **Load** deserializes composition JSON and rebuilds the canvas via
+  `GraphDefinitionMapper.FromDefinition` + `DesignerGraphMapper.Load`. Unknown
+  component types or ports surface as `ValidationMessageModel` warnings shown in
+  a snackbar; a hard JSON error shows an error snackbar.
+- **Clear** empties the canvas.
+
 ## Status
 
-- Done: component palette, option/resource inspector, and the node canvas
-  (add-from-palette, select-to-inspect), all driven by the real metadata
-  catalog and verified in the browser.
-- Follow-on: graph persistence to `FluxFlow.Composition` definitions via
-  `GraphDefinitionMapper` (save/load, including named-port links), and
-  validation display via `ValidationMessageModel`.
+The full renderer is in place and browser-verified: component palette,
+option/resource inspector, node canvas (add-from-palette, select-to-inspect),
+and save/load persistence to composition JSON with validation feedback — all
+driven by the real metadata catalog and the `FluxFlow.DesignerHost` model layer.

@@ -41,4 +41,7 @@ public sealed class DesignerCatalog
     public IReadOnlyList<PaletteItemModel> Palette { get; }
 
     public NodeInspectorModel? Inspector(string componentType) => _host.CreateInspector(componentType);
+
+    public PaletteItemModel? Find(string componentType)
+        => Palette.FirstOrDefault(item => string.Equals(item.ComponentType, componentType, StringComparison.Ordinal));
 }

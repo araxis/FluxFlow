@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Blazor.Diagrams;
 using Blazor.Diagrams.Core.Geometry;
 using Blazor.Diagrams.Core.Models.Base;
+using FluxFlow.Composition;
 using FluxFlow.DesignerApp.Features.Designer.Canvas;
 using FluxFlow.DesignerHost;
 
@@ -8,16 +10,20 @@ namespace FluxFlow.DesignerApp.Features.Designer;
 
 /// <summary>
 /// Owns the single <see cref="BlazorDiagram"/> for the designer canvas and the
-/// current node selection. The UI reads this state; it does not reach into the
-/// diagram directly. <see cref="Changed"/> fires when the selection changes so
-/// the page can refresh the inspector.
+/// current node selection, and bridges the canvas to the host-model persistence
+/// mapping. The UI reads this state; it does not reach into the diagram directly.
+/// <see cref="Changed"/> fires when the graph or selection changes.
 /// </summary>
 public sealed class DesignerGraphState
 {
+    public const string WorkflowName = "main";
+
+    private readonly DesignerCatalog _catalog;
     private int _added;
 
-    public DesignerGraphState()
+    public DesignerGraphState(DesignerCatalog catalog)
     {
+        _catalog = catalog;
         Diagram = new BlazorDiagram();
         Diagram.SelectionChanged += OnSelectionChanged;
     }
@@ -38,6 +44,48 @@ public sealed class DesignerGraphState
         Diagram.Nodes.Add(node);
         Changed?.Invoke();
         return node;
+    }
+
+    public void Clear()
+    {
+        Diagram.Links.Clear();
+        Diagram.Nodes.Clear();
+        _added = 0;
+        SelectedNode = null;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Serialize the current canvas as a composition definition (JSON).</summary>
+    public string ToJson()
+    {
+        var graph = DesignerGraphMapper.ToGraph(Diagram, WorkflowName);
+        var definition = GraphDefinitionMapper.ToDefinition(graph);
+        return JsonSerializer.Serialize(definition, CompositionDefinitionJson.CreateSerializerOptions());
+    }
+
+    /// <summary>Rebuild the canvas from a composition definition (JSON), returning any load warnings.</summary>
+    public IReadOnlyList<ValidationMessageModel> LoadJson(string json)
+    {
+        var definition = JsonSerializer.Deserialize<CompositionDefinition>(
+            json, CompositionDefinitionJson.CreateSerializerOptions())
+            ?? throw new InvalidOperationException("The JSON did not contain a composition definition.");
+
+        var graphs = GraphDefinitionMapper.FromDefinition(definition);
+        var graph = graphs.FirstOrDefault(candidate =>
+                        string.Equals(candidate.WorkflowName, WorkflowName, StringComparison.Ordinal))
+                    ?? graphs.FirstOrDefault();
+
+        if (graph is null)
+        {
+            Clear();
+            return [];
+        }
+
+        var messages = DesignerGraphMapper.Load(Diagram, graph, _catalog.Find);
+        _added = Diagram.Nodes.Count;
+        SelectedNode = null;
+        Changed?.Invoke();
+        return messages;
     }
 
     private void OnSelectionChanged(SelectableModel _)
