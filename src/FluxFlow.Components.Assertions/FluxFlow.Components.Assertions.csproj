@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone expression-driven assertion node for FluxFlow: an input in, a FlowAssertionResult broadcast out, with the original input fanned to Passed/Failed ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: missing expression and empty inputType now report ArgumentException, while non-positive boundedCapacity reports ArgumentOutOfRangeException. Runtime assertion behavior is unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

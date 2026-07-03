@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone routing nodes for FluxFlow: switch, fork, merge, window, correlation, and join over the FluxFlow.Nodes kit, with broadcast output/error/event ports. Predicate/key extraction comes from FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: switch, fork, merge, window, and correlation nodes reject blank inputType and non-positive boundedCapacity values before the node pipeline is created; window and correlation-specific limits now fail with routing-specific construction errors.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

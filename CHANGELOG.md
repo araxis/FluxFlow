@@ -7,6 +7,237 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.17.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.FileSystem 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Http 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Journal 2.3.6
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Metrics 3.0.4
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Payloads 3.0.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Projections 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.RequestReply 1.1.6
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Resources 1.6.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Secrets 1.6.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Serialization 3.0.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Sessions 3.3.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Sources 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage 3.0.10
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Timers 3.1.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Validation 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Mapping 1.0.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Assertions 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Configuration 1.5.1
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Control 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Expectations 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Expressions 2.1.3
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Http.AspNetCore 1.0.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mapping 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt 4.1.4
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Observability 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Routing 3.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.State 3.0.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage.FileSystem 3.3.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Storage.SqlFile 3.3.5
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Engine 2.0.2
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt.MqttNet 1.1.8
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.0.8
+
+Adds the shared FluxFlow package icon.
+
+- Packaging-only change: adds the shared FluxFlow package icon.
+- No source, public API, dependency, or runtime behavior changes.
+
 ## FluxFlow.Components.Mqtt.Composition 1.5.0
 
 Drops the FluxFlow.Composition.Hosting dependency and adds the shared package icon.

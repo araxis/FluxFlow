@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Expectations</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone event-expectation node for FluxFlow: post ProjectionEvent values, watch for a matching event (expect) or its absence (guard), and broadcast one EventExpectationResult with error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: invalid timeoutMilliseconds, maxObservedEvents, maxPreviewChars, and boundedCapacity now report ArgumentOutOfRangeException with expectation option names. Runtime expectation behavior is unchanged.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

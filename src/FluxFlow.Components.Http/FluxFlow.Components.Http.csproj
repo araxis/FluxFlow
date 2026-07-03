@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Http</PackageId>
     <AssemblyName>FluxFlow.Components.Http</AssemblyName>
     <RootNamespace>FluxFlow.Components.Http</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone HTTP node for FluxFlow: a blockified HttpClient (request in, response out) with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;http</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Hardens HttpClientNode option validation so non-positive capacities, response body limits, concurrency, and default timeout values fail fast during node construction.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

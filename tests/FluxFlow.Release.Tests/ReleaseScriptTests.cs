@@ -138,8 +138,8 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Adds typed option-path authoring for configuration validation requests.");
-            notes.ShouldContain("ConfigurationOptionPath");
+            notes.ShouldContain("Adds the shared FluxFlow package icon.");
+            notes.ShouldContain("No source, public API, dependency, or runtime behavior changes.");
             notes.ShouldNotContain("## ");
         }
         finally

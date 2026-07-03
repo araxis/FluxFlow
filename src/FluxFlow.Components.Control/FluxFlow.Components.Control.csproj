@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone expression-driven control nodes for FluxFlow: flow.filter passes matching messages and drops the rest, flow.when routes each message to its WhenTrue/WhenFalse ports. Each node takes an IFlowExpressionEngine directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns constructor option validation with standalone node conventions: expression-backed control nodes require a non-empty expression, all control nodes reject empty inputType and non-positive boundedCapacity values, and compiled-predicate construction remains available without an expression.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

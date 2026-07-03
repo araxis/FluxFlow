@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Mapping</PackageId>
     <AssemblyName>FluxFlow.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Mapping</RootNamespace>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Engine-free expression/mapping abstraction for FluxFlow: IFlowExpressionEngine, IFlowMapper, IFlowPredicate, FlowMapContext, and the expression/delegate mapper+predicate adapters. A leaf package referenced by nodes and the engine alike.</Description>
     <PackageTags>workflow;dataflow;mapping;expressions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Expression mapper and predicate adapters now fail fast when engines return null compiled expressions, with direct adapter guardrail coverage.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

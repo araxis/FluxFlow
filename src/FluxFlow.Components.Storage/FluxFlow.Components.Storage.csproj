@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>3.0.9</Version>
+    <Version>3.0.10</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone storage nodes for FluxFlow: blockified put/get/query/delete over an injected IStorageStore, with broadcast result/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Storage put, query, and delete nodes now report clear failures when an injected store violates non-null result contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

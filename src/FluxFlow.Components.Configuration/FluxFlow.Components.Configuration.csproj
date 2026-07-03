@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Configuration</PackageId>
     <AssemblyName>FluxFlow.Components.Configuration</AssemblyName>
     <RootNamespace>FluxFlow.Components.Configuration</RootNamespace>
-    <Version>1.5.0</Version>
+    <Version>1.5.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable configuration validation report helpers for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;configuration;validation</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds a typed configuration option path for code-authored validation requests.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

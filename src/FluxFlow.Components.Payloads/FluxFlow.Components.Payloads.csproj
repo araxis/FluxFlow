@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Payloads</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>A standalone payload-inspection node for FluxFlow: classify a byte/text payload (JSON, XML, base64, text, binary, empty) and broadcast a result with bounded previews, plus error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Rebuilt as a single standalone payload.inspect node over the FluxFlow.Nodes kit: a PayloadInspectionRequest in, a PayloadInspectionResult broadcast out (carrying the correlation id), failures on the error port, a diagnostic on the event port. The node factory, module/registration glue, component-type and port constants, the definition-based options reader, and the design-metadata provider are removed — classification logic, options, contracts, and error codes are unchanged. The node depends only on FluxFlow.Nodes and runs without the engine.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

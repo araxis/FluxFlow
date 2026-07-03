@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>3.0.2</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone observer nodes for FluxFlow (counter, logger, metrics) built on the FluxFlow.Nodes kit: an input in, a snapshot or log entry broadcast out — all carrying the message correlation id. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Aligns observability constructor option validation with standalone node conventions: counter, logger, and metrics nodes now reject empty inputType and non-positive boundedCapacity values before the node pipeline is created, while logger level validation remains fail-fast.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
