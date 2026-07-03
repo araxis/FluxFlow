@@ -1232,6 +1232,16 @@ Date: 2026-05-31
   Verification: controlled Release build with 0 warnings/0 errors, release
   tests `92` passed, and the full no-build Release suite `1707` passed across
   59 assemblies. See [[192-composition-resource-helper-relocation]].
+- 2026-07-03: Implemented Designer host layer phases 1-2 as the headless
+  host-model layer `samples/FluxFlow.DesignerHost` with
+  `tests/FluxFlow.DesignerHost.Tests` (20 tests): palette, inspector, option
+  editor, and resource picker view models projected from
+  `ComponentDesignMetadataCatalog` by a single explicit `DesignerHostCatalog`
+  adapter, with conservative editor fallbacks and host-owned-only resource
+  prompts. Both projects joined `FluxFlow.sln`; the sample is listed in
+  `docs/README.md`, and the coverage matrix candidate note was updated. No
+  package source, versions, or publishing state changed. See
+  [[193-designer-host-model-layer]].
 
 ## Remaining
 

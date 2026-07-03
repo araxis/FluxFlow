@@ -396,6 +396,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `192-composition-resource-helper-relocation.md`: keyed resource helper
   relocation onto the composition factory context, adapter
   Composition.Hosting reference removal, and the node kit clock option.
+- `193-designer-host-model-layer.md`: headless Designer host-model layer
+  (palette, inspector, option editor, and resource picker view models over the
+  metadata catalog) in `samples/FluxFlow.DesignerHost` with focused tests.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

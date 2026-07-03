@@ -14,6 +14,9 @@ runtime is the right fit for a host.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
 - `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.
 - `samples/FluxFlow.ComponentPackageTemplate`: copyable standalone component package shape.
+- `samples/FluxFlow.DesignerHost`: headless Designer host-model layer projecting
+  component design metadata into palette, inspector, and resource picker view
+  models (no UI, no resource ownership).
 
 ## Contents
 

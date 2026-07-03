@@ -5,9 +5,9 @@ Date: 2026-07-03
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/composition-hygiene-pass`. Local `main` was fast-forwarded to the
-  published Designer host layer planning state (`88027c7`); pushing
-  `origin/main` remains an operator step.
+  `work/designer-host-model` (stacked on `work/composition-hygiene-pass`).
+  Local `main` was fast-forwarded to the published Designer host layer
+  planning state (`88027c7`); pushing `origin/main` remains an operator step.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -111,12 +111,13 @@ Date: 2026-07-03
   `FlowNodeOptions.Clock` for deterministic safety-net error timestamps.
   Adapter package version bumps for the dependency change are deferred to the
   next release prep. See `192-composition-resource-helper-relocation.md`.
-- The Designer host layer is now planned in `docs/18-designer-host-layer.md`.
-  The plan keeps component packages source-only for metadata and leaves palette
-  models, node inspectors, option editor mapping, resource picker catalog
-  binding, validation/status display, persistence mapping, and runtime adapter
-  mapping to a future host-owned implementation pass. See
-  `191-designer-host-layer-planning.md`.
+- The Designer host layer is planned in `docs/18-designer-host-layer.md` and
+  phases 1-2 are now implemented as the headless host-model layer in
+  `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and
+  resource picker view models projected from the metadata catalog by
+  `DesignerHostCatalog`; 20 focused tests). Persistence mapping and renderer
+  UI remain separate bounded passes. See `191-designer-host-layer-planning.md`
+  and `193-designer-host-model-layer.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
