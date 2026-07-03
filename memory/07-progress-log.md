@@ -1390,6 +1390,9 @@ Date: 2026-05-31
   fan-in). Shipped as `FluxFlow.Fluent 1.0.0` (manifest, changelog, docs/14,
   baseline `55|21`, README, shared icon) with `samples/FluxFlow.FluentSample`.
   9 tests (branch/fan-in flake-checked 30x), full release suite green (92),
-  Release pack verified. Not yet merged to `main`. Optional follow-ons left
-  deliberately unbuilt (KISS): `.OnError` sugar, DI factory overloads, a
+  Release pack verified. Merged to `main` via PR #57 (CI green) and released to
+  nuget.org: `composition-v1.2.0` and `fluent-v1.0.0` (both published + indexed,
+  GitHub releases created; consumer smoke/feed-verify green, no indexing flake).
+  Optional follow-ons left deliberately unbuilt (KISS): `.OnError` sugar, DI
+  factory overloads, a
   separate hosted-runner package, reusable sub-flows.
