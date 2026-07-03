@@ -7,6 +7,36 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 1.1.0
+
+Moves the keyed-resource helpers onto the factory context.
+
+- Adds `GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+  `GetResource<TResource>` as `CompositionNodeFactoryContext` instance methods.
+- Adds a `Microsoft.Extensions.DependencyInjection.Abstractions` reference for
+  keyed service resolution.
+- Composition adapters no longer need a `FluxFlow.Composition.Hosting`
+  reference to resolve host-owned keyed resources.
+
+## FluxFlow.Composition.Hosting 1.1.0
+
+Deprecates the keyed-resource context extensions.
+
+- Marks `CompositionNodeFactoryContextResourceExtensions` obsolete; the
+  implementations now live as `CompositionNodeFactoryContext` instance methods
+  in `FluxFlow.Composition`.
+- The extensions delegate to the instance methods, so existing callers keep
+  the same behavior.
+
+## FluxFlow.Nodes 1.2.0
+
+Adds an optional node clock for deterministic error timestamps.
+
+- Adds `FlowNodeOptions.Clock` (`TimeProvider`, defaults to
+  `TimeProvider.System`).
+- `FlowNode` stamps its safety-net error (`ProcessAsync` throw) with the
+  configured clock instead of `DateTimeOffset.UtcNow`.
+
 ## FluxFlow.Components.Designer 2.17.0
 
 Adds neutral resource picker hint contracts for host Designer integrations.

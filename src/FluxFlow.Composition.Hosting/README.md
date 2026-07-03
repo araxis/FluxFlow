@@ -14,7 +14,11 @@ This package owns:
 - building the runtime through `CompositionRuntimeBuilder`
 - starting and stopping the runtime through `IHostedService`
 - exposing build diagnostics through `ICompositionRuntimeHost`
-- resolving named node resources from keyed DI services
+
+Named node resources resolve through the `CompositionNodeFactoryContext`
+instance methods in `FluxFlow.Composition`; this package's role is registering
+the composition runtime against the host's keyed services. The older context
+extension methods in this package remain as obsolete delegating wrappers.
 
 It does not own resource creation policies. Adapter packages still own concrete
 clients, stores, reconnect behavior, secrets, hosted client lifetime, and

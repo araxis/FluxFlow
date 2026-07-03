@@ -23,7 +23,6 @@
     <ProjectReference Include="..\FluxFlow.Components.Storage\FluxFlow.Components.Storage.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
-    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

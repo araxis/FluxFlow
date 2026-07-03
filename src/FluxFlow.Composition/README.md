@@ -124,10 +124,13 @@ var definition = new CompositionConfigurationLoader().Load(configuration);
 ```
 
 Resources are named references only. The host or adapter DI layer still owns
-the concrete resource registration and lifetime.
+the concrete resource registration and lifetime. Node factories resolve those
+references with the `CompositionNodeFactoryContext` instance methods
+`GetRequiredResourceKey`, `GetRequiredResource<TResource>`, and
+`GetResource<TResource>` over the keyed services the host registered.
 
 Use `FluxFlow.Composition.Hosting` when DI should build and start the runtime
-and node factories should resolve those resource references from keyed services.
+with host lifecycle.
 
 ## Sample
 

@@ -5,9 +5,9 @@ Date: 2026-07-03
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/designer-value-type-hint-contract`.
-- The tracked worktree is expected clean after the 2026-07-02 full public
-  package consumer validation after Designer `2.17.0` closeout.
+  `work/composition-hygiene-pass`. Local `main` was fast-forwarded to the
+  published Designer host layer planning state (`88027c7`); pushing
+  `origin/main` remains an operator step.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -103,6 +103,14 @@ Date: 2026-07-03
   outside the repository with all 55 direct package references restored from the
   public package feed and built successfully. See
   `190-full-public-package-consumer-validation-after-designer-2-17.md`.
+- Keyed resource resolution now lives as `CompositionNodeFactoryContext`
+  instance methods in `FluxFlow.Composition` (`1.1.0`); the
+  `FluxFlow.Composition.Hosting` context extensions are obsolete delegating
+  wrappers (`1.1.0`), and all 19 `.Composition` adapter packages no longer
+  reference `FluxFlow.Composition.Hosting`. `FluxFlow.Nodes` (`1.2.0`) gained
+  `FlowNodeOptions.Clock` for deterministic safety-net error timestamps.
+  Adapter package version bumps for the dependency change are deferred to the
+  next release prep. See `192-composition-resource-helper-relocation.md`.
 - The Designer host layer is now planned in `docs/18-designer-host-layer.md`.
   The plan keeps component packages source-only for metadata and leaves palette
   models, node inspectors, option editor mapping, resource picker catalog

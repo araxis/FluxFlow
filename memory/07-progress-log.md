@@ -1219,6 +1219,19 @@ Date: 2026-05-31
   22705 edges, and 976 communities; `graph.html` was skipped because the graph
   exceeds the local HTML visualization limit. See
   [[191-designer-host-layer-planning]].
+- 2026-07-03: Completed the composition dependency-hygiene pass. Keyed
+  resource resolution moved onto `CompositionNodeFactoryContext` instance
+  methods in `FluxFlow.Composition` (`1.1.0`), the
+  `FluxFlow.Composition.Hosting` context extensions became obsolete delegating
+  wrappers (`1.1.0`), all 19 `.Composition` adapters dropped their
+  `FluxFlow.Composition.Hosting` reference, and `FluxFlow.Nodes` (`1.2.0`)
+  gained `FlowNodeOptions.Clock` for deterministic safety-net error
+  timestamps. The public API baseline was re-accepted through the documented
+  flow; changelog and package release notes were updated. Local `main` was
+  fast-forwarded to `88027c7`; pushing `origin/main` remains an operator step.
+  Verification: controlled Release build with 0 warnings/0 errors, release
+  tests `92` passed, and the full no-build Release suite `1707` passed across
+  59 assemblies. See [[192-composition-resource-helper-relocation]].
 
 ## Remaining
 
@@ -1241,6 +1254,9 @@ Date: 2026-05-31
   combined temporary consumer restore/build after the Designer `2.17.0`
   publication. Future consumer validation should be rerun after package version
   changes or publication batches.
+- Composition adapter packages still declare a `FluxFlow.Composition.Hosting`
+  dependency in their last published versions; bump each adapter version at
+  the next release prep so the dependency removal ships.
 - Keep future work bounded: one package family, one convention pass, or one
   release-readiness pass per local commit, with focused tests, release
   convention tests, and the controlled solution build.

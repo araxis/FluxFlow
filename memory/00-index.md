@@ -393,6 +393,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `191-designer-host-layer-planning.md`: documentation-only Designer host
   layer plan covering host-owned palette, inspector, option editor, resource
   picker, validation, persistence, and runtime-mapping responsibilities.
+- `192-composition-resource-helper-relocation.md`: keyed resource helper
+  relocation onto the composition factory context, adapter
+  Composition.Hosting reference removal, and the node kit clock option.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Composition;
 
@@ -47,5 +48,52 @@ public sealed class CompositionNodeFactoryContext
             return default;
 
         return value.Deserialize<T>(_serializerOptions);
+    }
+
+    public string GetRequiredResourceKey(string resourceName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
+
+        var name = resourceName.Trim();
+        if (Resources.TryGetValue(name, out var key)
+            && !string.IsNullOrWhiteSpace(key))
+        {
+            return key.Trim();
+        }
+
+        throw new InvalidOperationException(
+            $"Node '{WorkflowName}.{NodeName}' requires resource '{name}', but no resource reference was configured.");
+    }
+
+    public TResource GetRequiredResource<TResource>(string resourceName)
+        where TResource : notnull
+    {
+        var key = GetRequiredResourceKey(resourceName);
+        var name = resourceName.Trim();
+        try
+        {
+            return Services.GetRequiredKeyedService<TResource>(key);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new InvalidOperationException(
+                $"Node '{WorkflowName}.{NodeName}' resource '{name}' references '{key}', but no keyed service of type '{typeof(TResource).Name}' is registered.",
+                exception);
+        }
+    }
+
+    public TResource? GetResource<TResource>(string resourceName)
+        where TResource : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
+
+        var name = resourceName.Trim();
+        if (!Resources.TryGetValue(name, out var key)
+            || string.IsNullOrWhiteSpace(key))
+        {
+            return null;
+        }
+
+        return Services.GetKeyedService<TResource>(key.Trim());
     }
 }

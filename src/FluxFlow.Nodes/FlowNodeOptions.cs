@@ -36,4 +36,11 @@ public sealed record FlowNodeOptions
             _maxDegreeOfParallelism = value;
         }
     }
+
+    /// <summary>
+    /// Clock used for node-owned timestamps (currently the safety-net error stamp when
+    /// <c>ProcessAsync</c> throws). Defaults to <see cref="TimeProvider.System"/>; pass a
+    /// FakeTimeProvider for deterministic error timestamps in tests.
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }

@@ -3,7 +3,6 @@ using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
 
 namespace FluxFlow.Components.Expectations.Composition;
 

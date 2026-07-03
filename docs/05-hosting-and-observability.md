@@ -104,7 +104,7 @@ The node factory asks for the local slot:
 var store = context.GetRequiredResource<IStorageStore>("store");
 ```
 
-The hosting bridge resolves the configured keyed service named `primary`.
+The factory context resolves the configured keyed service named `primary`.
 Concrete clients, stores, reconnect policies, secrets, and disposal ownership
 stay with the host or adapter package.
 
