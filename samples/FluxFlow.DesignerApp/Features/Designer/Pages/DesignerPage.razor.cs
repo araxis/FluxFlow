@@ -13,7 +13,11 @@ public partial class DesignerPage
 
     [Inject] private ISnackbar Snackbar { get; set; } = default!;
 
-    protected override void OnInitialized() => Graph.Changed += OnGraphChanged;
+    protected override void OnInitialized()
+    {
+        Graph.Changed += OnGraphChanged;
+        Graph.LinkRejected += OnLinkRejected;
+    }
 
     private void AddNode(string componentType)
     {
@@ -78,9 +82,21 @@ public partial class DesignerPage
         }
     }
 
+    private void DeleteSelected() => Graph.DeleteSelected();
+
     private void Clear() => Graph.Clear();
 
     private void ZoomToFit() => Graph.Diagram.ZoomToFit(40);
 
-    public void Dispose() => Graph.Changed -= OnGraphChanged;
+    private void OnLinkRejected(string reason)
+    {
+        Snackbar.Add(reason, Severity.Warning);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Graph.Changed -= OnGraphChanged;
+        Graph.LinkRejected -= OnLinkRejected;
+    }
 }

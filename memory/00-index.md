@@ -428,6 +428,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `201-designer-renderer-option-editing.md`: inspector option editors write into
   the selected node's configuration so saved composition JSON carries real
   option values; value round-trip browser-verified.
+- `202-designer-renderer-editor-polish.md`: Designer canvas delete-selected
+  (node/link, toolbar + Del key) and link-creation validation (reject self-links
+  and non-output→input, with snackbar); browser-verified. Renderer merged to
+  main via PR #55.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

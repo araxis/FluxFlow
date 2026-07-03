@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Blazor.Diagrams;
+using Blazor.Diagrams.Core.Anchors;
 using Blazor.Diagrams.Core.Geometry;
+using Blazor.Diagrams.Core.Models;
 using Blazor.Diagrams.Core.Models.Base;
 using FluxFlow.Composition;
 using FluxFlow.DesignerApp.Features.Designer.Canvas;
@@ -26,6 +28,7 @@ public sealed class DesignerGraphState
         _catalog = catalog;
         Diagram = new BlazorDiagram();
         Diagram.SelectionChanged += OnSelectionChanged;
+        Diagram.Links.Added += OnLinkAdded;
     }
 
     public BlazorDiagram Diagram { get; }
@@ -34,7 +37,12 @@ public sealed class DesignerGraphState
 
     public int NodeCount => Diagram.Nodes.Count;
 
+    public bool HasSelection => Diagram.GetSelectedModels().Any();
+
     public event Action? Changed;
+
+    /// <summary>Raised with a reason when a drawn link is rejected as invalid.</summary>
+    public event Action<string>? LinkRejected;
 
     public FlowNodeModel AddNode(PaletteItemModel item)
     {
@@ -53,6 +61,64 @@ public sealed class DesignerGraphState
         _added = 0;
         SelectedNode = null;
         Changed?.Invoke();
+    }
+
+    /// <summary>Remove the selected nodes and links. Removing a node also removes its links.</summary>
+    public void DeleteSelected()
+    {
+        var selected = Diagram.GetSelectedModels().ToList();
+        foreach (var link in selected.OfType<BaseLinkModel>())
+        {
+            Diagram.Links.Remove(link);
+        }
+
+        foreach (var node in selected.OfType<NodeModel>())
+        {
+            Diagram.Nodes.Remove(node);
+        }
+
+        SelectedNode = null;
+        Changed?.Invoke();
+    }
+
+    private void OnLinkAdded(BaseLinkModel link) => link.TargetAttached += OnLinkTargetAttached;
+
+    private void OnLinkTargetAttached(BaseLinkModel link)
+    {
+        if (IsValidConnection(link, out var reason))
+        {
+            Changed?.Invoke();
+            return;
+        }
+
+        Diagram.Links.Remove(link);
+        LinkRejected?.Invoke(reason);
+    }
+
+    private static bool IsValidConnection(BaseLinkModel link, out string reason)
+    {
+        reason = string.Empty;
+
+        // Only enforce rules once both ends land on component ports.
+        if (link.Source is not SinglePortAnchor source || source.Port.Parent is not FlowNodeModel sourceNode ||
+            link.Target is not SinglePortAnchor target || target.Port.Parent is not FlowNodeModel targetNode)
+        {
+            return true;
+        }
+
+        if (ReferenceEquals(sourceNode, targetNode))
+        {
+            reason = "A node cannot connect to itself.";
+            return false;
+        }
+
+        if (source.Port.Alignment != PortAlignment.Right || target.Port.Alignment != PortAlignment.Left)
+        {
+            reason = "Links must go from an output port (right) to an input port (left).";
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>Serialize the current canvas as a composition definition (JSON).</summary>

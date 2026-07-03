@@ -148,8 +148,8 @@ Date: 2026-07-03
   with lossless `GraphDefinitionMapper` round-trips to composition
   definitions; shared validation message mapping; 29 focused tests). Phase 5
   (the renderer UI) is now started as `samples/FluxFlow.DesignerApp`, a Blazor
-  WebAssembly + MudBlazor app (net10.0, on branch `work/designer-renderer-ui`);
-  the docs/18 phase 5 renderer is complete and browser-verified against the
+  WebAssembly + MudBlazor app (net10.0); it was merged to `main` via PR #55.
+  The docs/18 phase 5 renderer is complete and browser-verified against the
   real metadata catalog: the palette (23 components, grouped), the
   option/resource inspector, the Z.Blazor.Diagrams `3.0.4.1` node canvas
   (add-from-palette, node rendering with ports, canvas-selection-drives-
@@ -157,10 +157,12 @@ Date: 2026-07-03
   and save/load persistence of the canvas graph to a `FluxFlow.Composition`
   definition (named-port link mapping) with validation feedback — the saved
   composition JSON carries real option values that round-trip on load. So all
-  Designer host layer phases (1, 2, 4, 5) are now implemented;
-  phase 3 (host resource-catalog adapter, needs a real host app) and optional
-  editor polish (option-value editing into nodes, drag-to-connect validation,
-  delete, undo/redo) remain. See `191-designer-host-layer-planning.md`,
+  Designer host layer phases (1, 2, 4, 5) are now implemented. The canvas also
+  supports delete-selected (node/link) and link-creation validation (reject
+  self-links and non-output→input) on branch `work/designer-editor-polish`
+  (record 202). Remaining: phase 3 (host resource-catalog adapter, needs a real
+  host app) and optional undo/redo/duplicate polish. See
+  `191-designer-host-layer-planning.md`,
   `193-designer-host-model-layer.md`,
   `194-designer-host-persistence-mapping.md`,
   `198-designer-renderer-app-first-slice.md`,

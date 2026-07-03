@@ -19,6 +19,9 @@
             <MudTooltip Text="Load composition JSON">
                 <MudIconButton Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" OnClick="Load" />
             </MudTooltip>
+            <MudTooltip Text="Delete selected (Del)">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Disabled="@(!Graph.HasSelection)" OnClick="DeleteSelected" />
+            </MudTooltip>
             <MudTooltip Text="Clear canvas">
                 <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small" Disabled="@(Graph.NodeCount == 0)" OnClick="Clear" />
             </MudTooltip>
