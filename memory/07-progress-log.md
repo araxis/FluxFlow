@@ -1252,15 +1252,19 @@ Date: 2026-05-31
   [[194-designer-host-persistence-mapping]].
 - 2026-07-03: Added a shared "Fanout" NuGet package icon
   (`assets/icon.svg`/`assets/icon.png`) wired repo-wide through
-  `Directory.Build.targets`, and prepared the composition hygiene pass for
-  release: minor-bumped the 19 `FluxFlow.Components.*.Composition` adapters for
-  the `FluxFlow.Composition.Hosting` dependency removal plus the icon, with
-  CHANGELOG and release notes. Validated with a clean Release build, `92`
-  release tests, and full `DRY_RUN_OK` dry-runs for `nodes`, `composition`,
-  `composition-hosting`, and `components-timers-composition` (icon confirmed in
-  the nupkg, Hosting dependency confirmed gone). Nothing tagged or published;
-  publishing is an operator step because `origin/main` is 448 commits behind
-  and the branch push was permission-blocked. See
+  `Directory.Build.targets`, minor-bumped the 19
+  `FluxFlow.Components.*.Composition` adapters for the
+  `FluxFlow.Composition.Hosting` dependency removal plus the icon, and
+  published the full 22-package release set (`FluxFlow.Nodes` `1.2.0`,
+  `FluxFlow.Composition` `1.1.0`, `FluxFlow.Composition.Hosting` `1.1.0`, and
+  the 19 adapters). The `main` branch push stayed permission-blocked but
+  `work/designer-host-model` pushed successfully, unblocking release tags.
+  First-pass downstream workflows hit the known nuget.org indexing-lag flake
+  (`NU1102` at the pre-publish smoke gate, nothing partially published);
+  re-running after each dependency indexed brought all 22 packages to
+  `success`. Verified live: all 22 on the flat-container index, the embedded
+  icon endpoint returns `200`, and a fresh temporary consumer project
+  referencing all 22 packages restored and built cleanly. See
   [[195-nuget-icon-and-hygiene-release-prep]].
 
 ## Remaining

@@ -4,9 +4,10 @@ Date: 2026-07-03
 
 ## Summary
 
-Added a shared NuGet package icon and prepared the composition hygiene pass for
-release. All packaging was validated by dry-runs; nothing was tagged or
-published. Publishing remains an operator step (see Handoff).
+Added a shared NuGet package icon, prepared the composition hygiene pass for
+release, and published the full 22-package release set. All 22 packages are
+live and independently verified on the public NuGet feed. See Release
+Execution and Post-Publish Verification below.
 
 ## Icon
 
@@ -54,22 +55,51 @@ published. Publishing remains an operator step (see Handoff).
 - Adapter dry-runs require the bumped dependency wave in the package source
   first (documented seeding rule from `175`-`177`).
 
-## Handoff — publishing is an operator step
+## Release execution
 
-- Local `main` is `448` commits ahead of `origin/main`; the branch push to
-  `origin` was permission-blocked earlier this session. Release tags trigger
-  the GitHub release workflows, so the code must reach `origin` first.
-- Release each package in dependency-wave order with
-  `eng/package-release-tag.ps1 -Package <alias> -Push` (waves:
-  `nodes` -> `composition` -> `composition-hosting` -> the 19
-  `components-*-composition` adapters). The helper re-runs the dry-run,
-  requires a clean tree, asserts release notes exist, then creates and pushes
-  `<tagPrefix>-v<version>`.
-- After publish, verify with `eng/package-feed-verify.ps1` and rerun the full
-  public consumer validation.
+- The push to the default branch `main` stayed permission-blocked, but pushing
+  the feature branch `work/designer-host-model` to `origin` succeeded, so the
+  release-tag commit reached the remote and the GitHub release workflows could
+  run from it.
+- All 22 release tags were created and pushed with
+  `eng/package-release-tag.ps1 -Package <alias> -Push -SkipSolutionBuild`
+  (`nodes-v1.2.0`, `composition-v1.1.0`, `composition-hosting-v1.1.0`, and the
+  19 `components-*-composition` adapter tags).
+- First pass: `FluxFlow.Nodes 1.2.0` published and indexed immediately. The
+  other 21 workflows failed at the pre-publish "Smoke package consumer" gate
+  because `FluxFlow.Nodes 1.2.0` was not yet indexed on nuget.org when they ran
+  (`NU1102`) — the gate runs before the publish step, so nothing partially
+  published (verified live: `composition` still showed only `1.0.9` at that
+  point). This is the documented nuget.org indexing-lag flake.
+- Recovery: polled the flat-container until `FluxFlow.Nodes 1.2.0` appeared
+  (~6.5 min), re-ran `composition-v1.1.0` (`gh run rerun`) and it published and
+  indexed (~9 min). Because the 19 adapters no longer depend on
+  `FluxFlow.Composition.Hosting`, they and `composition-hosting` only needed
+  `FluxFlow.Composition 1.1.0` indexed, not each other — so all 20 remaining
+  workflows were re-run together and all 20 completed successfully (~9 min).
+
+## Post-publish verification
+
+- All 22 packages independently confirmed on the nuget.org flat-container
+  index at their released versions (`FluxFlow.Nodes` `1.2.0`,
+  `FluxFlow.Composition` `1.1.0`, `FluxFlow.Composition.Hosting` `1.1.0`, and
+  the 19 adapters at the versions listed above).
+- Embedded icon confirmed live: `GET
+  v3-flatcontainer/fluxflow.nodes/1.2.0/icon` returns `200`. (The classic
+  `iconUrl` registration field is `null` as expected for an embedded
+  `PackageIcon` — that field only applies to the older external-URL icon
+  convention.)
+- Full public consumer validation: a fresh temporary `net8.0` console project
+  outside the repository, referencing all 22 released packages by their new
+  versions, restored from `https://api.nuget.org/v3/index.json` and built
+  successfully with `0` warnings and `0` errors.
 
 ## Boundaries
 
-- No tags created, nothing published. Only version, changelog, release-note,
-  icon, and shared-props files changed. Node/adapter runtime behavior is
-  unchanged apart from the earlier hygiene-pass source edits.
+- Only version, changelog, release-note, icon, and shared-props files changed.
+  Node/adapter runtime behavior is unchanged apart from the earlier
+  hygiene-pass source edits.
+- Local `main` is still ahead of `origin/main`; only the
+  `work/designer-host-model` branch (which carries this release commit) was
+  pushed. Fast-forwarding `origin/main` to include this and the earlier
+  session's commits remains a separate operator step.

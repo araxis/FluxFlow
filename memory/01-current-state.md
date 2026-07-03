@@ -113,13 +113,16 @@ Date: 2026-07-03
 - A shared "Fanout" NuGet package icon is wired repo-wide via
   `Directory.Build.targets` (`assets/icon.svg` source, `assets/icon.png`
   256x256 raster); every package with an explicit `PackageId` picks it up at
-  its next release. The 19 `FluxFlow.Components.*.Composition` adapters are
-  minor-bumped for the Hosting-dependency removal plus the icon, with CHANGELOG
-  and release notes. The release set (3 core + 19 adapters) is validated by
-  dry-runs but not tagged or published: local `main` is 448 commits ahead of
-  `origin/main` and the branch push was permission-blocked, so publishing via
-  `eng/package-release-tag.ps1 -Push` in dependency-wave order is an operator
-  step. See `195-nuget-icon-and-hygiene-release-prep.md`.
+  its next release. The composition hygiene release set — `FluxFlow.Nodes`
+  `1.2.0`, `FluxFlow.Composition` `1.1.0`, `FluxFlow.Composition.Hosting`
+  `1.1.0`, and 19 `FluxFlow.Components.*.Composition` adapters minor-bumped for
+  the Hosting-dependency removal plus the icon — is tagged, published, and
+  independently verified live on the public NuGet feed (flat-container listing
+  plus a full temporary consumer restore/build of all 22 packages). Pushing
+  `origin/main` itself (to include this and the prior session's commits)
+  remains a separate operator step; only the `work/designer-host-model` branch
+  carrying the release commit was pushed. See
+  `195-nuget-icon-and-hygiene-release-prep.md`.
 - The Designer host layer is planned in `docs/18-designer-host-layer.md` and
   phases 1, 2, and 4 are now implemented as the headless host-model layer in
   `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and
