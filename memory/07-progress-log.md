@@ -1242,6 +1242,14 @@ Date: 2026-05-31
   `docs/README.md`, and the coverage matrix candidate note was updated. No
   package source, versions, or publishing state changed. See
   [[193-designer-host-model-layer]].
+- 2026-07-03: Implemented Designer host layer phase 4 in
+  `samples/FluxFlow.DesignerHost`: `GraphModel` (nodes, raw JSON option
+  values, resource references, links with optional cross-workflow segments,
+  host-only layout), `GraphDefinitionMapper` with lossless JSON-verified
+  round-trips to `CompositionDefinition`, and `ValidationMessageMapper` for
+  metadata errors plus composition diagnostics. Host tests now `29` passed.
+  Renderer UI is the only remaining Designer host pass. See
+  [[194-designer-host-persistence-mapping]].
 
 ## Remaining
 

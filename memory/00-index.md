@@ -399,6 +399,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `193-designer-host-model-layer.md`: headless Designer host-model layer
   (palette, inspector, option editor, and resource picker view models over the
   metadata catalog) in `samples/FluxFlow.DesignerHost` with focused tests.
+- `194-designer-host-persistence-mapping.md`: host graph model with lossless
+  mapping to and from composition definitions plus shared validation message
+  mapping; renderer UI is the only remaining Designer host pass.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

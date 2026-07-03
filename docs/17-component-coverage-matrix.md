@@ -92,9 +92,9 @@ Release tests currently enforce these consistency rules:
 Future work should be explicit and narrow. Good candidates:
 
 - extend the headless Designer host-model layer in
-  `samples/FluxFlow.DesignerHost` (palette, inspector, and resource picker view
-  models exist; persistence mapping and renderer UI remain separate bounded
-  passes per `docs/18-designer-host-layer.md`)
+  `samples/FluxFlow.DesignerHost` (palette, inspector, resource picker, and
+  graph/definition persistence models exist; renderer UI remains a separate
+  bounded pass per `docs/18-designer-host-layer.md`)
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node
   surface is explicitly needed

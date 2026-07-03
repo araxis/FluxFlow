@@ -112,12 +112,14 @@ Date: 2026-07-03
   Adapter package version bumps for the dependency change are deferred to the
   next release prep. See `192-composition-resource-helper-relocation.md`.
 - The Designer host layer is planned in `docs/18-designer-host-layer.md` and
-  phases 1-2 are now implemented as the headless host-model layer in
+  phases 1, 2, and 4 are now implemented as the headless host-model layer in
   `samples/FluxFlow.DesignerHost` (palette, inspector, option editor, and
-  resource picker view models projected from the metadata catalog by
-  `DesignerHostCatalog`; 20 focused tests). Persistence mapping and renderer
-  UI remain separate bounded passes. See `191-designer-host-layer-planning.md`
-  and `193-designer-host-model-layer.md`.
+  resource picker view models projected by `DesignerHostCatalog`; graph model
+  with lossless `GraphDefinitionMapper` round-trips to composition
+  definitions; shared validation message mapping; 29 focused tests). Renderer
+  UI is the only remaining Designer host pass. See
+  `191-designer-host-layer-planning.md`, `193-designer-host-model-layer.md`,
+  and `194-designer-host-persistence-mapping.md`.
 - MQTT connection pilot PR #24 is merged and released. It simplifies
   `FluxFlow.Components.Mqtt` so publish/trigger nodes depend on
   `IMqttPublisher` / `IMqttTriggerSource`, optional health uses
