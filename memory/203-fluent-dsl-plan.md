@@ -121,7 +121,9 @@ fan-in); (3) packaging (manifest, changelog, docs/14, baseline `55|21`, README,
 icon) + `samples/FluxFlow.FluentSample`. Public surface: `Flow`, `FlowBuilder<T>`,
 `FlowTerminal`, `FlowGraph`. 9 tests, branch/fan-in flake-checked 30x, full
 release suite green (92). Naming resolved to `Flow`/`FlowBuilder`/`FlowTerminal`/
-`FlowGraph`. Not yet merged to `main`.
+`FlowGraph`. Merged to `main` (PR #57) and released to nuget.org as
+`composition-v1.2.0` + `fluent-v1.0.0` (published, indexed, GitHub releases
+created).
 
 Deliberately NOT built (KISS / library-focus, see [[designer-ui-low-priority]]):
 `.OnError` sugar (the graph already exposes `Errors`), `Flow.From(sp => ...)` DI
