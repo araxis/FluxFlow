@@ -10,6 +10,7 @@ runtime is the right fit for a host.
 ## Current Samples
 
 - `samples/FluxFlow.CompositionSample`: pure in-memory standalone composition.
+- `samples/FluxFlow.FluentSample`: the same pipeline built with the type-safe fluent DSL, plus a branching/fan-in example.
 - `samples/FluxFlow.MqttCompositionSample`: MQTT-shaped hosted composition with in-memory adapter resources.
 - `samples/FluxFlow.HttpTriggerSample`: host-owned HTTP trigger wiring without the engine.
 - `samples/FluxFlow.SampleApp`: optional advanced engine runtime sample.

@@ -409,6 +409,21 @@ Drops the FluxFlow.Composition.Hosting dependency and adds the shared package ic
 - Adds the shared FluxFlow package icon.
 - Composition runtime and Designer metadata behavior are unchanged.
 
+## FluxFlow.Fluent 1.0.0
+
+First release: a type-safe, code-first fluent DSL for composing standalone nodes.
+
+- Adds `Flow.From(source)` and `FlowBuilder<T>` with `Then`, `Tap`, `Branch`,
+  `To`, and `Build` — connections are checked by the compiler (a node whose
+  input type does not match the current output will not compile), and the
+  `FlowMessage<T>` envelope is hidden.
+- Supports linear chains, fan-out (`Tap`), branching from a node's typed output
+  ports (`Branch`), and fan-in (share one node instance across branches).
+- The built `FlowGraph` reuses the `FluxFlow.Composition` runtime for source
+  start/stop, completion, aggregated errors/events, and ordered disposal; each
+  node completes once all of its upstream sources finish.
+- Depends on `FluxFlow.Nodes` and `FluxFlow.Composition` (>= 1.2.0).
+
 ## FluxFlow.Composition 1.2.0
 
 Adds a code-first runtime construction seam.

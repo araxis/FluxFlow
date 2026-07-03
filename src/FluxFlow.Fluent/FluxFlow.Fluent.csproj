@@ -4,11 +4,20 @@
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>FluxFlow.Fluent</RootNamespace>
+    <PackageId>FluxFlow.Fluent</PackageId>
     <AssemblyName>FluxFlow.Fluent</AssemblyName>
-    <!-- Not yet packable: the DSL is under active development. Flipped to a real
-         package (PackageId + manifest + public-API baseline wiring) once stable. -->
-    <IsPackable>false</IsPackable>
+    <RootNamespace>FluxFlow.Fluent</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>FluxFlow contributors</Authors>
+    <Description>Type-safe, code-first fluent DSL for composing FluxFlow standalone nodes into a runnable graph — Flow.From(source).Then(node).To(sink) with compile-time-checked wiring, branching, and fan-in. Reuses the FluxFlow.Composition runtime.</Description>
+    <PackageTags>workflow;dataflow;composition;nodes;fluent;dsl</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>First release: Flow.From/Then/Tap/Branch/To/Build over the FluxFlow.Nodes kit, reusing the FluxFlow.Composition runtime for lifecycle, error/event aggregation, and disposal.</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +28,10 @@
   <ItemGroup>
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat. -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
