@@ -1,8 +1,10 @@
-<MudPaper Elevation="1" Class="d-flex flex-column" Style="width: 300px; height: 100%;">
-    <MudText Typo="Typo.subtitle1" Class="pa-3 pb-1">Palette</MudText>
-    <MudText Typo="Typo.caption" Class="px-3 pb-2 mud-text-secondary">@Items.Count components</MudText>
-    <MudDivider />
-    <div style="flex: 1; overflow-y: auto;" class="pa-2">
+<MudPaper Elevation="1" Class="d-flex flex-column" Style="width: 300px; height: 100%; overflow: hidden;">
+    <div style="flex: 0 0 auto;">
+        <MudText Typo="Typo.subtitle1" Class="pa-3 pb-1">Palette</MudText>
+        <MudText Typo="Typo.caption" Class="px-3 pb-2 mud-text-secondary">@Items.Count components</MudText>
+        <MudDivider />
+    </div>
+    <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto;" class="pa-2">
         @foreach (var group in Items.GroupBy(item => item.Category).OrderBy(group => group.Key, StringComparer.Ordinal))
         {
             <MudText Typo="Typo.overline" Class="px-2 mt-2 mud-text-secondary">@group.Key</MudText>
