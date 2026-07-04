@@ -390,5 +390,12 @@
     "packageId": "FluxFlow.Fluent",
     "project": "src/FluxFlow.Fluent/FluxFlow.Fluent.csproj",
     "notesName": "FluxFlow.Fluent"
+  },
+  {
+    "alias": "fluent-hosting",
+    "tagPrefix": "fluent-hosting",
+    "packageId": "FluxFlow.Fluent.Hosting",
+    "project": "src/FluxFlow.Fluent.Hosting/FluxFlow.Fluent.Hosting.csproj",
+    "notesName": "FluxFlow.Fluent.Hosting"
   }
 ]

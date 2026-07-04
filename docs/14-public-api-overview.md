@@ -149,6 +149,24 @@ of its upstream sources finish, so fan-in drains before completing. `OnError` an
 `OnEvent` (on the builder, terminal, or graph) observe the flow's aggregated
 error/event streams; handlers are isolated and torn down with the graph.
 
+## Fluent DSL Hosting
+
+Namespace:
+
+```text
+FluxFlow.Fluent.Hosting
+```
+
+Main types:
+
+- `FluxFlowFluentHostingServiceCollectionExtensions`
+
+Use `services.AddFlowGraph(sp => Flow.From(...)...Build())` to run a fluent
+`FlowGraph` as an `IHostedService`: built and started when the host starts,
+drained on host stop, and disposed on shutdown. The factory receives the
+application `IServiceProvider`, so nodes can be resolved from DI. Call it more
+than once to host several flows in one application.
+
 ## HTTP Composition
 
 Namespace:

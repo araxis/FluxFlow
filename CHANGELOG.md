@@ -409,6 +409,19 @@ Drops the FluxFlow.Composition.Hosting dependency and adds the shared package ic
 - Adds the shared FluxFlow package icon.
 - Composition runtime and Designer metadata behavior are unchanged.
 
+## FluxFlow.Fluent.Hosting 1.0.0
+
+First release: run a fluent flow under the .NET Generic Host.
+
+- Adds `IServiceCollection.AddFlowGraph(Func<IServiceProvider, FlowGraph>)`,
+  which registers a fluent `FlowGraph` as an `IHostedService`: built and started
+  on host start, drained on host stop, and disposed on shutdown.
+- The factory delegate receives the application `IServiceProvider`, so nodes can
+  be resolved from DI. Call `AddFlowGraph` more than once to host several flows.
+- Depends on `FluxFlow.Fluent` (>= 1.1.0),
+  `Microsoft.Extensions.Hosting.Abstractions`, and
+  `Microsoft.Extensions.DependencyInjection.Abstractions`.
+
 ## FluxFlow.Fluent 1.1.0
 
 Adds error and event observation to the fluent DSL.
