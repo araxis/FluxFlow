@@ -67,6 +67,18 @@ public sealed class FlowBuilder<T>
     }
 
     /// <summary>
+    /// Splice a reusable named <see cref="FlowSegment{TIn,TOut}"/> into the chain. The segment
+    /// appends its own nodes (constructed fresh on each application) and the flow continues at
+    /// <typeparamref name="TOut"/>.
+    /// </summary>
+    public FlowBuilder<TOut> Apply<TOut>(FlowSegment<T, TOut> segment)
+    {
+        ArgumentNullException.ThrowIfNull(segment);
+
+        return segment.ApplyTo(this);
+    }
+
+    /// <summary>
     /// Append a terminal (sink) node. The sink's own output, if any, is left unlinked. Returns a
     /// <see cref="FlowTerminal"/> — call <see cref="FlowTerminal.Build"/> to produce the runnable
     /// graph. Passing the same sink instance from several branches fans them into one sink.

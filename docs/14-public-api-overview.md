@@ -136,6 +136,8 @@ Main types:
 - `FlowBuilder<T>`
 - `FlowTerminal`
 - `FlowGraph`
+- `FlowSegment<TIn, TOut>`
+- `FlowSegment`
 
 Use these types to compose standalone nodes in C# with compile-time-checked
 wiring: `Flow.From(source).Then(node).To(sink).Build()`. The generic parameter
@@ -148,6 +150,9 @@ completion, aggregated errors/events, and disposal; each node completes once all
 of its upstream sources finish, so fan-in drains before completing. `OnError` and
 `OnEvent` (on the builder, terminal, or graph) observe the flow's aggregated
 error/event streams; handlers are isolated and torn down with the graph.
+`FlowSegment<TIn, TOut>` (via `FlowSegment.Define`) is a reusable named fragment
+spliced into a chain with `Apply`; each application builds fresh nodes, so a
+segment can be reused across graphs.
 
 ## Fluent DSL Hosting
 

@@ -143,3 +143,13 @@ internal sealed class EventNode(string eventName) : FlowNode<string, string>
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Appends "!" to each payload.</summary>
+internal sealed class ExclaimNode : FlowNode<string, string>
+{
+    protected override Task ProcessAsync(FlowMessage<string> message)
+    {
+        Emit(message.With(message.Payload + "!"));
+        return Task.CompletedTask;
+    }
+}

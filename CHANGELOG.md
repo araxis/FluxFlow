@@ -422,6 +422,18 @@ First release: run a fluent flow under the .NET Generic Host.
   `Microsoft.Extensions.Hosting.Abstractions`, and
   `Microsoft.Extensions.DependencyInjection.Abstractions`.
 
+## FluxFlow.Fluent 1.2.0
+
+Adds reusable named sub-flows.
+
+- Adds `FlowSegment<TIn, TOut>` (and the `FlowSegment.Define` factory): a named,
+  typed fragment of a flow.
+- Adds `FlowBuilder<T>.Apply(segment)` to splice a segment into a chain.
+- A segment holds a build delegate, not node instances, so each application
+  constructs fresh nodes — a segment is safe to reuse across graphs and to apply
+  more than once.
+- Additive only; existing builder/graph API is unchanged.
+
 ## FluxFlow.Fluent 1.1.0
 
 Adds error and event observation to the fluent DSL.
