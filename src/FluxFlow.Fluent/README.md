@@ -82,6 +82,24 @@ dispose to unsubscribe). Observation is best-effort (the underlying stream is a
 latest-wins broadcast), a throwing handler is isolated so it cannot break
 observation, and subscriptions are torn down with the graph.
 
+## Reusable named sub-flows
+
+```csharp
+var normalize = FlowSegment.Define<string, string>("normalize",
+    b => b.Then(new TrimNode()).Then(new UppercaseNode()));
+
+await using var flow = Flow
+    .From(new WordSource(["  alpha ", "beta"]))
+    .Apply(normalize)          // splice the segment in
+    .To(new CollectSink(collector))
+    .Build();
+```
+
+A `FlowSegment<TIn, TOut>` is a named, typed fragment you define once and splice
+into any flow with `Apply`. It holds the build delegate, not node instances, so
+each application constructs fresh nodes — the same segment is safe to reuse
+across graphs and to apply more than once.
+
 ## Sample
 
 ```sh
