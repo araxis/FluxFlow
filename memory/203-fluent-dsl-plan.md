@@ -137,8 +137,15 @@ shutdown). The factory delegate receives the `IServiceProvider`, so it also
 covers DI-resolved nodes. Released to nuget.org (`fluent-hosting-v1.0.0`, PR #61;
 baseline index 56).
 
-Deliberately NOT built (KISS / library-focus, see [[designer-ui-low-priority]]):
-`Flow.From(sp => ...)` builder DI factory overloads (now largely redundant — the
-hosting factory delegate already gives DI-resolved nodes, and non-hosted callers
-pass constructed nodes) and reusable named sub-flows. Additive follow-ons if a
-real need appears.
+Follow-on shipped: reusable named sub-flows — `FlowSegment<TIn,TOut>`
+(`FlowSegment.Define`) + `FlowBuilder.Apply(segment)`. A segment holds a build
+delegate (not node instances), so each application constructs fresh nodes and is
+reusable across graphs. Released to nuget.org as `FluxFlow.Fluent 1.2.0`
+(`fluent-v1.2.0`, PR #63; baseline `55|35`).
+
+The planned fluent-DSL feature set is now complete (linear/fan-out/branching/
+fan-in, error/event observation, hosting, reusable segments). Only
+`Flow.From(sp => ...)` builder DI factory overloads remain deliberately unbuilt
+(KISS) — largely redundant since the hosting factory delegate already gives
+DI-resolved nodes and non-hosted callers pass constructed nodes; an additive
+follow-on if a real need appears.

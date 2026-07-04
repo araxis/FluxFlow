@@ -1402,6 +1402,12 @@ Date: 2026-05-31
   `fluent-hosting-v1.0.0`, published + indexed): `services.AddFlowGraph(sp =>
   Flow…Build())` registers a `FlowGraph` as an `IHostedService` (start on host
   start, drain on stop, dispose on shutdown); the factory delegate also gives
-  DI-resolved nodes. 5 tests (flake-checked 20x), baseline index 56. Still
-  deliberately unbuilt (KISS): builder DI factory overloads (now largely
-  redundant given the hosting factory), reusable sub-flows.
+  DI-resolved nodes. 5 tests (flake-checked 20x), baseline index 56.
+- Reusable named sub-flows shipped as `FluxFlow.Fluent 1.2.0` (PR #63,
+  `fluent-v1.2.0`, published + indexed): `FlowSegment<TIn,TOut>`
+  (`FlowSegment.Define`) + `FlowBuilder.Apply(segment)`; the segment holds a
+  build delegate (not node instances) so each application makes fresh nodes,
+  reusable across graphs. 6 new tests (flake-checked 20x), baseline `55|35`. The
+  planned fluent-DSL feature set is now complete; only builder DI factory
+  overloads remain deliberately unbuilt (KISS, redundant given the hosting
+  factory).
