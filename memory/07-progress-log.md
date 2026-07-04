@@ -1397,5 +1397,11 @@ Date: 2026-05-31
   published + indexed): `OnError`/`OnEvent` observation on
   `FlowBuilder`/`FlowTerminal`/`FlowGraph` over the aggregated error/event
   broadcasts (handler-isolated, torn down with the graph; 6 new tests, baseline
-  `55|29`). Still deliberately unbuilt (KISS): DI factory overloads, a separate
-  hosted-runner package, reusable sub-flows.
+  `55|29`).
+- Hosting shipped as new package `FluxFlow.Fluent.Hosting 1.0.0` (PR #61,
+  `fluent-hosting-v1.0.0`, published + indexed): `services.AddFlowGraph(sp =>
+  Flow…Build())` registers a `FlowGraph` as an `IHostedService` (start on host
+  start, drain on stop, dispose on shutdown); the factory delegate also gives
+  DI-resolved nodes. 5 tests (flake-checked 20x), baseline index 56. Still
+  deliberately unbuilt (KISS): builder DI factory overloads (now largely
+  redundant given the hosting factory), reusable sub-flows.

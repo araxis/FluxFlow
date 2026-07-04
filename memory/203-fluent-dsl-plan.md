@@ -130,9 +130,15 @@ Follow-on shipped: `OnError`/`OnEvent` observation on
 graph) — released to nuget.org as `FluxFlow.Fluent 1.1.0` (`fluent-v1.1.0`,
 PR #59; baseline `55|29`).
 
+Follow-on shipped: hosting — new `FluxFlow.Fluent.Hosting 1.0.0` package with
+`services.AddFlowGraph(sp => Flow…Build())` registering a `FlowGraph` as an
+`IHostedService` (built/started on host start, drained on stop, disposed on
+shutdown). The factory delegate receives the `IServiceProvider`, so it also
+covers DI-resolved nodes. Released to nuget.org (`fluent-hosting-v1.0.0`, PR #61;
+baseline index 56).
+
 Deliberately NOT built (KISS / library-focus, see [[designer-ui-low-priority]]):
-`Flow.From(sp => ...)` DI factory overloads (users already pass constructed
-nodes), a hosted-runner
-(belongs in a separate `FluxFlow.Fluent.Hosting` package like
-`Composition.Hosting`), and reusable named sub-flows. All are additive follow-ons
-if a real need appears.
+`Flow.From(sp => ...)` builder DI factory overloads (now largely redundant — the
+hosting factory delegate already gives DI-resolved nodes, and non-hosted callers
+pass constructed nodes) and reusable named sub-flows. Additive follow-ons if a
+real need appears.
