@@ -29,6 +29,7 @@ public sealed class CompositionRuntimeBuilder
 
         var nodes = new Dictionary<RuntimeNodeKey, CompositionRuntimeNode>();
         var links = new List<IDisposable>();
+        var upstreamsByInput = new Dictionary<CompositionInputPort, List<CompositionOutputPort>>();
         var nodesWithIncomingLinks = new HashSet<RuntimeNodeKey>();
 
         try
@@ -97,7 +98,14 @@ public sealed class CompositionRuntimeBuilder
                 foreach (var linkDefinition in workflow.Links)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    LinkNodes(workflowName, linkDefinition, nodes, links, nodesWithIncomingLinks, diagnostics);
+                    LinkNodes(
+                        workflowName,
+                        linkDefinition,
+                        nodes,
+                        links,
+                        upstreamsByInput,
+                        nodesWithIncomingLinks,
+                        diagnostics);
                 }
             }
 
@@ -106,6 +114,9 @@ public sealed class CompositionRuntimeBuilder
                 await CleanupAsync(nodes.Values, links, diagnostics).ConfigureAwait(false);
                 return CompositionBuildResult.Failure(diagnostics);
             }
+
+            foreach (var (input, upstreams) in upstreamsByInput)
+                links.Add(new CompositionInputCompletionLink(input, upstreams));
 
             return CompositionBuildResult.Success(
                 new CompositionRuntime(nodes.Values.ToArray(), links, nodesWithIncomingLinks));
@@ -184,6 +195,7 @@ public sealed class CompositionRuntimeBuilder
         LinkDefinition linkDefinition,
         IReadOnlyDictionary<RuntimeNodeKey, CompositionRuntimeNode> nodes,
         List<IDisposable> links,
+        Dictionary<CompositionInputPort, List<CompositionOutputPort>> upstreamsByInput,
         HashSet<RuntimeNodeKey> nodesWithIncomingLinks,
         List<CompositionDiagnostic> diagnostics)
     {
@@ -255,6 +267,13 @@ public sealed class CompositionRuntimeBuilder
         }
 
         links.Add(link);
+        if (!upstreamsByInput.TryGetValue(input, out var upstreams))
+        {
+            upstreams = [];
+            upstreamsByInput.Add(input, upstreams);
+        }
+
+        upstreams.Add(output);
         nodesWithIncomingLinks.Add(targetKey);
     }
 

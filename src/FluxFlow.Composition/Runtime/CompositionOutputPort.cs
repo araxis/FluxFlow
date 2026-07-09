@@ -16,6 +16,8 @@ public abstract class CompositionOutputPort
 
     public Type MessageType { get; }
 
+    internal abstract Task Completion { get; }
+
     internal abstract bool TryLinkTo(CompositionInputPort input, out IDisposable? link);
 }
 
@@ -29,6 +31,8 @@ public sealed class CompositionOutputPort<TMessage> : CompositionOutputPort
 
     public ISourceBlock<FlowMessage<TMessage>> Source { get; }
 
+    internal override Task Completion => Source.Completion;
+
     internal override bool TryLinkTo(CompositionInputPort input, out IDisposable? link)
     {
         if (input is not CompositionInputPort<TMessage> typedInput)
@@ -39,7 +43,7 @@ public sealed class CompositionOutputPort<TMessage> : CompositionOutputPort
 
         link = Source.LinkTo(
             typedInput.Target,
-            new DataflowLinkOptions { PropagateCompletion = true });
+            new DataflowLinkOptions { PropagateCompletion = false });
         return true;
     }
 }

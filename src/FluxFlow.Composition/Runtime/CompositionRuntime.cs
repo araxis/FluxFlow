@@ -112,24 +112,43 @@ public sealed class CompositionRuntime : IAsyncDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
 
+        var cleanupExceptions = new List<Exception>();
+
         foreach (var node in Nodes.Reverse())
         {
             try
             {
                 await node.Descriptor.DisposeAsync().ConfigureAwait(false);
             }
-            catch
+            catch (Exception exception)
             {
-                // Node completion/fault is exposed through Completion. Dispose must continue
-                // so every owned node and link gets a teardown attempt.
+                cleanupExceptions.Add(exception);
             }
         }
 
         foreach (var link in _links)
-            link.Dispose();
+        {
+            try
+            {
+                link.Dispose();
+            }
+            catch (Exception exception)
+            {
+                cleanupExceptions.Add(exception);
+            }
+        }
 
         foreach (var link in _diagnosticLinks)
-            link.Dispose();
+        {
+            try
+            {
+                link.Dispose();
+            }
+            catch (Exception exception)
+            {
+                cleanupExceptions.Add(exception);
+            }
+        }
 
         try
         {
@@ -138,6 +157,13 @@ public sealed class CompositionRuntime : IAsyncDisposable
         catch
         {
             // Completion remains the observable failure path.
+        }
+
+        if (cleanupExceptions.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more composition runtime resources failed during disposal.",
+                cleanupExceptions);
         }
     }
 

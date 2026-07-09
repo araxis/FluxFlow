@@ -15,6 +15,10 @@ public abstract class CompositionInputPort
     public string Name { get; }
 
     public Type MessageType { get; }
+
+    internal abstract void Complete();
+
+    internal abstract void Fault(Exception exception);
 }
 
 public sealed class CompositionInputPort<TMessage> : CompositionInputPort
@@ -26,4 +30,9 @@ public sealed class CompositionInputPort<TMessage> : CompositionInputPort
     }
 
     public ITargetBlock<FlowMessage<TMessage>> Target { get; }
+
+    internal override void Complete() => Target.Complete();
+
+    internal override void Fault(Exception exception)
+        => ((IDataflowBlock)Target).Fault(exception);
 }
