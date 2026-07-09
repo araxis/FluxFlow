@@ -5,6 +5,7 @@ using FluxFlow.Components.Http.Options;
 using FluxFlow.Nodes;
 using Shouldly;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
 using Xunit;
@@ -188,6 +189,69 @@ public sealed class HttpClientNodeTests
         response.BodyBytes.Length.ShouldBe(1000);
     }
 
+    [Theory]
+    [InlineData("iso-8859-1")]
+    [InlineData("\"iso-8859-1\"")]
+    public async Task ResponseBody_HonorsDeclaredCharset(string charset)
+    {
+        byte[] bytes = [0xE9];
+        var handler = new StubHandler((_, _) => Respond(
+            HttpStatusCode.OK,
+            bytes,
+            $"text/plain; charset={charset}"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput
+        {
+            Url = "https://example.test/encoded"
+        }));
+
+        var response = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
+        response.Body.ShouldBe("é");
+        response.BodyBytes.ShouldBe(bytes);
+    }
+
+    [Fact]
+    public async Task ResponseBody_InvalidCharsetFallsBackToUtf8()
+    {
+        const string expected = "fallback ✓";
+        var handler = new StubHandler((_, _) => Respond(
+            HttpStatusCode.OK,
+            Encoding.UTF8.GetBytes(expected),
+            "text/plain; charset=not-a-real-charset"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput
+        {
+            Url = "https://example.test/fallback"
+        }));
+
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
+            .Payload.Body.ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task ResponseBody_DecodesStructuredJsonMediaTypeAsUtf8()
+    {
+        const string expected = "{\"message\":\"hello\"}";
+        var handler = new StubHandler((_, _) => Respond(
+            HttpStatusCode.OK,
+            Encoding.UTF8.GetBytes(expected),
+            "application/problem+json"));
+        await using var node = new HttpClientNode(new HttpClient(handler));
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new HttpRequestInput
+        {
+            Url = "https://example.test/problem"
+        }));
+
+        (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
+            .Payload.Body.ShouldBe(expected);
+    }
+
     [Fact]
     public async Task Success_EmitsEventCarryingCorrelationId()
     {
@@ -247,15 +311,20 @@ public sealed class HttpClientNodeTests
     }
 
     private static Task<HttpResponseMessage> Respond(HttpStatusCode status, string body, string? contentType)
+        => Respond(status, Encoding.UTF8.GetBytes(body), contentType);
+
+    private static Task<HttpResponseMessage> Respond(
+        HttpStatusCode status,
+        byte[] body,
+        string? contentType)
     {
         var response = new HttpResponseMessage(status)
         {
-            Content = new ByteArrayContent(Encoding.UTF8.GetBytes(body))
+            Content = new ByteArrayContent(body)
         };
         if (contentType is not null)
         {
-            response.Content.Headers.ContentType =
-                new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            response.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
         }
 
         return Task.FromResult(response);

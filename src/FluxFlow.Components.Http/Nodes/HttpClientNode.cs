@@ -256,7 +256,8 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
             headers[header.Key] = header.Value.ToArray();
         }
 
-        var contentType = response.Content.Headers.ContentType?.ToString();
+        var contentTypeHeader = response.Content.Headers.ContentType;
+        var contentType = contentTypeHeader?.ToString();
 
         return new HttpResponseOutput
         {
@@ -269,7 +270,7 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
             ReasonPhrase = response.ReasonPhrase,
             Headers = headers,
             BodyBytes = bodyBytes,
-            Body = TryDecodeText(bodyBytes, contentType),
+            Body = TryDecodeText(bodyBytes, contentTypeHeader),
             ContentType = contentType,
             ElapsedMilliseconds = Elapsed(startedAt),
             Success = response.IsSuccessStatusCode,
@@ -277,20 +278,46 @@ public sealed class HttpClientNode : FlowNode<HttpRequestInput, HttpResponseOutp
         };
     }
 
-    private static string? TryDecodeText(byte[] bodyBytes, string? contentType)
+    private static string? TryDecodeText(
+        byte[] bodyBytes,
+        MediaTypeHeaderValue? contentType)
     {
-        if (bodyBytes.Length == 0)
-        {
+        if (bodyBytes.Length == 0 || !IsTextual(contentType))
             return null;
+
+        var encoding = ResolveEncoding(contentType?.CharSet);
+        return encoding.GetString(bodyBytes);
+    }
+
+    private static bool IsTextual(MediaTypeHeaderValue? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType?.CharSet))
+            return true;
+
+        var mediaType = contentType?.MediaType;
+        if (string.IsNullOrWhiteSpace(mediaType))
+            return false;
+
+        return mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase)
+            || mediaType.Equals("application/xml", StringComparison.OrdinalIgnoreCase)
+            || mediaType.EndsWith("+xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Encoding ResolveEncoding(string? charset)
+    {
+        if (string.IsNullOrWhiteSpace(charset))
+            return Encoding.UTF8;
+
+        try
+        {
+            return Encoding.GetEncoding(charset.Trim().Trim('"'));
         }
-
-        var isTextual = contentType is not null &&
-            (contentType.Contains("text", StringComparison.OrdinalIgnoreCase) ||
-             contentType.Contains("json", StringComparison.OrdinalIgnoreCase) ||
-             contentType.Contains("xml", StringComparison.OrdinalIgnoreCase) ||
-             contentType.Contains("charset", StringComparison.OrdinalIgnoreCase));
-
-        return isTextual ? Encoding.UTF8.GetString(bodyBytes) : null;
+        catch (ArgumentException)
+        {
+            return Encoding.UTF8;
+        }
     }
 
     private void EmitFailure(
