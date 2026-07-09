@@ -85,7 +85,9 @@ var node = new FlowWindowNode<AppMessage>(
 count, reason). `MaxItems` emits when the window fills; `TimeMilliseconds` emits when the
 open window ages out (timed off the injected clock); when both are set, whichever fires
 first wins. At least one boundary is required. On completion a partial window is emitted by
-default — set `EmitPartialOnCompletion = false` to discard it.
+default — set `EmitPartialOnCompletion = false` to discard it. Timer expiry and
+completion are serialized so a claimed partial window is emitted exactly once when
+both happen concurrently.
 
 ## Correlation
 

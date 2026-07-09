@@ -77,5 +77,8 @@ killing the pump. `Complete()` drains the input and completes the outputs;
   output, not a durable queue or no-loss delivery guarantee. Callback-driven
   sources can keep using nonblocking `Emit`.
 - **Inputs are a bounded buffer**, so a node throttles its own intake.
+- **Source startup honors cancellation**: a pre-canceled `StartAsync` returns a
+  canceled task without consuming the source's one-time start state, so a later
+  uncanceled start can still run it.
 - The kit owns no domain logic and no engine concepts — just the plumbing every
   node shares.

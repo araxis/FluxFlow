@@ -8,7 +8,7 @@ internal sealed class CompositionInputCompletionLink : IDisposable
     private int _finished;
     private int _disposeStarted;
 
-    public CompositionInputCompletionLink(
+    internal CompositionInputCompletionLink(
         CompositionInputPort input,
         IReadOnlyCollection<CompositionOutputPort> upstreams)
     {
@@ -23,7 +23,7 @@ internal sealed class CompositionInputCompletionLink : IDisposable
             .ToArray();
     }
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
             return;

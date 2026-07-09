@@ -1,13 +1,13 @@
 # Current State
 
-Date: 2026-07-03
+Date: 2026-07-09
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/designer-host-model` (stacked on `work/composition-hygiene-pass`).
-  Local `main` was fast-forwarded to the published Designer host layer
-  planning state (`88027c7`); pushing `origin/main` remains an operator step.
+  `fix/runtime-component-reliability`, based on `origin/main` at
+  `6ffc668b8054848f6c8e637005b10bcb4ee96689`. The review fixes and package
+  readiness work remain local; nothing was pushed, tagged, or published.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Current architecture direction: standalone nodes are the default,
@@ -15,6 +15,14 @@ Date: 2026-07-03
   `.Composition` packages own factory registration and optional Designer
   metadata, and `FluxFlow.Engine` remains optional advanced runtime
   infrastructure.
+- Eight repository review findings are fixed across Composition, Engine, Nodes,
+  FileSystem, Timers, Routing, and HTTP. The affected packages are prepared as
+  patch releases (Nodes `1.2.1`, Engine `2.0.3`, Composition `1.2.1`,
+  FileSystem `3.1.3`, Timers `3.1.3`, Routing `3.0.3`, HTTP `3.0.3`). Focused
+  suites, release tests, controlled Debug/Release builds, binary compatibility,
+  release preflight, and local-source package dry-runs passed. Public API
+  baselines and composition adapter versions remain unchanged. See
+  `204-runtime-and-component-review-fixes.md`.
 - Composition adapters now exist for the normal standalone component families:
   HTTP, Mapping, Control, Assertions, Validation, Timers, Sources, Routing,
   Serialization, Payloads, Observability, Projections, Metrics, Expectations,

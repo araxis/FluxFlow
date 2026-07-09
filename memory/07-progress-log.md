@@ -1344,6 +1344,16 @@ Date: 2026-05-31
   creates `interval-2.Output -> putRecord-3.Input`; an output→output drag is
   rejected with the snackbar and not persisted. See
   [[202-designer-renderer-editor-polish]].
+- 2026-07-09: Closed eight runtime/component review findings. Composition now
+  coordinates fan-in completion and aggregates cleanup failures; Engine fanout
+  is bounded and startup cancellation is consistent; confined FileSystem paths
+  reject linked descendants and reads enforce streaming limits; debounce/window
+  timer races emit exactly once; and HTTP honors response charsets. Seven patch
+  versions were prepared locally. Focused suites, release tests (`92`),
+  controlled Debug/Release builds, binary compatibility, release preflight, and
+  all seven local-source package dry-runs passed. No public baseline, adapter
+  version, tag, publication, PR, or merge changed. See
+  [[204-runtime-and-component-review-fixes]].
 
 ## Remaining
 

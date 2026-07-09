@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-05-31
+Date: 2026-07-09
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -439,6 +439,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   Foundation built on `work/fluent-dsl`: linear `From/Then/To/Build` + `Tap`
   fan-out, `FlowGraph` lifecycle, 7 passing tests (30× flake-checked). Branching,
   fan-in, DI/hosting, sample, and package release wiring are the next slices.
+- `204-runtime-and-component-review-fixes.md`: eight reliability fixes across
+  Composition, Engine, Nodes, FileSystem, Timers, Routing, and HTTP, with seven
+  patch-version bumps and complete package-readiness verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

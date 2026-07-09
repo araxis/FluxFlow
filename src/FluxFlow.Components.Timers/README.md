@@ -90,6 +90,8 @@ await delay.Input.SendAsync(FlowMessage.Create(message));
   interval, queuing items through bounded intake instead of dropping them.
 - `TimerDebounceNode<T>` keeps the latest input and emits it after no new input
   arrives for the quiet period; a pending item is flushed when the input completes.
+  Timer expiry and completion are serialized so the pending item is emitted exactly
+  once even when both happen concurrently.
 
 ## Deterministic time
 

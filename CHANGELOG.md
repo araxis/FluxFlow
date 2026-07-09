@@ -7,6 +7,59 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Nodes 1.2.1
+
+Honors pre-canceled source startup without consuming the source start state.
+
+- A later uncanceled `StartAsync` can still start a source after a canceled attempt.
+- No public API declarations changed.
+
+## FluxFlow.Engine 2.0.3
+
+Bounds internal fanout queues and consistently honors startup cancellation.
+
+- Internal error, event, and diagnostic fanout queues reject overflow immediately after 256 pending items while preserving accepted-item order.
+- Application runtimes, workflows, default nodes, and base nodes observe cancellation before startup succeeds or later nodes run.
+- No public API declarations changed.
+
+## FluxFlow.Composition 1.2.1
+
+Corrects shared-input completion and runtime cleanup behavior.
+
+- A composition input with multiple upstreams completes only after every upstream succeeds and faults on the first upstream failure.
+- Runtime disposal attempts every node and link before aggregating cleanup failures.
+- No public API declarations changed.
+
+## FluxFlow.Components.FileSystem 3.1.3
+
+Hardens confined paths and bounded file reads.
+
+- Relative paths confined to a base reject existing descendant symbolic links and reparse points.
+- Limited reads stream no more than `maxBytes + 1`, including when a file grows during the read.
+- No public API declarations changed.
+
+## FluxFlow.Components.Timers 3.1.3
+
+Serializes debounce timer expiry with completion.
+
+- A pending debounce value is emitted exactly once when timer expiry and input completion race.
+- No public API declarations changed.
+
+## FluxFlow.Components.Routing 3.0.3
+
+Serializes timed-window expiry with completion.
+
+- A claimed partial window is emitted exactly once when timer expiry and input completion race.
+- No public API declarations changed.
+
+## FluxFlow.Components.Http 3.0.3
+
+Honors response charset metadata for textual bodies.
+
+- Text, JSON, and XML bodies use supported declared charsets, including quoted values.
+- Missing, invalid, or unsupported charset metadata falls back to UTF-8 while preserving raw body bytes.
+- No public API declarations changed.
+
 ## FluxFlow.Components.Designer 2.17.1
 
 Adds the shared FluxFlow package icon.

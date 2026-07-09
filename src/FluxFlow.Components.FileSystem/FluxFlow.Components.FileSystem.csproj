@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>3.1.2</Version>
+    <Version>3.1.3</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Standalone file system nodes for FluxFlow: file.read and file.write transforms (request in, result out), plus directory.enumerate and file.watch sources. Built on FluxFlow.Nodes with broadcast output/error/event ports. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Rejects linked descendants for confined paths and enforces file read limits while streaming.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

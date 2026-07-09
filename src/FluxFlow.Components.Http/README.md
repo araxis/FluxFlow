@@ -62,6 +62,11 @@ new HttpClientNodeOptions
 greater than zero. `DefaultTimeoutMilliseconds`, when set, must also be greater
 than zero. Invalid options fail fast during node construction.
 
+`BodyBytes` always contains the captured response bytes. `Body` is populated for
+`text/*`, JSON/XML media types (including `+json` and `+xml` suffixes), or content
+with an explicit charset. Supported response charsets are honored, including
+quoted values; missing, invalid, or unsupported charset values fall back to UTF-8.
+
 ## Composition
 
 Building a workflow — reading config, creating nodes, linking them — is a

@@ -136,10 +136,14 @@ Relative paths are resolved under `BaseDirectory` when it is set. Relative paths
 escape the base directory are rejected. Absolute paths are rejected unless
 `AllowAbsolutePaths` is true. When `BaseDirectory` is not set and `AllowAbsolutePaths`
 is false, the current working directory is the implicit base and relative paths that
-escape it are rejected.
+escape it are rejected. Confined relative paths also reject existing descendant
+symbolic links and reparse points; the configured base itself is the trusted root.
+Absolute paths allowed by policy are not subject to that confinement check.
 
 `FileReadOptions.MaxBytes` defaults to 16777216 (16 MiB). Set it higher for larger
-files, or set it explicitly to `null` to keep unlimited reads.
+files, or set it explicitly to `null` to keep unlimited reads. Limited reads stream
+at most `MaxBytes + 1` bytes, so a file that grows while being read cannot bypass the
+configured allocation boundary.
 
 ## Composition
 

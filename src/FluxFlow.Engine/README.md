@@ -21,6 +21,13 @@ Use `FluxFlow.Engine` when a host already depends on:
 If a host only needs to compose standalone nodes from fluent C# or
 `IConfiguration`, use `FluxFlow.Composition` instead.
 
+Runtime and workflow startup check cancellation before each node and before
+entering the running state. A canceled startup stops the affected state
+machines without starting later nodes. Internal error, event, and diagnostic
+fanout queues are bounded to 256 pending items; accepted items remain ordered,
+while producers receive `false` immediately when a slow subscriber causes the
+queue to overflow.
+
 ## Public Surface
 
 The package exposes the engine-era namespaces:

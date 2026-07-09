@@ -4,7 +4,7 @@ internal static class BoundedFileReader
 {
     private const int BufferSize = 81_920;
 
-    public static async Task<BoundedFileReadResult> ReadAsync(
+    internal static async Task<BoundedFileReadResult> ReadAsync(
         Stream stream,
         long? maxBytes,
         CancellationToken cancellationToken = default)

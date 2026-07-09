@@ -46,6 +46,13 @@ optional descriptor cleanup hook. If both fail, the failures are reported
 together so cleanup diagnostics do not hide an adapter-owned resource leak.
 If a build is canceled after nodes or links have been allocated, the runtime
 builder disposes the partially built graph before rethrowing cancellation.
+Multiple outputs may target the same input. Data links do not independently
+complete that shared input; the runtime completes it only after every upstream
+output succeeds, or faults it when the first upstream faults.
+Runtime disposal attempts every node, graph link, and diagnostic link even when
+earlier cleanup fails, then reports cleanup failures together in an
+`AggregateException`. Runtime `Completion` remains the separate node-failure
+observation path.
 
 ## Fluent Composition
 
