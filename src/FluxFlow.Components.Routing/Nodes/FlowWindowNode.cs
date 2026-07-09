@@ -123,20 +123,15 @@ public sealed class FlowWindowNode<TInput> : FlowNode<TInput, FlowWindow<TInput>
     private void OnTimeElapsed(object? state)
     {
         var version = (long)state!;
-        FlowWindow<TInput>? window = null;
-        CorrelationId correlation = default;
         lock (_gate)
         {
             if (version == _windowVersion && _items.Count > 0)
             {
-                correlation = _windowCorrelationId;
-                window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
+                var correlation = _windowCorrelationId;
+                var window = BuildAndClearWindow(FlowWindowEmitReason.Time, _clock.GetUtcNow());
+                if (window is not null)
+                    EmitWindow(window, correlation);
             }
-        }
-
-        if (window is not null)
-        {
-            EmitWindow(window, correlation);
         }
     }
 

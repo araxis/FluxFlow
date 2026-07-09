@@ -112,6 +112,40 @@ public sealed class FlowWindowNodeTests
     }
 
     [Fact]
+    public async Task Window_TimerAndCompletionRaceEmitsPendingWindowExactlyOnce()
+    {
+        for (var iteration = 0; iteration < 50; iteration++)
+        {
+            var clock = new TrackingFakeTimeProvider(DateTimeOffset.UnixEpoch);
+            await using var node = new FlowWindowNode<int>(
+                new WindowRoutingOptions { TimeMilliseconds = 1 },
+                clock);
+            var output = RoutingTestSink.Link(node.Output);
+            var scheduled = clock.NextTimerScheduled;
+            await node.Input.SendAsync(FlowMessage.Create(iteration));
+            await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+            using var barrier = new Barrier(2);
+
+            var advance = Task.Run(() =>
+            {
+                barrier.SignalAndWait();
+                clock.Advance(TimeSpan.FromMilliseconds(1));
+            });
+            var complete = Task.Run(() =>
+            {
+                barrier.SignalAndWait();
+                node.Complete();
+            });
+
+            await Task.WhenAll(advance, complete).WaitAsync(TimeSpan.FromSeconds(30));
+            await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+            var window = (await RoutingTestSink.DrainUntilCompletedAsync(output))
+                .ShouldHaveSingleItem();
+            window.Payload.Items.ShouldBe([iteration]);
+        }
+    }
+
+    [Fact]
     public async Task Window_EmitsEvents()
     {
         await using var node = new FlowWindowNode<int>(

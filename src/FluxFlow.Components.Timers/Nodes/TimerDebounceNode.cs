@@ -74,19 +74,13 @@ public sealed class TimerDebounceNode<TInput> : FlowNode<TInput, TInput>
     private void OnQuietElapsed(object? state)
     {
         var seq = (long)state!;
-        FlowMessage<TInput>? toEmit = null;
         lock (_gate)
         {
             if (seq == _latestSeq && _pending is { } pending)
             {
                 _pending = null;
-                toEmit = pending;
+                EmitLatest(pending);
             }
-        }
-
-        if (toEmit is { } message)
-        {
-            EmitLatest(message);
         }
     }
 

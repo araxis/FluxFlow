@@ -108,6 +108,39 @@ public sealed class TimerDebounceNodeTests
     }
 
     [Fact]
+    public async Task Debounce_TimerAndCompletionRaceEmitsPendingValueExactlyOnce()
+    {
+        for (var iteration = 0; iteration < 50; iteration++)
+        {
+            var clock = new TrackingFakeTimeProvider();
+            await using var node = new TimerDebounceNode<int>(
+                new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(1) },
+                clock);
+            var output = TimerTestSink.Link(node.Output);
+            var scheduled = clock.TimerScheduled;
+            await node.Input.SendAsync(FlowMessage.Create(iteration));
+            await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
+            using var barrier = new Barrier(2);
+
+            var advance = Task.Run(() =>
+            {
+                barrier.SignalAndWait();
+                clock.Advance(TimeSpan.FromMilliseconds(1));
+            });
+            var complete = Task.Run(() =>
+            {
+                barrier.SignalAndWait();
+                node.Complete();
+            });
+
+            await Task.WhenAll(advance, complete).WaitAsync(TimeSpan.FromSeconds(30));
+            await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+            var emitted = await TimerTestSink.DrainUntilCompletedAsync(output);
+            emitted.ShouldHaveSingleItem().Payload.ShouldBe(iteration);
+        }
+    }
+
+    [Fact]
     public async Task Debounce_EmitsEvents()
     {
         await using var node = new TimerDebounceNode<string>(
