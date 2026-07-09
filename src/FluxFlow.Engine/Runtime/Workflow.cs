@@ -37,13 +37,17 @@ public sealed class Workflow(
         BeginStartup();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var group in Nodes.GroupBy(n => n.Phase).OrderBy(g => g.Key))
             {
                 foreach (var node in group)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     await node.Node.StartAsync(cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException)
         {

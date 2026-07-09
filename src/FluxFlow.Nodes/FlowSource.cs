@@ -53,6 +53,9 @@ public abstract class FlowSource<TOutput> : IFlowSource
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
+
         if (Interlocked.Exchange(ref _started, 1) != 0)
         {
             return Task.CompletedTask;

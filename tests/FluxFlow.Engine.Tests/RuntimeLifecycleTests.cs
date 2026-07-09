@@ -298,6 +298,71 @@ public sealed class RuntimeLifecycleTests
     }
 
     [Fact]
+    public async Task ApplicationRuntimeStartAsync_WithPreCanceledTokenStartsNoNodesAndStopsWorkflows()
+    {
+        var first = new TrackingNode();
+        var second = new TrackingNode();
+        var workflow = new Workflow(
+            new WorkflowName("main"),
+            [
+                RuntimeNode.Create(new NodeAddress("main", new NodeName("first")), first, phase: 0),
+                RuntimeNode.Create(new NodeAddress("main", new NodeName("second")), second, phase: 1)
+            ],
+            [],
+            []);
+        var runtime = new ApplicationRuntime([], [workflow], []);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => runtime.StartAsync(cancellation.Token));
+
+        first.Started.ShouldBeFalse();
+        second.Started.ShouldBeFalse();
+        runtime.State.ShouldBe(ApplicationState.Stopped);
+        workflow.State.ShouldBe(WorkflowState.Stopped);
+        await runtime.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task WorkflowStartAsync_WithPreCanceledTokenStartsNoNodesAndStops()
+    {
+        var node = new TrackingNode();
+        var workflow = new Workflow(
+            new WorkflowName("main"),
+            [RuntimeNode.Create(new NodeAddress("main", new NodeName("node")), node)],
+            [],
+            []);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => workflow.StartAsync(cancellation.Token));
+
+        node.Started.ShouldBeFalse();
+        workflow.State.ShouldBe(WorkflowState.Stopped);
+        await workflow.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DefaultAndBaseNodeStartAsync_HonorPreCanceledToken()
+    {
+        IFlowNode defaultNode = new PassiveSourceNode();
+        var baseNode = new PassiveFlowNode();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => defaultNode.StartAsync(cancellation.Token));
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => baseNode.StartAsync(cancellation.Token));
+
+        defaultNode.Complete();
+        baseNode.Complete();
+        (defaultNode as IDisposable)?.Dispose();
+    }
+
+    [Fact]
     public async Task ApplicationRuntimeDisposeAsync_WhenMultiSourceCompletionLinkIsDisposed_DoesNotFaultInput()
     {
         var sink = new CompletionTrackingSinkNode();
@@ -728,6 +793,10 @@ public sealed class RuntimeLifecycleTests
             Complete();
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class PassiveFlowNode : FlowNodeBase
+    {
     }
 
     private sealed class ThrowingDisposeNode : IFlowNode, IDisposable

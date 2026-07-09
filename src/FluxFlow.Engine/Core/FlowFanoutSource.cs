@@ -4,7 +4,11 @@ namespace FluxFlow.Engine.Components;
 
 internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsyncDisposable
 {
-    private readonly BufferBlock<T> _queue = new();
+    private const int DefaultCapacity = 256;
+    private readonly BufferBlock<T> _queue = new(new DataflowBlockOptions
+    {
+        BoundedCapacity = DefaultCapacity
+    });
     private readonly CancellationTokenSource _disposed = new();
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -35,12 +39,10 @@ internal sealed class FlowFanoutSource<T> : ISourceBlock<T>, IDisposable, IAsync
         T item,
         CancellationToken cancellationToken = default)
     {
-        if (Volatile.Read(ref _stopped) != 0)
-        {
-            return Task.FromResult(false);
-        }
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled<bool>(cancellationToken);
 
-        return _queue.SendAsync(item, cancellationToken);
+        return Task.FromResult(Post(item));
     }
 
     public IDisposable LinkTo(

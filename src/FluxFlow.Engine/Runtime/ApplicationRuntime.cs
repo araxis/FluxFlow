@@ -55,11 +55,13 @@ public sealed class ApplicationRuntime(
         foreach (var workflow in Workflows) workflow.BeginStartup();
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var all = Resources.Concat(Workflows.SelectMany(wf => wf.Nodes));
             foreach (var group in all.GroupBy(n => n.Phase).OrderBy(g => g.Key))
             {
                 foreach (var node in group)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     try
                     {
                         await node.Node.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -74,6 +76,8 @@ public sealed class ApplicationRuntime(
                     }
                 }
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException)
         {

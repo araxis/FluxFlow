@@ -28,7 +28,9 @@ public abstract class FlowNodeBase : IFlowNode, IFlowDiagnosticSource
     public ISourceBlock<FlowDiagnostic> Diagnostics => _diagnostics;
 
     public virtual Task StartAsync(CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+        => cancellationToken.IsCancellationRequested
+            ? Task.FromCanceled(cancellationToken)
+            : Task.CompletedTask;
 
     public virtual void Complete()
         => CompleteNode();

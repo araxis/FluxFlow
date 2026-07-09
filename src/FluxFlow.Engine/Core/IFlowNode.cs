@@ -6,5 +6,8 @@ public interface IFlowNode : IDataflowBlock
 {
     FlowNodeId Id { get; }
     ISourceBlock<FlowError> Errors { get; }
-    Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    Task StartAsync(CancellationToken cancellationToken = default)
+        => cancellationToken.IsCancellationRequested
+            ? Task.FromCanceled(cancellationToken)
+            : Task.CompletedTask;
 }

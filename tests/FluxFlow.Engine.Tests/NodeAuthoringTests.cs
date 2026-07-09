@@ -430,6 +430,51 @@ public sealed class NodeAuthoringTests
     }
 
     [Fact]
+    public async Task FlowNodeBase_DiagnosticOverflowRejectsPromptlyAndPreservesAcceptedOrder()
+    {
+        var node = new DiagnosticReportingNode();
+        var diagnostics = new BufferBlock<FlowDiagnostic>(
+            new DataflowBlockOptions { BoundedCapacity = 1 });
+        await diagnostics.SendAsync(new FlowDiagnostic
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Name = "sentinel"
+        });
+        node.Diagnostics.LinkTo(
+            diagnostics,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        var acceptedNames = new List<string>();
+        if (node.Report(0))
+            acceptedNames.Add("node.ready.0");
+
+        await Task.Delay(50);
+        var rejected = 0;
+        for (var value = 1; value <= 300; value++)
+        {
+            if (node.Report(value))
+                acceptedNames.Add($"node.ready.{value}");
+            else
+                rejected++;
+        }
+
+        rejected.ShouldBeGreaterThan(0);
+        (await node.ReportAsync(301).WaitAsync(TimeSpan.FromSeconds(1))).ShouldBeFalse();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => node.ReportAsync(302, cancellation.Token));
+
+        diagnostics.TryReceive(out var sentinel).ShouldBeTrue();
+        sentinel.Name.ShouldBe("sentinel");
+        var receive = ReceiveAllAsync(diagnostics);
+        node.Complete();
+
+        var delivered = await receive.WaitAsync(TimeSpan.FromSeconds(5));
+        delivered.Select(diagnostic => diagnostic.Name).ShouldBe(acceptedNames);
+    }
+
+    [Fact]
     public async Task FlowNodeBase_DiagnosticsCanBeReceivedDirectly()
     {
         var node = new DiagnosticReportingNode();
@@ -486,6 +531,18 @@ public sealed class NodeAuthoringTests
 
     private static System.Text.Json.JsonElement JsonValue<T>(T value)
         => System.Text.Json.JsonSerializer.SerializeToElement(value);
+
+    private static async Task<IReadOnlyList<T>> ReceiveAllAsync<T>(BufferBlock<T> source)
+    {
+        var values = new List<T>();
+        while (await source.OutputAvailableAsync().ConfigureAwait(false))
+        {
+            while (source.TryReceive(out var value))
+                values.Add(value);
+        }
+
+        return values;
+    }
 
     private sealed class SequenceNode : SourceFlowNode<int>
     {
@@ -625,10 +682,10 @@ public sealed class NodeAuthoringTests
 
     private sealed class DiagnosticReportingNode : FlowNodeBase
     {
-        public void Report()
+        public bool Report()
             => Report(1);
 
-        public void Report(int count)
+        public bool Report(int count)
             => TryEmitDiagnostic(
                 $"node.ready.{count}",
                 message: "Node is ready.",
@@ -636,6 +693,16 @@ public sealed class NodeAuthoringTests
                 {
                     ["count"] = count
                 });
+
+        public Task<bool> ReportAsync(int count, CancellationToken cancellationToken = default)
+            => EmitDiagnosticAsync(
+                $"node.ready.{count}",
+                message: "Node is ready.",
+                attributes: new Dictionary<string, object?>
+                {
+                    ["count"] = count
+                },
+                cancellationToken: cancellationToken);
     }
 
     private sealed class EventReportingNode : EventFlowNodeBase

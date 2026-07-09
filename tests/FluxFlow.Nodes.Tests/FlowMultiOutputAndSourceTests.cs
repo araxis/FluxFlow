@@ -66,6 +66,23 @@ public sealed class FlowMultiOutputAndSourceTests
     }
 
     [Fact]
+    public async Task Source_PreCanceledStartDoesNotConsumeStartState()
+    {
+        await using var source = new CountingSource(1);
+        var sink = Sink(source.Output);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => source.StartAsync(cancellation.Token));
+
+        await source.StartAsync();
+        await source.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        sink.TryReceive(out var message).ShouldBeTrue();
+        message.Payload.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Source_EmitAsync_DeliversLatestThroughBoundedOutputAndCompletes()
     {
         await using var source = new BoundedCountingSource();
