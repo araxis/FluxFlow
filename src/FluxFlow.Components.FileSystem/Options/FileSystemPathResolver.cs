@@ -77,7 +77,55 @@ internal static class FileSystemPathResolver
                 $"{policy.NodeType} path escapes {baseDescription}.");
         }
 
+        RejectLinkedDescendants(resolvedBase, resolvedPath, policy, baseDescription);
+
         return resolvedPath;
+    }
+
+    private static void RejectLinkedDescendants(
+        string resolvedBase,
+        string resolvedPath,
+        FileSystemPathPolicy policy,
+        string baseDescription)
+    {
+        var relativePath = Path.GetRelativePath(resolvedBase, resolvedPath);
+        if (relativePath == ".")
+            return;
+
+        var current = resolvedBase;
+        foreach (var segment in relativePath.Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            FileAttributes attributes;
+            try
+            {
+                attributes = File.GetAttributes(current);
+            }
+            catch (FileNotFoundException)
+            {
+                break;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                break;
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+            {
+                throw new FileSystemPathResolutionException(
+                    policy.InvalidPathCode,
+                    $"{policy.NodeType} could not validate the path under {baseDescription}: {exception.Message}",
+                    exception);
+            }
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new FileSystemPathResolutionException(
+                    policy.InvalidPathCode,
+                    $"{policy.NodeType} path contains a symbolic link or reparse point under {baseDescription}.");
+            }
+        }
     }
 
     private static bool IsUnderBaseDirectory(string baseDirectory, string path)

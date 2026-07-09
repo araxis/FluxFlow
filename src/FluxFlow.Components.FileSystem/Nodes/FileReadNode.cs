@@ -87,41 +87,27 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
 
         try
         {
-            var fileInfo = new FileInfo(resolved.Path);
-            if (!fileInfo.Exists)
+            await using var stream = new FileStream(resolved.Path, new FileStreamOptions
             {
-                ReportReadError(
-                    FileSystemErrorCodes.FileReadNotFound,
-                    $"file.read could not find '{request.Path}'.",
-                    message,
-                    resolvedPath: resolved.Path);
-                return;
-            }
-
-            if (ExceedsMaxBytes(fileInfo.Length))
-            {
-                ReportReadError(
-                    FileSystemErrorCodes.FileReadTooLarge,
-                    $"file.read file '{request.Path}' exceeds maxBytes.",
-                    message,
-                    resolvedPath: resolved.Path,
-                    bytesRead: fileInfo.Length);
-                return;
-            }
-
-            var bytes = await File.ReadAllBytesAsync(resolved.Path, Stopping).ConfigureAwait(false);
-            if (ExceedsMaxBytes(bytes.LongLength))
+                Mode = FileMode.Open,
+                Access = FileAccess.Read,
+                Share = FileShare.Read,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+            });
+            var read = await BoundedFileReader.ReadAsync(stream, _options.MaxBytes, Stopping)
+                .ConfigureAwait(false);
+            if (read.LimitExceeded)
             {
                 ReportReadError(
                     FileSystemErrorCodes.FileReadTooLarge,
                     $"file.read file '{request.Path}' exceeds maxBytes.",
                     message,
                     resolvedPath: resolved.Path,
-                    bytesRead: bytes.LongLength);
+                    bytesRead: read.BytesRead);
                 return;
             }
 
-            var result = CreateResult(request, resolved, bytes);
+            var result = CreateResult(request, resolved, read.Bytes);
 
             // Carry the correlation id forward onto the result.
             Emit(message.With(result));
@@ -283,9 +269,6 @@ public sealed class FileReadNode : FlowNode<FileReadRequest, FileReadResult>
         => string.IsNullOrWhiteSpace(request.Encoding)
             ? _options.DefaultEncoding
             : request.Encoding;
-
-    private bool ExceedsMaxBytes(long byteCount)
-        => _options.MaxBytes.HasValue && byteCount > _options.MaxBytes.Value;
 
     private static void ValidateDefaultEncoding(string defaultEncoding)
     {

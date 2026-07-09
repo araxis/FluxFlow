@@ -23,4 +23,7 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FluxFlow.Components.FileSystem.Tests" />
+  </ItemGroup>
 </Project>
