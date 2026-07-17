@@ -448,6 +448,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `206-vnext-data-foundation-api-review.md`: requirement-by-requirement public
   API review, negative-path hardening, verification evidence, and acceptance of
   the foundation before canonical Composition work.
+- `207-vnext-composition-definition-addressing.md`: canonical flat Composition
+  application definitions, strict deterministic JSON/config loading, shared
+  ordinal addressing, versioning, verification, and the link-compiler handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

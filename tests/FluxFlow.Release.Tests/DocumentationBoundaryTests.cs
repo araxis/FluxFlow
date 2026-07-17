@@ -6,33 +6,33 @@ namespace FluxFlow.Release.Tests;
 public sealed class DocumentationBoundaryTests
 {
     [Fact]
-    public void Definition_docs_keep_composition_definition_as_the_default_model()
+    public void Definition_docs_lead_with_canonical_composition_application_model()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "02-definitions-and-links.md");
         var text = File.ReadAllText(document);
-        var defaultSection = text[..Math.Min(text.Length, 1_200)];
+        var defaultSection = text[..Math.Min(text.Length, 1_600)];
 
+        defaultSection.Contains("FluxFlow.Composition.Model.ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("definition docs should lead with the canonical Composition application model.");
         defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
-            .ShouldBeTrue("definition docs should lead with the composition definition model.");
-        defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
-            .ShouldBeFalse("definition docs must not lead with the optional engine definition model.");
+            .ShouldBeFalse("definition docs must not lead with the legacy runtime definition model.");
 
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Definition", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var legacyRuntimeSectionIndex = text.IndexOf("## Legacy Runtime Definition", StringComparison.Ordinal);
+        legacyRuntimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "definition docs should keep engine definitions in an explicitly optional section.");
+            "definition docs should keep the current executable DTO in an explicitly legacy section.");
 
-        var fluentBuilderIndex = text.IndexOf("CompositionDefinitionBuilder", StringComparison.Ordinal);
-        fluentBuilderIndex.ShouldBeInRange(
+        var canonicalLoaderIndex = text.IndexOf("ApplicationDefinitionConfigurationLoader", StringComparison.Ordinal);
+        canonicalLoaderIndex.ShouldBeInRange(
             0,
-            optionalEngineSectionIndex,
-            "definition docs should show the fluent composition builder before optional engine APIs.");
+            legacyRuntimeSectionIndex,
+            "definition docs should show canonical loading before legacy runtime APIs.");
 
-        var engineDefinitionIndex = text.IndexOf("ApplicationDefinition", StringComparison.Ordinal);
-        engineDefinitionIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "ApplicationDefinition should only appear after the optional engine definition heading.");
+        var legacyDefinitionIndex = text.IndexOf("CompositionDefinition", StringComparison.Ordinal);
+        legacyDefinitionIndex.ShouldBeGreaterThan(
+            legacyRuntimeSectionIndex,
+            "CompositionDefinition should only appear after the legacy runtime heading.");
     }
 
     [Fact]
@@ -184,29 +184,29 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Json_docs_keep_composition_json_as_the_default_path()
+    public void Json_docs_lead_with_canonical_composition_json()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "09-json-conversion.md");
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_400)];
 
-        defaultSection.Contains("CompositionConfigurationLoader", StringComparison.Ordinal)
-            .ShouldBeTrue("JSON docs should lead with composition configuration loading.");
-        defaultSection.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
-            .ShouldBeTrue("JSON docs should show composition serializer options before optional engine APIs.");
+        defaultSection.Contains("FluxFlow.Composition.Model.ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("JSON docs should lead with the canonical Composition model.");
         defaultSection.Contains("ApplicationDefinitionJson", StringComparison.Ordinal)
-            .ShouldBeFalse("JSON docs must not lead with optional engine JSON APIs.");
+            .ShouldBeTrue("JSON docs should show the canonical serializer before compatibility APIs.");
+        defaultSection.Contains("CompositionDefinitionJson", StringComparison.Ordinal)
+            .ShouldBeFalse("JSON docs must not lead with legacy runtime JSON APIs.");
 
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine JSON", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var legacyRuntimeSectionIndex = text.IndexOf("## Legacy Runtime JSON", StringComparison.Ordinal);
+        legacyRuntimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "JSON docs should keep engine JSON in an explicitly optional section.");
+            "JSON docs should keep compatibility JSON in an explicitly legacy section.");
 
-        var engineJsonIndex = text.IndexOf("ApplicationDefinitionJson", StringComparison.Ordinal);
-        engineJsonIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "ApplicationDefinitionJson should only appear after the optional engine JSON heading.");
+        var legacyJsonIndex = text.IndexOf("CompositionDefinitionJson", StringComparison.Ordinal);
+        legacyJsonIndex.ShouldBeGreaterThan(
+            legacyRuntimeSectionIndex,
+            "CompositionDefinitionJson should only appear after the legacy runtime JSON heading.");
     }
 
     [Fact]

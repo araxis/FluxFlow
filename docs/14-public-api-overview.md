@@ -81,6 +81,27 @@ FluxFlow.Composition
 
 Main types:
 
+- `FluxFlow.Composition.Model.ApplicationDefinition`
+- `FluxFlow.Composition.Model.WorkflowDefinition`
+- `FluxFlow.Composition.Model.ComponentDefinition`
+- `FluxFlow.Composition.Model.ResourceDefinition`
+- `FluxFlow.Composition.Model.ResourceGroupDefinition`
+- `FluxFlow.Composition.Model.ResourceInstanceDefinition`
+- `FluxFlow.Composition.Model.ApplicationDefinitionJson`
+- `FluxFlow.Composition.Addressing.ApplicationAddress`
+- `FluxFlow.Composition.Addressing.ApplicationAddressKind`
+- `ApplicationDefinitionConfigurationLoader`
+
+The vNext canonical document is immutable and has exactly two case-sensitive
+root objects: `Resources` and `Workflows`. Resource groups form nested address
+namespaces and resource leaves require `Type`; workflows directly contain flat
+component objects that also require `Type`. `ApplicationAddress` represents
+resource paths, absolute workflow ports, local port resolution, and the
+reserved system event/diagnostic outputs with ordinal equality.
+
+The following types remain the current executable composition compatibility
+surface while runtime binding migrates to the canonical model:
+
 - `CompositionDefinition`
 - `WorkflowDefinition`
 - `NodeDefinition`
@@ -102,7 +123,7 @@ Main types:
 - `ICompositionDefinitionSource`
 - `ICompositionReloadPlanner`
 
-Use these types when the host wants direct standalone-node composition from
+Use the compatibility types when the host wants direct standalone-node composition from
 fluent C# or `IConfiguration` JSON without depending on the engine. Definition
 DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.

@@ -3,15 +3,16 @@
 Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
-It does not claim that the definition, runtime-update, or MQTT phases are
-implemented yet.
+The data foundation and canonical definition/address phases are implemented
+locally. Link compilation, runtime updates, and MQTT redesign remain pending.
 
 ## Package Ownership
 
 - `FluxFlow.Data` owns transport-neutral values, content, and result contracts.
 - `FluxFlow.Nodes` owns `FlowMessage<T>` and standalone Dataflow node plumbing.
-- `FluxFlow.Composition` will own the canonical application document, address
-  resolver, binding, link normalization, and static validation.
+- `FluxFlow.Composition` owns the canonical application document and address
+  resolver. Binding, link normalization, and canonical static validation are
+  the next bounded Composition milestones.
 - `FluxFlow.Engine` will execute compiled compositions and own stable ports,
   direct port interaction, runtime revisions, system events, and diagnostics.
 - `FluxFlow.Composition.Hosting` will own definition sources, DI provider
@@ -21,7 +22,7 @@ implemented yet.
   library types and own those library-specific lifetimes.
 
 The existing public definition models in Composition and Engine overlap. The
-new flat definition will be introduced in Composition. Engine's duplicate
+new flat definition is introduced in Composition. Engine's duplicate
 definition model is removed only in an Engine major release, after a legacy
 reader exists and the canonical Composition model is proven.
 
@@ -42,16 +43,19 @@ reader exists and the canonical Composition model is proven.
 - Expected operation failures are data on the normal output, not a universal
   error port.
 
-## Planned Definition Boundary
+## Definition Boundary
 
 The canonical document has exactly `Resources` and `Workflows` at the root.
 Workflow objects directly contain components. Resource groups are namespace
 objects without `Type`; resource leaves require `Type`. Component settings,
 resource references, and port links are flat properties.
 
-One ordinal, case-sensitive dot-address resolver will handle local workflow
-ports, absolute workflow ports, nested resources, system streams, runtime APIs,
-Designer persistence, and keyed DI names. Names containing dots are invalid.
+`FluxFlow.Composition.Model` now implements this document boundary, and
+`FluxFlow.Composition.Addressing.ApplicationAddress` implements the shared
+ordinal, case-sensitive address value for local workflow ports, absolute
+workflow ports, nested resources, and system streams. Runtime APIs, Designer
+persistence, and keyed DI will adopt the same value in later milestones. Names
+containing dots are invalid.
 
 Links may be declared once on either an input or output property as a string,
 an array, or an object containing `Port` and optional `Condition`. Metadata
@@ -74,9 +78,9 @@ introduced.
 
 ## Delivery Sequence
 
-1. Data, envelope identity, and result contracts.
-2. Canonical Composition definitions and addressing.
-3. Link normalization and condition compilation.
+1. Data, envelope identity, and result contracts. Complete locally.
+2. Canonical Composition definitions and addressing. Complete locally.
+3. Link normalization and condition compilation. Next.
 4. Stable ports and direct send/receive/observe APIs.
 5. Fault isolation, system events, and diagnostics.
 6. DI resource snapshots and transactional revisions.

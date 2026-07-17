@@ -1,14 +1,24 @@
 # FluxFlow.Composition
 
-Optional standalone-first composition for `FluxFlow.Nodes`.
+Canonical application definitions and standalone-first composition for
+`FluxFlow.Nodes`.
 
-Use this package when a host wants to build a workflow from fluent C# or
-`Microsoft.Extensions.Configuration` JSON while keeping component packages free
-of `FluxFlow.Engine`.
+Use this package for the vNext flat application document and shared address
+model. The package also retains the current fluent/config runtime DTOs while
+runtime binding migrates to the canonical model. Component packages remain
+free of `FluxFlow.Engine`.
 
 ## Boundary
 
-`FluxFlow.Composition` owns:
+The vNext boundary owns:
+
+- immutable application, workflow, component, and resource definitions
+- strict deterministic JSON with exactly `Resources` and `Workflows`
+- nested resource namespaces and flat component/resource settings
+- one ordinal, case-sensitive application address value
+- direct root or named-section `IConfiguration` loading
+
+The current runtime compatibility boundary also owns:
 
 - composition DTOs: workflows, nodes, links, and port references
 - explicit node type to factory registration
@@ -18,9 +28,65 @@ of `FluxFlow.Engine`.
 - direct typed Dataflow linking
 - runtime start, stop, completion, event/error aggregation, and disposal
 
-It does not own broker clients, stores, secrets, resource registration, file
-watching, YAML, live reload, assembly scanning, reflection discovery, or engine
+It does not yet compile canonical link properties into a runtime. It also does
+not own broker clients, stores, secrets, resource registration, file watching,
+YAML, live reload, assembly scanning, reflection discovery, or engine
 projection.
+
+## Canonical Definition
+
+The canonical document has exactly two case-sensitive root objects. Resource
+groups omit `Type`; resource leaves and workflow components require it.
+
+```json
+{
+  "Resources": {
+    "Messaging": {
+      "Broker1": {
+        "Type": "sample.broker",
+        "Host": "localhost"
+      },
+      "Client1": {
+        "Type": "sample.client",
+        "Broker": "Resources.Messaging.Broker1"
+      }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "Source": {
+        "Type": "sample.source"
+      },
+      "Sink": {
+        "Type": "sample.sink",
+        "Input": "Source.Output"
+      }
+    }
+  }
+}
+```
+
+```csharp
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Model;
+
+var definition = ApplicationDefinitionJson.Deserialize(json);
+var absolute = ApplicationAddress.ResolvePort("Sink.Input", "Orders");
+var fromConfiguration = new ApplicationDefinitionConfigurationLoader()
+    .Load(configuration, "Application");
+```
+
+Names and addresses are exact and case-sensitive. Workflow port addresses use
+`Workflow.Component.Port`; local references use `Component.Port`; resources
+use `Resources.Group.Resource`. `System.Events.Output` and
+`System.Diagnostics.Output` are reserved system addresses. The canonical
+serializer sorts names and nested object properties for deterministic output.
+
+Link-shaped component properties are preserved as JSON in this milestone but
+are not interpreted by the current runtime. Direction inference, condition
+compilation, and canonical link validation belong to the next milestone.
+
+## Legacy Runtime Definition
 
 Definition DTO collection properties copy assigned dictionaries and lists with
 ordinal key comparison. A host can still intentionally edit the model before
@@ -92,9 +158,9 @@ await runtime.StartAsync();
 await runtime.Completion;
 ```
 
-## Configuration Shape
+## Legacy Configuration Shape
 
-The default loader reads `FluxFlow:Composition`:
+The existing runtime loader reads `FluxFlow:Composition`:
 
 ```json
 {

@@ -28,6 +28,19 @@ Introduces the vNext message envelope identity model.
   hop identity and recording the parent message as causation.
 - This is an intentional major-version public contract change.
 
+## FluxFlow.Composition 2.0.0
+
+Introduces the canonical vNext application document and address contracts.
+
+- Adds immutable `FluxFlow.Composition.Model` definitions with exactly
+  `Resources` and `Workflows` at the document root.
+- Adds strict, deterministic JSON and `IConfiguration` loading for flat
+  component settings and nested resource namespaces.
+- Adds one ordinal, case-sensitive address type for nested resources, local or
+  absolute workflow ports, and reserved system output streams.
+- Keeps the existing composition runtime DTOs temporarily available as a
+  migration surface; canonical link compilation is a later milestone.
+
 ## FluxFlow.Nodes 1.2.1
 
 Honors pre-canceled source startup without consuming the source start state.

@@ -2,6 +2,23 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext Composition definition and addressing
+
+- Added immutable canonical application, workflow, component, resource-group,
+  and resource-instance definitions with exactly `Resources` and `Workflows`.
+- Added strict deterministic JSON, root/named-section configuration loading,
+  and one ordinal address type for resources, workflow ports, local port
+  resolution, and reserved system outputs.
+- Kept current runtime DTOs available as an explicit legacy migration surface;
+  canonical link properties are preserved but not compiled in this milestone.
+- Moved Composition to `2.0.0`, documented the public contract, and accepted
+  the reviewed source-declaration baseline change from 155 to 210 declarations.
+- Passed 101 Composition tests, 17 Hosting tests, 93 release tests, the complete
+  Release test sweep, controlled Debug/Release builds, binary compatibility
+  against published `1.2.0`, release preflight, and an isolated net8 consumer
+  dry-run from a temporary local dependency source.
+- Link normalization and condition compilation are the next bounded milestone.
+
 ## 2026-07-17 - vNext data foundation
 
 - Added Dataflow-free `FluxFlow.Data` `1.0.0` with immutable `FlowValue`,

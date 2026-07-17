@@ -1,189 +1,192 @@
 # Definitions And Links
 
-The default definition model is `CompositionDefinition`. Fluent builders and
-`IConfiguration` JSON both produce this DTO before validation, node creation, and
-linking.
+The canonical vNext definition is
+`FluxFlow.Composition.Model.ApplicationDefinition`. It is an immutable
+application document with exactly two case-sensitive root objects:
+`Resources` and `Workflows`.
 
-## Composition Shape
-
-```csharp
-public sealed record CompositionDefinition
-{
-    public Dictionary<string, WorkflowDefinition> Workflows { get; init; }
-}
-
-public sealed record WorkflowDefinition
-{
-    public Dictionary<string, NodeDefinition> Nodes { get; init; }
-    public List<LinkDefinition> Links { get; init; }
-}
-```
-
-- `Workflows` are named standalone-node graphs.
-- `WorkflowDefinition.Nodes` maps node names to `NodeDefinition`.
-- `WorkflowDefinition.Links` connects named output ports to named input ports.
-
-## Node Shape
-
-`NodeDefinition` contains:
-
-- `Type`: the registered composition node type string.
-- `Configuration`: node-specific options as JSON values.
-- `Resources`: local resource slots mapped to host-owned keyed resources.
-
-Example:
+## Canonical Shape
 
 ```json
 {
-  "type": "storage.put",
-  "configuration": {
-    "defaultCollection": "orders"
+  "Resources": {
+    "Messaging": {
+      "Broker1": {
+        "Type": "sample.broker",
+        "Host": "localhost"
+      },
+      "Client1": {
+        "Type": "sample.client",
+        "Broker": "Resources.Messaging.Broker1"
+      }
+    }
   },
-  "resources": {
-    "store": "primary"
-  }
-}
-```
-
-Composition records resource names only. The host or adapter package owns the
-actual client, store, secret, clock, connection, or expression engine.
-
-## Link Shape
-
-Links are explicit `from` and `to` port references:
-
-```json
-{
-  "from": "source.Output",
-  "to": "sink.Input"
-}
-```
-
-Appsettings-style composition configuration keeps links in the workflow:
-
-```json
-{
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "source": {
-              "type": "source.sequence",
-              "configuration": {
-                "count": 3
-              }
-            },
-            "sink": {
-              "type": "storage.put",
-              "resources": {
-                "store": "primary"
-              }
-            }
-          },
-          "links": [
-            { "from": "source.Output", "to": "sink.Input" }
-          ]
-        }
+  "Workflows": {
+    "Orders": {
+      "Source": {
+        "Type": "sample.source",
+        "Count": 3
+      },
+      "Sink": {
+        "Type": "sample.sink",
+        "Input": "Source.Output"
       }
     }
   }
 }
 ```
 
-The fluent builder creates the same model:
+The document rules are deliberately narrow:
+
+- both root sections are required and no other root property is allowed
+- workflows and resource groups are objects keyed by exact names
+- workflow objects contain components directly
+- resource groups omit `Type`; resource leaves require a string `Type`
+- components require a string `Type`
+- component and resource settings are direct properties
+- `Configuration`, per-component `Resources`, `Nodes`, and `Links` wrappers are
+  not part of the canonical shape
+- names use ordinal, case-sensitive comparison and cannot contain dots or
+  surrounding whitespace
+- `Resources` and `System` are reserved workflow names; `Type` is reserved in
+  resource maps
+
+The model copies caller-owned collections into immutable ordinal dictionaries
+and clones retained `JsonElement` values. Mutating an input dictionary or
+disposing its source `JsonDocument` cannot change a built definition.
+
+## Model Types
+
+```csharp
+using FluxFlow.Composition.Model;
+
+var application = new ApplicationDefinition(
+    resources:
+    [
+        new("Messaging", new ResourceGroupDefinition(
+        [
+            new("Broker1", new ResourceInstanceDefinition("sample.broker"))
+        ]))
+    ],
+    workflows:
+    [
+        new("Orders", new WorkflowDefinition(
+        [
+            new("Source", new ComponentDefinition("sample.source"))
+        ]))
+    ]);
+```
+
+`ResourceDefinition` is a closed resource shape with
+`ResourceGroupDefinition` and `ResourceInstanceDefinition` variants. Groups
+hold child resources; instances hold `Type` and flat properties.
+
+## JSON And Configuration
+
+`ApplicationDefinitionJson` is the authoritative strict reader and
+deterministic writer:
+
+```csharp
+var definition = ApplicationDefinitionJson.Deserialize(json);
+var canonicalJson = ApplicationDefinitionJson.Serialize(definition);
+```
+
+Writing always emits `Resources` before `Workflows`, sorts resource, workflow,
+component, and property names ordinally, and recursively sorts nested JSON
+object properties. Array order remains unchanged. Duplicate JSON properties
+are rejected, including duplicates inside retained option values.
+
+`ApplicationDefinitionConfigurationLoader` can load the canonical model from
+an `IConfiguration` root or an explicitly named host section:
+
+```csharp
+var rootDefinition = new ApplicationDefinitionConfigurationLoader()
+    .Load(configuration);
+
+var hostedDefinition = new ApplicationDefinitionConfigurationLoader()
+    .Load(configuration, "Application");
+```
+
+Configuration providers flatten JSON and cannot retain every lexical detail.
+Use `ApplicationDefinitionJson` when exact JSON shape and duplicate-property
+detection are required at the source boundary.
+
+## Address Rules
+
+`FluxFlow.Composition.Addressing.ApplicationAddress` is the shared ordinal,
+case-sensitive address value.
+
+| Target | Form | Example |
+|---|---|---|
+| Nested resource | `Resources.Group.Resource` | `Resources.Messaging.Client1` |
+| Absolute workflow port | `Workflow.Component.Port` | `Orders.Source.Output` |
+| Local workflow port | `Component.Port` | `Source.Output` |
+| System events | reserved absolute address | `System.Events.Output` |
+| System diagnostics | reserved absolute address | `System.Diagnostics.Output` |
+
+Local references require a workflow context:
+
+```csharp
+var input = ApplicationAddress.ResolvePort("Sink.Input", "Orders");
+var output = ApplicationAddress.Parse("Orders.Source.Output");
+var resource = ApplicationAddress.Parse("Resources.Messaging.Client1");
+```
+
+Addresses reject blank segments, surrounding whitespace, ambiguous resource
+references used as ports, and unrecognized `System` paths. Equality and hashing
+are ordinal, so `Orders.Source.Output` and `orders.Source.Output` are distinct.
+
+## Planned Link Properties
+
+Port properties may retain the agreed link-shaped JSON while link compilation
+is developed in the next milestone:
+
+```json
+{
+  "Type": "sample.sink",
+  "Input": [
+    "Source.Output",
+    {
+      "Port": "Other.Source.Output",
+      "Condition": "value != null"
+    }
+  ]
+}
+```
+
+The canonical model only preserves these properties today. It does not yet
+infer port direction, normalize links, compile conditions, or build a runtime
+from them. The next Composition milestone will add those behaviors using node
+port metadata and this same address contract.
+
+## Legacy Runtime Definition
+
+The existing executable Composition runtime still accepts
+`CompositionDefinition`, `WorkflowDefinition`, `NodeDefinition`, and
+`LinkDefinition` in the `FluxFlow.Composition` namespace. Its fluent builder
+and `CompositionConfigurationLoader` continue to use the earlier
+`workflows`/`nodes`/`links` shape during migration:
 
 ```csharp
 var definition = CompositionDefinitionBuilder
     .Create()
     .Workflow("main", workflow => workflow
-        .Node("source", "source.sequence", node => node
-            .Configure("count", 3))
-        .Node("sink", "storage.put", node => node
-            .Resource("store", "primary"))
+        .Node("source", "source.sequence")
+        .Node("sink", "storage.put")
         .Link("source.Output", "sink.Input"))
     .Build();
 ```
 
-## Reference Rules
-
-Inside a workflow, short port references use `node.port`:
-
-```text
-source.Output
-```
-
-Cross-workflow references use `workflow.node.port`:
-
-```text
-main.source.Output
-```
-
-Node references use the same rule without the port:
-
-```text
-source
-main.source
-```
-
-References are trimmed and cannot contain empty segments. Port references must
-use either two segments (`node.port`) or three segments (`workflow.node.port`).
-
-## Validation And Build
-
-`CompositionValidator` validates the definition against a
-`CompositionNodeRegistry` before the runtime is linked. It catches:
-
-- empty definitions, workflows, node names, and node types
-- unknown node types
-- missing source or target nodes
-- missing input or output ports when registration metadata exposes them
-- duplicate links
-- port type mismatches when registration metadata exposes message types
-
-`CompositionRuntimeBuilder` then creates node instances, validates descriptor
-ports, links the graph, and cleans up created nodes if build fails.
-
-## Configuration Loading
-
-`CompositionConfigurationLoader` reads `FluxFlow:Composition` by default:
-
-```csharp
-var definition = new CompositionConfigurationLoader().Load(configuration);
-```
-
-Use `CompositionDefinitionJson.CreateSerializerOptions()` when serializing or
-deserializing `CompositionDefinition`, `WorkflowDefinition`, `NodeDefinition`,
-`LinkDefinition`, `NodeReference`, or `PortReference` values directly.
-
-## Conditions And Routing
-
-Composition links are structural connections. They do not own inline `when`
-expressions in v1. Use normal standalone nodes for conditional behavior:
-
-- `flow.filter` to drop rejected messages.
-- `flow.when` to split true/false branches.
-- `flow.switch` to route by a host-owned selector.
-- `flow.mapper` to shape messages before routing.
-
-This keeps link wiring simple and leaves expression engines, context factories,
-and selectors as host-owned resources.
+Do not project new persisted application documents into this legacy shape by
+default. A later bounded milestone will bind the canonical model to runtime
+registrations and provide migration guidance before legacy declarations are
+removed.
 
 ## Optional Engine Definition
 
-`FluxFlow.Engine` still uses `ApplicationDefinition` for the older executable
-runtime:
-
-```csharp
-public sealed record ApplicationDefinition
-{
-    public Dictionary<string, NodeDefinition> Resources { get; init; }
-    public Dictionary<string, WorkflowDefinition> Workflows { get; init; }
-}
-```
-
-Engine JSON stores input-port links as extension properties on the node and can
-use inline `when` conditions. Use `ApplicationDefinitionJson` and the engine
-validation/build APIs only when a host intentionally chooses that runtime path.
+`FluxFlow.Engine` also retains its older executable `ApplicationDefinition`.
+It is not the canonical persistence or addressing model and will be removed in
+the next appropriate Engine major after the Composition model is proven and a
+legacy reader exists.
 
 Next: [Node Authoring](03-node-authoring.md).

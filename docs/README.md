@@ -3,7 +3,8 @@
 FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
 values, content, and result contracts, then start node authoring with
 `FluxFlow.Nodes`; add
-`FluxFlow.Composition` when you want fluent C# or `IConfiguration` JSON to build
+`FluxFlow.Composition` for the canonical application document and addressing,
+or when you need the current fluent/config runtime compatibility layer to build
 and link standalone nodes. Add `FluxFlow.Composition.Hosting` when a .NET host
 should build/start the composition through DI and resolve adapter-owned keyed
 resources. Use `FluxFlow.Engine` only when the older `ApplicationDefinition`
@@ -47,5 +48,6 @@ runtime is the right fit for a host.
 19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
 20. [Flow Data Contracts](20-flow-data-contracts.md)
 
-Pages 2 and later still describe engine-era APIs where named. Treat those as
-optional advanced runtime guidance, not the default component-package contract.
+Legacy Composition or Engine runtime APIs are labeled where they remain during
+the vNext migration. Treat those as compatibility guidance, not the canonical
+application-document contract.
