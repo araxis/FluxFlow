@@ -1,6 +1,8 @@
 # FluxFlow Docs
 
-FluxFlow is standalone-node-first. Start with `FluxFlow.Nodes`; add
+FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
+values, content, and result contracts, then start node authoring with
+`FluxFlow.Nodes`; add
 `FluxFlow.Composition` when you want fluent C# or `IConfiguration` JSON to build
 and link standalone nodes. Add `FluxFlow.Composition.Hosting` when a .NET host
 should build/start the composition through DI and resolve adapter-owned keyed
@@ -42,6 +44,8 @@ runtime is the right fit for a host.
 16. [Migration 0.5 To 0.6](16-migration-0.5-to-0.6.md)
 17. [Component Coverage Matrix](17-component-coverage-matrix.md)
 18. [Designer Host Layer](18-designer-host-layer.md)
+19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
+20. [Flow Data Contracts](20-flow-data-contracts.md)
 
 Pages 2 and later still describe engine-era APIs where named. Treat those as
 optional advanced runtime guidance, not the default component-package contract.

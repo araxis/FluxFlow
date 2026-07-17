@@ -7,18 +7,22 @@
     <PackageId>FluxFlow.Nodes</PackageId>
     <AssemblyName>FluxFlow.Nodes</AssemblyName>
     <RootNamespace>FluxFlow.Nodes</RootNamespace>
-    <Version>1.2.1</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Minimal base for FluxFlow nodes: a self-contained TPL Dataflow processor with a buffered input and broadcast output/error/event ports. Nodes built on it run standalone — no engine required.</Description>
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Honors pre-canceled source startup without consuming the source start state.</PackageReleaseNotes>
+    <PackageReleaseNotes>Introduces strong trace, message, and causation identities plus immutable FlowValue headers for the vNext envelope.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- On net10 Dataflow ships inbox; keep the explicit ref for net8 compat -->

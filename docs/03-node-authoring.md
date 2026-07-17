@@ -9,7 +9,7 @@ engine, registry, or runtime is required.
 
 | Type | Use |
 |------|-----|
-| `FlowMessage<T>` | Immutable message envelope with payload, correlation id, message id, timestamp, and headers. |
+| `FlowMessage<T>` | Immutable message envelope with payload, business correlation, graph trace, hop/causation identity, timestamp, and `FlowValue` headers. |
 | `FlowNode<TInput,TOutput>` | Single-input, single-output processor with `Input`, `Output`, `Events`, `Errors`, and `Completion`. |
 | `FlowSource<TOutput>` | Source node with `Output`, `Events`, `Errors`, `Completion`, and `StartAsync()`. |
 | `IFlowNode` | Lifecycle contract for complete, fault, completion, and async disposal. |

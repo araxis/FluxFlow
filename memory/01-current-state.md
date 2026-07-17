@@ -1,15 +1,27 @@
 # Current State
 
-Date: 2026-07-09
+Date: 2026-07-17
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `fix/runtime-component-reliability`, based on `origin/main` at
-  `6ffc668b8054848f6c8e637005b10bcb4ee96689`. The review fixes and package
-  readiness work remain local; nothing was pushed, tagged, or published.
+  `work/data-foundation-vnext`. The first bounded vNext data-foundation
+  milestone is implemented locally and has passed foundation API review.
+  Nothing from this milestone was pushed, tagged, published, merged, or opened
+  as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
+- Added Dataflow-free `FluxFlow.Data` `1.0.0` for immutable `FlowValue`,
+  `FlowContent` and codecs, and result/error contracts. `FluxFlow.Nodes` is now
+  `2.0.0` and its `FlowMessage<T>` envelope uses strong trace/message identity,
+  causation, and immutable `FlowValue` headers. The manifest contains 58
+  packages. Controlled Debug/Release builds, the complete Release test sweep,
+  package creation, release preflight, and isolated consumer dry-runs passed.
+  The reviewed foundation is ready for a separately bounded canonical
+  Composition definition/address milestone. Runtime/DI revisions, component
+  migration, diagnostics, and MQTT remain deferred. See
+  `205-vnext-data-foundation.md` and
+  `206-vnext-data-foundation-api-review.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

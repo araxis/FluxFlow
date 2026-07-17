@@ -7,6 +7,27 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Data 1.0.0
+
+Introduces the transport-neutral data foundation for the FluxFlow vNext line.
+
+- Adds deeply immutable `FlowValue` values with distinct numeric kinds,
+  structural equality, and deterministic lossless canonical JSON.
+- Adds `FlowContent` with exact ingress-byte retention, lazy thread-safe decode,
+  cached decode failures, and explicit exact/suffix/family codec selection.
+- Adds workflow-friendly `IFlowResult`, `FlowResult<T>`, and `FlowError`
+  contracts for expected failures on normal component outputs.
+
+## FluxFlow.Nodes 2.0.0
+
+Introduces the vNext message envelope identity model.
+
+- Adds strong `TraceId` and `MessageId` value types plus nullable causation.
+- Changes headers to immutable ordinal `FlowValue` values.
+- `With(...)` preserves correlation, trace, and headers while creating a new
+  hop identity and recording the parent message as causation.
+- This is an intentional major-version public contract change.
+
 ## FluxFlow.Nodes 1.2.1
 
 Honors pre-canceled source startup without consuming the source start state.

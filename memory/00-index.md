@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-07-09
+Date: 2026-07-17
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -442,6 +442,12 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `204-runtime-and-component-review-fixes.md`: eight reliability fixes across
   Composition, Engine, Nodes, FileSystem, Timers, Routing, and HTTP, with seven
   patch-version bumps and complete package-readiness verification.
+- `205-vnext-data-foundation.md`: first vNext foundation milestone covering
+  FlowValue, FlowContent/codecs, FlowMessage identity, result conventions,
+  package boundaries, and verification before the API-review gate.
+- `206-vnext-data-foundation-api-review.md`: requirement-by-requirement public
+  API review, negative-path hardening, verification evidence, and acceptance of
+  the foundation before canonical Composition work.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

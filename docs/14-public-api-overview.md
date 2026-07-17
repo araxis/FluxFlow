@@ -2,6 +2,7 @@
 
 FluxFlow's default public surface is standalone-node-first:
 
+- `FluxFlow.Data` for transport-neutral values, content, and result contracts.
 - `FluxFlow.Nodes` for node authoring.
 - `FluxFlow.Composition` for fluent/config composition of standalone nodes.
 - `FluxFlow.Engine` for the optional advanced engine runtime.
@@ -9,6 +10,31 @@ FluxFlow's default public surface is standalone-node-first:
 The release tests maintain a lightweight public API baseline for package source
 declarations. Treat baseline changes as a prompt to review package versioning,
 changelog entries, and documentation before accepting the new public surface.
+
+## Data Foundation
+
+Namespace:
+
+```text
+FluxFlow.Data
+```
+
+Main types:
+
+- `FlowValue` and `FlowValueKind`
+- `FlowValueCanonicalJson`
+- `FlowContent`
+- `IFlowContentCodec`
+- `FlowContentCodecCatalog`
+- `FlowContentCodecRegistration`
+- `IFlowResult`
+- `FlowResult<T>`
+- `FlowError`
+
+Use `FlowValue` when a component needs transport-neutral dynamic content and
+`FlowContent` when exact ingress bytes and content metadata must remain
+available alongside lazy structured decoding. These contracts do not depend on
+Dataflow, composition, hosting, or a component family.
 
 ## Node Kit
 
@@ -22,6 +48,8 @@ Main types:
 
 - `FlowMessage<T>`
 - `CorrelationId`
+- `TraceId`
+- `MessageId`
 - `FlowNode<TInput,TOutput>`
 - `FlowNodeOptions`
 - `FlowSource<TOutput>`
@@ -38,9 +66,10 @@ parallelism values when assigned. `FlowSourceOptions` lets source nodes opt into
 bounded broadcast output and awaitable output-block acceptance while sources
 that do not pass options keep the original unbounded broadcast behavior. It
 allows `UnboundedOutputCapacity` and validates other output capacities when
-assigned. `FlowMessage<T>` headers and `FlowEvent` attributes copy assigned
-dictionaries with ordinal key comparison, keeping broadcast envelopes and
-diagnostics stable after creation.
+assigned. `FlowMessage<T>` separates business correlation, graph trace,
+per-hop identity, and causation. Its headers are immutable ordinal `FlowValue`
+entries. `FlowEvent` attributes continue to copy assigned dictionaries with
+ordinal key comparison.
 
 ## Composition
 

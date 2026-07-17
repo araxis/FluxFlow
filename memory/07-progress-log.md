@@ -2,6 +2,35 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext data foundation
+
+- Added Dataflow-free `FluxFlow.Data` `1.0.0` with immutable `FlowValue`,
+  deterministic canonical JSON, lazy codec-driven `FlowContent`, and shared
+  success/error result contracts.
+- Updated `FluxFlow.Nodes` to `2.0.0`; `FlowMessage<T>` now carries strong trace
+  and message identities, causation, and immutable `FlowValue` headers.
+- Added architecture and contract records, package/solution wiring, tests,
+  changelog entries, and reviewed public API baseline changes.
+- Passed 24 Data tests, 39 Nodes tests, 92 release tests, the complete Release
+  test sweep, controlled Debug/Release builds, package creation, and release
+  preflight and isolated consumer dry-runs for Data and Nodes.
+- Stopped at the foundation API-review gate. Configuration, runtime/DI,
+  component migration, diagnostics, and MQTT work remain separate milestones.
+
+## 2026-07-17 - vNext data foundation API review
+
+- Audited package boundaries, every required `FlowValue` kind and invariant,
+  `FlowContent` codec/encoding/cache behavior, message identity propagation,
+  result semantics, JSON contracts, and major-version impact.
+- Added culture-independent literal snapshots, invalid-content and numeric
+  failure regressions, encoding precedence coverage, timestamp coverage, and a
+  release guard for the dependency-free Data package boundary.
+- Passed 32 Data tests, 41 Nodes tests, 93 release tests, the complete Release
+  solution test sweep, controlled Debug/Release builds, release preflight, and
+  isolated net8 package consumer dry-runs.
+- Accepted the foundation API. Canonical Composition definitions and addressing
+  are now unblocked as the next separately planned milestone.
+
 ## 2026-06-05 - Component design metadata providers
 
 - Added package-owned `IComponentDesignMetadataProvider` implementations for

@@ -17,17 +17,24 @@ configuration-driven node composition.
 
 ## Messages
 
-Every message travels in a `FlowMessage<T>` envelope: a strongly-typed
-`CorrelationId` + the `Payload` (plus a per-hop `MessageId`, `Timestamp`, and a
-`Headers` bag). It's immutable, so a broadcast can hand the same instance to many
-consumers. Transform the payload with `With`, which keeps the correlation id and
-headers — so correlation flows through a graph with no node copying it by hand.
-Assigned header dictionaries are copied with ordinal key comparison, so later
-caller mutations cannot change an existing envelope.
+Every message travels in a `FlowMessage<T>` envelope. `CorrelationId` identifies
+the business exchange, `TraceId` identifies one source delivery through the
+graph, `MessageId` identifies the current hop, and nullable `CausationId` points
+to the parent hop. Headers are immutable ordinal `FlowValue` entries from
+`FluxFlow.Data`.
+
+Transform the payload with `With`. It preserves correlation, trace, and headers,
+creates a new message id and timestamp, and records the source message id as
+causation. Assigned header dictionaries are copied, so later caller mutations
+cannot change an existing envelope.
 
 ```csharp
-var message = FlowMessage.Create("hello");        // mints a CorrelationId
-var next    = message.With(message.Payload.Length); // same id, new payload
+var message = FlowMessage.Create("hello");
+var next = message.With(message.Payload.Length);
+
+Debug.Assert(next.CorrelationId == message.CorrelationId);
+Debug.Assert(next.TraceId == message.TraceId);
+Debug.Assert(next.CausationId == message.MessageId);
 ```
 
 `CorrelationId` is a guarded value type (non-empty) and serializes as a bare JSON

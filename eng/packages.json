@@ -1,5 +1,12 @@
 [
   {
+    "alias": "data",
+    "tagPrefix": "data",
+    "packageId": "FluxFlow.Data",
+    "project": "src/FluxFlow.Data/FluxFlow.Data.csproj",
+    "notesName": "FluxFlow.Data"
+  },
+  {
     "alias": "nodes",
     "tagPrefix": "nodes",
     "packageId": "FluxFlow.Nodes",
