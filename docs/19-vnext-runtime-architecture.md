@@ -3,9 +3,9 @@
 Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
-The data foundation, canonical definition/address, and link compilation phases
-are implemented locally. Stable runtime ports, runtime updates, and MQTT
-redesign remain pending.
+The data foundation, canonical definition/address, link compilation, and stable
+port phases are implemented locally. System diagnostics, runtime updates, and
+MQTT redesign remain pending.
 
 ## Package Ownership
 
@@ -54,9 +54,9 @@ resource references, and port links are flat properties.
 `FluxFlow.Composition.Model` now implements this document boundary, and
 `FluxFlow.Composition.Addressing.ApplicationAddress` implements the shared
 ordinal, case-sensitive address value for local workflow ports, absolute
-workflow ports, nested resources, and system streams. Runtime APIs, Designer
-persistence, and keyed DI will adopt the same value in later milestones. Names
-containing dots are invalid.
+workflow ports, nested resources, and system streams. Engine stable-port APIs
+now use the same value. Designer persistence and keyed DI will adopt it in later
+milestones. Names containing dots are invalid.
 
 Links may be declared once on either an input or output property as a string,
 an array, or an object containing exact `Port` and optional `Condition` names.
@@ -66,6 +66,36 @@ condition string once per activation, and validates exact types, duplicates,
 explicit single-link claims, and cycles. Engine-owned system streams supply
 their payload metadata to the compiler rather than creating an Engine
 dependency in Composition.
+
+## Stable Port Runtime
+
+`FluxFlow.Engine.Ports` owns additive address-stable input mailboxes and output
+broadcast hubs. Hosts register exact payload types with
+`ApplicationPortRuntimeBuilder`, attach component
+`ITargetBlock<FlowMessage<T>>` and `ISourceBlock<FlowMessage<T>>` instances
+behind those addresses, and activate `CompiledApplicationLink` values without
+reparsing definitions or recompiling conditions.
+
+Input intake reports accepted, full, unavailable, and completed states without
+waiting for component capacity. During replacement, the dispatcher pauses,
+allows a message already claimed by the old target to finish, swaps the target,
+then sends stable-mailbox work to the new target. A stale attachment lease
+cannot detach a newer revision. Rejected target delivery retains the claimed
+message for a later attachment.
+
+Outputs broadcast each message to all compiled links, one-shot receives, and
+bounded observations. Link conditions receive `input`, `payload`, and `message`
+variables. Condition exceptions, full or unavailable targets, source faults,
+and overflowing observations are isolated from siblings and reported through a
+bounded best-effort rejection stream. Source completion only detaches that
+source; it never completes the stable output or shared downstream input.
+
+`SendAsync`, `ReceiveAsync`, `ObserveAsync`, and `SendAndReceiveAsync` use the
+same canonical addresses. Receive and observation do not steal workflow data;
+request/reply installs a `TraceId` waiter before input acceptance. Expected
+availability and timeout states are result values while caller cancellation is
+still cancellation. The rejection stream is a milestone-local precursor, not
+the final system-event or diagnostics model.
 
 ## Runtime Updates
 
@@ -85,8 +115,8 @@ introduced.
 1. Data, envelope identity, and result contracts. Complete locally.
 2. Canonical Composition definitions and addressing. Complete locally.
 3. Link normalization and condition compilation. Complete locally.
-4. Stable ports and direct send/receive/observe APIs. Next.
-5. Fault isolation, system events, and diagnostics.
+4. Stable ports and direct send/receive/observe APIs. Complete locally.
+5. Fault isolation, system events, and diagnostics. Next.
 6. DI resource snapshots and transactional revisions.
 7. MQTT as the first complete resource/component/adapter vertical slice.
 8. Remaining component families, Designer, hosting, and coordinated releases.

@@ -1153,6 +1153,40 @@ factories unless a package later exposes actual standalone node behavior.
 that a host can author nodes, load executable definitions, build a runtime, and
 observe lifecycle state without depending on internal runtime details.
 
+## Canonical Stable Ports
+
+Namespace:
+
+```text
+FluxFlow.Engine.Ports
+```
+
+Main types:
+
+- `ApplicationPortRuntimeBuilder`
+- `ApplicationPortRuntime`
+- `ApplicationPortMetadata`
+- `PortSendResult`
+- `PortReceiveResult<T>`
+- `PortObserveResult<T>`
+- `PortObservation<T>`
+- `PortRequestResult<T>`
+- `ApplicationPortRejection`
+
+This additive vNext surface uses
+`FluxFlow.Composition.Addressing.ApplicationAddress` and
+`FluxFlow.Nodes.FlowMessage<T>`. Stable bounded input mailboxes and output
+broadcast hubs remain addressable while component targets and sources are
+replaced. Direct receive and observation are broadcast subscribers, not
+competing consumers. `Connect(...)` activates a statically compiled canonical
+link with isolated condition and target failures. Expected full, unavailable,
+completed, and timeout states are result values; caller cancellation remains a
+canceled operation.
+
+The bounded `Rejections` stream records port-local delivery failures. Full
+system events, diagnostics, DI revisions, and hosted activation are separate
+later milestones.
+
 ## Hosting
 
 Namespace:

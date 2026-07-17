@@ -13,6 +13,7 @@ The stable engine surface includes:
 - public types in `FluxFlow.Engine`
 - public types in `FluxFlow.Engine.Components`
 - public types in `FluxFlow.Engine.Definitions`
+- public types in `FluxFlow.Engine.Ports`
 - public types in `FluxFlow.Engine.Runtime`
 - executable definition JSON shape
 - validation and runtime build error codes
@@ -52,6 +53,8 @@ Minor releases may include:
 - new overloads
 - new definition fields with safe defaults
 - additive lifecycle or observation features
+- additive canonical runtime surfaces that do not alter the established
+  definition runtime
 
 Minor releases should avoid changing defaults that existing definitions depend
 on.

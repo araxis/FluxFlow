@@ -2,6 +2,28 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext stable port runtime
+
+- Added additive Engine stable input mailboxes and output broadcast hubs over
+  canonical addresses and `FlowMessage<T>`, with explicit typed registration,
+  compiled-link activation, and generation-safe target/source attachment.
+- Added direct send, receive, bounded observe, and trace-correlated
+  request/reply APIs. Expected capacity, availability, completion, and timeout
+  states are results; address/type mistakes remain programming errors.
+- Isolated condition failures, target rejection/full state, source faults, and
+  observation overflow while preserving sibling fan-out and shared-input
+  lifetime. Added a bounded best-effort rejection stream as a precursor to full
+  system events and diagnostics.
+- Moved Engine to additive `2.1.0`, documented the new namespace, and accepted
+  the reviewed Engine baseline change from 407 to 503 declarations without
+  altering the legacy definition runtime.
+- Passed 77 Engine, 116 Composition, 17 Hosting, and 93 Release tests; the
+  complete Release solution sweep; controlled Debug/Release builds; binary
+  compatibility against local Engine `2.0.3`; release preflight; an isolated
+  package dry-run; and a compiled/executed net8 stable-port API consumer.
+- Isolated runtime status, `System.Events.Output`, and
+  `System.Diagnostics.Output` are the next bounded milestone.
+
 ## 2026-07-17 - vNext Composition link compilation
 
 - Added canonical link parsing for string, object, and mixed-array declarations

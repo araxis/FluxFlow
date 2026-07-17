@@ -44,6 +44,21 @@ next Engine milestone.
 - Adds optional host-supplied system-output type metadata so Engine-owned
   streams participate in exact type validation without an Engine dependency.
 
+## FluxFlow.Engine 2.1.0
+
+Adds the canonical vNext stable-port runtime without changing the established
+Engine definition runtime.
+
+- Adds bounded address-owned input mailboxes and output broadcast hubs over
+  canonical `ApplicationAddress` and `FlowMessage<T>` contracts.
+- Adds generation-safe component input/output attachment and activation of
+  precompiled canonical links with exact payload-type validation.
+- Adds direct send, receive, bounded observe, and trace-correlated request/reply
+  APIs with explicit availability, capacity, completion, and timeout results.
+- Isolates condition, target, source, and observation failures so one consumer
+  cannot stop sibling fan-out, and exposes a bounded best-effort rejection
+  stream for those outcomes.
+
 ## FluxFlow.Composition 2.0.0
 
 Introduces the canonical vNext application document and address contracts.

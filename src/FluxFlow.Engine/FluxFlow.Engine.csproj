@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Engine</PackageId>
     <AssemblyName>FluxFlow.Engine</AssemblyName>
     <RootNamespace>FluxFlow.Engine</RootNamespace>
-    <Version>2.0.3</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, host-provided expression routing, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Bounds internal diagnostic fanout and consistently honors startup cancellation before nodes run.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical stable ports with isolated fan-out and direct send, receive, observe, and request/reply APIs.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -29,7 +29,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
+    <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

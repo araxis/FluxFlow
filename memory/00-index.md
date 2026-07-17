@@ -455,6 +455,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
   parsing, absolute normalization, compile-once conditions, exact metadata/type
   validation, duplicate/exclusive/cycle diagnostics, and the stable-port
   runtime handoff.
+- `209-vnext-stable-port-runtime.md`: Engine-owned bounded stable input
+  mailboxes, output broadcast hubs, revision-safe attachment, compiled-link
+  activation, direct port APIs, package verification, and the system-stream
+  handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
