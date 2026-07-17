@@ -12,6 +12,8 @@ internal interface IApplicationInputPort
 
     Task Completion { get; }
 
+    ApplicationPortStatus GetStatus();
+
     void Complete();
 
     void Abort();
@@ -26,6 +28,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     private readonly SemaphoreSlim _attachmentGate = new(1, 1);
     private readonly CancellationTokenSource _abort = new();
     private readonly Action<ApplicationPortRejection> _report;
+    private readonly Action<ApplicationPortActivity> _activity;
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _pump;
@@ -41,11 +44,13 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     public ApplicationInputPort(
         ApplicationAddress address,
         int capacity,
-        Action<ApplicationPortRejection> report)
+        Action<ApplicationPortRejection> report,
+        Action<ApplicationPortActivity> activity)
     {
         Address = address;
         Capacity = capacity;
         _report = report;
+        _activity = activity;
         _availableCapacity = new SemaphoreSlim(capacity, capacity);
         _pump = PumpAsync();
     }
@@ -83,12 +88,48 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             {
                 _queue.Enqueue(message);
                 Pulse();
-                return CreateSendResult(PortSendStatus.Accepted);
+                status = PortSendStatus.Accepted;
             }
         }
 
-        Report(status, message, source);
+        if (status == PortSendStatus.Accepted)
+        {
+            _activity(new ApplicationPortActivity(
+                DateTimeOffset.UtcNow,
+                ApplicationPortActivityKind.InputAccepted,
+                Address,
+                source,
+                message.CorrelationId,
+                message.TraceId,
+                message.MessageId));
+        }
+        else
+        {
+            Report(status, message, source);
+        }
+
         return CreateSendResult(status);
+    }
+
+    public ApplicationPortStatus GetStatus()
+    {
+        lock (_gate)
+        {
+            return new ApplicationPortStatus
+            {
+                Address = Address,
+                Direction = ApplicationPortDirection.Input,
+                PayloadType = typeof(T),
+                Capacity = Capacity,
+                PendingMessages = _aborted ? 0 : Capacity - _availableCapacity.CurrentCount,
+                ActiveAttachments = _target is null ? 0 : 1,
+                Availability = _completeRequested || _aborted
+                    ? ApplicationPortAvailability.Completed
+                    : _target is null
+                        ? ApplicationPortAvailability.Unavailable
+                        : ApplicationPortAvailability.Available
+            };
+        }
     }
 
     public async ValueTask<IAsyncDisposable> AttachAsync(
@@ -150,6 +191,20 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                 _paused = false;
                 Pulse();
             }
+
+            _ = target.Completion.ContinueWith(
+                static (task, state) =>
+                {
+                    var completion = (TargetCompletion)state!;
+                    completion.Owner.HandleTargetCompletion(
+                        completion.Target,
+                        completion.Generation,
+                        task);
+                },
+                new TargetCompletion(this, target, generation),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
 
             return new InputAttachment(this, generation);
         }
@@ -228,7 +283,6 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                                 while (_queue.TryDequeue(out var queued))
                                     terminalDrops.Add(queued);
 
-                                _completion.TrySetResult();
                             }
                             else
                             {
@@ -267,8 +321,11 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
                     if (terminalDrops is not null)
                     {
+                        if (terminalDrops.Count > 0)
+                            _availableCapacity.Release(terminalDrops.Count);
                         foreach (var dropped in terminalDrops)
                             Report(PortSendStatus.Completed, dropped, source: null);
+                        _completion.TrySetResult();
                         return;
                     }
 
@@ -382,6 +439,40 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         }
     }
 
+    private void HandleTargetCompletion(
+        ITargetBlock<FlowMessage<T>> target,
+        long generation,
+        Task completion)
+    {
+        Exception? failure = null;
+        lock (_gate)
+        {
+            if (_aborted ||
+                generation != _generation ||
+                !ReferenceEquals(_target, target))
+            {
+                return;
+            }
+
+            _target = null;
+            failure = completion.IsFaulted
+                ? completion.Exception?.GetBaseException() ?? completion.Exception
+                : null;
+            Pulse();
+        }
+
+        if (failure is not null)
+        {
+            _report(new ApplicationPortRejection
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                Port = Address,
+                Reason = ApplicationPortRejectionReason.ComponentFaulted,
+                Exception = failure
+            });
+        }
+    }
+
     private void Report(
         PortSendStatus status,
         FlowMessage<T> message,
@@ -400,6 +491,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             Timestamp = DateTimeOffset.UtcNow,
             Port = Address,
             RelatedPort = source,
+            CorrelationId = message.CorrelationId,
             TraceId = message.TraceId,
             MessageId = message.MessageId,
             Reason = reason
@@ -444,4 +536,9 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                 await owner.DetachAsync(generation).ConfigureAwait(false);
         }
     }
+
+    private sealed record TargetCompletion(
+        ApplicationInputPort<T> Owner,
+        ITargetBlock<FlowMessage<T>> Target,
+        long Generation);
 }

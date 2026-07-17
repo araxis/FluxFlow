@@ -459,6 +459,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   mailboxes, output broadcast hubs, revision-safe attachment, compiled-link
   activation, direct port APIs, package verification, and the system-stream
   handoff.
+- `210-vnext-system-events-diagnostics.md`: canonical bounded system-event and
+  best-effort diagnostic outputs, isolated component failures, runtime/port
+  status snapshots, standard .NET instrumentation, and the DI-snapshot handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

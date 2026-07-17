@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext system events, diagnostics, and status
+
+- Added the reserved `System.Events.Output` and `System.Diagnostics.Output`
+  stable outputs plus exact compiler metadata. Reliable system events are
+  ordered/backpressured; best-effort diagnostics reject overflow immediately.
+- Added transport-safe event/diagnostic records, component/link failure
+  mapping, recursion guards, runtime/port status snapshots, and isolated
+  `ILogger`, `ActivitySource`, `Meter`, and `DiagnosticSource` integration.
+- Unexpected component source/target faults now detach only that attachment and
+  leave the application runtime active; normal completion drains accepted
+  system records before closing the reserved outputs.
+- Passed 92 Engine, 116 Composition, 17 Hosting, and 93 Release tests, including
+  deterministic signal JSON contracts; 1,911 Release tests across the complete
+  solution; controlled Debug/Release builds; package compatibility/preflight/
+  dry-run; and a package-only net8 API consumer. Full evidence is recorded in
+  [[210-vnext-system-events-diagnostics]].
+- Keyed DI resource/provider snapshots are the next bounded milestone;
+  transactional revisions and MQTT remain separate later stages.
+
 ## 2026-07-17 - vNext stable port runtime
 
 - Added additive Engine stable input mailboxes and output broadcast hubs over

@@ -44,6 +44,21 @@ next Engine milestone.
 - Adds optional host-supplied system-output type metadata so Engine-owned
   streams participate in exact type validation without an Engine dependency.
 
+## FluxFlow.Engine 2.2.0
+
+Adds canonical runtime status and the two reserved Engine signal outputs.
+
+- Registers exact `ApplicationSystemEvent` and `ApplicationDiagnostic` payload
+  metadata for `System.Events.Output` and `System.Diagnostics.Output`.
+- Adds bounded ordered system-event publication with asynchronous backpressure,
+  plus bounded best-effort diagnostic publication with immediate overflow.
+- Maps lifecycle, link, port, and isolated component-fault activity into normal
+  `FlowMessage<T>` streams without introducing Error or State ports.
+- Adds runtime and per-port status snapshots and keeps spontaneous component
+  source/target faults local to the affected attachment.
+- Integrates accepted diagnostics with `ILogger`, `ActivitySource`, `Meter`, and
+  `DiagnosticSource` while isolating host observability failures.
+
 ## FluxFlow.Engine 2.1.0
 
 Adds the canonical vNext stable-port runtime without changing the established

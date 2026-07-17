@@ -5,9 +5,10 @@ Date: 2026-07-17
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/stable-port-runtime-vnext`. The canonical stable-port runtime milestone
-  is implemented and verified locally. Nothing from the vNext milestones was
-  pushed, tagged, published, merged, or opened as a pull request.
+  `work/runtime-system-streams-vnext`. The canonical runtime system-event,
+  diagnostic, and status milestone is implemented and verified locally.
+  Nothing from the vNext milestones was pushed, tagged, published, merged, or
+  opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Added Dataflow-free `FluxFlow.Data` `1.0.0` for immutable `FlowValue`,
@@ -18,7 +19,7 @@ Date: 2026-07-17
   package creation, release preflight, and isolated consumer dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, and link-compilation milestones. Runtime/DI revisions, component
-  migration, diagnostics, and MQTT remain deferred. See
+  migration, DI snapshots, runtime revisions, and MQTT remain deferred. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.1.0` locally with immutable canonical
@@ -33,16 +34,17 @@ Date: 2026-07-17
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.1.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.2.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
-  result contracts, and bounded rejection reporting. Focused Engine,
-  Composition, Hosting, and release tests passed, as did the complete Release
-  test sweep, controlled Debug/Release builds, API compatibility against local
-  Engine `2.0.3`, package preflight/dry-run, and a package-only consumer of the
-  new API. See `209-vnext-stable-port-runtime.md`. The next bounded gate is the
-  isolated runtime status, `SystemEvents`, and `Diagnostics` stage; DI snapshot
-  publication and runtime revisions remain later milestones.
+  result contracts, bounded rejection reporting, canonical system-event and
+  diagnostic outputs, component-fault isolation, and runtime/port status
+  snapshots. Accepted diagnostics integrate with standard .NET logging,
+  activity, metric, and diagnostic-source surfaces. Focused Engine,
+  Composition, Hosting, and release tests passed; complete build, package, and
+  consumer evidence is recorded in `209-vnext-stable-port-runtime.md` and
+  `210-vnext-system-events-diagnostics.md`. The next bounded gate is keyed DI
+  resource/provider snapshots; transactional runtime revisions remain later.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

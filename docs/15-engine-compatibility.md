@@ -15,6 +15,7 @@ The stable engine surface includes:
 - public types in `FluxFlow.Engine.Definitions`
 - public types in `FluxFlow.Engine.Ports`
 - public types in `FluxFlow.Engine.Runtime`
+- public types in `FluxFlow.Engine.Signals`
 - executable definition JSON shape
 - validation and runtime build error codes
 - runtime lifecycle states

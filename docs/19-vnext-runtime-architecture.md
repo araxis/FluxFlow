@@ -3,9 +3,9 @@
 Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
-The data foundation, canonical definition/address, link compilation, and stable
-port phases are implemented locally. System diagnostics, runtime updates, and
-MQTT redesign remain pending.
+The data foundation, canonical definition/address, link compilation, stable
+port, and system-signal phases are implemented locally. DI snapshots, runtime
+updates, and MQTT redesign remain pending.
 
 ## Package Ownership
 
@@ -94,8 +94,36 @@ source; it never completes the stable output or shared downstream input.
 same canonical addresses. Receive and observation do not steal workflow data;
 request/reply installs a `TraceId` waiter before input acceptance. Expected
 availability and timeout states are result values while caller cancellation is
-still cancellation. The rejection stream is a milestone-local precursor, not
-the final system-event or diagnostics model.
+still cancellation. The rejection stream remains a bounded low-level audit
+surface beneath the canonical event and diagnostic streams.
+
+## System Events, Diagnostics, And Status
+
+The stable runtime automatically owns the two reserved canonical outputs.
+`System.Events.Output` carries `ApplicationSystemEvent` and
+`System.Diagnostics.Output` carries `ApplicationDiagnostic`; both remain normal
+`FlowMessage<T>` streams and use the same compiled-link and direct-access paths
+as component outputs.
+
+System-event publication is bounded, ordered, and backpressured. Accepted
+events are drained during normal completion before the system output closes.
+Link-condition, target, and component source/target faults are mapped to
+workflow-friendly events without exposing exceptions in the payload. A failure
+originating from a system stream is not recursively republished into that same
+stream.
+
+Diagnostics are bounded and best effort. Input acceptance, output emission,
+request timing, rejected delivery, and system-event subscriber failure produce
+diagnostic records; overflow rejects immediately without blocking workflow
+processing. Accepted records integrate with `ILogger`, `ActivitySource`,
+`Meter`, and `DiagnosticSource`, and host-provider exceptions are contained.
+
+`ApplicationRuntimeStatus` snapshots runtime state and per-port availability,
+pending count, and active attachment count. It does not introduce a State port.
+An unexpected component source or target fault marks only that attachment
+unavailable and leaves the runtime active. Resource/revision event categories
+are defined for later transactional-update stages, but no DI provider or
+revision behavior is added here.
 
 ## Runtime Updates
 
@@ -116,8 +144,8 @@ introduced.
 2. Canonical Composition definitions and addressing. Complete locally.
 3. Link normalization and condition compilation. Complete locally.
 4. Stable ports and direct send/receive/observe APIs. Complete locally.
-5. Fault isolation, system events, and diagnostics. Next.
-6. DI resource snapshots and transactional revisions.
+5. Fault isolation, system events, and diagnostics. Complete locally.
+6. DI resource snapshots and transactional revisions. Next.
 7. MQTT as the first complete resource/component/adapter vertical slice.
 8. Remaining component families, Designer, hosting, and coordinated releases.
 

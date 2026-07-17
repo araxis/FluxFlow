@@ -1183,9 +1183,49 @@ link with isolated condition and target failures. Expected full, unavailable,
 completed, and timeout states are result values; caller cancellation remains a
 canceled operation.
 
-The bounded `Rejections` stream records port-local delivery failures. Full
-system events, diagnostics, DI revisions, and hosted activation are separate
-later milestones.
+The bounded `Rejections` stream records port-local delivery failures. Canonical
+system events and diagnostics are described below. DI revisions and hosted
+activation remain separate later milestones.
+
+## Canonical Runtime Signals
+
+Namespace:
+
+```text
+FluxFlow.Engine.Signals
+```
+
+Main types:
+
+- `ApplicationSystemEvent`
+- `ApplicationSystemEventCategory`
+- `ApplicationSystemEventNames`
+- `SystemEventPublishResult`
+- `ApplicationDiagnostic`
+- `ApplicationDiagnosticKind`
+- `ApplicationDiagnosticLevel`
+- `ApplicationDiagnosticNames`
+- `ApplicationRuntimeInstrumentation`
+
+`ApplicationPortRuntimeBuilder` automatically registers
+`System.Events.Output` as `ApplicationSystemEvent` and
+`System.Diagnostics.Output` as `ApplicationDiagnostic`.
+`ApplicationPortRuntimeBuilder.SystemOutputs` supplies their exact metadata to
+the canonical link compiler.
+
+`PublishSystemEventAsync` applies bounded asynchronous backpressure and keeps
+accepted events ordered. `TryPublishDiagnostic` is bounded best effort and
+returns `false` immediately on overflow. Both streams use `FlowMessage<T>` as
+the only trace, correlation, message, and causation authority. Events and
+diagnostics therefore remain normal workflow data without duplicating envelope
+identity in their payloads.
+
+`ApplicationRuntimeStatus` and `ApplicationPortStatus` are snapshots exposed by
+the stable-port runtime; they are not a universal State port. Runtime failures,
+port activity, and direct request timing are mapped into system events or
+diagnostics. Accepted diagnostics integrate with standard `ILogger`,
+`ActivitySource`, `Meter`, and `DiagnosticSource` providers, with host-provider
+exceptions isolated from runtime processing.
 
 ## Hosting
 

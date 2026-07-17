@@ -104,7 +104,8 @@ public enum ApplicationPortRejectionReason
     ConditionFailed = 4,
     TargetRejected = 5,
     ObservationOverflowed = 6,
-    SourceFaulted = 7
+    SourceFaulted = 7,
+    ComponentFaulted = 8
 }
 
 public sealed record ApplicationPortRejection
@@ -114,6 +115,8 @@ public sealed record ApplicationPortRejection
     public required ApplicationAddress Port { get; init; }
 
     public ApplicationAddress? RelatedPort { get; init; }
+
+    public CorrelationId? CorrelationId { get; init; }
 
     public TraceId? TraceId { get; init; }
 

@@ -14,6 +14,8 @@ internal interface IApplicationOutputPort
 
     Task Completion { get; }
 
+    ApplicationPortStatus GetStatus();
+
     IDisposable Connect(IApplicationInputPort input, CompiledApplicationLink link);
 
     void Complete();
@@ -26,6 +28,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     private readonly object _gate = new();
     private readonly BufferBlock<FlowMessage<T>> _ingress;
     private readonly Action<ApplicationPortRejection> _report;
+    private readonly Action<ApplicationPortActivity> _activity;
     private readonly List<OutputLink> _links = [];
     private readonly List<ReceiveWaiter> _waiters = [];
     private readonly List<PortObservation<T>> _observations = [];
@@ -42,11 +45,13 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     public ApplicationOutputPort(
         ApplicationAddress address,
         int capacity,
-        Action<ApplicationPortRejection> report)
+        Action<ApplicationPortRejection> report,
+        Action<ApplicationPortActivity> activity)
     {
         Address = address;
         Capacity = capacity;
         _report = report;
+        _activity = activity;
         _ingress = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
         {
             BoundedCapacity = capacity
@@ -61,6 +66,27 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     public int Capacity { get; }
 
     public Task Completion => _completion.Task;
+
+    public ApplicationPortStatus GetStatus()
+    {
+        lock (_gate)
+        {
+            return new ApplicationPortStatus
+            {
+                Address = Address,
+                Direction = ApplicationPortDirection.Output,
+                PayloadType = typeof(T),
+                Capacity = Capacity,
+                PendingMessages = _aborted ? 0 : _ingress.Count,
+                ActiveAttachments = _activeSources,
+                Availability = _completeRequested || _aborted
+                    ? ApplicationPortAvailability.Completed
+                    : _activeSources == 0
+                        ? ApplicationPortAvailability.Unavailable
+                        : ApplicationPortAvailability.Available
+            };
+        }
+    }
 
     public IDisposable Attach(ISourceBlock<FlowMessage<T>> source)
     {
@@ -249,6 +275,15 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
 
     private void Dispatch(FlowMessage<T> message)
     {
+        _activity(new ApplicationPortActivity(
+            DateTimeOffset.UtcNow,
+            ApplicationPortActivityKind.OutputEmitted,
+            Address,
+            RelatedPort: null,
+            message.CorrelationId,
+            message.TraceId,
+            message.MessageId));
+
         OutputLink[] links;
         ReceiveWaiter[] waiters;
         PortObservation<T>[] observations;
@@ -279,6 +314,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 Port = Address,
+                CorrelationId = message.CorrelationId,
                 TraceId = message.TraceId,
                 MessageId = message.MessageId,
                 Reason = ApplicationPortRejectionReason.ObservationOverflowed,
@@ -438,6 +474,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                         Timestamp = DateTimeOffset.UtcNow,
                         Port = owner.Address,
                         RelatedPort = target.Address,
+                        CorrelationId = message.CorrelationId,
                         TraceId = message.TraceId,
                         MessageId = message.MessageId,
                         Reason = ApplicationPortRejectionReason.ConditionFailed,

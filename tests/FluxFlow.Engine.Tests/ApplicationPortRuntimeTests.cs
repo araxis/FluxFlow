@@ -84,9 +84,7 @@ public sealed class ApplicationPortRuntimeTests
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddInput<string>(Input)
             .Build();
-        var rejected = new BufferBlock<FlowMessage<string>>();
-        rejected.Complete();
-        await rejected.Completion;
+        var rejected = new RejectingTarget<FlowMessage<string>>();
         await using var rejectedAttachment = await runtime.AttachInputAsync(Input, rejected);
 
         (await runtime.SendAsync(Input, Message("retry"))).IsAccepted.ShouldBeTrue();
@@ -104,9 +102,7 @@ public sealed class ApplicationPortRuntimeTests
         await using var runtime = new ApplicationPortRuntimeBuilder()
             .AddInput<string>(Input)
             .Build();
-        var rejected = new BufferBlock<FlowMessage<string>>();
-        rejected.Complete();
-        await rejected.Completion;
+        var rejected = new RejectingTarget<FlowMessage<string>>();
         await using var attachment = await runtime.AttachInputAsync(Input, rejected);
         var retained = Message("retained");
 
@@ -489,6 +485,25 @@ public sealed class ApplicationPortRuntimeTests
             consumed.ShouldBeTrue();
             Accepted.Add(value!);
         }
+
+        public void Complete() => _completion.TrySetResult();
+
+        public void Fault(Exception exception) => _completion.TrySetException(exception);
+    }
+
+    private sealed class RejectingTarget<T> : ITargetBlock<T>
+    {
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Completion => _completion.Task;
+
+        public DataflowMessageStatus OfferMessage(
+            DataflowMessageHeader messageHeader,
+            T messageValue,
+            ISourceBlock<T>? source,
+            bool consumeToAccept)
+            => DataflowMessageStatus.DecliningPermanently;
 
         public void Complete() => _completion.TrySetResult();
 

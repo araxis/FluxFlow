@@ -1,7 +1,8 @@
 # FluxFlow.Engine
 
 Optional advanced executable runtime. The package contains the established
-`ApplicationDefinition` runtime and the additive canonical stable-port runtime.
+`ApplicationDefinition` runtime plus additive canonical stable ports, status,
+system events, and diagnostics.
 
 For new component packages and host composition, start with `FluxFlow.Nodes`,
 `FluxFlow.Composition`, and `FluxFlow.Composition.Hosting`. Component packages
@@ -21,6 +22,10 @@ Use `FluxFlow.Engine` when a host already depends on:
 Use `FluxFlow.Engine.Ports` when a host needs stable canonical port addresses,
 compiled Composition links, revision-safe component attachment, or direct
 send/receive/observe/request-reply interaction.
+
+Use `FluxFlow.Engine.Signals` for canonical runtime status, system-event, and
+diagnostic payloads. These contracts are transport-safe and travel in normal
+`FlowMessage<T>` envelopes.
 
 If a host only needs to compose standalone nodes from fluent C# or
 `IConfiguration`, use `FluxFlow.Composition` instead.
@@ -71,9 +76,40 @@ bounded buffer; an overflowing observer is removed without blocking links or
 other observers. `SendAndReceiveAsync` registers its response waiter before
 sending and matches the response by `TraceId`.
 
-`Rejections` is a bounded best-effort stream for intake, condition, target,
-source, and observation failures. It is not the full vNext system-event or
-diagnostics contract.
+`Rejections` remains a bounded low-level stream for intake, condition, target,
+source, and observation failures. The runtime also maps those outcomes into the
+canonical system-event and diagnostic surfaces described below.
+
+## Runtime Status And Signals
+
+Every `ApplicationPortRuntimeBuilder` registers these outputs automatically:
+
+- `System.Events.Output` carries `FlowMessage<ApplicationSystemEvent>`.
+- `System.Diagnostics.Output` carries `FlowMessage<ApplicationDiagnostic>`.
+
+Pass `ApplicationPortRuntimeBuilder.SystemOutputs` to
+`ApplicationLinkCompiler` so definitions can link either system output to an
+exactly typed workflow input. Direct receive and observe APIs work with the same
+addresses. Host subscribers can also link to
+`ApplicationPortRuntime.SystemEvents` and `.Diagnostics` before publishing
+activity.
+
+`PublishSystemEventAsync` writes to a bounded, ordered, reliable fanout. When
+its capacity is exhausted, publication waits; cancellation remains caller
+cancellation. A returned `Accepted` result means the event entered the reliable
+stream. A rejecting subscriber is detached and reported through diagnostics.
+
+`TryPublishDiagnostic` is intentionally best effort. Its bounded queue rejects
+immediately with `false` when full or completed, while accepted diagnostics stay
+ordered. Port input/output activity, direct request timing, link failures, and
+component source/target faults use this surface. Faults detach only the affected
+port attachment; `ApplicationRuntimeStatus` continues to describe the rest of
+the runtime.
+
+Accepted diagnostics integrate with `ILogger`, `ActivitySource`, `Meter`, and
+`DiagnosticSource`. Supply an `ILogger` with `UseLogger(...)`; use the names on
+`ApplicationRuntimeInstrumentation` to configure the other standard .NET
+listeners. Host provider failures are isolated from runtime processing.
 
 ## Public Surface
 
@@ -84,6 +120,7 @@ The package exposes these public namespaces:
 - `FluxFlow.Engine.Definitions`
 - `FluxFlow.Engine.Ports`
 - `FluxFlow.Engine.Runtime`
+- `FluxFlow.Engine.Signals`
 
 `FluxFlow.Mapping` owns expression and mapping contracts. The engine consumes
 those contracts for link conditions but does not own concrete expression

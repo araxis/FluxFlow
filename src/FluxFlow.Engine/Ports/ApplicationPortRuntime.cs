@@ -1,7 +1,13 @@
+using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks.Dataflow;
+using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
+using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
+using Microsoft.Extensions.Logging;
+using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Engine.Ports;
 
@@ -12,16 +18,22 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
     private readonly IReadOnlyDictionary<ApplicationAddress, IApplicationInputPort> _inputs;
     private readonly IReadOnlyDictionary<ApplicationAddress, IApplicationOutputPort> _outputs;
     private readonly IReadOnlyDictionary<ApplicationAddress, ApplicationPortMetadata> _metadataByAddress;
+    private readonly ApplicationRuntimeSignals _signals;
     private readonly BufferBlock<ApplicationPortRejection> _rejections = new(
         new DataflowBlockOptions { BoundedCapacity = RejectionCapacity });
     private readonly List<IDisposable> _links = [];
     private readonly object _gate = new();
     private readonly Task _completion;
+    private readonly object _statusGate = new();
+    private ApplicationRuntimeState _state = ApplicationRuntimeState.Active;
+    private DateTimeOffset _stateChangedAt = DateTimeOffset.UtcNow;
+    private Exception? _completionFailure;
     private int _completeRequested;
     private int _disposed;
 
     internal ApplicationPortRuntime(
-        IReadOnlyList<ApplicationPortRuntimeBuilder.PortRegistration> registrations)
+        IReadOnlyList<ApplicationPortRuntimeBuilder.PortRegistration> registrations,
+        ILogger? logger)
     {
         var inputs = new Dictionary<ApplicationAddress, IApplicationInputPort>();
         var outputs = new Dictionary<ApplicationAddress, IApplicationOutputPort>();
@@ -42,13 +54,13 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
             {
                 inputs.Add(
                     registration.Address,
-                    registration.CreateInput!(Report));
+                    registration.CreateInput!(Report, ReportActivity));
             }
             else
             {
                 outputs.Add(
                     registration.Address,
-                    registration.CreateOutput!(Report));
+                    registration.CreateOutput!(Report, ReportActivity));
             }
         }
 
@@ -58,6 +70,11 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         Ports = metadata.Values
             .OrderBy(static value => value.Address.Value, StringComparer.Ordinal)
             .ToArray();
+        _signals = new ApplicationRuntimeSignals(logger);
+        GetOutput<ApplicationSystemEvent>(ApplicationAddress.SystemEvents)
+            .Attach(_signals.SystemEvents);
+        GetOutput<ApplicationDiagnostic>(ApplicationAddress.SystemDiagnostics)
+            .Attach(_signals.Diagnostics);
         _completion = CompleteRuntimeAsync();
     }
 
@@ -65,14 +82,70 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
 
     public ISourceBlock<ApplicationPortRejection> Rejections => _rejections;
 
+    public ISourceBlock<FlowMessage<ApplicationSystemEvent>> SystemEvents => _signals.SystemEvents;
+
+    public ISourceBlock<FlowMessage<ApplicationDiagnostic>> Diagnostics => _signals.Diagnostics;
+
     public Task Completion => _completion;
+
+    public ApplicationRuntimeStatus Status
+    {
+        get
+        {
+            ApplicationRuntimeState state;
+            DateTimeOffset changedAt;
+            lock (_statusGate)
+            {
+                state = _state;
+                changedAt = _stateChangedAt;
+            }
+
+            return new ApplicationRuntimeStatus
+            {
+                State = state,
+                ChangedAt = changedAt,
+                Ports = _inputs.Values.Select(static port => port.GetStatus())
+                    .Concat(_outputs.Values.Select(static port => port.GetStatus()))
+                    .OrderBy(static port => port.Address.Value, StringComparer.Ordinal)
+                    .ToArray()
+            };
+        }
+    }
+
+    public ValueTask<SystemEventPublishResult> PublishSystemEventAsync(
+        FlowMessage<ApplicationSystemEvent> message,
+        CancellationToken cancellationToken = default)
+        => _signals.PublishSystemEventAsync(message, cancellationToken);
+
+    public bool TryPublishDiagnostic(FlowMessage<ApplicationDiagnostic> message)
+        => _signals.TryPublishDiagnostic(message);
 
     public ValueTask<PortSendResult> SendAsync<T>(
         ApplicationAddress input,
         FlowMessage<T> message,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
+        if (Volatile.Read(ref _completeRequested) != 0)
+        {
+            var typedInput = GetInput<T>(input);
+            Report(new ApplicationPortRejection
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                Port = input,
+                CorrelationId = message.CorrelationId,
+                TraceId = message.TraceId,
+                MessageId = message.MessageId,
+                Reason = ApplicationPortRejectionReason.Completed
+            });
+            return ValueTask.FromResult(new PortSendResult
+            {
+                Port = typedInput.Address,
+                Status = PortSendStatus.Completed
+            });
+        }
+
         return ValueTask.FromResult(GetInput<T>(input).TrySend(message));
     }
 
@@ -109,6 +182,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
+        var startedAt = Stopwatch.GetTimestamp();
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
         ValidateTimeout(timeout);
@@ -119,7 +193,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
             var initial = registration.Task.Result;
             if (initial.Status != PortReceiveStatus.Received)
             {
-                return new PortRequestResult<TResponse>
+                var unavailable = new PortRequestResult<TResponse>
                 {
                     InputPort = input,
                     OutputPort = output,
@@ -127,13 +201,15 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
                         ? PortRequestStatus.OutputCompleted
                         : PortRequestStatus.OutputUnavailable
                 };
+                ReportRequest(unavailable.Status, request, input, output, startedAt);
+                return unavailable;
             }
         }
 
         var send = await SendAsync(input, request, cancellationToken).ConfigureAwait(false);
         if (!send.IsAccepted)
         {
-            return new PortRequestResult<TResponse>
+            var rejected = new PortRequestResult<TResponse>
             {
                 InputPort = input,
                 OutputPort = output,
@@ -145,6 +221,8 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
                     _ => throw new ArgumentOutOfRangeException(nameof(send.Status))
                 }
             };
+            ReportRequest(rejected.Status, request, input, output, startedAt);
+            return rejected;
         }
 
         var receive = await WaitForReceiveAsync(
@@ -154,7 +232,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return new PortRequestResult<TResponse>
+        var result = new PortRequestResult<TResponse>
         {
             InputPort = input,
             OutputPort = output,
@@ -168,6 +246,8 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
             },
             Response = receive.Message
         };
+        ReportRequest(result.Status, request, input, output, startedAt);
+        return result;
     }
 
     public ValueTask<IAsyncDisposable> AttachInputAsync<T>(
@@ -214,9 +294,8 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         if (Interlocked.Exchange(ref _completeRequested, 1) != 0)
             return;
 
-        foreach (var output in _outputs.Values)
-            output.Complete();
-        _ = CompleteInputsAfterOutputsAsync();
+        SetState(ApplicationRuntimeState.Completing);
+        _ = CompletePortsAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -233,6 +312,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
 
         foreach (var link in links)
             link.Dispose();
+        await _signals.DisposeAsync().ConfigureAwait(false);
         foreach (var output in _outputs.Values)
             output.Abort();
         foreach (var input in _inputs.Values)
@@ -244,6 +324,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         }
         finally
         {
+            SetState(ApplicationRuntimeState.Disposed);
             _rejections.Complete();
         }
     }
@@ -256,6 +337,16 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
                     _inputs.Values.Select(static port => port.Completion)
                         .Concat(_outputs.Values.Select(static port => port.Completion)))
                 .ConfigureAwait(false);
+
+            if (Volatile.Read(ref _completionFailure) is { } failure)
+                ExceptionDispatchInfo.Capture(failure).Throw();
+
+            SetState(ApplicationRuntimeState.Completed);
+        }
+        catch
+        {
+            SetState(ApplicationRuntimeState.Faulted);
+            throw;
         }
         finally
         {
@@ -263,21 +354,53 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         }
     }
 
-    private async Task CompleteInputsAfterOutputsAsync()
+    private async Task CompletePortsAsync()
     {
         try
         {
-            await Task.WhenAll(_outputs.Values.Select(static port => port.Completion))
+            await _signals.PublishSystemEventAsync(
+                    FlowMessage.Create(new ApplicationSystemEvent
+                    {
+                        Timestamp = DateTimeOffset.UtcNow,
+                        Name = ApplicationSystemEventNames.RuntimeCompleting,
+                        Category = ApplicationSystemEventCategory.Lifecycle,
+                        Subject = "runtime"
+                    }),
+                    CancellationToken.None)
                 .ConfigureAwait(false);
-        }
-        catch
-        {
-            // Output faults are already represented by their Completion tasks.
-            // Inputs still need an explicit terminal signal.
-        }
 
-        foreach (var input in _inputs.Values)
-            input.Complete();
+            var normalOutputs = _outputs
+                .Where(static item => item.Key.Kind != ApplicationAddressKind.SystemPort)
+                .Select(static item => item.Value)
+                .ToArray();
+            foreach (var output in normalOutputs)
+                output.Complete();
+            await Task.WhenAll(normalOutputs.Select(static output => output.Completion))
+                .ConfigureAwait(false);
+
+            _signals.Complete();
+            await _signals.Completion.ConfigureAwait(false);
+
+            var systemOutputs = _outputs
+                .Where(static item => item.Key.Kind == ApplicationAddressKind.SystemPort)
+                .Select(static item => item.Value)
+                .ToArray();
+            foreach (var output in systemOutputs)
+                output.Complete();
+            await Task.WhenAll(systemOutputs.Select(static output => output.Completion))
+                .ConfigureAwait(false);
+
+            foreach (var input in _inputs.Values)
+                input.Complete();
+        }
+        catch (Exception exception)
+        {
+            Volatile.Write(ref _completionFailure, exception);
+            foreach (var output in _outputs.Values)
+                output.Abort();
+            foreach (var input in _inputs.Values)
+                input.Abort();
+        }
     }
 
     private ApplicationInputPort<T> GetInput<T>(ApplicationAddress address)
@@ -356,7 +479,213 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
     }
 
     private void Report(ApplicationPortRejection rejection)
-        => _rejections.Post(rejection);
+    {
+        _rejections.Post(rejection);
+        if (rejection.Port == ApplicationAddress.SystemDiagnostics ||
+            rejection.RelatedPort == ApplicationAddress.SystemDiagnostics)
+        {
+            return;
+        }
+
+        _signals.TryPublishDiagnostic(CreateDiagnosticMessage(rejection));
+        if (!CreatesSystemEvent(rejection) ||
+            rejection.Port.Kind == ApplicationAddressKind.SystemPort ||
+            rejection.RelatedPort?.Kind == ApplicationAddressKind.SystemPort)
+        {
+            return;
+        }
+
+        _signals.PublishSystemEventAsync(
+                CreateSystemEventMessage(rejection),
+                CancellationToken.None)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    private void ReportActivity(ApplicationPortActivity activity)
+    {
+        if (activity.Port == ApplicationAddress.SystemDiagnostics ||
+            activity.RelatedPort == ApplicationAddress.SystemDiagnostics)
+        {
+            return;
+        }
+
+        var diagnostic = new ApplicationDiagnostic
+        {
+            Timestamp = activity.Timestamp,
+            Name = activity.Kind == ApplicationPortActivityKind.InputAccepted
+                ? ApplicationDiagnosticNames.InputAccepted
+                : ApplicationDiagnosticNames.OutputEmitted,
+            Kind = activity.Kind == ApplicationPortActivityKind.InputAccepted
+                ? ApplicationDiagnosticKind.Input
+                : ApplicationDiagnosticKind.Output,
+            Level = ApplicationDiagnosticLevel.Trace,
+            Subject = activity.Port.Value,
+            Attributes = CreateDetails(
+                ("port", activity.Port.Value),
+                ("relatedPort", activity.RelatedPort?.Value))
+        };
+        _signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
+            activity.CorrelationId,
+            diagnostic)
+        {
+            TraceId = activity.TraceId,
+            CausationId = activity.MessageId
+        });
+    }
+
+    private void ReportRequest<TRequest>(
+        PortRequestStatus status,
+        FlowMessage<TRequest> request,
+        ApplicationAddress input,
+        ApplicationAddress output,
+        long startedAt)
+    {
+        var diagnostic = new ApplicationDiagnostic
+        {
+            Timestamp = DateTimeOffset.UtcNow,
+            Name = ApplicationDiagnosticNames.RequestCompleted,
+            Kind = ApplicationDiagnosticKind.Timing,
+            Level = status == PortRequestStatus.Received
+                ? ApplicationDiagnosticLevel.Debug
+                : ApplicationDiagnosticLevel.Warning,
+            Subject = input.Value,
+            Duration = Stopwatch.GetElapsedTime(startedAt),
+            Attributes = CreateDetails(
+                ("input", input.Value),
+                ("output", output.Value),
+                ("status", status.ToString()))
+        };
+        _signals.TryPublishDiagnostic(new FlowMessage<ApplicationDiagnostic>(
+            request.CorrelationId,
+            diagnostic)
+        {
+            TraceId = request.TraceId,
+            CausationId = request.MessageId
+        });
+    }
+
+    private FlowMessage<ApplicationDiagnostic> CreateDiagnosticMessage(
+        ApplicationPortRejection rejection)
+    {
+        var diagnostic = new ApplicationDiagnostic
+        {
+            Timestamp = rejection.Timestamp,
+            Name = ApplicationDiagnosticNames.PortRejected,
+            Kind = _metadataByAddress.TryGetValue(rejection.Port, out var metadata) &&
+                metadata.Direction == ApplicationPortDirection.Input
+                    ? ApplicationDiagnosticKind.Input
+                    : ApplicationDiagnosticKind.Output,
+            Level = rejection.Reason is ApplicationPortRejectionReason.ConditionFailed or
+                ApplicationPortRejectionReason.SourceFaulted or
+                ApplicationPortRejectionReason.ComponentFaulted
+                    ? ApplicationDiagnosticLevel.Error
+                    : ApplicationDiagnosticLevel.Warning,
+            Subject = rejection.Port.Value,
+            Message = $"Port activity was rejected with reason '{rejection.Reason}'.",
+            Error = rejection.Exception is null
+                ? null
+                : CreateFlowError(rejection),
+            Attributes = CreateDetails(
+                ("port", rejection.Port.Value),
+                ("relatedPort", rejection.RelatedPort?.Value),
+                ("reason", rejection.Reason.ToString()))
+        };
+        return CreateSignalMessage(
+            diagnostic,
+            rejection.CorrelationId,
+            rejection.TraceId,
+            rejection.MessageId);
+    }
+
+    private static FlowMessage<ApplicationSystemEvent> CreateSystemEventMessage(
+        ApplicationPortRejection rejection)
+    {
+        var systemEvent = new ApplicationSystemEvent
+        {
+            Timestamp = rejection.Timestamp,
+            Name = rejection.Reason switch
+            {
+                ApplicationPortRejectionReason.ConditionFailed =>
+                    ApplicationSystemEventNames.LinkConditionFailed,
+                ApplicationPortRejectionReason.SourceFaulted =>
+                    ApplicationSystemEventNames.ComponentFaulted,
+                ApplicationPortRejectionReason.ComponentFaulted =>
+                    ApplicationSystemEventNames.ComponentFaulted,
+                _ => ApplicationSystemEventNames.LinkTargetRejected
+            },
+            Category = rejection.Reason is ApplicationPortRejectionReason.SourceFaulted or
+                ApplicationPortRejectionReason.ComponentFaulted
+                ? ApplicationSystemEventCategory.Component
+                : ApplicationSystemEventCategory.Link,
+            Subject = rejection.Port.Value,
+            Error = CreateFlowError(rejection),
+            Details = CreateDetails(
+                ("port", rejection.Port.Value),
+                ("relatedPort", rejection.RelatedPort?.Value),
+                ("reason", rejection.Reason.ToString()))
+        };
+        return CreateSignalMessage(
+            systemEvent,
+            rejection.CorrelationId,
+            rejection.TraceId,
+            rejection.MessageId);
+    }
+
+    private static bool CreatesSystemEvent(ApplicationPortRejection rejection)
+        => rejection.Reason is ApplicationPortRejectionReason.ConditionFailed or
+            ApplicationPortRejectionReason.TargetRejected or
+            ApplicationPortRejectionReason.SourceFaulted or
+            ApplicationPortRejectionReason.ComponentFaulted;
+
+    private static DataFlowError CreateFlowError(ApplicationPortRejection rejection)
+        => new(
+            $"runtime.{rejection.Reason.ToString().ToLowerInvariant()}",
+            rejection.Exception?.Message ?? $"Runtime port failure: {rejection.Reason}.",
+            rejection.Reason is ApplicationPortRejectionReason.SourceFaulted or
+                ApplicationPortRejectionReason.ComponentFaulted
+                ? "component"
+                : "link",
+            isTransient: rejection.Reason != ApplicationPortRejectionReason.ConditionFailed,
+            CreateDetails(
+                ("port", rejection.Port.Value),
+                ("relatedPort", rejection.RelatedPort?.Value)));
+
+    private static FlowMessage<T> CreateSignalMessage<T>(
+        T payload,
+        CorrelationId? correlationId,
+        TraceId? traceId,
+        MessageId? causationId)
+        => new(
+            correlationId is null || correlationId.Value.IsEmpty
+                ? CorrelationId.New()
+                : correlationId.Value,
+            payload)
+        {
+            TraceId = traceId is null || traceId.Value.IsEmpty
+                ? TraceId.New()
+                : traceId.Value,
+            CausationId = causationId
+        };
+
+    private static FlowValue CreateDetails(params (string Name, string? Value)[] values)
+        => FlowValue.FromObject(values
+            .Where(static value => value.Value is not null)
+            .Select(static value => new KeyValuePair<string, FlowValue>(
+                value.Name,
+                FlowValue.From(value.Value!))));
+
+    private void SetState(ApplicationRuntimeState state)
+    {
+        lock (_statusGate)
+        {
+            if (_state == ApplicationRuntimeState.Disposed || _state == state)
+                return;
+            _state = state;
+            _stateChangedAt = DateTimeOffset.UtcNow;
+        }
+    }
 
     private void RemoveLink(IDisposable link)
     {
