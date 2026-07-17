@@ -17,4 +17,9 @@ public static class CompositionPorts
 
     public static CompositionPortMetadata Metadata<TMessage>(string name)
         => CompositionPortMetadata.Create<TMessage>(name);
+
+    public static CompositionPortMetadata Metadata<TMessage>(
+        string name,
+        CompositionPortLinkCardinality linkCardinality)
+        => CompositionPortMetadata.Create<TMessage>(name, linkCardinality);
 }

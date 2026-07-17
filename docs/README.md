@@ -3,9 +3,10 @@
 FluxFlow is standalone-node-first. Use `FluxFlow.Data` for transport-neutral
 values, content, and result contracts, then start node authoring with
 `FluxFlow.Nodes`; add
-`FluxFlow.Composition` for the canonical application document and addressing,
-or when you need the current fluent/config runtime compatibility layer to build
-and link standalone nodes. Add `FluxFlow.Composition.Hosting` when a .NET host
+`FluxFlow.Composition` for the canonical application document, addressing, and
+static link compilation, or when you need the current fluent/config runtime
+compatibility layer to build and link standalone nodes. Add
+`FluxFlow.Composition.Hosting` when a .NET host
 should build/start the composition through DI and resolve adapter-owned keyed
 resources. Use `FluxFlow.Engine` only when the older `ApplicationDefinition`
 runtime is the right fit for a host.

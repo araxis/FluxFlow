@@ -5,10 +5,10 @@ Date: 2026-07-17
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/composition-definition-addressing-vnext`. The canonical Composition
-  definition/address milestone is implemented and verified locally. Nothing
-  from the vNext milestones was pushed, tagged, published, merged, or opened as
-  a pull request.
+  `work/composition-links-vnext`. The canonical Composition link-compilation
+  milestone is implemented and verified locally. Nothing from the vNext
+  milestones was pushed, tagged, published, merged, or opened as a pull
+  request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Added Dataflow-free `FluxFlow.Data` `1.0.0` for immutable `FlowValue`,
@@ -17,20 +17,24 @@ Date: 2026-07-17
   causation, and immutable `FlowValue` headers. The manifest contains 58
   packages. Controlled Debug/Release builds, the complete Release test sweep,
   package creation, release preflight, and isolated consumer dry-runs passed.
-  The reviewed foundation now supports the canonical Composition definition
-  and address milestone. Runtime/DI revisions, component migration,
-  diagnostics, and MQTT remain deferred. See
+  The reviewed foundation now supports the canonical Composition definition,
+  address, and link-compilation milestones. Runtime/DI revisions, component
+  migration, diagnostics, and MQTT remain deferred. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.0.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `2.1.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
-  case-sensitive address type. The existing executable Composition DTOs remain
-  as a documented migration surface; canonical link properties are not yet
-  compiled. Focused and complete tests, controlled Debug/Release builds,
-  binary compatibility, release preflight, and isolated package dry-run passed.
-  See `207-vnext-composition-definition-addressing.md`. The next bounded gate is
-  link parsing, normalization, condition compilation, and static validation.
+  case-sensitive address type. Canonical input/output-side links now normalize
+  to absolute addresses, preserve declaration side, compile conditions once,
+  and report exact endpoint/type, duplicate, exclusive-claim, and cycle
+  diagnostics. The existing executable Composition DTOs remain a documented
+  migration surface; canonical links are not activated yet. Focused and
+  complete tests, controlled Debug/Release builds, binary compatibility,
+  release preflight, and isolated package dry-run passed. See
+  `207-vnext-composition-definition-addressing.md` and
+  `208-vnext-composition-link-compilation.md`. The next bounded gate is stable
+  Engine ports and direct send/receive/observe APIs.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

@@ -4,7 +4,8 @@ FluxFlow's default public surface is standalone-node-first:
 
 - `FluxFlow.Data` for transport-neutral values, content, and result contracts.
 - `FluxFlow.Nodes` for node authoring.
-- `FluxFlow.Composition` for fluent/config composition of standalone nodes.
+- `FluxFlow.Composition` for canonical definitions, link compilation, and
+  fluent/config composition of standalone nodes.
 - `FluxFlow.Engine` for the optional advanced engine runtime.
 
 The release tests maintain a lightweight public API baseline for package source
@@ -90,6 +91,11 @@ Main types:
 - `FluxFlow.Composition.Model.ApplicationDefinitionJson`
 - `FluxFlow.Composition.Addressing.ApplicationAddress`
 - `FluxFlow.Composition.Addressing.ApplicationAddressKind`
+- `FluxFlow.Composition.Links.ApplicationLinkCompiler`
+- `FluxFlow.Composition.Links.ApplicationLinkCompilationResult`
+- `FluxFlow.Composition.Links.CompiledApplicationLink`
+- `FluxFlow.Composition.Links.ApplicationLinkDiagnostic`
+- `FluxFlow.Composition.Links.ApplicationSystemOutputMetadata`
 - `ApplicationDefinitionConfigurationLoader`
 
 The vNext canonical document is immutable and has exactly two case-sensitive
@@ -98,6 +104,14 @@ namespaces and resource leaves require `Type`; workflows directly contain flat
 component objects that also require `Type`. `ApplicationAddress` represents
 resource paths, absolute workflow ports, local port resolution, and the
 reserved system event/diagnostic outputs with ordinal equality.
+
+`ApplicationLinkCompiler` reads links from registered input or output port
+properties, normalizes absolute source/target addresses, compiles expression
+conditions once, and reports static diagnostics for invalid endpoints, exact
+type mismatches, duplicate or exclusive claims, and cycles. Successful links
+preserve their declaration side for Designer persistence. Engine-owned system
+streams contribute type metadata through `ApplicationSystemOutputMetadata`.
+The compiler does not activate or route links.
 
 The following types remain the current executable composition compatibility
 surface while runtime binding migrates to the canonical model:

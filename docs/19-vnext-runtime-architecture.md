@@ -3,16 +3,17 @@
 Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
-The data foundation and canonical definition/address phases are implemented
-locally. Link compilation, runtime updates, and MQTT redesign remain pending.
+The data foundation, canonical definition/address, and link compilation phases
+are implemented locally. Stable runtime ports, runtime updates, and MQTT
+redesign remain pending.
 
 ## Package Ownership
 
 - `FluxFlow.Data` owns transport-neutral values, content, and result contracts.
 - `FluxFlow.Nodes` owns `FlowMessage<T>` and standalone Dataflow node plumbing.
-- `FluxFlow.Composition` owns the canonical application document and address
-  resolver. Binding, link normalization, and canonical static validation are
-  the next bounded Composition milestones.
+- `FluxFlow.Composition` owns the canonical application document, address
+  resolver, link normalization, compile-once conditions, and canonical static
+  link validation. Runtime activation remains an Engine responsibility.
 - `FluxFlow.Engine` will execute compiled compositions and own stable ports,
   direct port interaction, runtime revisions, system events, and diagnostics.
 - `FluxFlow.Composition.Hosting` will own definition sources, DI provider
@@ -58,10 +59,13 @@ persistence, and keyed DI will adopt the same value in later milestones. Names
 containing dots are invalid.
 
 Links may be declared once on either an input or output property as a string,
-an array, or an object containing `Port` and optional `Condition`. Metadata
-determines direction. The compiler will normalize both forms into one internal
-source/target link representation before validating types, duplicates,
-conditions, exclusive claims, and cycles.
+an array, or an object containing exact `Port` and optional `Condition` names.
+Metadata determines direction. `ApplicationLinkCompiler` normalizes both forms
+into absolute source/target links, preserves declaration side, compiles each
+condition string once per activation, and validates exact types, duplicates,
+explicit single-link claims, and cycles. Engine-owned system streams supply
+their payload metadata to the compiler rather than creating an Engine
+dependency in Composition.
 
 ## Runtime Updates
 
@@ -80,8 +84,8 @@ introduced.
 
 1. Data, envelope identity, and result contracts. Complete locally.
 2. Canonical Composition definitions and addressing. Complete locally.
-3. Link normalization and condition compilation. Next.
-4. Stable ports and direct send/receive/observe APIs.
+3. Link normalization and condition compilation. Complete locally.
+4. Stable ports and direct send/receive/observe APIs. Next.
 5. Fault isolation, system events, and diagnostics.
 6. DI resource snapshots and transactional revisions.
 7. MQTT as the first complete resource/component/adapter vertical slice.

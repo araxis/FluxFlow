@@ -28,6 +28,22 @@ Introduces the vNext message envelope identity model.
   hop identity and recording the parent message as causation.
 - This is an intentional major-version public contract change.
 
+## FluxFlow.Composition 2.1.0
+
+Adds the canonical vNext link compiler while leaving runtime activation for the
+next Engine milestone.
+
+- Reads link declarations from input or output port properties in string,
+  object, or mixed-array form and preserves the declaration side.
+- Normalizes local, absolute, cross-workflow, and reserved system source
+  addresses into deterministic source/target links.
+- Compiles expression conditions once per activation and provides isolated
+  per-link evaluation with the captured failure available to the runtime.
+- Validates component and port existence, exact payload types, duplicate links,
+  explicit single-link claims, and acyclic topology.
+- Adds optional host-supplied system-output type metadata so Engine-owned
+  streams participate in exact type validation without an Engine dependency.
+
 ## FluxFlow.Composition 2.0.0
 
 Introduces the canonical vNext application document and address contracts.

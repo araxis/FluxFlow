@@ -2,6 +2,24 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext Composition link compilation
+
+- Added canonical link parsing for string, object, and mixed-array declarations
+  on registered input or output properties, with absolute address
+  normalization and declaration-side preservation.
+- Added compile-once Mapping conditions, per-link evaluation failure capture,
+  exact component/port/type validation, duplicate detection, explicit
+  single-link claims, host-supplied system-output type metadata, and
+  cross-workflow cycle diagnostics.
+- Moved Composition to additive `2.1.0`, updated package/docs/changelog records,
+  and accepted the reviewed baseline change from 210 to 256 declarations.
+- Passed 116 Composition tests, 17 Hosting tests, 63 Engine tests, 97 Designer
+  tests, 93 release tests, the complete Release test sweep, controlled
+  Debug/Release builds, binary compatibility against local `2.0.0`, release
+  preflight, and an isolated net8 package dry-run from a seeded temp source.
+- Stable Engine ports and direct send/receive/observe APIs are the next bounded
+  milestone; canonical links are not activated in this pass.
+
 ## 2026-07-17 - vNext Composition definition and addressing
 
 - Added immutable canonical application, workflow, component, resource-group,

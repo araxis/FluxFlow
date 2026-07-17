@@ -451,6 +451,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `207-vnext-composition-definition-addressing.md`: canonical flat Composition
   application definitions, strict deterministic JSON/config loading, shared
   ordinal addressing, versioning, verification, and the link-compiler handoff.
+- `208-vnext-composition-link-compilation.md`: canonical input/output-side link
+  parsing, absolute normalization, compile-once conditions, exact metadata/type
+  validation, duplicate/exclusive/cycle diagnostics, and the stable-port
+  runtime handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

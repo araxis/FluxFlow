@@ -136,10 +136,10 @@ Addresses reject blank segments, surrounding whitespace, ambiguous resource
 references used as ports, and unrecognized `System` paths. Equality and hashing
 are ordinal, so `Orders.Source.Output` and `orders.Source.Output` are distinct.
 
-## Planned Link Properties
+## Canonical Link Compilation
 
-Port properties may retain the agreed link-shaped JSON while link compilation
-is developed in the next milestone:
+Port properties use the registered port name and may declare one link, or an
+array of links, on either endpoint:
 
 ```json
 {
@@ -154,10 +154,47 @@ is developed in the next milestone:
 }
 ```
 
-The canonical model only preserves these properties today. It does not yet
-infer port direction, normalize links, compile conditions, or build a runtime
-from them. The next Composition milestone will add those behaviors using node
-port metadata and this same address contract.
+The compiler accepts a string, an object with exact `Port` and optional
+`Condition` property names, or a mixed array of those forms. An empty array
+means no links. A link must appear on only one endpoint.
+
+```csharp
+using FluxFlow.Composition.Links;
+
+var result = new ApplicationLinkCompiler(registry, expressionEngine)
+    .Compile(definition);
+
+if (!result.IsValid)
+{
+    foreach (var diagnostic in result.Diagnostics)
+        Console.Error.WriteLine(diagnostic);
+}
+```
+
+`CompositionNodeRegistry` metadata determines whether a property is an input
+or output. The compiler converts local references to absolute addresses,
+preserves `ApplicationLinkDeclarationSide`, and sorts successful links by
+source and target. Ordinary component settings that do not match a registered
+port remain settings and are ignored by the link compiler.
+
+Validation rejects malformed declarations, unknown component types, missing
+components or ports, exact payload-type mismatches, duplicate endpoint pairs,
+explicit single-link claim conflicts, condition compilation failures, and
+cycles. Multiple upstreams to one input and multiple targets from one output
+remain valid by default. Use `CompositionPortLinkCardinality.Single` only for a
+port whose contract is exclusive.
+
+Each distinct condition string is compiled once per compiler invocation using
+`IFlowExpressionEngine`. A compiled link exposes `IsMatch(...)` and
+`TryMatch(...)`; the latter returns a captured evaluation exception so the
+future runtime can reject only that link for that message and continue with
+sibling links.
+
+Reserved system streams require host-supplied
+`ApplicationSystemOutputMetadata`. That keeps system payload contracts in the
+Engine while allowing Composition to perform the same exact type check without
+depending on Engine. Canonical runtime activation is still deferred to the
+stable-port Engine milestone.
 
 ## Legacy Runtime Definition
 

@@ -16,6 +16,8 @@ The vNext boundary owns:
 - strict deterministic JSON with exactly `Resources` and `Workflows`
 - nested resource namespaces and flat component/resource settings
 - one ordinal, case-sensitive application address value
+- canonical input/output-side link parsing and absolute normalization
+- compile-once expression conditions and static link diagnostics
 - direct root or named-section `IConfiguration` loading
 
 The current runtime compatibility boundary also owns:
@@ -28,10 +30,10 @@ The current runtime compatibility boundary also owns:
 - direct typed Dataflow linking
 - runtime start, stop, completion, event/error aggregation, and disposal
 
-It does not yet compile canonical link properties into a runtime. It also does
-not own broker clients, stores, secrets, resource registration, file watching,
-YAML, live reload, assembly scanning, reflection discovery, or engine
-projection.
+It does not yet activate canonical links or provide stable runtime ports. It
+also does not own broker clients, stores, secrets, resource registration, file
+watching, YAML, live reload, assembly scanning, reflection discovery, or
+engine projection.
 
 ## Canonical Definition
 
@@ -82,9 +84,59 @@ use `Resources.Group.Resource`. `System.Events.Output` and
 `System.Diagnostics.Output` are reserved system addresses. The canonical
 serializer sorts names and nested object properties for deterministic output.
 
-Link-shaped component properties are preserved as JSON in this milestone but
-are not interpreted by the current runtime. Direction inference, condition
-compilation, and canonical link validation belong to the next milestone.
+Link properties may be declared on exactly one endpoint. Direction is inferred
+from the registered component port metadata:
+
+```json
+{
+  "Type": "sample.source",
+  "Output": [
+    "Sink.Input",
+    {
+      "Port": "Audit.Writer.Input",
+      "Condition": "value != null"
+    }
+  ]
+}
+```
+
+```csharp
+using FluxFlow.Composition.Links;
+
+var compilation = new ApplicationLinkCompiler(registry, expressionEngine)
+    .Compile(definition);
+
+if (!compilation.IsValid)
+{
+    foreach (var diagnostic in compilation.Diagnostics)
+        Console.Error.WriteLine(diagnostic.Message);
+}
+```
+
+Strings, objects with exact `Port` and optional `Condition` names, and mixed
+arrays are supported. Every successful link has absolute source and target
+addresses and records whether it was declared input-side or output-side.
+Payload types must match exactly; links never insert a mapper. Multiple links
+are allowed by default. Register a port with
+`CompositionPortLinkCardinality.Single` when it permits only one claim.
+
+Conditions use `FluxFlow.Mapping.IFlowExpressionEngine` and compile once for
+each distinct expression during one compiler invocation. `IsMatch(...)`
+evaluates a compiled condition; `TryMatch(...)` turns an evaluation exception
+into a rejected link plus an exception value so a runtime can report that link
+failure and continue evaluating siblings.
+
+`System.Events.Output` and `System.Diagnostics.Output` are Engine-owned.
+Hosts compiling a link from either stream provide
+`ApplicationSystemOutputMetadata` with its payload type; missing metadata or
+an incompatible target is a static diagnostic. Composition remains free of an
+Engine reference.
+
+Compilation rejects malformed declarations, unknown component types, missing
+ports, duplicate endpoint pairs (including a link declared on both sides),
+single-link claim conflicts, incompatible types, invalid expressions, and
+component cycles. Valid compiled links are the input to the later stable-port
+runtime milestone; the legacy runtime below is unchanged.
 
 ## Legacy Runtime Definition
 

@@ -31,6 +31,26 @@ public sealed class CompositionNodeRegistrationTests
     }
 
     [Fact]
+    public void Port_metadata_defaults_to_multiple_links_and_supports_single_link_ports()
+    {
+        var multiple = CompositionPortMetadata.Create<string>("Output");
+        var single = CompositionPorts.Metadata<string>(
+            "Input",
+            CompositionPortLinkCardinality.Single);
+
+        multiple.LinkCardinality.ShouldBe(CompositionPortLinkCardinality.Multiple);
+        var (name, messageType, linkCardinality) = single;
+        name.ShouldBe("Input");
+        messageType.ShouldBe(typeof(string));
+        linkCardinality.ShouldBe(CompositionPortLinkCardinality.Single);
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new CompositionPortMetadata(
+                "Input",
+                typeof(string),
+                (CompositionPortLinkCardinality)42));
+    }
+
+    [Fact]
     public void Port_metadata_trims_names()
     {
         var metadata = CompositionPortMetadata.Create<string>(" Output ");
