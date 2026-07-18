@@ -1,11 +1,13 @@
 # FluxFlow.Components.Payloads.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone
-payload inspection node from `FluxFlow.Components.Payloads`.
+Composition registration and Designer metadata for canonical payload
+inspection. The package binds flat node settings, resolves host-owned resources,
+and creates the standalone `FlowContentInspectNode` from
+`FluxFlow.Components.Payloads`.
 
-This package does not scan assemblies, resolve CLR types from strings, own
-payload adapters, or manage resources beyond resolving an optional keyed
-`TimeProvider`. Hosts register the payload node factory explicitly.
+It does not scan assemblies, resolve CLR types from strings, own resource
+lifetimes, deserialize transport payloads outside `FlowContent`, or require the
+Engine runtime.
 
 ## Registration
 
@@ -15,62 +17,64 @@ services
     .RegisterNodes(registry => registry.RegisterPayloadInspect());
 ```
 
-## Node Types
+| Type | Input | Output | Diagnostics |
+|------|-------|--------|-------------|
+| `payload.inspect` | `FlowContent` | `FlowResult<PayloadInspectionResult>` | `Events` |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `payload.inspect` | `PayloadInspectNode` | `Input`, `Output` |
+Expected size, decode, and parse failures remain on `Output` with `IsError ==
+true`; there is no universal error port.
 
-The factory exposes `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic result, event, and error timestamps.
-The request/result CLR types are fixed to `PayloadInspectionRequest` and
-`PayloadInspectionResult`.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "inspect": {
-              "type": "payload.inspect",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "maxInputBytes": 1048576,
-                "maxPreviewBytes": 1024,
-                "maxFormattedChars": 4096,
-                "detectBase64": true,
-                "formatJson": true,
-                "formatXml": true,
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "PayloadCodecs": {
+      "Type": "host.payload-codecs"
+    },
+    "InspectionClock": {
+      "Type": "host.clock"
+    }
+  },
+  "Workflows": {
+    "Main": {
+      "InspectPayload": {
+        "Type": "payload.inspect",
+        "codecs": "Resources.PayloadCodecs",
+        "clock": "Resources.InspectionClock",
+        "maxInputBytes": 1048576,
+        "maxPreviewBytes": 1024,
+        "maxFormattedChars": 4096,
+        "detectBase64": true,
+        "formatJson": true,
+        "formatXml": true,
+        "boundedCapacity": 128
       }
     }
   }
 }
 ```
 
-The node binds the existing `PayloadInspectOptions` shape from composition
-configuration.
+Settings and resource references are flat within the component object. Both
+resources are optional:
+
+- `codecs`: keyed `FlowContentCodecCatalog` for host-owned media conventions
+- `clock`: keyed `TimeProvider` for deterministic result and diagnostic time
+
+Resource addresses are exact, ordinal, and case-sensitive. The host registers,
+owns, and disposes the keyed services; the factory falls back to the
+package-owned codec catalog and `TimeProvider.System` when references are
+absent.
 
 ## Design Metadata
 
-`PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `payload.inspect` composition node. The metadata describes the fixed
-request/result ports, `PayloadInspectOptions` surface, option grouping/editor
-hints, and optional `clock` resource picker hint for hosts that build palettes,
-editors, validators, or documentation views.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+`PayloadsComponentDesignMetadataProvider` describes:
 
-The optional `clock` resource remains host-owned with a key-pattern hint and is
-not represented as an editable node option.
+- canonical `FlowContent` input and `FlowResult<PayloadInspectionResult>` output
+- all `PayloadInspectOptions` fields with section, importance, and editor hints
+- optional host-owned codec-catalog and clock pickers
+- `Resources.{name}` key-pattern hints for both resources
+
+The metadata is descriptive only. Hosts own palette/inspector rendering,
+resource catalog binding, validation display, persistence, activation, and
+runtime mapping.

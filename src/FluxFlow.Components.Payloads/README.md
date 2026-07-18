@@ -1,103 +1,110 @@
 # FluxFlow.Components.Payloads
 
-A standalone payload-inspection node for FluxFlow.
+Standalone payload inspection for canonical `FlowContent`. The primary node
+preserves the exact content object and its lazy decoded `FlowValue`, creates
+bounded previews, and returns expected content failures as normal workflow data.
+No Engine runtime is required.
 
-## What it is
+## Canonical Node
 
-`PayloadInspectNode` is a self-contained TPL Dataflow processor. You post
-`PayloadInspectionRequest`s to its input and it broadcasts
-`PayloadInspectionResult`s on its output (failures on the error port, a
-diagnostic note on the event port). It needs **nothing else** — no engine,
-registry, or runtime:
-
-```csharp
-await using var node = new PayloadInspectNode();
-
-node.Output.LinkTo(logger.Input);   // broadcast: link the output to as many
-node.Output.LinkTo(mapper.Input);   // downstream nodes as you like
-
-await node.Input.SendAsync(FlowMessage.Create(new PayloadInspectionRequest
-{
-    Text = """{"name":"flux"}""",
-    ContentType = "application/json"
-}));
-```
-
-Messages travel as `FlowMessage<T>` envelopes, so the correlation id flows from
-the request through to the result for free.
-
-## Ports
-
-| Port | Block | Purpose |
-|------|-------|---------|
-| `Input` | `BufferBlock<FlowMessage<PayloadInspectionRequest>>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<FlowMessage<PayloadInspectionResult>>` | the inspection result, fanned out to every linked consumer |
-| `Errors` | `BroadcastBlock<FlowError>` | unexpected processing failures and unsupported encoding hints |
-| `Events` | `BroadcastBlock<FlowEvent>` | `payload.inspect.inspected` / `payload.inspect.failed` notes |
-
-Outputs are broadcast (latest-wins, no backpressure): a consumer that keeps up
-sees every message; one that falls badly behind may miss some. That is the
-deliberate trade for simplicity. If a graph genuinely must not drop, bridge that
-edge through its own bounded buffer.
-
-## What it does
-
-The node consumes `PayloadInspectionRequest` values and emits
-`PayloadInspectionResult` values. It can classify empty, JSON object, JSON
-array, JSON scalar, XML, base64, text, and binary payloads. For byte payloads,
-an explicit encoding hint wins; otherwise a content type `charset` value is
-used when present.
-
-Inspection results include byte count, detected encoding, text preview,
-formatted preview, parse error text when applicable, and truncation flags.
-Malformed JSON or XML remains a normal inspection result. An unsupported
-encoding hint (and any other unexpected processing failure) is emitted as a
-`FlowError` carrying the request's correlation id, and the node continues with
-later messages.
-
-Payloads larger than `maxInputBytes` (default 1048576) are not classified or
-formatted. They still emit a normal `PayloadInspectionResult` with the byte
-count and a "payload too large" formatted preview, not an error.
-
-## Request
+`FlowContentInspectNode` consumes `FlowMessage<FlowContent>` and emits
+`FlowMessage<FlowResult<PayloadInspectionResult>>` through one normal output.
 
 ```csharp
-new PayloadInspectionRequest
-{
-    Bytes = payloadBytes,
-    ContentType = "application/json",
-    EncodingHint = "utf-8"
-};
+var content = FlowContent.FromBytes(
+    Encoding.UTF8.GetBytes("""{"orderId":"order-42"}"""),
+    contentType: "application/json");
+
+await using var node = new FlowContentInspectNode();
+var results = new BufferBlock<
+    FlowMessage<FlowResult<PayloadInspectionResult>>>();
+node.Output.LinkTo(results);
+
+await node.Input.SendAsync(FlowMessage.Create(content));
+var result = (await results.ReceiveAsync()).Payload;
 ```
 
-Hosts can adapt any domain envelope into `PayloadInspectionRequest`. The
-package does not include transport-specific fields.
+The result keeps `PayloadInspectionResult.Content` as the exact input instance.
+`DecodedValue` is the value cached by `FlowContent.ReadAsFlowValue(...)`, so
+later components can reuse it without deserializing the original bytes again.
+The node does not convert content into mutable dictionaries or dynamic CLR
+objects.
+
+## Results
+
+The canonical output uses one result family:
+
+- `Inspected`: classification and previews succeeded.
+- `InputTooLarge`: the exact content is preserved but not decoded.
+- `DecodeFailed`: a selected content codec could not decode the bytes.
+- `ParseFailed`: declared JSON or XML was invalid.
+- `InspectFailed`: an unexpected per-message inspection operation failed.
+
+Failure variants set `IsError`, expose a stable `PayloadErrorCodeNames` code,
+retain the inspection value, and do not stop later messages. They are ordinary
+workflow data and can be filtered or mapped like any other result. The
+canonical node has no universal error port. Lifecycle and processing notes are
+published through `Events`.
+
+## Content Semantics
+
+The package-owned default codec catalog recognizes:
+
+- `application/json` and `+json` media types as JSON
+- `application/xml`, `text/xml`, and `+xml` media types as XML text
+- the `text/*` family as text
+- all unknown or missing media types as binary
+
+Inspection trusts declared media types. Bytes that happen to resemble JSON are
+not sniffed as JSON when their media type is unknown. Missing, invalid, or
+unsupported text encodings fall back to UTF-8 through the canonical content
+codec behavior.
+
+Hosts can supply a `FlowContentCodecCatalog` when they own additional media
+conventions:
+
+```csharp
+await using var node = new FlowContentInspectNode(
+    options: PayloadInspectOptions.Default,
+    codecs: hostCodecs,
+    clock: TimeProvider.System);
+```
+
+`PayloadKind` distinguishes empty, JSON object/array/scalar, XML, base64 text,
+text, binary, and already-decoded value content. Inspection can include byte
+count, detected encoding, text and formatted previews, truncation flags, parse
+details, and decoded base64 size.
 
 ## Options
 
 ```csharp
 new PayloadInspectOptions
 {
-    MaxInputBytes = 1_048_576,  // payloads past this skip classification/formatting
-    MaxPreviewBytes = 1024,     // text-preview byte cap
-    MaxFormattedChars = 4096,   // formatted-preview char cap
+    MaxInputBytes = 1_048_576,
+    MaxPreviewBytes = 1024,
+    MaxFormattedChars = 4096,
     DetectBase64 = true,
     FormatJson = true,
     FormatXml = true,
-    BoundedCapacity = 128       // input buffer size
+    BoundedCapacity = 128
 };
 ```
 
-Pass a `TimeProvider` as the second constructor argument to control the clock
-used for result/event/error timestamps (defaults to `TimeProvider.System`).
+`Input` is bounded and applies backpressure. `Output` and `Events` are
+broadcast sources, matching the standalone node-kit contract.
+
+## Request-Based Compatibility
+
+`PayloadInspectNode` remains available for existing code-authored workflows. It
+keeps its established `PayloadInspectionRequest -> PayloadInspectionResult`
+shape plus `Errors` and `Events`. New configuration-authored workflows should
+use `FlowContentInspectNode`; the compatibility node does not participate in
+the canonical `payload.inspect` Composition registration.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node. This package is just the standalone node.
-
-Use `FluxFlow.Components.Payloads.Composition` when a `FluxFlow.Composition`
-host should register the optional `payload.inspect` factory:
+Add `FluxFlow.Components.Payloads.Composition` when a Composition host should
+register the canonical `payload.inspect` factory and Designer metadata:
 
 ```csharp
 services
@@ -105,8 +112,6 @@ services
     .RegisterNodes(registry => registry.RegisterPayloadInspect());
 ```
 
-The composition adapter binds `PayloadInspectOptions` from node configuration
-and can resolve an optional host-owned keyed `TimeProvider` resource named
-`clock`. The request/result contracts and node behavior stay the same; the
-adapter does not add transport fields, payload sources, or formatting policy
-outside the existing options.
+The adapter can resolve optional host-owned keyed `FlowContentCodecCatalog` and
+`TimeProvider` resources. This runtime package does not own resource lifetime,
+configuration loading, links, or rendering.

@@ -1,13 +1,15 @@
+using System.Collections.Immutable;
+using System.Text;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Payloads;
 using FluxFlow.Components.Payloads.Composition;
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,16 +24,16 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public void RegisterPayloadInspect_registers_request_result_metadata()
+    public void RegisterPayloadInspect_registers_canonical_content_result_metadata()
     {
         var registry = new CompositionNodeRegistry()
             .RegisterPayloadInspect();
 
         var registration = registry.Registrations[PayloadsCompositionNodeTypes.Inspect];
         registration.Inputs[PayloadsCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(PayloadInspectionRequest));
+            .ShouldBe(typeof(FlowContent));
         registration.Outputs[PayloadsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(PayloadInspectionResult));
+            .ShouldBe(typeof(FlowResult<PayloadInspectionResult>));
     }
 
     [Fact]
@@ -45,12 +47,13 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         metadata.SuggestedEditorWidth.ShouldBe(420);
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
+            option.Name.Value == PayloadsCompositionResourceNames.Codecs ||
             option.Name.Value == PayloadsCompositionResourceNames.Clock);
-        AssertClockResource(metadata);
+        AssertResources(metadata);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_payload_ports()
+    public void Design_metadata_provider_describes_canonical_payload_ports()
     {
         var metadata = PayloadDesignMetadata();
 
@@ -60,14 +63,14 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(PayloadsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(PayloadInspectionRequest));
+        input.ValueType?.Value.ShouldBe(nameof(FlowContent));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(PayloadsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(PayloadInspectionResult));
+        output.ValueType?.Value.ShouldBe("FlowResult<PayloadInspectionResult>");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -87,193 +90,150 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             "boundedCapacity"
         ], ignoreOrder: false);
 
-        AssertOption(
-            metadata,
-            "maxInputBytes",
-            OptionValueKind.Number,
-            defaults.MaxInputBytes,
-            min: 1);
-        AssertOption(
-            metadata,
-            "maxPreviewBytes",
-            OptionValueKind.Number,
-            defaults.MaxPreviewBytes,
-            min: 1);
-        AssertOption(
-            metadata,
-            "maxFormattedChars",
-            OptionValueKind.Number,
-            defaults.MaxFormattedChars,
-            min: 1);
-        AssertOption(
-            metadata,
-            "detectBase64",
-            OptionValueKind.Boolean,
-            defaults.DetectBase64);
-        AssertOption(
-            metadata,
-            "formatJson",
-            OptionValueKind.Boolean,
-            defaults.FormatJson);
-        AssertOption(
-            metadata,
-            "formatXml",
-            OptionValueKind.Boolean,
-            defaults.FormatXml);
-        AssertOption(
-            metadata,
-            "boundedCapacity",
-            OptionValueKind.Number,
-            defaults.BoundedCapacity,
-            min: 1);
+        AssertOption(metadata, "maxInputBytes", OptionValueKind.Number, defaults.MaxInputBytes, 1);
+        AssertOption(metadata, "maxPreviewBytes", OptionValueKind.Number, defaults.MaxPreviewBytes, 1);
+        AssertOption(metadata, "maxFormattedChars", OptionValueKind.Number, defaults.MaxFormattedChars, 1);
+        AssertOption(metadata, "detectBase64", OptionValueKind.Boolean, defaults.DetectBase64);
+        AssertOption(metadata, "formatJson", OptionValueKind.Boolean, defaults.FormatJson);
+        AssertOption(metadata, "formatXml", OptionValueKind.Boolean, defaults.FormatXml);
+        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, defaults.BoundedCapacity, 1);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_payload_option_hints()
     {
-        var metadata = PayloadDesignMetadata();
-        var options = OptionsByName(metadata);
+        var options = OptionsByName(PayloadDesignMetadata());
 
-        AssertOptionHints(
-            options["maxInputBytes"],
-            "Limits",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["maxPreviewBytes"],
-            "Preview",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["maxFormattedChars"],
-            "Preview",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["detectBase64"],
-            "Detection",
-            OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            options["formatJson"],
-            "Formatting",
-            OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            options["formatXml"],
-            "Formatting",
-            OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            options["boundedCapacity"],
-            "Runtime",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(options["maxInputBytes"], "Limits", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(options["maxPreviewBytes"], "Preview", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(options["maxFormattedChars"], "Preview", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
+        AssertOptionHints(options["detectBase64"], "Detection", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(options["formatJson"], "Formatting", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(options["formatXml"], "Formatting", OptionDesignMetadataAttributeValues.Advanced);
+        AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_payload_resource_picker_hints()
+    public void Design_metadata_provider_describes_host_owned_resource_picker_hints()
     {
-        var metadata = PayloadDesignMetadata();
+        var resources = PayloadDesignMetadata().Resources;
 
         AssertResourceHints(
-            metadata.Resources.ShouldHaveSingleItem(),
+            resources.Single(resource => resource.Name.Value == PayloadsCompositionResourceNames.Codecs),
+            "codec-catalog",
+            "Resources.{name}");
+        AssertResourceHints(
+            resources.Single(resource => resource.Name.Value == PayloadsCompositionResourceNames.Clock),
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
-        var provider = new PayloadsComponentDesignMetadataProvider();
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            [new PayloadsComponentDesignMetadataProvider()]);
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
             new ComponentType(PayloadsCompositionNodeTypes.Inspect),
             out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull()
-            .DisplayName?.Value.ShouldBe("Payload Inspect");
+        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Payload Inspect");
     }
 
     [Fact]
-    public async Task Hosted_payload_inspect_classifies_json_and_preserves_correlation_id()
+    public async Task Hosted_payload_inspect_classifies_json_and_preserves_content()
     {
+        var content = FlowContent.FromBytes(
+            Encoding.UTF8.GetBytes("""{"name":"sample","count":2}"""),
+            "application/json");
+
         var result = await RunNodeAsync(
-            new PayloadInspectionRequest
-            {
-                Text = """{"name":"flux","count":2}""",
-                ContentType = "application/json"
-            },
+            content,
             node => node.Configure("maxPreviewBytes", 128));
 
         result.CorrelationId.ShouldBe(new CorrelationId("payload.inspect"));
-        result.Payload.Kind.ShouldBe(PayloadKind.JsonObject);
-        result.Payload.ContentType.ShouldBe("application/json");
-        result.Payload.TextPreview.ShouldNotBeNull().ShouldContain("\"name\"");
-        result.Payload.FormattedPreview.ShouldNotBeNull().ShouldContain("\n");
+        result.Payload.IsError.ShouldBeFalse();
+        var inspection = result.Payload.Value.ShouldNotBeNull();
+        inspection.Content.ShouldBeSameAs(content);
+        inspection.Kind.ShouldBe(PayloadKind.JsonObject);
+        inspection.TextPreview.ShouldNotBeNull().ShouldContain("\"name\"");
+        inspection.FormattedPreview.ShouldNotBeNull().ShouldContain("\n");
     }
 
     [Fact]
     public async Task Hosted_payload_inspect_binds_options_from_configuration()
     {
         var result = await RunNodeAsync(
-            new PayloadInspectionRequest
-            {
-                Text = """{"message":"abcdef"}""",
-                ContentType = "application/json"
-            },
+            FlowContent.FromBytes(
+                Encoding.UTF8.GetBytes("""{"message":"abcdef"}"""),
+                "application/json"),
             node => node
                 .Configure("maxPreviewBytes", 3)
                 .Configure("maxFormattedChars", 10));
 
-        result.Payload.TextPreview.ShouldBe("""{"m""");
-        result.Payload.TextPreviewTruncated.ShouldBeTrue();
-        result.Payload.FormattedPreview.ShouldNotBeNull();
-        result.Payload.FormattedPreview!.Length.ShouldBe(10);
-        result.Payload.FormattedPreviewTruncated.ShouldBeTrue();
+        var inspection = result.Payload.Value.ShouldNotBeNull();
+        inspection.TextPreview.ShouldBe("""{"m""");
+        inspection.TextPreviewTruncated.ShouldBeTrue();
+        inspection.FormattedPreview.ShouldNotBeNull().Length.ShouldBe(10);
+        inspection.FormattedPreviewTruncated.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task Hosted_payload_inspect_uses_optional_keyed_clock()
+    public async Task Hosted_payload_inspect_uses_optional_keyed_resources()
     {
-        var timestamp = DateTimeOffset.Parse("2026-06-18T12:00:00Z");
+        var timestamp = DateTimeOffset.Parse("2026-07-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
+        var codec = new FixedCodec(FlowValue.From("decoded"));
+        var catalog = new FlowContentCodecCatalog(
+        [
+            new(FlowContentCodecMatch.ExactMediaType, "application/example", codec)
+        ],
+        new BinaryFlowContentCodec());
+        var content = FlowContent.FromBytes(new byte[] { 1 }, "application/example");
 
         var result = await RunNodeAsync(
-            new PayloadInspectionRequest { Text = "hello" },
-            node => node.Resource(PayloadsCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+            content,
+            node => node
+                .Resource(PayloadsCompositionResourceNames.Codecs, "custom")
+                .Resource(PayloadsCompositionResourceNames.Clock, "fixed"),
+            services =>
+            {
+                services.AddKeyedSingleton("custom", catalog);
+                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
+            });
 
         result.Payload.Timestamp.ShouldBe(timestamp);
+        var inspection = result.Payload.Value.ShouldNotBeNull();
+        inspection.Timestamp.ShouldBe(timestamp);
+        inspection.DecodedValue.ShouldNotBeNull().GetString().ShouldBe("decoded");
+        codec.DecodeCount.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Hosted_payload_inspect_emits_errors_and_continues()
+    public async Task Hosted_payload_inspect_emits_expected_failures_as_results_and_continues()
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
+            descriptor.Errors.ShouldBeNull();
             var results = Link(output.Source);
-            var errors = Link(descriptor.Errors.ShouldNotBeNull());
             var bad = FlowMessage.Create(
-                new PayloadInspectionRequest
-                {
-                    Text = "hello",
-                    EncodingHint = "missing-encoding"
-                },
+                FlowContent.FromBytes(Encoding.UTF8.GetBytes("{"), "application/json"),
                 new CorrelationId("bad"));
             var good = FlowMessage.Create(
-                new PayloadInspectionRequest { Text = "hello" },
+                FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                 new CorrelationId("good"));
 
             (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
             (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
 
-            var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-            var result = await results.ReceiveAsync().WaitAsync(Timeout);
-
-            error.Code.ShouldBe(PayloadErrorCodes.UnsupportedEncoding);
-            error.CorrelationId.ShouldBe(bad.CorrelationId);
-            result.CorrelationId.ShouldBe(good.CorrelationId);
-            result.Payload.Kind.ShouldBe(PayloadKind.Text);
-            result.Payload.TextPreview.ShouldBe("hello");
+            var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+            var success = await results.ReceiveAsync().WaitAsync(Timeout);
+            failure.CorrelationId.ShouldBe(bad.CorrelationId);
+            failure.Payload.IsError.ShouldBeTrue();
+            failure.Payload.Error!.Code.ShouldBe(PayloadErrorCodeNames.ParseFailed);
+            success.CorrelationId.ShouldBe(good.CorrelationId);
+            success.Payload.IsError.ShouldBeFalse();
         });
     }
 
@@ -282,9 +242,10 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
-            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<PayloadInspectionResult>>());
+            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowResult<PayloadInspectionResult>>>());
             var events = Link(descriptor.Events.ShouldNotBeNull());
-            var message = FlowMessage.Create(new PayloadInspectionRequest { Text = "hello" });
+            var message = FlowMessage.Create(
+                FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello"), "text/plain"));
 
             (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
 
@@ -316,28 +277,24 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         host.Runtime.ShouldBeNull();
         host.Diagnostics.ShouldContain(diagnostic =>
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                "boundedCapacity",
-                StringComparison.OrdinalIgnoreCase));
+            diagnostic.Message.Contains("boundedCapacity", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static async Task<FlowMessage<PayloadInspectionResult>> RunNodeAsync(
-        PayloadInspectionRequest request,
+    private static async Task<FlowMessage<FlowResult<PayloadInspectionResult>>> RunNodeAsync(
+        FlowContent content,
         Action<NodeDefinitionBuilder>? configureNode = null,
         Action<IServiceCollection>? configureServices = null)
     {
-        FlowMessage<PayloadInspectionResult>? result = null;
+        FlowMessage<FlowResult<PayloadInspectionResult>>? result = null;
         await WithNodeAsync(
             async (input, output, _) =>
             {
                 var results = Link(output.Source);
                 var message = FlowMessage.Create(
-                    request,
+                    content,
                     new CorrelationId(PayloadsCompositionNodeTypes.Inspect));
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout))
-                    .ShouldBeTrue();
-
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
                 result = await results.ReceiveAsync().WaitAsync(Timeout);
             },
             configureNode,
@@ -353,9 +310,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
         ComponentDesignMetadata metadata)
-        => metadata.Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
+        => metadata.Options.ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
 
     private static void AssertOption(
         ComponentDesignMetadata metadata,
@@ -381,16 +336,11 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
             .ShouldBe(importance);
 
+        var editorName = new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor);
         if (editor is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
+            option.Attributes.ContainsKey(editorName).ShouldBeFalse();
         else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-                .ShouldBe(editor);
-        }
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor).ShouldBe(editor);
 
         option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
             .ShouldBeFalse();
@@ -398,15 +348,20 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             .ShouldBeFalse();
     }
 
-    private static void AssertClockResource(ComponentDesignMetadata metadata)
+    private static void AssertResources(ComponentDesignMetadata metadata)
     {
-        var resource = metadata.Resources.ShouldHaveSingleItem();
+        metadata.Resources.Count.ShouldBe(2);
+        var codecs = metadata.Resources[0];
+        codecs.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Codecs);
+        codecs.Order.ShouldBe(0);
+        codecs.IsRequired.ShouldBeFalse();
+        codecs.ValueType?.Value.ShouldBe(nameof(FlowContentCodecCatalog));
 
-        resource.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
-        resource.DisplayName?.Value.ShouldBe("Clock");
-        resource.Order.ShouldBe(0);
-        resource.IsRequired.ShouldBeFalse();
-        resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
+        var clock = metadata.Resources[1];
+        clock.Name.Value.ShouldBe(PayloadsCompositionResourceNames.Clock);
+        clock.Order.ShouldBe(1);
+        clock.IsRequired.ShouldBeFalse();
+        clock.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
     private static void AssertResourceHints(
@@ -429,8 +384,8 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
     private static async Task WithNodeAsync(
         Func<
-            CompositionInputPort<PayloadInspectionRequest>,
-            CompositionOutputPort<PayloadInspectionResult>,
+            CompositionInputPort<FlowContent>,
+            CompositionOutputPort<FlowResult<PayloadInspectionResult>>,
             ComposedNode,
             Task> run,
         Action<NodeDefinitionBuilder>? configureNode = null,
@@ -457,9 +412,9 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             .Nodes.ShouldHaveSingleItem()
             .Descriptor;
         var input = descriptor.Inputs[PayloadsCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<PayloadInspectionRequest>>();
+            .ShouldBeOfType<CompositionInputPort<FlowContent>>();
         var output = descriptor.Outputs[PayloadsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<PayloadInspectionResult>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<PayloadInspectionResult>>>();
 
         await run(input, output, descriptor);
     }
@@ -475,5 +430,18 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         var buffer = new BufferBlock<T>();
         source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
         return buffer;
+    }
+
+    private sealed class FixedCodec(FlowValue value) : IFlowContentCodec
+    {
+        private int _decodeCount;
+
+        public int DecodeCount => Volatile.Read(ref _decodeCount);
+
+        public FlowValue Decode(ImmutableArray<byte> content, string? encoding)
+        {
+            Interlocked.Increment(ref _decodeCount);
+            return value;
+        }
     }
 }

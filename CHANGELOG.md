@@ -7,6 +7,31 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Payloads 4.0.0
+
+Adds canonical content inspection while preserving the request-based node for
+code-authored compatibility.
+
+- Adds `FlowContentInspectNode`, which consumes exact `FlowContent` and emits
+  `FlowResult<PayloadInspectionResult>` through one normal output.
+- Preserves the original content instance and its cached decoded `FlowValue` so
+  downstream components can reuse decoding work.
+- Represents size, decode, parse, and inspection failures as normal result data
+  with stable string error codes and no universal error port.
+- Adds package-owned JSON, XML-text, text, and binary inspection conventions,
+  with optional host-provided codec catalogs.
+
+## FluxFlow.Components.Payloads.Composition 2.0.0
+
+Migrates `payload.inspect` to the canonical data and result contracts.
+
+- Changes the fixed ports to `FlowContent` Input and
+  `FlowResult<PayloadInspectionResult>` Output.
+- Adds an optional host-owned `FlowContentCodecCatalog` resource alongside the
+  optional clock and uses canonical `Resources.{name}` picker hints.
+- Removes the universal error channel from the canonical composed node;
+  expected content failures remain routable output values.
+
 ## FluxFlow.Components.Mapping 4.0.0
 
 Adds canonical transport-neutral expression mapping.

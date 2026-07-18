@@ -6,18 +6,19 @@
     <PackageId>FluxFlow.Components.Payloads</PackageId>
     <AssemblyName>FluxFlow.Components.Payloads</AssemblyName>
     <RootNamespace>FluxFlow.Components.Payloads</RootNamespace>
-    <Version>3.0.1</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>A standalone payload-inspection node for FluxFlow: classify a byte/text payload (JSON, XML, base64, text, binary, empty) and broadcast a result with bounded previews, plus error/event ports. No engine required.</Description>
+    <Description>Standalone FluxFlow payload inspection over canonical FlowContent, with reusable decoded FlowValue data, bounded previews, normal FlowResult outcomes, and a legacy request-based node. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;payloads;inspection</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical FlowContent inspection with one FlowResult output, reusable decoded FlowValue data, host-selectable codecs, and normal error results. The request-based PayloadInspectNode remains available for compatibility.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>
   <ItemGroup>

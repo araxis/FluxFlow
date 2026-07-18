@@ -2,6 +2,7 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Payloads.Composition;
 
@@ -18,7 +19,7 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
             .WithDisplay(
                 displayName: "Payload Inspect",
                 category: "Payloads",
-                summary: "Classifies payload content and creates bounded text or formatted previews.",
+                summary: "Inspects canonical content and returns normal success or error results with bounded previews.",
                 iconKey: "scan-search",
                 preferredNodeName: "inspect",
                 suggestedEditorWidth: 420);
@@ -105,15 +106,25 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                     OptionDesignMetadataAttributeValues.Number));
 
     private static void AddPayloadInspectResources(ComponentDesignMetadataBuilder builder)
-        => builder.AddResource(
-            PayloadsCompositionResourceNames.Clock,
-            displayName: "Clock",
-            order: 0,
-            summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
-            valueType: nameof(TimeProvider),
-            attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
-                ResourceDesignMetadataAttributeValues.Clock,
-                keyPattern: "clock:{name}"));
+        => builder
+            .AddResource(
+                PayloadsCompositionResourceNames.Codecs,
+                displayName: "Content Codecs",
+                order: 0,
+                summary: "Optional keyed codec catalog for host-owned media type conventions.",
+                valueType: nameof(FlowContentCodecCatalog),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    "codec-catalog",
+                    keyPattern: "Resources.{name}"))
+            .AddResource(
+                PayloadsCompositionResourceNames.Clock,
+                displayName: "Clock",
+                order: 1,
+                summary: "Optional keyed clock for deterministic payload inspection results and diagnostics.",
+                valueType: nameof(TimeProvider),
+                attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
+                    ResourceDesignMetadataAttributeValues.Clock,
+                    keyPattern: "Resources.{name}"));
 
     private static IReadOnlyDictionary<string, string> OptionAttributes(
         string section,
@@ -131,15 +142,15 @@ public sealed class PayloadsComponentDesignMetadataProvider : IComponentDesignMe
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
-                summary: "Payload inspection request.",
-                valueType: nameof(PayloadInspectionRequest),
+                summary: "Canonical content to inspect.",
+                valueType: nameof(FlowContent),
                 isPrimary: true)
             .AddOutputPort(
                 PayloadsCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Payload inspection result.",
-                valueType: nameof(PayloadInspectionResult),
+                summary: "Inspection value or expected content error.",
+                valueType: "FlowResult<PayloadInspectionResult>",
                 isPrimary: true);
 }

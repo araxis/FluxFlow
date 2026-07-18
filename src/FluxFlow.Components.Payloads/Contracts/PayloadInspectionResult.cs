@@ -1,8 +1,12 @@
+using FluxFlow.Data;
+
 namespace FluxFlow.Components.Payloads.Contracts;
 
 public sealed record PayloadInspectionResult
 {
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public FlowContent? Content { get; init; }
+    public FlowValue? DecodedValue { get; init; }
     public PayloadKind Kind { get; init; }
     public string? ContentType { get; init; }
     public int ByteCount { get; init; }

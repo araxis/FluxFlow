@@ -5,8 +5,9 @@ Status: accepted direction, implemented incrementally.
 This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
 port, system-signal, immutable DI provider-snapshot, transactional revision,
-MQTT vertical slice, and canonical FlowValue Mapping migration are implemented
-locally. The remaining component families are migrated incrementally.
+MQTT vertical slice, canonical FlowValue Mapping, and canonical FlowContent
+Payloads migration are implemented locally. The remaining component families
+are migrated incrementally.
 
 ## Package Ownership
 

@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-18 - vNext FlowContent Payload Inspection
+
+- Added `FlowContentInspectNode` with exact content preservation, one-time
+  cached `FlowValue` reuse, declared JSON/XML/text handling, binary fallback,
+  bounded previews, and one normal `FlowResult<PayloadInspectionResult>` output.
+- Kept size, decode, parse, null-input, and inspection failures on the normal
+  result stream so later messages continue; the canonical node has Events but
+  no universal Error port.
+- Migrated `payload.inspect` Composition and Designer metadata to canonical
+  `FlowContent`/`FlowResult` ports plus optional host-owned codec-catalog and
+  clock resources using `Resources.{name}` addresses.
+- Moved Payloads to `4.0.0` and Payloads Composition to `2.0.0`, updated package
+  docs/changelog/API baseline, and preserved the request-based standalone node.
+- Passed 1,998 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[217-vnext-payloads-flowcontent]].
+- Serialization is the next separately bounded component-family migration.
+
 ## 2026-07-18 - vNext FlowValue Mapping
 
 - Added `FlowValueMapperNode` with exact immutable FlowValue context, compile-once

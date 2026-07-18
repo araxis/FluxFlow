@@ -668,15 +668,18 @@ Main types:
 
 Use `RegisterPayloadInspect()` from the optional
 `FluxFlow.Components.Payloads.Composition` package when a composition host wants
-a `payload.inspect` node factory. The factory binds existing
-`PayloadInspectOptions` and can resolve an optional keyed `TimeProvider`
-resource through the host.
+a canonical `payload.inspect` node factory. The factory binds existing
+`PayloadInspectOptions`, consumes `FlowContent`, emits
+`FlowResult<PayloadInspectionResult>` through one normal output, and can resolve
+optional keyed `FlowContentCodecCatalog` and `TimeProvider` resources through
+the host. The request-based `PayloadInspectNode` remains available from the
+runtime package for code-authored compatibility.
 
 `PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `payload.inspect` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata includes options, fixed ports, and a resource hint for the optional
-`clock` resource.
+metadata includes options, canonical fixed ports, and host-owned picker hints
+for the optional `codecs` and `clock` resources.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
 

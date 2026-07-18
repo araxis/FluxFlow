@@ -480,6 +480,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `216-vnext-mapping-flowvalue.md`: canonical `FlowValue` mapping with one
   normal `FlowResult<FlowValue>` output, preserved typed compatibility,
   Composition/Designer migration, and package/consumer verification.
+- `217-vnext-payloads-flowcontent.md`: canonical `FlowContent` inspection with
+  cached `FlowValue` reuse, normal result failures, preserved request-based
+  compatibility, and Composition/package verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -5,9 +5,9 @@ Date: 2026-07-18
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/mapping-vnext`. The provider-neutral MQTT vertical slice and the first
-  normal component-family migration, canonical FlowValue Mapping, are
-  implemented and verified locally.
+  `work/payloads-vnext`. The provider-neutral MQTT vertical slice and the first
+  two normal component-family migrations, canonical FlowValue Mapping and
+  FlowContent Payloads, are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -22,8 +22,8 @@ Date: 2026-07-18
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
-  transactional-revision milestones. MQTT and Mapping now use this foundation;
-  the remaining component-family migrations continue separately. See
+  transactional-revision milestones. MQTT, Mapping, and Payloads now use this
+  foundation; the remaining component-family migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -100,8 +100,20 @@ Date: 2026-07-18
   metadata, while explicit generic registration preserves the prior typed
   surface. Focused/full tests, zero-warning controlled builds, binary
   compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Payloads is the next bounded family. See
+  passed. Payloads followed as the next bounded family. See
   `216-vnext-mapping-flowvalue.md`.
+- `FluxFlow.Components.Payloads` is now `4.0.0` locally with a canonical
+  `FlowContentInspectNode` that preserves exact content, exposes its cached
+  decoded `FlowValue`, trusts declared media conventions, and emits size,
+  decode, parse, and inspection failures as one normal
+  `FlowResult<PayloadInspectionResult>` output. The request-based
+  `PayloadInspectNode` remains available for code-authored compatibility.
+  `FluxFlow.Components.Payloads.Composition` is `2.0.0` with canonical ports,
+  no universal error output, and optional host-owned codec-catalog and clock
+  resources. Focused/full tests, zero-warning controlled builds, binary
+  compatibility, release preflight/dry-runs, and a package-only consumer
+  passed. Serialization is the next bounded family. See
+  `217-vnext-payloads-flowcontent.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer
