@@ -477,6 +477,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `215-vnext-mqtt-composition.md`: canonical nested MQTT resources, four vNext
   Composition nodes, signal-port metadata/runtime integration, package and
   consumer verification, and the component-family migration handoff.
+- `216-vnext-mapping-flowvalue.md`: canonical `FlowValue` mapping with one
+  normal `FlowResult<FlowValue>` output, preserved typed compatibility,
+  Composition/Designer migration, and package/consumer verification.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -767,6 +767,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var defaultPortNames = BuildDefaultRegistry(assembly, entry.PackageId)
+                .Registrations
+                .Values
+                .SelectMany(registration => registration.Inputs.Keys.Concat(registration.Outputs.Keys))
+                .ToHashSet(StringComparer.Ordinal);
             var metadataPorts = provider
                 .GetMetadata()
                 .SelectMany(metadata => metadata.Ports)
@@ -788,6 +793,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
             foreach (var portConstant in portConstants)
             {
+                if (!defaultPortNames.Contains(portConstant.Value))
+                    continue;
+
                 var portReference = $"{portTypeName}.{portConstant.Name}";
                 providerContent.Contains(portReference, StringComparison.Ordinal)
                     .ShouldBeTrue($"{entry.PackageId} provider must expose port '{portReference}'.");
@@ -1721,14 +1729,42 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string packageId)
     {
         var registry = new CompositionNodeRegistry();
+        var methods = ReadRegistryMethods(assembly, packageId);
 
-        foreach (var method in ReadRegistryMethods(assembly, packageId))
+        foreach (var method in methods
+                     .OrderBy(static method => method.IsGenericMethodDefinition))
         {
+            var defaultNodeTypes = ReadDefaultNodeTypes(method);
+            if (method.IsGenericMethodDefinition &&
+                defaultNodeTypes.Any(registry.Registrations.ContainsKey))
+            {
+                methods.Any(candidate =>
+                        !candidate.IsGenericMethodDefinition &&
+                        candidate.DeclaringType == method.DeclaringType &&
+                        candidate.Name == method.Name &&
+                        ReadDefaultNodeTypes(candidate).SequenceEqual(defaultNodeTypes))
+                    .ShouldBeTrue(
+                        $"{packageId} generic registry method '{method.Name}' duplicates a default node type without a matching canonical non-generic overload.");
+                // A canonical non-generic registration owns this default type;
+                // the generic overload remains an explicit compatibility path.
+                continue;
+            }
+
             InvokeRegistryMethod(method, registry, packageId);
         }
 
         return registry;
     }
+
+    private static string[] ReadDefaultNodeTypes(MethodInfo method)
+        => method
+            .GetParameters()
+            .Where(parameter =>
+                parameter.Name == "nodeType" &&
+                parameter.ParameterType == typeof(string) &&
+                parameter.HasDefaultValue)
+            .Select(parameter => (string)parameter.DefaultValue!)
+            .ToArray();
 
     private static MethodInfo[] ReadRegistryMethods(
         Assembly assembly,

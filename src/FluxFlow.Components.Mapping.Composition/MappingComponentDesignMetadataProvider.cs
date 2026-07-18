@@ -2,6 +2,7 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Components.Mapping.Options;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Mapping.Composition;
@@ -16,7 +17,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
             .WithDisplay(
                 displayName: "Mapper",
                 category: "Mapping",
-                summary: "Maps input messages with a host-provided expression engine.",
+                summary: "Maps FlowValue inputs and returns normal success or error results.",
                 iconKey: "map",
                 preferredNodeName: "map",
                 suggestedEditorWidth: 420)
@@ -64,7 +65,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                helperText: "Optional semantic type name for the FlowValue input.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -74,7 +75,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 OptionValueKind.Text,
                 displayName: "Output Type",
                 defaultValue: MapperOptions.ObjectTypeName,
-                helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.",
+                helperText: "Optional semantic type name for the mapped FlowValue.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -83,7 +84,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 "targetType",
                 OptionValueKind.Text,
                 displayName: "Target Type",
-                helperText: "Optional output type alias used when outputType is object.",
+                helperText: "Compatibility alias used when outputType is object.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -108,7 +109,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
-                    keyPattern: "expression-engine:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 MappingCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
@@ -117,7 +118,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(IMappingContextFactory),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
-                    keyPattern: "context-factory:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 MappingCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -126,29 +127,22 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddInputPort(
                 MappingCompositionPortNames.Input,
                 displayName: "Input",
-                group: "Messages",
+                group: "Values",
                 order: 0,
-                summary: "Input message.",
-                valueType: "TInput",
+                summary: "Immutable value to map.",
+                valueType: nameof(FlowValue),
                 isPrimary: true)
             .AddOutputPort(
                 MappingCompositionPortNames.Output,
                 displayName: "Output",
-                group: "Messages",
+                group: "Results",
                 order: 1,
-                summary: "Mapped output message.",
-                valueType: "TOutput",
+                summary: "Mapped FlowValue or expected mapping error.",
+                valueType: "FlowResult<FlowValue>",
                 isPrimary: true)
-            .AddOutputPort(
-                MappingCompositionPortNames.Failed,
-                displayName: "Failed",
-                group: "Messages",
-                order: 2,
-                summary: "Original input message when mapping fails.",
-                valueType: "TInput")
             .Build();
 }

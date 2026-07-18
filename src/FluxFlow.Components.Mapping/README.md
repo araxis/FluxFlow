@@ -1,110 +1,122 @@
 # FluxFlow.Components.Mapping
 
-A standalone mapper node for FluxFlow. It depends only on `FluxFlow.Nodes` and
-`FluxFlow.Mapping` — no engine, registry, or runtime. You `new` the node and
-`LinkTo` the next one.
+Standalone mapping nodes for FluxFlow. The primary `FlowValueMapperNode` maps
+transport-neutral `FlowValue` payloads without serializing them. The package
+depends on the data, node, and expression contracts only; it does not require an
+Engine runtime or choose an expression language.
 
-## Node
+## Nodes
 
 | Node | Shape | Purpose |
 |------|-------|---------|
-| `FlowMapperNode<TInput, TOutput>` | `Input` -> `Output`, `Failed` | Maps each message with a host-provided expression engine. |
+| `FlowValueMapperNode` | `Input` -> `Output` | Maps `FlowValue` and emits `FlowResult<FlowValue>` on one normal output. |
+| `FlowMapperNode<TInput,TOutput>` | `Input` -> `Output`, `Failed` | Preserved strongly typed compatibility surface. |
 
-Every message travels as a `FlowMessage<T>` envelope. The mapped result is
-broadcast on `Output` as `FlowMessage<TOutput>`, carrying the same correlation id
-as the input. When a mapping throws, the original input is fanned to `Failed`
-(as `FlowMessage<TInput>`, same correlation id) and a `FlowError` surfaces on
-`Errors`; the node keeps processing later messages.
+Both nodes compile `MapperOptions.Expression` once during construction and use
+a host-provided `IFlowExpressionEngine` for evaluation.
 
-The package does not choose an expression language. Applications provide an
-`IFlowExpressionEngine` (from `FluxFlow.Mapping`); the node compiles the mapping
-expression once at construction and evaluates the compiled form per message.
+## FlowValue Mapper
 
 ```csharp
 var options = new MapperOptions
 {
-    Expression = "...",
-    ExpressionName = "normalize-message",
-    InputType = "app.input",
-    OutputType = "app.output"
+    Expression = "input",
+    ExpressionName = "normalize-order",
+    InputType = "order.input",
+    OutputType = "order.normalized",
+    BoundedCapacity = 128
 };
 
+await using var node = new FlowValueMapperNode(options, expressionEngine);
+var results = new BufferBlock<FlowMessage<FlowResult<FlowValue>>>();
+node.Output.LinkTo(results);
+
+var input = FlowValue.FromObject(new Dictionary<string, FlowValue>
+{
+    ["orderId"] = FlowValue.From("order-42"),
+    ["total"] = FlowValue.From(125.50m)
+});
+
+await node.Input.SendAsync(FlowMessage.Create(input));
+var result = (await results.ReceiveAsync()).Payload;
+```
+
+The expression context receives the exact immutable `FlowValue` instance as
+both `input` and `value`. The mapper does not convert through JSON, dictionaries
+of `object`, or CLR dynamic objects.
+
+`Output` carries one normal result family:
+
+- Success: `Kind == MappingResultKinds.Mapped`, `IsError == false`, and `Value`
+  contains the mapped `FlowValue`.
+- Expected mapping failure: `Kind == MappingResultKinds.Failed`,
+  `IsError == true`, `Error.Code == MappingErrorCodeNames.MapperFailed`, and
+  `Value` retains the original input.
+
+Failure results preserve normal `FlowMessage` correlation and trace identity,
+create a new message identity through `With(...)`, and allow later messages to
+continue. There is no universal error port or separate failed branch on this
+canonical node.
+
+## Mapping Context
+
+Pass an `IMappingContextFactory` when expressions need additional data-shaped
+variables. Do not place mutable services, clients, or secrets in expression
+contexts.
+
+```csharp
+await using var node = new FlowValueMapperNode(
+    options,
+    expressionEngine,
+    contextFactory: appContextFactory,
+    clock: TimeProvider.System);
+```
+
+The context factory still receives the original `FlowValue`; no conversion is
+performed before context creation.
+
+## Typed Compatibility
+
+`FlowMapperNode<TInput,TOutput>` remains available for code-authored strongly
+typed workflows. Its established `Output`, `Failed`, `Errors`, and `Events`
+behavior is unchanged.
+
+```csharp
 await using var node = new FlowMapperNode<AppInput, AppOutput>(
     options,
-    appExpressionEngine,
+    expressionEngine,
     contextFactory: new TypedMappingContextFactory<AppInput>(new AppInputContextFactory()));
 
-node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
-node.Failed.LinkTo(deadLetterSink, new DataflowLinkOptions { PropagateCompletion = false });
-
+node.Output.LinkTo(resultSink);
+node.Failed.LinkTo(deadLetterSink);
 await node.Input.SendAsync(FlowMessage.Create(appInput));
 ```
 
-`TInput` and `TOutput` are the real CLR types the node maps between. `MapperOptions`
-carries the descriptive metadata (`InputType`, `OutputType`/`targetType`,
-`ExpressionId`, `ExpressionName`) used in diagnostics and error context, plus the
-`Expression` itself and the input `BoundedCapacity`.
-`Expression` is required, and `BoundedCapacity` must be greater than zero.
-Invalid options fail fast during node construction.
+Use this surface when the host deliberately owns closed CLR message types. New
+configuration-authored workflows should prefer the canonical `FlowValue`
+contract.
 
-## Mapping context
+## Validation And Diagnostics
 
-By default the node exposes the message payload as the `input` and `value`
-variables on the per-message `FlowMapContext`. Pass an `IMappingContextFactory`
-(for example a `TypedMappingContextFactory<TInput>` wrapping an
-`IFlowMapContextFactory<TInput>` from `FluxFlow.Mapping`) to control the variables
-each expression evaluates against:
-
-```csharp
-var node = new FlowMapperNode<AppInput, AppOutput>(
-    options,
-    appExpressionEngine,
-    contextFactory: new TypedMappingContextFactory<AppInput>(new AppInputContextFactory()));
-```
-
-## Behavior
-
-Mapping failures emit a `FlowError` on `Errors` (carrying the input's correlation
-id and `MappingErrorCodes.MapperFailed`), fan the original input to `Failed`, and
-the node keeps processing later messages. A compiled-mapper path that returns a
-wrong-typed or null value surfaces a clearer "incompatible or null value" message
-naming the expected output type. Per-message `flow.mapper.succeeded` /
-`flow.mapper.failed` events flow on the `Events` port with input type, output
-type, engine name, and the expression id/name when supplied.
-
-## Runtime timing
-
-Diagnostics use the node's clock for `Timestamp` (default `TimeProvider.System`).
-Provide a deterministic clock for tests:
-
-```csharp
-new FlowMapperNode<AppInput, AppOutput>(options, engine, clock: new FakeTimeProvider(timestamp));
-```
+`Expression` is required and `BoundedCapacity` must be greater than zero.
+Invalid options fail during construction. Per-message
+`flow.mapper.succeeded`/`flow.mapper.failed` diagnostics include the declared
+input/output types, engine name, and optional expression id/name. Diagnostic
+timestamps use the supplied `TimeProvider` or `TimeProvider.System`.
 
 ## Composition
 
-Add `FluxFlow.Components.Mapping.Composition` when a host wants to instantiate
-mapper nodes from `FluxFlow.Composition` fluent/config definitions. That optional
-package registers closed generic `FlowMapperNode<TInput,TOutput>` factories.
+Add `FluxFlow.Components.Mapping.Composition` for the canonical `flow.mapper`
+factory and Designer metadata:
 
 ```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
+services.AddKeyedSingleton<IFlowExpressionEngine>(
+    "Resources.Expressions.Primary",
+    expressionEngine);
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterMapper<AppInput, AppOutput>());
+registry.RegisterMapper();
 ```
 
-Use custom node type names when one host needs several mapper type pairs:
-
-```csharp
-registry.RegisterMapper<HttpResponseOutput, MqttPublishRequest>(
-    "flow.mapper.http-to-mqtt");
-```
-
-Composition resolves the expression engine from the keyed `engine` resource.
-Optional keyed `contextFactory` and `clock` resources can provide custom mapping
-context variables and deterministic diagnostics. The configured `InputType`,
-`OutputType`, and `targetType` remain diagnostic metadata; CLR port types come
-from the closed generic registration.
+The optional composition package also preserves
+`RegisterMapper<TInput,TOutput>()` for explicit typed compatibility
+registrations.

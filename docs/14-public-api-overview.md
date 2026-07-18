@@ -350,19 +350,21 @@ Main types:
 - `MappingCompositionPortNames`
 - `MappingCompositionResourceNames`
 
-Use `RegisterMapper<TInput,TOutput>()` from the optional
-`FluxFlow.Components.Mapping.Composition` package when a composition host wants
-closed generic `flow.mapper` node factories. The factory resolves a keyed
-`IFlowExpressionEngine` resource; optional keyed context factory and clock
-resources stay host-owned. Invalid mapper options fail during build as factory
-diagnostics when the host is configured to collect build failures.
+Use parameterless `RegisterMapper()` for the canonical `flow.mapper` contract:
+`FlowValue` input and one `FlowResult<FlowValue>` output. Expected expression
+failures remain normal result data and retain the original value; the canonical
+node has no `Failed` or universal error port. The factory resolves a keyed
+`IFlowExpressionEngine`; optional keyed context factory and clock resources stay
+host-owned. `RegisterMapper<TInput,TOutput>()` remains available as an explicit
+strongly typed compatibility registration.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `flow.mapper` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata includes editable options with section/editor hints, ports, and
-host-owned resource picker hints for the required `engine` resource plus
-optional `contextFactory` and `clock` resources.
+metadata includes editable options with section/editor hints, canonical
+`FlowValue`/`FlowResult<FlowValue>` ports, and host-owned resource picker hints
+using `Resources.{name}` for the required `engine` resource plus optional
+`contextFactory` and `clock` resources.
 
 ## Assertions Composition
 

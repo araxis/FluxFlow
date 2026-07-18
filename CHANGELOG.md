@@ -7,6 +7,30 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mapping 4.0.0
+
+Adds canonical transport-neutral expression mapping.
+
+- Adds `FlowValueMapperNode`, which maps immutable `FlowValue` payloads without
+  JSON round trips and emits `FlowResult<FlowValue>` on one normal output.
+- Represents expected expression failures as result data with a stable
+  `FlowError` code while preserving the original value and continuing later
+  inputs.
+- Preserves `FlowMapperNode<TInput,TOutput>` as the strongly typed compatibility
+  surface.
+
+## FluxFlow.Components.Mapping.Composition 2.0.0
+
+Migrates the canonical `flow.mapper` composition contract to vNext data
+contracts.
+
+- Parameterless `RegisterMapper()` exposes `FlowValue` input and
+  `FlowResult<FlowValue>` output without a failure port.
+- Keeps explicit `RegisterMapper<TInput,TOutput>()` registrations for typed
+  compatibility.
+- Updates Designer metadata to the canonical ports and exact
+  `Resources.{name}` host-owned resource-address pattern.
+
 ## FluxFlow.Components.Mqtt.Composition 2.0.0
 
 Replaces the legacy adapter-resource composition surface with the canonical

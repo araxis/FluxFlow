@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
@@ -487,6 +488,7 @@ public sealed class CompositionServiceProviderSnapshotTests
         public IDisposable LinkTo(ITargetBlock<T> target, DataflowLinkOptions linkOptions)
             => _block.LinkTo(target, linkOptions);
 
+        [return: MaybeNull]
         public T ConsumeMessage(
             DataflowMessageHeader messageHeader,
             ITargetBlock<T> target,

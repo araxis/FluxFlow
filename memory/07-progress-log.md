@@ -2,6 +2,22 @@
 
 Date: 2026-05-31
 
+## 2026-07-18 - vNext FlowValue Mapping
+
+- Added `FlowValueMapperNode` with exact immutable FlowValue context, compile-once
+  expressions, and one normal `FlowResult<FlowValue>` output for success and
+  expected failure variants; no JSON round trip or universal Error/Failed port.
+- Made parameterless `RegisterMapper()` the canonical Composition registration,
+  preserved explicit generic registrations, and migrated Designer metadata to
+  canonical ports and `Resources.{name}` resource addresses.
+- Moved Mapping to `4.0.0` and Mapping Composition to `2.0.0`, updated package
+  docs/changelog/API baseline, and kept prior binary declarations compatible.
+- Passed 1,989 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[216-vnext-mapping-flowvalue]].
+- Payloads is the next separately bounded component-family migration.
+
 ## 2026-07-18 - vNext MQTT Composition
 
 - Added canonical nested MQTT resource binding for brokers, logical clients,

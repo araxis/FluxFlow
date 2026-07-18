@@ -5,9 +5,9 @@ Date: 2026-07-18
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/mqtt-composition-vnext`. The provider-neutral MQTT core, both concrete
-  transport adapters, and canonical MQTT Composition milestone are implemented
-  and verified locally.
+  `work/mapping-vnext`. The provider-neutral MQTT vertical slice and the first
+  normal component-family migration, canonical FlowValue Mapping, are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -22,9 +22,8 @@ Date: 2026-07-18
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
-  transactional-revision milestones. MQTT core and its concrete adapters now
-  use this foundation; Composition and broader component-family migration
-  continue separately. See
+  transactional-revision milestones. MQTT and Mapping now use this foundation;
+  the remaining component-family migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -90,9 +89,19 @@ Date: 2026-07-18
   validation, and Designer metadata. `FluxFlow.Components.Designer` is now
   `2.18.0` with message/signal port hints. Focused and complete tests,
   controlled builds, package checks, and a package-only consumer passed. The
-  broader component-family migration is the next bounded lane. See
+  broader component-family migration began with Mapping. See
   `213-vnext-mqtt-core.md`, `214-vnext-mqtt-adapters.md`, and
   `215-vnext-mqtt-composition.md`.
+- `FluxFlow.Components.Mapping` is now `4.0.0` locally with a canonical
+  `FlowValueMapperNode` that consumes `FlowValue` without serialization and
+  emits success or expected failure as one `FlowResult<FlowValue>` output.
+  `FluxFlow.Components.Mapping.Composition` is `2.0.0`; parameterless
+  `RegisterMapper()` owns the canonical `flow.mapper` contract and Designer
+  metadata, while explicit generic registration preserves the prior typed
+  surface. Focused/full tests, zero-warning controlled builds, binary
+  compatibility, release preflight/dry-runs, and a package-only consumer
+  passed. Payloads is the next bounded family. See
+  `216-vnext-mapping-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

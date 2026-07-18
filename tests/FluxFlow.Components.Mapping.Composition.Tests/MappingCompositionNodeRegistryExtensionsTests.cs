@@ -5,6 +5,8 @@ using FluxFlow.Components.Mapping.Composition;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Model;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +18,20 @@ namespace FluxFlow.Components.Mapping.Composition.Tests;
 
 public sealed class MappingCompositionNodeRegistryExtensionsTests
 {
+    [Fact]
+    public void RegisterMapper_registers_canonical_flow_value_contract()
+    {
+        var registry = new CompositionNodeRegistry().RegisterMapper();
+
+        var mapper = registry.Registrations[MappingCompositionNodeTypes.Mapper];
+        mapper.Inputs.Keys.ShouldBe([MappingCompositionPortNames.Input]);
+        mapper.Outputs.Keys.ShouldBe([MappingCompositionPortNames.Output]);
+        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(FlowValue));
+        mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(FlowResult<FlowValue>));
+    }
+
     [Fact]
     public void RegisterMapper_registers_closed_mapper_metadata()
     {
@@ -129,15 +145,15 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         AssertResourceHints(
             resources[MappingCompositionResourceNames.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            "expression-engine:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[MappingCompositionResourceNames.ContextFactory],
             ResourceDesignMetadataAttributeValues.ContextFactory,
-            "context-factory:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[MappingCompositionResourceNames.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
@@ -153,10 +169,73 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-            (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "TOutput"),
-            (MappingCompositionPortNames.Failed, PortDirection.Output, 2, false, "TInput")
+            (MappingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+            (MappingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValue>")
         ]);
+    }
+
+    [Fact]
+    public async Task Canonical_factory_maps_flow_value_from_flat_definition()
+    {
+        FlowValue? observedInput = null;
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, resultType) =>
+            {
+                resultType.ShouldBe(typeof(FlowValue));
+                observedInput = context.Variables["input"].ShouldBeOfType<FlowValue>();
+                return FlowValue.FromObject(new Dictionary<string, FlowValue>
+                {
+                    ["mapped"] = observedInput.GetObject()["value"]
+                });
+            });
+        var definition = ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {
+                "Expressions": {
+                  "Primary": { "Type": "host.expression" }
+                }
+              },
+              "Workflows": {
+                "Main": {
+                  "Map": {
+                    "Type": "flow.mapper",
+                    "engine": "Resources.Expressions.Primary",
+                    "expression": "map",
+                    "boundedCapacity": 8
+                  }
+                }
+              }
+            }
+            """);
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>(
+            "Resources.Expressions.Primary",
+            engine);
+        await using var provider = services.BuildServiceProvider();
+        var registry = new CompositionNodeRegistry().RegisterMapper();
+        var component = definition.Workflows["Main"].Components["Map"];
+        await using var composed = await registry.Registrations[component.Type].Factory(
+            new CompositionNodeFactoryContext(provider, "Main", "Map", component));
+        var input = composed.Inputs[MappingCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        var output = composed.Outputs[MappingCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValue>>>();
+        var results = new BufferBlock<FlowMessage<FlowResult<FlowValue>>>();
+        output.Source.LinkTo(results);
+        var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["value"] = FlowValue.From("input")
+        });
+
+        (await input.Target.SendAsync(FlowMessage.Create(value))).ShouldBeTrue();
+
+        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        result.IsError.ShouldBeFalse();
+        result.Value!.GetObject()["mapped"].GetString().ShouldBe("input");
+        observedInput.ShouldBeSameAs(value);
+        composed.Errors.ShouldBeNull();
+        composed.Outputs.ContainsKey(MappingCompositionPortNames.Failed).ShouldBeFalse();
     }
 
     [Fact]

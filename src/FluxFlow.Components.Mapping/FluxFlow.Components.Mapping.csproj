@@ -6,18 +6,19 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>3.0.2</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>A standalone mapper node for FluxFlow: an input in, a mapped output broadcast out, the original input fanned to a Failed port on error. Maps each message with a host-provided expression engine (compiled once). No engine required.</Description>
+    <Description>Standalone mapping nodes for FluxFlow, including a transport-neutral FlowValue mapper with normal success/error results and the existing strongly typed mapper surface. No engine runtime required.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a standalone FlowValue mapper that evaluates compiled expressions without JSON round trips and emits expected mapping failures as normal FlowResult values.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>

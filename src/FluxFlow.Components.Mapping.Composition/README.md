@@ -1,93 +1,93 @@
 # FluxFlow.Components.Mapping.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone mapper
-node from `FluxFlow.Components.Mapping`.
+Optional `FluxFlow.Composition` registration helpers and Designer metadata for
+mapping components. The canonical `flow.mapper` contract consumes `FlowValue`
+and emits `FlowResult<FlowValue>` on one normal output.
 
-This package does not choose an expression language, scan assemblies, or resolve
-CLR types from strings. Hosts register closed mapper node types explicitly and
-provide keyed `IFlowExpressionEngine` services.
+The package does not choose an expression language, scan assemblies, resolve
+CLR types from strings, or own expression-engine resources.
 
-## Registration
-
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMapper<InputMessage, OutputMessage>());
-```
-
-Use custom node type names when a host needs more than one mapper shape:
+## Canonical Registration
 
 ```csharp
-registry
-    .RegisterMapper<HttpResponseOutput, MqttPublishRequest>("flow.mapper.http-to-mqtt")
-    .RegisterMapper<MqttReceivedMessage, HttpRequestInput>("flow.mapper.mqtt-to-http");
+services.AddKeyedSingleton<IFlowExpressionEngine>(
+    "Resources.Expressions.Primary",
+    expressionEngine);
+
+registry.RegisterMapper();
 ```
 
-## Node Types
+| Type | Node | Input | Output |
+|------|------|-------|--------|
+| `flow.mapper` | `FlowValueMapperNode` | `FlowValue` | `FlowResult<FlowValue>` |
 
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `flow.mapper` | `FlowMapperNode<TInput,TOutput>` | `engine` | `Input`, `Output`, `Failed` |
+The output result distinguishes mapped values from expected expression failures
+through `Kind`, `IsError`, and `Error`. The canonical contract has no `Failed`
+port and no universal error output.
 
-`contextFactory` is an optional keyed `IMappingContextFactory` resource for
-custom expression variables. `clock` is an optional keyed `TimeProvider` resource
-for deterministic diagnostics.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "map": {
-              "type": "flow.mapper",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input",
-                "expressionName": "copy",
-                "inputType": "app.input",
-                "outputType": "app.output",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Expressions": {
+      "Primary": {
+        "Type": "host.expression"
+      }
+    }
+  },
+  "Workflows": {
+    "Main": {
+      "MapOrder": {
+        "Type": "flow.mapper",
+        "engine": "Resources.Expressions.Primary",
+        "expression": "input",
+        "expressionName": "normalize-order",
+        "inputType": "order.input",
+        "outputType": "order.normalized",
+        "boundedCapacity": 128
       }
     }
   }
 }
 ```
 
-`MapperOptions.InputType`, `OutputType`, and `targetType` remain diagnostic
-metadata. The actual composition port types come from the closed generic
-registration selected by the host.
-Invalid `MapperOptions`, such as a missing expression or non-positive
-`boundedCapacity`, fail during composition build and surface as factory
-diagnostics when build failures are configured as diagnostics.
+Component settings and resource references are flat. Hosts register the
+referenced expression engine as a keyed `IFlowExpressionEngine` using the exact,
+case-sensitive resource address.
+
+`contextFactory` is an optional keyed `IMappingContextFactory` reference and
+`clock` is an optional keyed `TimeProvider` reference. Their addresses follow
+the same `Resources.{name}` pattern. The host owns registration, lifetime, and
+disposal of all three resources.
+
+Invalid options, such as a missing `expression` or non-positive
+`boundedCapacity`, fail during node activation.
+
+## Typed Compatibility Registration
+
+Existing code-authored hosts can retain explicit CLR contracts:
+
+```csharp
+registry.RegisterMapper<InputMessage, OutputMessage>(
+    "flow.mapper.typed");
+```
+
+That overload creates `FlowMapperNode<TInput,TOutput>` and preserves its
+`Input`, `Output`, and `Failed` ports. Use a distinct node type when canonical
+and typed registrations share one registry. `InputType`, `OutputType`, and
+`targetType` remain diagnostic metadata; the closed generic arguments determine
+the actual typed port contracts.
 
 ## Design Metadata
 
-`MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.mapper` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
+`MappingComponentDesignMetadataProvider` describes the canonical node:
 
-The provider describes editable options, host-owned resources, and ports. The
-`engine` resource is required; `contextFactory` and `clock` are optional.
-The mapper option metadata includes section, importance, editor, syntax, and
-related-resource hints so hosts can build more useful inspectors without
-hard-coding mapper-specific UI rules. Resource metadata includes host-owned
-picker hints and key patterns for the `engine`, `contextFactory`, and `clock`
-resources.
+- `Input`: `FlowValue`
+- `Output`: `FlowResult<FlowValue>`
+- required `engine` resource, plus optional `contextFactory` and `clock`
+- option section, importance, editor, syntax, and related-resource hints
+- host-owned resource pickers using `Resources.{name}` key patterns
 
-All option and resource metadata is descriptive only. Hosts still own
-registration, selection, lifetime, rendering, validation UI, and disposal of
-keyed services.
+The metadata is descriptive only. Hosts own palette and inspector rendering,
+resource selection, validation UI, activation, and persistence.
