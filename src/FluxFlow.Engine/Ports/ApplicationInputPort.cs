@@ -14,9 +14,20 @@ internal interface IApplicationInputPort
 
     ApplicationPortStatus GetStatus();
 
+    ValueTask<IApplicationInputRevision> BeginRevisionAsync(CancellationToken cancellationToken);
+
     void Complete();
 
     void Abort();
+}
+
+internal interface IApplicationInputRevision : IAsyncDisposable
+{
+    ApplicationAddress Address { get; }
+
+    Type PayloadType { get; }
+
+    IAsyncDisposable Commit(object? target);
 }
 
 internal sealed class ApplicationInputPort<T> : IApplicationInputPort
@@ -137,9 +148,23 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
-        cancellationToken.ThrowIfCancellationRequested();
+        var revision = await BeginRevisionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return revision.Commit(target);
+        }
+        finally
+        {
+            await revision.DisposeAsync().ConfigureAwait(false);
+        }
+    }
 
+    public async ValueTask<IApplicationInputRevision> BeginRevisionAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         await _attachmentGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
         try
         {
             Task waitForIdle;
@@ -153,64 +178,22 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                 waitForIdle = _inflightIdle.Task;
             }
 
-            try
-            {
-                await waitForIdle.WaitAsync(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            catch
-            {
-                lock (_gate)
-                {
-                    _paused = false;
-                    Pulse();
-                }
+            await waitForIdle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
 
-                throw;
-            }
-
-            long generation;
             lock (_gate)
             {
-                if (_aborted)
-                {
-                    _paused = false;
-                    Pulse();
-                    throw new ObjectDisposedException(GetType().FullName);
-                }
-
+                ObjectDisposedException.ThrowIf(_aborted, this);
                 if (_completeRequested)
-                {
-                    _paused = false;
-                    Pulse();
                     throw new InvalidOperationException($"Input port '{Address}' is completed.");
-                }
-
-                _target = target;
-                generation = ++_generation;
-                _paused = false;
-                Pulse();
             }
 
-            _ = target.Completion.ContinueWith(
-                static (task, state) =>
-                {
-                    var completion = (TargetCompletion)state!;
-                    completion.Owner.HandleTargetCompletion(
-                        completion.Target,
-                        completion.Generation,
-                        task);
-                },
-                new TargetCompletion(this, target, generation),
-                CancellationToken.None,
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
-
-            return new InputAttachment(this, generation);
+            return new InputRevision(this);
         }
-        finally
+        catch
         {
-            _attachmentGate.Release();
+            EndRevision();
+            throw;
         }
     }
 
@@ -439,6 +422,61 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         }
     }
 
+    private IAsyncDisposable CommitRevision(object? target)
+    {
+        if (target is not null && target is not ITargetBlock<FlowMessage<T>>)
+        {
+            throw new InvalidOperationException(
+                $"Input port '{Address}' requires target payload type '{typeof(T)}'.");
+        }
+
+        var typedTarget = (ITargetBlock<FlowMessage<T>>?)target;
+        long generation;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_aborted, this);
+            if (_completeRequested)
+                throw new InvalidOperationException($"Input port '{Address}' is completed.");
+
+            _target = typedTarget;
+            generation = ++_generation;
+        }
+
+        if (typedTarget is not null)
+            ObserveTargetCompletion(typedTarget, generation);
+        return new InputAttachment(this, generation);
+    }
+
+    private void ObserveTargetCompletion(
+        ITargetBlock<FlowMessage<T>> target,
+        long generation)
+    {
+        _ = target.Completion.ContinueWith(
+            static (task, state) =>
+            {
+                var completion = (TargetCompletion)state!;
+                completion.Owner.HandleTargetCompletion(
+                    completion.Target,
+                    completion.Generation,
+                    task);
+            },
+            new TargetCompletion(this, target, generation),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private void EndRevision()
+    {
+        lock (_gate)
+        {
+            _paused = false;
+            Pulse();
+        }
+
+        _attachmentGate.Release();
+    }
+
     private void HandleTargetCompletion(
         ITargetBlock<FlowMessage<T>> target,
         long generation,
@@ -534,6 +572,33 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0)
                 await owner.DetachAsync(generation).ConfigureAwait(false);
+        }
+    }
+
+    private sealed class InputRevision(ApplicationInputPort<T> owner) :
+        IApplicationInputRevision
+    {
+        private int _committed;
+        private int _disposed;
+
+        public ApplicationAddress Address => owner.Address;
+
+        public Type PayloadType => owner.PayloadType;
+
+        public IAsyncDisposable Commit(object? target)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+                throw new ObjectDisposedException(nameof(InputRevision));
+            if (Interlocked.Exchange(ref _committed, 1) != 0)
+                throw new InvalidOperationException($"Input port '{Address}' revision was already committed.");
+            return owner.CommitRevision(target);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                owner.EndRevision();
+            return ValueTask.CompletedTask;
         }
     }
 

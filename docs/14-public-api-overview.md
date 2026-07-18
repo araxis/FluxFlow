@@ -101,6 +101,10 @@ Main types:
 - `FluxFlow.Composition.Links.CompiledApplicationLink`
 - `FluxFlow.Composition.Links.ApplicationLinkDiagnostic`
 - `FluxFlow.Composition.Links.ApplicationSystemOutputMetadata`
+- `FluxFlow.Composition.Revisions.ApplicationRevisionPlanner`
+- `FluxFlow.Composition.Revisions.ApplicationRevisionPlan`
+- `FluxFlow.Composition.Revisions.ApplicationRevisionEvent`
+- `FluxFlow.Composition.Revisions.IApplicationRevisionEventSink`
 - `ApplicationDefinitionConfigurationLoader`
 
 The vNext canonical document is immutable and has exactly two case-sensitive
@@ -119,6 +123,11 @@ type mismatches, duplicate or exclusive claims, and cycles. Successful links
 preserve their declaration side for Designer persistence. Engine-owned system
 streams contribute type metadata through `ApplicationSystemOutputMetadata`.
 The compiler does not activate or route links.
+
+`ApplicationRevisionPlanner` compares complete canonical definitions, computes
+resource/workflow changes and transitive resource dependents, and rejects
+missing resource references or dependency cycles. Shared revision events are
+normal transport records; hosts provide the event sink and activation policy.
 
 The following types remain the current executable composition compatibility
 surface while runtime binding migrates to the canonical model:
@@ -183,6 +192,11 @@ Main types:
 - `CompositionServiceProviderSnapshot`
 - `CompositionProviderBoundary`
 - `CompositionProviderSnapshotInfo`
+- `ApplicationRevisionCoordinator`
+- `IApplicationRevisionCandidateFactory`
+- `IApplicationRevisionCandidate`
+- `ApplicationRevisionSnapshot`
+- `ApplicationRevisionUpdateResult`
 - `FluxFlowServiceCollectionExtensions`
 
 Use these types when a .NET host wants DI to load, build, start, stop, and
@@ -208,6 +222,12 @@ keys for resources, components, typed input/output ports, and
 instance/provider externally owned. Snapshots do not scan, merge providers, or
 perform fallback resolution. Scopes are available through the snapshot
 provider but are never created per message implicitly.
+
+The revision coordinator serializes complete-definition updates. Candidate
+factories build replacements outside live routing; successful activation is
+followed by one immutable current snapshot and old-candidate drain/disposal.
+Preactivation failure preserves the old revision. Cleanup failures after commit
+are reported without rolling back the new definition.
 
 ## Fluent DSL
 
@@ -1188,6 +1208,10 @@ Main types:
 
 - `ApplicationPortRuntimeBuilder`
 - `ApplicationPortRuntime`
+- `ApplicationPortRevisionBuilder`
+- `ApplicationPortRevision`
+- `ApplicationPortRevisionLease`
+- `ApplicationPortRevisionInfo`
 - `ApplicationPortMetadata`
 - `PortSendResult`
 - `PortReceiveResult<T>`
@@ -1207,9 +1231,11 @@ completed, and timeout states are result values; caller cancellation remains a
 canceled operation.
 
 The bounded `Rejections` stream records port-local delivery failures. Canonical
-system events and diagnostics are described below. Immutable DI provider
-snapshots are available through Composition.Hosting; transactional activation
-and revision swapping remain a separate later milestone.
+system events and diagnostics are described below. A prepared revision stages
+replacement sources, pauses only affected dispatchers, replaces input targets,
+and swaps a complete immutable compiled-link snapshot. Stable addresses and
+exact payload types must already be registered; queued payload migration and
+dynamic runtime port creation remain deferred.
 
 ## Canonical Runtime Signals
 
@@ -1243,6 +1269,8 @@ returns `false` immediately on overflow. Both streams use `FlowMessage<T>` as
 the only trace, correlation, message, and causation authority. Events and
 diagnostics therefore remain normal workflow data without duplicating envelope
 identity in their payloads.
+`ApplicationPortRuntime` implements the shared revision-event sink and maps
+revision phases into the same reliable system stream.
 
 `ApplicationRuntimeStatus` and `ApplicationPortStatus` are snapshots exposed by
 the stable-port runtime; they are not a universal State port. Runtime failures,

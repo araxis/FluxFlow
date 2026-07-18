@@ -5,8 +5,8 @@ Date: 2026-07-17
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/di-resource-snapshots-vnext`. The immutable DI resource/provider
-  snapshot milestone is implemented and verified locally.
+  `work/transactional-revisions-vnext`. The transactional application revision
+  milestone is implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -20,12 +20,12 @@ Date: 2026-07-17
   test sweep, package creation, release preflight, and isolated consumer
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
-  address, link-compilation, stable-port, system-signal, and DI-snapshot
-  milestones. Transactional runtime revisions, component migration, and MQTT
-  remain deferred. See
+  address, link-compilation, stable-port, system-signal, DI-snapshot, and
+  transactional-revision milestones. Component migration and MQTT remain
+  deferred. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.2.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `2.3.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
   case-sensitive address type. Canonical input/output-side links now normalize
@@ -37,25 +37,32 @@ Date: 2026-07-17
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.2.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.3.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
   diagnostic outputs, component-fault isolation, and runtime/port status
-  snapshots. Accepted diagnostics integrate with standard .NET logging,
-  activity, metric, and diagnostic-source surfaces. Focused Engine,
+  snapshots. It now also supports serialized stable-port revisions with
+  generation-safe input replacement, immutable output route snapshots,
+  bounded prepared staging, atomic revision publication, and reliable revision
+  events. Accepted diagnostics integrate with standard .NET logging, activity,
+  metric, and diagnostic-source surfaces. Focused Engine,
   Composition, Hosting, and release tests passed; complete build, package, and
   consumer evidence is recorded in `209-vnext-stable-port-runtime.md` and
   `210-vnext-system-events-diagnostics.md`.
-- `FluxFlow.Composition.Hosting` is now `2.0.0` locally with immutable owned
+- `FluxFlow.Composition.Hosting` is now `2.1.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow
   ports, and `IFlowSignalTarget`. Exact external instances/providers cross the
   boundary only through explicit non-owning bridges; snapshots do not scan,
   merge, or fall back to another provider. Focused and full tests, controlled
   builds, binary compatibility, package preflight/dry-runs, and a package-only
-  net8 consumer passed. See `211-vnext-di-resource-provider-snapshots.md`.
-  Transactional resource/workflow revisions are the next bounded gate.
+  net8 consumer passed. It now also provides an Engine-independent
+  `ApplicationRevisionCoordinator` that plans complete definitions, prepares
+  candidates off-route, publishes one active snapshot after activation, and
+  drains replaced candidates without rolling back post-commit failures. See
+  `211-vnext-di-resource-provider-snapshots.md` and
+  `212-vnext-transactional-revisions.md`. MQTT is the next bounded gate.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

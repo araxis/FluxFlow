@@ -7,6 +7,41 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 2.1.0
+
+Adds the Engine-independent transactional host coordinator for complete
+application-definition updates.
+
+- Serializes candidate preparation and activation against the latest committed
+  definition and publishes shared proposed-through-disposed revision phases.
+- Commits one immutable active snapshot after candidate activation, then drains
+  and disposes the previous candidate while reporting every cleanup failure.
+- Disposes prepared candidates on rejection or cancellation and leaves the
+  active definition unchanged before the activation boundary.
+
+## FluxFlow.Engine 2.3.0
+
+Adds atomic revision activation behind canonical stable port addresses.
+
+- Stages replacement output sources in bounded buffers until activation and
+  pauses only inputs and outputs affected by attachment or route changes.
+- Swaps the complete immutable revision-routing snapshot while dispatch is
+  paused and preserves queued input work for the new target.
+- Exposes generation-safe revision leases and maps shared revision lifecycle
+  records into the reliable `System.Events.Output` stream.
+
+## FluxFlow.Composition 2.3.0
+
+Adds complete-definition revision planning and shared revision lifecycle
+contracts without taking an Engine or hosting dependency.
+
+- Computes resource and workflow changes plus transitive resource-dependent
+  closure using canonical addresses.
+- Rejects missing resource references and resource dependency cycles before
+  candidate activation.
+- Defines proposed, accepted, rejected, activated, draining, and disposed event
+  phases through a host-supplied revision-event sink.
+
 ## FluxFlow.Composition.Hosting 2.0.0
 
 Adds immutable provider snapshots and canonical keyed DI registration for the

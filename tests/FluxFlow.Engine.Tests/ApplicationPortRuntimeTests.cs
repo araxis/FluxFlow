@@ -3,7 +3,10 @@ using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
 using FluxFlow.Composition.Model;
+using FluxFlow.Composition.Revisions;
+using FluxFlow.Data;
 using FluxFlow.Engine.Ports;
+using FluxFlow.Engine.Signals;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Shouldly;
@@ -364,6 +367,163 @@ public sealed class ApplicationPortRuntimeTests
             await runtime.ObserveAsync<string>(Output, cancellationToken: canceled.Token));
     }
 
+    [Fact]
+    public async Task Prepared_revision_stages_outputs_and_swaps_routing_as_one_snapshot()
+    {
+        var firstInput = ApplicationAddress.WorkflowPort("Main", "First", "Input");
+        var secondInput = ApplicationAddress.WorkflowPort("Main", "Second", "Input");
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput<string>(Output)
+            .AddInput<string>(firstInput)
+            .AddInput<string>(secondInput)
+            .Build();
+        var firstTarget = new BufferBlock<FlowMessage<string>>();
+        var secondTarget = new BufferBlock<FlowMessage<string>>();
+        await using var firstAttachment = await runtime.AttachInputAsync(firstInput, firstTarget);
+        await using var secondAttachment = await runtime.AttachInputAsync(secondInput, secondTarget);
+        var firstSource = new BufferBlock<FlowMessage<string>>();
+
+        await using var firstBuilder = runtime.CreateRevision("revision-1")
+            .AttachOutput(Output, firstSource)
+            .SetLinks(CompileLinks("\"First.Input\"", ["First", "Second"]));
+        await using var firstRevision = firstBuilder.Build();
+        await using var firstLease = await firstRevision.ActivateAsync();
+
+        firstSource.Post(Message("first-route")).ShouldBeTrue();
+        (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload.ShouldBe("first-route");
+
+        var secondSource = new BufferBlock<FlowMessage<string>>();
+        await using var secondBuilder = runtime.CreateRevision("revision-2")
+            .AttachOutput(Output, secondSource)
+            .SetLinks(CompileLinks("\"Second.Input\"", ["First", "Second"]));
+        await using var secondRevision = secondBuilder.Build();
+        secondSource.Post(Message("staged")).ShouldBeTrue();
+        await Task.Delay(30);
+        secondTarget.TryReceive(out _).ShouldBeFalse();
+
+        await using var secondLease = await secondRevision.ActivateAsync();
+        firstSource.Post(Message("existing-source")).ShouldBeTrue();
+
+        var received = new[]
+        {
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload,
+            (await secondTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload
+        };
+        received.OrderBy(static value => value, StringComparer.Ordinal)
+            .ShouldBe(["existing-source", "staged"]);
+        firstTarget.TryReceive(out _).ShouldBeFalse();
+        runtime.CurrentRevision!.RevisionId.ShouldBe("revision-2");
+        runtime.CurrentRevision.Sequence.ShouldBe(2);
+        firstLease.Info.Sequence.ShouldBe(1);
+        secondLease.Info.Sequence.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Canceled_revision_keeps_the_current_input_attachment_and_revision()
+    {
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddInput<string>(Input, capacity: 3)
+            .Build();
+        var oldTarget = new PostponedTarget<FlowMessage<string>>();
+        await using var oldAttachment = await runtime.AttachInputAsync(Input, oldTarget);
+        (await runtime.SendAsync(Input, Message("claimed"))).IsAccepted.ShouldBeTrue();
+        await oldTarget.Offered.WaitAsync(TimeSpan.FromSeconds(5));
+        (await runtime.SendAsync(Input, Message("queued"))).IsAccepted.ShouldBeTrue();
+        var replacement = new BufferBlock<FlowMessage<string>>();
+        await using var builder = runtime.CreateRevision("canceled")
+            .ReplaceInput(Input, replacement);
+        await using var revision = builder.Build();
+        using var cancellation = new CancellationTokenSource();
+
+        var activation = revision.ActivateAsync(cancellation.Token).AsTask();
+        await Task.Delay(30);
+        activation.IsCompleted.ShouldBeFalse();
+        cancellation.Cancel();
+        await Should.ThrowAsync<OperationCanceledException>(async () => await activation);
+        runtime.CurrentRevision.ShouldBeNull();
+
+        oldTarget.AcceptPostponed();
+        await EventuallyAsync(() => Task.FromResult(oldTarget.HasPostponed));
+        oldTarget.AcceptPostponed();
+        oldTarget.Accepted.Select(static message => message.Payload)
+            .ShouldBe(["claimed", "queued"]);
+        replacement.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Faulted_prepared_source_rejects_activation_without_changing_current_routing()
+    {
+        var firstInput = ApplicationAddress.WorkflowPort("Main", "First", "Input");
+        var secondInput = ApplicationAddress.WorkflowPort("Main", "Second", "Input");
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput<string>(Output)
+            .AddInput<string>(firstInput)
+            .AddInput<string>(secondInput)
+            .Build();
+        var firstTarget = new BufferBlock<FlowMessage<string>>();
+        var secondTarget = new BufferBlock<FlowMessage<string>>();
+        await using var firstAttachment = await runtime.AttachInputAsync(firstInput, firstTarget);
+        await using var secondAttachment = await runtime.AttachInputAsync(secondInput, secondTarget);
+        var currentSource = new BufferBlock<FlowMessage<string>>();
+        await using var currentBuilder = runtime.CreateRevision("current")
+            .AttachOutput(Output, currentSource)
+            .SetLinks(CompileLinks("\"First.Input\"", ["First", "Second"]));
+        await using var currentRevision = currentBuilder.Build();
+        await using var currentLease = await currentRevision.ActivateAsync();
+
+        var faultedSource = new BufferBlock<FlowMessage<string>>();
+        await using var rejectedBuilder = runtime.CreateRevision("rejected")
+            .AttachOutput(Output, faultedSource)
+            .SetLinks(CompileLinks("\"Second.Input\"", ["First", "Second"]));
+        await using var rejectedRevision = rejectedBuilder.Build();
+        ((IDataflowBlock)faultedSource).Fault(new InvalidOperationException("source failed"));
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await rejectedRevision.ActivateAsync());
+
+        runtime.CurrentRevision!.RevisionId.ShouldBe("current");
+        currentSource.Post(Message("still-current")).ShouldBeTrue();
+        (await firstTarget.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload.ShouldBe("still-current");
+        secondTarget.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Revision_event_sink_publishes_a_reliable_system_event()
+    {
+        await using var runtime = new ApplicationPortRuntimeBuilder().Build();
+        var events = new BufferBlock<FlowMessage<ApplicationSystemEvent>>();
+        using var eventLink = runtime.SystemEvents.LinkTo(events);
+        var timestamp = DateTimeOffset.UtcNow;
+        var revisionEvent = new ApplicationRevisionEvent(
+            7,
+            "revision-7",
+            timestamp,
+            ApplicationRevisionPhase.Activated,
+            [ApplicationAddress.Resource("broker")],
+            ["Main"],
+            new FluxFlow.Data.FlowError(
+                "revision.warning",
+                "Revision warning.",
+                "Revision",
+                false));
+
+        (await ((IApplicationRevisionEventSink)runtime).PublishAsync(revisionEvent))
+            .ShouldBeTrue();
+
+        var message = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        message.Payload.Timestamp.ShouldBe(timestamp);
+        message.Payload.Name.ShouldBe(ApplicationSystemEventNames.RevisionChanged);
+        message.Payload.Category.ShouldBe(ApplicationSystemEventCategory.Revision);
+        message.Payload.Subject.ShouldBe("revision-7");
+        message.Payload.Error.ShouldBe(revisionEvent.Error);
+        var details = message.Payload.Details.GetObject();
+        details["sequence"].GetInteger().ShouldBe(7);
+        details["phase"].GetString().ShouldBe("Activated");
+        details["resources"].GetArray().Single().GetString().ShouldBe("Resources.broker");
+        details["workflows"].GetArray().Single().GetString().ShouldBe("Main");
+    }
+
     private static FlowMessage<string> Message(string payload)
         => FlowMessage.Create(payload);
 
@@ -445,6 +605,15 @@ public sealed class ApplicationPortRuntimeTests
         public List<T> Accepted { get; } = [];
 
         public Task Offered => _offered.Task;
+
+        public bool HasPostponed
+        {
+            get
+            {
+                lock (_gate)
+                    return _source is not null;
+            }
+        }
 
         public Task Completion => _completion.Task;
 

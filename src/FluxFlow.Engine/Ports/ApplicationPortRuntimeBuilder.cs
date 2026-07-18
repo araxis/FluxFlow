@@ -110,11 +110,12 @@ public sealed class ApplicationPortRuntimeBuilder
             typeof(T),
             capacity,
             null,
-            (report, activity) => new ApplicationOutputPort<T>(
+            (report, activity, revisionRouting) => new ApplicationOutputPort<T>(
                 address,
                 capacity,
                 report,
-                activity));
+                activity,
+                revisionRouting));
 
     internal sealed record PortRegistration(
         ApplicationAddress Address,
@@ -122,5 +123,5 @@ public sealed class ApplicationPortRuntimeBuilder
         Type PayloadType,
         int Capacity,
         Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, IApplicationInputPort>? CreateInput,
-        Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, IApplicationOutputPort>? CreateOutput);
+        Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, ApplicationRevisionRouting, IApplicationOutputPort>? CreateOutput);
 }

@@ -19,6 +19,8 @@ This package owns:
 - building the runtime through `CompositionRuntimeBuilder`
 - starting and stopping the runtime through `IHostedService`
 - exposing build diagnostics through `ICompositionRuntimeHost`
+- serializing complete-definition revision preparation, activation, commit,
+  drain, and disposal through host-supplied candidates
 
 Named node resources resolve through the `CompositionNodeFactoryContext`
 instance methods in `FluxFlow.Composition`; this package's role is registering
@@ -77,13 +79,49 @@ disposed twice.
 
 `CompositionProviderBoundary` distinguishes `Host`, `ResourceRevision`, and
 `WorkflowRevision` snapshots. `CompositionProviderSnapshotInfo` is a stable
-transport record for later revision events. Scopes remain opt-in through
+transport record for revision events. Scopes remain opt-in through
 `snapshot.Services.CreateScope()`; message processing does not create scopes
 implicitly. Prefer `DisposeAsync()` when registrations may be async-disposable.
 
 `CompositionServiceProviderSnapshot.CreateExternalHost(...)` wraps an existing
 host provider without taking disposal ownership. This is an explicit bridge,
 not a provider fallback mechanism.
+
+## Transactional Revisions
+
+`ApplicationRevisionCoordinator` accepts the next complete canonical
+`ApplicationDefinition`; partial document patches are a source-layer concern.
+It plans against the latest committed definition, asks an explicit
+`IApplicationRevisionCandidateFactory` to prepare replacements away from live
+routing, and serializes concurrent updates.
+
+```csharp
+await using var revisions = new ApplicationRevisionCoordinator(
+    currentDefinition,
+    candidateFactory,
+    revisionEventSink,
+    currentCandidate);
+
+var result = await revisions.ApplyAsync("orders-8", nextDefinition);
+if (!result.IsActivated)
+{
+    foreach (var failure in result.Failures)
+        Console.Error.WriteLine(failure.Error.Code);
+}
+```
+
+Candidate activation is the commit boundary. After it succeeds, the coordinator
+publishes one immutable `Current` snapshot before draining the previous
+candidate. Drain and disposal are both attempted; failures are returned with
+the activated result and do not roll back the new revision. Failure or caller
+cancellation before activation disposes the prepared candidate and preserves
+the old definition.
+
+Candidate factories own package-specific construction and must clean up any
+partial work if `PrepareAsync` throws. Candidates expose provider snapshot
+metadata and must make a failed `ActivateAsync` safe to dispose. The coordinator
+does not depend on Engine, merge service providers, discover registrations, or
+define resource creation policy.
 
 ## Hosted Runtime Registration
 

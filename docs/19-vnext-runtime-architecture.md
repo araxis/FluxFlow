@@ -4,8 +4,8 @@ Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
-port, system-signal, and immutable DI provider-snapshot phases are implemented
-locally. Transactional runtime updates and MQTT redesign remain pending.
+port, system-signal, immutable DI provider-snapshot, and transactional revision
+phases are implemented locally. MQTT redesign remains pending.
 
 ## Package Ownership
 
@@ -14,10 +14,11 @@ locally. Transactional runtime updates and MQTT redesign remain pending.
 - `FluxFlow.Composition` owns the canonical application document, address
   resolver, link normalization, compile-once conditions, and canonical static
   link validation. Runtime activation remains an Engine responsibility.
-- `FluxFlow.Engine` will execute compiled compositions and own stable ports,
+- `FluxFlow.Engine` executes compiled compositions and owns stable ports,
   direct port interaction, runtime revisions, system events, and diagnostics.
 - `FluxFlow.Composition.Hosting` owns definition sources, immutable DI provider
-  snapshots, and hosted lifecycle. It will also own transactional updates.
+  snapshots, hosted lifecycle, and Engine-independent transactional update
+  coordination.
 - Component runtime packages remain usable without Composition or Engine.
 - Concrete adapter packages translate public contracts to private client
   library types and own those library-specific lifetimes.
@@ -121,8 +122,8 @@ processing. Accepted records integrate with `ILogger`, `ActivitySource`,
 `ApplicationRuntimeStatus` snapshots runtime state and per-port availability,
 pending count, and active attachment count. It does not introduce a State port.
 An unexpected component source or target fault marks only that attachment
-unavailable and leaves the runtime active. Resource/revision event categories
-are defined for later transactional-update stages.
+unavailable and leaves the runtime active. Revision phases use the reliable
+system stream through the shared `IApplicationRevisionEventSink` boundary.
 
 ## DI Provider Snapshots
 
@@ -145,17 +146,29 @@ externally owned. Methods containing `View` create non-owning aliases of another
 provider-owned service. Snapshots do not scan assemblies, reflect over
 component types, merge providers, or fall back to arbitrary providers.
 
-This phase provides construction and ownership primitives only. It does not
-publish snapshots atomically, compute dependency closures, activate candidate
-revisions, or swap live routing.
+Provider snapshots remain construction and ownership primitives. Transactional
+coordination composes them through candidate metadata without merging or
+mutating built providers.
 
 ## Runtime Updates
 
-An update will parse and validate a complete candidate, compute its dependency
-closure, build and start replacements away from routing, pause only affected
-mailbox dispatchers, atomically swap one immutable routing/resource snapshot,
-resume dispatch, and drain the old revision. Failure before activation leaves
-the old revision unchanged.
+`ApplicationRevisionPlanner` compares complete canonical definitions, reports
+resource/workflow changes, expands transitive resource dependents, and rejects
+missing references or dependency cycles. `ApplicationRevisionCoordinator`
+serializes full-definition updates and delegates package-specific preparation,
+activation, draining, and disposal through explicit candidates.
+
+`ApplicationPortRuntime` stages replacement outputs behind bounded buffers,
+waits for already-claimed input work, pauses only changed input/output
+dispatchers, and swaps one immutable complete-link snapshot. Queued mailbox
+work then reaches the new target. Failure or cancellation before candidate
+activation disposes prepared work and leaves the active definition unchanged;
+after activation the new immutable snapshot remains current while every old
+drain/disposal action is attempted.
+
+The current runtime revision surface requires stable addresses and exact
+payload types to be registered in advance. Dynamic port registration, payload
+type migration, and automatic mapper insertion remain deferred.
 
 Standard DI remains the activation and ownership mechanism. Packages register
 explicitly through `IServiceCollection`; no assembly scanning, reflection
@@ -171,8 +184,8 @@ introduced.
 5. Fault isolation, system events, and diagnostics. Complete locally.
 6. Immutable DI resource/provider snapshots and canonical keyed registration.
    Complete locally.
-7. Transactional resource and workflow revisions. Next.
-8. MQTT as the first complete resource/component/adapter vertical slice.
+7. Transactional resource and workflow revisions. Complete locally.
+8. MQTT as the first complete resource/component/adapter vertical slice. Next.
 9. Remaining component families, Designer, hosting, and coordinated releases.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,

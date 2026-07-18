@@ -2,6 +2,30 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext transactional application revisions
+
+- Added deterministic complete-definition revision planning with nested
+  resource flattening, transitive dependency closure, missing/cycle
+  diagnostics, structural JSON comparison, and whole-workflow replacement
+  units.
+- Added serialized stable-port revisions with generation-safe input pause,
+  immutable output route snapshots, bounded prepared staging, atomic current
+  revision publication, and reliable revision events on
+  `System.Events.Output`.
+- Added an Engine-independent Hosting coordinator that prepares candidates
+  off-route, commits one active snapshot after activation, preserves the old
+  candidate on pre-commit failure, and reports post-commit drain/disposal
+  failures without rollback.
+- Passed 123 Composition, 96 Engine, 38 Hosting, and 93 Release tests; 1,943
+  Release tests across 63 projects; controlled zero-warning Debug/Release
+  builds; binary compatibility, preflight, and local-source package dry-runs
+  for all three changed packages; and a package-only net8 consumer that printed
+  `TRANSACTIONAL_REVISION_API_OK`. Full evidence is in
+  [[212-vnext-transactional-revisions]].
+- MQTT is the next bounded vNext vertical slice. Dynamic port registration,
+  type migration, automatic mapping, and component state migration remain
+  separate later work.
+
 ## 2026-07-17 - vNext DI resource and provider snapshots
 
 - Added immutable host/resource-revision/workflow-revision Microsoft DI

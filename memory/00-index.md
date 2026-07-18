@@ -465,6 +465,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `211-vnext-di-resource-provider-snapshots.md`: immutable Microsoft DI provider
   snapshots, canonical keyed resource/component/port/signal registration,
   explicit ownership boundaries, and the transactional-revision handoff.
+- `212-vnext-transactional-revisions.md`: complete-definition revision
+  planning, atomic stable-port activation, Engine-independent candidate
+  coordination, rollback/drain semantics, and the MQTT vertical-slice handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

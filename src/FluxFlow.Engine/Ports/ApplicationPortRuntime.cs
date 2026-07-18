@@ -4,6 +4,7 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Data;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Links;
+using FluxFlow.Composition.Revisions;
 using FluxFlow.Engine.Signals;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Logging;
@@ -11,18 +12,20 @@ using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Engine.Ports;
 
-public sealed class ApplicationPortRuntime : IAsyncDisposable
+public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsyncDisposable
 {
     private const int RejectionCapacity = 256;
 
     private readonly IReadOnlyDictionary<ApplicationAddress, IApplicationInputPort> _inputs;
     private readonly IReadOnlyDictionary<ApplicationAddress, IApplicationOutputPort> _outputs;
     private readonly IReadOnlyDictionary<ApplicationAddress, ApplicationPortMetadata> _metadataByAddress;
+    private readonly ApplicationRevisionRouting _revisionRouting = new();
     private readonly ApplicationRuntimeSignals _signals;
     private readonly BufferBlock<ApplicationPortRejection> _rejections = new(
         new DataflowBlockOptions { BoundedCapacity = RejectionCapacity });
     private readonly List<IDisposable> _links = [];
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _revisionGate = new(1, 1);
     private readonly Task _completion;
     private readonly object _statusGate = new();
     private ApplicationRuntimeState _state = ApplicationRuntimeState.Active;
@@ -30,6 +33,8 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
     private Exception? _completionFailure;
     private int _completeRequested;
     private int _disposed;
+    private long _revisionSequence;
+    private ApplicationPortRevisionInfo? _currentRevision;
 
     internal ApplicationPortRuntime(
         IReadOnlyList<ApplicationPortRuntimeBuilder.PortRegistration> registrations,
@@ -60,7 +65,7 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
             {
                 outputs.Add(
                     registration.Address,
-                    registration.CreateOutput!(Report, ReportActivity));
+                    registration.CreateOutput!(Report, ReportActivity, _revisionRouting));
             }
         }
 
@@ -87,6 +92,8 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
     public ISourceBlock<FlowMessage<ApplicationDiagnostic>> Diagnostics => _signals.Diagnostics;
 
     public Task Completion => _completion;
+
+    public ApplicationPortRevisionInfo? CurrentRevision => Volatile.Read(ref _currentRevision);
 
     public ApplicationRuntimeStatus Status
     {
@@ -117,8 +124,43 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
         CancellationToken cancellationToken = default)
         => _signals.PublishSystemEventAsync(message, cancellationToken);
 
+    public async ValueTask<bool> PublishAsync(
+        ApplicationRevisionEvent revisionEvent,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisionEvent);
+        var details = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        {
+            ["phase"] = FlowValue.From(revisionEvent.Phase.ToString()),
+            ["resources"] = FlowValue.FromArray(
+                revisionEvent.Resources.Select(static resource => FlowValue.From(resource.Value))),
+            ["sequence"] = FlowValue.From(revisionEvent.Sequence),
+            ["workflows"] = FlowValue.FromArray(
+                revisionEvent.Workflows.Select(FlowValue.From))
+        });
+        var result = await PublishSystemEventAsync(
+                FlowMessage.Create(new ApplicationSystemEvent
+                {
+                    Timestamp = revisionEvent.Timestamp,
+                    Name = ApplicationSystemEventNames.RevisionChanged,
+                    Category = ApplicationSystemEventCategory.Revision,
+                    Subject = revisionEvent.RevisionId,
+                    Error = revisionEvent.Error,
+                    Details = details
+                }),
+                cancellationToken)
+            .ConfigureAwait(false);
+        return result.IsAccepted;
+    }
+
     public bool TryPublishDiagnostic(FlowMessage<ApplicationDiagnostic> message)
         => _signals.TryPublishDiagnostic(message);
+
+    public ApplicationPortRevisionBuilder CreateRevision(string revisionId)
+    {
+        ThrowIfDisposed();
+        return new ApplicationPortRevisionBuilder(this, revisionId);
+    }
 
     public ValueTask<PortSendResult> SendAsync<T>(
         ApplicationAddress input,
@@ -291,8 +333,11 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
 
     public void Complete()
     {
-        if (Interlocked.Exchange(ref _completeRequested, 1) != 0)
-            return;
+        lock (_gate)
+        {
+            if (Interlocked.Exchange(ref _completeRequested, 1) != 0)
+                return;
+        }
 
         SetState(ApplicationRuntimeState.Completing);
         _ = CompletePortsAsync();
@@ -300,32 +345,184 @@ public sealed class ApplicationPortRuntime : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            return;
-
-        IDisposable[] links;
         lock (_gate)
         {
-            links = _links.ToArray();
-            _links.Clear();
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
         }
 
-        foreach (var link in links)
-            link.Dispose();
-        await _signals.DisposeAsync().ConfigureAwait(false);
-        foreach (var output in _outputs.Values)
-            output.Abort();
-        foreach (var input in _inputs.Values)
-            input.Abort();
+        await _revisionGate.WaitAsync().ConfigureAwait(false);
 
         try
         {
-            await _completion.ConfigureAwait(false);
+            IDisposable[] links;
+            lock (_gate)
+            {
+                links = _links.ToArray();
+                _links.Clear();
+            }
+
+            foreach (var link in links)
+                link.Dispose();
+            await _signals.DisposeAsync().ConfigureAwait(false);
+            foreach (var output in _outputs.Values)
+                output.Abort();
+            foreach (var input in _inputs.Values)
+                input.Abort();
+
+            try
+            {
+                await _completion.ConfigureAwait(false);
+            }
+            finally
+            {
+                SetState(ApplicationRuntimeState.Disposed);
+                _rejections.Complete();
+            }
         }
         finally
         {
-            SetState(ApplicationRuntimeState.Disposed);
-            _rejections.Complete();
+            _revisionGate.Release();
+        }
+    }
+
+    internal void ValidateRevisionInput<T>(ApplicationAddress address)
+        => _ = GetInput<T>(address);
+
+    internal IPreparedApplicationOutput PrepareRevisionOutput<T>(
+        ApplicationAddress address,
+        ISourceBlock<FlowMessage<T>> source)
+        => GetOutput<T>(address).PrepareRevisionOutput(source);
+
+    internal ApplicationRevisionRouting.Snapshot PrepareRevisionRouting(
+        IEnumerable<CompiledApplicationLink> links)
+    {
+        var routes = new Dictionary<ApplicationAddress, List<IApplicationRevisionRoute>>();
+        var identities = new HashSet<ApplicationRevisionRouting.RouteIdentity>();
+        foreach (var link in links)
+        {
+            ArgumentNullException.ThrowIfNull(link);
+            if (!_outputs.TryGetValue(link.Source, out var output))
+                throw CreatePortException(link.Source, ApplicationPortDirection.Output);
+            if (!_inputs.TryGetValue(link.Target, out var input))
+                throw CreatePortException(link.Target, ApplicationPortDirection.Input);
+            if (output.PayloadType != input.PayloadType || output.PayloadType != link.MessageType)
+            {
+                throw new InvalidOperationException(
+                    $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{link.MessageType}', " +
+                    $"but the runtime ports use '{output.PayloadType}' and '{input.PayloadType}'.");
+            }
+
+            var identity = new ApplicationRevisionRouting.RouteIdentity(
+                link.Source,
+                link.Target,
+                link.MessageType,
+                link.ConditionExpression);
+            if (!identities.Add(identity))
+                throw new InvalidOperationException($"Revision contains duplicate link '{link.Source}' to '{link.Target}'.");
+            if (!routes.TryGetValue(link.Source, out var values))
+            {
+                values = [];
+                routes.Add(link.Source, values);
+            }
+
+            values.Add(output.CreateRevisionRoute(input, link));
+        }
+
+        return new ApplicationRevisionRouting.Snapshot(
+            routes.ToDictionary(
+                static pair => pair.Key,
+                static pair => (IReadOnlyList<IApplicationRevisionRoute>)pair.Value.ToArray()),
+            identities);
+    }
+
+    internal async ValueTask<ApplicationPortRevisionLease> ActivateRevisionAsync(
+        ApplicationPortRevision revision,
+        CancellationToken cancellationToken)
+    {
+        await _revisionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var inputRevisions = new List<IApplicationInputRevision>();
+        var outputRevisions = new List<IApplicationOutputRevision>();
+        try
+        {
+            ThrowIfDisposed();
+            if (Volatile.Read(ref _completeRequested) != 0)
+                throw new InvalidOperationException("The application port runtime is completing.");
+            if (string.Equals(CurrentRevision?.RevisionId, revision.RevisionId, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Revision '{revision.RevisionId}' is already active.");
+
+            var currentRouting = _revisionRouting.Current;
+            var nextRouting = revision.RoutingConfigured
+                ? revision.Routing!
+                : currentRouting;
+            var affectedInputs = revision.InputReplacements.Keys
+                .Concat(currentRouting.GetChangedTargets(nextRouting))
+                .Distinct()
+                .OrderBy(static address => address.Value, StringComparer.Ordinal)
+                .ToArray();
+            var affectedOutputs = revision.PreparedOutputs
+                .Select(static output => output.Address)
+                .Concat(currentRouting.GetChangedSources(nextRouting))
+                .Distinct()
+                .OrderBy(static address => address.Value, StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var address in affectedInputs)
+            {
+                inputRevisions.Add(await _inputs[address]
+                    .BeginRevisionAsync(cancellationToken)
+                    .ConfigureAwait(false));
+            }
+
+            foreach (var address in affectedOutputs)
+            {
+                outputRevisions.Add(await _outputs[address]
+                    .BeginRevisionAsync(cancellationToken)
+                    .ConfigureAwait(false));
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var output in revision.PreparedOutputs)
+                output.ThrowIfFaulted();
+            foreach (var output in revision.PreparedOutputs)
+                output.Activate();
+
+            var inputAttachments = new List<IAsyncDisposable>();
+            ApplicationPortRevisionInfo info;
+            lock (_gate)
+            {
+                ThrowIfDisposed();
+                if (Volatile.Read(ref _completeRequested) != 0)
+                    throw new InvalidOperationException("The application port runtime is completing.");
+
+                foreach (var inputRevision in inputRevisions)
+                {
+                    revision.InputReplacements.TryGetValue(inputRevision.Address, out var target);
+                    if (revision.InputReplacements.ContainsKey(inputRevision.Address))
+                        inputAttachments.Add(inputRevision.Commit(target));
+                }
+
+                if (revision.RoutingConfigured)
+                    _revisionRouting.Swap(nextRouting);
+                info = new ApplicationPortRevisionInfo
+                {
+                    Sequence = ++_revisionSequence,
+                    RevisionId = revision.RevisionId,
+                    ActivatedAt = DateTimeOffset.UtcNow
+                };
+                Volatile.Write(ref _currentRevision, info);
+            }
+
+            var outputs = revision.TransferPreparedOutputs();
+            return new ApplicationPortRevisionLease(info, inputAttachments, outputs);
+        }
+        finally
+        {
+            for (var index = outputRevisions.Count - 1; index >= 0; index--)
+                await outputRevisions[index].DisposeAsync().ConfigureAwait(false);
+            for (var index = inputRevisions.Count - 1; index >= 0; index--)
+                await inputRevisions[index].DisposeAsync().ConfigureAwait(false);
+            _revisionGate.Release();
         }
     }
 

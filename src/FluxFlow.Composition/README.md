@@ -18,6 +18,9 @@ The vNext boundary owns:
 - one ordinal, case-sensitive application address value
 - canonical input/output-side link parsing and absolute normalization
 - compile-once expression conditions and static link diagnostics
+- complete-definition revision changes and transitive resource dependency
+  planning
+- shared revision lifecycle event contracts
 - direct root or named-section `IConfiguration` loading
 
 The current runtime compatibility boundary also owns:
@@ -138,8 +141,33 @@ Engine reference.
 Compilation rejects malformed declarations, unknown component types, missing
 ports, duplicate endpoint pairs (including a link declared on both sides),
 single-link claim conflicts, incompatible types, invalid expressions, and
-component cycles. Valid compiled links are the input to the later stable-port
-runtime milestone; the legacy runtime below is unchanged.
+component cycles. Valid compiled links are the input to the stable-port
+runtime in `FluxFlow.Engine`; the legacy runtime below is unchanged.
+
+## Revision Planning
+
+`ApplicationRevisionPlanner` compares the current and next complete canonical
+definitions. It reports added, updated, and removed resources and workflows,
+then expands changed resources through transitive resource dependents and the
+workflows that reference them. Missing resource references and resource cycles
+reject the plan before a host prepares replacements.
+
+```csharp
+using FluxFlow.Composition.Revisions;
+
+var plan = new ApplicationRevisionPlanner().Plan(current, next);
+if (!plan.IsValid)
+{
+    foreach (var diagnostic in plan.Diagnostics)
+        Console.Error.WriteLine(diagnostic.Message);
+}
+```
+
+`ApplicationRevisionEvent` and `IApplicationRevisionEventSink` are the shared,
+Engine-independent lifecycle boundary for `Proposed`, `Accepted`, `Rejected`,
+`Activated`, `Draining`, and `Disposed` phases. Composition computes the plan;
+it does not create providers, start candidates, switch routing, or drain old
+revisions.
 
 ## Legacy Runtime Definition
 

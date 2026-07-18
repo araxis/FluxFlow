@@ -16,11 +16,33 @@ internal interface IApplicationOutputPort
 
     ApplicationPortStatus GetStatus();
 
+    ValueTask<IApplicationOutputRevision> BeginRevisionAsync(CancellationToken cancellationToken);
+
+    IPreparedApplicationOutput PrepareRevisionOutput(object source);
+
     IDisposable Connect(IApplicationInputPort input, CompiledApplicationLink link);
+
+    IApplicationRevisionRoute CreateRevisionRoute(
+        IApplicationInputPort input,
+        CompiledApplicationLink link);
 
     void Complete();
 
     void Abort();
+}
+
+internal interface IApplicationOutputRevision : IAsyncDisposable
+{
+    ApplicationAddress Address { get; }
+}
+
+internal interface IPreparedApplicationOutput : IDisposable
+{
+    ApplicationAddress Address { get; }
+
+    void ThrowIfFaulted();
+
+    void Activate();
 }
 
 internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
@@ -29,11 +51,13 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
     private readonly BufferBlock<FlowMessage<T>> _ingress;
     private readonly Action<ApplicationPortRejection> _report;
     private readonly Action<ApplicationPortActivity> _activity;
+    private readonly ApplicationRevisionRouting _revisionRouting;
     private readonly List<OutputLink> _links = [];
     private readonly List<ReceiveWaiter> _waiters = [];
     private readonly List<PortObservation<T>> _observations = [];
     private readonly List<OutputAttachment> _attachments = [];
     private readonly CancellationTokenSource _abort = new();
+    private readonly SemaphoreSlim _dispatchGate = new(1, 1);
     private readonly TaskCompletionSource _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _pump;
@@ -46,12 +70,14 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         ApplicationAddress address,
         int capacity,
         Action<ApplicationPortRejection> report,
-        Action<ApplicationPortActivity> activity)
+        Action<ApplicationPortActivity> activity,
+        ApplicationRevisionRouting revisionRouting)
     {
         Address = address;
         Capacity = capacity;
         _report = report;
         _activity = activity;
+        _revisionRouting = revisionRouting;
         _ingress = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
         {
             BoundedCapacity = capacity
@@ -86,6 +112,47 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                         : ApplicationPortAvailability.Available
             };
         }
+    }
+
+    public async ValueTask<IApplicationOutputRevision> BeginRevisionAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await _dispatchGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        lock (_gate)
+        {
+            if (_aborted)
+            {
+                _dispatchGate.Release();
+                throw new ObjectDisposedException(GetType().FullName);
+            }
+
+            if (_completeRequested)
+            {
+                _dispatchGate.Release();
+                throw new InvalidOperationException($"Output port '{Address}' is completed.");
+            }
+        }
+
+        return new OutputRevision(this);
+    }
+
+    public IPreparedApplicationOutput PrepareRevisionOutput(object source)
+    {
+        if (source is not ISourceBlock<FlowMessage<T>> typedSource)
+        {
+            throw new InvalidOperationException(
+                $"Output port '{Address}' requires source payload type '{typeof(T)}'.");
+        }
+
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_aborted, this);
+            if (_completeRequested)
+                throw new InvalidOperationException($"Output port '{Address}' is completed.");
+        }
+
+        return new PreparedOutput(this, typedSource);
     }
 
     public IDisposable Attach(ISourceBlock<FlowMessage<T>> source)
@@ -143,6 +210,19 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         }
 
         return outputLink;
+    }
+
+    public IApplicationRevisionRoute CreateRevisionRoute(
+        IApplicationInputPort input,
+        CompiledApplicationLink link)
+    {
+        if (input is not ApplicationInputPort<T> typedInput)
+        {
+            throw new InvalidOperationException(
+                $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{typeof(T)}'.");
+        }
+
+        return new RevisionOutputLink(this, typedInput, link);
     }
 
     public ReceiveRegistration RegisterReceive(TraceId? traceId)
@@ -255,7 +335,17 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             while (await _ingress.OutputAvailableAsync(_abort.Token).ConfigureAwait(false))
             {
                 while (_ingress.TryReceive(out var message))
-                    Dispatch(message);
+                {
+                    await _dispatchGate.WaitAsync(_abort.Token).ConfigureAwait(false);
+                    try
+                    {
+                        Dispatch(message);
+                    }
+                    finally
+                    {
+                        _dispatchGate.Release();
+                    }
+                }
             }
 
             await _ingress.Completion.ConfigureAwait(false);
@@ -285,6 +375,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             message.MessageId));
 
         OutputLink[] links;
+        var revisionLinks = _revisionRouting.GetRoutes(Address);
         ReceiveWaiter[] waiters;
         PortObservation<T>[] observations;
         lock (_gate)
@@ -293,6 +384,9 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             waiters = _waiters.ToArray();
             observations = _observations.ToArray();
         }
+
+        foreach (var link in revisionLinks)
+            link.TryDeliver(message);
 
         foreach (var link in links)
             link.TryDeliver(message);
@@ -454,38 +548,7 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         {
             if (Volatile.Read(ref _disposed) != 0)
                 return;
-
-            var context = new FlowMapContext
-            {
-                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["input"] = message.Payload,
-                    ["message"] = message,
-                    ["payload"] = message.Payload
-                }
-            };
-
-            if (!link.TryMatch(context, out var exception))
-            {
-                if (exception is not null)
-                {
-                    owner._report(new ApplicationPortRejection
-                    {
-                        Timestamp = DateTimeOffset.UtcNow,
-                        Port = owner.Address,
-                        RelatedPort = target.Address,
-                        CorrelationId = message.CorrelationId,
-                        TraceId = message.TraceId,
-                        MessageId = message.MessageId,
-                        Reason = ApplicationPortRejectionReason.ConditionFailed,
-                        Exception = exception
-                    });
-                }
-
-                return;
-            }
-
-            target.TrySend(message, owner.Address);
+            owner.TryDeliver(target, link, message);
         }
 
         public void Dispose()
@@ -493,6 +556,19 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             if (Interlocked.Exchange(ref _disposed, 1) == 0)
                 owner.RemoveLink(this);
         }
+    }
+
+    private sealed class RevisionOutputLink(
+        ApplicationOutputPort<T> owner,
+        ApplicationInputPort<T> target,
+        CompiledApplicationLink link) : IApplicationRevisionRoute
+    {
+        public ApplicationAddress Source => link.Source;
+
+        public ApplicationAddress Target => link.Target;
+
+        public void TryDeliver(object message)
+            => owner.TryDeliver(target, link, (FlowMessage<T>)message);
     }
 
     private sealed class OutputAttachment(
@@ -520,5 +596,111 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
                 Exception = exception
             });
         }
+    }
+
+    private sealed class OutputRevision(ApplicationOutputPort<T> owner) :
+        IApplicationOutputRevision
+    {
+        private int _disposed;
+
+        public ApplicationAddress Address => owner.Address;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                owner._dispatchGate.Release();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class PreparedOutput : IPreparedApplicationOutput
+    {
+        private readonly ApplicationOutputPort<T> _owner;
+        private readonly BufferBlock<FlowMessage<T>> _staging;
+        private readonly IDisposable _sourceLink;
+        private IDisposable? _activeAttachment;
+        private int _activated;
+        private int _disposed;
+
+        public PreparedOutput(
+            ApplicationOutputPort<T> owner,
+            ISourceBlock<FlowMessage<T>> source)
+        {
+            _owner = owner;
+            _staging = new BufferBlock<FlowMessage<T>>(new DataflowBlockOptions
+            {
+                BoundedCapacity = owner.Capacity
+            });
+            _sourceLink = source.LinkTo(
+                _staging,
+                new DataflowLinkOptions { PropagateCompletion = true });
+        }
+
+        public ApplicationAddress Address => _owner.Address;
+
+        public void ThrowIfFaulted()
+        {
+            if (_staging.Completion.IsFaulted)
+            {
+                throw new InvalidOperationException(
+                    $"Prepared output source for '{Address}' faulted before activation.",
+                    _staging.Completion.Exception?.GetBaseException());
+            }
+        }
+
+        public void Activate()
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (Interlocked.Exchange(ref _activated, 1) != 0)
+                throw new InvalidOperationException($"Prepared output '{Address}' is already active.");
+            _activeAttachment = _owner.Attach(_staging);
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+            _activeAttachment?.Dispose();
+            _sourceLink.Dispose();
+            _staging.Complete();
+        }
+    }
+
+    private void TryDeliver(
+        ApplicationInputPort<T> target,
+        CompiledApplicationLink link,
+        FlowMessage<T> message)
+    {
+        var context = new FlowMapContext
+        {
+            Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["input"] = message.Payload,
+                ["message"] = message,
+                ["payload"] = message.Payload
+            }
+        };
+
+        if (!link.TryMatch(context, out var exception))
+        {
+            if (exception is not null)
+            {
+                _report(new ApplicationPortRejection
+                {
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Port = Address,
+                    RelatedPort = target.Address,
+                    CorrelationId = message.CorrelationId,
+                    TraceId = message.TraceId,
+                    MessageId = message.MessageId,
+                    Reason = ApplicationPortRejectionReason.ConditionFailed,
+                    Exception = exception
+                });
+            }
+
+            return;
+        }
+
+        target.TrySend(message, Address);
     }
 }

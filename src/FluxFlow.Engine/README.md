@@ -80,6 +80,32 @@ sending and matches the response by `TraceId`.
 source, and observation failures. The runtime also maps those outcomes into the
 canonical system-event and diagnostic surfaces described below.
 
+## Transactional Port Revisions
+
+`CreateRevision(...)` prepares a batch of stable input replacements, staged
+output sources, and one complete compiled-link snapshot. Output sources feed
+bounded staging buffers but remain invisible to routing until activation.
+
+```csharp
+await using var builder = ports.CreateRevision("orders-8")
+    .ReplaceInput(inputAddress, replacement.Input)
+    .AttachOutput(outputAddress, replacement.Output)
+    .SetLinks(compiledLinks);
+await using var revision = builder.Build();
+await using var lease = await revision.ActivateAsync();
+```
+
+Activation serializes with other revisions, pauses only affected dispatchers,
+waits for work already claimed by old input targets, activates staged outputs,
+and swaps one immutable routing pointer. Queued stable-mailbox work then moves
+to the replacement target. `CurrentRevision` identifies the committed sequence;
+disposing an older lease cannot detach a newer input generation.
+
+Revisions use stable addresses and exact payload types already registered with
+`ApplicationPortRuntimeBuilder`. Adding an unregistered runtime port, changing
+a payload type, or migrating queued payloads is rejected or remains a later
+host-level capability; no implicit mapper is inserted.
+
 ## Runtime Status And Signals
 
 Every `ApplicationPortRuntimeBuilder` registers these outputs automatically:
@@ -98,6 +124,9 @@ activity.
 its capacity is exhausted, publication waits; cancellation remains caller
 cancellation. A returned `Accepted` result means the event entered the reliable
 stream. A rejecting subscriber is detached and reported through diagnostics.
+`ApplicationPortRuntime` also implements `IApplicationRevisionEventSink`,
+mapping revision phases into `flow.revision.changed` events on the same reliable
+stream.
 
 `TryPublishDiagnostic` is intentionally best effort. Its bounded queue rejects
 immediately with `false` when full or completed, while accepted diagnostics stay
