@@ -1,88 +1,102 @@
 # FluxFlow.Components.Serialization
 
-Reusable serialization and encoding components for FluxFlow.
+Standalone conversion nodes for canonical `FlowContent` and `FlowValue`.
+The package makes JSON, text, and Base64 boundaries explicit without requiring
+the Engine runtime or converting through mutable dictionaries and dynamic CLR
+objects.
 
-## Nodes
+## Canonical Nodes
 
-| Node type | Shape | Purpose |
-|-----------|-------|---------|
-| `json.parse` | `Input` -> `Output`, `Errors` | Parses text or bytes into a JSON result. |
-| `json.stringify` | `Input` -> `Output`, `Errors` | Serializes a value into JSON text and bytes. |
-| `text.encode` | `Input` -> `Output`, `Errors` | Encodes text into bytes. |
-| `text.decode` | `Input` -> `Output`, `Errors` | Decodes bytes into text. |
-| `base64.encode` | `Input` -> `Output`, `Errors` | Encodes bytes or text into base64 text. |
-| `base64.decode` | `Input` -> `Output`, `Errors` | Decodes base64 text into bytes and optional text. |
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowContentJsonParseNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `FlowValueJsonStringifyNode` | `FlowValue` | `FlowResult<FlowContent>` |
+| `FlowValueTextEncodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
+| `FlowContentTextDecodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `FlowContentBase64EncodeNode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `FlowValueBase64DecodeNode` | `FlowValue.String` | `FlowResult<FlowContent>` |
 
-## Configuration
-
-Each node supports the same basic safety options:
-
-```json
-{
-  "type": "json.parse",
-  "name": "parse",
-  "boundedCapacity": 128,
-  "defaultEncoding": "utf-8",
-  "maxInputBytes": 1048576,
-  "maxOutputBytes": 1048576,
-  "writeIndented": false,
-  "allowTrailingCommas": false,
-  "skipComments": false
-}
-```
-
-Per-message failures emit `FlowError` values on the `Errors` port and the node
-continues with later messages. Size limits are enforced before large inputs or
-outputs are forwarded.
-
-## Examples
+Every node has one bounded `Input`, one broadcast `Output`, and `Events` for
+diagnostics. Expected format, type, and size failures use `IsError == true` on
+the normal output. The canonical nodes do not expose a universal error port.
 
 ```csharp
-new JsonParseRequest
-{
-    Text = """{"ok":true}"""
-};
+var content = FlowContent.FromBytes(
+    Encoding.UTF8.GetBytes("""{"orderId":"order-42"}"""),
+    contentType: "application/json");
+
+await using var node = new FlowContentJsonParseNode();
+var results = new BufferBlock<FlowMessage<FlowResult<FlowValue>>>();
+node.Output.LinkTo(results);
+
+await node.Input.SendAsync(FlowMessage.Create(content));
+var result = (await results.ReceiveAsync()).Payload;
 ```
 
-```csharp
-new Base64DecodeRequest
-{
-    Text = "aGVsbG8=",
-    DecodeText = true
-};
-```
+Success and failure messages preserve correlation, trace, and headers while
+creating the next message and causation identity through `FlowMessage.With(...)`.
+Later inputs continue after expected conversion failures.
 
-## Direct Use
+## Conversion Semantics
 
-```csharp
-await using var node = new JsonParseNode(
-    new SerializationNodeOptions { AllowTrailingCommas = true });
-```
+`json.parse` decodes a byte-backed `FlowContent` once and caches the resulting
+`FlowValue` on that exact content object. It accepts JSON regardless of media
+type because selecting this node is the explicit parse decision. JSON objects
+become ordinal immutable objects, arrays retain order, and numeric values retain
+integer, decimal, or floating-point kinds.
 
-Each node is standalone: create it with `SerializationNodeOptions` and an
-optional `TimeProvider`, post `FlowMessage<TRequest>` to `Input`, and link
-`Output`, `Errors`, or `Events` to the next stage.
+`json.stringify` writes ordinary JSON, not the tagged canonical `FlowValue`
+storage format. Object properties are ordered ordinally for deterministic
+output. Binary values become Base64 strings; date/time, duration, and GUID
+values use invariant string forms.
+
+`text.encode` accepts only a string `FlowValue` and creates `text/plain`
+content. `text.decode` produces a string `FlowValue`, uses `FlowContent.Encoding`
+or a content-type charset when present, skips the selected encoding preamble,
+and otherwise uses `DefaultEncoding`. Invalid declared transport encodings fall
+back to that validated default.
+
+`base64.encode` uses the exact original content bytes. Value-backed content may
+contain a binary or string `FlowValue`; other value kinds are rejected as normal
+results. `base64.decode` accepts a string `FlowValue` and creates
+`application/octet-stream` content.
+
+## Results And Limits
+
+`SerializationResultKinds` identifies each operation success or failure.
+`SerializationErrorCodeNames` provides stable workflow-facing codes for format,
+type, missing-input, input-limit, and output-limit failures. `FlowError.Details`
+contains the node type, input kind, exception type, and available content
+metadata.
+
+`SerializationNodeOptions` applies bounded intake and conversion limits:
+
+| Option | Default | Purpose |
+|--------|---------|---------|
+| `BoundedCapacity` | `128` | Maximum queued messages. |
+| `DefaultEncoding` | `utf-8` | Encoding when content does not declare one. |
+| `MaxInputBytes` | `1048576` | Maximum byte-backed input or encoded text size. |
+| `MaxOutputBytes` | `1048576` | Maximum generated content or text size. |
+| `WriteIndented` | `false` | Pretty-print JSON output. |
+| `AllowTrailingCommas` | `false` | Permit trailing commas during JSON parsing. |
+| `SkipComments` | `false` | Permit and skip JSON comments. |
+
+Invalid static options fail node construction. Unexpected implementation faults
+remain node faults so the runtime can isolate the component; only deliberate
+conversion failures become result data.
+
+## Legacy Request Nodes
+
+The existing `JsonParseNode`, `JsonStringifyNode`, `TextEncodeNode`,
+`TextDecodeNode`, `Base64EncodeNode`, and `Base64DecodeNode` remain available for
+code-authored compatibility. They retain their request/result contracts and
+legacy `Errors` behavior. New configuration-authored workflows should use the
+canonical nodes through `FluxFlow.Components.Serialization.Composition`.
 
 ## Composition
 
-The optional `FluxFlow.Components.Serialization.Composition` package registers
-serialization factories for `FluxFlow.Composition`. It binds the existing
-`SerializationNodeOptions` from node configuration and resolves an optional
-host-owned keyed `TimeProvider` resource.
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterJsonParse()
-        .RegisterJsonStringify()
-        .RegisterTextEncode()
-        .RegisterTextDecode()
-        .RegisterBase64Encode()
-        .RegisterBase64Decode());
-```
-
-The request/result CLR types are fixed by the serialization contracts; no type
-alias or string-to-type resolution is needed. Encoding fallback, JSON parsing,
-and size limits remain normal node options rather than composition-owned
-resource behavior.
+Add `FluxFlow.Components.Serialization.Composition` to register the six fixed
+canonical node types and their Designer metadata. That optional package binds
+flat component settings and resolves an optional host-owned keyed
+`TimeProvider`; this runtime package does not own resources, links,
+configuration loading, or rendering.

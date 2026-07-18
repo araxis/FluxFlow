@@ -7,6 +7,29 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Serialization 4.0.0
+
+Adds explicit canonical conversions while preserving the request-based nodes
+for code-authored compatibility.
+
+- Adds six standalone nodes that convert between immutable `FlowValue` and
+  exact `FlowContent` for JSON, text, and Base64 boundaries.
+- Emits expected type, format, and size failures as `FlowResult<T>` values with
+  stable string error codes and no universal error port.
+- Caches JSON/text decoding through `FlowContent`, writes deterministic ordinary
+  JSON, and preserves exact bytes through Base64 operations.
+
+## FluxFlow.Components.Serialization.Composition 2.0.0
+
+Migrates the six fixed serialization node types to canonical data contracts.
+
+- Uses `FlowContent` for byte-backed inputs/outputs and `FlowValue` for dynamic
+  text/structured inputs/outputs.
+- Changes every output to `FlowResult<T>` and keeps expected failures routable
+  through the normal output.
+- Updates Designer metadata and clock resource hints to exact
+  `Resources.{name}` addresses.
+
 ## FluxFlow.Components.Payloads 4.0.0
 
 Adds canonical content inspection while preserving the request-based node for

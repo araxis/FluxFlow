@@ -5,9 +5,10 @@ Status: accepted direction, implemented incrementally.
 This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
 port, system-signal, immutable DI provider-snapshot, transactional revision,
-MQTT vertical slice, canonical FlowValue Mapping, and canonical FlowContent
-Payloads migration are implemented locally. The remaining component families
-are migrated incrementally.
+MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
+Payloads inspection, and explicit canonical Serialization conversions are
+implemented locally. The remaining component families are migrated
+incrementally.
 
 ## Package Ownership
 
@@ -221,7 +222,8 @@ resource/node binding are the next coordinated MQTT milestone.
    Complete locally.
 7. Transactional resource and workflow revisions. Complete locally.
 8. MQTT core resource/component vertical slice. Complete locally.
-9. Concrete MQTT adapters and canonical MQTT Composition binding. Next.
+9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
+   locally.
 10. Remaining component families, Designer, hosting, and coordinated releases.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,

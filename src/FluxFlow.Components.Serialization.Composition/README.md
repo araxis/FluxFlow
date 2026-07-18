@@ -1,11 +1,9 @@
 # FluxFlow.Components.Serialization.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone
-serialization nodes from `FluxFlow.Components.Serialization`.
-
-This package does not choose serializers, scan assemblies, resolve CLR types
-from strings, or own encoding resources. Hosts register the fixed serialization
-node factories explicitly and may provide an optional keyed `TimeProvider`.
+Composition registration and Designer metadata for explicit conversions among
+canonical `FlowContent`, `FlowValue`, JSON, text, and Base64. The package binds
+flat component settings and resolves an optional host-owned clock; it does not
+own resources, scan assemblies, or require the Engine runtime.
 
 ## Registration
 
@@ -21,64 +19,67 @@ services
         .RegisterBase64Decode());
 ```
 
-## Node Types
+| Type | Input | Output |
+|------|-------|--------|
+| `json.parse` | `FlowContent` | `FlowResult<FlowValue>` |
+| `json.stringify` | `FlowValue` | `FlowResult<FlowContent>` |
+| `text.encode` | `FlowValue` string | `FlowResult<FlowContent>` |
+| `text.decode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `base64.encode` | `FlowContent` | `FlowResult<FlowValue>` |
+| `base64.decode` | `FlowValue` string | `FlowResult<FlowContent>` |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `json.parse` | `JsonParseNode` | `Input`, `Output` |
-| `json.stringify` | `JsonStringifyNode` | `Input`, `Output` |
-| `text.encode` | `TextEncodeNode` | `Input`, `Output` |
-| `text.decode` | `TextDecodeNode` | `Input`, `Output` |
-| `base64.encode` | `Base64EncodeNode` | `Input`, `Output` |
-| `base64.decode` | `Base64DecodeNode` | `Input`, `Output` |
+Expected conversion failures remain on `Output` and later inputs continue.
+The canonical registrations expose `Events` and no universal error port.
 
-All factories expose `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic diagnostics. The request/result CLR
-types are fixed to the contracts from `FluxFlow.Components.Serialization`.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "parse": {
-              "type": "json.parse",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "defaultEncoding": "utf-8",
-                "maxInputBytes": 1048576,
-                "maxOutputBytes": 1048576,
-                "allowTrailingCommas": true,
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "ConversionClock": {
+      "Type": "host.clock"
+    }
+  },
+  "Workflows": {
+    "NormalizeOrder": {
+      "ParseOrder": {
+        "Type": "json.parse",
+        "clock": "Resources.ConversionClock",
+        "allowTrailingCommas": false,
+        "maxInputBytes": 1048576,
+        "Output": "MapOrder.Input"
+      },
+      "MapOrder": {
+        "Type": "flow.mapper"
+      },
+      "WriteOrder": {
+        "Type": "json.stringify",
+        "Input": "MapOrder.Output",
+        "writeIndented": false,
+        "maxOutputBytes": 1048576
       }
     }
   }
 }
 ```
 
-Each node binds the existing `SerializationNodeOptions` shape from composition
-configuration.
+Links may be declared once on either side; the example shows both forms for
+illustration, not duplicate declarations for the same edge. Component settings
+and resource references remain flat. Addresses are exact, ordinal, and
+case-sensitive.
+
+`clock` is an optional keyed `TimeProvider` using a `Resources.{name}` address.
+The host owns registration, lifetime, and disposal. When omitted, the node uses
+`TimeProvider.System`.
 
 ## Design Metadata
 
-`SerializationComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the six serialization composition nodes. The metadata describes the fixed
-request/result ports, shared `SerializationNodeOptions` surface, option
-grouping/editor hints, and optional `clock` resource picker hint for hosts that
-build palettes, editors, validators, or documentation views.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+`SerializationComponentDesignMetadataProvider` describes the six fixed
+canonical port pairs, all shared option section/importance/editor hints, and the
+optional host-owned clock picker. The metadata is descriptive only; hosts own
+palette and inspector rendering, validation display, persistence, activation,
+and runtime mapping.
 
-The optional `clock` resource remains host-owned with a key-pattern hint and is
-not represented as an editable node option.
+The Composition 2.x registrations intentionally select the canonical nodes.
+Legacy request-based standalone nodes remain in the runtime package but are not
+registered under these fixed node type names.

@@ -1,7 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Serialization.Contracts;
 using FluxFlow.Components.Serialization.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Serialization.Composition;
 
@@ -15,51 +15,51 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
             CreateMetadata(
                 SerializationCompositionNodeTypes.JsonParse,
                 "JSON Parse",
-                "Parses text or bytes into a JSON result.",
+                "Parses JSON content into an immutable workflow value.",
                 "braces",
                 "parse",
-                nameof(JsonParseRequest),
-                nameof(JsonParseResult)),
+                nameof(FlowContent),
+                "FlowResult<FlowValue>"),
             CreateMetadata(
                 SerializationCompositionNodeTypes.JsonStringify,
                 "JSON Stringify",
-                "Serializes a value into JSON text and bytes.",
+                "Serializes an immutable workflow value into JSON content.",
                 "file-json",
                 "stringify",
-                nameof(JsonStringifyRequest),
-                nameof(JsonStringifyResult)),
+                nameof(FlowValue),
+                "FlowResult<FlowContent>"),
             CreateMetadata(
                 SerializationCompositionNodeTypes.TextEncode,
                 "Text Encode",
-                "Encodes text into bytes.",
+                "Encodes a string workflow value into text content.",
                 "binary",
                 "encode",
-                nameof(TextEncodeRequest),
-                nameof(TextEncodeResult)),
+                nameof(FlowValue),
+                "FlowResult<FlowContent>"),
             CreateMetadata(
                 SerializationCompositionNodeTypes.TextDecode,
                 "Text Decode",
-                "Decodes bytes into text.",
+                "Decodes text content into a string workflow value.",
                 "letter-text",
                 "decode",
-                nameof(TextDecodeRequest),
-                nameof(TextDecodeResult)),
+                nameof(FlowContent),
+                "FlowResult<FlowValue>"),
             CreateMetadata(
                 SerializationCompositionNodeTypes.Base64Encode,
                 "Base64 Encode",
-                "Encodes bytes or text into base64 text.",
+                "Encodes exact content bytes into a Base64 string value.",
                 "file-up",
                 "base64Encode",
-                nameof(Base64EncodeRequest),
-                nameof(Base64EncodeResult)),
+                nameof(FlowContent),
+                "FlowResult<FlowValue>"),
             CreateMetadata(
                 SerializationCompositionNodeTypes.Base64Decode,
                 "Base64 Decode",
-                "Decodes base64 text into bytes and optional text.",
+                "Decodes a Base64 string value into binary content.",
                 "file-down",
                 "base64Decode",
-                nameof(Base64DecodeRequest),
-                nameof(Base64DecodeResult))
+                nameof(FlowValue),
+                "FlowResult<FlowContent>")
         ];
 
     private static ComponentDesignMetadata CreateMetadata(
@@ -87,7 +87,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                    keyPattern: "Resources.{name}"));
 
         AddSharedOptions(builder);
         AddSerializationPorts(builder, inputType, outputType);
@@ -106,7 +106,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
-                summary: "Serialization request message.",
+                summary: "Canonical conversion input.",
                 valueType: inputType,
                 isPrimary: true)
             .AddOutputPort(
@@ -114,7 +114,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Serialization result message.",
+                summary: "Converted value or expected conversion error.",
                 valueType: outputType,
                 isPrimary: true);
     }
@@ -136,7 +136,7 @@ public sealed class SerializationComponentDesignMetadataProvider : IComponentDes
                 "defaultEncoding",
                 OptionValueKind.Text,
                 displayName: "Default Encoding",
-                helperText: "Encoding name used when a request does not specify one.",
+                helperText: "Encoding used when content does not declare one.",
                 defaultValue: Defaults.DefaultEncoding,
                 attributes: OptionAttributes(
                     "Encoding",

@@ -638,15 +638,19 @@ Use `RegisterJsonParse()`, `RegisterJsonStringify()`,
 `RegisterTextEncode()`, `RegisterTextDecode()`, `RegisterBase64Encode()`, and
 `RegisterBase64Decode()` from the optional
 `FluxFlow.Components.Serialization.Composition` package when a composition host
-wants serialization and encoding factories. The factories bind existing
-serialization options and can resolve an optional keyed `TimeProvider` resource
-through the host.
+wants canonical serialization and encoding factories. Parse/decode registrations
+convert `FlowContent` to `FlowResult<FlowValue>`; stringify/encode registrations
+convert `FlowValue` to `FlowResult<FlowContent>`. Expected conversion failures
+stay on the normal output. The factories bind `SerializationNodeOptions` and can
+resolve an optional keyed `TimeProvider` resource through the host.
 
 `SerializationComponentDesignMetadataProvider` exposes neutral Designer
 metadata for the six serialization composition nodes so hosts can compose
 palette, editor, validation, or documentation hints without copying package
 descriptors. The metadata includes shared options, fixed ports, and a resource
-hint for the optional `clock` resource.
+hint for the optional `clock` resource using the exact `Resources.{name}` address
+pattern. The request-based standalone nodes remain available from the runtime
+package for code-authored compatibility.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
 

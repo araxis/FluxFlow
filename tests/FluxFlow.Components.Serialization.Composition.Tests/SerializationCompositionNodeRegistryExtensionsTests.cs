@@ -1,16 +1,12 @@
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Serialization;
-using FluxFlow.Components.Serialization.Composition;
-using FluxFlow.Components.Serialization.Contracts;
 using FluxFlow.Components.Serialization.Diagnostics;
 using FluxFlow.Components.Serialization.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,34 +21,16 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public void RegisterSerializationNodes_registers_request_result_metadata()
+    public void Register_serialization_nodes_registers_canonical_metadata()
     {
-        var registry = new CompositionNodeRegistry()
-            .RegisterJsonParse()
-            .RegisterJsonStringify()
-            .RegisterTextEncode()
-            .RegisterTextDecode()
-            .RegisterBase64Encode()
-            .RegisterBase64Decode();
+        var registry = RegisterAll(new CompositionNodeRegistry());
 
-        AssertMetadata<JsonParseRequest, JsonParseResult>(
-            registry,
-            SerializationCompositionNodeTypes.JsonParse);
-        AssertMetadata<JsonStringifyRequest, JsonStringifyResult>(
-            registry,
-            SerializationCompositionNodeTypes.JsonStringify);
-        AssertMetadata<TextEncodeRequest, TextEncodeResult>(
-            registry,
-            SerializationCompositionNodeTypes.TextEncode);
-        AssertMetadata<TextDecodeRequest, TextDecodeResult>(
-            registry,
-            SerializationCompositionNodeTypes.TextDecode);
-        AssertMetadata<Base64EncodeRequest, Base64EncodeResult>(
-            registry,
-            SerializationCompositionNodeTypes.Base64Encode);
-        AssertMetadata<Base64DecodeRequest, Base64DecodeResult>(
-            registry,
-            SerializationCompositionNodeTypes.Base64Decode);
+        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.JsonParse);
+        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.JsonStringify);
+        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.TextEncode);
+        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.TextDecode);
+        AssertMetadata<FlowContent, FlowValue>(registry, SerializationCompositionNodeTypes.Base64Encode);
+        AssertMetadata<FlowValue, FlowContent>(registry, SerializationCompositionNodeTypes.Base64Decode);
     }
 
     [Fact]
@@ -81,264 +59,222 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_fixed_serialization_ports()
+    public void Design_metadata_provider_describes_canonical_ports()
     {
         var metadata = DesignMetadataByType();
 
-        AssertDesignPorts<JsonParseRequest, JsonParseResult>(
-            metadata[SerializationCompositionNodeTypes.JsonParse]);
-        AssertDesignPorts<JsonStringifyRequest, JsonStringifyResult>(
-            metadata[SerializationCompositionNodeTypes.JsonStringify]);
-        AssertDesignPorts<TextEncodeRequest, TextEncodeResult>(
-            metadata[SerializationCompositionNodeTypes.TextEncode]);
-        AssertDesignPorts<TextDecodeRequest, TextDecodeResult>(
-            metadata[SerializationCompositionNodeTypes.TextDecode]);
-        AssertDesignPorts<Base64EncodeRequest, Base64EncodeResult>(
-            metadata[SerializationCompositionNodeTypes.Base64Encode]);
-        AssertDesignPorts<Base64DecodeRequest, Base64DecodeResult>(
-            metadata[SerializationCompositionNodeTypes.Base64Decode]);
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.JsonParse],
+            nameof(FlowContent), "FlowResult<FlowValue>");
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.JsonStringify],
+            nameof(FlowValue), "FlowResult<FlowContent>");
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.TextEncode],
+            nameof(FlowValue), "FlowResult<FlowContent>");
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.TextDecode],
+            nameof(FlowContent), "FlowResult<FlowValue>");
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.Base64Encode],
+            nameof(FlowContent), "FlowResult<FlowValue>");
+        AssertDesignPorts(metadata[SerializationCompositionNodeTypes.Base64Decode],
+            nameof(FlowValue), "FlowResult<FlowContent>");
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_shared_serialization_options()
+    public void Design_metadata_provider_describes_shared_options_and_hints()
     {
-        var metadata = DesignMetadataByType();
-
-        foreach (var item in metadata.Values)
+        foreach (var item in DesignMetadataByType().Values)
         {
             AssertSharedOptions(item);
-        }
-    }
-
-    [Fact]
-    public void Design_metadata_provider_describes_shared_serialization_option_hints()
-    {
-        var metadata = DesignMetadataByType();
-
-        foreach (var item in metadata.Values)
-        {
             var options = OptionsByName(item);
-
-            AssertOptionHints(
-                options["boundedCapacity"],
-                "Runtime",
+            AssertOptionHints(options["boundedCapacity"], "Runtime",
                 OptionDesignMetadataAttributeValues.Advanced,
                 OptionDesignMetadataAttributeValues.Number);
-            AssertOptionHints(
-                options["defaultEncoding"],
-                "Encoding",
+            AssertOptionHints(options["defaultEncoding"], "Encoding",
                 OptionDesignMetadataAttributeValues.Advanced,
                 OptionDesignMetadataAttributeValues.Text);
-            AssertOptionHints(
-                options["maxInputBytes"],
-                "Runtime",
+            AssertOptionHints(options["maxInputBytes"], "Runtime",
                 OptionDesignMetadataAttributeValues.Advanced,
                 OptionDesignMetadataAttributeValues.Number);
-            AssertOptionHints(
-                options["maxOutputBytes"],
-                "Runtime",
+            AssertOptionHints(options["maxOutputBytes"], "Runtime",
                 OptionDesignMetadataAttributeValues.Advanced,
                 OptionDesignMetadataAttributeValues.Number);
-            AssertOptionHints(
-                options["writeIndented"],
-                "JSON",
+            AssertOptionHints(options["writeIndented"], "JSON",
                 OptionDesignMetadataAttributeValues.Advanced);
-            AssertOptionHints(
-                options["allowTrailingCommas"],
-                "JSON",
+            AssertOptionHints(options["allowTrailingCommas"], "JSON",
                 OptionDesignMetadataAttributeValues.Advanced);
-            AssertOptionHints(
-                options["skipComments"],
-                "JSON",
+            AssertOptionHints(options["skipComments"], "JSON",
                 OptionDesignMetadataAttributeValues.Advanced);
         }
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_serialization_resource_picker_hints()
+    public void Design_metadata_provider_describes_host_owned_clock_picker()
     {
-        var metadata = DesignMetadataByType();
-
-        foreach (var item in metadata.Values)
+        foreach (var item in DesignMetadataByType().Values)
         {
-            AssertResourceHints(
-                item.Resources.ShouldHaveSingleItem(),
-                ResourceDesignMetadataAttributeValues.Clock,
-                "clock:{name}");
+            var resource = item.Resources.ShouldHaveSingleItem();
+            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
+                .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
+            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
+                .ShouldBe(ResourceDesignMetadataAttributeValues.Clock);
+            AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
+                .ShouldBe("Resources.{name}");
         }
     }
 
     [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
-        var provider = new SerializationComponentDesignMetadataProvider();
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            [new SerializationComponentDesignMetadataProvider()]);
 
         catalog.All.Count.ShouldBe(6);
         catalog.TryGet(
             new ComponentType(SerializationCompositionNodeTypes.JsonParse),
-            out var jsonParseMetadata).ShouldBeTrue();
-        jsonParseMetadata.ShouldNotBeNull()
-            .DisplayName?.Value.ShouldBe("JSON Parse");
+            out var parse).ShouldBeTrue();
+        parse.ShouldNotBeNull().DisplayName?.Value.ShouldBe("JSON Parse");
         catalog.TryGet(
             new ComponentType(SerializationCompositionNodeTypes.Base64Decode),
-            out var base64DecodeMetadata).ShouldBeTrue();
-        base64DecodeMetadata.ShouldNotBeNull()
-            .DisplayName?.Value.ShouldBe("Base64 Decode");
+            out var decode).ShouldBeTrue();
+        decode.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Base64 Decode");
     }
 
     [Fact]
-    public async Task Hosted_json_parse_parses_text_and_preserves_correlation_id()
+    public async Task Hosted_json_parse_binds_options_and_returns_flow_value()
     {
-        var result = await RunNodeAsync<JsonParseRequest, JsonParseResult>(
+        var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
             registry => registry.RegisterJsonParse(),
-            new JsonParseRequest { Text = """{"name":"flux",}""" },
+            FlowContent.FromBytes(
+                Encoding.UTF8.GetBytes("""{"name":"sample",}"""),
+                "application/json"),
             node => node.Configure("allowTrailingCommas", true));
 
         result.CorrelationId.ShouldBe(new CorrelationId("json.parse"));
-        result.Payload.Kind.ShouldBe(JsonValueKind.Object);
-        result.Payload.Value.ShouldBeOfType<JsonObject>()["name"]!
-            .GetValue<string>()
-            .ShouldBe("flux");
+        result.Payload.IsError.ShouldBeFalse();
+        result.Payload.Value.ShouldNotBeNull().GetObject()["name"]
+            .GetString().ShouldBe("sample");
     }
 
     [Fact]
-    public async Task Hosted_json_stringify_serializes_value()
+    public async Task Hosted_json_stringify_returns_json_content()
     {
-        var result = await RunNodeAsync<JsonStringifyRequest, JsonStringifyResult>(
+        var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.JsonStringify,
             registry => registry.RegisterJsonStringify(),
-            new JsonStringifyRequest
+            FlowValue.FromObject(new Dictionary<string, FlowValue>
             {
-                Value = new Dictionary<string, object?> { ["ok"] = true }
-            });
+                ["ok"] = FlowValue.From(true)
+            }));
 
-        result.CorrelationId.ShouldBe(new CorrelationId("json.stringify"));
-        result.Payload.Text.ShouldBe("""{"ok":true}""");
-        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes(result.Payload.Text));
+        var content = result.Payload.Value.ShouldNotBeNull();
+        content.ContentType.ShouldBe("application/json");
+        Encoding.UTF8.GetString(content.OriginalBytes.AsSpan())
+            .ShouldBe("""{"ok":true}""");
     }
 
     [Fact]
-    public async Task Hosted_text_encode_encodes_text()
+    public async Task Hosted_text_encode_returns_text_content()
     {
-        var result = await RunNodeAsync<TextEncodeRequest, TextEncodeResult>(
+        var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.TextEncode,
             registry => registry.RegisterTextEncode(),
-            new TextEncodeRequest { Text = "hello" });
+            FlowValue.From("hello"));
 
-        result.CorrelationId.ShouldBe(new CorrelationId("text.encode"));
-        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
-        result.Payload.ByteCount.ShouldBe(5);
-        result.Payload.Encoding.ShouldBe("utf-8");
+        var content = result.Payload.Value.ShouldNotBeNull();
+        content.ContentType.ShouldBe("text/plain");
+        content.Encoding.ShouldBe("utf-8");
+        Encoding.UTF8.GetString(content.OriginalBytes.AsSpan()).ShouldBe("hello");
     }
 
     [Fact]
-    public async Task Hosted_text_decode_binds_options_and_decodes_bytes()
+    public async Task Hosted_text_decode_binds_encoding_and_skips_preamble()
     {
         var encoding = Encoding.Unicode;
-        var bytes = encoding.GetPreamble()
-            .Concat(encoding.GetBytes("hello"))
-            .ToArray();
-        var result = await RunNodeAsync<TextDecodeRequest, TextDecodeResult>(
+        var bytes = encoding.GetPreamble().Concat(encoding.GetBytes("hello")).ToArray();
+        var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.TextDecode,
             registry => registry.RegisterTextDecode(),
-            new TextDecodeRequest { Bytes = bytes },
+            FlowContent.FromBytes(bytes, "text/plain"),
             node => node.Configure("defaultEncoding", "utf-16"));
 
-        result.CorrelationId.ShouldBe(new CorrelationId("text.decode"));
-        result.Payload.Text.ShouldBe("hello");
-        result.Payload.Encoding.ShouldBe("utf-16");
-        result.Payload.ByteCount.ShouldBe(bytes.Length);
+        result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("hello");
     }
 
     [Fact]
-    public async Task Hosted_base64_encode_encodes_text()
+    public async Task Hosted_base64_encode_returns_string_value()
     {
-        var result = await RunNodeAsync<Base64EncodeRequest, Base64EncodeResult>(
+        var result = await RunNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.Base64Encode,
             registry => registry.RegisterBase64Encode(),
-            new Base64EncodeRequest { Text = "hello" });
+            FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello")));
 
-        result.CorrelationId.ShouldBe(new CorrelationId("base64.encode"));
-        result.Payload.Text.ShouldBe("aGVsbG8=");
-        result.Payload.ByteCount.ShouldBe(5);
-        result.Payload.EncodedLength.ShouldBe(8);
+        result.Payload.Value.ShouldNotBeNull().GetString().ShouldBe("aGVsbG8=");
     }
 
     [Fact]
-    public async Task Hosted_base64_decode_decodes_text()
+    public async Task Hosted_base64_decode_returns_binary_content()
     {
-        var result = await RunNodeAsync<Base64DecodeRequest, Base64DecodeResult>(
+        var result = await RunNodeAsync<FlowValue, FlowContent>(
             SerializationCompositionNodeTypes.Base64Decode,
             registry => registry.RegisterBase64Decode(),
-            new Base64DecodeRequest
-            {
-                Text = "aGVsbG8=",
-                DecodeText = true
-            });
+            FlowValue.From("aGVsbG8="));
 
-        result.CorrelationId.ShouldBe(new CorrelationId("base64.decode"));
-        result.Payload.Bytes.ShouldBe(Encoding.UTF8.GetBytes("hello"));
-        result.Payload.Text.ShouldBe("hello");
-        result.Payload.Encoding.ShouldBe("utf-8");
+        var content = result.Payload.Value.ShouldNotBeNull();
+        content.ContentType.ShouldBe("application/octet-stream");
+        content.OriginalBytes.AsSpan()
+            .SequenceEqual(Encoding.UTF8.GetBytes("hello")).ShouldBeTrue();
     }
 
     [Fact]
     public async Task Hosted_node_uses_optional_keyed_clock_for_events()
     {
-        var timestamp = DateTimeOffset.Parse("2026-06-18T12:00:00Z");
+        var timestamp = DateTimeOffset.Parse("2026-07-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
-        await WithNodeAsync<JsonParseRequest, JsonParseResult>(
+        await WithNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
             registry => registry.RegisterJsonParse(),
             async (input, output, descriptor) =>
             {
+                output.Source.LinkTo(DataflowBlock.NullTarget<
+                    FlowMessage<FlowResult<FlowValue>>>());
                 var events = Link(descriptor.Events.ShouldNotBeNull());
-                output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<JsonParseResult>>());
-
-                (await input.Target.SendAsync(FlowMessage.Create(
-                        new JsonParseRequest { Text = """{"ok":true}""" }))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
+                await input.Target.SendAsync(FlowMessage.Create(
+                    FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json")));
 
                 var @event = await events.ReceiveAsync().WaitAsync(Timeout);
                 @event.Name.ShouldBe(SerializationDiagnosticNames.JsonParsed);
                 @event.Timestamp.ShouldBe(timestamp);
             },
-            configureNode: node => node.Resource(
-                SerializationCompositionResourceNames.Clock,
-                "fixed"),
-            configureServices: services =>
-                services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+            node => node.Resource(SerializationCompositionResourceNames.Clock, "fixed"),
+            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
     }
 
     [Fact]
-    public async Task Hosted_node_emits_errors_and_continues_after_conversion_failure()
+    public async Task Hosted_expected_failure_uses_output_and_continues()
     {
-        await WithNodeAsync<JsonParseRequest, JsonParseResult>(
+        await WithNodeAsync<FlowContent, FlowValue>(
             SerializationCompositionNodeTypes.JsonParse,
             registry => registry.RegisterJsonParse(),
             async (input, output, descriptor) =>
             {
+                descriptor.Errors.ShouldBeNull();
                 var results = Link(output.Source);
-                var errors = Link(descriptor.Errors.ShouldNotBeNull());
                 var bad = FlowMessage.Create(
-                    new JsonParseRequest { Text = "{" },
+                    FlowContent.FromBytes(Encoding.UTF8.GetBytes("{"), "application/json"),
                     new CorrelationId("bad"));
                 var good = FlowMessage.Create(
-                    new JsonParseRequest { Text = """{"ok":true}""" },
+                    FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                     new CorrelationId("good"));
 
-                (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
+                await input.Target.SendAsync(bad);
+                await input.Target.SendAsync(good);
 
-                var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
-
-                error.Code.ShouldBe(SerializationErrorCodes.JsonParseFailed);
-                error.CorrelationId.ShouldBe(bad.CorrelationId);
-                result.CorrelationId.ShouldBe(good.CorrelationId);
-                result.Payload.Kind.ShouldBe(JsonValueKind.Object);
+                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+                var success = await results.ReceiveAsync().WaitAsync(Timeout);
+                failure.CorrelationId.ShouldBe(bad.CorrelationId);
+                failure.Payload.Error.ShouldNotBeNull().Code
+                    .ShouldBe(SerializationErrorCodeNames.JsonParseFailed);
+                success.CorrelationId.ShouldBe(good.CorrelationId);
+                success.Payload.IsError.ShouldBeFalse();
             });
     }
 
@@ -364,10 +300,17 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         host.Runtime.ShouldBeNull();
         host.Diagnostics.ShouldContain(diagnostic =>
             diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                "boundedCapacity",
-                StringComparison.OrdinalIgnoreCase));
+            diagnostic.Message.Contains("boundedCapacity", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static CompositionNodeRegistry RegisterAll(CompositionNodeRegistry registry)
+        => registry
+            .RegisterJsonParse()
+            .RegisterJsonStringify()
+            .RegisterTextEncode()
+            .RegisterTextDecode()
+            .RegisterBase64Encode()
+            .RegisterBase64Decode();
 
     private static void AssertMetadata<TInput, TOutput>(
         CompositionNodeRegistry registry,
@@ -377,7 +320,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         registration.Inputs[SerializationCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(TInput));
         registration.Outputs[SerializationCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(TOutput));
+            .ShouldBe(typeof(FlowResult<TOutput>));
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
@@ -387,34 +330,31 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
 
     private static Dictionary<string, OptionDesignMetadata> OptionsByName(
         ComponentDesignMetadata metadata)
-        => metadata.Options.ToDictionary(
-            option => option.Name.Value,
-            StringComparer.Ordinal);
+        => metadata.Options.ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
 
-    private static void AssertDesignPorts<TInput, TOutput>(
-        ComponentDesignMetadata metadata)
+    private static void AssertDesignPorts(
+        ComponentDesignMetadata metadata,
+        string inputType,
+        string outputType)
     {
         metadata.Ports.Count.ShouldBe(2);
-
         var input = metadata.Ports[0];
         input.Name.Value.ShouldBe(SerializationCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(inputType);
         input.IsPrimary.ShouldBeTrue();
-
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(SerializationCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(outputType);
         output.IsPrimary.ShouldBeTrue();
     }
 
     private static void AssertSharedOptions(ComponentDesignMetadata metadata)
     {
         var defaults = new SerializationNodeOptions();
-
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
             "boundedCapacity",
             "defaultEncoding",
@@ -424,45 +364,13 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             "allowTrailingCommas",
             "skipComments"
         ], ignoreOrder: false);
-
-        AssertOption(
-            metadata,
-            "boundedCapacity",
-            OptionValueKind.Number,
-            defaults.BoundedCapacity,
-            min: 1);
-        AssertOption(
-            metadata,
-            "defaultEncoding",
-            OptionValueKind.Text,
-            defaults.DefaultEncoding);
-        AssertOption(
-            metadata,
-            "maxInputBytes",
-            OptionValueKind.Number,
-            defaults.MaxInputBytes,
-            min: 1);
-        AssertOption(
-            metadata,
-            "maxOutputBytes",
-            OptionValueKind.Number,
-            defaults.MaxOutputBytes,
-            min: 1);
-        AssertOption(
-            metadata,
-            "writeIndented",
-            OptionValueKind.Boolean,
-            defaults.WriteIndented);
-        AssertOption(
-            metadata,
-            "allowTrailingCommas",
-            OptionValueKind.Boolean,
-            defaults.AllowTrailingCommas);
-        AssertOption(
-            metadata,
-            "skipComments",
-            OptionValueKind.Boolean,
-            defaults.SkipComments);
+        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number, defaults.BoundedCapacity, 1);
+        AssertOption(metadata, "defaultEncoding", OptionValueKind.Text, defaults.DefaultEncoding);
+        AssertOption(metadata, "maxInputBytes", OptionValueKind.Number, defaults.MaxInputBytes, 1);
+        AssertOption(metadata, "maxOutputBytes", OptionValueKind.Number, defaults.MaxOutputBytes, 1);
+        AssertOption(metadata, "writeIndented", OptionValueKind.Boolean, defaults.WriteIndented);
+        AssertOption(metadata, "allowTrailingCommas", OptionValueKind.Boolean, defaults.AllowTrailingCommas);
+        AssertOption(metadata, "skipComments", OptionValueKind.Boolean, defaults.SkipComments);
     }
 
     private static void AssertOption(
@@ -488,28 +396,20 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
             .ShouldBe(section);
         AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Importance)
             .ShouldBe(importance);
-
+        var editorName = new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor);
         if (editor is null)
-        {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
-                .ShouldBeFalse();
-        }
+            option.Attributes.ContainsKey(editorName).ShouldBeFalse();
         else
-        {
-            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor)
-                .ShouldBe(editor);
-        }
-
-        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
-            .ShouldBeFalse();
-        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
-            .ShouldBeFalse();
+            AttributeValue(option.Attributes, OptionDesignMetadataAttributeNames.Editor).ShouldBe(editor);
+        option.Attributes.ContainsKey(new ComponentAttributeName(
+            OptionDesignMetadataAttributeNames.Syntax)).ShouldBeFalse();
+        option.Attributes.ContainsKey(new ComponentAttributeName(
+            OptionDesignMetadataAttributeNames.RelatedResource)).ShouldBeFalse();
     }
 
     private static void AssertClockResource(ComponentDesignMetadata metadata)
     {
         var resource = metadata.Resources.ShouldHaveSingleItem();
-
         resource.Name.Value.ShouldBe(SerializationCompositionResourceNames.Clock);
         resource.DisplayName?.Value.ShouldBe("Clock");
         resource.Order.ShouldBe(0);
@@ -517,55 +417,40 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         resource.ValueType?.Value.ShouldBe(nameof(TimeProvider));
     }
 
-    private static void AssertResourceHints(
-        ResourceDesignMetadata resource,
-        string pickerKind,
-        string keyPattern)
-    {
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.Ownership)
-            .ShouldBe(ResourceDesignMetadataAttributeValues.HostOwned);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.PickerKind)
-            .ShouldBe(pickerKind);
-        AttributeValue(resource.Attributes, ResourceDesignMetadataAttributeNames.KeyPattern)
-            .ShouldBe(keyPattern);
-    }
-
     private static string AttributeValue(
         IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> attributes,
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task<FlowMessage<TOutput>> RunNodeAsync<TInput, TOutput>(
+    private static async Task<FlowMessage<FlowResult<TOutput>>> RunNodeAsync<TInput, TOutput>(
         string nodeType,
         Func<CompositionNodeRegistry, CompositionNodeRegistry> register,
-        TInput request,
+        TInput inputValue,
         Action<NodeDefinitionBuilder>? configureNode = null)
     {
-        FlowMessage<TOutput>? result = null;
+        FlowMessage<FlowResult<TOutput>>? result = null;
         await WithNodeAsync<TInput, TOutput>(
             nodeType,
             register,
             async (input, output, _) =>
             {
                 var results = Link(output.Source);
-                var message = FlowMessage.Create(
-                    request,
-                    new CorrelationId(nodeType));
-
-                (await input.Target.SendAsync(message).WaitAsync(Timeout))
-                    .ShouldBeTrue();
-
+                var message = FlowMessage.Create(inputValue, new CorrelationId(nodeType));
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
                 result = await results.ReceiveAsync().WaitAsync(Timeout);
             },
             configureNode);
-
         return result.ShouldNotBeNull();
     }
 
     private static async Task WithNodeAsync<TInput, TOutput>(
         string nodeType,
         Func<CompositionNodeRegistry, CompositionNodeRegistry> register,
-        Func<CompositionInputPort<TInput>, CompositionOutputPort<TOutput>, ComposedNode, Task> run,
+        Func<
+            CompositionInputPort<TInput>,
+            CompositionOutputPort<FlowResult<TOutput>>,
+            ComposedNode,
+            Task> run,
         Action<NodeDefinitionBuilder>? configureNode = null,
         Action<IServiceCollection>? configureServices = null)
     {
@@ -574,10 +459,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         services
             .AddFluxFlowComposition(CompositionDefinitionBuilder
                 .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    nodeType,
-                    configureNode))
+                .Workflow("main", workflow => workflow.Node("node", nodeType, configureNode))
                 .Build())
             .RegisterNodes(registry => register(registry))
             .Configure(options => options.StartRuntimeWithHost = false);
@@ -592,8 +474,7 @@ public sealed class SerializationCompositionNodeRegistryExtensionsTests
         var input = descriptor.Inputs[SerializationCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<TInput>>();
         var output = descriptor.Outputs[SerializationCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<TOutput>>();
-
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<TOutput>>>();
         await run(input, output, descriptor);
     }
 

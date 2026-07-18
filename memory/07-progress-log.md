@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-18 - vNext FlowContent And FlowValue Serialization
+
+- Added six canonical standalone nodes for explicit JSON, text, and Base64
+  conversion between `FlowContent` and `FlowValue`, with one normal
+  `FlowResult<T>` output and no universal Error port.
+- Kept expected format, type, size, null-input, and encoding failures as stable
+  normal result variants while preserving message lineage, event diagnostics,
+  later-message continuation, exact bytes, decode-cache reuse, and deterministic
+  JSON.
+- Migrated all six Serialization Composition registrations and Designer
+  metadata to canonical ports, explicit concrete factories, and
+  `Resources.{name}` clock addresses.
+- Moved Serialization to `4.0.0` and Serialization Composition to `2.0.0`,
+  updated package docs/changelog/API baseline, and preserved all request-based
+  standalone declarations.
+- Passed 2,011 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds, binary compatibility, two release preflights/dry-runs,
+  and a package-only net8 consumer. Full evidence is in
+  [[218-vnext-serialization-flowcontent-flowvalue]].
+- Validation is the next separately bounded component-family migration.
+
 ## 2026-07-18 - vNext FlowContent Payload Inspection
 
 - Added `FlowContentInspectNode` with exact content preservation, one-time
@@ -19,7 +40,7 @@ Date: 2026-05-31
   Debug/Release builds across 130 projects, binary compatibility, two release
   preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
   [[217-vnext-payloads-flowcontent]].
-- Serialization is the next separately bounded component-family migration.
+- Serialization followed as the next bounded component-family migration.
 
 ## 2026-07-18 - vNext FlowValue Mapping
 

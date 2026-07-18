@@ -5,9 +5,10 @@ Date: 2026-07-18
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/payloads-vnext`. The provider-neutral MQTT vertical slice and the first
-  two normal component-family migrations, canonical FlowValue Mapping and
-  FlowContent Payloads, are implemented and verified locally.
+  `work/serialization-vnext`. The provider-neutral MQTT vertical slice and the
+  first three normal component-family migrations, canonical FlowValue Mapping,
+  FlowContent Payloads, and FlowContent/FlowValue Serialization, are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -22,8 +23,9 @@ Date: 2026-07-18
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
-  transactional-revision milestones. MQTT, Mapping, and Payloads now use this
-  foundation; the remaining component-family migrations continue separately. See
+  transactional-revision milestones. MQTT, Mapping, Payloads, and Serialization
+  now use this foundation; the remaining component-family migrations continue
+  separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -112,8 +114,20 @@ Date: 2026-07-18
   no universal error output, and optional host-owned codec-catalog and clock
   resources. Focused/full tests, zero-warning controlled builds, binary
   compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Serialization is the next bounded family. See
+  passed. Serialization followed as the next bounded family. See
   `217-vnext-payloads-flowcontent.md`.
+- `FluxFlow.Components.Serialization` is now `4.0.0` locally with six canonical
+  standalone nodes for explicit JSON, text, and Base64 conversion between
+  `FlowContent` and `FlowValue`. Expected conversion failures remain normal
+  `FlowResult<T>` data; exact bytes, decode-cache reuse, deterministic JSON,
+  configured limits, encoding fallback, message lineage, and Events are
+  preserved. All request-based standalone nodes remain available for
+  code-authored compatibility. `FluxFlow.Components.Serialization.Composition`
+  is `2.0.0` with canonical fixed ports, explicit concrete factories, no
+  universal Errors port, and a host-owned `Resources.{name}` clock. Focused and
+  full tests, zero-warning controlled builds, binary compatibility, release
+  preflight/dry-runs, and a package-only consumer passed. Validation is the next
+  bounded family. See `218-vnext-serialization-flowcontent-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer
