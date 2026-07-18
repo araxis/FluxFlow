@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.MqttNet</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.MqttNet</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.MqttNet</RootNamespace>
-    <Version>1.1.8</Version>
+    <Version>1.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>MQTTnet-backed adapter for FluxFlow MQTT components. Owns MQTT client creation, connection, Last Will setup, publish, trigger subscriptions, acknowledgement, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
+    <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;mqttnet</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds MqttNetTransportFactory and a non-resilient provider session for the FluxFlow MQTT 5.0 transport SPI. The core controller owns reconnect, desired subscriptions, trigger claims, acknowledgement policy, and diagnostics. The legacy adapter API remains available during migration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.MqttNet.Tests" />
+    <InternalsVisibleTo Include="FluxFlow.Components.Mqtt.Adapters.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />

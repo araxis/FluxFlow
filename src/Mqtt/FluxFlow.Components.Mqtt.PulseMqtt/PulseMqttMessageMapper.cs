@@ -1,5 +1,6 @@
 using System.Text;
 using FluxFlow.Components.Mqtt.Contracts;
+using FluxFlow.Data;
 using Pulse.Mqtt;
 using Pulse.Mqtt.Packets;
 using FluxMqttQualityOfService = FluxFlow.Components.Mqtt.Contracts.MqttQualityOfService;
@@ -32,6 +33,26 @@ internal static class PulseMqttMessageMapper
         };
     }
 
+    public static MqttPublishPacket ToPublishPacket(MqttPublishMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return new MqttPublishPacket
+        {
+            Topic = message.Topic,
+            Payload = message.Content.OriginalBytes.ToArray(),
+            ContentType = string.IsNullOrWhiteSpace(message.Content.ContentType)
+                ? null
+                : message.Content.ContentType,
+            QualityOfService = ToPulseQualityOfService(message.Qos),
+            Retain = message.Retain,
+            CorrelationData = ToCorrelationData(message.CorrelationData),
+            ResponseTopic = string.IsNullOrWhiteSpace(message.ResponseTopic)
+                ? null
+                : message.ResponseTopic,
+            UserProperties = ToUserProperties(message.UserProperties)
+        };
+    }
+
     public static MqttWillMessage ToWillMessage(PulseMqttLastWillOptions lastWill)
     {
         ArgumentNullException.ThrowIfNull(lastWill);
@@ -51,6 +72,25 @@ internal static class PulseMqttMessageMapper
                 ? null
                 : lastWill.Properties.ResponseTopic,
             UserProperties = ToUserProperties(lastWill.Properties?.UserProperties)
+        };
+    }
+
+    public static MqttWillMessage ToWillMessage(MqttPublishMessage lastWill)
+    {
+        ArgumentNullException.ThrowIfNull(lastWill);
+        return new MqttWillMessage(lastWill.Topic)
+        {
+            Payload = lastWill.Content.OriginalBytes.ToArray(),
+            ContentType = string.IsNullOrWhiteSpace(lastWill.Content.ContentType)
+                ? null
+                : lastWill.Content.ContentType,
+            QualityOfService = ToPulseQualityOfService(lastWill.Qos),
+            Retain = lastWill.Retain,
+            CorrelationData = ToCorrelationData(lastWill.CorrelationData),
+            ResponseTopic = string.IsNullOrWhiteSpace(lastWill.ResponseTopic)
+                ? null
+                : lastWill.ResponseTopic,
+            UserProperties = ToUserProperties(lastWill.UserProperties)
         };
     }
 
@@ -80,6 +120,44 @@ internal static class PulseMqttMessageMapper
             UserProperties = ToDictionary(packet.UserProperties)
         };
     }
+
+    public static MqttReceivedApplicationMessage ToReceivedApplicationMessage(
+        MqttPublishPacket packet,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(packet);
+        return new MqttReceivedApplicationMessage
+        {
+            Timestamp = timestamp,
+            Topic = packet.Topic,
+            Content = FlowContent.FromBytes(packet.Payload, packet.ContentType),
+            Qos = FromPulseQos(packet.QualityOfService),
+            Retain = packet.Retain,
+            CorrelationData = DecodeCorrelationId(packet.CorrelationData),
+            ResponseTopic = string.IsNullOrWhiteSpace(packet.ResponseTopic)
+                ? null
+                : packet.ResponseTopic,
+            UserProperties = ToDictionary(packet.UserProperties)
+        };
+    }
+
+    public static PulseMqttQualityOfService ToPulseQualityOfService(MqttQos qos)
+        => qos switch
+        {
+            MqttQos.AtMostOnce => PulseMqttQualityOfService.AtMostOnce,
+            MqttQos.AtLeastOnce => PulseMqttQualityOfService.AtLeastOnce,
+            MqttQos.ExactlyOnce => PulseMqttQualityOfService.ExactlyOnce,
+            _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "MQTT QoS is not supported.")
+        };
+
+    public static MqttQos FromPulseQos(PulseMqttQualityOfService qos)
+        => qos switch
+        {
+            PulseMqttQualityOfService.AtMostOnce => MqttQos.AtMostOnce,
+            PulseMqttQualityOfService.AtLeastOnce => MqttQos.AtLeastOnce,
+            PulseMqttQualityOfService.ExactlyOnce => MqttQos.ExactlyOnce,
+            _ => throw new ArgumentOutOfRangeException(nameof(qos), qos, "MQTT QoS is not supported.")
+        };
 
     public static PulseMqttQualityOfService ToPulseQualityOfService(
         FluxMqttQualityOfService qualityOfService)

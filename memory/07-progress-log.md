@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext MQTT transport adapters
+
+- Added thin concrete implementations of the provider-neutral MQTT transport
+  SPI while keeping reconnect, retry, desired subscriptions, trigger claims,
+  ordering, and workflow acknowledgement in the core controller.
+- Added exact-byte/configuration mapping, bounded provider event streams,
+  deferred broker acknowledgement tokens, stable transport failure
+  classification, and coordinated one-outcome broker acknowledgement across
+  overlapping trigger matches.
+- Moved the concrete adapter packages to `1.2.0` and `2.1.0`, retained their
+  legacy APIs, and added one shared behavioral conformance suite alongside
+  provider-focused tests.
+- Passed 82 MQTT core, 37 first-adapter, 24 second-adapter, 7 shared adapter,
+  10 Composition, and 93 release tests; the complete Release sweep passed
+  1,977 tests across 63 projects. Controlled Debug/Release builds, binary
+  compatibility, release preflight/dry-runs, and a package-only consumer also
+  passed. Full evidence is in [[214-vnext-mqtt-adapters]].
+- Canonical MQTT Composition binding is the next bounded milestone.
+
 ## 2026-07-17 - vNext MQTT core
 
 - Added provider-neutral broker/client configuration, discriminated client

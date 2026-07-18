@@ -471,6 +471,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `213-vnext-mqtt-core.md`: provider-neutral MQTT client configuration,
   controller, command/result contracts, transport SPI, nodes, subscriptions,
   acknowledgements, reconnect semantics, and the concrete-adapter handoff.
+- `214-vnext-mqtt-adapters.md`: concrete implementations of the MQTT transport
+  SPI, shared adapter conformance, coordinated broker acknowledgements, and the
+  canonical MQTT Composition handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

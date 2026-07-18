@@ -2,51 +2,60 @@
 
 Pulse MQTT-backed adapter for `FluxFlow.Components.Mqtt`.
 
-The core MQTT package stays client-library-neutral: `MqttPublishNode` needs only
-`IMqttPublisher`, and `MqttTriggerNode` needs only `IMqttTriggerSource`. This
-package supplies one concrete session object, `PulseMqttClient`, that implements:
+The current integration point is `PulseMqttTransportFactory`. It implements the
+provider-neutral MQTT transport SPI and creates a non-resilient raw provider
+client for each logical `MqttClientController` connection. This package maps:
 
-- `IMqttPublisher`
-- `IMqttTriggerSource`
-- `IMqttClientHealthSource`
+- resolved broker, credential, certificate, and Last Will configuration;
+- exact `FlowContent` bytes and MQTT message metadata;
+- subscribe and unsubscribe operations; and
+- deferred broker Ack/Nak completion.
 
-`PulseMqttClient` owns Pulse MQTT client creation, transport configuration,
-start/stop, publish mapping, route-stream trigger subscriptions, Last Will
-configuration, and health events.
+`FluxFlow.Components.Mqtt` owns logical-client lifetime, auto-connect,
+reconnect, desired subscriptions, trigger claims, delivery policy, result
+values, and diagnostics. The adapter deliberately uses the provider's raw
+client rather than its resilient layer, so policy is not duplicated.
 
 ## Usage
 
 ```csharp
-var mqtt = new PulseMqttClient(new PulseMqttClientOptions
+var configuration = new MqttClientConfiguration
 {
-    Host = "localhost",
-    Port = 1883,
+    Name = "primary",
     ClientId = "fluxflow-worker",
-    LastWill = new PulseMqttLastWillOptions
+    Broker = new MqttBrokerConfiguration
     {
-        Topic = "workers/fluxflow/status",
-        Payload = "offline"u8.ToArray(),
-        Retain = true,
-        QualityOfService = MqttQualityOfService.AtLeastOnce,
-        ContentType = "text/plain"
-    }
-});
+        Host = "localhost",
+        Port = 1883
+    },
+    AutoConnect = MqttAutoConnectMode.OnStart
+};
 
-await mqtt.ConnectAsync();
+await using var client = new MqttClientController(
+    configuration,
+    new PulseMqttTransportFactory());
 
-var publish = new MqttPublishNode(mqtt);
-var trigger = new MqttTriggerNode(mqtt, new MqttTriggerOptions
-{
-    TopicFilter = "commands/+",
-    Mode = MqttTriggerMode.RequestReply,
-    Acknowledgement = MqttTriggerAcknowledgement.OnSuccessfulResponse
-});
+await client.StartAsync();
 ```
 
-Use `ConnectAsync` when the caller needs the adapter to wait for a live session.
-Use `StartAsync` when the caller wants Pulse MQTT's resilient background
-connection lifecycle and will observe health events until the session becomes
-connected.
+Hosts with an advanced provider transport can pass it to
+`PulseMqttTransportFactory`. When the default TCP transport is used, the
+adapter maps the resolved broker and client certificates from
+`MqttClientConfiguration`.
+
+Publish and Last Will content must carry original bytes in `FlowContent`; a
+workflow mapper or serializer performs any JSON, text, or domain conversion
+before the MQTT boundary. QoS 1/2 deliveries are deferred until the core
+controller resolves the configured workflow acknowledgement policy.
+
+## Legacy Client API
+
+`PulseMqttClient`, `IMqttPublisher`, `IMqttTriggerSource`, and
+`IMqttClientHealthSource` remain available while the current MQTT Composition
+adapter migrates. That legacy client retains its existing resilient lifecycle,
+offline queue, durable-store, route-stream, and health behavior. New host
+integration should use `MqttClientController` with
+`PulseMqttTransportFactory`.
 
 By default, FluxFlow publish semantics stay strict: publishing while disconnected
 throws `MqttClientUnavailableException`. Set
@@ -64,7 +73,7 @@ caller-owned maps cannot alter CONNECT user properties after options creation.
 and Last Will payloads are copied before concrete client handoff so caller-owned
 buffers cannot alter queued client-library messages.
 
-## Dependency Injection
+## Legacy Dependency Injection
 
 Register a named client session when the host wants DI-owned lifetime and keyed
 MQTT roles:
@@ -105,14 +114,11 @@ composition layer; the registration owns only the adapter client session.
 
 ## Composition
 
-This package does not expose `FluxFlow.Composition` node factories. It owns the
-Pulse MQTT-backed client session, resilient connection lifecycle, durable store
-options, and DI registration only.
-
-Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
-composition. That package consumes host-owned `IMqttPublisher`,
-`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
-by this adapter package.
+This package does not expose `FluxFlow.Composition` node factories. The current
+`FluxFlow.Components.Mqtt.Composition` package still consumes the legacy
+`IMqttPublisher`, `IMqttTriggerSource`, and optional
+`IMqttClientHealthSource` resources. Canonical Composition binding to
+`MqttClientController` is a separate migration milestone.
 
 ## Durable Stores
 

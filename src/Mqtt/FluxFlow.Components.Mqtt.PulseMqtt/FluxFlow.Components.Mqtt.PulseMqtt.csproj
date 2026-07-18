@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mqtt.PulseMqtt</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.PulseMqtt</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.PulseMqtt</RootNamespace>
-    <Version>2.0.8</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Pulse MQTT-backed adapter for FluxFlow MQTT components. Owns Pulse client creation, start/stop, broker transport configuration, Last Will setup, publish mapping, trigger subscriptions, and health events while implementing the client-library-neutral FluxFlow MQTT contracts.</Description>
+    <Description>Concrete MQTT transport adapter for FluxFlow. Maps resolved client configuration, exact message bytes, subscriptions, and broker acknowledgements while the provider-neutral MQTT core owns client policy and workflow behavior.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;pulsemqtt</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds PulseMqttTransportFactory and a non-resilient provider session for the FluxFlow MQTT 5.0 transport SPI. The core controller owns reconnect, desired subscriptions, trigger claims, acknowledgement policy, and diagnostics. The legacy adapter API remains available during migration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

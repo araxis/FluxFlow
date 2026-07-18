@@ -157,6 +157,15 @@ public sealed class MqttClientController : IMqttClientController
                 isTransient: false,
                 exception);
         }
+        catch (MqttTransportException exception)
+        {
+            return Failure(
+                request.Operation,
+                ErrorCodeFor(request.Operation),
+                exception.Message,
+                exception.IsTransient,
+                exception);
+        }
         catch (Exception exception)
         {
             return Failure(
@@ -687,10 +696,35 @@ public sealed class MqttClientController : IMqttClientController
                 .ToArray();
         }
 
+        if (received.Message.Qos == MqttQos.AtMostOnce || received.Delivery.IsEmpty)
+        {
+            await Task.WhenAll(targets.Select(target => DispatchToTriggerAsync(
+                target.Registration,
+                target.Matches,
+                received,
+                acknowledgement: null,
+                cancellationToken))).ConfigureAwait(false);
+            return;
+        }
+
+        if (targets.Length == 0)
+        {
+            await _session!.AcknowledgeAsync(
+                received.Delivery,
+                MqttWorkflowOutcome.Ack,
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var acknowledgement = new BrokerAcknowledgementCoordinator(
+            _session!,
+            received.Delivery,
+            targets.Length);
         await Task.WhenAll(targets.Select(target => DispatchToTriggerAsync(
             target.Registration,
             target.Matches,
             received,
+            acknowledgement,
             cancellationToken))).ConfigureAwait(false);
     }
 
@@ -698,23 +732,37 @@ public sealed class MqttClientController : IMqttClientController
         MqttTriggerRegistration registration,
         string[] matches,
         MqttTransportReceivedMessage received,
+        BrokerAcknowledgementCoordinator? acknowledgement,
         CancellationToken cancellationToken)
     {
+        MqttTriggerDelivery? delivery = null;
         try
         {
             var message = received.Message with { MatchedSubscriptions = matches };
-            var delivery = new MqttTriggerDelivery(
+            delivery = new MqttTriggerDelivery(
                 message,
-                (outcome, token) => CompleteBrokerAcknowledgementAsync(
-                    registration.Options,
-                    received,
-                    outcome,
-                    token));
+                acknowledgement is null
+                    ? static (_, _) => ValueTask.CompletedTask
+                    : acknowledgement.CompleteAsync);
             await registration.WriteAsync(delivery, cancellationToken).ConfigureAwait(false);
+
+            if (registration.Options.BrokerAcknowledgement ==
+                MqttBrokerAcknowledgement.Automatic)
+            {
+                await delivery.CompleteBrokerAcknowledgementAsync(
+                    MqttWorkflowOutcome.Ack,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (ChannelClosedException)
         {
             // A trigger revision can close after the dispatch snapshot was captured.
+            if (delivery is not null)
+            {
+                await delivery.CompleteBrokerAcknowledgementAsync(
+                    MqttWorkflowOutcome.Nak,
+                    CancellationToken.None).ConfigureAwait(false);
+            }
         }
     }
 
@@ -732,22 +780,6 @@ public sealed class MqttClientController : IMqttClientController
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-
-    private ValueTask CompleteBrokerAcknowledgementAsync(
-        MqttTriggerRegistrationOptions options,
-        MqttTransportReceivedMessage received,
-        MqttWorkflowOutcome outcome,
-        CancellationToken cancellationToken)
-    {
-        if (received.Message.Qos == MqttQos.AtMostOnce ||
-            options.BrokerAcknowledgement == MqttBrokerAcknowledgement.Automatic ||
-            received.Delivery.IsEmpty)
-        {
-            return ValueTask.CompletedTask;
-        }
-
-        return _session!.AcknowledgeAsync(received.Delivery, outcome, cancellationToken);
-    }
 
     private async ValueTask RemoveTriggerAsync(MqttTriggerRegistration registration)
     {
@@ -1035,7 +1067,8 @@ public sealed class MqttClientController : IMqttClientController
             nameof(configuration.Broker.Host));
         if (configuration.Broker.Port is <= 0 or > 65535)
             throw new ArgumentOutOfRangeException(nameof(configuration.Broker.Port));
-        if (configuration.KeepAlive <= TimeSpan.Zero)
+        if (configuration.KeepAlive <= TimeSpan.Zero ||
+            configuration.KeepAlive > TimeSpan.FromSeconds(ushort.MaxValue))
             throw new ArgumentOutOfRangeException(nameof(configuration.KeepAlive));
         if (!Enum.IsDefined(configuration.AutoConnect))
             throw new ArgumentOutOfRangeException(nameof(configuration.AutoConnect));
@@ -1106,6 +1139,12 @@ public sealed class MqttClientController : IMqttClientController
         if (!validation.IsValid)
             throw new ArgumentException(validation.Message, nameof(message));
         ArgumentNullException.ThrowIfNull(message.Content);
+        if (!message.Content.HasOriginalRepresentation)
+        {
+            throw new ArgumentException(
+                "An MQTT publish message requires FlowContent with an exact byte representation.",
+                nameof(message));
+        }
         if (!Enum.IsDefined(message.Qos))
             throw new ArgumentOutOfRangeException(nameof(message.Qos));
         if (!string.IsNullOrWhiteSpace(message.ResponseTopic))
@@ -1155,5 +1194,45 @@ public sealed class MqttClientController : IMqttClientController
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private sealed class BrokerAcknowledgementCoordinator(
+        IMqttTransportSession session,
+        MqttTransportDeliveryToken delivery,
+        int participants)
+    {
+        private readonly object _gate = new();
+        private int _remaining = participants;
+        private MqttWorkflowOutcome _outcome = MqttWorkflowOutcome.Ack;
+
+        internal ValueTask CompleteAsync(
+            MqttWorkflowOutcome outcome,
+            CancellationToken cancellationToken)
+        {
+            MqttWorkflowOutcome finalOutcome;
+            lock (_gate)
+            {
+                if (_remaining <= 0)
+                    return ValueTask.CompletedTask;
+
+                if (Priority(outcome) > Priority(_outcome))
+                    _outcome = outcome;
+                _remaining--;
+                if (_remaining != 0)
+                    return ValueTask.CompletedTask;
+                finalOutcome = _outcome;
+            }
+
+            return session.AcknowledgeAsync(delivery, finalOutcome, cancellationToken);
+        }
+
+        private static int Priority(MqttWorkflowOutcome outcome)
+            => outcome switch
+            {
+                MqttWorkflowOutcome.Ack => 0,
+                MqttWorkflowOutcome.Timeout => 1,
+                MqttWorkflowOutcome.Nak => 2,
+                _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+            };
     }
 }

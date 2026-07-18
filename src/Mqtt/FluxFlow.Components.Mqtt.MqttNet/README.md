@@ -2,51 +2,54 @@
 
 MQTTnet-backed adapter for `FluxFlow.Components.Mqtt`.
 
-The core MQTT package stays client-library-neutral: `MqttPublishNode` needs only
-`IMqttPublisher`, and `MqttTriggerNode` needs only `IMqttTriggerSource`. This
-package supplies one concrete session object, `MqttNetClient`, that implements:
+The current integration point is `MqttNetTransportFactory`. It implements the
+provider-neutral MQTT transport SPI and creates one non-resilient provider
+session for each logical `MqttClientController` connection. This package maps:
 
-- `IMqttPublisher`
-- `IMqttTriggerSource`
-- `IMqttClientHealthSource`
+- resolved broker, credential, certificate, and Last Will configuration;
+- exact `FlowContent` bytes and MQTT message metadata;
+- subscribe and unsubscribe operations; and
+- deferred broker Ack/Nak completion.
 
-`MqttNetClient` owns MQTT client creation, broker connection, Last Will
-configuration, reconnect, publish mapping, subscription streams, manual
-acknowledgement, and health events.
+`FluxFlow.Components.Mqtt` owns logical-client lifetime, auto-connect,
+reconnect, desired subscriptions, trigger claims, delivery policy, result
+values, and diagnostics. The adapter does not run a second reconnect or
+subscription policy loop.
 
 ## Usage
 
 ```csharp
-var mqtt = new MqttNetClient(new MqttNetClientOptions
+var configuration = new MqttClientConfiguration
 {
-    Host = "localhost",
-    Port = 1883,
+    Name = "primary",
     ClientId = "fluxflow-worker",
-    LastWill = new MqttNetLastWillOptions
+    Broker = new MqttBrokerConfiguration
     {
-        Topic = "workers/fluxflow/status",
-        Payload = "offline"u8.ToArray(),
-        Retain = true,
-        QualityOfService = MqttQualityOfService.AtLeastOnce,
-        ContentType = "text/plain"
-    }
-});
+        Host = "localhost",
+        Port = 1883
+    },
+    AutoConnect = MqttAutoConnectMode.OnStart
+};
 
-await mqtt.ConnectAsync();
+await using var client = new MqttClientController(
+    configuration,
+    new MqttNetTransportFactory());
 
-var publish = new MqttPublishNode(mqtt);
-var trigger = new MqttTriggerNode(mqtt, new MqttTriggerOptions
-{
-    TopicFilter = "commands/+",
-    Mode = MqttTriggerMode.RequestReply,
-    Acknowledgement = MqttTriggerAcknowledgement.OnSuccessfulResponse
-});
+await client.StartAsync();
 ```
 
-Call `ConnectAsync` before using the object as a publisher or trigger source.
-When the MQTT client is disconnected, publish and subscribe throw
-`MqttClientUnavailableException`, which the core nodes translate into their
-not-connected diagnostics.
+Publish and Last Will content must carry original bytes in `FlowContent`; a
+workflow mapper or serializer performs any JSON, text, or domain conversion
+before the MQTT boundary. QoS 1/2 deliveries are deferred until the core
+controller resolves the configured workflow acknowledgement policy.
+
+## Legacy Client API
+
+`MqttNetClient`, `IMqttPublisher`, `IMqttTriggerSource`, and
+`IMqttClientHealthSource` remain available while the current MQTT Composition
+adapter migrates. That legacy client retains its existing reconnect,
+subscription-stream, and health behavior. New host integration should use
+`MqttClientController` with `MqttNetTransportFactory`.
 
 Mapper helpers reject null text before encoding MQTT credentials, correlation
 data, and user properties so malformed adapter input fails with clear argument
@@ -60,7 +63,7 @@ caller-owned maps cannot alter CONNECT user properties after options creation.
 and Last Will payloads are copied before concrete client handoff so caller-owned buffers
 cannot alter queued client-library messages.
 
-## Dependency Injection
+## Legacy Dependency Injection
 
 Register a named client session when the host wants DI-owned lifetime and keyed
 MQTT roles:
@@ -103,10 +106,10 @@ registration owns only the adapter client session.
 This package does not expose `FluxFlow.Composition` node factories. It owns the
 MQTTnet-backed client session and DI registration only.
 
-Use `FluxFlow.Components.Mqtt.Composition` for `mqtt.publish` and `mqtt.trigger`
-composition. That package consumes host-owned `IMqttPublisher`,
-`IMqttTriggerSource`, and optional `IMqttClientHealthSource` resources provided
-by this adapter package.
+The current `FluxFlow.Components.Mqtt.Composition` package still consumes the
+legacy `IMqttPublisher`, `IMqttTriggerSource`, and optional
+`IMqttClientHealthSource` resources. Canonical Composition binding to
+`MqttClientController` is a separate migration milestone.
 
 ## Last Will
 

@@ -19,6 +19,20 @@ namespace FluxFlow.Components.Mqtt.Tests;
 public sealed class MqttClientControllerTests
 {
     [Fact]
+    public void ConfigurationRejectsKeepAliveBeyondProtocolLimit()
+    {
+        var configuration = Configuration(
+            "client-1",
+            new MqttBrokerConfiguration { Host = "broker.internal" }) with
+        {
+            KeepAlive = TimeSpan.FromSeconds(ushort.MaxValue + 1d)
+        };
+
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new MqttClientController(configuration, new VNextRecordingMqttTransportFactory()));
+    }
+
+    [Fact]
     public async Task DisconnectedCommandsReturnNormalTransientResultsAndLifecycleIsIdempotent()
     {
         var session = new VNextRecordingMqttTransportSession();
@@ -541,6 +555,114 @@ public sealed class MqttClientControllerTests
 
         await Task.Delay(20);
         session.Acknowledged.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task OverlappingTriggersAggregateOneBrokerOutcomeAcrossPolicies()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+        await using var automatic = new MqttSubscriptionTriggerNode(
+            controller,
+            new MqttSubscriptionTriggerOptions
+            {
+                TriggerId = "automatic",
+                Subscriptions =
+                [
+                    MqttSubscriptionTarget.FromInline(new MqttSubscriptionDefinition
+                    {
+                        TopicFilter = "commands/#",
+                        Qos = MqttQos.AtLeastOnce
+                    })
+                ],
+                BrokerAcknowledgement = MqttBrokerAcknowledgement.Automatic
+            });
+        await using var deferred = new MqttSubscriptionTriggerNode(
+            controller,
+            new MqttSubscriptionTriggerOptions
+            {
+                TriggerId = "deferred",
+                Subscriptions =
+                [
+                    MqttSubscriptionTarget.FromInline(new MqttSubscriptionDefinition
+                    {
+                        TopicFilter = "commands/+",
+                        Qos = MqttQos.AtLeastOnce
+                    })
+                ],
+                WorkflowAcknowledgement = MqttWorkflowAcknowledgement.Required,
+                BrokerAcknowledgement = MqttBrokerAcknowledgement.AfterOutcome,
+                OutcomeTimeout = TimeSpan.FromSeconds(5)
+            });
+        var automaticOutput = MqttTestContext.Sink(automatic.Output);
+        var deferredOutput = MqttTestContext.Sink(deferred.Output);
+        await automatic.StartAsync();
+        await deferred.StartAsync();
+        await WaitUntilAsync(() => session.Subscribed.Count == 2);
+
+        await session.EmitAsync(
+            Received("commands/run", MqttQos.AtLeastOnce),
+            "shared-delivery");
+        await automaticOutput.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        var deferredMessage = await deferredOutput.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        session.Acknowledged.ShouldBeEmpty();
+        await deferred.Nak.SendAsync(FlowMessage.Create(
+            "ignored",
+            traceId: deferredMessage.TraceId));
+
+        await WaitUntilAsync(() => session.Acknowledged.Count == 1);
+        var acknowledgement = session.Acknowledged.Single();
+        acknowledgement.Delivery.Value.ShouldBe("shared-delivery");
+        acknowledgement.Outcome.ShouldBe(MqttWorkflowOutcome.Nak);
+    }
+
+    [Fact]
+    public async Task TransportFailurePreservesNonTransientResultClassification()
+    {
+        var session = new VNextRecordingMqttTransportSession
+        {
+            PublishHandler = static (_, _) => ValueTask.FromException(
+                new MqttTransportException(
+                    "Publishing is not authorized.",
+                    "Authentication",
+                    isTransient: false))
+        };
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+
+        var result = await controller.ExecuteAsync(new MqttPublishClientRequest
+        {
+            Message = Publish("events/one")
+        });
+
+        result.ShouldBeOfType<MqttClientFailureResult>();
+        result.Error!.IsTransient.ShouldBeFalse();
+        result.Error.Code.ShouldBe(MqttClientErrorCodes.PublishFailed);
+    }
+
+    [Fact]
+    public async Task PublishRequiresFlowContentWithExactBytes()
+    {
+        var session = new VNextRecordingMqttTransportSession();
+        await using var controller = CreateController(session);
+        await controller.StartAsync();
+
+        var result = await controller.ExecuteAsync(new MqttPublishClientRequest
+        {
+            Message = new MqttPublishMessage
+            {
+                Topic = "events/one",
+                Content = FlowContent.FromValue(FlowValue.From("not encoded"))
+            }
+        });
+
+        result.ShouldBeOfType<MqttClientFailureResult>();
+        result.Error!.Code.ShouldBe(MqttClientErrorCodes.InvalidRequest);
+        result.Error.IsTransient.ShouldBeFalse();
+        session.Published.ShouldBeEmpty();
     }
 
     [Fact]

@@ -7,6 +7,29 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.MqttNet 1.2.0
+
+Adds a concrete implementation of the MQTT 5.0 provider transport boundary.
+
+- Adds `MqttNetTransportFactory` and a non-resilient provider session that maps
+  resolved client configuration, exact `FlowContent` bytes, subscriptions,
+  deferred acknowledgements, and provider lifecycle events.
+- Leaves reconnect, desired subscriptions, trigger claims, workflow
+  acknowledgement policy, results, and diagnostics with the provider-neutral
+  MQTT core.
+- Retains the legacy client API during the Composition migration.
+
+## FluxFlow.Components.Mqtt.PulseMqtt 2.1.0
+
+Adds a concrete implementation of the MQTT 5.0 provider transport boundary.
+
+- Adds `PulseMqttTransportFactory` and a non-resilient raw provider session
+  that maps resolved client configuration, exact `FlowContent` bytes,
+  subscriptions, deferred acknowledgements, and provider lifecycle events.
+- Recreates the raw provider client per connection while leaving reconnect and
+  all desired-state policy with the provider-neutral MQTT core.
+- Retains the legacy resilient client API during the Composition migration.
+
 ## FluxFlow.Components.Mqtt 5.0.0
 
 Introduces transport-neutral MQTT client orchestration as the first vNext
