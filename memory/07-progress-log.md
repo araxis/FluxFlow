@@ -2,6 +2,30 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext MQTT core
+
+- Added provider-neutral broker/client configuration, discriminated client
+  requests and normal result values, reusable FlowContent MQTT messages, a
+  concrete-adapter transport SPI, and one host-lifetime controller per logical
+  client.
+- Added `MqttControlNode`, `MqttPublishOperationNode`,
+  `MqttSubscriptionTriggerNode`, and `MqttClientEventsNode` with normal result
+  errors, standard diagnostic events, semantic concurrency/order settings,
+  scalar-or-array named/inline subscriptions, and payload-independent Ack/Nak
+  signals.
+- Implemented auto-connect/reconnect policy, desired-subscription restoration,
+  exclusive trigger claims, overlapping-filter delivery deduplication,
+  workflow/broker acknowledgement modes, bounded event/trigger isolation, and
+  deterministic cleanup while retaining legacy 4.x declarations for the
+  adapter migration.
+- Moved MQTT core to `5.0.0`. Passed 78 focused MQTT tests, 1,963 Release tests
+  across 63 projects, zero-warning Debug/Release builds, 93 release convention
+  tests, binary compatibility against `4.1.4`, release preflight, complete
+  local-source dry-run, and a package-only consumer that printed
+  `MQTT_CORE_API_OK`. Full evidence is in [[213-vnext-mqtt-core]].
+- Concrete adapter SPI implementations are the next bounded MQTT milestone;
+  canonical Composition binding remains a separate following gate.
+
 ## 2026-07-17 - vNext transactional application revisions
 
 - Added deterministic complete-definition revision planning with nested

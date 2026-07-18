@@ -1,9 +1,218 @@
 # FluxFlow.Components.Mqtt
 
-Standalone MQTT nodes for FluxFlow, built on the [FluxFlow.Nodes](../../FluxFlow.Nodes/README.md)
-kit. No engine, registry, runtime, or concrete network client is required: provide a
-publisher or trigger-source implementation in the host, `new` the nodes, `LinkTo`
-their ports, and run.
+Transport-neutral MQTT client orchestration and standalone components for
+FluxFlow. The 5.x core uses [FluxFlow.Data](../../FluxFlow.Data/README.md)
+`FlowContent`, normal polymorphic command results, and one host-lifetime client
+controller per logical MQTT client. It does not depend on Engine, Composition,
+or a concrete MQTT client library.
+
+The previous 4.x publish/trigger contracts remain in this package temporarily
+so existing adapters continue to build while they migrate through the shared
+transport conformance suite. New applications should use the 5.x contracts
+described first below.
+
+## 5.x Ownership Model
+
+- `MqttBrokerConfiguration` describes one broker endpoint, port, TLS transport,
+  and server name. It does not own a client session.
+- `MqttClientConfiguration` describes one logical client identity, resolved
+  credentials/certificates, clean start, keepalive, Last Will, auto-connect,
+  reconnect policy, and initial named subscriptions.
+- Each `MqttClientController` owns exactly one neutral transport session and may
+  share its broker configuration with other independent controllers.
+- `IMqttTransportFactory` and `IMqttTransportSession` are the adapter SPI.
+  Concrete client-library types never cross that boundary.
+- The host owns the controller lifetime. Control, publish, trigger, and events
+  components share it and never dispose it.
+
+Credentials and certificates in `MqttClientConfiguration` are already resolved
+host values. Configuration binding applies deployment override, direct client
+value, referenced resource, then default precedence before constructing the
+controller. Inline secret policy also belongs to the host, not this runtime
+contract.
+
+## 5.x Components
+
+| Component class | Canonical type | Shape | Purpose |
+|---|---|---|---|
+| `MqttControlNode` | `mqtt.control` | `Input` -> `Output` | Executes Connect, Disconnect, Status, Publish, Subscribe, and Unsubscribe requests and emits exactly one `MqttClientResult` for every accepted request. |
+| `MqttPublishOperationNode` | `mqtt.publish` | `Input` -> `Output` | Focused convenience component over the same publish request/result path. |
+| `MqttSubscriptionTriggerNode` | `mqtt.trigger` | `Output`, `Ack`, `Nak` | Emits received `FlowContent` messages and accepts payload-independent workflow outcome signals matched by `TraceId`. |
+| `MqttClientEventsNode` | `mqtt.events` | `Output` | Emits reliable connection, subscription, and reconnect domain events for workflow use. |
+
+The new components expose no universal `Errors` or `State` port. Expected
+failures are `MqttClientFailureResult` values on normal `Output`. Component
+diagnostics remain on `Events`; an unexpected component fault is surfaced by
+component completion and the Engine system-event stream when hosted.
+
+`MqttControlOptions` uses semantic scheduling settings:
+
+- `RequestProcessing`: `Sequential` or `Concurrent`.
+- `ResultOrder`: `PreserveInput` or `Completion`.
+- `MaximumConcurrentRequests` and `MaximumPendingRequests`.
+
+Lifecycle and subscription mutations are serialized inside the controller.
+Publish and status operations may run concurrently. Explicit Disconnect
+suppresses reconnect until Connect or host restart. Disconnected operations
+return immediate transient result errors.
+
+## Standalone C#
+
+```csharp
+var controller = new MqttClientController(
+    new MqttClientConfiguration
+    {
+        Name = "Resources.Messaging.TelemetryClient",
+        ClientId = "telemetry-client",
+        Broker = new MqttBrokerConfiguration
+        {
+            Host = "broker.internal",
+            Port = 8883,
+            UseTls = true
+        },
+        AutoConnect = MqttAutoConnectMode.OnStart,
+        Reconnect = new MqttReconnectConfiguration
+        {
+            Enabled = true,
+            Policy = new MqttRetryPolicy
+            {
+                Strategy = MqttRetryStrategy.Exponential,
+                InitialDelay = TimeSpan.FromSeconds(1),
+                MaximumDelay = TimeSpan.FromMinutes(1),
+                JitterFactor = 0.2
+            }
+        }
+    },
+    transportFactory);
+
+await controller.StartAsync();
+
+await using var control = new MqttControlNode(
+    controller,
+    new MqttControlOptions
+    {
+        RequestProcessing = MqttRequestProcessing.Concurrent,
+        ResultOrder = MqttResultOrder.PreserveInput,
+        MaximumConcurrentRequests = 8,
+        MaximumPendingRequests = 128
+    });
+
+await control.Input.SendAsync(FlowMessage.Create<MqttClientRequest>(
+    new MqttPublishClientRequest
+    {
+        Message = new MqttPublishMessage
+        {
+            Topic = "telemetry/line-1",
+            Content = FlowContent.FromBytes(payload, "application/json"),
+            Qos = MqttQos.AtLeastOnce
+        }
+    }));
+```
+
+The request JSON discriminator is `Operation`. Result JSON uses `Kind`, has a
+computed `IsError`, and carries workflow-friendly `FlowError` details. The
+focused publish component uses the same controller path and result variants.
+
+## Subscriptions And Acknowledgements
+
+A trigger accepts one or many `MqttSubscriptionTarget` values. A named target
+is created with `MqttSubscriptionTarget.Named(...)`; an inline target uses
+`FromInline(...)`. Named subscriptions are client-owned and survive trigger
+removal. Inline subscriptions are trigger-owned and are removed with the
+trigger.
+
+Missing named subscriptions leave the trigger waiting. A successful Subscribe
+command creates or updates the named desired subscription and activates waiting
+triggers. Desired subscriptions are restored after reconnect. Unsubscribe
+removes named desired state. One trigger may claim a subscription identity;
+identical filters cannot be claimed by different triggers, while different
+overlapping filters are valid. One publication matching several subscriptions
+inside one trigger is emitted once with all `MatchedSubscriptions`.
+
+Workflow acknowledgement and broker acknowledgement are separate:
+
+- `MqttWorkflowAcknowledgement.None` or `Required` controls Ack/Nak signals.
+- `MqttBrokerAcknowledgement.Automatic` is independent of workflow outcome.
+- `AfterHandoff` completes broker acknowledgement after output acceptance.
+- `AfterOutcome` maps Ack, Nak, or timeout through adapter capabilities.
+- QoS 0 never performs broker acknowledgement.
+
+Ack and Nak ignore signal payload type. The first signal matching a pending
+delivery `TraceId` wins; duplicate, conflicting, late, and unknown signals are
+diagnostic events only. Deferred policies are rejected during trigger
+registration when the adapter does not advertise the required capability.
+
+## Composition
+
+### Canonical JSON Target
+
+The vNext composition migration will bind the 5.x core from the canonical flat
+document below. The current `FluxFlow.Components.Mqtt.Composition` package still
+binds the legacy 4.x publish/trigger surface until the adapter/conformance
+milestone is complete.
+
+```json
+{
+  "Resources": {
+    "Messaging": {
+      "Broker1": {
+        "Type": "mqtt.broker",
+        "Host": "broker.internal",
+        "Port": 8883,
+        "UseTls": true
+      },
+      "TelemetryClient": {
+        "Type": "mqtt.client",
+        "Broker": "Resources.Messaging.Broker1",
+        "ClientId": "telemetry-client",
+        "AutoConnect": "OnStart",
+        "Reconnect": "Resources.Resilience.MqttRetry"
+      },
+      "Commands": {
+        "Type": "mqtt.subscription",
+        "TopicFilter": "commands/+",
+        "Qos": "AtLeastOnce"
+      }
+    },
+    "Resilience": {
+      "MqttRetry": {
+        "Type": "resilience.retry",
+        "Strategy": "Exponential",
+        "InitialDelay": "00:00:01",
+        "MaximumDelay": "00:01:00",
+        "JitterFactor": 0.2
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "ReceiveCommands": {
+        "Type": "mqtt.trigger",
+        "Client": "Resources.Messaging.TelemetryClient",
+        "Subscription": "Resources.Messaging.Commands",
+        "WorkflowAcknowledgement": "Required",
+        "BrokerAcknowledgement": "AfterOutcome",
+        "Output": "HandleCommand.Input"
+      },
+      "HandleCommand": {
+        "Type": "orders.handle-command",
+        "Accepted": "ReceiveCommands.Ack",
+        "Rejected": "ReceiveCommands.Nak"
+      }
+    }
+  }
+}
+```
+
+One subscription uses a string or inline object directly; multiple
+subscriptions use a mixed array of those forms. `Qos` is the canonical property
+name. Components remain flat: there is no per-node Resources, Nodes, Links, or
+Composition wrapper.
+
+## Legacy 4.x Contracts
+
+The declarations below are retained only for coordinated adapter and
+composition migration.
 
 Applications supply small interfaces that can be implemented over any MQTT client
 library:
@@ -15,7 +224,7 @@ library:
 One concrete object may implement any combination of these interfaces. The MQTT nodes
 depend only on the role they actually need.
 
-## Nodes
+### Legacy Nodes
 
 | Node | Shape | Purpose |
 |------|-------|---------|
@@ -28,7 +237,7 @@ broadcast `Output`, `Errors`, and `Events` ports, plus a `Responses` target on
 start, stop, reconnect, or dispose a concrete client. Client-session ownership,
 connection policy, and reconnect policy belong behind the supplied interfaces.
 
-## Contracts
+### Legacy Contracts
 
 ```csharp
 public interface IMqttPublisher
@@ -65,7 +274,7 @@ Implementations should throw `MqttClientUnavailableException` when they cannot p
 or open a trigger subscription because no client is currently available. Nodes
 translate that into the package not-connected error codes and keep running.
 
-## Publish
+### Legacy Publish
 
 ```csharp
 var publish = new MqttPublishNode(
@@ -110,7 +319,7 @@ publish contracts after creation.
 Publish payload byte arrays are also copied when assigned, so mutating the
 caller-owned buffer after creating a request does not change the request.
 
-## Trigger
+### Legacy Trigger
 
 ```csharp
 var trigger = new MqttTriggerNode(
@@ -164,7 +373,7 @@ Request/reply correlation, duplicate detection, timeout, and pending cleanup use
 shared `CorrelatedRequestTracker` from `FluxFlow.Components.RequestReply`; MQTT keeps
 only MQTT-specific subscription and ack/nack policy in the trigger node.
 
-## Adapter-Owned Client Session
+### Legacy Adapter-Owned Client Session
 
 Broker addresses, credentials, reconnect policy, concrete client lifetime, and MQTT
 Last Will belong to the supplied implementation or a future adapter package. Last
@@ -172,7 +381,7 @@ Will is registered during MQTT `CONNECT`, so it is not part of
 `MqttPublishOptions` or `MqttTriggerOptions`. For graceful offline messages, publish
 an ordinary `MqttPublishRequest`.
 
-## Client Health
+### Legacy Client Health
 
 Adapters that also implement `IMqttClientHealthSource` can expose connection health
 transitions to hosts, dashboards, or future monitoring nodes. The publish and trigger
@@ -186,13 +395,13 @@ contract surface.
 Received payload and correlation-data byte arrays are copied when assigned so
 adapter-owned buffers cannot mutate a received-message contract after mapping.
 
-## Runtime Timing
+### Legacy Runtime Timing
 
 Pass a `TimeProvider` to any node when tests or hosts need deterministic package-owned
 timestamps such as publish result times, node event times, and trigger response
 timeouts.
 
-## Composition Support
+### Legacy Composition Support
 
 Add `FluxFlow.Components.Mqtt.Composition` when a host wants to instantiate MQTT
 nodes from `FluxFlow.Composition` fluent definitions or `IConfiguration` JSON.
@@ -216,7 +425,7 @@ The optional composition package also exposes
 `mqtt.publish` and `mqtt.trigger` composition node types. The standalone MQTT
 package remains free of Designer, Composition, and Engine dependencies.
 
-## Topic Validation
+### Topic Validation
 
 Use `MqttTopicValidator.ValidatePublishTopic` and
 `MqttTopicValidator.ValidateSubscriptionFilter` when projecting host settings or

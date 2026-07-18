@@ -468,6 +468,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `212-vnext-transactional-revisions.md`: complete-definition revision
   planning, atomic stable-port activation, Engine-independent candidate
   coordination, rollback/drain semantics, and the MQTT vertical-slice handoff.
+- `213-vnext-mqtt-core.md`: provider-neutral MQTT client configuration,
+  controller, command/result contracts, transport SPI, nodes, subscriptions,
+  acknowledgements, reconnect semantics, and the concrete-adapter handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

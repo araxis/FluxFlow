@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt 5.0.0
+
+Introduces transport-neutral MQTT client orchestration as the first vNext
+component vertical slice.
+
+- Adds resolved broker/client, credential/certificate, retry, Last Will, and
+  named-subscription contracts over `FlowContent` without exposing concrete
+  client-library types.
+- Adds one host-lifetime `MqttClientController` per logical client with
+  auto-connect, reconnect suppression, desired-subscription restoration,
+  exclusive trigger claims, and neutral transport capabilities.
+- Adds control, focused publish, trigger, and client-events components with
+  normal polymorphic command results and no universal error or state port.
+- Separates payload-independent workflow Ack/Nak signals from Automatic,
+  AfterHandoff, and AfterOutcome broker acknowledgement policies.
+- Retains the 4.x declarations temporarily so concrete adapters and the legacy
+  composition package can migrate in the next coordinated milestone.
+
 ## FluxFlow.Composition.Hosting 2.1.0
 
 Adds the Engine-independent transactional host coordinator for complete

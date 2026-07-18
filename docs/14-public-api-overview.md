@@ -884,12 +884,42 @@ Namespace:
 
 ```text
 FluxFlow.Components.Mqtt
+FluxFlow.Components.Mqtt.Acknowledgements
+FluxFlow.Components.Mqtt.Client
+FluxFlow.Components.Mqtt.Configuration
 FluxFlow.Components.Mqtt.Contracts
+FluxFlow.Components.Mqtt.Events
 FluxFlow.Components.Mqtt.Nodes
 FluxFlow.Components.Mqtt.Options
+FluxFlow.Components.Mqtt.Subscriptions
+FluxFlow.Components.Mqtt.Transport
 ```
 
 Main types:
+
+- `MqttClientController`
+- `IMqttClientController`
+- `MqttClientConfiguration`
+- `MqttBrokerConfiguration`
+- `MqttReconnectConfiguration`
+- `MqttRetryPolicy`
+- `MqttClientRequest`
+- `MqttClientResult`
+- `MqttControlNode`
+- `MqttPublishOperationNode`
+- `MqttSubscriptionTriggerNode`
+- `MqttClientEventsNode`
+- `MqttPublishMessage`
+- `MqttReceivedApplicationMessage`
+- `MqttSubscriptionDefinition`
+- `MqttSubscriptionTarget`
+- `IMqttTransportFactory`
+- `IMqttTransportSession`
+- `MqttTransportCapabilities`
+- `MqttWorkflowAcknowledgement`
+- `MqttBrokerAcknowledgement`
+
+Legacy migration types retained in 5.x:
 
 - `IMqttPublisher`
 - `IMqttTriggerSource`
@@ -907,9 +937,17 @@ Main types:
 - `MqttClientHealthEvent`
 - `MqttTopicValidator`
 
-Use `FluxFlow.Components.Mqtt` when a host wants standalone MQTT publish and
-trigger nodes over neutral contracts. Concrete MQTT clients stay behind
-adapter-owned `IMqttPublisher` and `IMqttTriggerSource` implementations.
+Use `FluxFlow.Components.Mqtt` 5.x when a host wants one transport-neutral,
+host-lifetime controller per logical MQTT client and standalone control,
+focused publish, trigger, and domain-event components. Expected operation
+failures are `MqttClientResult` variants on normal output. MQTT payloads use
+`FlowContent`; Ack/Nak signal payloads are ignored and matched by `TraceId`.
+Concrete MQTT clients stay behind `IMqttTransportFactory` and
+`IMqttTransportSession`.
+
+The previous publisher/trigger-source contracts remain available only for
+coordinated adapter and Composition migration. Their existing immutable-copy
+behavior remains unchanged:
 `MqttPublishProperties.UserProperties`,
 `MqttReceivedMessage.UserProperties`, and
 `MqttClientHealthEvent.Attributes` snapshot assigned dictionaries with ordinal

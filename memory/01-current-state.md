@@ -5,8 +5,8 @@ Date: 2026-07-17
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/transactional-revisions-vnext`. The transactional application revision
-  milestone is implemented and verified locally.
+  `work/mqtt-vnext`. The provider-neutral MQTT core milestone is implemented
+  and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -21,8 +21,8 @@ Date: 2026-07-17
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
-  transactional-revision milestones. Component migration and MQTT remain
-  deferred. See
+  transactional-revision milestones. MQTT core now uses this foundation;
+  concrete adapter and component-family migration continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.3.0` locally with immutable canonical
@@ -62,7 +62,19 @@ Date: 2026-07-17
   candidates off-route, publishes one active snapshot after activation, and
   drains replaced candidates without rolling back post-commit failures. See
   `211-vnext-di-resource-provider-snapshots.md` and
-  `212-vnext-transactional-revisions.md`. MQTT is the next bounded gate.
+  `212-vnext-transactional-revisions.md`.
+- `FluxFlow.Components.Mqtt` is now `5.0.0` locally with provider-neutral
+  endpoint/client configuration, one controller per logical client,
+  discriminated command/result contracts, FlowContent application messages,
+  transport SPI, semantic request scheduling, named/inline subscriptions,
+  workflow and broker acknowledgement policy, lifecycle diagnostics, and
+  reconnect/restoration behavior. Expected failures are normal result values;
+  the vNext MQTT nodes expose Output and Events without universal Error or
+  State ports. Legacy 4.x declarations remain temporarily for adapter build
+  compatibility. Focused/full tests, controlled builds, binary compatibility,
+  release preflight/dry-run, and a package-only consumer passed. Concrete
+  adapter conformance is the next bounded gate; canonical MQTT Composition
+  binding follows separately. See `213-vnext-mqtt-core.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

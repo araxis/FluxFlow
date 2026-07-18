@@ -4,8 +4,9 @@ Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
-port, system-signal, immutable DI provider-snapshot, and transactional revision
-phases are implemented locally. MQTT redesign remains pending.
+port, system-signal, immutable DI provider-snapshot, transactional revision,
+and MQTT core phases are implemented locally. Concrete MQTT adapter migration
+remains pending.
 
 ## Package Ownership
 
@@ -175,6 +176,39 @@ explicitly through `IServiceCollection`; no assembly scanning, reflection
 discovery, arbitrary provider merging, or parallel registration framework is
 introduced.
 
+## MQTT Core Vertical Slice
+
+`FluxFlow.Components.Mqtt` 5.x owns resolved broker/client settings, neutral
+transport SPI contracts, multi-command request/result families, desired
+subscriptions, reconnect policy, trigger claims, and standalone control,
+publish, trigger, and client-event components. `FlowContent` carries MQTT
+payloads; expected operation failures are polymorphic results on normal output.
+
+One host-lifetime `MqttClientController` owns one transport session for one
+logical client. Multiple controllers may share one broker endpoint while
+retaining independent identity, credentials, connection state, subscriptions,
+and reconnect behavior. Lifecycle and subscription mutation are serialized;
+publish and status may run concurrently. Explicit Disconnect suppresses
+reconnect until Connect or host restart, and availability-only auto-connect
+failure does not reject controller startup.
+
+Named subscriptions are client-owned; trigger inline subscriptions are
+trigger-owned. Missing named subscriptions wait for later creation. Desired
+subscriptions are restored after reconnect. Trigger claims are exclusive by
+identity and identical resolved filter, while overlapping filters remain valid.
+One received publication is emitted once per trigger with every matching
+subscription label.
+
+Workflow Ack/Nak signals are payload-independent and match `TraceId`. Broker
+acknowledgement is separately Automatic, AfterHandoff, or AfterOutcome and is
+validated against neutral adapter capabilities. Client lifecycle and
+subscription events use the explicit `mqtt.events` domain stream; component
+activity remains diagnostics and there is no universal State or Error port.
+
+The existing 4.x declarations remain temporarily available. Concrete adapter
+SPI implementation, shared conformance tests, and canonical Composition
+resource/node binding are the next coordinated MQTT milestone.
+
 ## Delivery Sequence
 
 1. Data, envelope identity, and result contracts. Complete locally.
@@ -185,8 +219,9 @@ introduced.
 6. Immutable DI resource/provider snapshots and canonical keyed registration.
    Complete locally.
 7. Transactional resource and workflow revisions. Complete locally.
-8. MQTT as the first complete resource/component/adapter vertical slice. Next.
-9. Remaining component families, Designer, hosting, and coordinated releases.
+8. MQTT core resource/component vertical slice. Complete locally.
+9. Concrete MQTT adapters and canonical MQTT Composition binding. Next.
+10. Remaining component families, Designer, hosting, and coordinated releases.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain
