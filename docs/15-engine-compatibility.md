@@ -60,6 +60,24 @@ Minor releases may include:
 Minor releases should avoid changing defaults that existing definitions depend
 on.
 
+The payload-independent `IFlowSignalTarget` is an additive standalone Nodes
+contract. It accepts the existing `FlowMessage<T>` envelope and reports
+acceptance as a Boolean; it does not change stable-port routing or message
+identity and does not add an Engine dependency to Composition.Hosting.
+
+## Provider Snapshot Compatibility
+
+`FluxFlow.Composition.Hosting` versions its provider-snapshot API independently
+from Engine. A snapshot is an immutable ownership boundary over a normal
+Microsoft DI provider. Canonical address strings are stable, ordinal keyed
+service identities.
+
+Compatibility does not imply provider fallback or automatic provider merging.
+Hosts compose service collections before `Build(...)` and bridge exact external
+instances explicitly. Factory registrations transfer disposal ownership to the
+built provider; `...View`, `AddExternal...`, `BridgeExternal...`, and
+external-host snapshots do not.
+
 ## Major Releases
 
 Major releases are for breaking changes.

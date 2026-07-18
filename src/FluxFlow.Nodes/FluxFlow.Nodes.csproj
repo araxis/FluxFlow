@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Nodes</PackageId>
     <AssemblyName>FluxFlow.Nodes</AssemblyName>
     <RootNamespace>FluxFlow.Nodes</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Minimal base for FluxFlow nodes: a self-contained TPL Dataflow processor with a buffered input and broadcast output/error/event ports. Nodes built on it run standalone — no engine required.</Description>
     <PackageTags>workflow;dataflow;tpl;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Introduces strong trace, message, and causation identities plus immutable FlowValue headers for the vNext envelope.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds a payload-independent signal target for trace-correlated signal inputs without an Engine dependency.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

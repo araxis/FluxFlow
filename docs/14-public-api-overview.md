@@ -57,6 +57,7 @@ Main types:
 - `FlowSourceOptions`
 - `IFlowNode`
 - `IFlowSource`
+- `IFlowSignalTarget`
 - `FlowError`
 - `FlowEvent`
 - `FlowEventLevel`
@@ -71,6 +72,10 @@ assigned. `FlowMessage<T>` separates business correlation, graph trace,
 per-hop identity, and causation. Its headers are immutable ordinal `FlowValue`
 entries. `FlowEvent` attributes continue to copy assigned dictionaries with
 ordinal key comparison.
+
+`IFlowSignalTarget.SendAsync<T>` is the standalone, payload-independent signal
+input contract. It reports acceptance as a Boolean and retains normal
+`FlowMessage<T>` identity without adding routing or correlation behavior.
 
 ## Composition
 
@@ -102,8 +107,10 @@ The vNext canonical document is immutable and has exactly two case-sensitive
 root objects: `Resources` and `Workflows`. Resource groups form nested address
 namespaces and resource leaves require `Type`; workflows directly contain flat
 component objects that also require `Type`. `ApplicationAddress` represents
-resource paths, absolute workflow ports, local port resolution, and the
-reserved system event/diagnostic outputs with ordinal equality.
+resource paths, absolute workflow components and ports, local port resolution,
+and the reserved system event/diagnostic outputs with ordinal equality.
+`Workflow.Component` is the canonical component key;
+`ResolvePort("Component.Port", workflow)` remains the local-port resolver.
 
 `ApplicationLinkCompiler` reads links from registered input or output port
 properties, normalizes absolute source/target addresses, compiles expression
@@ -172,6 +179,11 @@ Main types:
 - `ConfigurationCompositionDefinitionSource`
 - `ICompositionNodeRegistryContributor`
 - `CompositionNodeFactoryContextResourceExtensions`
+- `CompositionServiceProviderSnapshotBuilder`
+- `CompositionServiceProviderSnapshot`
+- `CompositionProviderBoundary`
+- `CompositionProviderSnapshotInfo`
+- `FluxFlowServiceCollectionExtensions`
 
 Use these types when a .NET host wants DI to load, build, start, stop, and
 observe a composition runtime. Resource helpers resolve named node resource
@@ -185,6 +197,17 @@ it does not scan assemblies or discover node factories implicitly.
 Hosted and manual lifecycle calls are idempotent at this boundary, so repeated
 start or stop requests do not start or complete the same runtime more than
 once. A stopped runtime is not restarted by the host.
+
+Provider snapshot builders copy explicitly supplied service collections and
+build normal Microsoft DI providers for `Host`, `ResourceRevision`, or
+`WorkflowRevision` boundaries. Canonical address strings are keyed-service
+keys for resources, components, typed input/output ports, and
+`IFlowSignalTarget`. Factory registrations are provider-owned;
+`...View` registrations are non-owning aliases; `AddExternal...`,
+`BridgeExternal...`, and `CreateExternalHost(...)` keep the exact external
+instance/provider externally owned. Snapshots do not scan, merge providers, or
+perform fallback resolution. Scopes are available through the snapshot
+provider but are never created per message implicitly.
 
 ## Fluent DSL
 
@@ -1184,8 +1207,9 @@ completed, and timeout states are result values; caller cancellation remains a
 canceled operation.
 
 The bounded `Rejections` stream records port-local delivery failures. Canonical
-system events and diagnostics are described below. DI revisions and hosted
-activation remain separate later milestones.
+system events and diagnostics are described below. Immutable DI provider
+snapshots are available through Composition.Hosting; transactional activation
+and revision swapping remain a separate later milestone.
 
 ## Canonical Runtime Signals
 

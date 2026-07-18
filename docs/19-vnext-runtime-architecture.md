@@ -4,8 +4,8 @@ Status: accepted direction, implemented incrementally.
 
 This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
-port, and system-signal phases are implemented locally. DI snapshots, runtime
-updates, and MQTT redesign remain pending.
+port, system-signal, and immutable DI provider-snapshot phases are implemented
+locally. Transactional runtime updates and MQTT redesign remain pending.
 
 ## Package Ownership
 
@@ -16,8 +16,8 @@ updates, and MQTT redesign remain pending.
   link validation. Runtime activation remains an Engine responsibility.
 - `FluxFlow.Engine` will execute compiled compositions and own stable ports,
   direct port interaction, runtime revisions, system events, and diagnostics.
-- `FluxFlow.Composition.Hosting` will own definition sources, DI provider
-  snapshots, transactional updates, and hosted lifecycle.
+- `FluxFlow.Composition.Hosting` owns definition sources, immutable DI provider
+  snapshots, and hosted lifecycle. It will also own transactional updates.
 - Component runtime packages remain usable without Composition or Engine.
 - Concrete adapter packages translate public contracts to private client
   library types and own those library-specific lifetimes.
@@ -54,9 +54,9 @@ resource references, and port links are flat properties.
 `FluxFlow.Composition.Model` now implements this document boundary, and
 `FluxFlow.Composition.Addressing.ApplicationAddress` implements the shared
 ordinal, case-sensitive address value for local workflow ports, absolute
-workflow ports, nested resources, and system streams. Engine stable-port APIs
-now use the same value. Designer persistence and keyed DI will adopt it in later
-milestones. Names containing dots are invalid.
+workflow components and ports, nested resources, and system streams. Engine
+stable-port APIs and Hosting keyed DI use the same value. Designer persistence
+adopts the same canonical representation. Names containing dots are invalid.
 
 Links may be declared once on either an input or output property as a string,
 an array, or an object containing exact `Port` and optional `Condition` names.
@@ -122,8 +122,32 @@ processing. Accepted records integrate with `ILogger`, `ActivitySource`,
 pending count, and active attachment count. It does not introduce a State port.
 An unexpected component source or target fault marks only that attachment
 unavailable and leaves the runtime active. Resource/revision event categories
-are defined for later transactional-update stages, but no DI provider or
-revision behavior is added here.
+are defined for later transactional-update stages.
+
+## DI Provider Snapshots
+
+`FluxFlow.Composition.Hosting.Snapshots` builds immutable ownership boundaries
+from explicitly composed `IServiceCollection` instances. Host,
+resource-revision, and workflow-revision snapshots expose stable metadata for
+later system events. Build and scope validation are enabled by default; scopes
+are available but never created per message implicitly.
+
+Canonical `ApplicationAddress.Value` strings are keyed-service identities.
+Resources, `Workflow.Component` blocks, typed input/output ports, and
+payload-independent signal targets register explicitly through normal
+`IServiceCollection` extensions. Component and port views avoid duplicate
+ownership while preserving normal Dataflow interfaces.
+
+Factory-created services are provider-owned. External instances and host
+providers cross the boundary only through methods explicitly named
+`AddExternal...`, `BridgeExternal...`, or `CreateExternalHost(...)`, and remain
+externally owned. Methods containing `View` create non-owning aliases of another
+provider-owned service. Snapshots do not scan assemblies, reflect over
+component types, merge providers, or fall back to arbitrary providers.
+
+This phase provides construction and ownership primitives only. It does not
+publish snapshots atomically, compute dependency closures, activate candidate
+revisions, or swap live routing.
 
 ## Runtime Updates
 
@@ -145,9 +169,11 @@ introduced.
 3. Link normalization and condition compilation. Complete locally.
 4. Stable ports and direct send/receive/observe APIs. Complete locally.
 5. Fault isolation, system events, and diagnostics. Complete locally.
-6. DI resource snapshots and transactional revisions. Next.
-7. MQTT as the first complete resource/component/adapter vertical slice.
-8. Remaining component families, Designer, hosting, and coordinated releases.
+6. Immutable DI resource/provider snapshots and canonical keyed registration.
+   Complete locally.
+7. Transactional resource and workflow revisions. Next.
+8. MQTT as the first complete resource/component/adapter vertical slice.
+9. Remaining component families, Designer, hosting, and coordinated releases.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

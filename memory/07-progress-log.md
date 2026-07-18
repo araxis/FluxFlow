@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-17 - vNext DI resource and provider snapshots
+
+- Added immutable host/resource-revision/workflow-revision Microsoft DI
+  snapshots with copied service descriptors, validation-safe defaults,
+  optional scopes, stable metadata, and explicit external-provider bridges.
+- Added canonical keyed registration for resources, `Workflow.Component`
+  blocks, typed Dataflow ports, and payload-independent `IFlowSignalTarget`
+  inputs. Owned, view, and external registrations now have distinct disposal
+  behavior.
+- Kept Composition.Hosting standalone-first: release boundary tests rejected
+  the initial Engine-owned signal contract, so the final signal abstraction
+  lives in Nodes and Hosting remains Engine-free.
+- Passed 41 Nodes, 116 Composition, 32 Hosting, and 93 Release tests; 1,926
+  Release tests across 63 projects; controlled Debug/Release builds; binary
+  compatibility, preflight, and local-source dry-runs for the three changed
+  packages; and a package-only net8 consumer that printed
+  `DI_SNAPSHOT_API_OK`. Full evidence is in
+  [[211-vnext-di-resource-provider-snapshots]].
+- Transactional resource/workflow revisions are the next bounded milestone;
+  MQTT remains a separate later vertical slice.
+
 ## 2026-07-17 - vNext system events, diagnostics, and status
 
 - Added the reserved `System.Events.Output` and `System.Diagnostics.Output`

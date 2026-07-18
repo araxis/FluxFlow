@@ -40,6 +40,17 @@ Debug.Assert(next.CausationId == message.MessageId);
 `CorrelationId` is a guarded value type (non-empty) and serializes as a bare JSON
 string, so envelopes persist cleanly.
 
+## Signal Targets
+
+`IFlowSignalTarget` is a payload-independent input contract for signal-style
+ports such as acknowledgement inputs. Its generic `SendAsync<T>` accepts any
+normal `FlowMessage<T>` and returns whether the target accepted it. This keeps
+the registration independent of payload type while preserving trace identity.
+
+The abstraction does not route, correlate, persist, or own resources. A target
+defines what acceptance means and uses `Completion` for its lifecycle. Typed
+data ports should continue to expose `ITargetBlock<FlowMessage<T>>`.
+
 ## `FlowNode<TInput, TOutput>`
 
 Derive from it and implement `ProcessAsync`. The base gives you four ports:

@@ -54,10 +54,17 @@ public sealed class ApplicationAddress : IEquatable<ApplicationAddress>
                 "System addresses are limited to 'System.Events.Output' and 'System.Diagnostics.Output'.");
         }
 
+        if (segments.Length == 2)
+        {
+            return new ApplicationAddress(
+                ApplicationAddressKind.WorkflowComponent,
+                segments);
+        }
+
         if (segments.Length != 3)
         {
             throw new FormatException(
-                "Workflow port addresses must use exactly 'Workflow.Component.Port'.");
+                "Workflow component and port addresses must use 'Workflow.Component' or 'Workflow.Component.Port'.");
         }
 
         return new ApplicationAddress(ApplicationAddressKind.WorkflowPort, segments);
@@ -96,6 +103,21 @@ public sealed class ApplicationAddress : IEquatable<ApplicationAddress>
         string component,
         string port)
     {
+        var componentAddress = WorkflowComponent(workflow, component);
+
+        return new ApplicationAddress(
+            ApplicationAddressKind.WorkflowPort,
+            [
+                componentAddress._segments[0],
+                componentAddress._segments[1],
+                RequireConstructedSegment(port, nameof(port), "Port name")
+            ]);
+    }
+
+    public static ApplicationAddress WorkflowComponent(
+        string workflow,
+        string component)
+    {
         workflow = RequireConstructedSegment(workflow, nameof(workflow), "Workflow name");
         if (string.Equals(workflow, "Resources", StringComparison.Ordinal) ||
             string.Equals(workflow, "System", StringComparison.Ordinal))
@@ -106,11 +128,10 @@ public sealed class ApplicationAddress : IEquatable<ApplicationAddress>
         }
 
         return new ApplicationAddress(
-            ApplicationAddressKind.WorkflowPort,
+            ApplicationAddressKind.WorkflowComponent,
             [
                 workflow,
-                RequireConstructedSegment(component, nameof(component), "Component name"),
-                RequireConstructedSegment(port, nameof(port), "Port name")
+                RequireConstructedSegment(component, nameof(component), "Component name")
             ]);
     }
 

@@ -7,6 +7,28 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 2.0.0
+
+Adds immutable provider snapshots and canonical keyed DI registration for the
+vNext runtime line.
+
+- Builds owned host, resource-revision, and workflow-revision providers from
+  explicitly composed service collections with validation enabled by default.
+- Registers resources, components, typed Dataflow ports, and payload-independent
+  signal targets by canonical application-address string.
+- Makes external ownership explicit and prevents component/port aliases from
+  causing duplicate disposal.
+
+## FluxFlow.Nodes 2.1.0
+
+Adds `IFlowSignalTarget`, the standalone payload-independent keyed input
+contract for normal `FlowMessage<T>` signals.
+
+## FluxFlow.Composition 2.2.0
+
+Adds canonical `Workflow.Component` addresses for keyed component registration
+while preserving local `Component.Port` resolution.
+
 ## FluxFlow.Data 1.0.0
 
 Introduces the transport-neutral data foundation for the FluxFlow vNext line.

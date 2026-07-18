@@ -78,9 +78,12 @@ var fromConfiguration = new ApplicationDefinitionConfigurationLoader()
     .Load(configuration, "Application");
 ```
 
-Names and addresses are exact and case-sensitive. Workflow port addresses use
-`Workflow.Component.Port`; local references use `Component.Port`; resources
-use `Resources.Group.Resource`. `System.Events.Output` and
+Names and addresses are exact and case-sensitive. Component addresses use
+`Workflow.Component`; workflow port addresses use `Workflow.Component.Port`;
+local port references use `Component.Port`; resources use
+`Resources.Group.Resource`. Parsing a two-segment absolute address produces a
+component address, while `ResolvePort("Component.Port", currentWorkflow)` keeps
+the same local-port behavior. `System.Events.Output` and
 `System.Diagnostics.Output` are reserved system addresses. The canonical
 serializer sorts names and nested object properties for deterministic output.
 

@@ -2,7 +2,8 @@ namespace FluxFlow.Composition.Addressing;
 
 public enum ApplicationAddressKind
 {
-    Resource,
-    WorkflowPort,
-    SystemPort
+    Resource = 0,
+    WorkflowPort = 1,
+    SystemPort = 2,
+    WorkflowComponent = 3
 }

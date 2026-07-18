@@ -462,6 +462,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `210-vnext-system-events-diagnostics.md`: canonical bounded system-event and
   best-effort diagnostic outputs, isolated component failures, runtime/port
   status snapshots, standard .NET instrumentation, and the DI-snapshot handoff.
+- `211-vnext-di-resource-provider-snapshots.md`: immutable Microsoft DI provider
+  snapshots, canonical keyed resource/component/port/signal registration,
+  explicit ownership boundaries, and the transactional-revision handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

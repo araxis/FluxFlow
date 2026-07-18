@@ -1,6 +1,7 @@
 # FluxFlow.Composition.Hosting
 
-Optional hosting bridge for `FluxFlow.Composition`.
+Optional hosting and immutable provider-snapshot bridge for
+`FluxFlow.Composition`.
 
 Use this package when a .NET host wants DI/configuration to own composition
 startup while keeping concrete resources in adapter packages.
@@ -9,6 +10,10 @@ startup while keeping concrete resources in adapter packages.
 
 This package owns:
 
+- building immutable host, resource-revision, and workflow-revision service
+  provider snapshots
+- explicit keyed registration of resources, components, typed ports, and
+  payload-independent signal targets by canonical application address
 - registering a single composition runtime with `IServiceCollection`
 - loading a `CompositionDefinition` from an object or `IConfiguration`
 - building the runtime through `CompositionRuntimeBuilder`
@@ -24,7 +29,63 @@ It does not own resource creation policies. Adapter packages still own concrete
 clients, stores, reconnect behavior, secrets, hosted client lifetime, and
 adapter-specific options.
 
-## Registration
+Provider snapshots do not merge service providers and do not fall back to an
+arbitrary parent provider. Compose `IServiceCollection` instances before
+building a snapshot, or bridge an exact external instance explicitly.
+
+## Provider Snapshots
+
+`CompositionServiceProviderSnapshotBuilder` copies service descriptors when
+they are added. Later changes to the source collection do not affect a built
+snapshot. `Build(...)` creates a normal Microsoft DI provider with scope and
+build validation enabled by default.
+
+```csharp
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Snapshots;
+using Microsoft.Extensions.DependencyInjection;
+
+var registrations = new ServiceCollection();
+var clientAddress = ApplicationAddress.Resource("Messaging", "Client1");
+
+registrations.AddFluxFlowResource<IMessageClient>(
+    clientAddress,
+    services => new MessageClient(
+        services.GetRequiredService<ClientOptions>()));
+
+await using var resources = new CompositionServiceProviderSnapshotBuilder()
+    .AddServices(registrations)
+    .Build(CompositionProviderBoundary.ResourceRevision, "resources-7");
+
+var client = resources.GetRequiredKeyedService<IMessageClient>(
+    "Resources.Messaging.Client1");
+```
+
+Canonical `ApplicationAddress.Value` strings are the DI keys. Resource keys use
+`Resources.Group.Resource`, components use `Workflow.Component`, and typed
+ports use `Workflow.Component.Port`. System outputs may also be registered as
+typed output ports. The same resource string stored in canonical JSON therefore
+resolves directly through keyed DI.
+
+Factory registrations are owned and disposed by the built provider. Methods
+whose names contain `View` create non-owning aliases of another provider-owned
+service. Methods whose names start with `AddExternal` and builder methods whose
+names start with `BridgeExternal` retain external ownership. Component and port
+aliases use non-owning forwarding views so one underlying block is never
+disposed twice.
+
+`CompositionProviderBoundary` distinguishes `Host`, `ResourceRevision`, and
+`WorkflowRevision` snapshots. `CompositionProviderSnapshotInfo` is a stable
+transport record for later revision events. Scopes remain opt-in through
+`snapshot.Services.CreateScope()`; message processing does not create scopes
+implicitly. Prefer `DisposeAsync()` when registrations may be async-disposable.
+
+`CompositionServiceProviderSnapshot.CreateExternalHost(...)` wraps an existing
+host provider without taking disposal ownership. This is an explicit bridge,
+not a provider fallback mechanism.
+
+## Hosted Runtime Registration
 
 ```csharp
 services.AddKeyedSingleton<IMessageStore>("primary", new InMemoryMessageStore());
@@ -57,7 +118,8 @@ Contributor registration is explicit and duplicate-safe by implementation type.
 The hosting package does not scan assemblies or discover node factories
 implicitly.
 
-Configuration records the resource reference by name:
+The established hosted runtime configuration records the resource reference by
+name:
 
 ```json
 {
