@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-07-17
+Date: 2026-07-18
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -474,6 +474,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `214-vnext-mqtt-adapters.md`: concrete implementations of the MQTT transport
   SPI, shared adapter conformance, coordinated broker acknowledgements, and the
   canonical MQTT Composition handoff.
+- `215-vnext-mqtt-composition.md`: canonical nested MQTT resources, four vNext
+  Composition nodes, signal-port metadata/runtime integration, package and
+  consumer verification, and the component-family migration handoff.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

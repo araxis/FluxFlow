@@ -1,6 +1,7 @@
 using FluxFlow.Components.Mqtt.Contracts;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace FluxFlow.Components.Mqtt.Configuration;
 
@@ -45,6 +46,7 @@ public sealed record MqttClientConfiguration
     }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<MqttAutoConnectMode>))]
 public enum MqttAutoConnectMode
 {
     Disabled = 0,

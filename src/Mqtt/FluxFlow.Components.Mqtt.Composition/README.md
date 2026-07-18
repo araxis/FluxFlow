@@ -1,91 +1,167 @@
 # FluxFlow.Components.Mqtt.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone MQTT nodes
-from `FluxFlow.Components.Mqtt`.
+Canonical MQTT resources and component factories for `FluxFlow.Composition`.
+The package maps one or more logical MQTT clients to the provider-neutral
+controller in `FluxFlow.Components.Mqtt`; concrete adapters remain responsible
+only for the underlying protocol transport.
 
-This package does not create MQTT clients, own broker settings, or choose a client
-library. Concrete adapter packages or the host register keyed `IMqttPublisher` and
-`IMqttTriggerSource` services. Composition definitions reference those keys as
-resources.
+## Boundary
+
+- `mqtt.broker` describes one broker endpoint. Multiple logical clients may
+  share it.
+- `mqtt.client` describes one independently identified logical client and owns
+  its credentials, certificates, Last Will, desired subscriptions,
+  auto-connect mode, and reconnect policy.
+- `mqtt.subscription` names reusable subscription settings.
+- `resilience.retry` names reusable reconnect settings.
+- `mqtt.control`, `mqtt.publish`, `mqtt.trigger`, and `mqtt.events` share the
+  keyed `IMqttClientController` selected by their `Client` property.
+
+The host registers an `IMqttTransportFactory`, credentials, certificates, and
+optional clocks. `AddMqttCompositionResources(...)` validates MQTT resource
+references and registers broker, retry, subscription, client configuration,
+and one host-lifetime controller per `mqtt.client` address. It does not scan
+assemblies or choose a concrete MQTT provider.
 
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<IMqttPublisher>("primary", publisher);
-services.AddKeyedSingleton<IMqttTriggerSource>("primary", triggerSource);
+using FluxFlow.Components.Mqtt.Composition;
+using FluxFlow.Components.Mqtt.Transport;
+using FluxFlow.Composition;
+using Microsoft.Extensions.DependencyInjection;
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMqttNodes());
+var definition = ApplicationDefinitionJson.Deserialize(json);
+
+services.AddSingleton<IMqttTransportFactory>(transportFactory);
+services.AddMqttCompositionResources(definition);
+
+var registry = new CompositionNodeRegistry().RegisterMqttNodes();
 ```
 
-## Node Types
+For different transports per client, register keyed factories under the full
+client resource address. A keyed factory takes precedence over the unkeyed host
+default. The same rule applies to an optional keyed `TimeProvider`.
 
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `mqtt.publish` | `MqttPublishNode` | `publisher` | `Input`, `Output` |
-| `mqtt.trigger` | `MqttTriggerNode` | `triggerSource` | `Output`, `Responses` |
+## Canonical Document
 
-`clock` is an optional keyed `TimeProvider` resource for deterministic timestamps
-and trigger response timeout tests.
-
-## Configuration
+The application document remains flat at its two root sections. Resource groups
+are namespaces, workflow names are object keys, and component settings and link
+declarations sit directly on each component.
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "commands": {
-              "type": "mqtt.trigger",
-              "resources": {
-                "triggerSource": "primary"
-              },
-              "configuration": {
-                "topicFilter": "commands/+",
-                "mode": "RequestReply",
-                "acknowledgement": "OnSuccessfulResponse"
-              }
-            },
-            "publishResult": {
-              "type": "mqtt.publish",
-              "resources": {
-                "publisher": "primary"
-              },
-              "configuration": {
-                "publishTimeoutMilliseconds": 30000
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Messaging": {
+      "Broker1": {
+        "Type": "mqtt.broker",
+        "Host": "broker.internal",
+        "Port": 8883,
+        "UseTls": true
+      },
+      "Reconnect": {
+        "Type": "resilience.retry",
+        "Strategy": "Exponential",
+        "InitialDelay": "00:00:01",
+        "MaximumDelay": "00:01:00"
+      },
+      "Commands": {
+        "Type": "mqtt.subscription",
+        "TopicFilter": "commands/+",
+        "Qos": "AtLeastOnce"
+      },
+      "Client1": {
+        "Type": "mqtt.client",
+        "ClientId": "application-client-1",
+        "Broker": "Resources.Messaging.Broker1",
+        "Credentials": "Resources.Security.MqttCredentials",
+        "Reconnect": "Resources.Messaging.Reconnect",
+        "Subscriptions": "Resources.Messaging.Commands",
+        "AutoConnect": "OnStart"
+      }
+    },
+    "Security": {
+      "MqttCredentials": {
+        "Type": "host.credentials"
+      }
+    }
+  },
+  "Workflows": {
+    "CommandProcessing": {
+      "Receive": {
+        "Type": "mqtt.trigger",
+        "Client": "Resources.Messaging.Client1",
+        "Subscription": "Commands",
+        "Ack": "Handle.Output",
+        "Nak": "Handle.Failure"
+      },
+      "Handle": {
+        "Type": "application.command-handler",
+        "Input": "Receive.Output"
+      },
+      "Publish": {
+        "Type": "mqtt.publish",
+        "Client": "Resources.Messaging.Client1",
+        "Input": "CreateReply.Output"
+      },
+      "CreateReply": {
+        "Type": "application.reply-mapper",
+        "Input": "Handle.Output"
+      },
+      "Control": {
+        "Type": "mqtt.control",
+        "Client": "Resources.Messaging.Client1"
+      },
+      "ClientEvents": {
+        "Type": "mqtt.events",
+        "Client": "Resources.Messaging.Client1"
       }
     }
   }
 }
 ```
 
-The composition package binds only node runtime options. Publish topics, payloads,
-quality of service, retain flags, and MQTT protocol metadata still come from
-`MqttPublishRequest` messages at runtime.
+A single subscription may be a string or inline object. Multiple subscriptions
+use a mixed array of names and inline objects. Client resource `Subscriptions`
+accepts one canonical `Resources...` address or an array of addresses.
 
-To publish a response to a received MQTT message, insert a transform node that
-maps `MqttReceivedMessage` to `MqttPublishRequest` before linking into
-`publishResult.Input`.
+## Node Contracts
+
+| Type | Input | Output |
+|---|---|---|
+| `mqtt.control` | `FlowMessage<MqttClientRequest>` | `FlowMessage<MqttClientResult>` |
+| `mqtt.publish` | `FlowMessage<MqttPublishMessage>` | `FlowMessage<MqttClientResult>` |
+| `mqtt.trigger` | `Ack`, `Nak` signals | `FlowMessage<MqttReceivedApplicationMessage>` |
+| `mqtt.events` | none | `FlowMessage<MqttClientEvent>` |
+
+Control and publish failures are normal `MqttClientResult` values with
+`Kind = "Error"`, `IsSuccess = false`, and a structured `Error`; there is no
+universal error port. Workflow links and mappers can inspect those fields like
+any other data. Trigger `Ack` and `Nak` accept any `FlowMessage<T>` and match
+only its trace identity, so the signal payload type is irrelevant.
+
+Control supports sequential or concurrent request processing, independent
+result ordering, bounded pending work, and explicit maximum concurrency.
+Trigger claims remain exclusive per named or equivalent inline subscription;
+duplicate claims fail immediately during controller registration.
+
+## Secrets And Ownership
+
+Hosts should register `MqttCredentialConfiguration` and
+`MqttClientCertificate` as keyed services under the referenced canonical
+resource addresses. Direct `Username` and `Password` values override a
+referenced credential value. Inline passwords and certificate bytes are
+rejected unless the host explicitly supplies an `IMqttInlineSecretPolicy` that
+allows them.
+
+The service provider owns controllers created by this package. Nodes share but
+never dispose those controllers. Broker connections, client sessions,
+subscriptions, reconnect, and desired-state restoration stay in the core
+controller; components remain ordinary workflow nodes.
 
 ## Design Metadata
 
-`MqttComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`mqtt.publish` and `mqtt.trigger` so hosts can build palettes, editors,
-validation hints, or documentation without copying package descriptors. The
-metadata describes the existing MQTT node option records with section,
-importance, and editor hints; fixed ports; and resource picker hints with key
-patterns. `mqtt.publish` requires `publisher`; `mqtt.trigger` requires
-`triggerSource`; both can reference an optional `clock`. Resource metadata is
-descriptive only, so `IMqttPublisher`, `IMqttTriggerSource`, and optional keyed
-`TimeProvider` clocks remain host-owned and are not modeled as editable node
-options.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+`MqttComponentDesignMetadataProvider` describes all four node types, their
+options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
+hints. The metadata is descriptive only; hosts still own resource catalogs,
+secret entry, rendering, persistence, and lifecycle policy.

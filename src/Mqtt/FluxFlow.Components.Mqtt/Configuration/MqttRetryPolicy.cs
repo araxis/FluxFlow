@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace FluxFlow.Components.Mqtt.Configuration;
 
@@ -75,6 +76,7 @@ public sealed record MqttRetryPolicy
     }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<MqttRetryStrategy>))]
 public enum MqttRetryStrategy
 {
     Fixed = 0,

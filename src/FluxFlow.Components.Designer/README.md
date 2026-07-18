@@ -50,6 +50,9 @@ component without depending on a specific rendering framework.
   `OptionDesignMetadataAttributes`: shared names, values, and helpers for
   describing option editor, section, importance, syntax, and related-resource
   hints.
+- `PortDesignMetadataAttributeNames`, `PortDesignMetadataAttributeValues`, and
+  `PortDesignMetadataAttributes`: neutral hints that let a host distinguish a
+  payload-independent signal input from a normal typed message port.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
 options and ports, duplicate primary ports per direction, invalid option
@@ -102,6 +105,14 @@ needs to describe a host-owned resource picker. The shared attribute names cover
 resource ownership, picker kind, key pattern, related option, and conditional
 requiredness. They are only hints for hosts; the host still owns resource
 catalogs, keyed registrations, secrets, lifetimes, and disposal.
+
+## Port Metadata
+
+Normal ports are typed message ports. A component with an
+`IFlowSignalTarget` input can add `PortDesignMetadataAttributes.CreateSignal()`
+to that input's attributes. Hosts may then render or validate the input as a
+trace-identity signal whose incoming payload type is irrelevant. This remains
+descriptive metadata; the Designer package does not link or deliver signals.
 
 Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
 of the host-owned picker hints from one component metadata item or a validated

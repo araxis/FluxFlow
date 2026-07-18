@@ -10,6 +10,11 @@ public static class CompositionPorts
         ITargetBlock<FlowMessage<TMessage>> target)
         => new(name, target);
 
+    public static CompositionSignalInputPort SignalInput(
+        string name,
+        IFlowSignalTarget target)
+        => new(name, target);
+
     public static CompositionOutputPort<TMessage> Output<TMessage>(
         string name,
         ISourceBlock<FlowMessage<TMessage>> source)
@@ -22,4 +27,9 @@ public static class CompositionPorts
         string name,
         CompositionPortLinkCardinality linkCardinality)
         => CompositionPortMetadata.Create<TMessage>(name, linkCardinality);
+
+    public static CompositionPortMetadata SignalMetadata(
+        string name,
+        CompositionPortLinkCardinality linkCardinality = CompositionPortLinkCardinality.Multiple)
+        => CompositionPortMetadata.CreateSignal(name, linkCardinality);
 }

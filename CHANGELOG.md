@@ -7,6 +7,34 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mqtt.Composition 2.0.0
+
+Replaces the legacy adapter-resource composition surface with the canonical
+MQTT client model.
+
+- Adds strict flat binding for `mqtt.broker`, `mqtt.client`,
+  `mqtt.subscription`, and `resilience.retry` resources through Microsoft DI.
+- Adds `mqtt.control`, `mqtt.publish`, `mqtt.trigger`, and `mqtt.events` over
+  one host-lifetime `IMqttClientController` per logical client.
+- Adds payload-independent trigger `Ack`/`Nak` inputs, result-as-data output
+  contracts, resource validation, secret policy, and complete Designer hints.
+
+## FluxFlow.Engine 2.4.0
+
+Adds bounded payload-independent signal inputs to the stable-port runtime,
+including direct access, compiled routing, status, and transactional target
+replacement.
+
+## FluxFlow.Composition 2.4.0
+
+Adds signal input metadata/runtime links and allows node factories to consume
+canonical flat component definitions and resource properties directly.
+
+## FluxFlow.Components.Designer 2.18.0
+
+Adds neutral port-kind metadata attributes for payload-independent signal
+inputs.
+
 ## FluxFlow.Components.Mqtt.MqttNet 1.2.0
 
 Adds a concrete implementation of the MQTT 5.0 provider transport boundary.

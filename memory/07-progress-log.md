@@ -2,6 +2,26 @@
 
 Date: 2026-05-31
 
+## 2026-07-18 - vNext MQTT Composition
+
+- Added canonical nested MQTT resource binding for brokers, logical clients,
+  subscriptions, retry policy, credentials, certificates, Last Will, and
+  host-owned transport/controller services with strict reference validation.
+- Replaced the legacy Composition surface with `mqtt.control`, `mqtt.publish`,
+  `mqtt.trigger`, and `mqtt.events`; expected failures remain normal results,
+  while trigger Ack/Nak are payload-independent signal inputs.
+- Added message/signal port metadata to Composition, Engine stable signal
+  mailboxes and direct access, Designer signal hints, canonical sample/docs,
+  and deterministic rejection of duplicate subscription leaf names.
+- Hardened prepared Engine output activation against a source/staging fault
+  propagation race found by the complete test sweep; the regression passed
+  30/30 stress iterations.
+- Passed 1,983 Release tests across 63 projects, controlled Debug/Release
+  builds across 130 projects, four release preflights and dry-runs, expected
+  package compatibility review, and a package-only net8 consumer. Full evidence
+  is in [[215-vnext-mqtt-composition]].
+- Component-family migration is the next bounded milestone.
+
 ## 2026-07-17 - vNext MQTT transport adapters
 
 - Added thin concrete implementations of the provider-neutral MQTT transport

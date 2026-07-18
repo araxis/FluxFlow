@@ -1,31 +1,33 @@
-using System.Runtime.CompilerServices;
-using System.Text;
+using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Contracts;
-using FluxFlow.Components.Mqtt.Options;
+using FluxFlow.Components.Mqtt.Events;
+using FluxFlow.Components.Mqtt.Subscriptions;
+using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-var seedMessages = new[]
+var messages = new[]
 {
-    CreateReceived("devices/pump-01/state", "online", "pump-01-state"),
-    CreateReceived("devices/pump-02/state", "offline", "pump-02-state")
+    new SampleMessage("devices/pump-01/state/reply", "ACK: online"),
+    new SampleMessage("devices/pump-02/state/reply", "ACK: offline")
 };
 
-var configurationPublished = await RunConfigurationCompositionAsync(seedMessages);
+var configurationPublished = await RunConfigurationCompositionAsync(messages);
 PrintPublished("configuration", configurationPublished);
 
-var fluentPublished = await RunFluentCompositionAsync(seedMessages);
+var fluentPublished = await RunFluentCompositionAsync(messages);
 PrintPublished("fluent", fluentPublished);
 
 return 0;
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunConfigurationCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages)
+static async Task<IReadOnlyList<MqttPublishMessage>> RunConfigurationCompositionAsync(
+    IReadOnlyList<SampleMessage> messages)
 {
     var configuration = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
@@ -37,25 +39,17 @@ static async Task<IReadOnlyList<MqttPublishRequest>> RunConfigurationComposition
         services => services.AddFluxFlowComposition(configuration));
 }
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunFluentCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages)
+static async Task<IReadOnlyList<MqttPublishMessage>> RunFluentCompositionAsync(
+    IReadOnlyList<SampleMessage> messages)
 {
     var definition = CompositionDefinitionBuilder
         .Create()
         .Workflow("main", workflow => workflow
-            .Node("inbound", MqttCompositionNodeTypes.Trigger, node => node
-                .Resource(MqttCompositionResourceNames.TriggerSource, "memory")
-                .Configure("topicFilter", "devices/+/state")
-                .Configure("boundedCapacity", 16))
-            .Node("reply", SampleNodeTypes.MqttReply, node => node
-                .Configure("replyTopicSuffix", "/reply")
-                .Configure("payloadPrefix", "ACK: "))
+            .Node("source", SampleNodeTypes.PublishSource)
             .Node("outbound", MqttCompositionNodeTypes.Publish, node => node
-                .Resource(MqttCompositionResourceNames.Publisher, "memory")
-                .Configure("publishTimeoutMilliseconds", 1_000)
-                .Configure("boundedCapacity", 16))
-            .Link("inbound.Output", "reply.Input")
-            .Link("reply.Output", "outbound.Input"))
+                .Resource(MqttCompositionResourceNames.Client, "memory")
+                .Configure("maximumPendingRequests", 16))
+            .Link("source.Output", "outbound.Input"))
         .Build();
 
     return await RunHostedCompositionAsync(
@@ -63,15 +57,14 @@ static async Task<IReadOnlyList<MqttPublishRequest>> RunFluentCompositionAsync(
         services => services.AddFluxFlowComposition(definition));
 }
 
-static async Task<IReadOnlyList<MqttPublishRequest>> RunHostedCompositionAsync(
-    IReadOnlyList<MqttReceivedMessage> messages,
+static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedCompositionAsync(
+    IReadOnlyList<SampleMessage> messages,
     Func<IServiceCollection, CompositionHostingBuilder> addComposition)
 {
-    var adapter = new InMemoryMqttAdapter(messages);
+    var controller = new RecordingMqttController();
     var services = new ServiceCollection();
-
-    services.AddKeyedSingleton<IMqttPublisher>("memory", adapter);
-    services.AddKeyedSingleton<IMqttTriggerSource>("memory", adapter);
+    services.AddSingleton(new SampleMessages(messages));
+    services.AddKeyedSingleton<IMqttClientController>("memory", controller);
 
     addComposition(services)
         .RegisterNodes(RegisterSampleNodes);
@@ -92,7 +85,7 @@ static async Task<IReadOnlyList<MqttPublishRequest>> RunHostedCompositionAsync(
             host.Diagnostics.Select(diagnostic => diagnostic.Message)));
     }
 
-    return adapter.Published;
+    return controller.Published;
 }
 
 static void RegisterSampleNodes(CompositionNodeRegistry registry)
@@ -100,170 +93,122 @@ static void RegisterSampleNodes(CompositionNodeRegistry registry)
     registry
         .RegisterMqttNodes()
         .Register(
-            SampleNodeTypes.MqttReply,
+            SampleNodeTypes.PublishSource,
             context =>
             {
-                var options = context.BindConfiguration<ReplyOptions>();
-                var node = new MqttReplyMapperNode(options);
+                var messages = context.Services.GetRequiredService<SampleMessages>();
+                var node = new MqttPublishSourceNode(messages.Values);
                 return ValueTask.FromResult(ComposedNode.Create(
                     node,
-                    inputs:
-                    [
-                        CompositionPorts.Input<MqttReceivedMessage>(
-                            "Input",
-                            node.Input)
-                    ],
                     outputs:
                     [
-                        CompositionPorts.Output<MqttPublishRequest>(
-                            "Output",
+                        CompositionPorts.Output<MqttPublishMessage>(
+                            MqttCompositionPortNames.Output,
                             node.Output)
                     ],
                     events: node.Events,
                     errors: node.Errors));
             },
-            inputs: [CompositionPorts.Metadata<MqttReceivedMessage>("Input")],
-            outputs: [CompositionPorts.Metadata<MqttPublishRequest>("Output")]);
-}
-
-static MqttReceivedMessage CreateReceived(
-    string topic,
-    string payload,
-    string correlationId)
-{
-    var payloadBytes = Encoding.UTF8.GetBytes(payload);
-    return new MqttReceivedMessage
-    {
-        Timestamp = DateTimeOffset.UtcNow,
-        Topic = topic,
-        Payload = payloadBytes,
-        PayloadPreview = payload,
-        ContentType = "text/plain",
-        CorrelationId = correlationId
-    };
+            outputs:
+            [
+                CompositionPorts.Metadata<MqttPublishMessage>(
+                    MqttCompositionPortNames.Output)
+            ]);
 }
 
 static void PrintPublished(
     string label,
-    IReadOnlyList<MqttPublishRequest> published)
+    IReadOnlyList<MqttPublishMessage> published)
 {
     Console.WriteLine($"{label}:");
-    foreach (var request in published)
+    foreach (var message in published)
     {
         Console.WriteLine(
-            $"  {request.Topic} -> {Encoding.UTF8.GetString(request.Payload)}");
+            $"  {message.Topic} -> " +
+            System.Text.Encoding.UTF8.GetString(message.Content.OriginalBytes.AsSpan()));
     }
 }
 
 internal static class SampleNodeTypes
 {
-    public const string MqttReply = "sample.mqtt.reply";
+    public const string PublishSource = "sample.mqtt.publish-source";
 }
 
-internal sealed record ReplyOptions
-{
-    public string ReplyTopicSuffix { get; init; } = "/reply";
+internal sealed record SampleMessage(string Topic, string Content);
 
-    public string PayloadPrefix { get; init; } = "ACK: ";
-}
+internal sealed record SampleMessages(IReadOnlyList<SampleMessage> Values);
 
-internal sealed class MqttReplyMapperNode(ReplyOptions options)
-    : FlowNode<MqttReceivedMessage, MqttPublishRequest>
+internal sealed class MqttPublishSourceNode(IReadOnlyList<SampleMessage> messages)
+    : FlowSource<MqttPublishMessage>
 {
-    protected override Task ProcessAsync(FlowMessage<MqttReceivedMessage> message)
+    protected override Task RunAsync(CancellationToken cancellationToken)
     {
-        var received = message.Payload;
-        var receivedPayload = Encoding.UTF8.GetString(received.Payload);
-        var publishPayload = $"{options.PayloadPrefix}{receivedPayload}";
-        var publishPayloadBytes = Encoding.UTF8.GetBytes(publishPayload);
-
-        Emit(message.With(new MqttPublishRequest
+        foreach (var message in messages)
         {
-            Topic = $"{received.Topic}{options.ReplyTopicSuffix}",
-            Payload = publishPayloadBytes,
-            PayloadPreview = publishPayload,
-            ContentType = "text/plain",
-            QualityOfService = received.QualityOfService,
-            Properties = new MqttPublishProperties
+            cancellationToken.ThrowIfCancellationRequested();
+            Emit(FlowMessage.Create(new MqttPublishMessage
             {
-                CorrelationId = received.CorrelationId
-            }
-        }));
+                Topic = message.Topic,
+                Content = FlowContent.FromBytes(
+                    System.Text.Encoding.UTF8.GetBytes(message.Content),
+                    "text/plain",
+                    "utf-8")
+            }));
+        }
 
         return Task.CompletedTask;
     }
 }
 
-internal sealed class InMemoryMqttAdapter(IReadOnlyList<MqttReceivedMessage> messages) :
-    IMqttPublisher,
-    IMqttTriggerSource
+internal sealed class RecordingMqttController : IMqttClientController
 {
     private readonly object _gate = new();
-    private readonly List<MqttPublishRequest> _published = [];
+    private readonly List<MqttPublishMessage> _published = [];
 
-    public IReadOnlyList<MqttPublishRequest> Published
+    public string Name => "memory";
+
+    public bool IsConnected => true;
+
+    public MqttTransportCapabilities Capabilities { get; } = new();
+
+    public IReadOnlyList<MqttPublishMessage> Published
     {
         get
         {
             lock (_gate)
-            {
                 return _published.ToArray();
-            }
         }
     }
 
-    public ValueTask PublishAsync(
-        MqttPublishRequest request,
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public ValueTask<MqttClientResult> ExecuteAsync(
+        MqttClientRequest request,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var publish = request as MqttPublishClientRequest
+            ?? throw new InvalidOperationException(
+                "The sample controller accepts publish requests only.");
         lock (_gate)
-        {
-            _published.Add(request);
-        }
-
-        return ValueTask.CompletedTask;
+            _published.Add(publish.Message);
+        return ValueTask.FromResult<MqttClientResult>(
+            new MqttPublishOperationResult(DateTimeOffset.UtcNow, publish.Message));
     }
 
-    public ValueTask<IMqttSubscription> SubscribeAsync(
-        MqttTriggerOptions options,
+    public ValueTask<IMqttTriggerRegistration> RegisterTriggerAsync(
+        MqttTriggerRegistrationOptions options,
         CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult<IMqttSubscription>(
-            new InMemoryMqttSubscription(messages));
-    }
-}
+        => throw new NotSupportedException();
 
-internal sealed class InMemoryMqttSubscription(IReadOnlyList<MqttReceivedMessage> messages)
-    : IMqttSubscription
-{
-    public IAsyncEnumerable<IMqttReceivedContext> Messages => ReadAsync();
+    public ValueTask<IMqttClientEventSubscription> SubscribeEventsAsync(
+        int capacity = 128,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    private async IAsyncEnumerable<IMqttReceivedContext> ReadAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        foreach (var message in messages)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.Yield();
-            yield return new InMemoryMqttReceivedContext(message);
-        }
-    }
-}
-
-internal sealed class InMemoryMqttReceivedContext(MqttReceivedMessage message)
-    : IMqttReceivedContext
-{
-    public MqttReceivedMessage Message { get; } = message;
-
-    public ValueTask AckAsync(CancellationToken cancellationToken = default)
-        => ValueTask.CompletedTask;
-
-    public ValueTask NackAsync(
-        Exception? error = null,
-        CancellationToken cancellationToken = default)
-        => ValueTask.CompletedTask;
 }

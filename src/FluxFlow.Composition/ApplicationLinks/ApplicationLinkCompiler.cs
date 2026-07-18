@@ -119,7 +119,8 @@ public sealed class ApplicationLinkCompiler
                         continue;
 
                     if (sourceMetadata is not null &&
-                        sourceMetadata.MessageType != targetMetadata!.MessageType)
+                        targetMetadata!.Kind != CompositionPortKind.Signal &&
+                        sourceMetadata.MessageType != targetMetadata.MessageType)
                     {
                         diagnostics.Add(CreateDiagnostic(
                             ApplicationLinkDiagnosticCode.PortTypeMismatch,
@@ -134,7 +135,7 @@ public sealed class ApplicationLinkCompiler
                         new CompiledApplicationLink(
                             source,
                             target,
-                            targetMetadata!.MessageType,
+                            sourceMetadata!.MessageType,
                             declaration.Condition,
                             compiledCondition,
                             side),

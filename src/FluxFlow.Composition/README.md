@@ -122,9 +122,19 @@ if (!compilation.IsValid)
 Strings, objects with exact `Port` and optional `Condition` names, and mixed
 arrays are supported. Every successful link has absolute source and target
 addresses and records whether it was declared input-side or output-side.
-Payload types must match exactly; links never insert a mapper. Multiple links
-are allowed by default. Register a port with
+Payload types must match exactly for message ports; links never insert a
+mapper. A payload-independent signal input accepts any source message type and
+preserves the source envelope identity. Multiple links are allowed by default.
+Register a port with
 `CompositionPortLinkCardinality.Single` when it permits only one claim.
+
+Node registrations declare signal inputs with
+`CompositionPorts.SignalMetadata(...)`, while factories expose the matching
+`IFlowSignalTarget` through `CompositionPorts.SignalInput(...)`. The standalone
+runtime forwards source envelopes to signal targets without taking ownership
+of target completion. `CompositionNodeFactoryContext` accepts either the
+legacy node DTO or a canonical flat `ComponentDefinition`; canonical resource
+properties such as `Client` resolve through the same keyed-service methods.
 
 Conditions use `FluxFlow.Mapping.IFlowExpressionEngine` and compile once for
 each distinct expression during one compiler invocation. `IsMatch(...)`

@@ -9,11 +9,19 @@ public enum ApplicationPortDirection
     Output = 2
 }
 
+public enum ApplicationPortKind
+{
+    Message = 0,
+    Signal = 1
+}
+
 public sealed record ApplicationPortMetadata
 {
     public required ApplicationAddress Address { get; init; }
 
     public required ApplicationPortDirection Direction { get; init; }
+
+    public ApplicationPortKind Kind { get; init; }
 
     public required Type PayloadType { get; init; }
 

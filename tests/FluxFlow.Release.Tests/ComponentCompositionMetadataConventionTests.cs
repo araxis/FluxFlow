@@ -1900,7 +1900,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must include the host resource name placeholder.");
         (
             keyPattern.Value.Contains(pickerKind.Value, StringComparison.Ordinal) ||
-            string.Equals(keyPattern.Value, resource.Name.Value, StringComparison.Ordinal)
+            string.Equals(keyPattern.Value, resource.Name.Value, StringComparison.Ordinal) ||
+            keyPattern.Value.StartsWith("Resources.", StringComparison.Ordinal)
         )
             .ShouldBeTrue(
                 $"{entry.PackageId} Designer metadata for '{nodeType}' resource '{resource.Name.Value}' key pattern '{keyPattern.Value}' must align with picker kind '{pickerKind.Value}' or its named resource pattern.");

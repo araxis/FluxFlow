@@ -1,41 +1,23 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Engine.Ports;
 
-internal interface IApplicationInputPort
+internal interface IApplicationSignalInputPort : IApplicationInputPort, IFlowSignalTarget
 {
-    ApplicationAddress Address { get; }
+    PortSendResult TrySend<T>(
+        FlowMessage<T> message,
+        ApplicationAddress? source = null);
 
-    Type PayloadType { get; }
-
-    ApplicationPortKind Kind { get; }
-
-    Task Completion { get; }
-
-    ApplicationPortStatus GetStatus();
-
-    ValueTask<IApplicationInputRevision> BeginRevisionAsync(CancellationToken cancellationToken);
-
-    void Complete();
-
-    void Abort();
+    ValueTask<IAsyncDisposable> AttachAsync(
+        IFlowSignalTarget target,
+        CancellationToken cancellationToken);
 }
 
-internal interface IApplicationInputRevision : IAsyncDisposable
-{
-    ApplicationAddress Address { get; }
-
-    Type PayloadType { get; }
-
-    IAsyncDisposable Commit(object? target);
-}
-
-internal sealed class ApplicationInputPort<T> : IApplicationInputPort
+internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 {
     private readonly object _gate = new();
-    private readonly Queue<FlowMessage<T>> _queue = new();
+    private readonly Queue<ISignalEnvelope> _queue = new();
     private readonly SemaphoreSlim _availableCapacity;
     private readonly SemaphoreSlim _signal = new(0, 1);
     private readonly SemaphoreSlim _attachmentGate = new(1, 1);
@@ -46,15 +28,15 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _pump;
 
-    private ITargetBlock<FlowMessage<T>>? _target;
-    private FlowMessage<T>? _retry;
+    private IFlowSignalTarget? _target;
+    private ISignalEnvelope? _retry;
     private TaskCompletionSource _inflightIdle = CompletedSignal();
     private long _generation;
     private bool _paused;
     private bool _completeRequested;
     private bool _aborted;
 
-    public ApplicationInputPort(
+    public ApplicationSignalInputPort(
         ApplicationAddress address,
         int capacity,
         Action<ApplicationPortRejection> report,
@@ -70,19 +52,20 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
     public ApplicationAddress Address { get; }
 
-    public Type PayloadType => typeof(T);
+    public Type PayloadType => typeof(object);
 
-    public ApplicationPortKind Kind => ApplicationPortKind.Message;
+    public ApplicationPortKind Kind => ApplicationPortKind.Signal;
 
     public int Capacity { get; }
 
     public Task Completion => _completion.Task;
 
-    public PortSendResult TrySend(
+    public PortSendResult TrySend<T>(
         FlowMessage<T> message,
         ApplicationAddress? source = null)
     {
         ArgumentNullException.ThrowIfNull(message);
+        var envelope = new SignalEnvelope<T>(message);
 
         PortSendStatus status;
         lock (_gate)
@@ -101,7 +84,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             }
             else
             {
-                _queue.Enqueue(message);
+                _queue.Enqueue(envelope);
                 Pulse();
                 status = PortSendStatus.Accepted;
             }
@@ -114,16 +97,28 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                 ApplicationPortActivityKind.InputAccepted,
                 Address,
                 source,
-                message.CorrelationId,
-                message.TraceId,
-                message.MessageId));
+                envelope.CorrelationId,
+                envelope.TraceId,
+                envelope.MessageId));
         }
         else
         {
-            Report(status, message, source);
+            Report(status, envelope, source);
         }
 
-        return CreateSendResult(status);
+        return new PortSendResult
+        {
+            Port = Address,
+            Status = status
+        };
+    }
+
+    public ValueTask<bool> SendAsync<T>(
+        FlowMessage<T> signal,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(TrySend(signal).IsAccepted);
     }
 
     public ApplicationPortStatus GetStatus()
@@ -134,8 +129,8 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             {
                 Address = Address,
                 Direction = ApplicationPortDirection.Input,
-                Kind = ApplicationPortKind.Message,
-                PayloadType = typeof(T),
+                Kind = ApplicationPortKind.Signal,
+                PayloadType = typeof(object),
                 Capacity = Capacity,
                 PendingMessages = _aborted ? 0 : Capacity - _availableCapacity.CurrentCount,
                 ActiveAttachments = _target is null ? 0 : 1,
@@ -149,7 +144,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     }
 
     public async ValueTask<IAsyncDisposable> AttachAsync(
-        ITargetBlock<FlowMessage<T>> target,
+        IFlowSignalTarget target,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -177,7 +172,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             {
                 ObjectDisposedException.ThrowIf(_aborted, this);
                 if (_completeRequested)
-                    throw new InvalidOperationException($"Input port '{Address}' is completed.");
+                    throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
 
                 _paused = true;
                 waitForIdle = _inflightIdle.Task;
@@ -190,7 +185,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             {
                 ObjectDisposedException.ThrowIf(_aborted, this);
                 if (_completeRequested)
-                    throw new InvalidOperationException($"Input port '{Address}' is completed.");
+                    throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
             }
 
             return new InputRevision(this);
@@ -244,16 +239,15 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
                 while (true)
                 {
-                    FlowMessage<T>? message = null;
-                    ITargetBlock<FlowMessage<T>>? target = null;
+                    ISignalEnvelope? message = null;
+                    IFlowSignalTarget? target = null;
+                    List<ISignalEnvelope>? terminalDrops = null;
                     var finish = false;
-                    List<FlowMessage<T>>? terminalDrops = null;
 
                     lock (_gate)
                     {
                         if (_aborted)
                             return;
-
                         if (_paused)
                             break;
 
@@ -270,7 +264,6 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
                                 while (_queue.TryDequeue(out var queued))
                                     terminalDrops.Add(queued);
-
                             }
                             else
                             {
@@ -289,7 +282,6 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                             {
                                 if (_completeRequested)
                                 {
-                                    target = _target;
                                     _target = null;
                                     finish = true;
                                 }
@@ -319,8 +311,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
                     if (finish)
                     {
-                        target!.Complete();
-                        await CompleteFromTargetAsync(target).ConfigureAwait(false);
+                        _completion.TrySetResult();
                         return;
                     }
 
@@ -328,7 +319,8 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                     Exception? failure = null;
                     try
                     {
-                        accepted = await target!.SendAsync(message!, _abort.Token).ConfigureAwait(false);
+                        accepted = await message!.SendAsync(target!, _abort.Token)
+                            .ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) when (_abort.IsCancellationRequested)
                     {
@@ -362,7 +354,8 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
                         {
                             Timestamp = DateTimeOffset.UtcNow,
                             Port = Address,
-                            TraceId = message!.TraceId,
+                            CorrelationId = message!.CorrelationId,
+                            TraceId = message.TraceId,
                             MessageId = message.MessageId,
                             Reason = ApplicationPortRejectionReason.TargetRejected,
                             Exception = failure
@@ -379,19 +372,6 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         catch (Exception exception)
         {
             _completion.TrySetException(exception);
-        }
-    }
-
-    private async Task CompleteFromTargetAsync(ITargetBlock<FlowMessage<T>> target)
-    {
-        try
-        {
-            await target.Completion.ConfigureAwait(false);
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            _completion.TrySetException(exception.GetBaseException());
         }
     }
 
@@ -429,32 +409,30 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
     private IAsyncDisposable CommitRevision(object? target)
     {
-        if (target is not null && target is not ITargetBlock<FlowMessage<T>>)
+        if (target is not null && target is not IFlowSignalTarget)
         {
             throw new InvalidOperationException(
-                $"Input port '{Address}' requires target payload type '{typeof(T)}'.");
+                $"Signal input port '{Address}' requires an {nameof(IFlowSignalTarget)} target.");
         }
 
-        var typedTarget = (ITargetBlock<FlowMessage<T>>?)target;
+        var signalTarget = (IFlowSignalTarget?)target;
         long generation;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_aborted, this);
             if (_completeRequested)
-                throw new InvalidOperationException($"Input port '{Address}' is completed.");
+                throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
 
-            _target = typedTarget;
+            _target = signalTarget;
             generation = ++_generation;
         }
 
-        if (typedTarget is not null)
-            ObserveTargetCompletion(typedTarget, generation);
+        if (signalTarget is not null)
+            ObserveTargetCompletion(signalTarget, generation);
         return new InputAttachment(this, generation);
     }
 
-    private void ObserveTargetCompletion(
-        ITargetBlock<FlowMessage<T>> target,
-        long generation)
+    private void ObserveTargetCompletion(IFlowSignalTarget target, long generation)
     {
         _ = target.Completion.ContinueWith(
             static (task, state) =>
@@ -483,7 +461,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     }
 
     private void HandleTargetCompletion(
-        ITargetBlock<FlowMessage<T>> target,
+        IFlowSignalTarget target,
         long generation,
         Task completion)
     {
@@ -518,7 +496,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 
     private void Report(
         PortSendStatus status,
-        FlowMessage<T> message,
+        ISignalEnvelope message,
         ApplicationAddress? source)
     {
         var reason = status switch
@@ -541,13 +519,6 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         });
     }
 
-    private PortSendResult CreateSendResult(PortSendStatus status)
-        => new()
-        {
-            Port = Address,
-            Status = status
-        };
-
     private void Pulse()
     {
         try
@@ -567,8 +538,35 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         return source;
     }
 
+    private interface ISignalEnvelope
+    {
+        CorrelationId CorrelationId { get; }
+
+        TraceId TraceId { get; }
+
+        MessageId MessageId { get; }
+
+        ValueTask<bool> SendAsync(
+            IFlowSignalTarget target,
+            CancellationToken cancellationToken);
+    }
+
+    private sealed class SignalEnvelope<T>(FlowMessage<T> message) : ISignalEnvelope
+    {
+        public CorrelationId CorrelationId => message.CorrelationId;
+
+        public TraceId TraceId => message.TraceId;
+
+        public MessageId MessageId => message.MessageId;
+
+        public ValueTask<bool> SendAsync(
+            IFlowSignalTarget target,
+            CancellationToken cancellationToken)
+            => target.SendAsync(message, cancellationToken);
+    }
+
     private sealed class InputAttachment(
-        ApplicationInputPort<T> owner,
+        ApplicationSignalInputPort owner,
         long generation) : IAsyncDisposable
     {
         private int _disposed;
@@ -580,7 +578,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
         }
     }
 
-    private sealed class InputRevision(ApplicationInputPort<T> owner) :
+    private sealed class InputRevision(ApplicationSignalInputPort owner) :
         IApplicationInputRevision
     {
         private int _committed;
@@ -595,7 +593,11 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
             if (Volatile.Read(ref _disposed) != 0)
                 throw new ObjectDisposedException(nameof(InputRevision));
             if (Interlocked.Exchange(ref _committed, 1) != 0)
-                throw new InvalidOperationException($"Input port '{Address}' revision was already committed.");
+            {
+                throw new InvalidOperationException(
+                    $"Signal input port '{Address}' revision was already committed.");
+            }
+
             return owner.CommitRevision(target);
         }
 
@@ -608,7 +610,7 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     }
 
     private sealed record TargetCompletion(
-        ApplicationInputPort<T> Owner,
-        ITargetBlock<FlowMessage<T>> Target,
+        ApplicationSignalInputPort Owner,
+        IFlowSignalTarget Target,
         long Generation);
 }

@@ -149,7 +149,9 @@ public sealed class CompositionRuntimeBuilder
                 continue;
             }
 
-            if (input.MessageType != metadata.MessageType)
+            if (input.Kind != metadata.Kind ||
+                (metadata.Kind == CompositionPortKind.Message &&
+                 input.MessageType != metadata.MessageType))
             {
                 diagnostics.Add(new CompositionDiagnostic
                 {
@@ -241,7 +243,8 @@ public sealed class CompositionRuntimeBuilder
             return;
         }
 
-        if (output.MessageType != input.MessageType)
+        if (input.Kind != CompositionPortKind.Signal &&
+            output.MessageType != input.MessageType)
         {
             diagnostics.Add(new CompositionDiagnostic
             {

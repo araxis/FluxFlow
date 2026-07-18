@@ -35,6 +35,12 @@ public sealed class CompositionOutputPort<TMessage> : CompositionOutputPort
 
     internal override bool TryLinkTo(CompositionInputPort input, out IDisposable? link)
     {
+        if (input is CompositionSignalInputPort signalInput)
+        {
+            link = new CompositionSignalLink<TMessage>(Source, signalInput.Target);
+            return true;
+        }
+
         if (input is not CompositionInputPort<TMessage> typedInput)
         {
             link = null;
@@ -45,5 +51,48 @@ public sealed class CompositionOutputPort<TMessage> : CompositionOutputPort
             typedInput.Target,
             new DataflowLinkOptions { PropagateCompletion = false });
         return true;
+    }
+}
+
+internal sealed class CompositionSignalLink<TMessage> : IDisposable
+{
+    private readonly ActionBlock<FlowMessage<TMessage>> _forwarder;
+    private readonly IDisposable _sourceLink;
+    private int _disposed;
+
+    public CompositionSignalLink(
+        ISourceBlock<FlowMessage<TMessage>> source,
+        IFlowSignalTarget target)
+    {
+        _forwarder = new ActionBlock<FlowMessage<TMessage>>(
+            async message =>
+            {
+                await target.SendAsync(message).ConfigureAwait(false);
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = 1,
+                EnsureOrdered = true,
+                MaxDegreeOfParallelism = 1
+            });
+        _sourceLink = source.LinkTo(
+            _forwarder,
+            new DataflowLinkOptions { PropagateCompletion = true });
+
+        _ = target.Completion.ContinueWith(
+            static (_, state) => ((ActionBlock<FlowMessage<TMessage>>)state!).Complete(),
+            _forwarder,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _sourceLink.Dispose();
+        _forwarder.Complete();
     }
 }

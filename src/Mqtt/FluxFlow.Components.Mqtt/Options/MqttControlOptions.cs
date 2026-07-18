@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FluxFlow.Components.Mqtt.Options;
 
 public sealed record MqttControlOptions
@@ -12,12 +14,14 @@ public sealed record MqttControlOptions
     public int MaximumPendingRequests { get; init; } = 128;
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<MqttRequestProcessing>))]
 public enum MqttRequestProcessing
 {
     Sequential = 0,
     Concurrent = 1
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<MqttResultOrder>))]
 public enum MqttResultOrder
 {
     PreserveInput = 0,

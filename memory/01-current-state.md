@@ -1,12 +1,13 @@
 # Current State
 
-Date: 2026-07-17
+Date: 2026-07-18
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/mqtt-adapters-vnext`. The provider-neutral MQTT core and both concrete
-  transport-adapter milestones are implemented and verified locally.
+  `work/mqtt-composition-vnext`. The provider-neutral MQTT core, both concrete
+  transport adapters, and canonical MQTT Composition milestone are implemented
+  and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -26,19 +27,21 @@ Date: 2026-07-17
   continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.3.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
   case-sensitive address type. Canonical input/output-side links now normalize
   to absolute addresses, preserve declaration side, compile conditions once,
   and report exact endpoint/type, duplicate, exclusive-claim, and cycle
-  diagnostics. The existing executable Composition DTOs remain a documented
-  migration surface. Focused and
+  diagnostics. Composition ports now distinguish typed messages from
+  payload-independent signals, and canonical component factory contexts bind
+  flat settings and resource references directly. The existing executable
+  Composition DTOs remain a documented migration surface. Focused and
   complete tests, controlled Debug/Release builds, binary compatibility,
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.3.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.4.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
@@ -46,7 +49,11 @@ Date: 2026-07-17
   snapshots. It now also supports serialized stable-port revisions with
   generation-safe input replacement, immutable output route snapshots,
   bounded prepared staging, atomic revision publication, and reliable revision
-  events. Accepted diagnostics integrate with standard .NET logging, activity,
+  events. Stable signal mailboxes now accept any `FlowMessage<T>` payload and
+  are addressable through the same runtime and keyed-service surfaces. Prepared
+  output activation also observes source faults directly, removing an
+  asynchronous Dataflow propagation race. Accepted diagnostics integrate with
+  standard .NET logging, activity,
   metric, and diagnostic-source surfaces. Focused Engine,
   Composition, Hosting, and release tests passed; complete build, package, and
   consumer evidence is recorded in `209-vnext-stable-port-runtime.md` and
@@ -77,8 +84,15 @@ Date: 2026-07-17
   `FluxFlow.Components.Mqtt.PulseMqtt` is `2.1.0`. Shared conformance,
   focused/full tests, controlled builds, binary compatibility, release
   preflight/dry-runs, and package-only consumers passed. Canonical MQTT
-  Composition binding is the next bounded gate. See `213-vnext-mqtt-core.md`
-  and `214-vnext-mqtt-adapters.md`.
+  Composition is now `2.0.0` with flat/nested `mqtt.broker`, `mqtt.client`,
+  `mqtt.subscription`, and `resilience.retry` resources, one keyed controller
+  per client, four fixed node contracts, Ack/Nak signal inputs, strict resource
+  validation, and Designer metadata. `FluxFlow.Components.Designer` is now
+  `2.18.0` with message/signal port hints. Focused and complete tests,
+  controlled builds, package checks, and a package-only consumer passed. The
+  broader component-family migration is the next bounded lane. See
+  `213-vnext-mqtt-core.md`, `214-vnext-mqtt-adapters.md`, and
+  `215-vnext-mqtt-composition.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

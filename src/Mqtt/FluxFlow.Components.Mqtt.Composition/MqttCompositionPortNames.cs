@@ -6,5 +6,7 @@ public static class MqttCompositionPortNames
 
     public const string Output = "Output";
 
-    public const string Responses = "Responses";
+    public const string Ack = "Ack";
+
+    public const string Nak = "Nak";
 }

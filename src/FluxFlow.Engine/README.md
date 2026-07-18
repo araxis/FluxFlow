@@ -45,6 +45,28 @@ replace a component revision without replacing link or direct-API addresses.
 Inputs are bounded mailboxes; outputs broadcast each message independently to
 workflow links, one-shot receivers, and bounded observations.
 
+Payload-independent inputs use `AddSignalInput(...)`. They retain the stable
+address, bounded mailbox, direct-send result, compiled conditions, and revision
+semantics of message inputs while accepting `FlowMessage<T>` for any `T`.
+
+```csharp
+var ackAddress = ApplicationAddress.WorkflowPort("Orders", "Receive", "Ack");
+
+await using var ports = new ApplicationPortRuntimeBuilder()
+    .AddSignalInput(ackAddress)
+    .Build();
+
+await using var attachment = await ports.AttachSignalInputAsync(
+    ackAddress,
+    acknowledgementTarget);
+
+var accepted = await ports.GetSignalTarget(ackAddress)
+    .SendAsync(FlowMessage.Create("payload is ignored"));
+```
+
+Signal targets are component-owned. Stable-port completion, detachment, and
+revision replacement never call `Complete` or dispose the attached target.
+
 ```csharp
 var inputAddress = ApplicationAddress.WorkflowPort("Orders", "Validate", "Input");
 var outputAddress = ApplicationAddress.WorkflowPort("Orders", "Validate", "Output");

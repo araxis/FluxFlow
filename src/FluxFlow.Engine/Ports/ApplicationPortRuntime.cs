@@ -50,6 +50,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             {
                 Address = registration.Address,
                 Direction = registration.Direction,
+                Kind = registration.Kind,
                 PayloadType = registration.PayloadType,
                 Capacity = registration.Capacity
             };
@@ -169,9 +170,9 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
     {
         ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
+        var inputPort = GetInputPort(input);
         if (Volatile.Read(ref _completeRequested) != 0)
         {
-            var typedInput = GetInput<T>(input);
             Report(new ApplicationPortRejection
             {
                 Timestamp = DateTimeOffset.UtcNow,
@@ -183,12 +184,14 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             });
             return ValueTask.FromResult(new PortSendResult
             {
-                Port = typedInput.Address,
+                Port = inputPort.Address,
                 Status = PortSendStatus.Completed
             });
         }
 
-        return ValueTask.FromResult(GetInput<T>(input).TrySend(message));
+        return ValueTask.FromResult(inputPort is IApplicationSignalInputPort signalInput
+            ? signalInput.TrySend(message)
+            : GetInput<T>(input).TrySend(message));
     }
 
     public async Task<PortReceiveResult<T>> ReceiveAsync<T>(
@@ -301,6 +304,22 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
         return GetInput<T>(input).AttachAsync(target, cancellationToken);
     }
 
+    public ValueTask<IAsyncDisposable> AttachSignalInputAsync(
+        ApplicationAddress input,
+        IFlowSignalTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(target);
+        return GetSignalInput(input).AttachAsync(target, cancellationToken);
+    }
+
+    public IFlowSignalTarget GetSignalTarget(ApplicationAddress input)
+    {
+        ThrowIfDisposed();
+        return GetSignalInput(input);
+    }
+
     public IDisposable AttachOutput<T>(
         ApplicationAddress output,
         ISourceBlock<FlowMessage<T>> source)
@@ -318,7 +337,8 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             throw CreatePortException(link.Source, ApplicationPortDirection.Output);
         if (!_inputs.TryGetValue(link.Target, out var input))
             throw CreatePortException(link.Target, ApplicationPortDirection.Input);
-        if (output.PayloadType != input.PayloadType || output.PayloadType != link.MessageType)
+        if (output.PayloadType != link.MessageType ||
+            (input.Kind == ApplicationPortKind.Message && output.PayloadType != input.PayloadType))
         {
             throw new InvalidOperationException(
                 $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{link.MessageType}', " +
@@ -389,6 +409,9 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
     internal void ValidateRevisionInput<T>(ApplicationAddress address)
         => _ = GetInput<T>(address);
 
+    internal void ValidateRevisionSignalInput(ApplicationAddress address)
+        => _ = GetSignalInput(address);
+
     internal IPreparedApplicationOutput PrepareRevisionOutput<T>(
         ApplicationAddress address,
         ISourceBlock<FlowMessage<T>> source)
@@ -406,7 +429,8 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
                 throw CreatePortException(link.Source, ApplicationPortDirection.Output);
             if (!_inputs.TryGetValue(link.Target, out var input))
                 throw CreatePortException(link.Target, ApplicationPortDirection.Input);
-            if (output.PayloadType != input.PayloadType || output.PayloadType != link.MessageType)
+            if (output.PayloadType != link.MessageType ||
+                (input.Kind == ApplicationPortKind.Message && output.PayloadType != input.PayloadType))
             {
                 throw new InvalidOperationException(
                     $"Link '{link.Source}' to '{link.Target}' requires exact payload type '{link.MessageType}', " +
@@ -602,12 +626,30 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
 
     private ApplicationInputPort<T> GetInput<T>(ApplicationAddress address)
     {
-        ArgumentNullException.ThrowIfNull(address);
-        if (!_inputs.TryGetValue(address, out var input))
-            throw CreatePortException(address, ApplicationPortDirection.Input);
+        var input = GetInputPort(address);
         if (input is not ApplicationInputPort<T> typed)
             throw CreateTypeException(address, typeof(T), input.PayloadType);
         return typed;
+    }
+
+    private IApplicationInputPort GetInputPort(ApplicationAddress address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        if (!_inputs.TryGetValue(address, out var input))
+            throw CreatePortException(address, ApplicationPortDirection.Input);
+        return input;
+    }
+
+    private IApplicationSignalInputPort GetSignalInput(ApplicationAddress address)
+    {
+        var input = GetInputPort(address);
+        if (input is not IApplicationSignalInputPort signal)
+        {
+            throw new InvalidOperationException(
+                $"Application port '{address}' is a message input, not a signal input.");
+        }
+
+        return signal;
     }
 
     private ApplicationOutputPort<T> GetOutput<T>(ApplicationAddress address)

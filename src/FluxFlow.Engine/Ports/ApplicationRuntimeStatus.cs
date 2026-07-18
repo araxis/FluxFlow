@@ -24,6 +24,8 @@ public sealed record ApplicationPortStatus
 
     public required ApplicationPortDirection Direction { get; init; }
 
+    public ApplicationPortKind Kind { get; init; }
+
     public required Type PayloadType { get; init; }
 
     public required int Capacity { get; init; }

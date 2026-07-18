@@ -242,6 +242,7 @@ public sealed class CompositionValidator
 
         if (sourceRegistration.Outputs.TryGetValue(from.Port, out output)
             && targetRegistration.Inputs.TryGetValue(to.Port, out input)
+            && input.Kind != CompositionPortKind.Signal
             && output.MessageType != input.MessageType)
         {
             diagnostics.Add(new CompositionDiagnostic

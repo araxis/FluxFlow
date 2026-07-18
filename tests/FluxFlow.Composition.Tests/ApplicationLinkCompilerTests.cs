@@ -10,6 +10,40 @@ namespace FluxFlow.Composition.Tests;
 public sealed class ApplicationLinkCompilerTests
 {
     [Fact]
+    public void Compiler_allows_any_output_payload_to_target_a_signal_port()
+    {
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "source",
+                UnusedFactory,
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "signal",
+                UnusedFactory,
+                inputs: [CompositionPorts.SignalMetadata("Ack")]);
+        var definition = Parse(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Source": { "Type": "source", "Output": "Target.Ack" },
+                  "Target": { "Type": "signal" }
+                }
+              }
+            }
+            """);
+
+        var result = new ApplicationLinkCompiler(registry).Compile(definition);
+
+        result.IsValid.ShouldBeTrue();
+        var link = result.Links.ShouldHaveSingleItem();
+        link.Source.ShouldBe(ApplicationAddress.WorkflowPort("Main", "Source", "Output"));
+        link.Target.ShouldBe(ApplicationAddress.WorkflowPort("Main", "Target", "Ack"));
+        link.MessageType.ShouldBe(typeof(string));
+    }
+
+    [Fact]
     public void Compiler_normalizes_mixed_input_and_output_declarations()
     {
         var engine = new TestExpressionEngine();

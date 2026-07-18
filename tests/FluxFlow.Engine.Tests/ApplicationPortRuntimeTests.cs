@@ -20,6 +20,77 @@ public sealed class ApplicationPortRuntimeTests
         ApplicationAddress.WorkflowPort("Main", "Processor", "Input");
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("Main", "Source", "Output");
+    private static readonly ApplicationAddress Signal =
+        ApplicationAddress.WorkflowPort("Main", "Trigger", "Ack");
+
+    [Fact]
+    public async Task Stable_signal_input_accepts_multiple_payload_types_and_is_directly_addressable()
+    {
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddSignalInput(Signal, capacity: 3)
+            .Build();
+        var target = new RecordingSignalTarget();
+        await using var attachment = await runtime.AttachSignalInputAsync(Signal, target);
+
+        var first = FlowMessage.Create("first");
+        var second = FlowMessage.Create(42);
+        (await runtime.SendAsync(Signal, first)).IsAccepted.ShouldBeTrue();
+        (await runtime.SendAsync(Signal, second)).IsAccepted.ShouldBeTrue();
+        (await runtime.GetSignalTarget(Signal).SendAsync(FlowMessage.Create(true))).ShouldBeTrue();
+
+        await target.WaitForCountAsync(3);
+        target.Payloads.ShouldBe(["first", 42, true]);
+        target.TraceIds.Take(2).ShouldBe([first.TraceId, second.TraceId]);
+
+        var metadata = runtime.Ports.Single(port => port.Address == Signal);
+        metadata.Kind.ShouldBe(ApplicationPortKind.Signal);
+        metadata.PayloadType.ShouldBe(typeof(object));
+        runtime.Status.Ports.Single(port => port.Address == Signal)
+            .Kind.ShouldBe(ApplicationPortKind.Signal);
+    }
+
+    [Fact]
+    public async Task Compiled_routes_deliver_typed_outputs_to_signal_inputs()
+    {
+        await using var runtime = new ApplicationPortRuntimeBuilder()
+            .AddOutput<string>(Output)
+            .AddSignalInput(Signal)
+            .Build();
+        var target = new RecordingSignalTarget();
+        await using var targetAttachment = await runtime.AttachSignalInputAsync(Signal, target);
+        var source = new BufferBlock<FlowMessage<string>>();
+        using var sourceAttachment = runtime.AttachOutput(Output, source);
+
+        var definition = ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Source": { "Type": "source", "Output": "Trigger.Ack" },
+                  "Trigger": { "Type": "trigger" }
+                }
+              }
+            }
+            """);
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "source",
+                UnusedFactory,
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "trigger",
+                UnusedFactory,
+                inputs: [CompositionPorts.SignalMetadata("Ack")]);
+        var compilation = new ApplicationLinkCompiler(registry).Compile(definition);
+        compilation.IsValid.ShouldBeTrue();
+        using var route = runtime.Connect(compilation.Links.ShouldHaveSingleItem());
+
+        source.Post(Message("ack")).ShouldBeTrue();
+
+        await target.WaitForCountAsync(1);
+        target.Payloads.ShouldBe(["ack"]);
+    }
 
     [Fact]
     public async Task Direct_send_reports_unavailable_full_and_completed_without_waiting()
@@ -479,6 +550,8 @@ public sealed class ApplicationPortRuntimeTests
         await using var rejectedRevision = rejectedBuilder.Build();
         ((IDataflowBlock)faultedSource).Fault(new InvalidOperationException("source failed"));
         await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await faultedSource.Completion);
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
             await rejectedRevision.ActivateAsync());
 
         runtime.CurrentRevision!.RevisionId.ShouldBe("current");
@@ -677,5 +750,65 @@ public sealed class ApplicationPortRuntimeTests
         public void Complete() => _completion.TrySetResult();
 
         public void Fault(Exception exception) => _completion.TrySetException(exception);
+    }
+
+    private sealed class RecordingSignalTarget : IFlowSignalTarget
+    {
+        private readonly object _gate = new();
+        private readonly TaskCompletionSource _completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly List<object?> _payloads = [];
+        private readonly List<TraceId> _traceIds = [];
+
+        public Task Completion => _completion.Task;
+
+        public IReadOnlyList<object?> Payloads
+        {
+            get
+            {
+                lock (_gate)
+                    return _payloads.ToArray();
+            }
+        }
+
+        public IReadOnlyList<TraceId> TraceIds
+        {
+            get
+            {
+                lock (_gate)
+                    return _traceIds.ToArray();
+            }
+        }
+
+        public ValueTask<bool> SendAsync<T>(
+            FlowMessage<T> signal,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                _payloads.Add(signal.Payload);
+                _traceIds.Add(signal.TraceId);
+            }
+
+            return ValueTask.FromResult(true);
+        }
+
+        public async Task WaitForCountAsync(int count)
+        {
+            var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (DateTime.UtcNow < timeout)
+            {
+                lock (_gate)
+                {
+                    if (_payloads.Count >= count)
+                        return;
+                }
+
+                await Task.Delay(10);
+            }
+
+            throw new TimeoutException("Signal count was not reached before the test timeout.");
+        }
     }
 }

@@ -51,6 +51,24 @@ public sealed class CompositionNodeRegistrationTests
     }
 
     [Fact]
+    public void Signal_port_metadata_is_payload_independent()
+    {
+        var metadata = CompositionPorts.SignalMetadata(
+            "Ack",
+            CompositionPortLinkCardinality.Single);
+
+        metadata.Name.ShouldBe("Ack");
+        metadata.Kind.ShouldBe(CompositionPortKind.Signal);
+        metadata.MessageType.ShouldBe(typeof(object));
+        metadata.LinkCardinality.ShouldBe(CompositionPortLinkCardinality.Single);
+        Should.Throw<ArgumentException>(() => new CompositionPortMetadata(
+            "Ack",
+            typeof(string),
+            CompositionPortLinkCardinality.Multiple,
+            CompositionPortKind.Signal));
+    }
+
+    [Fact]
     public void Port_metadata_trims_names()
     {
         var metadata = CompositionPortMetadata.Create<string>(" Output ");

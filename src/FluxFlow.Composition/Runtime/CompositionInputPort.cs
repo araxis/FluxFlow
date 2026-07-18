@@ -5,16 +5,24 @@ namespace FluxFlow.Composition;
 
 public abstract class CompositionInputPort
 {
-    private protected CompositionInputPort(string name, Type messageType)
+    private protected CompositionInputPort(
+        string name,
+        Type messageType,
+        CompositionPortKind kind = CompositionPortKind.Message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!Enum.IsDefined(kind))
+            throw new ArgumentOutOfRangeException(nameof(kind));
         Name = name;
         MessageType = messageType ?? throw new ArgumentNullException(nameof(messageType));
+        Kind = kind;
     }
 
     public string Name { get; }
 
     public Type MessageType { get; }
+
+    public CompositionPortKind Kind { get; }
 
     internal abstract void Complete();
 
@@ -35,4 +43,24 @@ public sealed class CompositionInputPort<TMessage> : CompositionInputPort
 
     internal override void Fault(Exception exception)
         => ((IDataflowBlock)Target).Fault(exception);
+}
+
+public sealed class CompositionSignalInputPort : CompositionInputPort
+{
+    public CompositionSignalInputPort(string name, IFlowSignalTarget target)
+        : base(name, typeof(object), CompositionPortKind.Signal)
+    {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+    }
+
+    public IFlowSignalTarget Target { get; }
+
+    internal override void Complete()
+    {
+    }
+
+    internal override void Fault(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+    }
 }

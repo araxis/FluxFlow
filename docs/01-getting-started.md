@@ -37,16 +37,15 @@ The sample builds a pure in-memory workflow:
 source.Output -> upper.Input -> upper.Output -> sink.Input
 ```
 
-Run the MQTT-shaped composition sample when you want to see keyed adapter
-resources in the hosted composition path:
+Run the MQTT-shaped composition sample when you want to see a keyed logical
+client controller in the hosted composition path:
 
 ```sh
 dotnet run --project samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj
 ```
 
-That sample uses an in-memory `IMqttTriggerSource` and `IMqttPublisher` with
-the same `mqtt.trigger` and `mqtt.publish` factories a real adapter package
-would use.
+That sample uses an in-memory `IMqttClientController` with the same
+`mqtt.publish` factory used by a real provider-neutral client resource.
 
 ## Composition Flow
 

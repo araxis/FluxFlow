@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Composition;
@@ -19,6 +20,21 @@ public sealed class CompositionNodeFactoryContext
         NodeName = nodeName;
         Definition = definition ?? throw new ArgumentNullException(nameof(definition));
         _serializerOptions = serializerOptions ?? CompositionDefinitionJson.CreateSerializerOptions();
+    }
+
+    public CompositionNodeFactoryContext(
+        IServiceProvider services,
+        string workflowName,
+        string componentName,
+        ComponentDefinition definition,
+        JsonSerializerOptions? serializerOptions = null)
+        : this(
+            services,
+            workflowName,
+            componentName,
+            ToNodeDefinition(definition),
+            serializerOptions)
+    {
     }
 
     public IServiceProvider Services { get; }
@@ -61,6 +77,13 @@ public sealed class CompositionNodeFactoryContext
             return key.Trim();
         }
 
+        if (Configuration.TryGetValue(name, out var property) &&
+            property.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(property.GetString()))
+        {
+            return property.GetString()!.Trim();
+        }
+
         throw new InvalidOperationException(
             $"Node '{WorkflowName}.{NodeName}' requires resource '{name}', but no resource reference was configured.");
     }
@@ -88,12 +111,31 @@ public sealed class CompositionNodeFactoryContext
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
         var name = resourceName.Trim();
-        if (!Resources.TryGetValue(name, out var key)
-            || string.IsNullOrWhiteSpace(key))
+        if (!Resources.TryGetValue(name, out var key) || string.IsNullOrWhiteSpace(key))
         {
-            return null;
+            if (!Configuration.TryGetValue(name, out var property) ||
+                property.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(property.GetString()))
+            {
+                return null;
+            }
+
+            key = property.GetString()!;
         }
 
         return Services.GetKeyedService<TResource>(key.Trim());
+    }
+
+    private static NodeDefinition ToNodeDefinition(ComponentDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        return new NodeDefinition
+        {
+            Type = definition.Type,
+            Configuration = definition.Properties.ToDictionary(
+                static property => property.Key,
+                static property => property.Value,
+                StringComparer.Ordinal)
+        };
     }
 }

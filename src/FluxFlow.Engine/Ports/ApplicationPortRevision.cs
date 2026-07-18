@@ -47,6 +47,25 @@ public sealed class ApplicationPortRevisionBuilder : IAsyncDisposable
         return this;
     }
 
+    public ApplicationPortRevisionBuilder ReplaceSignalInput(
+        ApplicationAddress address,
+        IFlowSignalTarget target)
+    {
+        ThrowIfUnavailable();
+        ArgumentNullException.ThrowIfNull(target);
+        _runtime.ValidateRevisionSignalInput(address);
+        AddInputReplacement(address, target);
+        return this;
+    }
+
+    public ApplicationPortRevisionBuilder RemoveSignalInput(ApplicationAddress address)
+    {
+        ThrowIfUnavailable();
+        _runtime.ValidateRevisionSignalInput(address);
+        AddInputReplacement(address, target: null);
+        return this;
+    }
+
     public ApplicationPortRevisionBuilder AttachOutput<T>(
         ApplicationAddress address,
         ISourceBlock<FlowMessage<T>> source)

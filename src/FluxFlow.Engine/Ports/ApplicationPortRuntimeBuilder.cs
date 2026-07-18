@@ -50,9 +50,26 @@ public sealed class ApplicationPortRuntimeBuilder
         Add(new PortRegistration(
             address,
             ApplicationPortDirection.Input,
+            ApplicationPortKind.Message,
             typeof(T),
             capacity,
             (report, activity) => new ApplicationInputPort<T>(address, capacity, report, activity),
+            null));
+        return this;
+    }
+
+    public ApplicationPortRuntimeBuilder AddSignalInput(
+        ApplicationAddress address,
+        int capacity = DefaultInputCapacity)
+    {
+        ValidateAddress(address, ApplicationPortDirection.Input);
+        Add(new PortRegistration(
+            address,
+            ApplicationPortDirection.Input,
+            ApplicationPortKind.Signal,
+            typeof(object),
+            capacity,
+            (report, activity) => new ApplicationSignalInputPort(address, capacity, report, activity),
             null));
         return this;
     }
@@ -107,6 +124,7 @@ public sealed class ApplicationPortRuntimeBuilder
         => new(
             address,
             ApplicationPortDirection.Output,
+            ApplicationPortKind.Message,
             typeof(T),
             capacity,
             null,
@@ -120,6 +138,7 @@ public sealed class ApplicationPortRuntimeBuilder
     internal sealed record PortRegistration(
         ApplicationAddress Address,
         ApplicationPortDirection Direction,
+        ApplicationPortKind Kind,
         Type PayloadType,
         int Capacity,
         Func<Action<ApplicationPortRejection>, Action<ApplicationPortActivity>, IApplicationInputPort>? CreateInput,
