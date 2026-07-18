@@ -41,20 +41,15 @@ The canonical registrations expose `Events` and no universal error port.
     }
   },
   "Workflows": {
-    "NormalizeOrder": {
-      "ParseOrder": {
+    "Conversions": {
+      "ParseInbound": {
         "Type": "json.parse",
         "clock": "Resources.ConversionClock",
         "allowTrailingCommas": false,
-        "maxInputBytes": 1048576,
-        "Output": "MapOrder.Input"
+        "maxInputBytes": 1048576
       },
-      "MapOrder": {
-        "Type": "flow.mapper"
-      },
-      "WriteOrder": {
+      "WriteOutbound": {
         "Type": "json.stringify",
-        "Input": "MapOrder.Output",
         "writeIndented": false,
         "maxOutputBytes": 1048576
       }
@@ -63,9 +58,11 @@ The canonical registrations expose `Events` and no universal error port.
 }
 ```
 
-Links may be declared once on either side; the example shows both forms for
-illustration, not duplicate declarations for the same edge. Component settings
-and resource references remain flat. Addresses are exact, ordinal, and
+The example leaves both component ports available for direct runtime access or
+for type-compatible workflow links. A `FlowResult<T>` output is not implicitly
+unwrapped into a `T` input; use an explicit result-aware component when chaining
+a conversion result into another typed operation. Component settings and
+resource references remain flat. Addresses are exact, ordinal, and
 case-sensitive.
 
 `clock` is an optional keyed `TimeProvider` using a `Resources.{name}` address.
