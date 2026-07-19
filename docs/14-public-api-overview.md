@@ -441,20 +441,27 @@ Main types:
 - `ValidationCompositionPortNames`
 - `ValidationCompositionResourceNames`
 
-Use `RegisterJsonSchemaValidator<TInput>()` from the optional
-`FluxFlow.Components.Validation.Composition` package when a composition host
-wants closed generic `json.schema-validator` node factories. The factory binds
+Use parameterless `RegisterJsonSchemaValidator()` from the optional
+`FluxFlow.Components.Validation.Composition` package for the canonical fixed
+`json.schema-validator` factory. It consumes `FlowValue` and emits one
+`FlowResult<JsonSchemaFlowValueValidationResult>` output. Valid and invalid
+schema outcomes are normal successful result kinds; selector or evaluation
+failures remain normal error results. The factory binds
 `JsonSchemaValidatorOptions`, compiles inline `schema` or `schemaPath` during
-composition build, and resolves optional keyed typed selector and clock
-resources through the host.
+composition build, and resolves optional host-owned
+`IJsonSchemaFlowValueSelector` and clock resources through exact
+`Resources.{name}` addresses.
 Invalid validator options fail during build as factory diagnostics when the host
 is configured to collect build failures.
+
+Explicit `RegisterJsonSchemaValidator<TInput>(customNodeType)` remains available
+for hosts migrating the prior generic Output/Valid/Invalid/Errors contract.
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `json.schema-validator` composition node so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
-The metadata includes editable options, fixed ports, and resource hints for the
-optional `selector` and `clock` resources.
+The metadata includes editable options, the fixed FlowValue/single-result port
+pair, and resource hints for the optional `selector` and `clock` resources.
 
 ## Timers Composition
 

@@ -1,11 +1,15 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Validation.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Validation.Composition;
 
 public sealed class ValidationComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
+    // Explicit generic registrations retain ValidationCompositionPortNames.Valid
+    // and ValidationCompositionPortNames.Invalid as compatibility-only ports.
+    // Fixed canonical metadata intentionally exposes only Input and Output.
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateJsonSchemaValidatorMetadata()];
 
@@ -14,7 +18,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
             .WithDisplay(
                 displayName: "JSON Schema Validator",
                 category: "Validation",
-                summary: "Validates input messages against an inline or path-based JSON schema.",
+                summary: "Validates immutable workflow values against an inline or path-based JSON schema.",
                 iconKey: "shield-check",
                 preferredNodeName: "validate",
                 suggestedEditorWidth: 460)
@@ -50,7 +54,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: JsonSchemaValidatorOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                helperText: "Diagnostic type metadata; the canonical input is FlowValue.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -92,10 +96,10 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Selector",
                 order: 0,
                 summary: "Optional keyed JSON schema value selector used to choose the value to validate.",
-                valueType: "IJsonSchemaValueSelector<TInput>",
+                valueType: "IJsonSchemaFlowValueSelector",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
-                    keyPattern: "selector:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 ValidationCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -104,36 +108,22 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddInputPort(
                 ValidationCompositionPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
-                summary: "Input message to validate.",
-                valueType: "TInput",
+                summary: "Immutable workflow value to validate.",
+                valueType: nameof(FlowValue),
                 isPrimary: true)
             .AddOutputPort(
                 ValidationCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "JSON schema validation result.",
-                valueType: "JsonSchemaValidationResult<TInput>",
+                summary: "Normal valid, invalid, or processing-failure result.",
+                valueType: "FlowResult<JsonSchemaFlowValueValidationResult>",
                 isPrimary: true)
-            .AddOutputPort(
-                ValidationCompositionPortNames.Valid,
-                displayName: "Valid",
-                group: "Branches",
-                order: 2,
-                summary: "Original input when validation succeeds.",
-                valueType: "TInput")
-            .AddOutputPort(
-                ValidationCompositionPortNames.Invalid,
-                displayName: "Invalid",
-                group: "Branches",
-                order: 3,
-                summary: "Original input when validation fails.",
-                valueType: "TInput")
             .Build();
 }

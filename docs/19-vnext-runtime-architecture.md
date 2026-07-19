@@ -6,9 +6,9 @@ This record defines the target architecture for the next major FluxFlow line.
 The data foundation, canonical definition/address, link compilation, stable
 port, system-signal, immutable DI provider-snapshot, transactional revision,
 MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
-Payloads inspection, and explicit canonical Serialization conversions are
-implemented locally. The remaining component families are migrated
-incrementally.
+Payloads inspection, explicit canonical Serialization conversions, and
+canonical FlowValue JSON Schema Validation are implemented locally. The
+remaining component families are migrated incrementally.
 
 ## Package Ownership
 
@@ -208,8 +208,8 @@ subscription events use the explicit `mqtt.events` domain stream; component
 activity remains diagnostics and there is no universal State or Error port.
 
 The existing 4.x declarations remain temporarily available. Concrete adapter
-SPI implementation, shared conformance tests, and canonical Composition
-resource/node binding are the next coordinated MQTT milestone.
+SPI implementations, shared conformance tests, and canonical Composition
+resource/node binding are complete locally.
 
 ## Delivery Sequence
 
@@ -224,7 +224,9 @@ resource/node binding are the next coordinated MQTT milestone.
 8. MQTT core resource/component vertical slice. Complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
-10. Remaining component families, Designer, hosting, and coordinated releases.
+10. Component-family migration is in progress: Mapping, Payloads,
+    Serialization, and Validation are complete locally. Assertions is next;
+    Designer, hosting, and coordinated releases follow the component passes.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

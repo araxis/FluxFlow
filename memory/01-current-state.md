@@ -1,14 +1,14 @@
 # Current State
 
-Date: 2026-07-18
+Date: 2026-07-19
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/serialization-vnext`. The provider-neutral MQTT vertical slice and the
-  first three normal component-family migrations, canonical FlowValue Mapping,
-  FlowContent Payloads, and FlowContent/FlowValue Serialization, are
-  implemented and verified locally.
+  `work/validation-vnext`. The provider-neutral MQTT vertical slice and the
+  first four normal component-family migrations, canonical FlowValue Mapping,
+  FlowContent Payloads, FlowContent/FlowValue Serialization, and FlowValue
+  Validation, are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -23,9 +23,9 @@ Date: 2026-07-18
   dry-runs passed.
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
-  transactional-revision milestones. MQTT, Mapping, Payloads, and Serialization
-  now use this foundation; the remaining component-family migrations continue
-  separately. See
+  transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
+  and Validation now use this foundation; the remaining component-family
+  migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -126,8 +126,22 @@ Date: 2026-07-18
   is `2.0.0` with canonical fixed ports, explicit concrete factories, no
   universal Errors port, and a host-owned `Resources.{name}` clock. Focused and
   full tests, zero-warning controlled builds, binary compatibility, release
-  preflight/dry-runs, and a package-only consumer passed. Validation is the next
-  bounded family. See `218-vnext-serialization-flowcontent-flowvalue.md`.
+  preflight/dry-runs, and a package-only consumer passed. Validation followed
+  as the next bounded family. See
+  `218-vnext-serialization-flowcontent-flowvalue.md`.
+- `FluxFlow.Components.Validation` is now `4.0.0` locally with a canonical
+  `FlowValueJsonSchemaValidatorNode` that emits valid and invalid evaluations,
+  plus expected selector and schema failures, as one normal
+  `FlowResult<JsonSchemaFlowValueValidationResult>` stream. The transport-neutral
+  selector returns `FlowValue`, deterministic conversion supplies ordinary JSON
+  schema semantics, and message lineage is preserved. The generic standalone
+  node and contracts remain available for code-authored compatibility.
+  `FluxFlow.Components.Validation.Composition` is `2.0.0` with canonical fixed
+  ports, no legacy branch or universal Errors ports, and host-owned
+  `Resources.{name}` selector and clock addresses. Focused/full tests,
+  zero-warning controlled builds, binary compatibility, release
+  preflight/dry-runs, and a package-only consumer passed. Assertions is the
+  next bounded family. See `219-vnext-validation-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

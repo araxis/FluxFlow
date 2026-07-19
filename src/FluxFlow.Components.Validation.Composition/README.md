@@ -1,104 +1,100 @@
 # FluxFlow.Components.Validation.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone JSON
-schema validator node from `FluxFlow.Components.Validation`.
-
-This package does not scan assemblies, resolve CLR types from strings, watch
-schema files, or own schema resources. Hosts register closed validator node
-types explicitly and provide any optional keyed selector or clock services.
+Composition registration and Designer metadata for canonical JSON Schema
+validation over immutable `FlowValue`. The package binds flat component
+settings and resolves optional host-owned selector and clock resources; it does
+not own resources, scan assemblies, watch schema files, or require Engine.
 
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<IJsonSchemaValueSelector<OrderMessage>>(
-    "payload",
-    new OrderPayloadSelector());
-
 services
     .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterJsonSchemaValidator<OrderMessage>());
+    .RegisterNodes(registry => registry.RegisterJsonSchemaValidator());
 ```
 
-Use custom node type names when a host needs more than one input shape:
+| Type | Input | Output |
+|------|-------|--------|
+| `json.schema-validator` | `FlowValue` | `FlowResult<JsonSchemaFlowValueValidationResult>` |
 
-```csharp
-registry
-    .RegisterJsonSchemaValidator<OrderMessage>("json.schema-validator.order")
-    .RegisterJsonSchemaValidator<HttpMessage>("json.schema-validator.http");
-```
+Valid schema matches use result kind `Valid`. Schema rejection uses `Invalid`
+with issues and is not an error. Missing input, selector failure, and evaluation
+failure use stable error variants on the same Output. The fixed registration
+exposes Events and no Valid, Invalid, or universal Errors ports.
 
-## Node Types
-
-| Type | Node | Optional resources | Ports |
-|------|------|--------------------|-------|
-| `json.schema-validator` | `JsonSchemaValidatorNode<TInput>` | `selector`, `clock` | `Input`, `Output`, `Valid`, `Invalid` |
-
-`Output` emits `JsonSchemaValidationResult<TInput>`. `Valid` and `Invalid`
-emit the original `TInput` message with the input correlation id.
-
-`selector` is an optional keyed `IJsonSchemaValueSelector<TInput>` resource for
-selecting the value to validate. `clock` is an optional keyed `TimeProvider`
-resource for deterministic result and diagnostic timestamps.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "validate-order": {
-              "type": "json.schema-validator",
-              "resources": {
-                "selector": "payload",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "schema": {
-                  "type": "object",
-                  "required": [ "id" ],
-                  "properties": {
-                    "id": { "type": "string" }
-                  }
-                },
-                "schemaId": "orders",
-                "valueSelector": "payload",
-                "inputType": "app.order",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Validation": {
+      "OrderBody": {
+        "Type": "host.validation-selector"
+      }
+    },
+    "Clocks": {
+      "Business": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "ValidateOrder": {
+        "Type": "json.schema-validator",
+        "selector": "Resources.Validation.OrderBody",
+        "clock": "Resources.Clocks.Business",
+        "schema": {
+          "type": "object",
+          "required": [ "id", "total" ],
+          "properties": {
+            "id": { "type": "string" },
+            "total": { "type": "number" }
+          }
+        },
+        "schemaId": "orders",
+        "valueSelector": "body",
+        "boundedCapacity": 128
       }
     }
   }
 }
 ```
 
-`schemaPath` is also supported and is read during composition build. The node
-does not perform file I/O or schema compilation in its message pump.
+Components, settings, resource references, and port links remain flat. Resource
+addresses are exact, ordinal, and case-sensitive. `schemaPath` is read only
+during composition build; the message pump performs no file I/O or schema
+compilation.
 
-`JsonSchemaValidatorOptions.InputType` remains diagnostic metadata. The actual
-composition port type comes from the closed generic registration selected by the
-host.
+The host registers the referenced `IJsonSchemaFlowValueSelector` and
+`TimeProvider` keyed services and owns their lifetime. Both Designer resource
+pickers use `Resources.{name}` addresses.
 
-Invalid `JsonSchemaValidatorOptions`, such as blank `inputType` or non-positive
-`boundedCapacity`, fail during composition build and surface as factory
-diagnostics when build failures are configured as diagnostics.
+## Typed Compatibility Registration
+
+The explicit generic overload preserves the previous node and port shape:
+
+```csharp
+registry.RegisterJsonSchemaValidator<OrderMessage>(
+    "json.schema-validator.legacy-order");
+```
+
+That custom type uses `JsonSchemaValidatorNode<OrderMessage>`,
+`IJsonSchemaValueSelector<OrderMessage>`, and Output, Valid, Invalid, Errors,
+and Events. Hosts must choose a custom node type so it does not replace the
+canonical fixed registration.
+
+## Result Boundary
+
+The Output payload is a typed `FlowResult<JsonSchemaFlowValueValidationResult>`.
+Links do not implicitly extract its Value. Conditions may route by result kind
+or error state, and an explicit result-aware mapper or component can extract
+the validation value when a downstream `FlowValue` input is required.
 
 ## Design Metadata
 
-`ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `json.schema-validator` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes node options, ports, option grouping/editor hints, and
-resource hints for the optional `selector` and `clock` resources. Host-owned
-resource metadata also includes key-pattern hints for selector and clock
-services. These resources remain host-owned composition resources and are not
-exposed as editable node options.
+`ValidationComponentDesignMetadataProvider` describes the fixed FlowValue Input
+and single FlowResult Output, schema/selection/runtime option hints, and optional
+host-owned selector and clock pickers. The metadata is descriptive only; hosts
+own palette rendering, persistence, validation display, resource registration,
+activation, and runtime mapping.

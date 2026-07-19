@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Validation.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Validation.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation.Composition</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone JSON schema validator nodes over host-owned keyed selector and clock resources.</Description>
+    <Description>Optional FluxFlow.Composition registration for canonical FlowValue JSON Schema validation, with preserved generic compatibility registration.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes FlowValue validation with one normal FlowResult output the fixed JSON Schema composition contract while retaining explicit generic compatibility registration.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

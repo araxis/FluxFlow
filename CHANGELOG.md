@@ -7,6 +7,34 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Validation 4.0.0
+
+Adds canonical JSON Schema validation over immutable workflow values while
+preserving the generic validator for code-authored compatibility.
+
+- Adds `FlowValueJsonSchemaValidatorNode` with one
+  `FlowResult<JsonSchemaFlowValueValidationResult>` output and Events.
+- Keeps valid and invalid schema outcomes as successful result variants;
+  missing input, selector failure, and evaluation failure use stable normal
+  error variants without a universal error port.
+- Adds a transport-neutral FlowValue selector contract and deterministic
+  ordinary JSON conversion for every FlowValue kind.
+- Preserves `JsonSchemaValidatorNode<TInput>`, its typed selector, branch ports,
+  Errors port, and existing request/result contracts.
+
+## FluxFlow.Components.Validation.Composition 2.0.0
+
+Makes FlowValue validation the fixed `json.schema-validator` composition
+contract.
+
+- Changes the fixed ports to `FlowValue` Input and one
+  `FlowResult<JsonSchemaFlowValueValidationResult>` Output.
+- Resolves optional host-owned FlowValue selector and clock resources through
+  exact `Resources.{name}` addresses.
+- Keeps explicit generic registration available under host-selected custom node
+  type names for compatibility.
+- Updates Designer metadata to the canonical single-output contract.
+
 ## FluxFlow.Components.Serialization 4.0.0
 
 Adds explicit canonical conversions while preserving the request-based nodes

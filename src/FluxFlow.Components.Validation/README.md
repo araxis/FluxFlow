@@ -1,107 +1,117 @@
 # FluxFlow.Components.Validation
 
-A standalone JSON schema validator node for FluxFlow. It depends only on
-`FluxFlow.Nodes` — no engine, registry, or runtime. You `new` the node and
-`LinkTo` the next one.
+Standalone JSON Schema validation for immutable workflow values. The package
+depends on `FluxFlow.Data` and `FluxFlow.Nodes`, not Engine or JSON composition.
 
-## Node
+## Canonical Node
 
-| Node | Shape | Purpose |
-|------|-------|---------|
-| `JsonSchemaValidatorNode<TInput>` | `Input` -> `Output` (result), `Valid`, `Invalid` | Validates a selected value with a JSON schema. |
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowValueJsonSchemaValidatorNode` | `FlowMessage<FlowValue>` | `FlowMessage<FlowResult<JsonSchemaFlowValueValidationResult>>` |
 
-Every message travels as a `FlowMessage<T>` envelope. The validation result is
-broadcast on `Output` as `FlowMessage<JsonSchemaValidationResult<TInput>>`; the
-original input is fanned to `Valid` or `Invalid` (each `FlowMessage<TInput>`).
-All three carry the same correlation id as the input.
+The canonical node evaluates ordinary JSON semantics represented by
+`FlowValue`. Objects, arrays, scalar numeric kinds, strings, booleans, null,
+binary values, temporal values, durations, and GUIDs are converted
+deterministically for JSON Schema evaluation without changing the input value.
 
 ```csharp
-var schema = new JsonSchemaValidatorOptions
+var options = new JsonSchemaValidatorOptions
 {
     Schema = JsonSerializer.SerializeToElement(new
     {
         type = "object",
-        required = new[] { "id" },
-        properties = new { id = new { type = "string" } }
+        required = new[] { "id", "total" },
+        properties = new
+        {
+            id = new { type = "string" },
+            total = new { type = "number" }
+        }
     }),
     SchemaId = "orders"
-}.LoadSchema();
+};
 
-await using var node = new JsonSchemaValidatorNode<JsonElement>(schema, schemaId: "orders");
+await using var node = new FlowValueJsonSchemaValidatorNode(
+    options.LoadSchema(),
+    schemaId: options.SchemaId,
+    options: options);
 
-node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
-node.Valid.LinkTo(validSink, new DataflowLinkOptions { PropagateCompletion = false });
-node.Invalid.LinkTo(invalidSink, new DataflowLinkOptions { PropagateCompletion = false });
-
-await node.Input.SendAsync(FlowMessage.Create(order));
+node.Output.LinkTo(resultSink);
+await node.Input.SendAsync(FlowMessage.Create(orderValue));
 ```
 
-`JsonSchemaValidatorOptions.LoadSchema()` compiles the schema once (from inline
-`Schema` or `SchemaPath`), so the node never performs File I/O or compilation in
-its pump. A missing or malformed schema throws `InvalidOperationException` at
-that point — configuration mistakes fail fast.
-Node construction also validates option shape before the pipeline is created:
-blank `InputType` and non-positive `BoundedCapacity` values fail with
-`json.schema-validator` construction errors.
+`Valid` and `Invalid` are both successful result kinds. The domain result keeps
+the exact input and selected `FlowValue`, an `IsValid` flag, schema identity,
+selector name, timestamp, and structured validation issues. Missing input,
+selector failure, and schema evaluation failure use stable error result kinds
+and `FlowError` codes on the same Output. Later inputs continue after expected
+failures.
 
-## Value selectors
+The canonical node has `Input`, `Output`, and `Events`. It does not expose
+universal Errors or branch ports. Message correlation, trace, headers, and
+causation are preserved through `FlowMessage.With(...)`.
 
-By default the node validates the whole payload. Pass an
-`IJsonSchemaValueSelector<TInput>` to select a value from the payload (e.g. an
-inner property), plus a `valueSelector` name carried into the validation result
-and selector context:
+## Value Selection
+
+The default selector validates the complete input. Implement
+`IJsonSchemaFlowValueSelector` when a component should validate a nested value:
 
 ```csharp
-var node = new JsonSchemaValidatorNode<AppMessage>(
-    schema,
-    selector: new PayloadSelector(),
-    valueSelector: "payload");
+public sealed class BodySelector : IJsonSchemaFlowValueSelector
+{
+    public FlowValue Select(
+        FlowValue input,
+        JsonSchemaValidatorContext context)
+        => input.GetObject()["body"];
+}
 ```
 
-The node accepts `JsonElement`, `JsonDocument`, `JsonNode`, `byte[]`, `string`
-(parsed as JSON when possible, otherwise treated as a string value), and plain
-objects (serialized) as selected values.
+The selected value remains a `FlowValue`; selectors do not introduce arbitrary
+CLR object conversion. The configured `valueSelector` is descriptive context
+for the selector and result. `payloadSelector` remains a compatibility alias.
 
-## Behavior
+## Schema And Timing
 
-Invalid data is not an error: the node emits a result and routes the original
-input to `Invalid`. Value-selection, value-conversion, and schema-evaluation
-failures emit a `FlowError` on `Errors` (carrying the input's correlation id and
-a `Code` from `ValidationErrorCodes`) and the node keeps processing later
-messages. A one-time `json.schema-validator.loaded` event is emitted on
-construction, and per-message `valid`/`invalid`/`failed` events flow on the
-`Events` port.
+`JsonSchemaValidatorOptions.LoadSchema()` compiles inline `Schema` or
+`SchemaPath` once before the node processes messages. Missing or malformed
+schemas fail activation. Blank `InputType` and non-positive `BoundedCapacity`
+also reject construction.
 
-## Runtime timing
+Results and Events use the supplied `TimeProvider`, defaulting to
+`TimeProvider.System`. The package does not own schema files, selectors,
+clocks, or their lifetimes.
 
-Validation results use the node's clock for `Timestamp` (default
-`TimeProvider.System`). Provide a deterministic clock for tests:
+## Compatibility Node
 
-```csharp
-new JsonSchemaValidatorNode<JsonElement>(schema, clock: new FakeTimeProvider(timestamp));
-```
+`JsonSchemaValidatorNode<TInput>` remains available unchanged. It emits
+`JsonSchemaValidationResult<TInput>` on Output, fans the original message to
+Valid or Invalid, and reports selection/conversion/evaluation failures through
+its legacy Errors port. `IJsonSchemaValueSelector<TInput>` remains available
+for that code-authored surface.
+
+New composition definitions should use the canonical FlowValue node. The
+generic node is retained for explicit migration and strongly typed hosts.
 
 ## Composition
 
-The optional `FluxFlow.Components.Validation.Composition` package registers
-closed generic `json.schema-validator` factories for `FluxFlow.Composition`.
-The adapter binds `JsonSchemaValidatorOptions`, compiles inline `schema` or
-`schemaPath` during composition build, and resolves optional host-owned keyed
-`IJsonSchemaValueSelector<TInput>` and `TimeProvider` resources.
+`FluxFlow.Components.Validation.Composition` registers the canonical fixed
+`json.schema-validator` type with parameterless `RegisterJsonSchemaValidator()`.
+The adapter binds options, loads the schema during composition build, and
+resolves optional host-owned `IJsonSchemaFlowValueSelector` and `TimeProvider`
+resources.
 
 ```csharp
 services
     .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterJsonSchemaValidator<JsonElement>());
+    .RegisterNodes(registry => registry.RegisterJsonSchemaValidator());
 ```
 
-Use custom node type strings for multiple input shapes, for example
-`json.schema-validator.order` and `json.schema-validator.http`. `InputType`
-remains diagnostic metadata; the CLR port type comes from the closed generic
-registration.
-Invalid `JsonSchemaValidatorOptions`, such as blank `inputType` or non-positive
-`boundedCapacity`, fail during composition build and surface as factory
-diagnostics when build failures are configured as diagnostics. JSON schema
-loading and selector behavior remain owned by the validator package and the
-host-provided resources, not by Designer metadata.
+The explicit generic overload remains available under a custom node type:
+
+```csharp
+registry.RegisterJsonSchemaValidator<OrderMessage>(
+    "json.schema-validator.legacy-order");
+```
+
+`FlowResult<T>` is a real typed output. FluxFlow does not implicitly unwrap its
+`Value` into a downstream `T` input; route it to a result-aware component or use
+an explicitly registered mapper for that result type.

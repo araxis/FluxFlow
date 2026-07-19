@@ -486,6 +486,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `218-vnext-serialization-flowcontent-flowvalue.md`: canonical explicit
   JSON/Text/Base64 conversions between `FlowContent` and `FlowValue`, normal
   result failures, preserved request-based compatibility, and package evidence.
+- `219-vnext-validation-flowvalue.md`: canonical `FlowValue` JSON Schema
+  validation with valid/invalid normal results, preserved generic compatibility,
+  explicit typed-result boundaries, and Composition/package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

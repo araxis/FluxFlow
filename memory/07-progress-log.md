@@ -2,6 +2,28 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue Validation
+
+- Added canonical `FlowValueJsonSchemaValidatorNode` with one normal
+  `FlowResult<JsonSchemaFlowValueValidationResult>` output and Events. Valid and
+  invalid evaluations are successful variants; expected selector and schema
+  failures remain normal workflow data.
+- Added the transport-neutral `IJsonSchemaFlowValueSelector` and deterministic
+  ordinary-JSON conversion while preserving exact values, validation issues,
+  schema metadata, and message lineage.
+- Migrated parameterless Validation Composition registration and Designer
+  metadata to the canonical fixed ports and `Resources.{name}` selector/clock
+  addresses. The existing generic node and registration remain available for
+  code-authored compatibility.
+- Moved Validation to `4.0.0` and Validation Composition to `2.0.0`, updated
+  package docs/changelog/API baseline, and documented that typed results are not
+  implicitly unwrapped on links.
+- Passed 2,021 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds, binary compatibility, two release preflights/dry-runs,
+  and a package-only net8 consumer. Full evidence is in
+  [[219-vnext-validation-flowvalue]].
+- Assertions is the next separately bounded component-family migration.
+
 ## 2026-07-18 - vNext FlowContent And FlowValue Serialization
 
 - Added six canonical standalone nodes for explicit JSON, text, and Base64
@@ -21,7 +43,7 @@ Date: 2026-05-31
   Debug/Release builds, binary compatibility, two release preflights/dry-runs,
   and a package-only net8 consumer. Full evidence is in
   [[218-vnext-serialization-flowcontent-flowvalue]].
-- Validation is the next separately bounded component-family migration.
+- Validation followed as the next bounded component-family migration.
 
 ## 2026-07-18 - vNext FlowContent Payload Inspection
 

@@ -7,6 +7,7 @@ using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,6 +19,22 @@ namespace FluxFlow.Components.Validation.Composition.Tests;
 
 public sealed class ValidationCompositionNodeRegistryExtensionsTests
 {
+    [Fact]
+    public void RegisterJsonSchemaValidator_registers_canonical_flow_value_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterJsonSchemaValidator();
+
+        var validator =
+            registry.Registrations[ValidationCompositionNodeTypes.JsonSchemaValidator];
+        validator.Inputs.Keys.ShouldBe([ValidationCompositionPortNames.Input]);
+        validator.Inputs[ValidationCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(FlowValue));
+        validator.Outputs.Keys.ShouldBe([ValidationCompositionPortNames.Output]);
+        validator.Outputs[ValidationCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(FlowResult<JsonSchemaFlowValueValidationResult>));
+    }
+
     [Fact]
     public void RegisterJsonSchemaValidator_registers_closed_validator_metadata()
     {
@@ -89,7 +106,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             resource.Order,
             resource.IsRequired,
             resource.ValueType?.Value)).ShouldBe([
-            (ValidationCompositionResourceNames.Selector, 0, false, "IJsonSchemaValueSelector<TInput>"),
+            (ValidationCompositionResourceNames.Selector, 0, false, "IJsonSchemaFlowValueSelector"),
             (ValidationCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
         ]);
     }
@@ -107,10 +124,8 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (ValidationCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-            (ValidationCompositionPortNames.Output, PortDirection.Output, 1, true, "JsonSchemaValidationResult<TInput>"),
-            (ValidationCompositionPortNames.Valid, PortDirection.Output, 2, false, "TInput"),
-            (ValidationCompositionPortNames.Invalid, PortDirection.Output, 3, false, "TInput")
+            (ValidationCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+            (ValidationCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<JsonSchemaFlowValueValidationResult>")
         ]);
     }
 
@@ -156,11 +171,11 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         AssertResourceHints(
             resources[ValidationCompositionResourceNames.Selector],
             ResourceDesignMetadataAttributeValues.Selector,
-            "selector:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[ValidationCompositionResourceNames.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
@@ -175,6 +190,107 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull();
         metadata.Type.ShouldBe(new ComponentType(ValidationCompositionNodeTypes.JsonSchemaValidator));
+    }
+
+    [Fact]
+    public async Task Hosted_canonical_validator_emits_valid_and_invalid_normal_results()
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "validate",
+                    ValidationCompositionNodeTypes.JsonSchemaValidator,
+                    node => node
+                        .Configure("schema", OrderSchemaJson())
+                        .Configure("schemaId", "orders")
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterJsonSchemaValidator())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await provider.GetServices<IHostedService>().ShouldHaveSingleItem()
+            .StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var validatorNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
+        var input = validatorNode.Descriptor.Inputs[ValidationCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        var output = validatorNode.Descriptor.Outputs[ValidationCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<JsonSchemaFlowValueValidationResult>>>();
+        validatorNode.Descriptor.Outputs.Keys.ShouldBe([ValidationCompositionPortNames.Output]);
+        validatorNode.Descriptor.Errors.ShouldBeNull();
+        var results = new BufferBlock<
+            FlowMessage<FlowResult<JsonSchemaFlowValueValidationResult>>>();
+        output.Source.LinkTo(results);
+
+        await input.Target.SendAsync(FlowMessage.Create(Order("A-001", FlowValue.From(10L))));
+        await input.Target.SendAsync(FlowMessage.Create(Order("A-002", FlowValue.From("wrong"))));
+
+        var valid = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        var invalid = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        valid.Kind.ShouldBe(ValidationResultKinds.Valid);
+        valid.IsError.ShouldBeFalse();
+        valid.Value.ShouldNotBeNull().SchemaId.ShouldBe("orders");
+        invalid.Kind.ShouldBe(ValidationResultKinds.Invalid);
+        invalid.IsError.ShouldBeFalse();
+        invalid.Value.ShouldNotBeNull().Issues.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task Hosted_canonical_validator_uses_flow_value_selector_and_clock_resources()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-07-18T19:00:00Z");
+        var selector = new BodyFlowValueSelector();
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IJsonSchemaFlowValueSelector>("body", selector);
+        services.AddKeyedSingleton<TimeProvider>("fixed", new FakeTimeProvider(timestamp));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "validate",
+                    ValidationCompositionNodeTypes.JsonSchemaValidator,
+                    node => node
+                        .Resource(ValidationCompositionResourceNames.Selector, "body")
+                        .Resource(ValidationCompositionResourceNames.Clock, "fixed")
+                        .Configure("schema", OrderSchemaJson())
+                        .Configure("valueSelector", "body")
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterJsonSchemaValidator())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await provider.GetServices<IHostedService>().ShouldHaveSingleItem()
+            .StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var validatorNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
+        var input = validatorNode.Descriptor.Inputs[ValidationCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        var output = validatorNode.Descriptor.Outputs[ValidationCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<JsonSchemaFlowValueValidationResult>>>();
+        var results = new BufferBlock<
+            FlowMessage<FlowResult<JsonSchemaFlowValueValidationResult>>>();
+        output.Source.LinkTo(results);
+        var body = Order("A-003", FlowValue.From(30L));
+        var message = FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["body"] = body
+        });
+
+        await input.Target.SendAsync(FlowMessage.Create(message));
+
+        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload.Value.ShouldNotBeNull();
+        selector.Calls.ShouldBe(1);
+        selector.LastValueSelector.ShouldBe("body");
+        result.Timestamp.ShouldBe(timestamp);
+        result.Input.ShouldBeSameAs(message);
+        result.Value.ShouldBeSameAs(body);
     }
 
     [Fact]
@@ -457,8 +573,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
                     "validate",
                     ValidationCompositionNodeTypes.JsonSchemaValidator))
                 .Build())
-            .RegisterNodes(registry =>
-                registry.RegisterJsonSchemaValidator<object>())
+            .RegisterNodes(registry => registry.RegisterJsonSchemaValidator())
             .Configure(options => options.ThrowOnBuildFailure = false);
 
         await using var provider = services.BuildServiceProvider();
@@ -492,8 +607,7 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
                         .Configure("schema", StringSchemaJson())
                         .Configure(optionName, optionValue)))
                 .Build())
-            .RegisterNodes(registry =>
-                registry.RegisterJsonSchemaValidator<object>())
+            .RegisterNodes(registry => registry.RegisterJsonSchemaValidator())
             .Configure(options => options.ThrowOnBuildFailure = false);
 
         await using var provider = services.BuildServiceProvider();
@@ -525,6 +639,13 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         {
             type = "string",
             minLength = 1
+        });
+
+    private static FlowValue Order(string id, FlowValue total)
+        => FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["id"] = FlowValue.From(id),
+            ["total"] = total
         });
 
     private sealed record InputMessage(string Payload);
@@ -599,6 +720,20 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             LastValueSelector = context.ValueSelector;
             using var document = JsonDocument.Parse(input.Payload);
             return document.RootElement.Clone();
+        }
+    }
+
+    private sealed class BodyFlowValueSelector : IJsonSchemaFlowValueSelector
+    {
+        public int Calls { get; private set; }
+
+        public string? LastValueSelector { get; private set; }
+
+        public FlowValue Select(FlowValue input, JsonSchemaValidatorContext context)
+        {
+            Calls++;
+            LastValueSelector = context.ValueSelector;
+            return input.GetObject()["body"];
         }
     }
 }
