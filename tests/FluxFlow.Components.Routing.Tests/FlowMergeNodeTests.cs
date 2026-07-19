@@ -9,6 +9,8 @@ using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
+#pragma warning disable CS0618
+
 // Merge is a fan-in node: several upstreams of the same type all link into the single
 // bounded Input (a BufferBlock already merges concurrent producers), and the node
 // re-broadcasts each message on Output preserving the correlation id.

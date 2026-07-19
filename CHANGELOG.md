@@ -7,6 +7,32 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Routing 4.0.0
+
+Adds canonical FlowValue routing results while preserving the released generic
+nodes for code-authored compatibility.
+
+- Adds `FlowValueWindowNode`, `FlowValueCorrelationNode`, and
+  `FlowValueJoinNode` with one normal `FlowResult<T>` Output and Events.
+- Emits windows, matches, and timeouts as successful result variants; expected
+  selector, key, side, and capacity failures are normal error variants.
+- Preserves message lineage across matches, timeouts, and operation failures.
+- Marks Switch, Fork, and Merge obsolete because canonical links provide
+  conditional routing, fan-out, and shared-input fan-in.
+
+## FluxFlow.Components.Routing.Composition 2.0.0
+
+Makes FlowValue/result routing the fixed Window, Correlation, and Join
+composition contract.
+
+- Adds parameterless canonical registrations with one Output and no universal
+  Errors surface.
+- Resolves required selector delegates and optional clocks through exact
+  `Resources.{name}` addresses.
+- Keeps explicit generic registration overloads for typed compatibility.
+- Marks structural routing registrations and metadata deprecated and updates
+  package examples to the flat two-section application document.
+
 ## FluxFlow.Components.Expectations 4.0.0
 
 Adds a canonical exact-once projection-event expectation node while preserving

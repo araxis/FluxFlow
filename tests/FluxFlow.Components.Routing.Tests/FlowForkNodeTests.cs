@@ -8,6 +8,8 @@ using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class FlowForkNodeTests
 {
     [Fact]

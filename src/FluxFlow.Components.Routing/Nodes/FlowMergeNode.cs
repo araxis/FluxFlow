@@ -13,6 +13,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// upstream completes the input. Works with nothing but <c>new FlowMergeNode&lt;T&gt;(options)</c>
 /// — no engine.
 /// </summary>
+[Obsolete("Use canonical multi-source input links instead of FlowMergeNode.")]
 public sealed class FlowMergeNode<TInput> : FlowNode<TInput, TInput>
 {
     private readonly MergeRoutingOptions _options;

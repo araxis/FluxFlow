@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue Routing
+
+- Added canonical FlowValue Window, Correlation, and Join nodes with one normal
+  `FlowResult<T>` Output plus Events. Windows, matches, and timeouts are success
+  variants; expected selector, validation, and capacity failures are normal
+  error variants.
+- Preserved message lineage across success, timeout, and operation failures and
+  hardened adapter completion/fault handling.
+- Added parameterless canonical Composition registrations and FlowValue/result
+  Designer ports while retaining explicit generic compatibility registrations.
+- Marked Switch, Fork, and Merge runtime nodes, registrations, and metadata
+  obsolete/deprecated because canonical links own condition, fan-out, and
+  shared-input fan-in semantics.
+- Routing moved to `4.0.0` and Routing Composition to `2.0.0`; declaration
+  baselines, package docs, shared docs, and changelog were updated.
+- Runtime (`86`), Composition (`19`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,048`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Control is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext Expectation Results
 
 - Added canonical `FlowEventExpectationNode` with one normal

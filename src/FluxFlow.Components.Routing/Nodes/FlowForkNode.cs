@@ -12,6 +12,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// extra broadcast ports surfaced by name via <see cref="Outputs"/>. Works with nothing
 /// but <c>new FlowForkNode&lt;T&gt;(options)</c> — no engine.
 /// </summary>
+[Obsolete("Use canonical output fanout links instead of FlowForkNode.")]
 public sealed class FlowForkNode<TInput> : FlowNode<TInput, TInput>
 {
     private readonly ForkRoutingOptions _options;

@@ -5,11 +5,11 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/expectations-vnext`. The provider-neutral MQTT vertical slice and the
-  first six normal component-family migrations, canonical FlowValue Mapping,
+  `work/routing-vnext`. The provider-neutral MQTT vertical slice and the
+  first seven normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
-  Validation, FlowValue Assertions, and projection-event Expectations, are
-  implemented and verified locally.
+  Validation, FlowValue Assertions, projection-event Expectations, and
+  FlowValue/result Routing, are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -25,8 +25,8 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  Validation, Assertions, and Expectations now use this foundation; the remaining
-  component-family migrations continue separately. See
+  Validation, Assertions, Expectations, and Routing now use this foundation;
+  the remaining component-family migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -167,8 +167,20 @@ Date: 2026-07-19
   available for code-authored compatibility. Expectations Composition is now
   `2.0.0` with canonical fixed ports and exact `Resources.{name}` clock
   addressing. Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Routing is the next
-  bounded family assessment. See `221-vnext-expectations-flowresult.md`.
+  preflight/dry-runs, and a package-only consumer passed. Routing followed as
+  the next bounded family. See `221-vnext-expectations-flowresult.md`.
+- `FluxFlow.Components.Routing` is now `4.0.0` locally with canonical
+  `FlowValueWindowNode`, `FlowValueCorrelationNode`, and `FlowValueJoinNode`.
+  Windows, matches, and timeouts are successful `FlowResult<T>` variants;
+  expected selector, key, side, and capacity failures are normal error variants
+  with preserved message lineage and no universal Errors port. Switch, Fork,
+  and Merge remain compatible but are obsolete because canonical links own
+  conditional routing, fan-out, and shared-input fan-in. Routing Composition is
+  now `2.0.0` with parameterless canonical registration, fixed FlowValue/result
+  ports, exact keyed selectors/clocks, and deprecated structural metadata.
+  Focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Control is the next
+  bounded family assessment. See `222-vnext-routing-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

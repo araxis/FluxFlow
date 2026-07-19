@@ -97,14 +97,16 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
                     exception.Message,
                     exception.InnerException,
                     exception.Key,
-                    exception.Side);
+                    exception.Side,
+                    message.CorrelationId);
             }
             catch (Exception exception)
             {
                 ReportCorrelationError(
                     RoutingErrorCodes.CorrelationKeyFailed,
                     $"flow.correlation failed: {exception.Message}",
-                    exception);
+                    exception,
+                    correlationId: message.CorrelationId);
             }
             finally
             {
@@ -159,7 +161,8 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
                 $"flow.correlation side '{item.Side}' is not supported.",
                 null,
                 item.Key,
-                item.Side);
+                item.Side,
+                message.CorrelationId);
             return;
         }
 
@@ -170,7 +173,8 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
                 $"flow.correlation maxPending limit reached; key '{item.Key}' was not tracked.",
                 null,
                 item.Key,
-                side);
+                side,
+                message.CorrelationId);
             return;
         }
 
@@ -465,11 +469,13 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
         string message,
         Exception? exception,
         string? key = null,
-        string? side = null)
+        string? side = null,
+        CorrelationId? correlationId = null)
     {
         EmitError(new FlowError
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
             Code = code,
             Message = message,
             Context = CreateErrorContext(key, side),
@@ -478,6 +484,7 @@ public sealed class FlowCorrelationNode<TInput> : FlowNode<TInput, FlowCorrelati
         EmitEvent(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
             Name = RoutingDiagnosticNames.CorrelationFailed,
             Level = FlowEventLevel.Error,
             Message = message,

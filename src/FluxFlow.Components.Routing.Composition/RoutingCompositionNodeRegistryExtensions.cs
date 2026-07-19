@@ -2,9 +2,12 @@ using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Components.Routing.Nodes;
 using FluxFlow.Components.Routing.Options;
 using FluxFlow.Composition;
+using FluxFlow.Data;
 using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Routing.Composition;
+
+#pragma warning disable CS0618
 
 public static class RoutingCompositionNodeRegistryExtensions
 {
@@ -22,6 +25,7 @@ public static class RoutingCompositionNodeRegistryExtensions
         "Events"
     ];
 
+    [Obsolete("Use canonical conditional links instead of flow.switch.")]
     public static CompositionNodeRegistry RegisterSwitch<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = RoutingCompositionNodeTypes.Switch)
@@ -39,6 +43,7 @@ public static class RoutingCompositionNodeRegistryExtensions
             ]);
     }
 
+    [Obsolete("Use canonical output fanout links instead of flow.fork.")]
     public static CompositionNodeRegistry RegisterFork<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = RoutingCompositionNodeTypes.Fork)
@@ -56,6 +61,7 @@ public static class RoutingCompositionNodeRegistryExtensions
             ]);
     }
 
+    [Obsolete("Use canonical multi-source input links instead of flow.merge.")]
     public static CompositionNodeRegistry RegisterMerge<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = RoutingCompositionNodeTypes.Merge)
@@ -100,6 +106,28 @@ public static class RoutingCompositionNodeRegistryExtensions
             ]);
     }
 
+    public static CompositionNodeRegistry RegisterWindow(
+        this CompositionNodeRegistry registry,
+        string nodeType = RoutingCompositionNodeTypes.Window)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
+
+        return registry.Register(
+            nodeType,
+            CreateFlowValueWindowNode,
+            inputs:
+            [
+                CompositionPorts.Metadata<FlowValue>(
+                    RoutingCompositionPortNames.Input)
+            ],
+            outputs:
+            [
+                CompositionPorts.Metadata<FlowResult<FlowWindow<FlowValue>>>(
+                    RoutingCompositionPortNames.Output)
+            ]);
+    }
+
     public static CompositionNodeRegistry RegisterCorrelation<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = RoutingCompositionNodeTypes.Correlation)
@@ -126,6 +154,28 @@ public static class RoutingCompositionNodeRegistryExtensions
             ]);
     }
 
+    public static CompositionNodeRegistry RegisterCorrelation(
+        this CompositionNodeRegistry registry,
+        string nodeType = RoutingCompositionNodeTypes.Correlation)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
+
+        return registry.Register(
+            nodeType,
+            CreateFlowValueCorrelationNode,
+            inputs:
+            [
+                CompositionPorts.Metadata<FlowValue>(
+                    RoutingCompositionPortNames.Input)
+            ],
+            outputs:
+            [
+                CompositionPorts.Metadata<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+                    RoutingCompositionPortNames.Output)
+            ]);
+    }
+
     public static CompositionNodeRegistry RegisterJoin<TLeft, TRight>(
         this CompositionNodeRegistry registry,
         string nodeType = RoutingCompositionNodeTypes.Join)
@@ -149,6 +199,30 @@ public static class RoutingCompositionNodeRegistryExtensions
                     RoutingCompositionPortNames.Output),
                 CompositionPorts.Metadata<FlowJoinTimeout<TLeft, TRight>>(
                     RoutingCompositionPortNames.Timeouts)
+            ]);
+    }
+
+    public static CompositionNodeRegistry RegisterJoin(
+        this CompositionNodeRegistry registry,
+        string nodeType = RoutingCompositionNodeTypes.Join)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
+
+        return registry.Register(
+            nodeType,
+            CreateFlowValueJoinNode,
+            inputs:
+            [
+                CompositionPorts.Metadata<FlowValue>(
+                    RoutingCompositionPortNames.Left),
+                CompositionPorts.Metadata<FlowValue>(
+                    RoutingCompositionPortNames.Right)
+            ],
+            outputs:
+            [
+                CompositionPorts.Metadata<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+                    RoutingCompositionPortNames.Output)
             ]);
     }
 
@@ -299,6 +373,31 @@ public static class RoutingCompositionNodeRegistryExtensions
             errors: node.Errors));
     }
 
+    private static ValueTask<ComposedNode> CreateFlowValueWindowNode(
+        CompositionNodeFactoryContext context)
+    {
+        var options = context.BindConfiguration<WindowRoutingOptions>();
+        var clock = context.GetResource<TimeProvider>(
+            RoutingCompositionResourceNames.Clock);
+        var node = new FlowValueWindowNode(options, clock);
+
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs:
+            [
+                CompositionPorts.Input<FlowValue>(
+                    RoutingCompositionPortNames.Input,
+                    node.Input)
+            ],
+            outputs:
+            [
+                CompositionPorts.Output<FlowResult<FlowWindow<FlowValue>>>(
+                    RoutingCompositionPortNames.Output,
+                    node.Output)
+            ],
+            events: node.Events));
+    }
+
     private static ValueTask<ComposedNode> CreateCorrelationNode<TInput>(
         CompositionNodeFactoryContext context)
     {
@@ -340,6 +439,40 @@ public static class RoutingCompositionNodeRegistryExtensions
             errors: node.Errors));
     }
 
+    private static ValueTask<ComposedNode> CreateFlowValueCorrelationNode(
+        CompositionNodeFactoryContext context)
+    {
+        var options = context.BindConfiguration<CorrelationRoutingOptions>();
+        var keySelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+            RoutingCompositionResourceNames.KeySelector);
+        var sideSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+            RoutingCompositionResourceNames.SideSelector);
+        var clock = context.GetResource<TimeProvider>(
+            RoutingCompositionResourceNames.Clock);
+        var node = new FlowValueCorrelationNode(
+            options,
+            keySelector,
+            sideSelector,
+            options.Engine,
+            clock);
+
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs:
+            [
+                CompositionPorts.Input<FlowValue>(
+                    RoutingCompositionPortNames.Input,
+                    node.Input)
+            ],
+            outputs:
+            [
+                CompositionPorts.Output<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+                    RoutingCompositionPortNames.Output,
+                    node.Output)
+            ],
+            events: node.Events));
+    }
+
     private static ValueTask<ComposedNode> CreateJoinNode<TLeft, TRight>(
         CompositionNodeFactoryContext context)
     {
@@ -379,6 +512,43 @@ public static class RoutingCompositionNodeRegistryExtensions
             ],
             events: node.Events,
             errors: node.Errors));
+    }
+
+    private static ValueTask<ComposedNode> CreateFlowValueJoinNode(
+        CompositionNodeFactoryContext context)
+    {
+        var options = context.BindConfiguration<JoinRoutingOptions>();
+        var leftSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+            RoutingCompositionResourceNames.LeftKeySelector);
+        var rightSelector = context.GetRequiredResource<Func<FlowValue, string?>>(
+            RoutingCompositionResourceNames.RightKeySelector);
+        var clock = context.GetResource<TimeProvider>(
+            RoutingCompositionResourceNames.Clock);
+        var node = new FlowValueJoinNode(
+            options,
+            leftSelector,
+            rightSelector,
+            options.Engine,
+            clock);
+
+        return ValueTask.FromResult(ComposedNode.Create(
+            node,
+            inputs:
+            [
+                CompositionPorts.Input<FlowValue>(
+                    RoutingCompositionPortNames.Left,
+                    node.Left),
+                CompositionPorts.Input<FlowValue>(
+                    RoutingCompositionPortNames.Right,
+                    node.Right)
+            ],
+            outputs:
+            [
+                CompositionPorts.Output<FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>>(
+                    RoutingCompositionPortNames.Output,
+                    node.Output)
+            ],
+            events: node.Events));
     }
 
     private static Dictionary<string, string> ValidateRouteOutputs(

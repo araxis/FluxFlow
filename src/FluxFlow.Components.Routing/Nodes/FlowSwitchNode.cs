@@ -16,6 +16,7 @@ namespace FluxFlow.Components.Routing.Nodes;
 /// keeps processing. Works with nothing but <c>new FlowSwitchNode&lt;T&gt;(options, selector)</c>
 /// — no engine.
 /// </summary>
+[Obsolete("Use canonical conditional links instead of FlowSwitchNode.")]
 public sealed class FlowSwitchNode<TInput> : FlowNode<TInput, TInput>
 {
     private readonly SwitchRoutingOptions _options;

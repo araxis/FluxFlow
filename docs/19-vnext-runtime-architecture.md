@@ -7,9 +7,11 @@ The data foundation, canonical definition/address, link compilation, stable
 port, system-signal, immutable DI provider-snapshot, transactional revision,
 MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
 Payloads inspection, explicit canonical Serialization conversions, canonical
-FlowValue JSON Schema Validation and Assertions, and canonical projection-event
-Expectations are implemented locally. The remaining component families are
-migrated incrementally.
+FlowValue JSON Schema Validation and Assertions, canonical projection-event
+Expectations, and canonical FlowValue/result Window, Correlation, and Join are
+implemented locally. Structural Switch, Fork, and Merge routing is deprecated
+in favor of canonical links. The remaining component families are migrated
+incrementally.
 
 ## Package Ownership
 
@@ -226,9 +228,10 @@ resource/node binding are complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
 10. Component-family migration is in progress: Mapping, Payloads,
-    Serialization, Validation, Assertions, and Expectations are complete
-    locally. Remaining runtime families continue as separately bounded passes;
-    Designer, hosting, and coordinated releases follow those passes.
+    Serialization, Validation, Assertions, Expectations, and Routing are
+    complete locally. Remaining runtime families continue as separately
+    bounded passes; Designer, hosting, and coordinated releases follow those
+    passes.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

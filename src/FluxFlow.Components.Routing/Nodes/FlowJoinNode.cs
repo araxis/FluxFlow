@@ -213,6 +213,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
 
     private async Task ProcessCommandAsync(JoinCommand command)
     {
+        var correlationId = command.Left?.CorrelationId ?? command.Right?.CorrelationId;
         try
         {
             switch (command.Kind)
@@ -245,14 +246,16 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
                 exception.Message,
                 exception.InnerException,
                 exception.Key,
-                exception.Side);
+                exception.Side,
+                correlationId);
         }
         catch (Exception exception)
         {
             ReportJoinError(
                 RoutingErrorCodes.JoinFailed,
                 $"flow.join failed: {exception.Message}",
-                exception);
+                exception,
+                correlationId: correlationId);
         }
     }
 
@@ -337,7 +340,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Left))
+        if (!CanTrackPending(key, FlowJoinSide.Left, message.CorrelationId))
         {
             return;
         }
@@ -360,7 +363,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
             return;
         }
 
-        if (!CanTrackPending(key, FlowJoinSide.Right))
+        if (!CanTrackPending(key, FlowJoinSide.Right, message.CorrelationId))
         {
             return;
         }
@@ -383,7 +386,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
         return bucket;
     }
 
-    private bool CanTrackPending(string key, FlowJoinSide side)
+    private bool CanTrackPending(string key, FlowJoinSide side, CorrelationId correlationId)
     {
         if (_pendingCount < _options.MaxPending)
         {
@@ -395,7 +398,8 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
             $"flow.join maxPending limit reached; key '{key}' was not tracked.",
             null,
             key,
-            side);
+            side,
+            correlationId);
         return false;
     }
 
@@ -717,11 +721,13 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
         string message,
         Exception? exception,
         string? key = null,
-        FlowJoinSide? side = null)
+        FlowJoinSide? side = null,
+        CorrelationId? correlationId = null)
     {
         _errors.Post(new FlowError
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
             Code = code,
             Message = message,
             Context = CreateErrorContext(key, side),
@@ -730,6 +736,7 @@ public sealed class FlowJoinNode<TLeft, TRight> : IFlowNode
         _events.Post(new FlowEvent
         {
             Timestamp = _clock.GetUtcNow(),
+            CorrelationId = correlationId,
             Name = RoutingDiagnosticNames.JoinFailed,
             Level = FlowEventLevel.Error,
             Message = message,

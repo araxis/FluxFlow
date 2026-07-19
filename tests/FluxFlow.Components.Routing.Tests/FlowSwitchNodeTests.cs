@@ -9,6 +9,8 @@ using Xunit;
 
 namespace FluxFlow.Components.Routing.Tests;
 
+#pragma warning disable CS0618
+
 // Every test news the node directly with its options and a route-key selector — no engine,
 // no registry. Messages travel as FlowMessage<T>; the correlation id flows input -> matched
 // / default / route ports and onto any error for free.

@@ -496,6 +496,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   expectations with matched/unmet/timeout/completion normal results, normal
   evaluation errors, exact-once lifecycle behavior, preserved standalone
   compatibility, and Composition/package evidence.
+- `222-vnext-routing-flowvalue.md`: canonical FlowValue/result Window,
+  Correlation, and Join nodes, deprecated structural routing, preserved generic
+  compatibility, and Composition/package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

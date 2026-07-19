@@ -1,6 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Routing.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Routing.Composition;
 
@@ -117,7 +118,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         new Dictionary<string, string>
         {
             ["dynamicOutputsOption"] = "routeOutputs",
-            ["requiredResource"] = RoutingCompositionResourceNames.RouteKeySelector
+            ["requiredResource"] = RoutingCompositionResourceNames.RouteKeySelector,
+            ["deprecated"] = "true",
+            ["deprecationReason"] = "Use canonical conditional output links."
         });
 
     private static ComponentDesignMetadata CreateForkMetadata()
@@ -146,7 +149,9 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         [ClockResource(0)],
         new Dictionary<string, string>
         {
-            ["dynamicOutputsOption"] = "outputs"
+            ["dynamicOutputsOption"] = "outputs",
+            ["deprecated"] = "true",
+            ["deprecationReason"] = "Use canonical output fanout links."
         });
 
     private static ComponentDesignMetadata CreateMergeMetadata()
@@ -166,7 +171,12 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
             AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
             AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Merged output message.", "TInput", 1, isPrimary: true);
         },
-        [ClockResource(0)]);
+        [ClockResource(0)],
+        new Dictionary<string, string>
+        {
+            ["deprecated"] = "true",
+            ["deprecationReason"] = "Use canonical multi-source input links."
+        });
 
     private static ComponentDesignMetadata CreateWindowMetadata()
         => RoutingMetadata(
@@ -204,8 +214,8 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input message.", "TInput", 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Buffered window.", "FlowWindow<TInput>", 1, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Immutable workflow value.", nameof(FlowValue), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal count, time, completion, or error result.", "FlowResult<FlowWindow<FlowValue>>", 1, isPrimary: true);
         },
         [ClockResource(0)]);
 
@@ -241,22 +251,20 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Input request or response message.", "TInput", 0, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Correlation match result.", "FlowCorrelationMatch<TInput>", 1, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Matched, "Matched", "Correlation match result alias.", "FlowCorrelationMatch<TInput>", 2);
-            AddOutputPort(builder, RoutingCompositionPortNames.Timeouts, "Timeouts", "Correlation timeout result.", "FlowCorrelationTimeout<TInput>", 3);
+            AddInputPort(builder, RoutingCompositionPortNames.Input, "Input", "Immutable request or response value.", nameof(FlowValue), 0, isPrimary: true);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal match, timeout, or error result.", "FlowResult<FlowCorrelationOutcome<FlowValue>>", 1, isPrimary: true);
         },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.KeySelector,
                 "Key Selector",
-                "Func<TInput,string?>",
+                "Func<FlowValue,string?>",
                 0,
                 "Required keyed delegate that selects the correlation key for each input message."),
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.SideSelector,
                 "Side Selector",
-                "Func<TInput,string?>",
+                "Func<FlowValue,string?>",
                 1,
                 "Required keyed delegate that selects request or response side labels."),
             ClockResource(2)
@@ -297,22 +305,21 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         ],
         builder =>
         {
-            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Left input message.", "TLeft", 0, isPrimary: true);
-            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Right input message.", "TRight", 1);
-            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Joined output result.", "FlowJoinResult<TLeft,TRight>", 2, isPrimary: true);
-            AddOutputPort(builder, RoutingCompositionPortNames.Timeouts, "Timeouts", "Join timeout result.", "FlowJoinTimeout<TLeft,TRight>", 3);
+            AddInputPort(builder, RoutingCompositionPortNames.Left, "Left", "Immutable left workflow value.", nameof(FlowValue), 0, isPrimary: true);
+            AddInputPort(builder, RoutingCompositionPortNames.Right, "Right", "Immutable right workflow value.", nameof(FlowValue), 1);
+            AddOutputPort(builder, RoutingCompositionPortNames.Output, "Output", "Normal match, timeout, or error result.", "FlowResult<FlowJoinOutcome<FlowValue,FlowValue>>", 2, isPrimary: true);
         },
         [
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.LeftKeySelector,
                 "Left Key Selector",
-                "Func<TLeft,string?>",
+                "Func<FlowValue,string?>",
                 0,
                 "Required keyed delegate that selects the join key for left messages."),
             RequiredSelectorResource(
                 RoutingCompositionResourceNames.RightKeySelector,
                 "Right Key Selector",
-                "Func<TRight,string?>",
+                "Func<FlowValue,string?>",
                 1,
                 "Required keyed delegate that selects the join key for right messages."),
             ClockResource(2)

@@ -5,6 +5,7 @@ using FluxFlow.Components.Routing.Composition;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,8 @@ using Shouldly;
 using Xunit;
 
 namespace FluxFlow.Components.Routing.Composition.Tests;
+
+#pragma warning disable CS0618
 
 public sealed class RoutingCompositionNodeRegistryExtensionsTests
 {
@@ -52,6 +55,32 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         registry.Registrations[RoutingCompositionNodeTypes.Join]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(FlowJoinResult<LeftMessage, RightMessage>));
+    }
+
+    [Fact]
+    public void RegisterRoutingNodes_registers_canonical_flow_value_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterWindow()
+            .RegisterCorrelation()
+            .RegisterJoin();
+
+        registry.Registrations[RoutingCompositionNodeTypes.Window]
+            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
+                typeof(FlowResult<FlowWindow<FlowValue>>));
+        registry.Registrations[RoutingCompositionNodeTypes.Correlation]
+            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
+                typeof(FlowResult<FlowCorrelationOutcome<FlowValue>>));
+        registry.Registrations[RoutingCompositionNodeTypes.Correlation]
+            .Outputs.Keys.ShouldBe([RoutingCompositionPortNames.Output]);
+        registry.Registrations[RoutingCompositionNodeTypes.Join]
+            .Inputs.Values.Select(input => input.MessageType).ShouldBe([
+                typeof(FlowValue),
+                typeof(FlowValue)
+            ]);
+        registry.Registrations[RoutingCompositionNodeTypes.Join]
+            .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
+                typeof(FlowResult<FlowJoinOutcome<FlowValue, FlowValue>>));
     }
 
     [Fact]
@@ -121,15 +150,15 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         AssertResources(
             byType[RoutingCompositionNodeTypes.Correlation],
             [
-                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<TInput,string?>"),
-                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<TInput,string?>"),
+                (RoutingCompositionResourceNames.KeySelector, 0, true, "Func<FlowValue,string?>"),
+                (RoutingCompositionResourceNames.SideSelector, 1, true, "Func<FlowValue,string?>"),
                 (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
         AssertResources(
             byType[RoutingCompositionNodeTypes.Join],
             [
-                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<TLeft,string?>"),
-                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<TRight,string?>"),
+                (RoutingCompositionResourceNames.LeftKeySelector, 0, true, "Func<FlowValue,string?>"),
+                (RoutingCompositionResourceNames.RightKeySelector, 1, true, "Func<FlowValue,string?>"),
                 (RoutingCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
     }
@@ -153,6 +182,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .ShouldNotContain("Priority");
         metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
             .Value.ShouldBe("routeOutputs");
+        metadata[RoutingCompositionNodeTypes.Switch].Attributes[new ComponentAttributeName("deprecated")]
+            .Value.ShouldBe("true");
 
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Fork],
@@ -162,6 +193,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             ]);
         metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("dynamicOutputsOption")]
             .Value.ShouldBe("outputs");
+        metadata[RoutingCompositionNodeTypes.Fork].Attributes[new ComponentAttributeName("deprecated")]
+            .Value.ShouldBe("true");
 
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Merge],
@@ -169,27 +202,26 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
                 (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
                 (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
             ]);
+        metadata[RoutingCompositionNodeTypes.Merge].Attributes[new ComponentAttributeName("deprecated")]
+            .Value.ShouldBe("true");
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Window],
             [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowWindow<TInput>")
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowWindow<FlowValue>>")
             ]);
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Correlation],
             [
-                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowCorrelationMatch<TInput>"),
-                (RoutingCompositionPortNames.Matched, PortDirection.Output, 2, false, "FlowCorrelationMatch<TInput>"),
-                (RoutingCompositionPortNames.Timeouts, PortDirection.Output, 3, false, "FlowCorrelationTimeout<TInput>")
+                (RoutingCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowCorrelationOutcome<FlowValue>>")
             ]);
         AssertPorts(
             metadata[RoutingCompositionNodeTypes.Join],
             [
-                (RoutingCompositionPortNames.Left, PortDirection.Input, 0, true, "TLeft"),
-                (RoutingCompositionPortNames.Right, PortDirection.Input, 1, false, "TRight"),
-                (RoutingCompositionPortNames.Output, PortDirection.Output, 2, true, "FlowJoinResult<TLeft,TRight>"),
-                (RoutingCompositionPortNames.Timeouts, PortDirection.Output, 3, false, "FlowJoinTimeout<TLeft,TRight>")
+                (RoutingCompositionPortNames.Left, PortDirection.Input, 0, true, nameof(FlowValue)),
+                (RoutingCompositionPortNames.Right, PortDirection.Input, 1, false, nameof(FlowValue)),
+                (RoutingCompositionPortNames.Output, PortDirection.Output, 2, true, "FlowResult<FlowJoinOutcome<FlowValue,FlowValue>>")
             ]);
     }
 
@@ -773,6 +805,65 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public async Task Hosted_canonical_correlation_resolves_flow_value_selectors()
+    {
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<Func<FlowValue, string?>>(
+            "key",
+            value => value.GetObject()["key"].GetString());
+        services.AddKeyedSingleton<Func<FlowValue, string?>>(
+            "side",
+            value => value.GetObject()["side"].GetString());
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "correlate",
+                    RoutingCompositionNodeTypes.Correlation,
+                    node => node
+                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
+                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
+                        .Configure("requestSide", "request")
+                        .Configure("responseSide", "response")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterCorrelation())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
+            .Runtime.ShouldNotBeNull()
+            .Nodes.ShouldHaveSingleItem()
+            .Descriptor;
+        var input = descriptor.Inputs[RoutingCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        descriptor.Outputs.Keys.ShouldBe([RoutingCompositionPortNames.Output]);
+        var output = descriptor.Outputs[RoutingCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowCorrelationOutcome<FlowValue>>>>();
+        descriptor.Errors.ShouldBeNull();
+        var results = Link(output.Source);
+        var request = FlowMessage.Create(
+            RoutingItem("A-350", "request", "left"),
+            new CorrelationId("request"));
+
+        (await input.Target.SendAsync(request)
+            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await input.Target.SendAsync(FlowMessage.Create(
+                RoutingItem("A-350", "response", "right"),
+                new CorrelationId("response")))
+            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+
+        var result = await results.ReceiveAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        result.CorrelationId.ShouldBe(request.CorrelationId);
+        result.Payload.Kind.ShouldBe(RoutingResultKinds.Matched);
+        result.Payload.Value
+            .ShouldBeOfType<FlowCorrelationMatchedOutcome<FlowValue>>()
+            .Match.Key.ShouldBe("A-350");
+    }
+
+    [Fact]
     public async Task Hosted_join_resolves_selectors_and_routes_matches()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:30:00Z");
@@ -1147,6 +1238,14 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
         return buffer;
     }
+
+    private static FlowValue RoutingItem(string key, string side, string value)
+        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        {
+            ["key"] = FlowValue.From(key),
+            ["side"] = FlowValue.From(side),
+            ["value"] = FlowValue.From(value)
+        });
 
     private sealed record InputMessage(string Route, string Id);
 

@@ -615,21 +615,30 @@ Main types:
 - `RoutingCompositionPortNames`
 - `RoutingCompositionResourceNames`
 
-Use `RegisterSwitch<TInput>()`, `RegisterFork<TInput>()`,
-`RegisterMerge<TInput>()`, `RegisterWindow<TInput>()`,
-`RegisterCorrelation<TInput>()`, and `RegisterJoin<TLeft,TRight>()` from the
-optional `FluxFlow.Components.Routing.Composition` package when a composition
-host wants routing node factories. Switch, correlation, and join factories
-resolve host-owned keyed selector delegates; all factories can resolve an
-optional keyed `TimeProvider` resource through the host.
-Invalid routing options fail during build as factory diagnostics when the host
-is configured to collect build failures.
+Use parameterless `RegisterWindow()`, `RegisterCorrelation()`, and
+`RegisterJoin()` from the optional
+`FluxFlow.Components.Routing.Composition` package for the canonical fixed
+contracts. They consume `FlowValue` and emit one `FlowResult<T>` Output;
+Correlation and Join resolve host-owned keyed `Func<FlowValue,string?>`
+selectors, and all three can resolve an optional keyed `TimeProvider`.
+Expected operation failures remain normal result data and canonical descriptors
+do not expose a universal Errors port. Invalid options and missing resources
+fail during build as factory diagnostics when the host collects build failures.
+
+Explicit `RegisterWindow<TInput>()`, `RegisterCorrelation<TInput>()`, and
+`RegisterJoin<TLeft,TRight>()` overloads preserve the released typed contracts
+under host-selected node type names. `RegisterSwitch<TInput>()`,
+`RegisterFork<TInput>()`, and `RegisterMerge<TInput>()` remain available but are
+obsolete because canonical links provide conditional routing, fan-out, and
+shared-input fan-in.
 
 `RoutingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the six routing composition nodes so hosts can compose palette, editor,
+the six routing composition types so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata describes built-in ports and option-defined dynamic output surfaces
-plus host-owned resource hints for selector delegates and `clock`.
+retained nodes use canonical FlowValue/result ports; structural nodes are marked
+deprecated while preserving their option-defined dynamic output metadata. The
+provider also describes host-owned resource hints for selector delegates and
+`clock`.
 The provider authors that metadata through the shared validated Designer
 metadata builder, including built-in input and output port descriptors.
 

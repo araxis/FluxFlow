@@ -6,18 +6,19 @@
     <PackageId>FluxFlow.Components.Routing</PackageId>
     <AssemblyName>FluxFlow.Components.Routing</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing</RootNamespace>
-    <Version>3.0.3</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone routing nodes for FluxFlow: switch, fork, merge, window, correlation, and join over the FluxFlow.Nodes kit, with broadcast output/error/event ports. Predicate/key extraction comes from FluxFlow.Mapping. No engine required.</Description>
+    <Description>Standalone routing nodes with canonical FlowValue window, correlation, and join results plus explicit generic compatibility surfaces.</Description>
     <PackageTags>workflow;dataflow;components;routing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Prevents timed windows from losing claimed output during concurrent completion.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical FlowValue Window, Correlation, and Join nodes with one normal FlowResult output. Switch, Fork, and Merge remain available as deprecated compatibility nodes because canonical links own those graph behaviors.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
