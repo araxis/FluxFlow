@@ -145,7 +145,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 group: "Messages",
                 order: 0,
                 summary: "State reducer request.",
-                valueType: nameof(StateReducerInput),
+                valueType: nameof(FlowValueStateReducerInput),
                 isPrimary: true)
             .AddOutputPort(
                 StateCompositionPortNames.Output,
@@ -153,6 +153,6 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 group: "Results",
                 order: 1,
                 summary: "State reducer result.",
-                valueType: nameof(StateReducerResult),
+                valueType: "FlowResult<FlowValueStateReducerResult>",
                 isPrimary: true);
 }

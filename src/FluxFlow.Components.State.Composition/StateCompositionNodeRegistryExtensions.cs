@@ -1,7 +1,10 @@
+using System.Collections.Immutable;
+using System.Text.Json;
 using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Nodes;
 using FluxFlow.Components.State.Options;
 using FluxFlow.Composition;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.State.Composition;
@@ -20,12 +23,12 @@ public static class StateCompositionNodeRegistryExtensions
             CreateStateReducerNode,
             inputs:
             [
-                CompositionPorts.Metadata<StateReducerInput>(
+                CompositionPorts.Metadata<FlowValueStateReducerInput>(
                     StateCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<StateReducerResult>(
+                CompositionPorts.Metadata<FlowResult<FlowValueStateReducerResult>>(
                     StateCompositionPortNames.Output)
             ]);
     }
@@ -33,28 +36,49 @@ public static class StateCompositionNodeRegistryExtensions
     private static ValueTask<ComposedNode> CreateStateReducerNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<StateReducerOptions>();
+        var configuration = context.BindConfiguration<StateReducerConfiguration>();
+        var options = new FlowValueStateReducerOptions
+        {
+            Engine = configuration.Engine,
+            KeyExpression = configuration.KeyExpression,
+            Reducer = configuration.Reducer,
+            ExpressionId = configuration.ExpressionId,
+            ExpressionName = configuration.ExpressionName,
+            InitialState = DecodeInitialState(configuration.InitialState),
+            BoundedCapacity = configuration.BoundedCapacity,
+            MaxKeys = configuration.MaxKeys
+        };
         var expressionEngine = context.GetRequiredResource<IFlowExpressionEngine>(
             StateCompositionResourceNames.Engine);
         var clock = context.GetResource<TimeProvider>(
             StateCompositionResourceNames.Clock);
-        var node = new StateReducerNode(options, expressionEngine, clock);
+        var node = new FlowValueStateReducerNode(options, expressionEngine, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<StateReducerInput>(
+                CompositionPorts.Input<FlowValueStateReducerInput>(
                     StateCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<StateReducerResult>(
+                CompositionPorts.Output<FlowResult<FlowValueStateReducerResult>>(
                     StateCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
+
+    private static FlowValue DecodeInitialState(JsonElement? value)
+    {
+        if (!value.HasValue)
+            return FlowValue.Null;
+
+        var bytes = ImmutableArray.CreateRange(
+            JsonSerializer.SerializeToUtf8Bytes(value.Value));
+        return new JsonFlowContentCodec().Decode(bytes, encoding: null);
+    }
+
 }

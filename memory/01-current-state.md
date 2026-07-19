@@ -5,12 +5,12 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/control-vnext`. The provider-neutral MQTT vertical slice and the
-  first eight normal component-family migrations, canonical FlowValue Mapping,
+  `work/state-vnext`. The provider-neutral MQTT vertical slice and the
+  first nine normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
-  FlowValue/result Routing plus canonical-link Control deprecation, are
-  implemented and verified locally.
+  FlowValue/result Routing plus canonical-link Control deprecation and
+  FlowValue State commands/results, are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -26,8 +26,9 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  Validation, Assertions, Expectations, Routing, and Control now use this
-  foundation; the remaining component-family migrations continue separately.
+  Validation, Assertions, Expectations, Routing, Control, and State now use
+  this foundation; the remaining component-family migrations continue
+  separately.
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
@@ -191,8 +192,19 @@ Date: 2026-07-19
   them from new-node palettes while rendering stored definitions. No runtime
   behavior or public declaration signature changed. Focused/full tests,
   controlled builds, binary compatibility, preflight/dry-runs, and a
-  package-only consumer passed. State is the next bounded family assessment.
+  package-only consumer passed. State followed as the next bounded family.
   See `223-vnext-control-link-deprecation.md`.
+- `FluxFlow.Components.State` is now `4.0.0` locally with canonical typed
+  commands carrying immutable FlowValue input/state and one normal
+  `FlowResult<FlowValueStateReducerResult>` Output. Updated, reset, and cleared
+  operations are success variants; expected message, key, expression, reducer,
+  and key-limit failures are normal error variants with stable string codes.
+  The object-based standalone node remains available for compatibility. State
+  Composition is now `2.0.0` with canonical fixed ports, no universal Errors
+  surface, ordinary JSON initial-state decoding, and exact host-owned engine and
+  clock resources. Focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Projections is the
+  next bounded family assessment. See `224-vnext-state-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

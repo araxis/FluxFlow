@@ -765,12 +765,22 @@ Main types:
 
 Use `RegisterStateReducer()` from the optional
 `FluxFlow.Components.State.Composition` package when a composition host wants a
-`state.reducer` node factory. The factory binds existing `StateReducerOptions`,
-resolves a required keyed `IFlowExpressionEngine`, and can resolve an optional
-keyed `TimeProvider` resource through the host.
+`state.reducer` node factory. The canonical factory consumes
+`FlowValueStateReducerInput` and emits one
+`FlowResult<FlowValueStateReducerResult>` Output plus Events. Updated, reset,
+and cleared operations are successful result variants; expected key,
+expression, reducer, and key-limit failures are normal error variants. The
+descriptor has no universal Errors port.
+
+The factory binds ordinary JSON `initialState` values into immutable
+`FlowValue`, resolves a required keyed `IFlowExpressionEngine`, and can resolve
+an optional keyed `TimeProvider` through exact host-owned resource addresses.
+The runtime package retains the released object-based `StateReducerNode` and
+contracts for code-authored compatibility; Composition `2.x` registers only
+the canonical fixed contract.
 
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reducer`, including the existing reducer options, fixed ports, and
+`state.reducer`, including canonical reducer options and fixed ports, and
 resource hints for the required `engine` resource plus optional `clock`
 resource. The `engine` option is diagnostic/config metadata, not DI selection.
 The provider authors that metadata through the shared validated Designer

@@ -44,7 +44,7 @@ Status values:
 | Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | aligned |
 | Expectations | `FluxFlow.Components.Expectations` | yes | `FluxFlow.Components.Expectations.Composition` | yes | yes | canonical projection-event/result aligned |
 | Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | aligned |
-| State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | aligned |
+| State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | canonical FlowValue command/result aligned; object-based runtime retained for compatibility |
 | Storage | `FluxFlow.Components.Storage` | yes | `FluxFlow.Components.Storage.Composition` | yes | yes | aligned |
 
 ## Adapter And Support Packages

@@ -6,18 +6,19 @@
     <PackageId>FluxFlow.Components.State</PackageId>
     <AssemblyName>FluxFlow.Components.State</AssemblyName>
     <RootNamespace>FluxFlow.Components.State</RootNamespace>
-    <Version>3.0.5</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>A standalone keyed state-reducer node for FluxFlow: a reducer input in, an updated state snapshot broadcast out, per-key state kept in the node. No engine required.</Description>
+    <Description>Standalone keyed state reducers with a canonical FlowValue command/result contract and an object-based compatibility surface.</Description>
     <PackageTags>workflow;dataflow;components;state;reducer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds the canonical FlowValueStateReducerNode with typed commands, one normal FlowResult output, stable result and error kinds, and immutable expression data. The released object-based StateReducerNode remains available for compatibility.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>

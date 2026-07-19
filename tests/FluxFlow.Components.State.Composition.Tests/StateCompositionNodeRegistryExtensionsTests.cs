@@ -1,4 +1,4 @@
-using System.Text.Json;
+using System.Numerics;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
@@ -8,6 +8,7 @@ using FluxFlow.Components.State.Contracts;
 using FluxFlow.Components.State.Diagnostics;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,9 +31,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
 
         var reducer = registry.Registrations[StateCompositionNodeTypes.Reducer];
         reducer.Inputs[StateCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(StateReducerInput));
+            .ShouldBe(typeof(FlowValueStateReducerInput));
         reducer.Outputs[StateCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(StateReducerResult));
+            .ShouldBe(typeof(FlowResult<FlowValueStateReducerResult>));
     }
 
     [Fact]
@@ -61,14 +62,14 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(StateCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(StateReducerInput));
+        input.ValueType?.Value.ShouldBe(nameof(FlowValueStateReducerInput));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(StateCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(StateReducerResult));
+        output.ValueType?.Value.ShouldBe("FlowResult<FlowValueStateReducerResult>");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -182,10 +183,18 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                 var results = Link(output.Source);
                 var events = Link(descriptor.Events.ShouldNotBeNull());
                 var first = FlowMessage.Create(
-                    new StateReducerInput { Key = "a", Input = "first" },
+                    new FlowValueStateReducerInput
+                    {
+                        Key = "a",
+                        Input = FlowValue.From("first")
+                    },
                     new CorrelationId("first"));
                 var second = FlowMessage.Create(
-                    new StateReducerInput { Key = "a", Input = "second" },
+                    new FlowValueStateReducerInput
+                    {
+                        Key = "a",
+                        Input = FlowValue.From("second")
+                    },
                     new CorrelationId("second"));
 
                 (await input.Target.SendAsync(first).WaitAsync(Timeout)).ShouldBeTrue();
@@ -195,16 +204,20 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                 var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
 
                 firstResult.CorrelationId.ShouldBe(first.CorrelationId);
-                firstResult.Payload.Key.ShouldBe("a");
-                firstResult.Payload.NewState.ShouldBe(11L);
-                firstResult.Payload.Version.ShouldBe(1);
-                firstResult.Payload.UpdatedAt.ShouldBe(timestamp);
+                firstResult.Payload.Kind.ShouldBe(StateResultKinds.Updated);
+                var firstValue = firstResult.Payload.Value.ShouldNotBeNull();
+                firstValue.Key.ShouldBe("a");
+                firstValue.NewState.GetInteger().ShouldBe(11L);
+                firstValue.Version.ShouldBe(1);
+                firstValue.UpdatedAt.ShouldBe(timestamp);
 
                 secondResult.CorrelationId.ShouldBe(second.CorrelationId);
-                secondResult.Payload.PreviousState.ShouldBe(11L);
-                secondResult.Payload.NewState.ShouldBe(12L);
-                secondResult.Payload.Version.ShouldBe(2);
-                secondResult.Payload.UpdatedAt.ShouldBe(timestamp);
+                var secondValue = secondResult.Payload.Value.ShouldNotBeNull();
+                secondValue.PreviousState.GetInteger().ShouldBe(11L);
+                secondValue.NewState.GetInteger().ShouldBe(12L);
+                secondValue.Version.ShouldBe(2);
+                secondValue.UpdatedAt.ShouldBe(timestamp);
+                descriptor.Errors.ShouldBeNull();
 
                 var @event = await events.ReceiveAsync().WaitAsync(Timeout);
                 @event.Name.ShouldBe(StateDiagnosticNames.ReducerUpdated);
@@ -234,21 +247,21 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             {
                 var results = Link(output.Source);
                 var events = Link(descriptor.Events.ShouldNotBeNull());
-                var message = FlowMessage.Create(new StateReducerInput
+                var message = FlowMessage.Create(new FlowValueStateReducerInput
                 {
                     Key = "ignored",
-                    Input = "payload",
-                    Variables = new Dictionary<string, object?>
+                    Input = FlowValue.From("payload"),
+                    Variables = new Dictionary<string, FlowValue>
                     {
-                        ["topic"] = "orders/created"
+                        ["topic"] = FlowValue.From("orders/created")
                     }
                 });
 
                 (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                result.Payload.Key.ShouldBe("orders/created");
-                result.Payload.NewState.ShouldBe("payload");
+                result.Payload.Value.ShouldNotBeNull().Key.ShouldBe("orders/created");
+                result.Payload.Value.NewState.GetString().ShouldBe("payload");
 
                 var @event = await events.ReceiveAsync().WaitAsync(Timeout);
                 @event.Attributes["expressionId"].ShouldBe("state-1");
@@ -275,16 +288,16 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             {
                 var results = Link(output.Source);
 
-                (await input.Target.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a" }))
+                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput { Key = "a" }))
                     .WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(FlowMessage.Create(new StateReducerInput
+                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput
                     {
                         Key = "a",
-                        InitialState = 100,
+                        InitialState = FlowValue.From(100),
                         Operation = StateReducerOperation.Reset
                     }))
                     .WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(FlowMessage.Create(new StateReducerInput
+                (await input.Target.SendAsync(FlowMessage.Create(new FlowValueStateReducerInput
                     {
                         Key = "a",
                         Operation = StateReducerOperation.Clear
@@ -295,10 +308,12 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
                 var reset = await results.ReceiveAsync().WaitAsync(Timeout);
                 var clear = await results.ReceiveAsync().WaitAsync(Timeout);
 
-                reset.Payload.NewState.ShouldBe(100);
-                reset.Payload.Version.ShouldBe(2);
-                clear.Payload.NewState.ShouldBeNull();
-                clear.Payload.Version.ShouldBe(3);
+                reset.Payload.Kind.ShouldBe(StateResultKinds.Reset);
+                reset.Payload.Value.ShouldNotBeNull().NewState.GetInteger().ShouldBe(100);
+                reset.Payload.Value.Version.ShouldBe(2);
+                clear.Payload.Kind.ShouldBe(StateResultKinds.Cleared);
+                clear.Payload.Value.ShouldNotBeNull().NewState.ShouldBeSameAs(FlowValue.Null);
+                clear.Payload.Value.Version.ShouldBe(3);
             },
             node => node
                 .Resource(StateCompositionResourceNames.Engine, "primary")
@@ -310,30 +325,42 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_reducer_emits_errors_and_continues_after_reducer_failure()
+    public async Task Hosted_reducer_emits_normal_failure_and_continues_after_reducer_failure()
     {
         await WithNodeAsync(
             async (input, output, descriptor) =>
             {
                 var results = Link(output.Source);
-                var errors = Link(descriptor.Errors.ShouldNotBeNull());
                 var bad = FlowMessage.Create(
-                    new StateReducerInput { Key = "a", Input = "bad" },
+                    new FlowValueStateReducerInput
+                    {
+                        Key = "a",
+                        Input = FlowValue.From("bad")
+                    },
                     new CorrelationId("bad"));
                 var good = FlowMessage.Create(
-                    new StateReducerInput { Key = "a", Input = "good" },
+                    new FlowValueStateReducerInput
+                    {
+                        Key = "a",
+                        Input = FlowValue.From("good")
+                    },
                     new CorrelationId("good"));
 
                 (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
                 (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
 
-                var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+                var success = await results.ReceiveAsync().WaitAsync(Timeout);
 
-                error.Code.ShouldBe(StateErrorCodes.ReducerFailed);
-                error.CorrelationId.ShouldBe(bad.CorrelationId);
-                result.CorrelationId.ShouldBe(good.CorrelationId);
-                result.Payload.NewState.ShouldBe("good");
+                failure.CorrelationId.ShouldBe(bad.CorrelationId);
+                failure.Payload.IsError.ShouldBeTrue();
+                failure.Payload.Error.ShouldNotBeNull().Code
+                    .ShouldBe(StateErrorCodeNames.ReducerFailed);
+                failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
+                    .ShouldBe(StateErrorCodes.ReducerFailed);
+                success.CorrelationId.ShouldBe(good.CorrelationId);
+                success.Payload.Value.ShouldNotBeNull().NewState.GetString().ShouldBe("good");
+                descriptor.Errors.ShouldBeNull();
             },
             node => node
                 .Resource(StateCompositionResourceNames.Engine, "primary")
@@ -436,8 +463,8 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
 
     private static async Task WithNodeAsync(
         Func<
-            CompositionInputPort<StateReducerInput>,
-            CompositionOutputPort<StateReducerResult>,
+            CompositionInputPort<FlowValueStateReducerInput>,
+            CompositionOutputPort<FlowResult<FlowValueStateReducerResult>>,
             ComposedNode,
             Task> run,
         Action<NodeDefinitionBuilder> configureNode,
@@ -464,9 +491,9 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             .Nodes.ShouldHaveSingleItem()
             .Descriptor;
         var input = descriptor.Inputs[StateCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<StateReducerInput>>();
+            .ShouldBeOfType<CompositionInputPort<FlowValueStateReducerInput>>();
         var output = descriptor.Outputs[StateCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<StateReducerResult>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValueStateReducerResult>>>();
 
         await run(input, output, descriptor);
     }
@@ -580,27 +607,22 @@ public sealed class StateCompositionNodeRegistryExtensionsTests
             string expression,
             FlowMapContext context,
             Type resultType)
-            => expression switch
+        {
+            var input = (FlowValue)context.Variables["input"]!;
+            var state = (FlowValue)context.Variables["state"]!;
+            return expression switch
             {
-                "count" => CoerceNumber(context.Variables["state"]) + 1,
-                "last-input" => context.Variables["input"],
-                "topic-key" => context.Variables["topic"],
-                "fail-on-bad" when Equals(context.Variables["input"], "bad") =>
+                "count" => FlowValue.From(CoerceNumber(state) + 1),
+                "last-input" => input,
+                "topic-key" => (object)((FlowValue)context.Variables["topic"]!).GetString(),
+                "fail-on-bad" when input.GetString() == "bad" =>
                     throw new InvalidOperationException("bad input"),
-                "fail-on-bad" => context.Variables["input"],
+                "fail-on-bad" => input,
                 _ => throw new InvalidOperationException($"Unknown expression '{expression}'.")
             };
+        }
 
-        private static long CoerceNumber(object? value)
-            => value switch
-            {
-                null => 0,
-                long number => number,
-                int number => number,
-                JsonElement json when json.ValueKind == JsonValueKind.Number &&
-                                      json.TryGetInt64(out var number) => number,
-                _ => throw new InvalidOperationException(
-                    $"Cannot coerce '{value.GetType().Name}' to a number.")
-            };
+        private static BigInteger CoerceNumber(FlowValue value)
+            => value.Kind == FlowValueKind.Null ? 0 : value.GetInteger();
     }
 }

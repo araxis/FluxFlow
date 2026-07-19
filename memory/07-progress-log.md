@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue State
+
+- Added `FlowValueStateReducerNode` with typed commands, immutable FlowValue
+  state, one normal `FlowResult<FlowValueStateReducerResult>` Output, and Events.
+- Added updated/reset/cleared success variants plus normal invalid-message,
+  key, expression, reducer, and key-limit failures with stable string codes.
+- Migrated State Composition and Designer metadata to canonical fixed ports,
+  no universal Errors surface, exact host-owned resources, and natural JSON
+  `initialState` decoding.
+- Preserved the complete object-based standalone State node as an explicit
+  compatibility surface.
+- State moved to `4.0.0` and State Composition to `2.0.0`; package docs, shared
+  docs, changelog, and source-declaration baseline were updated.
+- Runtime (`28`), Composition (`15`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,057`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Projections is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext Control Link Deprecation
 
 - Made canonical conditioned links the filtering and branching primitive; no

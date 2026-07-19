@@ -1,78 +1,83 @@
 # FluxFlow.Components.State.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone state
-reducer node from `FluxFlow.Components.State`.
+Composition registration and Designer metadata for the canonical
+`state.reducer` component. It consumes typed commands containing immutable
+`FlowValue` data and emits one normal `FlowResult<T>` output.
 
-This package does not scan assemblies, resolve CLR types from strings, create
-reducer registries, or own expression engines. Hosts register the state reducer
-factory explicitly and provide a keyed `IFlowExpressionEngine`; they may also
-provide an optional keyed `TimeProvider`.
+This package does not choose an expression language, scan assemblies, resolve
+CLR types from strings, or own expression-engine and clock resources.
 
 ## Registration
 
 ```csharp
+services.AddKeyedSingleton<IFlowExpressionEngine>(
+    "Resources.State.Engine",
+    expressionEngine);
+
 services
-    .AddKeyedSingleton<IFlowExpressionEngine>("state", expressionEngine)
     .AddFluxFlowComposition(configuration)
     .RegisterNodes(registry => registry.RegisterStateReducer());
 ```
 
-## Node Types
+| Type | Required resources | Input | Output |
+|------|--------------------|-------|--------|
+| `state.reducer` | `engine` | `FlowValueStateReducerInput` | `FlowResult<FlowValueStateReducerResult>` |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `state.reducer` | `StateReducerNode` | `Input`, `Output` |
+`clock` is an optional keyed `TimeProvider`. The fixed descriptor exposes
+Events and no universal Errors port. Expected operation failures remain normal
+result data on Output.
 
-The factory exposes `Events` and `Errors`. `engine` is a required keyed
-`IFlowExpressionEngine` resource. `clock` is an optional keyed `TimeProvider`
-resource for deterministic result, event, and error timestamps.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "state": {
-              "type": "state.reducer",
-              "resources": {
-                "engine": "state",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "reducer": "count",
-                "keyExpression": "topic-key",
-                "initialState": 0,
-                "maxKeys": 1024,
-                "boundedCapacity": 128,
-                "expressionName": "topic counter"
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "State": {
+      "Engine": {
+        "Type": "host.expression-engine"
+      },
+      "Clock": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "TrackState": {
+        "Type": "state.reducer",
+        "engine": "Resources.State.Engine",
+        "clock": "Resources.State.Clock",
+        "reducer": "increment-count",
+        "keyExpression": "order-customer-key",
+        "initialState": {
+          "count": 0
+        },
+        "maxKeys": 1024,
+        "boundedCapacity": 128,
+        "Input": "Normalize.Output"
       }
     }
   }
 }
 ```
 
-The node binds the existing `StateReducerOptions` shape from composition
-configuration. `StateReducerOptions.Engine` remains configuration metadata; the
-composition adapter resolves the expression engine from the `engine` resource.
+Component settings, resource references, and port links are flat. Resource
+addresses and component/port names are exact and case-sensitive. The factory
+decodes ordinary JSON `initialState` values into immutable `FlowValue`; workflow
+authors do not write the tagged canonical serialization format.
+
+The `engine` option remains optional diagnostic metadata. DI selection uses the
+required `engine` resource reference. Missing resources and invalid options fail
+activation with composition diagnostics.
 
 ## Design Metadata
 
-`StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reducer` so hosts can build palettes, editors, validation hints, or
-documentation without copying package descriptors. The metadata describes the
-existing `StateReducerOptions` configuration surface, option grouping/editor
-hints, fixed `Input`/`Output` ports, and host-owned resource picker hints for
-the required keyed expression engine and optional keyed `TimeProvider`. Those
-resources stay host-owned; the `engine` option remains only diagnostic/config
-metadata and is not used for DI selection.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+`StateComponentDesignMetadataProvider` describes canonical command/result
+ports, reducer option sections and editor hints, and host-owned expression-engine
+and clock pickers using exact `Resources.{name}` addresses. The metadata is
+descriptive only. Hosts own palette and inspector rendering, resource selection,
+validation UI, activation, and persistence.
+
+The runtime package still contains the released object-based State node for
+code-authored compatibility. Composition `2.x` registers only the canonical
+fixed contract; install Composition `1.x` for an existing legacy definition.

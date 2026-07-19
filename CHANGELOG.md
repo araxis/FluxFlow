@@ -7,6 +7,36 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.State 4.0.0
+
+Adds a canonical keyed state reducer over immutable workflow values while
+preserving the released object-based node for code-authored compatibility.
+
+- Adds `FlowValueStateReducerNode` with typed commands and one normal
+  `FlowResult<FlowValueStateReducerResult>` Output plus Events.
+- Emits updated, reset, and cleared outcomes as successful result variants;
+  expected validation, key, reducer, and capacity failures are normal error
+  variants with stable string codes and immutable details.
+- Compiles reducer and optional key expressions once, preserves exact
+  `FlowValue` inputs and message lineage, and keeps ordered per-key updates.
+- Keeps `StateReducerNode`, its object contracts, Errors port, and released
+  runtime behavior unchanged for compatibility.
+
+## FluxFlow.Components.State.Composition 2.0.0
+
+Makes the canonical FlowValue command/result contract the fixed
+`state.reducer` registration.
+
+- Changes Input to `FlowValueStateReducerInput` and Output to
+  `FlowResult<FlowValueStateReducerResult>`.
+- Removes the universal Errors surface; expected failures remain normal output
+  data that links can inspect and route.
+- Decodes ordinary JSON `initialState` configuration into immutable
+  `FlowValue` and resolves expression-engine and clock resources by exact
+  host-owned addresses.
+- Updates Designer metadata and package examples to canonical fixed ports and
+  the flat two-section application document.
+
 ## FluxFlow.Components.Control 4.0.0
 
 Deprecates structural control nodes now represented by canonical conditional

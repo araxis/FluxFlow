@@ -1,102 +1,86 @@
 # FluxFlow.Components.State
 
-A standalone keyed state-reducer node for FluxFlow. It depends only on
-`FluxFlow.Nodes` and `FluxFlow.Mapping` — no engine, registry, or runtime. You
-`new` the node and `LinkTo` the next one.
+Standalone keyed state reducers for FluxFlow. The canonical node keeps dynamic
+state as immutable `FlowValue` data and emits every expected outcome through one
+normal `FlowResult<T>` output. The package does not require Composition or
+Engine; construct a node and link its Dataflow ports directly.
 
-## Node
+## Canonical Node
 
-| Node | Shape | Purpose |
-|------|-------|---------|
-| `StateReducerNode` | `Input` -> `Output`, `Errors`, `Events` | Keeps per-key state and updates it with a reducer expression. |
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowValueStateReducerNode` | `FlowValueStateReducerInput` | `FlowResult<FlowValueStateReducerResult>` |
 
-Every message travels as a `FlowMessage<T>` envelope. The updated state snapshot
-is broadcast on `Output` as `FlowMessage<StateReducerResult>` carrying the same
-correlation id as the input. State updates are serial, so each key observes
-deterministic, ordered changes.
-
-State reducer contracts trim key text on assignment. `StateReducerInput`
-defensively copies `Variables` with ordinal key comparison so later caller
-mutations do not change the message seen by the node.
+The node also exposes `Events` for lifecycle and operation diagnostics. It has
+no universal Errors port. Expected failures are ordinary result data, so links
+can inspect and route them without faulting the workflow.
 
 ```csharp
-await using var node = new StateReducerNode(
-    new StateReducerOptions
+await using var node = new FlowValueStateReducerNode(
+    new FlowValueStateReducerOptions
     {
-        KeyExpression = "topic",
-        InitialState = new { count = 0 },
-        Reducer = "update-topic-state",
+        Reducer = "increment-count",
+        InitialState = FlowValue.From(0),
         BoundedCapacity = 128,
         MaxKeys = 1024
     },
-    myExpressionEngine);
+    expressionEngine);
 
-node.Output.LinkTo(resultSink, new DataflowLinkOptions { PropagateCompletion = false });
+node.Output.LinkTo(resultSink);
 
-await node.Input.SendAsync(FlowMessage.Create(new StateReducerInput { Key = "a", Input = payload }));
+await node.Input.SendAsync(FlowMessage.Create(
+    new FlowValueStateReducerInput
+    {
+        Key = "orders",
+        Input = FlowValue.From(1)
+    }));
 ```
 
-The reducer (and optional key) expression is compiled once at construction via
-`IFlowExpressionEngine.Compile<T>(...)`, so parsing happens there rather than per
-message. `StateReducerNode` consumes `StateReducerInput` and emits
-`StateReducerResult`. The reducer expression receives variables for `key`,
+The reducer and optional key expression are compiled once at construction with
+`IFlowExpressionEngine.Compile<T>(...)`. Reducers return `FlowValue`; key
+expressions return `string`. The expression context contains `key`, `request`,
 `input`, `value`, `state`, `previousState`, `initialState`, `version`,
-`operation`, and any per-message `Variables`.
+`operation`, and the command's immutable ordinal `Variables`.
 
-If `KeyExpression` is set, it resolves the state key from the same expression
-context. Otherwise the node uses `StateReducerInput.Key`.
+## Commands And Results
 
-`StateReducerOptions` trims diagnostic text fields when assigned. A missing
-`Reducer`, an empty `KeyExpression`, a non-positive `BoundedCapacity`, or a
-negative `MaxKeys` fails fast as an argument exception.
+`FlowValueStateReducerInput.Operation` defaults to `Reduce`:
 
-## Operations
+- `Reduce` evaluates the reducer and stores the returned value.
+- `Reset` stores the command `InitialState`, or the node option when absent.
+- `Clear` removes the key and emits `FlowValue.Null` as the new state.
 
-`StateReducerInput.Operation` defaults to `Reduce`.
+Successful results use `updated`, `reset`, or `cleared` kinds.
+Each value records the key, previous state, input, new state, operation, version,
+and update time. Updates are processed serially and preserve input order.
 
-- `Reduce`: evaluate the reducer and store the new state.
-- `Reset`: store the request `InitialState` or node `InitialState`.
-- `Clear`: remove the state for the key and emit a result with `NewState` null.
+Invalid messages, invalid keys, key-expression failures, reducer failures, and
+key-limit rejections use the `state.operation-failed` result kind. Their
+`FlowError.Code` comes from `StateErrorCodeNames`; immutable details retain the
+legacy numeric code for migration. A normal failure does not stop later input.
 
-## Behavior
+Input messages retain business correlation, trace, causation, headers, and hop
+lineage through `FlowMessage<T>.With(...)`. `UpdatedAt` and diagnostic timestamps
+use the injected `TimeProvider`, defaulting to `TimeProvider.System`.
 
-Reducer, key-evaluation, and key-limit failures emit a `FlowError` on `Errors`
-(carrying the input's correlation id and a `Code` from `StateErrorCodes`) and the
-node keeps processing later messages. Per-operation notes
-(`state.reducer.updated`/`reset`/`cleared`), reducer failures, and key-limit
-warnings flow on the `Events` port (also carrying the correlation id where one is
-available).
-Unsupported per-message operations are reported as `InvalidMessage` errors and
-later valid messages continue through the node.
+## Lifecycle
 
-## Runtime timing
+`Complete()` drains accepted commands before completing Output and Events.
+`Fault(exception)` faults the data path for unexpected runtime failures.
+`DisposeAsync()` completes and drains the node. Component failures remain local
+and do not define host lifetime.
 
-`StateReducerResult.UpdatedAt` uses the node's clock (default
-`TimeProvider.System`). Provide a deterministic clock for tests:
+## Object Compatibility
 
-```csharp
-new StateReducerNode(options, myExpressionEngine, clock: new FakeTimeProvider(timestamp));
-```
+`StateReducerNode`, `StateReducerInput`, `StateReducerResult`, and
+`StateReducerOptions` remain available with their released object-based state,
+direct result Output, Errors port, and Events behavior. They are compatibility
+surfaces for existing code-authored workflows; no implicit conversion exists
+between those contracts and canonical `FlowValue` or `FlowResult<T>` links.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node package. This package is just the standalone
-node.
-
-Use `FluxFlow.Components.State.Composition` when a `FluxFlow.Composition` host
-should register the optional `state.reducer` factory:
-
-```csharp
-services
-    .AddKeyedSingleton<IFlowExpressionEngine>("state", myExpressionEngine)
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterStateReducer());
-```
-
-The composition adapter binds `StateReducerOptions` from node configuration,
-resolves the required expression engine from the host-owned keyed `engine`
-resource, and can resolve an optional host-owned keyed `TimeProvider` resource
-named `clock`.
-`StateReducerOptions.Engine` remains diagnostic/config metadata; it is not used
-for DI selection by the composition adapter.
+Use `FluxFlow.Components.State.Composition` when a Composition host should
+register the canonical `state.reducer` factory and Designer metadata. The host
+owns keyed expression-engine and clock resources; the component package does
+not create or manage them.
