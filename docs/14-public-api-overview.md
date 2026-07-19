@@ -592,15 +592,22 @@ Main types:
 
 Use `RegisterMetricsAggregate()` from the optional
 `FluxFlow.Components.Metrics.Composition` package when a composition host wants
-a `metrics.aggregate` node factory. The factory binds existing
-`MetricsAggregateOptions` and can resolve an optional keyed `TimeProvider`
-resource through the host.
+a canonical `metrics.aggregate` node factory. It consumes typed
+`MetricSampleInput` values and emits successful snapshots, partial group-limit
+applications, and expected failures through one
+`FlowResult<MetricSnapshotOutput>` Output. The descriptor has no universal
+Errors port. The factory binds `MetricsAggregateOptions` and can resolve an
+optional keyed `TimeProvider` resource through the host.
+
+The runtime package retains the released `MetricsAggregateNode`, direct
+snapshot Output, Errors port, and aggregation behavior for code-authored
+compatibility. Composition `2.x` registers only the canonical fixed contract.
 
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `metrics.aggregate` composition node, including existing metrics aggregate
-options, fixed ports, and a resource hint for the optional `clock` resource.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+options, canonical fixed ports, and a resource hint for the optional `clock`
+resource. The provider authors that metadata through the shared validated
+Designer metadata builder.
 
 ## Routing Composition
 

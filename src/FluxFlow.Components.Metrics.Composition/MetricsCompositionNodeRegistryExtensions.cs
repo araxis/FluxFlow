@@ -2,6 +2,7 @@ using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Nodes;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Metrics.Composition;
 
@@ -24,7 +25,7 @@ public static class MetricsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<MetricSnapshotOutput>(
+                CompositionPorts.Metadata<FlowResult<MetricSnapshotOutput>>(
                     MetricsCompositionPortNames.Output)
             ]);
     }
@@ -35,7 +36,7 @@ public static class MetricsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<MetricsAggregateOptions>();
         var clock = context.GetResource<TimeProvider>(
             MetricsCompositionResourceNames.Clock);
-        var node = new MetricsAggregateNode(options, clock);
+        var node = new FlowMetricsAggregateNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -47,11 +48,10 @@ public static class MetricsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<MetricSnapshotOutput>(
+                CompositionPorts.Output<FlowResult<MetricSnapshotOutput>>(
                     MetricsCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 }

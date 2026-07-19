@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext Metric Results
+
+- Added `FlowMetricsAggregateNode` with typed metric sample input and one
+  `FlowResult<MetricSnapshotOutput>` Output plus Events.
+- Preserved ordered count/value/size/group/latest/min-max/rate aggregation,
+  fan-out, and strong message lineage; coalesced final snapshots now emit
+  exactly once after normal completion drains accepted input.
+- Made invalid samples normal failures and group-limit applications explicit
+  partial results carrying the updated global snapshot, with bounded rejected
+  group tracking and later-sample continuation.
+- Migrated Metrics Composition and Designer metadata to the canonical fixed
+  Output and no universal Errors surface while retaining the direct-result node
+  for compatibility.
+- Metrics moved to `4.0.0` and Metrics Composition to `2.0.0`; package docs,
+  shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`47`), Composition (`14`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,076`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Observability is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext Projection Results
 
 - Added `FlowEventProjectionNode` with typed ProjectionEvent input and one

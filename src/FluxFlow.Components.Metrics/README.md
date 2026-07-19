@@ -1,115 +1,97 @@
 # FluxFlow.Components.Metrics
 
-A standalone metrics-aggregation node for FluxFlow — a "blockified" rolling aggregator.
+Standalone metric aggregation nodes for FluxFlow. The canonical node retains
+the typed sample and snapshot domain contracts while representing successful,
+partial, and failed aggregation outcomes through one normal `FlowResult<T>`
+output. No Composition or Engine package is required.
 
-## What it is
+## Canonical Node
 
-`MetricsAggregateNode` is a self-contained TPL Dataflow processor. You post
-`MetricSampleInput`s to its input and it broadcasts `MetricSnapshotOutput`s on its
-output (rejected-group / invalid-sample failures on the error port, diagnostics on
-the event port). It needs **nothing else** — no engine, registry, or runtime:
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowMetricsAggregateNode` | `MetricSampleInput` | `FlowResult<MetricSnapshotOutput>` |
+
+The node also exposes Events for lifecycle and aggregation diagnostics. It has
+no universal Errors port.
 
 ```csharp
-await using var node = new MetricsAggregateNode();
+await using var node = new FlowMetricsAggregateNode(
+    new MetricsAggregateOptions
+    {
+        RateWindowSeconds = 60,
+        GroupByTag = "tenant",
+        MaxGroups = 100,
+        EmitEverySample = true
+    });
 
-node.Output.LinkTo(dashboard.Input);   // broadcast: link the output to as many
-node.Output.LinkTo(logger.Input);      // downstream nodes as you like
+var results = new BufferBlock<FlowMessage<FlowResult<MetricSnapshotOutput>>>();
+node.Output.LinkTo(results);
 
 await node.Input.SendAsync(FlowMessage.Create(new MetricSampleInput
 {
-    Name = "message",
-    Group = topic,
-    Size = payloadLength
+    Timestamp = DateTimeOffset.UtcNow,
+    Name = "request.duration",
+    Value = 42.5,
+    Unit = "ms",
+    Size = 512,
+    Tags = new Dictionary<string, string>
+    {
+        ["tenant"] = "north"
+    }
 }));
 ```
 
-Every message travels as a `FlowMessage<T>` envelope, so the correlation id flows
-from the sample that produced a snapshot through to that snapshot for free.
-Metric contracts trim optional text on assignment. Tag maps, latest samples, and
-group snapshot maps are copied defensively with ordinal key comparison so later
-caller mutations do not change the message or snapshot contracts.
+Accepted samples update total and per-group counts, numeric aggregates, size
+totals, latest sample state, and rolling rates. The injected `TimeProvider`
+supplies missing sample timestamps and diagnostic timestamps.
 
-## Ports
+## Result Contract
 
-| Port | Block | Purpose |
-|------|-------|---------|
-| `Input` | `BufferBlock<FlowMessage<MetricSampleInput>>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<FlowMessage<MetricSnapshotOutput>>` | the rolling snapshot, fanned out to every linked consumer |
-| `Errors` | `BroadcastBlock<FlowError>` | invalid samples (`InvalidSample`) and rejected groups (`GroupLimitReached`) |
-| `Events` | `BroadcastBlock<FlowEvent>` | `metrics.aggregate.updated` / `.failed` / `.group-limit-reached` notes |
+Normal snapshots use the `snapshot` result kind. When
+`EmitEverySample = false`, normal `Complete()` drains accepted input and emits
+one `final-snapshot` result with the lineage of the last accepted sample.
 
-Outputs are broadcast (latest-wins, no backpressure): a consumer that keeps up
-sees every snapshot; one that falls badly behind may miss some. That is the
-deliberate trade for simplicity. If a graph genuinely must not drop, bridge that
-edge through its own bounded buffer.
+Invalid samples use `aggregate-failed` with the stable
+`metrics.invalid_sample` error code. Unexpected evaluation failures use the
+same result kind with `metrics.aggregate_failed`. These are normal output
+values, leave aggregate state unchanged, and do not prevent later input.
 
-## Behavior
+When `MaxGroups` is reached, the sample still updates the global aggregate but
+cannot update a per-group entry. That partial application emits exactly one
+`group-limit-reached` error result carrying the updated snapshot as its optional
+Value. Every partially applied sample remains explicit, while internal tracking
+of distinct rejected groups is bounded.
 
-`metrics.aggregate` folds each `MetricSampleInput` into a running snapshot —
-count, value (total/average/min/max), rate (windowed current + lifetime average),
-size, the latest sample, and per-group breakdowns. Missing numeric values still
-count as samples; they are not added to numeric totals unless
-`TreatMissingValueAsZero` is enabled.
-
-Group tracking is bounded by `MaxGroups`. Samples that exceed the group limit
-still update global totals, but the new group is not added and a `FlowError`
-(`GroupLimitReached`) is emitted once per rejected group; rejected-group tracking
-is itself capped, after which a single summary error is emitted.
-
-By default the node emits a snapshot on every sample (`EmitEverySample = true`).
-Set `EmitEverySample = false` to coalesce: the node emits a single final snapshot
-as the input drains.
+All result messages preserve correlation, trace, causation, and headers through
+`FlowMessage<T>.With(...)`.
 
 ## Options
 
-```csharp
-new MetricsAggregateOptions
-{
-    RateWindowSeconds = 60,        // window for the "current rate" calculation
-    BoundedCapacity = 128,         // input buffer size
-    MaxGroups = 1024,              // per-group itemization cap
-    EmitEverySample = true,        // false to emit only the final snapshot
-    TrackLatest = true,
-    TrackMinMax = true,
-    TrackSize = true,
-    GroupByTag = "topic",          // group by a tag value instead of Group
-    TreatMissingValueAsZero = false
-};
-```
+- `RateWindowSeconds` controls rolling current-rate calculations.
+- `BoundedCapacity` bounds accepted input queued for ordered processing.
+- `MaxGroups` bounds per-group aggregate state.
+- `EmitEverySample` selects per-sample snapshots or one completion snapshot.
+- `TrackLatest`, `TrackMinMax`, and `TrackSize` select snapshot detail.
+- `GroupByTag` selects a tag value instead of `MetricSampleInput.Group`.
+- `TreatMissingValueAsZero` counts absent numeric values as zero observations.
 
-`MetricsAggregateOptions` normalizes `GroupByTag` when assigned.
-`RateWindowSeconds` must be a finite positive value, `BoundedCapacity` must be
-positive, and `MaxGroups` must be zero or greater; invalid values fail fast as
-argument exceptions.
+## Lifecycle
 
-A `TimeProvider` can be injected for deterministic fallback timestamps. Explicit
-sample timestamps always win; the time provider is used only when
-`MetricSampleInput` omits `Timestamp`.
+`Complete()` drains accepted samples and handles the configured final snapshot.
+`Fault(exception)` remains the unexpected Dataflow fault surface, and
+`DisposeAsync()` completes and drains the node.
 
-```csharp
-await using var node = new MetricsAggregateNode(options, timeProvider);
-```
+## Direct-Result Compatibility
+
+`MetricsAggregateNode` remains available with its released direct
+`MetricSnapshotOutput` Output, Errors port, Events, and aggregation behavior. It
+is a compatibility surface for existing code-authored workflows. No implicit
+conversion exists between its output and
+`FlowResult<MetricSnapshotOutput>` links.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node. This package is just the standalone node.
-
-Use `FluxFlow.Components.Metrics.Composition` when a `FluxFlow.Composition`
-host should register the optional `metrics.aggregate` factory:
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMetricsAggregate());
-```
-
-The composition adapter binds `MetricsAggregateOptions` from node configuration
-and can resolve an optional host-owned keyed `TimeProvider` resource named
-`clock`. Group tracking, aggregation windows, and snapshot emission remain
-normal node behavior controlled by `MetricsAggregateOptions`.
-
-The optional composition package also exposes
-`MetricsComponentDesignMetadataProvider` for neutral Designer metadata over the
-`metrics.aggregate` composition node type. The standalone Metrics package
-remains free of Designer, Composition, and Engine dependencies.
+Use `FluxFlow.Components.Metrics.Composition` when a Composition host should
+register the canonical `metrics.aggregate` factory and Designer metadata. Hosts
+own optional keyed clocks and decide how snapshots are stored, displayed, or
+forwarded.

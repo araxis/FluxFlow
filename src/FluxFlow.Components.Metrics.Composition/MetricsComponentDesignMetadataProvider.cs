@@ -155,7 +155,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Metric aggregate snapshot.",
-                valueType: nameof(MetricSnapshotOutput),
+                summary: "Metric aggregate snapshot or expected aggregation failure.",
+                valueType: "FlowResult<MetricSnapshotOutput>",
                 isPrimary: true);
 }

@@ -5,13 +5,13 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/projections-vnext`. The provider-neutral MQTT vertical slice and the
-  first ten normal component-family migrations, canonical FlowValue Mapping,
+  `work/metrics-vnext`. The provider-neutral MQTT vertical slice and the
+  first eleven normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
-  FlowValue State commands/results plus typed-event Projection results, are
-  implemented and verified locally.
+  FlowValue State commands/results, typed-event Projection results, and typed
+  Metric snapshot/results are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -28,7 +28,7 @@ Date: 2026-07-19
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
   Validation, Assertions, Expectations, Routing, Control, State, and
-  Projections now use this foundation; the remaining component-family
+  Projections, and Metrics now use this foundation; the remaining component-family
   migrations continue separately.
   See
   `205-vnext-data-foundation.md` and
@@ -218,6 +218,18 @@ Date: 2026-07-19
   tests, controlled builds, binary compatibility, preflight/dry-runs, and a
   package-only consumer passed. Metrics is the next bounded family assessment.
   See `225-vnext-projections-flowresult.md`.
+- `FluxFlow.Components.Metrics` is now `4.0.0` locally with canonical
+  `FlowMetricsAggregateNode`. It retains typed metric sample and snapshot
+  contracts while emitting per-sample/final snapshots, partial group-limit
+  applications, and expected failures through one
+  `FlowResult<MetricSnapshotOutput>` Output plus Events. Ordered aggregation,
+  rates, fan-out, and message lineage are preserved; coalesced final snapshots
+  emit after normal input drain. The direct-result standalone node remains
+  available for compatibility. Metrics Composition is now `2.0.0` with the
+  canonical fixed Output, no universal Errors surface, and an exact host-owned
+  clock resource. Focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Observability is the
+  next bounded family assessment. See `226-vnext-metrics-flowresult.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

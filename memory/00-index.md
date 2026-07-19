@@ -508,6 +508,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `225-vnext-projections-flowresult.md`: canonical typed-event projection
   snapshots and expected failures on one normal result output, ordered final
   completion, preserved direct-result compatibility, and package evidence.
+- `226-vnext-metrics-flowresult.md`: canonical typed-sample metric snapshots,
+  partial group-limit and expected failure results, ordered final completion,
+  preserved direct-result compatibility, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -8,6 +8,7 @@ using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -31,7 +32,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         registration.Inputs[MetricsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(MetricSampleInput));
         registration.Outputs[MetricsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(MetricSnapshotOutput));
+            .ShouldBe(typeof(FlowResult<MetricSnapshotOutput>));
     }
 
     [Fact]
@@ -67,7 +68,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(MetricsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(MetricSnapshotOutput));
+        output.ValueType?.Value.ShouldBe("FlowResult<MetricSnapshotOutput>");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -241,14 +242,16 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
 
             snapshot.CorrelationId.ShouldBe(second.CorrelationId);
-            snapshot.Payload.SampleCount.ShouldBe(2);
-            snapshot.Payload.ValueCount.ShouldBe(2);
-            snapshot.Payload.TotalValue.ShouldBe(6);
-            snapshot.Payload.AverageValue.ShouldBe(3);
-            snapshot.Payload.TotalSize.ShouldBe(30);
-            snapshot.Payload.Groups.Keys.ShouldBe(["sensors/a", "sensors/b"], ignoreOrder: true);
-            snapshot.Payload.Groups["sensors/a"].TotalSize.ShouldBe(10);
-            snapshot.Payload.Groups["sensors/b"].TotalSize.ShouldBe(20);
+            snapshot.Payload.Kind.ShouldBe(MetricsResultKinds.Snapshot);
+            var value = snapshot.Payload.Value.ShouldNotBeNull();
+            value.SampleCount.ShouldBe(2);
+            value.ValueCount.ShouldBe(2);
+            value.TotalValue.ShouldBe(6);
+            value.AverageValue.ShouldBe(3);
+            value.TotalSize.ShouldBe(30);
+            value.Groups.Keys.ShouldBe(["sensors/a", "sensors/b"], ignoreOrder: true);
+            value.Groups["sensors/a"].TotalSize.ShouldBe(10);
+            value.Groups["sensors/b"].TotalSize.ShouldBe(20);
         },
         node => node
             .Configure("rateWindowSeconds", 10)
@@ -267,16 +270,17 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
                 var snapshots = Link(output.Source);
 
                 (await input.Target.SendAsync(FlowMessage.Create(new MetricSampleInput
-                    {
-                        Name = "items",
-                        Value = 1
-                    }))
+                {
+                    Name = "items",
+                    Value = 1
+                }))
                     .WaitAsync(Timeout)).ShouldBeTrue();
 
                 var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
-                snapshot.Payload.Timestamp.ShouldBe(timestamp);
-                snapshot.Payload.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
-                snapshot.Payload.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
+                var value = snapshot.Payload.Value.ShouldNotBeNull();
+                value.Timestamp.ShouldBe(timestamp);
+                value.Latest.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
+                value.Groups["default"].LatestTimestamp.ShouldBe(timestamp);
             },
             node => node.Resource(MetricsCompositionResourceNames.Clock, "fixed"),
             services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
@@ -298,8 +302,9 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             await descriptor.Completion.WaitAsync(Timeout);
 
             var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
-            snapshot.Payload.SampleCount.ShouldBe(2);
-            snapshot.Payload.TotalValue.ShouldBe(3);
+            snapshot.Payload.Kind.ShouldBe(MetricsResultKinds.FinalSnapshot);
+            snapshot.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(2);
+            snapshot.Payload.Value.TotalValue.ShouldBe(3);
             snapshots.TryReceive(out _).ShouldBeFalse();
         },
         node => node.Configure("emitEverySample", false));
@@ -310,7 +315,8 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
-            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<MetricSnapshotOutput>>());
+            output.Source.LinkTo(
+                DataflowBlock.NullTarget<FlowMessage<FlowResult<MetricSnapshotOutput>>>());
             var events = Link(descriptor.Events.ShouldNotBeNull());
             var message = FlowMessage.Create(new MetricSampleInput
             {
@@ -324,16 +330,16 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             @event.Name.ShouldBe(MetricsDiagnosticNames.AggregateUpdated);
             @event.CorrelationId.ShouldBe(message.CorrelationId);
             @event.Attributes["sampleCount"].ShouldBe(1L);
+            descriptor.Errors.ShouldBeNull();
         });
     }
 
     [Fact]
-    public async Task Hosted_metrics_aggregate_emits_errors_and_continues_after_invalid_sample()
+    public async Task Hosted_metrics_aggregate_emits_normal_failure_and_continues_after_invalid_sample()
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
-            var snapshots = Link(output.Source);
-            var errors = Link(descriptor.Errors.ShouldNotBeNull());
+            var results = Link(output.Source);
             var bad = FlowMessage.Create(
                 new MetricSampleInput { Size = -1 },
                 new CorrelationId("bad"));
@@ -344,15 +350,43 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
             (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
             (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
 
-            var error = await errors.ReceiveAsync().WaitAsync(Timeout);
-            var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
+            var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+            var snapshot = await results.ReceiveAsync().WaitAsync(Timeout);
 
-            error.Code.ShouldBe(MetricsErrorCodes.InvalidSample);
-            error.CorrelationId.ShouldBe(bad.CorrelationId);
+            failure.CorrelationId.ShouldBe(bad.CorrelationId);
+            failure.Payload.IsError.ShouldBeTrue();
+            failure.Payload.Error.ShouldNotBeNull().Code
+                .ShouldBe(MetricsErrorCodeNames.InvalidSample);
             snapshot.CorrelationId.ShouldBe(good.CorrelationId);
-            snapshot.Payload.SampleCount.ShouldBe(1);
-            snapshot.Payload.TotalSize.ShouldBe(3);
+            snapshot.Payload.Value.ShouldNotBeNull().SampleCount.ShouldBe(1);
+            snapshot.Payload.Value.TotalSize.ShouldBe(3);
+            descriptor.Errors.ShouldBeNull();
         });
+    }
+
+    [Fact]
+    public async Task Hosted_metrics_group_limit_failure_carries_global_snapshot()
+    {
+        await WithNodeAsync(
+            async (input, output, descriptor) =>
+            {
+                var results = Link(output.Source);
+                await input.Target.SendAsync(FlowMessage.Create(
+                    new MetricSampleInput { Group = "a", Value = 1 }));
+                await input.Target.SendAsync(FlowMessage.Create(
+                    new MetricSampleInput { Group = "b", Value = 2 }));
+
+                await results.ReceiveAsync().WaitAsync(Timeout);
+                var partial = await results.ReceiveAsync().WaitAsync(Timeout);
+                partial.Payload.Kind.ShouldBe(MetricsResultKinds.GroupLimitReached);
+                partial.Payload.IsError.ShouldBeTrue();
+                var snapshot = partial.Payload.Value.ShouldNotBeNull();
+                snapshot.SampleCount.ShouldBe(2);
+                snapshot.TotalValue.ShouldBe(3);
+                snapshot.Groups.Keys.ShouldBe(["a"]);
+                descriptor.Errors.ShouldBeNull();
+            },
+            node => node.Configure("maxGroups", 1));
     }
 
     [Fact]
@@ -466,7 +500,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
     private static async Task WithNodeAsync(
         Func<
             CompositionInputPort<MetricSampleInput>,
-            CompositionOutputPort<MetricSnapshotOutput>,
+            CompositionOutputPort<FlowResult<MetricSnapshotOutput>>,
             ComposedNode,
             Task> run,
         Action<NodeDefinitionBuilder>? configureNode = null,
@@ -495,7 +529,7 @@ public sealed class MetricsCompositionNodeRegistryExtensionsTests
         var input = descriptor.Inputs[MetricsCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<MetricSampleInput>>();
         var output = descriptor.Outputs[MetricsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<MetricSnapshotOutput>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<MetricSnapshotOutput>>>();
 
         await run(input, output, descriptor);
     }

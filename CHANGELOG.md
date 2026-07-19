@@ -7,6 +7,35 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Metrics 4.0.0
+
+Adds canonical normal-result metric aggregation while preserving the released
+direct-result node for code-authored compatibility.
+
+- Adds `FlowMetricsAggregateNode` with typed `MetricSampleInput` input and one
+  `FlowResult<MetricSnapshotOutput>` Output plus Events.
+- Emits per-sample and final snapshots as successful variants; invalid samples
+  and partial group-limit applications are normal error variants with stable
+  string codes and immutable details.
+- Applies group-limited samples to global aggregates while carrying the updated
+  snapshot on the partial result and keeping rejected-group tracking bounded.
+- Preserves ordered counts, values, sizes, groups, latest samples, event-time
+  rates, message lineage, and output fan-out.
+- Keeps `MetricsAggregateNode`, its direct snapshot Output, Errors port, and
+  released runtime behavior unchanged for compatibility.
+
+## FluxFlow.Components.Metrics.Composition 2.0.0
+
+Makes the canonical result contract the fixed `metrics.aggregate` registration.
+
+- Changes Output to `FlowResult<MetricSnapshotOutput>` and removes the
+  universal Errors surface.
+- Keeps typed `MetricSampleInput` Input and the optional host-owned clock at an
+  exact resource address.
+- Makes coalesced final snapshots part of normal composition completion.
+- Updates Designer metadata and package examples to the canonical fixed ports
+  and flat two-section application document.
+
 ## FluxFlow.Components.Projections 4.0.0
 
 Adds canonical normal-result event projections while preserving the released
