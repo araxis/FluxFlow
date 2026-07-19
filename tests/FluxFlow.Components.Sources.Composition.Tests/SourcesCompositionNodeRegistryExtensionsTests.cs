@@ -5,6 +5,7 @@ using FluxFlow.Components.Sources.Composition;
 using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,13 +21,28 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     public void RegisterSourceNodes_registers_source_metadata()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterGeneratedSource<InputMessage>()
+            .RegisterGeneratedSource()
             .RegisterSequenceSource();
 
         registry.Registrations[SourcesCompositionNodeTypes.Generated]
             .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(InputMessage));
+                typeof(FlowValue));
         registry.Registrations[SourcesCompositionNodeTypes.Sequence]
+            .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
+                typeof(FlowValue));
+    }
+
+    [Fact]
+    public void Explicit_registrations_preserve_typed_compatibility_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterGeneratedSource<InputMessage>("source.generated.input")
+            .RegisterSequenceItemSource("source.sequence.item");
+
+        registry.Registrations["source.generated.input"]
+            .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
+                typeof(InputMessage));
+        registry.Registrations["source.sequence.item"]
             .Outputs[SourcesCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(SourceSequenceItem));
     }
@@ -63,6 +79,10 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         {
             AssertClockResource(item);
         }
+        metadata.Single(item =>
+                item.Type.Value == SourcesCompositionNodeTypes.Generated)
+            .Attributes[new ComponentAttributeName("omittedOptions")]
+            .Value.ShouldBe("outputType");
     }
 
     [Fact]
@@ -70,8 +90,8 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Generated], "TOutput");
-        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Sequence], nameof(SourceSequenceItem));
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Generated], nameof(FlowValue));
+        AssertSourcePorts(metadata[SourcesCompositionNodeTypes.Sequence], nameof(FlowValue));
     }
 
     [Fact]
@@ -83,7 +103,6 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             metadata[SourcesCompositionNodeTypes.Generated],
             [
                 ("name", OptionValueKind.Text, "generated", null),
-                ("outputType", OptionValueKind.Text, "object", null),
                 ("items", OptionValueKind.Json, null, null),
                 ("loop", OptionValueKind.Boolean, false, null),
                 ("maxItems", OptionValueKind.Number, null, 1),
@@ -113,11 +132,6 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
         AssertOptionHints(
             generatedOptions["name"],
             "Diagnostics",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
-            generatedOptions["outputType"],
-            "Type Metadata",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(
@@ -229,7 +243,6 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                     SourcesCompositionNodeTypes.Generated,
                     node => node
                         .Configure("name", "orders")
-                        .Configure("outputType", "app.order")
                         .Configure("items", new[]
                         {
                             new InputMessage("A-100", 10),
@@ -238,7 +251,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                         .Configure("boundedCapacity", 8)))
                 .Build())
             .RegisterNodes(registry =>
-                registry.RegisterGeneratedSource<InputMessage>())
+                registry.RegisterGeneratedSource())
             .Configure(options => options.StartRuntimeWithHost = false);
 
         await using var provider = services.BuildServiceProvider();
@@ -248,7 +261,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var sourceNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = sourceNode.Descriptor.Outputs[SourcesCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var items = Link(output.Source);
         var events = Link(sourceNode.Descriptor.Events.ShouldNotBeNull());
 
@@ -260,13 +273,49 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .Select(flowEvent => flowEvent.Name)
             .ToArray();
 
-        emitted.Select(message => message.Payload.Id).ShouldBe(["A-100", "A-101"]);
-        emitted.Select(message => message.Payload.Value).ShouldBe([10, 20]);
+        emitted.Select(message => message.Payload.GetObject()["id"].GetString())
+            .ShouldBe(["A-100", "A-101"]);
+        emitted.Select(message => (long)message.Payload.GetObject()["value"].GetInteger())
+            .ShouldBe([10, 20]);
         emitted.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(2);
         emitted.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+        sourceNode.Descriptor.Errors.ShouldBeNull();
         eventNames.ShouldContain("source.generated.started");
         eventNames.ShouldContain("source.generated.emitted");
         eventNames.ShouldContain("source.generated.completed");
+    }
+
+    [Fact]
+    public async Task Hosted_generated_source_normalizes_one_scalar_item()
+    {
+        var services = new ServiceCollection();
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "single",
+                    SourcesCompositionNodeTypes.Generated,
+                    node => node.Configure("items", "one")))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterGeneratedSource())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        await BuildCompositionAsync(provider);
+
+        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
+            .Runtime.ShouldNotBeNull();
+        var sourceNode = runtime.Nodes.ShouldHaveSingleItem();
+        var output = sourceNode.Descriptor.Outputs[SourcesCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
+        var items = Link(output.Source);
+
+        await runtime.StartAsync();
+        await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var emitted = (await DrainUntilCompletedAsync(items)).ShouldHaveSingleItem();
+        emitted.Payload.GetString().ShouldBe("one");
+        sourceNode.Descriptor.Errors.ShouldBeNull();
     }
 
     [Fact]
@@ -285,13 +334,12 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                     node => node
                         .Resource(SourcesCompositionResourceNames.Clock, "fixed")
                         .Configure("name", "feed")
-                        .Configure("outputType", "string")
                         .Configure("initialDelayMilliseconds", 15)
                         .Configure("intervalMilliseconds", 30)
                         .Configure("items", new[] { "one", "two" })))
                 .Build())
             .RegisterNodes(registry =>
-                registry.RegisterGeneratedSource<string>())
+                registry.RegisterGeneratedSource())
             .Configure(options => options.StartRuntimeWithHost = false);
 
         await using var provider = services.BuildServiceProvider();
@@ -301,7 +349,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var sourceNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = sourceNode.Descriptor.Outputs[SourcesCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<string>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var items = Link(output.Source);
 
         await runtime.StartAsync();
@@ -309,7 +357,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
 
         var emitted = await DrainUntilCompletedAsync(items);
 
-        emitted.Select(message => message.Payload).ShouldBe(["one", "two"]);
+        emitted.Select(message => message.Payload.GetString()).ShouldBe(["one", "two"]);
         clock.GetUtcNow().ShouldBe(startedAt.AddMilliseconds(60));
     }
 
@@ -324,11 +372,10 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                     "empty",
                     SourcesCompositionNodeTypes.Generated,
                     node => node
-                        .Configure("name", "empty")
-                        .Configure("outputType", "string")))
+                        .Configure("name", "empty")))
                 .Build())
             .RegisterNodes(registry =>
-                registry.RegisterGeneratedSource<string>())
+                registry.RegisterGeneratedSource())
             .Configure(options => options.StartRuntimeWithHost = false);
 
         await using var provider = services.BuildServiceProvider();
@@ -338,7 +385,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var sourceNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = sourceNode.Descriptor.Outputs[SourcesCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<string>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var items = Link(output.Source);
 
         await runtime.StartAsync();
@@ -379,7 +426,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var sourceNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = sourceNode.Descriptor.Outputs[SourcesCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<SourceSequenceItem>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var items = Link(output.Source);
 
         await runtime.StartAsync();
@@ -387,12 +434,19 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
 
         var emitted = await DrainUntilCompletedAsync(items);
 
-        emitted.Select(message => message.Payload.Sequence).ShouldBe([1, 2, 3]);
-        emitted.Select(message => message.Payload.Value).ShouldBe([10, 15, 20]);
-        emitted.ShouldAllBe(message => message.Payload.Name == "numbers");
-        emitted.ShouldAllBe(message => message.Payload.Timestamp >= startedAt);
+        emitted.Select(message =>
+                (long)message.Payload.GetObject()["sequence"].GetInteger())
+            .ShouldBe([1, 2, 3]);
+        emitted.Select(message =>
+                (long)message.Payload.GetObject()["value"].GetInteger())
+            .ShouldBe([10, 15, 20]);
+        emitted.ShouldAllBe(message =>
+            message.Payload.GetObject()["name"].GetString() == "numbers");
+        emitted.ShouldAllBe(message =>
+            message.Payload.GetObject()["timestamp"].GetDateTimeOffset() >= startedAt);
         emitted.Select(message => message.CorrelationId).Distinct().Count().ShouldBe(3);
         emitted.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
+        sourceNode.Descriptor.Errors.ShouldBeNull();
     }
 
     [Theory]
@@ -430,7 +484,7 @@ public sealed class SourcesCompositionNodeRegistryExtensionsTests
                     }))
                 .Build())
             .RegisterNodes(registry => registry
-                .RegisterGeneratedSource<string>()
+                .RegisterGeneratedSource()
                 .RegisterSequenceSource())
             .Configure(options => options.ThrowOnBuildFailure = false);
 

@@ -1,6 +1,6 @@
 # FluxFlow Memory Index
 
-Date: 2026-07-18
+Date: 2026-07-19
 
 This folder records the extraction work for `FluxFlow.Engine`.
 
@@ -514,6 +514,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `227-vnext-observability-flowvalue.md`: canonical FlowValue Counter, Logger,
   and Metrics normal-result contracts, FlowValue-native selectors, preserved
   generic compatibility, and package evidence.
+- `228-vnext-sources-flowvalue.md`: canonical FlowValue generated and sequence
+  sources, one-or-many ordinary JSON item binding, preserved typed
+  compatibility, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -519,24 +519,34 @@ Main types:
 
 - `SourcesComponentDesignMetadataProvider`
 - `SourcesCompositionNodeRegistryExtensions`
+- `SourcesTypedRegistrationExtensions`
 - `SourcesCompositionNodeTypes`
 - `SourcesCompositionPortNames`
 - `SourcesCompositionResourceNames`
 
-Use `RegisterGeneratedSource<TOutput>()` and `RegisterSequenceSource()` from the
-optional `FluxFlow.Components.Sources.Composition` package when a composition
-host wants generated or sequence source factories. The generated factory
-deserializes inline `items` into the closed output type; both factories resolve
-optional keyed `TimeProvider` resources through the host.
+Use parameterless `RegisterGeneratedSource()` and `RegisterSequenceSource()`
+from the optional `FluxFlow.Components.Sources.Composition` package for the
+canonical fixed contracts. Both are zero-input sources with one `FlowValue`
+Output, Events, and no universal Errors port. Generated `items` accepts one
+ordinary JSON value or an array; each item is decoded once into immutable
+FlowValue data during activation. Both factories resolve an optional exact
+keyed `TimeProvider` through the host.
 Invalid source option values fail during composition build through the factory
 path, so hosts that collect build diagnostics receive `FactoryFailed` entries
 instead of a partially created runtime.
+
+Explicit `RegisterGeneratedSource<TOutput>(nodeType)` and
+`RegisterSequenceItemSource(nodeType)` calls preserve the released typed
+outputs for code-authored compatibility. Use distinct node type names when
+typed and canonical registrations share a registry.
 
 `SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
 generated and sequence source composition nodes so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata includes inline generated `items` as JSON node configuration,
-fixed output ports, and a resource hint for the optional `clock` resource.
+canonical fixed FlowValue output ports, and a resource hint for the optional
+`clock` resource. The generic-only `outputType` diagnostic option is explicitly
+omitted from the canonical metadata.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
 

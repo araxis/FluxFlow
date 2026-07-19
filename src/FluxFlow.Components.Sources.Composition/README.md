@@ -1,106 +1,105 @@
 # FluxFlow.Components.Sources.Composition
 
-Optional `FluxFlow.Composition` registration helpers for standalone generated
-and sequence source nodes from `FluxFlow.Components.Sources`.
+Composition registration and Designer metadata for canonical generated and
+sequence `FlowValue` sources. Both node types have no input, one normal
+`Output`, lifecycle `Events`, and no universal `Errors` port.
 
-This package does not scan assemblies, resolve CLR types from strings, add hot
-reload behavior, or resolve generated items from resources. Hosts register
-closed generated source output types explicitly and provide optional keyed
-`TimeProvider` services.
+This package does not scan assemblies, resolve CLR types from strings, own
+clock lifetime, add polling, persist output, or depend on Engine.
 
-## Registration
-
-```csharp
-services.AddKeyedSingleton<TimeProvider>("fixed", timeProvider);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterGeneratedSource<OrderMessage>()
-        .RegisterSequenceSource());
-```
-
-Use custom node type names when a host needs more than one generated output
-shape:
+## Canonical Registration
 
 ```csharp
+services.AddKeyedSingleton<TimeProvider>(
+    "Resources.System.Clock",
+    timeProvider);
+
 registry
-    .RegisterGeneratedSource<OrderMessage>("source.generated.order")
-    .RegisterGeneratedSource<HttpMessage>("source.generated.http");
+    .RegisterGeneratedSource()
+    .RegisterSequenceSource();
 ```
 
-## Node Types
+| Type | Node | Output | Optional resource |
+|------|------|--------|-------------------|
+| `source.generated` | `FlowValueGeneratedSourceNode` | `FlowValue` | `clock` |
+| `source.sequence` | `FlowValueSequenceSourceNode` | `FlowValue` | `clock` |
 
-| Type | Node | Optional resource | Ports |
-|------|------|-------------------|-------|
-| `source.generated` | `GeneratedSourceNode<TOutput>` | `clock` | `Output` |
-| `source.sequence` | `SequenceSourceNode` | `clock` | `Output` |
+The composition runtime starts and stops both through `IFlowSource`. Invalid
+options fail node activation. Missing generated `items` creates an empty source.
 
-The composition runtime starts both sources through the normal `IFlowSource`
-lifecycle. `source.generated` deserializes inline `items` from node
-configuration into the closed generic output type registered by the host.
-
-## Design Metadata
-
-`SourcesComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the generated and sequence source composition nodes. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes node options, ports, option grouping/editor hints, and a
-resource picker hint for the optional `clock` resource. Inline generated
-`items` are node configuration and are exposed as JSON metadata. The clock
-remains a host-owned composition resource with a key-pattern hint and is not
-exposed as an editable node option.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "orders": {
-              "type": "source.generated",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "name": "orders",
-                "outputType": "app.order",
-                "items": [
-                  { "id": "A-100", "total": 125 },
-                  { "id": "A-101", "total": 250 }
-                ],
-                "boundedCapacity": 128
-              }
-            },
-            "numbers": {
-              "type": "source.sequence",
-              "configuration": {
-                "name": "numbers",
-                "start": 10,
-                "step": 5,
-                "count": 3
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "System": {
+      "Clock": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "Main": {
+      "Orders": {
+        "Type": "source.generated",
+        "clock": "Resources.System.Clock",
+        "name": "orders",
+        "items": [
+          { "id": "A-100", "total": 125 },
+          { "id": "A-101", "total": 250 }
+        ],
+        "boundedCapacity": 128,
+        "Output": "Normalize.Input"
+      },
+      "Numbers": {
+        "Type": "source.sequence",
+        "name": "numbers",
+        "start": 10,
+        "step": 5,
+        "count": 3,
+        "Output": ["Audit.Input", "Aggregate.Input"]
       }
     }
   }
 }
 ```
 
-Missing generated `items` bind as an empty source. `GeneratedSourceOptions.OutputType`
-remains diagnostic metadata; the actual output port type comes from the closed
-generic registration selected by the host.
-Invalid source option values fail during composition build through the node
-factory. If build failures are configured as diagnostics, the runtime is not
-created and the host receives a `FactoryFailed` diagnostic with the relevant
-option name.
+Component settings, resource references, and links are flat. `items` accepts
+one JSON value directly or an array for multiple values. Ordinary JSON strings,
+numbers, booleans, nulls, arrays, and objects are decoded once into immutable
+`FlowValue` data at activation.
+
+The sample output links are valid when the target inputs also accept
+`FlowValue`. Exact payload types remain part of static link validation; the
+runtime does not insert implicit mappers.
+
+## Host-Owned Clock
+
+`clock` is optional and resolves an exact keyed `TimeProvider` address. Without
+it, the node uses `TimeProvider.System`. The host owns the selected service,
+its lifetime, and disposal.
+
+## Typed Compatibility
+
+Code-authored hosts can retain released typed contracts explicitly:
+
+```csharp
+registry
+    .RegisterGeneratedSource<OrderMessage>("source.generated.order")
+    .RegisterSequenceItemSource("source.sequence.item");
+```
+
+The generic registration emits `TOutput`; the sequence-item registration emits
+`SourceSequenceItem`. Use distinct node type names when typed and canonical
+registrations share a registry. Typed nodes retain their released error ports
+and behavior.
+
+## Design Metadata
+
+`SourcesComponentDesignMetadataProvider` describes canonical fixed `FlowValue`
+outputs, option sections/editor hints, generated JSON items, and the optional
+host-owned clock picker. The generic-only `outputType` diagnostic option is
+explicitly omitted from canonical metadata.
+
+The metadata is descriptive. Hosts own palettes, inspectors, validation UI,
+resource selection, activation, persistence, and runtime status display.

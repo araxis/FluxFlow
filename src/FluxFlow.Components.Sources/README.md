@@ -1,107 +1,111 @@
 # FluxFlow.Components.Sources
 
-Standalone deterministic source nodes for FluxFlow, built on the
-[FluxFlow.Nodes](../FluxFlow.Nodes) kit. Every node is a self-contained TPL
-Dataflow processor: `new` it, `LinkTo` the next node, `StartAsync()` it, and run
-it — no engine, registry, or runtime required. All timing is driven by an
-injected `TimeProvider`, so tests stay deterministic with a `FakeTimeProvider`.
+Standalone deterministic source nodes for FluxFlow. Canonical sources emit
+immutable `FlowValue` messages on one normal `Output` plus lifecycle `Events`.
+They have no input and no universal `Errors` port.
 
-## Nodes
+The package depends on TPL Dataflow through `FluxFlow.Nodes`, but it does not
+require Composition, Engine, hosting, reflection, or assembly scanning.
 
-| Node | Kind | Shape | Purpose |
-|------|------|-------|---------|
-| `GeneratedSourceNode<T>` | source | `Output` | Emits a configured list of `T` values as `FlowMessage<T>`. |
-| `SequenceSourceNode` | source | `Output` | Emits a deterministic numeric `FlowMessage<SourceSequenceItem>` sequence. |
+## Canonical Sources
 
-Both nodes are zero-input emitters. Call `StartAsync()` and they produce until
-their configured count is reached (source complete) or they are stopped via
-`Complete()`/`DisposeAsync()`. Every emitted item is a `FlowMessage<T>` envelope
-with a fresh `CorrelationId`. Lifecycle notes (started, emitted, completed,
-failed) surface on the `Events` port using `SourceDiagnosticNames`; failures
-surface a `FlowError` on the `Errors` port.
+| Node | Output | Purpose |
+|------|--------|---------|
+| `FlowValueGeneratedSourceNode` | `FlowMessage<FlowValue>` | Emits configured immutable values. |
+| `FlowValueSequenceSourceNode` | `FlowMessage<FlowValue>` | Emits deterministic sequence objects. |
 
-`BoundedCapacity` configures the source output capacity. Generated and sequence
-loops await source output acceptance. Output remains broadcast/latest-wins; use
-a dedicated durable buffer if a workflow edge must guarantee no loss.
-Source options validate at construction. Invalid capacities, negative delays,
-invalid generated loop/max item settings, invalid sequence counts, and zero
-steps fail before source pipelines are created.
+Both nodes mint a fresh message identity for every emitted value. They start
+once through `StartAsync()`, stop through `Complete()` or disposal, preserve
+configured order, and publish started, emitted, completed, and failed lifecycle
+events. A pre-canceled start does not consume the one-start state.
 
-## Generated
+Configuration errors fail construction. An unexpected source-loop failure
+faults `Completion` and `Output`; hosts surface that fault through the canonical
+runtime system streams. There is no per-input expected failure because source
+nodes have no input operation.
+
+## Generated Values
 
 ```csharp
-await using var node = new GeneratedSourceNode<AppMessage>(
-    new GeneratedSourceOptions
+var first = FlowValue.FromObject(new Dictionary<string, FlowValue>
+{
+    ["id"] = FlowValue.From("A-100"),
+    ["total"] = FlowValue.From(125)
+});
+
+await using var source = new FlowValueGeneratedSourceNode(
+    new FlowValueGeneratedSourceOptions
     {
-        Name = "feed",
-        OutputType = "app.message",
+        Name = "orders",
         Loop = true,
         MaxItems = 5,
-        IntervalMilliseconds = 100
+        IntervalMilliseconds = 100,
+        BoundedCapacity = 128
     },
-    items: new[]
-    {
-        new AppMessage("A-100", "alpha"),
-        new AppMessage("A-101", "beta")
-    });
-node.Output.LinkTo(downstream);
-await node.StartAsync();
+    [first, FlowValue.From("complete")]);
+
+source.Output.LinkTo(downstream);
+await source.StartAsync();
 ```
 
-The host materializes (and, if it started from JSON, deserializes) the items it
-wants to emit and hands them in directly — the package no longer resolves output
-types from strings or deserializes JSON. `MaxItems` caps the emitted count, and
-`Loop = true` (which requires `MaxItems`) cycles through the items until that cap
-is reached.
+`Loop = true` requires `MaxItems`. Without looping, `MaxItems` can cap the
+configured list. Missing or empty items complete without output.
 
-## Sequence
+## Sequence Values
 
 ```csharp
-await using var node = new SequenceSourceNode(new SequenceSourceOptions
-{
-    Name = "numbers",
-    Start = 10,
-    Step = 5,
-    Count = 3,
-    InitialDelayMilliseconds = 0,
-    IntervalMilliseconds = 0
-});
-node.Output.LinkTo(downstream);
-await node.StartAsync();
+await using var source = new FlowValueSequenceSourceNode(
+    new SequenceSourceOptions
+    {
+        Name = "numbers",
+        Start = 10,
+        Step = 5,
+        Count = 3,
+        BoundedCapacity = 128
+    });
+
+source.Output.LinkTo(downstream);
+await source.StartAsync();
 ```
 
-`SequenceSourceNode` emits `SourceSequenceItem` values with a name, sequence
-number, computed value (`Start + Step * index`), the start/step inputs, and a
-timestamp from the injected clock.
+Each sequence output is a `FlowValue` object with `name`, `sequence`, `value`,
+`start`, `step`, and `timestamp` properties. The timestamp comes from the
+configured `TimeProvider`.
 
-## Deterministic time
+## Timing And Capacity
 
-Pass a `TimeProvider` to either node's constructor (it defaults to
-`TimeProvider.System`). Both honor `InitialDelayMilliseconds` and
-`IntervalMilliseconds` off that clock, so tests can supply a
-[`FakeTimeProvider`](https://www.nuget.org/packages/Microsoft.Extensions.TimeProvider.Testing)
-and advance it to release each delay without real-time waits, and item
-timestamps come from the configured clock's timeline.
+Both canonical nodes accept an optional `TimeProvider` and honor
+`InitialDelayMilliseconds` and `IntervalMilliseconds`. Tests can inject a fake
+clock and advance delays deterministically.
+
+`BoundedCapacity` bounds the source broadcast block. Source loops await output
+acceptance. Broadcast output remains a live fan-out surface rather than durable
+storage; use a durable component when replay or guaranteed persistence is
+required.
+
+## Typed Compatibility
+
+Released direct-use nodes remain available unchanged:
+
+- `GeneratedSourceNode<TOutput>` emits `FlowMessage<TOutput>`.
+- `SequenceSourceNode` emits `FlowMessage<SourceSequenceItem>`.
+
+Those types retain their released `Output`, `Errors`, and `Events` surfaces.
+They are compatibility APIs for code-authored typed pipelines; canonical
+workflow definitions use the FlowValue nodes.
 
 ## Composition
 
-The optional `FluxFlow.Components.Sources.Composition` package registers source
-factories for `FluxFlow.Composition`. It binds the existing source options from
-node configuration, resolves an optional host-owned keyed `TimeProvider`
-resource, and deserializes `source.generated` inline `items` into the closed
-generic output type registered by the host.
+Install `FluxFlow.Components.Sources.Composition` for canonical factories,
+Designer metadata, flat JSON item decoding, and optional host-owned keyed
+clocks:
 
 ```csharp
 services
     .AddFluxFlowComposition(configuration)
     .RegisterNodes(registry => registry
-        .RegisterGeneratedSource<AppMessage>()
+        .RegisterGeneratedSource()
         .RegisterSequenceSource());
 ```
 
-Use custom node type strings for multiple generated output shapes, for example
-`source.generated.order` and `source.generated.http`. `OutputType` remains
-diagnostic metadata; the CLR output port type comes from the closed generic
-registration. The composition adapter does not own generated item sources,
-clock lifetime, or source lifecycle beyond the composed runtime start/stop
-contract.
+The composition adapter owns neither clock lifetime nor source output storage.

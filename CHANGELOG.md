@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sources 4.0.0
+
+Adds canonical immutable workflow-value sources while preserving released
+typed nodes for code-authored compatibility.
+
+- Adds `FlowValueGeneratedSourceNode` and `FlowValueSequenceSourceNode`, each
+  with one normal FlowValue Output plus Events and no universal Errors port.
+- Emits ordinary configured JSON and deterministic sequence objects as
+  immutable FlowValue data with fresh message identity per item.
+- Preserves source lifecycle, configured order, loops, limits, deterministic
+  clocks, bounded output, fan-out, clean completion, and pre-canceled startup.
+- Keeps `GeneratedSourceNode<TOutput>` and `SequenceSourceNode`, including their
+  released typed outputs and Errors ports, unchanged for compatibility.
+
+## FluxFlow.Components.Sources.Composition 2.0.0
+
+Makes parameterless source registrations canonical fixed FlowValue contracts.
+
+- Registers `source.generated` and `source.sequence` with one FlowValue Output,
+  Events, and no universal Errors surface.
+- Accepts generated `items` as one ordinary JSON value or an array and decodes
+  each item once at activation.
+- Retains explicit generic generated registration and adds an explicit typed
+  sequence-item compatibility registration.
+- Updates Designer metadata and examples to canonical fixed ports, exact
+  host-owned clock addresses, and the flat two-section application document.
+
 ## FluxFlow.Components.Observability 4.0.0
 
 Adds canonical FlowValue observation while preserving the released generic

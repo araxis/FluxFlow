@@ -17,6 +17,9 @@ and failed aggregation outcomes through one normal FlowResult output.
 Observability now uses FlowValue-native Counter, Logger, and Metrics components
 with one normal result stream per component while retaining generic standalone
 compatibility surfaces.
+Sources now emits generated and deterministic sequence data as canonical
+FlowValue messages with natural zero-input lifecycle semantics, while retaining
+released typed standalone and explicit registration compatibility surfaces.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
 are migrated incrementally.
@@ -236,10 +239,10 @@ resource/node binding are complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
 10. Component-family migration is in progress: Mapping, Payloads,
-    Serialization, Validation, Assertions, Expectations, Routing, and Control
-    are complete locally. Remaining runtime families continue as separately
-    bounded passes; Designer, hosting, and coordinated releases follow those
-    passes.
+    Serialization, Validation, Assertions, Expectations, Routing, Control,
+    State, Projections, Metrics, Observability, and Sources are complete
+    locally. Remaining runtime families continue as separately bounded passes;
+    Designer, hosting, and coordinated releases follow those passes.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

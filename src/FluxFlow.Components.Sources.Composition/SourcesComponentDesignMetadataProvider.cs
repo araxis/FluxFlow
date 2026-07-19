@@ -1,7 +1,7 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Sources.Contracts;
 using FluxFlow.Components.Sources.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Sources.Composition;
 
@@ -18,29 +18,24 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
         => CreateSourceMetadata(
             SourcesCompositionNodeTypes.Generated,
             "Generated Source",
-            "Emits inline configured items as typed source messages.",
+            "Emits inline configured items as immutable workflow values.",
             "list-plus",
             "generated",
             suggestedEditorWidth: 440,
             builder =>
             {
-                AddNameOption(builder, GeneratedSourceOptions.DefaultName);
                 builder
-                    .AddOption(
-                        "outputType",
-                        OptionValueKind.Text,
-                        displayName: "Output Type",
-                        helperText: "Diagnostic output type metadata; CLR output type comes from the closed registration.",
-                        defaultValue: GeneratedSourceOptions.ObjectTypeName,
-                        attributes: OptionAttributes(
-                            "Type Metadata",
-                            OptionDesignMetadataAttributeValues.Advanced,
-                            OptionDesignMetadataAttributeValues.Text))
+                    .AddAttribute("omittedOptions", "outputType")
+                    .AddAttribute(
+                        "omittedOptionsReason",
+                        "outputType is generic compatibility metadata; the canonical contract has fixed FlowValue output.");
+                AddNameOption(builder, FlowValueGeneratedSourceOptions.DefaultName);
+                builder
                     .AddOption(
                         "items",
                         OptionValueKind.Json,
                         displayName: "Items",
-                        helperText: "Inline array of payloads deserialized into the closed generated output type.",
+                        helperText: "One inline JSON value or an array of values to emit as FlowValue messages.",
                         attributes: OptionAttributes(
                             "Items",
                             OptionDesignMetadataAttributeValues.Primary,
@@ -66,14 +61,14 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                     "Interval Milliseconds",
                     "Delay between emitted items.");
                 AddBoundedCapacityOption(builder);
-                AddOutputPort(builder, "TOutput", "Generated source item.");
+                AddOutputPort(builder, nameof(FlowValue), "Generated workflow value.");
             });
 
     private static ComponentDesignMetadata CreateSequenceMetadata()
         => CreateSourceMetadata(
             SourcesCompositionNodeTypes.Sequence,
             "Sequence Source",
-            "Emits numeric sequence items as source messages.",
+            "Emits numeric sequence objects as immutable workflow values.",
             "list-ordered",
             "sequence",
             suggestedEditorWidth: 420,
@@ -123,7 +118,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
                     "Interval Milliseconds",
                     "Delay between emitted items.");
                 AddBoundedCapacityOption(builder);
-                AddOutputPort(builder, nameof(SourceSequenceItem), "Sequence source item.");
+                AddOutputPort(builder, nameof(FlowValue), "Sequence workflow value.");
             });
 
     private static ComponentDesignMetadata CreateSourceMetadata(

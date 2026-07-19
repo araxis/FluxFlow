@@ -2,6 +2,24 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue Sources
+
+- Added canonical FlowValue Generated and Sequence source nodes with one normal
+  Output plus Events and no universal Errors ports.
+- Preserved natural zero-input lifecycle, deterministic clocks, ordered loops
+  and sequences, bounded output, fresh message identity, and pre-canceled
+  startup without inventing fake inputs or result wrappers.
+- Made parameterless Composition registrations canonical, accepted generated
+  `items` as one ordinary JSON value or an array, and retained explicit typed
+  generated/sequence-item compatibility registration paths.
+- Sources moved to `4.0.0` and Sources Composition to `2.0.0`; package docs,
+  shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`37`), Composition (`24`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,099`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Timers is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext FlowValue Observability
 
 - Added canonical FlowValue Counter, Logger, and Metrics nodes with one normal

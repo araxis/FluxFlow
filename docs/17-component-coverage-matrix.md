@@ -32,7 +32,7 @@ Status values:
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | aligned |
 | Control | `FluxFlow.Components.Control` | yes | `FluxFlow.Components.Control.Composition` | yes | yes | structural Filter and When deprecated; canonical link conditions replace them |
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result aligned |
-| Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | aligned |
+| Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | canonical FlowValue generated/sequence sources aligned; typed runtime retained for compatibility |
 | Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | canonical FlowValue/result Window, Correlation, and Join aligned; structural nodes deprecated |
 | Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result aligned |
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
