@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Control</PackageId>
     <AssemblyName>FluxFlow.Components.Control</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control</RootNamespace>
-    <Version>3.0.2</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone expression-driven control nodes for FluxFlow: flow.filter passes matching messages and drops the rest, flow.when routes each message to its WhenTrue/WhenFalse ports. Each node takes an IFlowExpressionEngine directly and depends only on FluxFlow.Nodes and FluxFlow.Mapping. No engine required.</Description>
+    <Description>Compatibility control nodes superseded by canonical conditional workflow links.</Description>
     <PackageTags>workflow;dataflow;components;control</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Marks Filter and When obsolete because canonical conditional workflow links now own filtering and branching. Existing nodes and behavior remain available for compatibility.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

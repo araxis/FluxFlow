@@ -5,11 +5,12 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/routing-vnext`. The provider-neutral MQTT vertical slice and the
-  first seven normal component-family migrations, canonical FlowValue Mapping,
+  `work/control-vnext`. The provider-neutral MQTT vertical slice and the
+  first eight normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
-  FlowValue/result Routing, are implemented and verified locally.
+  FlowValue/result Routing plus canonical-link Control deprecation, are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -25,8 +26,9 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  Validation, Assertions, Expectations, and Routing now use this foundation;
-  the remaining component-family migrations continue separately. See
+  Validation, Assertions, Expectations, Routing, and Control now use this
+  foundation; the remaining component-family migrations continue separately.
+  See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -179,8 +181,18 @@ Date: 2026-07-19
   now `2.0.0` with parameterless canonical registration, fixed FlowValue/result
   ports, exact keyed selectors/clocks, and deprecated structural metadata.
   Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Control is the next
-  bounded family assessment. See `222-vnext-routing-flowvalue.md`.
+  preflight/dry-runs, and a package-only consumer passed. Control followed as
+  the next bounded family. See `222-vnext-routing-flowvalue.md`.
+- `FluxFlow.Components.Control` is now `4.0.0` locally and
+  `FluxFlow.Components.Control.Composition` is `2.0.0`. Filter and When remain
+  compatible but are obsolete because canonical conditioned output links own
+  filtering and branching. Their legacy factories and complete Designer
+  metadata remain available; Designer entries are deprecated so hosts can hide
+  them from new-node palettes while rendering stored definitions. No runtime
+  behavior or public declaration signature changed. Focused/full tests,
+  controlled builds, binary compatibility, preflight/dry-runs, and a
+  package-only consumer passed. State is the next bounded family assessment.
+  See `223-vnext-control-link-deprecation.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

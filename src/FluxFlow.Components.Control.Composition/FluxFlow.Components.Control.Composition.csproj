@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Control.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Control.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Control.Composition</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone control nodes over host-owned keyed expression resources.</Description>
+    <Description>Compatibility registration and Designer metadata for control nodes superseded by canonical conditional links.</Description>
     <PackageTags>workflow;dataflow;components;control;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
+    <PackageReleaseNotes>Marks Filter and When registrations and Designer metadata deprecated because canonical conditional links own filtering and branching. Existing factories remain available for compatibility.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

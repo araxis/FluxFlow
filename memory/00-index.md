@@ -499,6 +499,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `222-vnext-routing-flowvalue.md`: canonical FlowValue/result Window,
   Correlation, and Join nodes, deprecated structural routing, preserved generic
   compatibility, and Composition/package evidence.
+- `223-vnext-control-link-deprecation.md`: canonical link-condition replacement
+  for Filter and When, preserved obsolete runtime/Composition compatibility,
+  Designer migration metadata, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

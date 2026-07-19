@@ -7,6 +7,29 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Control 4.0.0
+
+Deprecates structural control nodes now represented by canonical conditional
+workflow links.
+
+- Marks `FilterNode<TInput>` and `WhenNode<TInput>` obsolete with migration
+  guidance while preserving every released option, port, diagnostic, and
+  runtime behavior.
+- Documents one conditioned link as filtering and complementary conditioned
+  links as branching.
+- Adds no replacement component because link conditions already compile once,
+  isolate failures, fan out, and preserve shared-input behavior.
+
+## FluxFlow.Components.Control.Composition 2.0.0
+
+Moves the Control composition package to compatibility-only status.
+
+- Marks `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` obsolete.
+- Marks both Designer metadata entries deprecated while retaining complete
+  legacy option, resource, alias, and port descriptors.
+- Updates package examples to canonical flat link conditions and keeps the
+  released factories available for existing definitions.
+
 ## FluxFlow.Components.Routing 4.0.0
 
 Adds canonical FlowValue routing results while preserving the released generic

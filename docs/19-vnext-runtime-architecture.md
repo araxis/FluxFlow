@@ -9,9 +9,9 @@ MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
 Payloads inspection, explicit canonical Serialization conversions, canonical
 FlowValue JSON Schema Validation and Assertions, canonical projection-event
 Expectations, and canonical FlowValue/result Window, Correlation, and Join are
-implemented locally. Structural Switch, Fork, and Merge routing is deprecated
-in favor of canonical links. The remaining component families are migrated
-incrementally.
+implemented locally. Structural Switch, Fork, and Merge routing plus Filter and
+When control nodes are deprecated in favor of canonical links. The remaining
+component families are migrated incrementally.
 
 ## Package Ownership
 
@@ -228,8 +228,8 @@ resource/node binding are complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
 10. Component-family migration is in progress: Mapping, Payloads,
-    Serialization, Validation, Assertions, Expectations, and Routing are
-    complete locally. Remaining runtime families continue as separately
+    Serialization, Validation, Assertions, Expectations, Routing, and Control
+    are complete locally. Remaining runtime families continue as separately
     bounded passes; Designer, hosting, and coordinated releases follow those
     passes.
 

@@ -10,6 +10,8 @@ using Xunit;
 
 namespace FluxFlow.Components.Control.Tests;
 
+#pragma warning disable CS0618
+
 // Every test news the node directly — no engine, no registry. Messages travel as
 // FlowMessage<T> envelopes; the correlation id flows input -> output and onto any
 // error for free.

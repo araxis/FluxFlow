@@ -87,7 +87,12 @@ public sealed class ControlComponentDesignMetadataProvider : IComponentDesignMet
                 summary: summary,
                 iconKey: iconKey,
                 preferredNodeName: preferredNodeName,
-                suggestedEditorWidth: 420);
+                suggestedEditorWidth: 420)
+            .AddAttributes(new Dictionary<string, string>
+            {
+                ["deprecated"] = "true",
+                ["deprecationReason"] = "Use canonical conditional workflow links."
+            });
 
         AddExpressionOptions(builder);
         AddExpressionResources(builder);

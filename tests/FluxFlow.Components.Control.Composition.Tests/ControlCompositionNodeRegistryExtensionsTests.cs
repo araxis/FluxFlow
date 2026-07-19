@@ -15,8 +15,40 @@ using Xunit;
 
 namespace FluxFlow.Components.Control.Composition.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class ControlCompositionNodeRegistryExtensionsTests
 {
+    [Fact]
+    public void Legacy_registrations_and_metadata_point_to_canonical_link_conditions()
+    {
+        var methods = typeof(ControlCompositionNodeRegistryExtensions)
+            .GetMethods()
+            .Where(method =>
+                method.Name is nameof(ControlCompositionNodeRegistryExtensions.RegisterFilter)
+                    or nameof(ControlCompositionNodeRegistryExtensions.RegisterWhen))
+            .ToArray();
+
+        methods.Length.ShouldBe(2);
+        foreach (var method in methods)
+        {
+            var attribute = method
+                .GetCustomAttributes(typeof(ObsoleteAttribute), inherit: false)
+                .ShouldHaveSingleItem()
+                .ShouldBeOfType<ObsoleteAttribute>();
+            attribute.Message.ShouldBe("Use canonical conditional workflow links instead.");
+            attribute.IsError.ShouldBeFalse();
+        }
+
+        foreach (var metadata in new ControlComponentDesignMetadataProvider().GetMetadata())
+        {
+            metadata.Attributes[new ComponentAttributeName("deprecated")]
+                .Value.ShouldBe("true");
+            metadata.Attributes[new ComponentAttributeName("deprecationReason")]
+                .Value.ShouldBe("Use canonical conditional workflow links.");
+        }
+    }
+
     [Fact]
     public void RegisterFilter_registers_closed_filter_metadata()
     {

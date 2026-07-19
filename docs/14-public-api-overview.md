@@ -418,20 +418,23 @@ Main types:
 - `ControlCompositionPortNames`
 - `ControlCompositionResourceNames`
 
-Use `RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` from the optional
-`FluxFlow.Components.Control.Composition` package when a composition host wants
-closed generic `flow.filter` and `flow.when` node factories. The factories
-resolve a keyed `IFlowExpressionEngine` resource; optional keyed typed context
-factory and clock resources stay host-owned. Invalid control options fail
-during build as factory diagnostics when the host is configured to collect
-build failures.
+`RegisterFilter<TInput>()` and `RegisterWhen<TInput>()` are compatibility
+factories and are obsolete in Control Composition `2.x`. Canonical definitions
+represent filtering as one conditioned output link and branching as
+complementary conditioned output links. Composition compiles conditions once,
+isolates a failed condition to its link, and preserves sibling fan-out without
+requiring a structural control node.
 
-`ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.filter` and `flow.when` composition nodes so hosts can compose palette,
-editor, validation, or documentation hints without copying package descriptors.
-The metadata includes editable options with section/editor hints, ports, and
-host-owned resource picker hints for the required `engine` resource plus
-optional `contextFactory` and `clock` resources.
+Existing definitions can retain the factories. They still resolve a keyed
+`IFlowExpressionEngine`; optional keyed typed context factory and clock
+resources remain host-owned, and invalid legacy options continue to surface as
+factory diagnostics.
+
+`ControlComponentDesignMetadataProvider` preserves complete neutral metadata
+for existing `flow.filter` and `flow.when` documents, including editable
+options, ports, aliases, and host-owned resources. Both entries are marked
+deprecated with canonical-link migration guidance; hosts can hide them from
+new-node palettes while continuing to render and validate stored definitions.
 
 ## Validation Composition
 

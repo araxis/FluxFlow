@@ -14,6 +14,7 @@ namespace FluxFlow.Components.Control.Nodes;
 /// node keeps processing later messages. Diagnostics flow on <c>Events</c>.
 /// Works with nothing but <c>new FilterNode&lt;T&gt;(options, predicate)</c> — no engine.
 /// </summary>
+[Obsolete("Use canonical conditional workflow links instead.")]
 public sealed class FilterNode<TInput> : FlowNode<TInput, TInput>
 {
     public const string FilterPassed = ControlDiagnosticNames.FilterPassed;

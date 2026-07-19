@@ -1,127 +1,82 @@
 # FluxFlow.Components.Control
 
-Standalone expression-driven control nodes for FluxFlow. They depend only on
-`FluxFlow.Nodes` and `FluxFlow.Mapping` — no engine, registry, or runtime. You
-`new` a node and `LinkTo` the next one.
+Compatibility expression-driven control nodes for FluxFlow. `FilterNode<T>`
+and `WhenNode<T>` are obsolete because the canonical workflow model evaluates
+conditions directly on links.
 
-## Nodes
+No runtime behavior was removed. Existing code-authored workflows can continue
+using the nodes while definitions migrate.
 
-| Node | Shape | Purpose |
-|------|-------|---------|
-| `FilterNode<TInput>` | `Input` -> `Output` | Re-broadcasts messages whose payload matches an expression; drops the rest. |
-| `WhenNode<TInput>` | `Input` -> `WhenTrue` / `WhenFalse` | Routes each message by expression result. |
+## Canonical Replacement
 
-Every message travels as a `FlowMessage<T>` envelope. `FilterNode` re-broadcasts
-the surviving `FlowMessage<TInput>` on `Output`; `WhenNode` fans the original
-message to `WhenTrue` (its primary `Output`) or `WhenFalse`. The routed message
-carries the same correlation id as the input.
+A filter is one conditioned link. A true/false branch is two links with
+complementary conditions:
 
-The package does not choose an expression language: each node takes an
-`IFlowExpressionEngine` directly and compiles its predicate **once** at
-construction, evaluating only the compiled form per message.
-
-```csharp
-var options = new ControlExpressionOptions
+```json
 {
-    Expression = "value > 10",
-    ExpressionId = "route-v1",
-    ExpressionName = "route-important",
-    InputType = "int"
-};
-
-await using var when = new WhenNode<int>(options, appExpressionEngine);
-
-when.WhenTrue.LinkTo(highSink, new DataflowLinkOptions { PropagateCompletion = false });
-when.WhenFalse.LinkTo(lowSink, new DataflowLinkOptions { PropagateCompletion = false });
-
-await when.Input.SendAsync(FlowMessage.Create(42));
+  "Resources": {},
+  "Workflows": {
+    "Orders": {
+      "Normalize": {
+        "Type": "flow.mapper",
+        "Output": [
+          {
+            "Port": "Priority.Input",
+            "Condition": "payload.priority == 'High'"
+          },
+          {
+            "Port": "Standard.Input",
+            "Condition": "payload.priority != 'High'"
+          }
+        ]
+      },
+      "Priority": {
+        "Type": "orders.priority"
+      },
+      "Standard": {
+        "Type": "orders.standard"
+      }
+    }
+  }
+}
 ```
 
-`FilterNode` works the same way:
+Composition compiles each distinct condition once per activation. At runtime a
+condition failure rejects only that link, reports runtime diagnostics, and does
+not stop sibling links or the host. Output fan-out and shared target inputs are
+already part of canonical link behavior, so a separate router adds no domain
+result.
+
+## Compatibility Nodes
+
+| Node | Shape | Behavior |
+|------|-------|----------|
+| `FilterNode<TInput>` | `Input` -> `Output` | Emits matching messages and drops nonmatches. |
+| `WhenNode<TInput>` | `Input` -> `WhenTrue` / `WhenFalse` | Routes each message to one branch; `Output` aliases `WhenTrue`. |
+
+Both nodes remain standalone and usable without Engine or Composition. They
+accept either a compiled `IFlowPredicate<TInput>` or an
+`IFlowExpressionEngine` plus optional `IFlowMapContextFactory<TInput>`, compile
+expressions once, preserve message correlation, expose Events, and report
+evaluation failures through their released Errors ports.
 
 ```csharp
-await using var filter = new FilterNode<int>(
-    new ControlExpressionOptions { Expression = "value % 2 == 0", InputType = "int" },
-    appExpressionEngine);
-
-filter.Output.LinkTo(evenSink, new DataflowLinkOptions { PropagateCompletion = false });
-await filter.Input.SendAsync(FlowMessage.Create(2));
+#pragma warning disable CS0618
+await using var node = new FilterNode<OrderMessage>(
+    options,
+    expressionEngine,
+    contextFactory,
+    clock);
+#pragma warning restore CS0618
 ```
 
-Expression-backed constructors require a non-empty `Expression`, non-empty
-`InputType`, and `BoundedCapacity` greater than zero. Invalid options fail fast
-during node construction before the input pipeline is created.
+`InputType` remains diagnostic metadata and `BoundedCapacity` controls the
+standalone node queue. Invalid options continue to fail construction before an
+input pipeline is created.
 
-### Custom mapping context
+## Composition Compatibility
 
-By default the predicate sees the payload as the `input` and `value` variables.
-Pass an `IFlowMapContextFactory<TInput>` to shape the variables an expression
-engine evaluates against:
-
-```csharp
-var node = new FilterNode<AppMessage>(options, appExpressionEngine, new AppMessageContextFactory());
-```
-
-You can also supply an already-compiled `IFlowPredicate<TInput>` directly when
-you do not want the node to own compilation:
-
-```csharp
-var node = new WhenNode<int>(options, myPredicate, engineName: "my-engine");
-```
-
-The compiled-predicate constructors do not require `Expression`, but they still
-validate `InputType` and `BoundedCapacity` because those values drive
-diagnostics and queue sizing.
-
-## Behavior
-
-Expression-evaluation failures emit a `FlowError` on `Errors` (carrying the
-input's correlation id and a `Code` from `ControlErrorCodes`) and the node keeps
-processing later messages. Per-message diagnostics — `flow.filter.passed` /
-`flow.filter.rejected` / `flow.filter.failed` and `flow.when.routed` /
-`flow.when.failed` (see `ControlDiagnosticNames`) — flow on the `Events` port
-with input type, engine, expression id, expression name, route, and pass/fail
-metadata where available.
-
-## Runtime timing
-
-Error and event timestamps use the node's clock (default `TimeProvider.System`).
-Provide a deterministic clock for tests:
-
-```csharp
-new FilterNode<int>(options, engine, clock: new FakeTimeProvider(timestamp));
-```
-
-## Composition
-
-Add `FluxFlow.Components.Control.Composition` when a host wants to instantiate
-control nodes from `FluxFlow.Composition` fluent/config definitions. That
-optional package registers closed generic `FilterNode<TInput>` and
-`WhenNode<TInput>` factories.
-
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterFilter<AppMessage>()
-        .RegisterWhen<AppMessage>());
-```
-
-Use custom node type names when one host needs several input shapes:
-
-```csharp
-registry
-    .RegisterFilter<OrderMessage>("flow.filter.order")
-    .RegisterWhen<HttpResponseOutput>("flow.when.http-response");
-```
-
-Composition resolves the expression engine from the host-owned keyed `engine`
-resource. Optional host-owned keyed `contextFactory` and `clock` resources can
-provide custom expression variables and deterministic diagnostics. The
-configured `InputType` remains diagnostic metadata; CLR port types come from
-the closed generic registration. Invalid `ControlExpressionOptions`, such as a
-missing expression, blank `inputType`, or non-positive `boundedCapacity`, fail
-during composition build and surface as factory diagnostics when build failures
-are configured as diagnostics.
+`FluxFlow.Components.Control.Composition` keeps the released closed-generic
+factories and Designer metadata for legacy definitions. New canonical
+definitions should express filtering and branching on their output links and
+should not register `flow.filter` or `flow.when`.

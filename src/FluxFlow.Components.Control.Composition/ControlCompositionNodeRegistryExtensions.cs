@@ -7,6 +7,7 @@ namespace FluxFlow.Components.Control.Composition;
 
 public static class ControlCompositionNodeRegistryExtensions
 {
+    [Obsolete("Use canonical conditional workflow links instead.")]
     public static CompositionNodeRegistry RegisterFilter<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = ControlCompositionNodeTypes.Filter)
@@ -29,6 +30,7 @@ public static class ControlCompositionNodeRegistryExtensions
             ]);
     }
 
+    [Obsolete("Use canonical conditional workflow links instead.")]
     public static CompositionNodeRegistry RegisterWhen<TInput>(
         this CompositionNodeRegistry registry,
         string nodeType = ControlCompositionNodeTypes.When)
@@ -65,11 +67,13 @@ public static class ControlCompositionNodeRegistryExtensions
             ControlCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ControlCompositionResourceNames.Clock);
+#pragma warning disable CS0618
         var node = new FilterNode<TInput>(
             options,
             expressionEngine,
             contextFactory,
             clock);
+#pragma warning restore CS0618
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -99,11 +103,13 @@ public static class ControlCompositionNodeRegistryExtensions
             ControlCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ControlCompositionResourceNames.Clock);
+#pragma warning disable CS0618
         var node = new WhenNode<TInput>(
             options,
             expressionEngine,
             contextFactory,
             clock);
+#pragma warning restore CS0618
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

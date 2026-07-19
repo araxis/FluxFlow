@@ -1,97 +1,74 @@
 # FluxFlow.Components.Control.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone control
-nodes from `FluxFlow.Components.Control`.
+Compatibility `FluxFlow.Composition` registrations and Designer metadata for
+the obsolete `flow.filter` and `flow.when` nodes. Canonical definitions use
+conditions directly on links instead of structural control components.
 
-This package does not choose an expression language, scan assemblies, or resolve
-CLR types from strings. Hosts register closed control node types explicitly and
-provide keyed `IFlowExpressionEngine` services.
-
-## Registration
-
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterFilter<OrderMessage>()
-        .RegisterWhen<OrderMessage>());
-```
-
-Use custom node type names when a host needs more than one input shape:
-
-```csharp
-registry
-    .RegisterFilter<OrderMessage>("flow.filter.order")
-    .RegisterWhen<HttpResponseOutput>("flow.when.http-response");
-```
-
-## Node Types
-
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `flow.filter` | `FilterNode<TInput>` | `engine` | `Input`, `Output` |
-| `flow.when` | `WhenNode<TInput>` | `engine` | `Input`, `WhenTrue`, `WhenFalse`, `Output` |
-
-`contextFactory` is an optional keyed `IFlowMapContextFactory<TInput>` resource
-for custom expression variables. `clock` is an optional keyed `TimeProvider`
-resource for deterministic diagnostics.
-
-For `flow.when`, `Output` is an alias for the node's primary `WhenTrue` stream.
-
-## Configuration
+## Canonical Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "important": {
-              "type": "flow.filter",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input.Priority == \"High\"",
-                "expressionName": "important-orders",
-                "inputType": "app.order",
-                "boundedCapacity": 128
-              }
-            }
+  "Resources": {},
+  "Workflows": {
+    "Orders": {
+      "Source": {
+        "Type": "orders.source",
+        "Output": [
+          {
+            "Port": "Accepted.Input",
+            "Condition": "payload.accepted == true"
           },
-          "links": []
-        }
+          {
+            "Port": "Rejected.Input",
+            "Condition": "payload.accepted != true"
+          }
+        ]
+      },
+      "Accepted": {
+        "Type": "orders.accepted"
+      },
+      "Rejected": {
+        "Type": "orders.rejected"
       }
     }
   }
 }
 ```
 
-`ControlExpressionOptions.InputType` remains diagnostic metadata. The actual
-composition port type comes from the closed generic registration selected by the
-host.
-Invalid `ControlExpressionOptions`, such as a missing expression, blank
-`inputType`, or non-positive `boundedCapacity`, fail during composition build
-and surface as factory diagnostics when build failures are configured as
-diagnostics.
+Use one conditioned link to filter and complementary conditioned links to
+branch. Component settings and links remain flat, addresses are exact and
+case-sensitive, and the link compiler owns compile-once condition validation.
+
+## Legacy Registration
+
+The released factories remain available for existing definitions:
+
+```csharp
+#pragma warning disable CS0618
+registry
+    .RegisterFilter<OrderMessage>()
+    .RegisterWhen<OrderMessage>();
+#pragma warning restore CS0618
+```
+
+| Type | Required resource | Ports |
+|------|-------------------|-------|
+| `flow.filter` | `engine` | `Input`, `Output` |
+| `flow.when` | `engine` | `Input`, `WhenTrue`, `WhenFalse`, `Output` |
+
+The factories still resolve a host-owned keyed `IFlowExpressionEngine`, an
+optional typed `IFlowMapContextFactory<TInput>`, and an optional
+`TimeProvider`. They preserve all released options, diagnostics, aliases,
+Errors ports, and activation validation. Use custom node type names when a
+legacy host needs several CLR input shapes.
 
 ## Design Metadata
 
-`ControlComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.filter` and `flow.when` composition nodes. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
+`ControlComponentDesignMetadataProvider` retains complete option, port, and
+resource metadata so existing documents remain readable. Both entries set
+`deprecated=true` and provide canonical-link migration guidance. Hosts should
+hide deprecated entries from new-node palettes while still rendering and
+validating existing nodes.
 
-The provider describes editable options, host-owned resources, and ports.
-`engine` is required; `contextFactory` and `clock` are optional. Resource
-metadata includes host-owned picker hints and key patterns for the `engine`,
-`contextFactory`, and `clock` resources.
-
-The control option metadata includes section, importance, editor, syntax, and
-related-resource hints so hosts can build more useful inspectors without
-hard-coding control-specific UI rules. All option and resource metadata is
-descriptive only, so hosts still own keyed service registration, selection,
-lifetime, rendering, validation UI, and disposal.
+The metadata is descriptive only. Hosts continue to own resource registration,
+lifetime, rendering, validation UI, and persistence.

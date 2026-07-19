@@ -17,6 +17,7 @@ namespace FluxFlow.Components.Control.Nodes;
 /// later messages. Diagnostics flow on <c>Events</c>. Works with nothing but
 /// <c>new WhenNode&lt;T&gt;(options, predicate)</c> — no engine.
 /// </summary>
+[Obsolete("Use canonical conditional workflow links instead.")]
 public sealed class WhenNode<TInput> : FlowNode<TInput, TInput>
 {
     public const string WhenRouted = ControlDiagnosticNames.WhenRouted;

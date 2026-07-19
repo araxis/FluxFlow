@@ -2,6 +2,22 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext Control Link Deprecation
+
+- Made canonical conditioned links the filtering and branching primitive; no
+  redundant FlowValue Control node was added.
+- Marked `FilterNode<TInput>`, `WhenNode<TInput>`, and their Composition
+  registrations obsolete while preserving released behavior and contracts.
+- Marked both Designer entries deprecated with canonical-link migration
+  guidance while retaining legacy options, ports, aliases, and resources.
+- Control moved to `4.0.0` and Control Composition to `2.0.0`; package docs,
+  shared docs, and changelog now show flat conditioned-link replacements.
+- Runtime (`30`), Composition (`19`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,051`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- State is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext FlowValue Routing
 
 - Added canonical FlowValue Window, Correlation, and Join nodes with one normal
