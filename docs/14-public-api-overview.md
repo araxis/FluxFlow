@@ -884,16 +884,23 @@ Main types:
 
 Use `RegisterEventProjection()` from the optional
 `FluxFlow.Components.Projections.Composition` package when a composition host
-wants an `event.projection` node factory. The factory binds existing
-`EventProjectionOptions` and can resolve an optional keyed `TimeProvider`
-resource through the host.
+wants the canonical `event.projection` node factory. It consumes typed
+`ProjectionEvent` values and emits matching and final snapshots through one
+`FlowResult<EventProjectionSnapshot>` Output. Expected projection failures are
+normal error variants; the descriptor has no universal Errors port. The
+factory binds `EventProjectionOptions` and can resolve an optional keyed
+`TimeProvider` through an exact host-owned resource address. A configured final
+snapshot is emitted after accepted input drains during normal completion.
+
+The runtime package retains the released `EventProjectionNode`, direct snapshot
+Output, Errors port, and explicit final-flush API for code-authored
+compatibility. Composition `2.x` registers only the canonical fixed contract.
 
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.projection` composition node, including existing projection
 options, fixed ports, and a resource hint for the optional `clock` resource.
 The provider authors that metadata through the shared validated Designer
-metadata builder. The final snapshot lifecycle remains a direct node API in
-this composition pass.
+metadata builder.
 
 ## Expectations Composition
 

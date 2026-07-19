@@ -1,39 +1,39 @@
 # FluxFlow.Components.Projections
 
-A standalone event-projection node for FluxFlow, built on the `FluxFlow.Nodes` kit.
-No engine required: `new` the node, post events, link the output.
+Standalone event projection nodes for FluxFlow. The canonical node retains the
+typed event and snapshot domain contracts while representing successful
+snapshots and expected failures through one normal `FlowResult<T>` output. No
+Composition or Engine package is required.
 
-## Node
+## Canonical Node
 
-| Node | Shape | Purpose |
-|------|-------|---------|
-| `EventProjectionNode` | `Input` -> `Output`, `Errors`, `Events` | Folds matching events into count, latest-event, and rolling-rate snapshots. |
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowEventProjectionNode` | `ProjectionEvent` | `FlowResult<EventProjectionSnapshot>` |
 
-`EventProjectionNode` is a `FlowNode<ProjectionEvent, EventProjectionSnapshot>`. Post a
-`FlowMessage<ProjectionEvent>` to `Input`; the node broadcasts a
-`FlowMessage<EventProjectionSnapshot>` on `Output` carrying the triggering event's
-correlation id. Errors surface on `Errors` (`FlowError`) and diagnostics on `Events`
-(`FlowEvent`).
-
-## Example
+The node also exposes Events for lifecycle and projection diagnostics. It has
+no universal Errors port.
 
 ```csharp
-var node = new EventProjectionNode(new EventProjectionOptions
-{
-    Name = "failed-operations",
-    RateWindowSeconds = 60,
-    MaxPreviewChars = 256,
-    Filter = new EventFilter
+await using var node = new FlowEventProjectionNode(
+    new EventProjectionOptions
     {
-        TypePrefix = "operation.",
-        Status = "failed",
-        SubjectPrefix = "orders/",
-        Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
-    }
-});
+        Name = "failed-operations",
+        RateWindowSeconds = 60,
+        MaxPreviewChars = 256,
+        Filter = new EventFilter
+        {
+            TypePrefix = "operation.",
+            Status = "failed",
+            SubjectPrefix = "orders/",
+            Attributes = new Dictionary<string, string>
+            {
+                ["tenant"] = "north"
+            }
+        }
+    });
 
-var snapshots = new BufferBlock<FlowMessage<EventProjectionSnapshot>>();
-node.Output.LinkTo(snapshots, new DataflowLinkOptions { PropagateCompletion = true });
+node.Output.LinkTo(results);
 
 await node.Input.SendAsync(FlowMessage.Create(new ProjectionEvent
 {
@@ -41,91 +41,59 @@ await node.Input.SendAsync(FlowMessage.Create(new ProjectionEvent
     Type = "operation.completed",
     Source = "orders",
     Subject = "orders/42",
-    Status = "failed",
-    Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
+    Status = "failed"
 }));
 ```
 
-The snapshot includes:
+Each matching event updates observed/matched counts, first and last match times,
+the latest event summary, and the rolling event-time rate. The emitted snapshot
+uses the injected `TimeProvider` for its timestamp. Payload previews are
+truncated to `MaxPreviewChars`. Filtered events produce no result but remain in
+the observed count reported by a later or final snapshot.
 
-- observed event count
-- matched event count
-- rolling current rate
-- first and last matched timestamps
-- latest matching event summary
-- latest payload preview with a configured length limit
+## Result Contract
 
-`EventProjectionOptions` validates at construction: non-positive
-`RateWindowSeconds` or `BoundedCapacity` fails fast as an argument exception.
+Matching snapshots use the `snapshot` result kind. When
+`EmitFinalSnapshot = true`, normal `Complete()` drains accepted input and emits
+one `final-snapshot` result before completing Output. The final rolling rate is
+evaluated against the last matched event timestamp, so replayed historical
+streams retain meaningful rates.
+
+Invalid event data and unexpected projection evaluation failures use the
+`projection-failed` kind and `projection.failed` error code. Immutable error
+details include event context, exception type, and the released numeric error
+code. These are normal output values and later accepted events continue.
+
+Snapshot and failure messages preserve correlation, trace, causation, and
+headers through `FlowMessage<T>.With(...)`. A final snapshot keeps complete
+lineage from the last matching event; when nothing matched it starts a new
+exchange.
 
 ## Filters
 
-`EventFilter` supports:
+`EventFilter` supports exact event type, type/subject/channel prefixes,
+excluded subject/channel prefixes, status, source, source node, component id,
+attribute pairs, and an event timestamp range. String comparison is ordinal.
+A null filter is normalized to match all events.
 
-- event type or type prefix
-- subject prefix
-- channel prefix
-- excluded subject prefix
-- excluded channel prefix
-- status
-- source
-- source node id
-- component id through an event attribute named `componentId`
-- attribute key/value pairs
-- event timestamp range
+## Lifecycle
 
-Filters use ordinal string comparison.
+`Complete()` drains accepted events and handles the configured final snapshot.
+`CompleteWithFinalSnapshotAsync()` completes and waits for the same canonical
+lifecycle. `Fault(exception)` remains the unexpected data-path fault surface,
+and `DisposeAsync()` completes and drains the node.
 
-## Timing
+## Direct-Result Compatibility
 
-Pass a `TimeProvider` to the constructor for deterministic snapshot timestamps in
-tests or hosts:
-
-```csharp
-var node = new EventProjectionNode(options, timeProvider);
-```
-
-Event rate uses matching event timestamps. Snapshot timestamps use the supplied
-`TimeProvider` (defaults to `TimeProvider.System`).
-
-## Final snapshot
-
-With `EmitFinalSnapshot = true` (and typically `EmitEveryMatch = false`) the node
-emits a single closing snapshot when the stream ends. Drain and close it via
-`await node.CompleteWithFinalSnapshotAsync()` instead of `Complete()`; the flush rides
-the ordered input pump so it lands after every event already posted.
-
-When the node is hosted through `FluxFlow.Composition`, v1 runtime stop uses
-normal node completion. Use the direct node API when a closing final snapshot is
-required until composition grows an explicit final-flush lifecycle hook.
+`EventProjectionNode` remains available with its released direct
+`EventProjectionSnapshot` Output, Errors port, Events, and explicit
+`CompleteWithFinalSnapshotAsync()` flush behavior. It is a compatibility surface
+for existing code-authored workflows. No implicit conversion exists between its
+output and `FlowResult<EventProjectionSnapshot>` links.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node. This package is just the standalone node.
-
-Use `FluxFlow.Components.Projections.Composition` when a
-`FluxFlow.Composition` host should register the optional `event.projection`
-factory:
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterEventProjection());
-```
-
-The composition adapter binds `EventProjectionOptions` from node configuration
-and can resolve an optional host-owned keyed `TimeProvider` resource named
-`clock`. Filtering, rolling rate calculation, and final snapshot behavior remain
-normal node behavior controlled by `EventProjectionOptions`.
-
-The optional composition package also exposes
-`ProjectionsComponentDesignMetadataProvider` for neutral Designer metadata over
-the `event.projection` composition node type. The standalone Projections package
-remains free of Designer, Composition, and Engine dependencies.
-
-## Boundaries
-
-This package has no UI dependency and no concrete resource ownership. It
-depends only on `FluxFlow.Nodes`. Hosts decide how snapshots are displayed,
-stored, tested, or forwarded.
+Use `FluxFlow.Components.Projections.Composition` when a Composition host should
+register the canonical `event.projection` factory and Designer metadata. Hosts
+own optional keyed clocks and decide how snapshots are stored, displayed, or
+forwarded.

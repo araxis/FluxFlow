@@ -1,12 +1,14 @@
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Projections;
 using FluxFlow.Components.Projections.Composition;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,7 +32,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         registration.Inputs[ProjectionsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ProjectionsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(EventProjectionSnapshot));
+            .ShouldBe(typeof(FlowResult<EventProjectionSnapshot>));
     }
 
     [Fact]
@@ -66,7 +68,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(ProjectionsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(EventProjectionSnapshot));
+        output.ValueType?.Value.ShouldBe("FlowResult<EventProjectionSnapshot>");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -240,17 +242,20 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                 var secondSnapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
 
                 firstSnapshot.CorrelationId.ShouldBe(first.CorrelationId);
-                firstSnapshot.Payload.Timestamp.ShouldBe(timestamp);
-                firstSnapshot.Payload.Name.ShouldBe("errors");
-                firstSnapshot.Payload.ObservedCount.ShouldBe(1);
-                firstSnapshot.Payload.MatchedCount.ShouldBe(1);
-                firstSnapshot.Payload.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
+                firstSnapshot.Payload.Kind.ShouldBe(ProjectionResultKinds.Snapshot);
+                var firstValue = firstSnapshot.Payload.Value.ShouldNotBeNull();
+                firstValue.Timestamp.ShouldBe(timestamp);
+                firstValue.Name.ShouldBe("errors");
+                firstValue.ObservedCount.ShouldBe(1);
+                firstValue.MatchedCount.ShouldBe(1);
+                firstValue.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
 
                 secondSnapshot.CorrelationId.ShouldBe(second.CorrelationId);
-                secondSnapshot.Payload.ObservedCount.ShouldBe(3);
-                secondSnapshot.Payload.MatchedCount.ShouldBe(2);
-                secondSnapshot.Payload.CurrentRate.ShouldBe(0.2d);
-                secondSnapshot.Payload.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
+                var secondValue = secondSnapshot.Payload.Value.ShouldNotBeNull();
+                secondValue.ObservedCount.ShouldBe(3);
+                secondValue.MatchedCount.ShouldBe(2);
+                secondValue.CurrentRate.ShouldBe(0.2d);
+                secondValue.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
             },
             node => node
                 .Configure("name", "errors")
@@ -294,11 +299,12 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                     .WaitAsync(Timeout)).ShouldBeTrue();
 
                 var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
-                snapshot.Payload.MatchedCount.ShouldBe(1);
-                snapshot.Payload.Filter.TypePrefix.ShouldBe("task.");
-                snapshot.Payload.Filter.Status.ShouldBe("failed");
-                snapshot.Payload.Filter.SubjectPrefix.ShouldBe("jobs/");
-                snapshot.Payload.Filter.Attributes["tenant"].ShouldBe("north");
+                var value = snapshot.Payload.Value.ShouldNotBeNull();
+                value.MatchedCount.ShouldBe(1);
+                value.Filter.TypePrefix.ShouldBe("task.");
+                value.Filter.Status.ShouldBe("failed");
+                value.Filter.SubjectPrefix.ShouldBe("jobs/");
+                value.Filter.Attributes["tenant"].ShouldBe("north");
             },
             node => node.Configure(
                 "filter",
@@ -319,7 +325,8 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
-            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<EventProjectionSnapshot>>());
+            output.Source.LinkTo(
+                DataflowBlock.NullTarget<FlowMessage<FlowResult<EventProjectionSnapshot>>>());
             var events = Link(descriptor.Events.ShouldNotBeNull());
             var message = FlowMessage.Create(CreateEvent(
                 DateTimeOffset.Parse("2026-06-18T13:00:00Z"),
@@ -331,6 +338,37 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
             @event.Name.ShouldBe(ProjectionDiagnosticNames.ProjectionUpdated);
             @event.CorrelationId.ShouldBe(message.CorrelationId);
             @event.Attributes["matchedCount"].ShouldBe(1L);
+            descriptor.Errors.ShouldBeNull();
+        });
+    }
+
+    [Fact]
+    public async Task Hosted_event_projection_emits_normal_failure_and_continues()
+    {
+        await WithNodeAsync(async (input, output, descriptor) =>
+        {
+            var results = Link(output.Source);
+            var missing = FlowMessage.Create<ProjectionEvent>(
+                null!,
+                new CorrelationId("missing"));
+            var valid = FlowMessage.Create(
+                CreateEvent(
+                    DateTimeOffset.Parse("2026-06-18T13:05:00Z"),
+                    "event.created"),
+                new CorrelationId("valid"));
+
+            (await input.Target.SendAsync(missing).WaitAsync(Timeout)).ShouldBeTrue();
+            (await input.Target.SendAsync(valid).WaitAsync(Timeout)).ShouldBeTrue();
+
+            var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+            var success = await results.ReceiveAsync().WaitAsync(Timeout);
+            failure.CorrelationId.ShouldBe(missing.CorrelationId);
+            failure.Payload.IsError.ShouldBeTrue();
+            failure.Payload.Error.ShouldNotBeNull().Code
+                .ShouldBe(ProjectionErrorCodeNames.ProjectionFailed);
+            success.CorrelationId.ShouldBe(valid.CorrelationId);
+            success.Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
+            descriptor.Errors.ShouldBeNull();
         });
     }
 
@@ -445,7 +483,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
     private static async Task WithNodeAsync(
         Func<
             CompositionInputPort<ProjectionEvent>,
-            CompositionOutputPort<EventProjectionSnapshot>,
+            CompositionOutputPort<FlowResult<EventProjectionSnapshot>>,
             ComposedNode,
             Task> run,
         Action<NodeDefinitionBuilder>? configureNode = null,
@@ -474,7 +512,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         var input = descriptor.Inputs[ProjectionsCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<ProjectionEvent>>();
         var output = descriptor.Outputs[ProjectionsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<EventProjectionSnapshot>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<EventProjectionSnapshot>>>();
 
         await run(input, output, descriptor);
     }

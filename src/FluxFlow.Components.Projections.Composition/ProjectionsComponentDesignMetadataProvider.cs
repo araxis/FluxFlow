@@ -75,7 +75,7 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 "emitFinalSnapshot",
                 OptionValueKind.Boolean,
                 displayName: "Emit Final Snapshot",
-                helperText: "Direct-node lifecycle option for final snapshots; composition runtime stop uses normal completion.",
+                helperText: "Emit one final snapshot after accepted input drains on completion.",
                 defaultValue: Defaults.EmitFinalSnapshot,
                 attributes: OptionAttributes(
                     "Emission",
@@ -139,6 +139,6 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 group: "Results",
                 order: 1,
                 summary: "Event projection snapshot.",
-                valueType: nameof(EventProjectionSnapshot),
+                valueType: "FlowResult<EventProjectionSnapshot>",
                 isPrimary: true);
 }

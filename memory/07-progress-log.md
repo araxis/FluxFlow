@@ -2,6 +2,26 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext Projection Results
+
+- Added `FlowEventProjectionNode` with typed ProjectionEvent input and one
+  `FlowResult<EventProjectionSnapshot>` Output plus Events.
+- Preserved ordered counts, filters, previews, replay-time rolling rates, fan-out,
+  and strong message lineage; configured final snapshots now emit exactly once
+  after normal completion drains accepted input.
+- Made expected projection failures normal result data with stable string codes
+  while preserving later-event continuation.
+- Migrated Projections Composition and Designer metadata to the canonical fixed
+  Output and no universal Errors surface while retaining the direct-result node
+  for compatibility.
+- Projections moved to `4.0.0` and Projections Composition to `2.0.0`; package
+  docs, shared docs, changelog, and source-declaration baseline were updated.
+- Runtime (`17`), Composition (`12`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,064`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Metrics is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext FlowValue State
 
 - Added `FlowValueStateReducerNode` with typed commands, immutable FlowValue

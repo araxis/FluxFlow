@@ -10,9 +10,11 @@ Payloads inspection, explicit canonical Serialization conversions, canonical
 FlowValue JSON Schema Validation and Assertions, canonical projection-event
 Expectations, and canonical FlowValue/result Window, Correlation, and Join are
 implemented locally. State now uses typed commands with FlowValue state and one
-normal FlowResult output. Structural Switch, Fork, and Merge routing plus Filter
-and When control nodes are deprecated in favor of canonical links. The
-remaining component families are migrated incrementally.
+normal FlowResult output, and Projections retains typed domain events while
+emitting snapshots and expected failures through one normal FlowResult output.
+Structural Switch, Fork, and Merge routing plus Filter and When control nodes
+are deprecated in favor of canonical links. The remaining component families
+are migrated incrementally.
 
 ## Package Ownership
 

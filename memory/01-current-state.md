@@ -5,12 +5,13 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/state-vnext`. The provider-neutral MQTT vertical slice and the
-  first nine normal component-family migrations, canonical FlowValue Mapping,
+  `work/projections-vnext`. The provider-neutral MQTT vertical slice and the
+  first ten normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
-  FlowValue State commands/results, are implemented and verified locally.
+  FlowValue State commands/results plus typed-event Projection results, are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -26,9 +27,9 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  Validation, Assertions, Expectations, Routing, Control, and State now use
-  this foundation; the remaining component-family migrations continue
-  separately.
+  Validation, Assertions, Expectations, Routing, Control, State, and
+  Projections now use this foundation; the remaining component-family
+  migrations continue separately.
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
@@ -203,8 +204,20 @@ Date: 2026-07-19
   Composition is now `2.0.0` with canonical fixed ports, no universal Errors
   surface, ordinary JSON initial-state decoding, and exact host-owned engine and
   clock resources. Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Projections is the
-  next bounded family assessment. See `224-vnext-state-flowvalue.md`.
+  preflight/dry-runs, and a package-only consumer passed. Projections followed
+  as the next bounded family. See `224-vnext-state-flowvalue.md`.
+- `FluxFlow.Components.Projections` is now `4.0.0` locally with canonical
+  `FlowEventProjectionNode`. It retains typed ProjectionEvent and snapshot
+  contracts while emitting matching/final snapshots and expected failures
+  through one `FlowResult<EventProjectionSnapshot>` Output plus Events.
+  Ordered counts, filters, previews, replay-time rates, fan-out, and message
+  lineage are preserved; configured final snapshots emit after normal input
+  drain. The direct-result standalone node remains available for compatibility.
+  Projections Composition is now `2.0.0` with the canonical fixed Output, no
+  universal Errors surface, and an exact host-owned clock resource. Focused/full
+  tests, controlled builds, binary compatibility, preflight/dry-runs, and a
+  package-only consumer passed. Metrics is the next bounded family assessment.
+  See `225-vnext-projections-flowresult.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

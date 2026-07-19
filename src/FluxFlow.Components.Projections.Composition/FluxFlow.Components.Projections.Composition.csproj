@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Projections.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Projections.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections.Composition</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for the standalone event projection node over host-owned keyed clocks.</Description>
+    <Description>Canonical event-projection result registration and Designer metadata over host-owned clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
+    <PackageReleaseNotes>Moves event.projection to one FlowResult snapshot output, removes the universal Errors surface, and makes configured final snapshots part of normal ordered completion.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\FluxFlow.Components.Projections\FluxFlow.Components.Projections.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>

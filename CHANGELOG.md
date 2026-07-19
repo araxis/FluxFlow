@@ -7,6 +7,35 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Projections 4.0.0
+
+Adds canonical normal-result event projections while preserving the released
+direct-result node for code-authored compatibility.
+
+- Adds `FlowEventProjectionNode` with typed `ProjectionEvent` input and one
+  `FlowResult<EventProjectionSnapshot>` Output plus Events.
+- Emits matching and final snapshots as successful variants; expected
+  projection failures are normal error variants with stable string codes and
+  immutable details.
+- Preserves ordered counts, latest-event summaries, rolling replay-time rates,
+  filter semantics, message lineage, and output fan-out.
+- Emits a configured final snapshot automatically after accepted input drains
+  on normal completion.
+- Keeps `EventProjectionNode`, its direct snapshot Output, Errors port, and
+  explicit final-snapshot API unchanged for compatibility.
+
+## FluxFlow.Components.Projections.Composition 2.0.0
+
+Makes the canonical result contract the fixed `event.projection` registration.
+
+- Changes Output to `FlowResult<EventProjectionSnapshot>` and removes the
+  universal Errors surface.
+- Keeps typed `ProjectionEvent` Input and the optional host-owned clock at an
+  exact resource address.
+- Makes configured final snapshots part of normal composition completion.
+- Updates Designer metadata and package examples to the canonical fixed ports
+  and flat two-section application document.
+
 ## FluxFlow.Components.State 4.0.0
 
 Adds a canonical keyed state reducer over immutable workflow values while

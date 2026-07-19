@@ -2,6 +2,7 @@ using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Nodes;
 using FluxFlow.Components.Projections.Options;
 using FluxFlow.Composition;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Projections.Composition;
 
@@ -24,7 +25,7 @@ public static class ProjectionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<EventProjectionSnapshot>(
+                CompositionPorts.Metadata<FlowResult<EventProjectionSnapshot>>(
                     ProjectionsCompositionPortNames.Output)
             ]);
     }
@@ -35,7 +36,7 @@ public static class ProjectionsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<EventProjectionOptions>();
         var clock = context.GetResource<TimeProvider>(
             ProjectionsCompositionResourceNames.Clock);
-        var node = new EventProjectionNode(options, clock);
+        var node = new FlowEventProjectionNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -47,11 +48,10 @@ public static class ProjectionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<EventProjectionSnapshot>(
+                CompositionPorts.Output<FlowResult<EventProjectionSnapshot>>(
                     ProjectionsCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
 }
