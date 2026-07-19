@@ -5,13 +5,14 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/metrics-vnext`. The provider-neutral MQTT vertical slice and the
-  first eleven normal component-family migrations, canonical FlowValue Mapping,
+  `work/observability-vnext`. The provider-neutral MQTT vertical slice and the
+  first twelve normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
   FlowValue State commands/results, typed-event Projection results, and typed
-  Metric snapshot/results are implemented and verified locally.
+  Metric snapshot/results plus FlowValue Observability results are implemented
+  and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -28,7 +29,7 @@ Date: 2026-07-19
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
   Validation, Assertions, Expectations, Routing, Control, State, and
-  Projections, and Metrics now use this foundation; the remaining component-family
+  Projections, Metrics, and Observability now use this foundation; the remaining component-family
   migrations continue separately.
   See
   `205-vnext-data-foundation.md` and
@@ -230,6 +231,18 @@ Date: 2026-07-19
   clock resource. Focused/full tests, controlled builds, binary compatibility,
   preflight/dry-runs, and a package-only consumer passed. Observability is the
   next bounded family assessment. See `226-vnext-metrics-flowresult.md`.
+- `FluxFlow.Components.Observability` is now `4.0.0` locally with canonical
+  FlowValue Counter, Logger, and Metrics nodes. Each emits one normal FlowResult
+  Output plus Events; rejected Counter inputs are explicit successes, and
+  Logger/Metrics selector failures are one partial result carrying usable data.
+  FlowValue-native selectors avoid object conversion, and Logger accepts scalar
+  or array selector-name configuration. All released generic nodes remain
+  available for compatibility. Observability Composition is now `2.0.0` with
+  parameterless canonical registrations, explicit generic compatibility
+  overloads, no canonical Errors surfaces, and exact host-owned resources.
+  Focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Sources is the next
+  bounded family assessment. See `227-vnext-observability-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

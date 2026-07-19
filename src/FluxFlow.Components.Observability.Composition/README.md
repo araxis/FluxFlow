@@ -1,12 +1,11 @@
 # FluxFlow.Components.Observability.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone
-observability nodes from `FluxFlow.Components.Observability`.
+Composition registration and Designer metadata for canonical FlowValue Counter,
+Logger, and Metrics components. Each component emits one normal FlowResult
+output plus Events.
 
-This package does not create telemetry sinks, scan assemblies, resolve CLR types
-from strings, or own expression and selector services. Hosts register the
-observability node factories explicitly and provide keyed resources when a node
-configuration needs them.
+This package does not scan assemblies, own expression engines/selectors/clocks,
+create logging or metric sinks, or add renderer behavior.
 
 ## Registration
 
@@ -14,91 +13,105 @@ configuration needs them.
 services
     .AddFluxFlowComposition(configuration)
     .RegisterNodes(registry => registry
-        .RegisterCounter<MyMessage>()
-        .RegisterLogger<MyMessage>()
-        .RegisterMetrics<MyMessage>());
+        .RegisterCounter()
+        .RegisterLogger()
+        .RegisterMetrics());
 ```
 
-## Node Types
+| Type | Input | Output |
+|------|-------|--------|
+| `flow.counter` | `FlowValue` | `FlowResult<FlowCounterSnapshot>` |
+| `flow.logger` | `FlowValue` | `FlowResult<FlowValueLogEntry>` |
+| `flow.metrics` | `FlowValue` | `FlowResult<FlowMetricSnapshot>` |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `flow.counter` | `FlowCounterNode<TInput>` | `Input`, `Output` |
-| `flow.logger` | `FlowLoggerNode<TInput>` | `Input`, `Output` |
-| `flow.metrics` | `FlowMetricsNode<TInput>` | `Input`, `Output` |
+Descriptors expose Events and no universal Errors ports. Counter rejection is a
+successful result. Logger attribute and Metrics size failures are partial error
+results carrying usable output values.
 
-All factories expose `Events` and `Errors`. Registrations are closed over
-`TInput`; hosts that need multiple input shapes should use custom node type
-strings such as `flow.counter.order`.
-
-## Resources
-
-- `clock`: optional keyed `TimeProvider` for all nodes.
-- `engine`: required keyed `IFlowExpressionEngine` only when counter options
-  configure `predicate` or `expression`.
-- `contextFactory`: optional keyed `IFlowMapContextFactory<TInput>` for counters.
-- `sizeSelector`: optional keyed `IObservabilityValueSelector<TInput>` for
-  metrics.
-- `attribute:{name}`: required keyed `IObservabilityValueSelector<TInput>` for
-  each logger `attributeSelectors` entry.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "logger": {
-              "type": "flow.logger",
-              "resources": {
-                "clock": "fixed",
-                "attribute:kind": "kind-selector"
-              },
-              "configuration": {
-                "inputType": "message",
-                "level": "Information",
-                "category": "workflow",
-                "messageTemplate": "Observed {kind} item #{sequence}",
-                "attributeSelectors": [ "kind" ],
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Expressions": {
+      "Main": {
+        "Type": "host.expression"
+      }
+    },
+    "Selectors": {
+      "Kind": {
+        "Type": "host.flowValueSelector"
+      },
+      "Size": {
+        "Type": "host.flowValueSelector"
+      }
+    },
+    "System": {
+      "Clock": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "Telemetry": {
+      "CountAccepted": {
+        "Type": "flow.counter",
+        "engine": "Resources.Expressions.Main",
+        "clock": "Resources.System.Clock",
+        "name": "accepted-orders",
+        "predicate": "input.status = 'accepted'",
+        "boundedCapacity": 128,
+        "Input": "OrderSource.Output"
+      },
+      "LogOrders": {
+        "Type": "flow.logger",
+        "clock": "Resources.System.Clock",
+        "attributeSelectors": ["kind"],
+        "attribute:kind": "Resources.Selectors.Kind",
+        "level": "Information",
+        "category": "orders",
+        "messageTemplate": "Observed {kind} item #{sequence}.",
+        "boundedCapacity": 128,
+        "Input": "OrderSource.Output"
+      },
+      "MeasureOrders": {
+        "Type": "flow.metrics",
+        "sizeSelector": "Resources.Selectors.Size",
+        "clock": "Resources.System.Clock",
+        "name": "orders",
+        "boundedCapacity": 128,
+        "Input": "OrderSource.Output"
       }
     }
   }
 }
 ```
 
-Each node binds its existing options record from composition configuration.
-Invalid observability options, such as blank `inputType`, non-positive
-`boundedCapacity`, or unsupported logger `level`, fail during composition build
-and surface as factory diagnostics when build failures are configured as
-diagnostics.
+Component settings, resource references, and port links are flat. Resource
+addresses and component/port names are exact and case-sensitive. Logger uses a
+string for one `attributeSelectors` entry or an array for multiple entries;
+each entry resolves the matching `attribute:{name}` resource.
+
+## Host-Owned Resources
+
+- Counter: conditionally required `engine`, optional `contextFactory`, optional
+  `clock`.
+- Logger: optional `clock` and one required `attribute:{name}` selector for each
+  configured attribute name.
+- Metrics: optional `sizeSelector` and optional `clock`.
+
+Every selector in the canonical contract implements
+`IObservabilityFlowValueSelector` and returns FlowValue directly.
 
 ## Design Metadata
 
-`ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
-for `flow.counter`, `flow.logger`, and `flow.metrics` so hosts can build
-palettes, editors, validation hints, or documentation without copying package
-descriptors. The metadata describes the existing observability option records,
-fixed ports, option grouping/editor hints, and host-owned resource hints.
-Counter metadata exposes the `engine`, `contextFactory`, and `clock` resources,
-with `engine` marked as conditionally required when `predicate` or `expression`
-is configured. Logger metadata exposes `clock` and the dynamic
-`attribute:{name}` selector resource pattern used by `attributeSelectors`.
-Metrics metadata exposes `sizeSelector` and `clock`. Host-owned resource
-metadata also includes key-pattern hints for expression engines, context
-factories, selectors, and clocks.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+`ObservabilityComponentDesignMetadataProvider` describes canonical fixed ports,
+option sections/editor hints, conditional expression resources, FlowValue
+selector patterns, and exact host-owned resource addresses. The metadata is
+descriptive only; hosts own palette and inspector rendering, resource selection,
+validation UI, activation, persistence, and sink integration.
 
-Expression engines, context factories, selectors, and optional keyed
-`TimeProvider` clocks remain host-owned resources; option fields such as
-`engine`, `attributeSelectors`, and `sizeSelector` only carry the existing
-configuration metadata used by the nodes and factories.
+Explicit generic registration overloads retain the released direct-result
+contract for code-authored compatibility. Composition `2.x` parameterless
+registrations are canonical; install Composition `1.x` for existing legacy
+definitions.

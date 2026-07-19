@@ -14,6 +14,9 @@ normal FlowResult output, Projections retains typed domain events while
 emitting snapshots and expected failures through one normal FlowResult output,
 and Metrics retains typed samples/snapshots while exposing successful, partial,
 and failed aggregation outcomes through one normal FlowResult output.
+Observability now uses FlowValue-native Counter, Logger, and Metrics components
+with one normal result stream per component while retaining generic standalone
+compatibility surfaces.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
 are migrated incrementally.

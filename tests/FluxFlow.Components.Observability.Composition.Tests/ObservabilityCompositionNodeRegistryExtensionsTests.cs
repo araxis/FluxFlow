@@ -7,6 +7,7 @@ using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,25 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void RegisterObservabilityNodes_registers_canonical_flowvalue_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterCounter()
+            .RegisterLogger()
+            .RegisterMetrics();
+
+        AssertCanonicalMetadata<FlowResult<FlowCounterSnapshot>>(
+            registry,
+            ObservabilityCompositionNodeTypes.Counter);
+        AssertCanonicalMetadata<FlowResult<FlowValueLogEntry>>(
+            registry,
+            ObservabilityCompositionNodeTypes.Logger);
+        AssertCanonicalMetadata<FlowResult<FlowMetricSnapshot>>(
+            registry,
+            ObservabilityCompositionNodeTypes.Metrics);
+    }
+
+    [Fact]
     public void Design_metadata_provider_returns_valid_observability_metadata()
     {
         var metadata = MetadataByType();
@@ -62,11 +82,21 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
                 option.Name.Value.StartsWith("attribute:", StringComparison.Ordinal));
         }
 
+        metadata[ObservabilityCompositionNodeTypes.Counter]
+            .Attributes[new ComponentAttributeName("omittedOptions")]
+            .Value.ShouldBe("inputType,engine");
+        metadata[ObservabilityCompositionNodeTypes.Logger]
+            .Attributes[new ComponentAttributeName("omittedOptions")]
+            .Value.ShouldBe("inputType");
+        metadata[ObservabilityCompositionNodeTypes.Metrics]
+            .Attributes[new ComponentAttributeName("omittedOptions")]
+            .Value.ShouldBe("inputType,sizeSelector");
+
         AssertResources(
             metadata[ObservabilityCompositionNodeTypes.Counter],
             [
                 (ObservabilityCompositionResourceNames.Engine, 0, false, nameof(IFlowExpressionEngine)),
-                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<TInput>"),
+                (ObservabilityCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<FlowValue>"),
                 (ObservabilityCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
             ]);
         metadata[ObservabilityCompositionNodeTypes.Counter]
@@ -79,7 +109,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             metadata[ObservabilityCompositionNodeTypes.Logger],
             [
                 (ObservabilityCompositionResourceNames.Clock, 0, false, nameof(TimeProvider)),
-                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, "IObservabilityValueSelector<TInput>")
+                (ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}", 1, false, nameof(IObservabilityFlowValueSelector))
             ]);
         var attributeSelector = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Resources
@@ -96,7 +126,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         AssertResources(
             metadata[ObservabilityCompositionNodeTypes.Metrics],
             [
-                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, "IObservabilityValueSelector<TInput>"),
+                (ObservabilityCompositionResourceNames.SizeSelector, 0, false, nameof(IObservabilityFlowValueSelector)),
                 (ObservabilityCompositionResourceNames.Clock, 1, false, nameof(TimeProvider))
             ]);
     }
@@ -108,25 +138,23 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
 
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Counter],
-            nameof(FlowCounterSnapshot));
+            "FlowResult<FlowCounterSnapshot>");
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Logger],
-            nameof(FlowLogEntry));
+            "FlowResult<FlowValueLogEntry>");
         AssertPorts(
             metadata[ObservabilityCompositionNodeTypes.Metrics],
-            nameof(FlowMetricSnapshot));
+            "FlowResult<FlowMetricSnapshot>");
     }
 
     [Fact]
     public void Design_metadata_provider_describes_counter_options()
     {
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Counter];
-        var defaults = new FlowCounterOptions();
+        var defaults = new FlowValueCounterOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "inputType",
             "name",
-            "engine",
             "predicate",
             "expression",
             "expressionId",
@@ -134,9 +162,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             "boundedCapacity"
         ], ignoreOrder: false);
 
-        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
         AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
-        AssertOption(metadata, "engine", OptionValueKind.Text, defaultValue: null);
         AssertOption(metadata, "predicate", OptionValueKind.Expression, defaultValue: null);
         AssertOption(metadata, "expression", OptionValueKind.Expression, defaultValue: null);
         AssertOption(metadata, "expressionId", OptionValueKind.Text, defaultValue: null);
@@ -153,18 +179,15 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     public void Design_metadata_provider_describes_logger_options()
     {
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Logger];
-        var defaults = new FlowLoggerOptions();
+        var defaults = new FlowValueLoggerOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "inputType",
             "level",
             "category",
             "messageTemplate",
             "attributeSelectors",
             "boundedCapacity"
         ], ignoreOrder: false);
-
-        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
 
         var level = metadata.Options.Single(option => option.Name.Value == "level");
         level.Kind.ShouldBe(OptionValueKind.Enum);
@@ -197,18 +220,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     public void Design_metadata_provider_describes_metrics_options()
     {
         var metadata = MetadataByType()[ObservabilityCompositionNodeTypes.Metrics];
-        var defaults = new FlowMetricsOptions();
+        var defaults = new FlowValueMetricsOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
-            "inputType",
             "name",
-            "sizeSelector",
             "boundedCapacity"
         ], ignoreOrder: false);
 
-        AssertOption(metadata, "inputType", OptionValueKind.Text, defaults.InputType);
         AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
-        AssertOption(metadata, "sizeSelector", OptionValueKind.Text, defaultValue: null);
         AssertOption(
             metadata,
             "boundedCapacity",
@@ -225,9 +244,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var counterOptions = metadata[ObservabilityCompositionNodeTypes.Counter]
             .Options
             .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
-        AssertOptionHints(counterOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(counterOptions["name"], "Counter", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(counterOptions["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(
             counterOptions["predicate"],
             "Filtering",
@@ -249,7 +266,6 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var loggerOptions = metadata[ObservabilityCompositionNodeTypes.Logger]
             .Options
             .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
-        AssertOptionHints(loggerOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(loggerOptions["level"], "Logging", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(loggerOptions["category"], "Logging", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(loggerOptions["messageTemplate"], "Logging", OptionDesignMetadataAttributeValues.Primary);
@@ -264,14 +280,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         var metricsOptions = metadata[ObservabilityCompositionNodeTypes.Metrics]
             .Options
             .ToDictionary(option => option.Name.Value, StringComparer.Ordinal);
-        AssertOptionHints(metricsOptions["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(metricsOptions["name"], "Metrics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
-            metricsOptions["sizeSelector"],
-            "Metrics",
-            OptionDesignMetadataAttributeValues.Primary,
-            OptionDesignMetadataAttributeValues.Text,
-            relatedResource: ObservabilityCompositionResourceNames.SizeSelector);
         AssertOptionHints(metricsOptions["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
@@ -550,6 +559,80 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public async Task Hosted_canonical_counter_emits_normal_flow_result_without_errors_port()
+    {
+        await WithNodeAsync<FlowValue, FlowResult<FlowCounterSnapshot>>(
+            ObservabilityCompositionNodeTypes.Counter,
+            registry => registry.RegisterCounter(),
+            async (input, output, descriptor) =>
+            {
+                var results = Link(output.Source);
+                var message = FlowMessage.Create(FlowValue.From("item"));
+
+                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+
+                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                result.CorrelationId.ShouldBe(message.CorrelationId);
+                result.Payload.Kind.ShouldBe(ObservabilityResultKinds.CounterSnapshot);
+                result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+                descriptor.Errors.ShouldBeNull();
+            });
+    }
+
+    [Fact]
+    public async Task Hosted_canonical_logger_carries_partial_entry_on_selector_failure()
+    {
+        await WithNodeAsync<FlowValue, FlowResult<FlowValueLogEntry>>(
+            ObservabilityCompositionNodeTypes.Logger,
+            registry => registry.RegisterLogger(),
+            async (input, output, descriptor) =>
+            {
+                var results = Link(output.Source);
+                await input.Target.SendAsync(FlowMessage.Create(FlowValue.From("item")));
+
+                var partial = await results.ReceiveAsync().WaitAsync(Timeout);
+                partial.Payload.Kind.ShouldBe(ObservabilityResultKinds.LogEntryPartial);
+                partial.Payload.Error.ShouldNotBeNull().Code
+                    .ShouldBe(ObservabilityErrorCodeNames.LoggerAttributeSelectorFailed);
+                partial.Payload.Value.ShouldNotBeNull().Attributes.GetObject()
+                    .ShouldBeEmpty();
+                descriptor.Errors.ShouldBeNull();
+            },
+            node => node
+                .Configure("attributeSelectors", "broken")
+                .Resource(
+                    ObservabilityCompositionResourceNames.AttributeSelector("broken"),
+                    "broken"),
+            services => services.AddKeyedSingleton<IObservabilityFlowValueSelector>(
+                "broken",
+                new FlowValueSelector((_, _) =>
+                    throw new InvalidOperationException("selector failed"))));
+    }
+
+    [Fact]
+    public async Task Hosted_canonical_metrics_resolves_flowvalue_size_selector()
+    {
+        await WithNodeAsync<FlowValue, FlowResult<FlowMetricSnapshot>>(
+            ObservabilityCompositionNodeTypes.Metrics,
+            registry => registry.RegisterMetrics(),
+            async (input, output, descriptor) =>
+            {
+                var results = Link(output.Source);
+                await input.Target.SendAsync(FlowMessage.Create(FlowValue.From("item")));
+
+                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                result.Payload.Kind.ShouldBe(ObservabilityResultKinds.MetricSnapshot);
+                result.Payload.Value.ShouldNotBeNull().TotalSize.ShouldBe(4);
+                descriptor.Errors.ShouldBeNull();
+            },
+            node => node
+                .Resource(ObservabilityCompositionResourceNames.SizeSelector, "size"),
+            services => services.AddKeyedSingleton<IObservabilityFlowValueSelector>(
+                "size",
+                new FlowValueSelector((input, _) => FlowValue.From(input.GetString().Length))));
+    }
+
+    [Fact]
     public async Task Counter_predicate_failure_emits_error_and_continues()
     {
         var calls = 0;
@@ -735,6 +818,17 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(TOutput));
     }
 
+    private static void AssertCanonicalMetadata<TOutput>(
+        CompositionNodeRegistry registry,
+        string nodeType)
+    {
+        var registration = registry.Registrations[nodeType];
+        registration.Inputs[ObservabilityCompositionPortNames.Input].MessageType
+            .ShouldBe(typeof(FlowValue));
+        registration.Outputs[ObservabilityCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(TOutput));
+    }
+
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
         => new ObservabilityComponentDesignMetadataProvider()
             .GetMetadata()
@@ -750,7 +844,7 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(ObservabilityCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe("TInput");
+        input.ValueType?.Value.ShouldBe(nameof(FlowValue));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
@@ -956,6 +1050,14 @@ public sealed class ObservabilityCompositionNodeRegistryExtensionsTests
         : IObservabilityValueSelector<TInput>
     {
         public object? Select(TInput input, ObservabilityNodeContext context)
+            => selector(input, context);
+    }
+
+    private sealed class FlowValueSelector(
+        Func<FlowValue, ObservabilityNodeContext, FlowValue> selector)
+        : IObservabilityFlowValueSelector
+    {
+        public FlowValue Select(FlowValue input, ObservabilityNodeContext context)
             => selector(input, context);
     }
 }

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone observability nodes over host-owned keyed expression, selector, context, and clock resources.</Description>
+    <Description>Canonical FlowValue observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes parameterless Counter, Logger, and Metrics registrations canonical FlowValue/FlowResult contracts without universal Errors ports while preserving explicit generic registrations for compatibility.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -23,6 +23,7 @@
     <ProjectReference Include="..\FluxFlow.Components.Observability\FluxFlow.Components.Observability.csproj" />
     <ProjectReference Include="..\FluxFlow.Components.Designer\FluxFlow.Components.Designer.csproj" />
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Data\FluxFlow.Data.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
   </ItemGroup>
 

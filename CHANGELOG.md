@@ -7,6 +7,38 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Observability 4.0.0
+
+Adds canonical FlowValue observation while preserving the released generic
+nodes for code-authored compatibility.
+
+- Adds `FlowValueCounterNode`, `FlowValueLoggerNode`, and
+  `FlowValueMetricsNode`, each with one normal `FlowResult<T>` Output plus
+  Events and no universal Errors port.
+- Represents predicate rejection as a successful counter result and collapses
+  Logger attribute-selection and Metrics size-selection failures into one
+  partial error result carrying the usable entry or snapshot.
+- Adds immutable FlowValue log attributes and FlowValue-native selector
+  resources without object conversion or serialization round trips.
+- Preserves ordered processing, clocks, rates, counts, templates, message
+  lineage, later-input continuation, and output fan-out.
+- Keeps every released generic node, option, selector, direct Output, Errors
+  port, and runtime behavior unchanged for compatibility.
+
+## FluxFlow.Components.Observability.Composition 2.0.0
+
+Makes parameterless observability registrations the canonical fixed contracts.
+
+- Registers `flow.counter`, `flow.logger`, and `flow.metrics` with FlowValue
+  Input, one corresponding FlowResult Output, Events, and no universal Errors
+  surface.
+- Resolves FlowValue expression contexts, FlowValue-native selectors, and clocks
+  from exact host-owned resource addresses.
+- Keeps explicit generic registration overloads as the complete `1.x`
+  compatibility surface.
+- Updates Designer metadata and package examples to canonical fixed ports,
+  canonical options, and the flat two-section application document.
+
 ## FluxFlow.Components.Metrics 4.0.0
 
 Adds canonical normal-result metric aggregation while preserving the released

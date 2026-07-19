@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue Observability
+
+- Added canonical FlowValue Counter, Logger, and Metrics nodes with one normal
+  FlowResult Output plus Events and no universal Errors ports.
+- Made predicate rejection an explicit successful counter result and collapsed
+  Logger attribute and Metrics size failures into one partial result carrying
+  the usable entry or snapshot.
+- Added immutable FlowValue log data, FlowValue-native selectors, finite size
+  validation, ordered continuation, one-or-many Logger selector binding, and
+  strong message lineage.
+- Made parameterless Composition registrations canonical while retaining every
+  explicit generic registration and runtime contract for compatibility.
+- Observability moved to `4.0.0` and Observability Composition to `2.0.0`;
+  package docs, shared docs, changelog, and source-declaration baseline were
+  updated.
+- Runtime (`36`), Composition (`26`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,088`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Sources is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext Metric Results
 
 - Added `FlowMetricsAggregateNode` with typed metric sample input and one

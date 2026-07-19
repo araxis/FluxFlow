@@ -556,23 +556,30 @@ Main types:
 - `ObservabilityCompositionPortNames`
 - `ObservabilityCompositionResourceNames`
 
-Use `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
-`RegisterMetrics<TInput>()` from the optional
-`FluxFlow.Components.Observability.Composition` package when a composition host
-wants counter, logger, or metrics node factories. The factories bind existing
-observability options and resolve host-owned keyed expression, selector,
-context, and clock resources. Invalid observability options fail during build
-as factory diagnostics when the host is configured to collect build failures.
+Use parameterless `RegisterCounter()`, `RegisterLogger()`, and
+`RegisterMetrics()` from the optional
+`FluxFlow.Components.Observability.Composition` package for the canonical
+FlowValue contracts. Counter results distinguish counted and predicate-rejected
+values. Logger and Metrics selector failures are one partial error result that
+carries the usable log entry or metric snapshot. Every descriptor has one
+normal FlowResult Output, Events, and no universal Errors port.
+
+Explicit `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
+`RegisterMetrics<TInput>()` overloads preserve the released generic direct
+Output and Errors contracts for code-authored compatibility. All factories
+resolve host-owned keyed expression, selector, context, and clock resources.
+Invalid options fail during build as factory diagnostics when the host collects
+build failures.
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the three observability composition nodes, including existing option records
-fixed ports, and host-owned resource hints. Counter metadata includes the
+for the three canonical observability composition nodes, including FlowValue
+options, fixed result ports, and host-owned resource hints. Counter metadata includes the
 conditionally required expression engine plus optional context factory and
 clock resources. Logger metadata includes the dynamic `attribute:{name}`
-selector resource pattern, and metrics metadata includes the optional
-`sizeSelector` and `clock` resources. Expression engines, context factories,
-selectors, and clocks remain host-owned keyed resources. The provider authors
-that metadata through the shared validated Designer metadata builder.
+FlowValue selector resource pattern, and metrics metadata includes the optional
+FlowValue `sizeSelector` and `clock` resources. Expression engines, context
+factories, selectors, and clocks remain host-owned keyed resources. The provider
+authors that metadata through the shared validated Designer metadata builder.
 
 ## Metrics Composition
 

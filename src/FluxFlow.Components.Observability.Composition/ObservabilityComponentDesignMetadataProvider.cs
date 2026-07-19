@@ -2,15 +2,16 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Observability.Contracts;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Observability.Composition;
 
 public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
-    private static readonly FlowCounterOptions CounterDefaults = new();
-    private static readonly FlowLoggerOptions LoggerDefaults = new();
-    private static readonly FlowMetricsOptions MetricsDefaults = new();
+    private static readonly FlowValueCounterOptions CounterDefaults = new();
+    private static readonly FlowValueLoggerOptions LoggerDefaults = new();
+    private static readonly FlowValueMetricsOptions MetricsDefaults = new();
 
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         =>
@@ -27,16 +28,20 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Counter",
             "Counts accepted input messages and emits counter snapshots.",
             "hash",
-            "count");
+            "count")
+            .AddAttribute("omittedOptions", "inputType,engine")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "inputType and engine are generic compatibility diagnostics; the canonical contract has fixed FlowValue input and selects its engine through a resource.");
 
         AddCounterOptions(builder);
         AddCounterResources(builder);
         AddTransformPorts(
             builder,
-            "TInput",
-            "Input message to count.",
-            nameof(FlowCounterSnapshot),
-            "Counter snapshot.");
+            nameof(FlowValue),
+            "Workflow value to count.",
+            "FlowResult<FlowCounterSnapshot>",
+            "Counted, rejected, or failed counter result.");
 
         return builder.Build();
     }
@@ -48,16 +53,20 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Logger",
             "Renders structured log entries from input messages.",
             "list",
-            "log");
+            "log")
+            .AddAttribute("omittedOptions", "inputType")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "inputType is generic compatibility metadata; the canonical contract has fixed FlowValue input.");
 
         AddLoggerOptions(builder);
         AddLoggerResources(builder);
         AddTransformPorts(
             builder,
-            "TInput",
-            "Input message to log.",
-            nameof(FlowLogEntry),
-            "Structured log entry.");
+            nameof(FlowValue),
+            "Workflow value to log.",
+            "FlowResult<FlowValueLogEntry>",
+            "Complete, partial, or failed structured log result.");
 
         return builder.Build();
     }
@@ -69,16 +78,20 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Metrics",
             "Tracks count, rate, timestamp, and optional size snapshots for inputs.",
             "activity",
-            "observeMetrics");
+            "observeMetrics")
+            .AddAttribute("omittedOptions", "inputType,sizeSelector")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "inputType and the diagnostic sizeSelector option belong to generic compatibility; the canonical contract has fixed FlowValue input and selects size through the resource.");
 
         AddMetricsOptions(builder);
         AddMetricsResources(builder);
         AddTransformPorts(
             builder,
-            "TInput",
-            "Input message to observe.",
-            nameof(FlowMetricSnapshot),
-            "Metric snapshot.");
+            nameof(FlowValue),
+            "Workflow value to observe.",
+            "FlowResult<FlowMetricSnapshot>",
+            "Complete, partial, or failed metric snapshot result.");
 
         return builder.Build();
     }
@@ -100,7 +113,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static void AddCounterOptions(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddOption(InputTypeOption(CounterDefaults.InputType))
             .AddOption(
                 "name",
                 OptionValueKind.Text,
@@ -108,15 +120,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 helperText: "Optional counter name included in snapshots and diagnostics.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Counter",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "engine",
-                OptionValueKind.Text,
-                displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
@@ -163,7 +166,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static void AddLoggerOptions(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddOption(InputTypeOption(LoggerDefaults.InputType))
             .AddOption(
                 "level",
                 OptionValueKind.Enum,
@@ -207,7 +209,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
 
     private static void AddMetricsOptions(ComponentDesignMetadataBuilder builder)
         => builder
-            .AddOption(InputTypeOption(MetricsDefaults.InputType))
             .AddOption(
                 "name",
                 OptionValueKind.Text,
@@ -217,16 +218,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                     section: "Metrics",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "sizeSelector",
-                OptionValueKind.Text,
-                displayName: "Size Selector",
-                helperText: "Diagnostic selector metadata; composition DI selection uses the sizeSelector resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Metrics",
-                    importance: OptionDesignMetadataAttributeValues.Primary,
-                    editor: OptionDesignMetadataAttributeValues.Text,
-                    relatedResource: ObservabilityCompositionResourceNames.SizeSelector))
             .AddOption(BoundedCapacityOption(MetricsDefaults.BoundedCapacity));
 
     private static void AddCounterResources(ComponentDesignMetadataBuilder builder)
@@ -246,7 +237,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed mapping context factory used when evaluating counter predicates.",
-                valueType: "IFlowMapContextFactory<TInput>",
+                valueType: "IFlowMapContextFactory<FlowValue>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
                     keyPattern: "context-factory:{name}"))
@@ -276,7 +267,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Attribute Selector",
                 order: 1,
                 summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
-                valueType: "IObservabilityValueSelector<TInput>",
+                valueType: nameof(IObservabilityFlowValueSelector),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
@@ -289,7 +280,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Size Selector",
                 order: 0,
                 summary: "Optional keyed selector used to calculate message size metrics.",
-                valueType: "IObservabilityValueSelector<TInput>",
+                valueType: nameof(IObservabilityFlowValueSelector),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: "selector:{name}"))
@@ -302,19 +293,6 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
                     keyPattern: "clock:{name}"));
-
-    private static OptionDesignMetadata InputTypeOption(string defaultValue) => new()
-    {
-        Name = new ComponentOptionName("inputType"),
-        Kind = OptionValueKind.Text,
-        DisplayName = new ComponentMetadataText("Input Type"),
-        DefaultValue = defaultValue,
-        HelperText = new ComponentMetadataText("Diagnostic input type metadata; CLR input type comes from the closed registration."),
-        Attributes = OptionDesignMetadataAttributes.CreateMap(
-            section: "Type Metadata",
-            importance: OptionDesignMetadataAttributeValues.Advanced,
-            editor: OptionDesignMetadataAttributeValues.Text)
-    };
 
     private static OptionDesignMetadata BoundedCapacityOption(int defaultValue) => new()
     {

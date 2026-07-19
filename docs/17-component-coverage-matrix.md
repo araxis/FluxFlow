@@ -36,7 +36,7 @@ Status values:
 | Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | canonical FlowValue/result Window, Correlation, and Join aligned; structural nodes deprecated |
 | Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result aligned |
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
-| Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | aligned |
+| Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | canonical FlowValue/result Counter, Logger, and Metrics aligned; generic runtime retained for compatibility |
 | Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | aligned |
 | Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | canonical `FlowContent` aligned |
 | Serialization | `FluxFlow.Components.Serialization` | yes | `FluxFlow.Components.Serialization.Composition` | yes | yes | canonical `FlowContent`/`FlowValue` aligned |
