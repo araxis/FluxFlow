@@ -1,86 +1,99 @@
 # FluxFlow.Components.Assertions.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone
-assertion node from `FluxFlow.Components.Assertions`.
+Optional `FluxFlow.Composition` registration helpers and Designer metadata for
+assertion components. The canonical `flow.assert` contract consumes `FlowValue`
+and emits `FlowResult<FlowValueAssertionResult>` on one normal output.
 
-This package does not choose an expression language, scan assemblies, or resolve
-CLR types from strings. Hosts register closed assertion node types explicitly
-and provide keyed `IFlowExpressionEngine` services.
+The package does not choose an expression language, scan assemblies, resolve
+CLR types from strings, or own expression-engine resources.
 
-## Registration
-
-```csharp
-services.AddKeyedSingleton<IFlowExpressionEngine>("default", expressionEngine);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry =>
-        registry.RegisterAssertion<OrderMessage>());
-```
-
-Use custom node type names when a host needs more than one input shape:
+## Canonical Registration
 
 ```csharp
-registry
-    .RegisterAssertion<OrderMessage>("flow.assert.order")
-    .RegisterAssertion<HttpResponseOutput>("flow.assert.http-response");
+services.AddKeyedSingleton<IFlowExpressionEngine>(
+    "Resources.Expressions.Primary",
+    expressionEngine);
+
+registry.RegisterAssertion();
 ```
 
-## Node Types
+| Type | Node | Input | Output |
+|------|------|-------|--------|
+| `flow.assert` | `FlowValueAssertionNode` | `FlowValue` | `FlowResult<FlowValueAssertionResult>` |
 
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `flow.assert` | `FlowAssertionComponent<TInput>` | `engine` | `Input`, `Output`, `Passed`, `Failed` |
+Passed and failed assertions are successful result kinds. Missing input and
+expression evaluation failures are normal error results. The canonical
+contract has no `Passed`, `Failed`, or universal error port.
 
-`Output` emits `FlowAssertionResult`. `Passed` and `Failed` emit the original
-`TInput` message when the assertion options allow routed inputs.
-
-`contextFactory` is an optional keyed `IFlowMapContextFactory<TInput>` resource
-for custom expression variables. `clock` is an optional keyed `TimeProvider`
-resource for deterministic result and diagnostic timestamps.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "score-check": {
-              "type": "flow.assert",
-              "resources": {
-                "engine": "default"
-              },
-              "configuration": {
-                "expression": "input.Score >= 10",
-                "description": "score-check",
-                "failureMessage": "Score too low.",
-                "inputType": "app.order",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Expressions": {
+      "Primary": {
+        "Type": "host.expression"
+      }
+    },
+    "Contexts": {
+      "Score": {
+        "Type": "host.assertion-context"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderChecks": {
+      "CheckScore": {
+        "Type": "flow.assert",
+        "engine": "Resources.Expressions.Primary",
+        "contextFactory": "Resources.Contexts.Score",
+        "expression": "score >= 10",
+        "expressionName": "minimum-score",
+        "description": "score-check",
+        "failureMessage": "Score too low.",
+        "inputType": "order",
+        "boundedCapacity": 128
       }
     }
   }
 }
 ```
 
-`AssertionOptions.InputType` remains diagnostic metadata. The actual composition
-port type comes from the closed generic registration selected by the host.
+Component settings and resource references are flat. Hosts register the
+referenced expression engine as a keyed `IFlowExpressionEngine` using the exact,
+case-sensitive resource address.
+
+`contextFactory` is an optional keyed `IFlowMapContextFactory<FlowValue>`
+reference and `clock` is an optional keyed `TimeProvider` reference. All three
+resource hints use `Resources.{name}`. The host owns registration, lifetime,
+and disposal.
+
+Invalid options, such as a missing expression or non-positive bounded capacity,
+fail during node activation.
+
+## Typed Compatibility Registration
+
+Existing code-authored hosts can retain explicit CLR contracts:
+
+```csharp
+registry.RegisterAssertion<OrderMessage>("flow.assert.order");
+```
+
+That overload creates `FlowAssertionComponent<TInput>` and preserves its
+`Input`, `Output`, `Passed`, `Failed`, Events, and Errors surfaces. The
+`emitPassedInput` and `emitFailedInput` options apply only to this generic
+compatibility registration. Use a distinct node type when canonical and generic
+registrations share one registry.
 
 ## Design Metadata
 
-`AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.assert` composition node. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
+`AssertionsComponentDesignMetadataProvider` describes the canonical node:
 
-The provider describes editable options, option grouping hints, host-owned
-resource picker hints, and ports. `engine` is required; `contextFactory` and
-`clock` are optional. Resource metadata is descriptive only, so hosts still own
-keyed service registration, selection, lifetime, and disposal.
+- `Input`: `FlowValue`
+- `Output`: `FlowResult<FlowValueAssertionResult>`
+- required `engine` resource, plus optional `contextFactory` and `clock`
+- option section, importance, editor, syntax, and related-resource hints
+- host-owned resource pickers using `Resources.{name}` key patterns
+
+The metadata is descriptive only. Hosts own palette and inspector rendering,
+resource selection, validation UI, activation, and persistence.

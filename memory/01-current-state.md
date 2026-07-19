@@ -5,10 +5,10 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/validation-vnext`. The provider-neutral MQTT vertical slice and the
-  first four normal component-family migrations, canonical FlowValue Mapping,
-  FlowContent Payloads, FlowContent/FlowValue Serialization, and FlowValue
-  Validation, are implemented and verified locally.
+  `work/assertions-vnext`. The provider-neutral MQTT vertical slice and the
+  first five normal component-family migrations, canonical FlowValue Mapping,
+  FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
+  Validation, and FlowValue Assertions, are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -24,8 +24,8 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  and Validation now use this foundation; the remaining component-family
-  migrations continue separately. See
+  Validation, and Assertions now use this foundation; the remaining
+  component-family migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
 - `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
@@ -140,8 +140,22 @@ Date: 2026-07-19
   ports, no legacy branch or universal Errors ports, and host-owned
   `Resources.{name}` selector and clock addresses. Focused/full tests,
   zero-warning controlled builds, binary compatibility, release
-  preflight/dry-runs, and a package-only consumer passed. Assertions is the
-  next bounded family. See `219-vnext-validation-flowvalue.md`.
+  preflight/dry-runs, and a package-only consumer passed. Assertions followed
+  as the next bounded family. See `219-vnext-validation-flowvalue.md`.
+- `FluxFlow.Components.Assertions` is now `4.0.0` locally with a canonical
+  `FlowValueAssertionNode` that emits passed and failed rules as successful
+  `FlowResult<FlowValueAssertionResult>` variants and missing/evaluation
+  failures as normal error results. It preserves exact values, expression
+  metadata, timing, diagnostics, message lineage, and later-message
+  continuation without branch or universal Errors ports. The generic
+  standalone component and branch/error contracts remain available for
+  code-authored compatibility. `FluxFlow.Components.Assertions.Composition` is
+  `2.0.0` with canonical fixed ports, parameterless registration, and
+  host-owned `Resources.{name}` engine, FlowValue context factory, and clock
+  addresses. Focused/full tests, zero-warning controlled builds, binary
+  compatibility, release preflight/dry-runs, and a package-only consumer
+  passed. Expectations is the next bounded family. See
+  `220-vnext-assertions-flowvalue.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

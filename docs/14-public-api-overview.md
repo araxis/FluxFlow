@@ -382,17 +382,25 @@ Main types:
 - `AssertionsCompositionPortNames`
 - `AssertionsCompositionResourceNames`
 
-Use `RegisterAssertion<TInput>()` from the optional
-`FluxFlow.Components.Assertions.Composition` package when a composition host
-wants closed generic `flow.assert` node factories. The factory resolves a keyed
-`IFlowExpressionEngine` resource; optional keyed typed context factory and clock
-resources stay host-owned.
+Use parameterless `RegisterAssertion()` from the optional
+`FluxFlow.Components.Assertions.Composition` package for the canonical fixed
+`flow.assert` factory. It consumes `FlowValue` and emits one
+`FlowResult<FlowValueAssertionResult>` output. Passed and failed rules are
+normal successful result kinds; missing input and expression evaluation
+failures remain normal error results. The factory resolves a required keyed
+`IFlowExpressionEngine`; optional keyed `IFlowMapContextFactory<FlowValue>` and
+clock resources stay host-owned. `RegisterAssertion<TInput>(customNodeType)`
+remains available as an explicit generic compatibility registration.
 
 `AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `flow.assert` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
-metadata includes editable options, ports, and resource hints for the required
-`engine` resource plus optional `contextFactory` and `clock` resources.
+metadata includes editable options with section/editor hints, canonical
+`FlowValue`/`FlowResult<FlowValueAssertionResult>` ports, and host-owned resource
+picker hints using `Resources.{name}` for the required `engine` resource plus
+optional `contextFactory` and `clock` resources. Routed-input settings are
+documented as generic compatibility options rather than canonical Designer
+controls.
 
 ## Control Composition
 

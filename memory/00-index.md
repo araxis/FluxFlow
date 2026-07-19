@@ -489,6 +489,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `219-vnext-validation-flowvalue.md`: canonical `FlowValue` JSON Schema
   validation with valid/invalid normal results, preserved generic compatibility,
   explicit typed-result boundaries, and Composition/package evidence.
+- `220-vnext-assertions-flowvalue.md`: canonical `FlowValue` assertions with
+  pass/fail normal results, normal evaluation errors, preserved generic branch
+  compatibility, and Composition/package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -5,6 +5,7 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,22 @@ namespace FluxFlow.Components.Assertions.Composition.Tests;
 public sealed class AssertionsCompositionNodeRegistryExtensionsTests
 {
     [Fact]
-    public void RegisterAssertion_registers_closed_assertion_metadata()
+    public void RegisterAssertion_registers_canonical_flow_value_metadata()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterAssertion();
+
+        var assertion = registry.Registrations[AssertionsCompositionNodeTypes.Assert];
+        assertion.Inputs[AssertionsCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(FlowValue));
+        assertion.Outputs[AssertionsCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(FlowResult<FlowValueAssertionResult>));
+        assertion.Outputs.ContainsKey(AssertionsCompositionPortNames.Passed).ShouldBeFalse();
+        assertion.Outputs.ContainsKey(AssertionsCompositionPortNames.Failed).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Generic_RegisterAssertion_preserves_closed_assertion_metadata()
     {
         var registry = new CompositionNodeRegistry()
             .RegisterAssertion<InputMessage>();
@@ -73,9 +89,7 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             ("inputType", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number),
             ("description", OptionValueKind.Text),
-            ("failureMessage", OptionValueKind.Text),
-            ("emitPassedInput", OptionValueKind.Boolean),
-            ("emitFailedInput", OptionValueKind.Boolean)
+            ("failureMessage", OptionValueKind.Text)
         ]);
         metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
@@ -92,9 +106,11 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         AssertResources(
             metadata,
             (AssertionsCompositionResourceNames.Engine, 0, true, nameof(IFlowExpressionEngine)),
-            (AssertionsCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<TInput>"),
+            (AssertionsCompositionResourceNames.ContextFactory, 1, false, "IFlowMapContextFactory<FlowValue>"),
             (AssertionsCompositionResourceNames.Clock, 2, false, nameof(TimeProvider))
         );
+        AttributeValue(metadata.Attributes, "omittedOptions")
+            .ShouldBe("emitPassedInput,emitFailedInput");
     }
 
     [Fact]
@@ -110,10 +126,8 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-            (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, nameof(FlowAssertionResult)),
-            (AssertionsCompositionPortNames.Passed, PortDirection.Output, 2, false, "TInput"),
-            (AssertionsCompositionPortNames.Failed, PortDirection.Output, 3, false, "TInput")
+            (AssertionsCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+            (AssertionsCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValueAssertionResult>")
         ]);
     }
 
@@ -141,8 +155,6 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(options["description"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["failureMessage"], "Results", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["emitPassedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(options["emitFailedInput"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
     }
 
     [Fact]
@@ -158,15 +170,15 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
         AssertResourceHints(
             resources[AssertionsCompositionResourceNames.Engine],
             ResourceDesignMetadataAttributeValues.ExpressionEngine,
-            "expression-engine:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[AssertionsCompositionResourceNames.ContextFactory],
             ResourceDesignMetadataAttributeValues.ContextFactory,
-            "context-factory:{name}");
+            "Resources.{name}");
         AssertResourceHints(
             resources[AssertionsCompositionResourceNames.Clock],
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
@@ -181,6 +193,75 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             out var metadata).ShouldBeTrue();
         metadata.ShouldNotBeNull();
         metadata.Type.ShouldBe(new ComponentType(AssertionsCompositionNodeTypes.Assert));
+    }
+
+    [Fact]
+    public async Task Hosted_canonical_assertion_uses_flow_values_and_normal_results()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-07-19T13:00:00Z");
+        var contextFactory = new FlowValueContextFactory();
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, resultType) =>
+            {
+                resultType.ShouldBe(typeof(bool));
+                return context.Variables["passed"];
+            });
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
+        services.AddKeyedSingleton<IFlowMapContextFactory<FlowValue>>(
+            "custom",
+            contextFactory);
+        services.AddKeyedSingleton<TimeProvider>(
+            "fixed",
+            new FakeTimeProvider(timestamp));
+        services
+            .AddFluxFlowComposition(CompositionDefinitionBuilder
+                .Create()
+                .Workflow("main", workflow => workflow.Node(
+                    "assert",
+                    AssertionsCompositionNodeTypes.Assert,
+                    node => node
+                        .Resource(AssertionsCompositionResourceNames.Engine, "primary")
+                        .Resource(AssertionsCompositionResourceNames.ContextFactory, "custom")
+                        .Resource(AssertionsCompositionResourceNames.Clock, "fixed")
+                        .Configure("expression", "passed")
+                        .Configure("description", "canonical assertion")
+                        .Configure("boundedCapacity", 8)))
+                .Build())
+            .RegisterNodes(registry => registry.RegisterAssertion())
+            .Configure(options => options.StartRuntimeWithHost = false);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await hostedService.StartAsync(CancellationToken.None);
+
+        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
+        var assertionNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
+        var input = assertionNode.Descriptor.Inputs[AssertionsCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        var output = assertionNode.Descriptor.Outputs[AssertionsCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValueAssertionResult>>>();
+        assertionNode.Descriptor.Outputs.Count.ShouldBe(1);
+        var results = new BufferBlock<
+            FlowMessage<FlowResult<FlowValueAssertionResult>>>();
+        output.Source.LinkTo(results);
+        var value = FlowValue.From("value");
+        var message = FlowMessage.Create(
+            value,
+            new CorrelationId("canonical-assertion"));
+
+        (await input.Target.SendAsync(message).WaitAsync(TimeSpan.FromSeconds(5)))
+            .ShouldBeTrue();
+
+        var result = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        result.Payload.Kind.ShouldBe(AssertionResultKinds.Passed);
+        result.Payload.IsError.ShouldBeFalse();
+        result.Payload.Value.ShouldNotBeNull().Input.ShouldBeSameAs(value);
+        result.Payload.Value.Description.ShouldBe("canonical assertion");
+        result.Payload.Value.EvaluatedAt.ShouldBe(timestamp);
+        result.CorrelationId.ShouldBe(message.CorrelationId);
+        result.CausationId.ShouldBe(message.MessageId);
+        contextFactory.Input.ShouldBeSameAs(value);
     }
 
     private static void AssertResources(
@@ -534,6 +615,25 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
     }
 
     private sealed record InputMessage(int Score);
+
+    private sealed class FlowValueContextFactory : IFlowMapContextFactory<FlowValue>
+    {
+        public FlowValue? Input { get; private set; }
+
+        public FlowMapContext Create(FlowValue input)
+        {
+            Input = input;
+            return new FlowMapContext
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["value"] = input,
+                    ["passed"] = true
+                }
+            };
+        }
+    }
 
     private sealed class CustomContextFactory(bool passed) :
         IFlowMapContextFactory<InputMessage>

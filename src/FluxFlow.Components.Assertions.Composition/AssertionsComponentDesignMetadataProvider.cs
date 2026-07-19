@@ -2,12 +2,16 @@ using FluxFlow.Components.Assertions.Contracts;
 using FluxFlow.Components.Assertions.Options;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 
 namespace FluxFlow.Components.Assertions.Composition;
 
 public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
+    // Explicit generic registrations retain AssertionsCompositionPortNames.Passed
+    // and AssertionsCompositionPortNames.Failed as compatibility-only ports.
+    // Fixed canonical metadata intentionally exposes only Input and Output.
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateAssertionMetadata()];
 
@@ -16,10 +20,14 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
             .WithDisplay(
                 displayName: "Assertion",
                 category: "Assertions",
-                summary: "Evaluates an input message and emits assertion results plus optional routed inputs.",
+                summary: "Evaluates a FlowValue and returns pass, fail, or expected evaluation-error results.",
                 iconKey: "check-circle",
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
+            .AddAttribute("omittedOptions", "emitPassedInput,emitFailedInput")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "Routed-input flags apply only to explicit generic compatibility registrations; the canonical node has one result output.")
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,
@@ -64,7 +72,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Input Type",
                 defaultValue: AssertionOptions.ObjectTypeName,
-                helperText: "Diagnostic input type metadata; CLR input type comes from the closed registration.",
+                helperText: "Optional semantic type name for the FlowValue input.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -100,24 +108,6 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     section: "Results",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "emitPassedInput",
-                OptionValueKind.Boolean,
-                displayName: "Emit Passed Input",
-                helperText: "Emit matching input messages on the Passed output.",
-                defaultValue: true,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Branches",
-                    importance: OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(
-                "emitFailedInput",
-                OptionValueKind.Boolean,
-                displayName: "Emit Failed Input",
-                helperText: "Emit failing input messages on the Failed output.",
-                defaultValue: true,
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Branches",
-                    importance: OptionDesignMetadataAttributeValues.Advanced))
             .AddResource(
                 AssertionsCompositionResourceNames.Engine,
                 displayName: "Engine",
@@ -127,16 +117,16 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ExpressionEngine,
-                    keyPattern: "expression-engine:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 AssertionsCompositionResourceNames.ContextFactory,
                 displayName: "Context Factory",
                 order: 1,
                 summary: "Optional keyed input context factory for custom expression variables.",
-                valueType: "IFlowMapContextFactory<TInput>",
+                valueType: "IFlowMapContextFactory<FlowValue>",
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.ContextFactory,
-                    keyPattern: "context-factory:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 AssertionsCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -145,36 +135,22 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddInputPort(
                 AssertionsCompositionPortNames.Input,
                 displayName: "Input",
                 group: "Messages",
                 order: 0,
-                summary: "Input message to evaluate.",
-                valueType: "TInput",
+                summary: "Immutable value to evaluate.",
+                valueType: nameof(FlowValue),
                 isPrimary: true)
             .AddOutputPort(
                 AssertionsCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Assertion result.",
-                valueType: nameof(FlowAssertionResult),
+                summary: "Assertion outcome or expected evaluation error.",
+                valueType: "FlowResult<FlowValueAssertionResult>",
                 isPrimary: true)
-            .AddOutputPort(
-                AssertionsCompositionPortNames.Passed,
-                displayName: "Passed",
-                group: "Branches",
-                order: 2,
-                summary: "Original input when the assertion passes.",
-                valueType: "TInput")
-            .AddOutputPort(
-                AssertionsCompositionPortNames.Failed,
-                displayName: "Failed",
-                group: "Branches",
-                order: 3,
-                summary: "Original input when the assertion fails.",
-                valueType: "TInput")
             .Build();
 }

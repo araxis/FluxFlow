@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext FlowValue Assertions
+
+- Added canonical `FlowValueAssertionNode` with one normal
+  `FlowResult<FlowValueAssertionResult>` output and Events. Passed and failed
+  rules are successful variants; missing input and expression evaluation
+  failures remain normal workflow data.
+- Added canonical options, transport-neutral result data, stable result/error
+  strings, exact value preservation, message lineage, compile-once predicate
+  evaluation, FlowValue context support, and later-message continuation.
+- Migrated parameterless Assertions Composition registration and Designer
+  metadata to canonical fixed ports and `Resources.{name}` engine/context/clock
+  addresses. Existing generic registration retains its branch/error surfaces.
+- Moved Assertions to `4.0.0` and Assertions Composition to `2.0.0`, updated
+  package docs/changelog/API baseline, and documented the explicit typed-result
+  boundary.
+- Passed 2,030 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[220-vnext-assertions-flowvalue]].
+- Expectations is the next separately bounded component-family migration.
+
 ## 2026-07-19 - vNext FlowValue Validation
 
 - Added canonical `FlowValueJsonSchemaValidatorNode` with one normal
@@ -22,7 +43,7 @@ Date: 2026-05-31
   Debug/Release builds, binary compatibility, two release preflights/dry-runs,
   and a package-only net8 consumer. Full evidence is in
   [[219-vnext-validation-flowvalue]].
-- Assertions is the next separately bounded component-family migration.
+- Assertions followed as the next bounded component-family migration.
 
 ## 2026-07-18 - vNext FlowContent And FlowValue Serialization
 

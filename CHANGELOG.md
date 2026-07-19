@@ -7,6 +7,34 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Assertions 4.0.0
+
+Adds canonical expression assertions over immutable workflow values while
+preserving the generic assertion component for code-authored compatibility.
+
+- Adds `FlowValueAssertionNode` with one
+  `FlowResult<FlowValueAssertionResult>` output and Events.
+- Keeps passed and failed rules as successful result variants; missing input
+  and expression evaluation failure use stable normal error variants without a
+  universal error port.
+- Preserves exact FlowValue input, expression metadata, deterministic timing,
+  message lineage, and later-message continuation.
+- Preserves `FlowAssertionComponent<TInput>`, its routed input ports, Errors
+  port, options, and existing result contracts.
+
+## FluxFlow.Components.Assertions.Composition 2.0.0
+
+Makes FlowValue assertions the fixed `flow.assert` composition contract.
+
+- Changes the fixed ports to `FlowValue` Input and one
+  `FlowResult<FlowValueAssertionResult>` Output.
+- Resolves required expression-engine and optional context-factory/clock
+  resources through exact `Resources.{name}` addresses.
+- Keeps explicit generic registration available under host-selected custom
+  node type names for compatibility.
+- Updates Designer metadata to the canonical single-output contract and marks
+  routed-input settings as generic compatibility options.
+
 ## FluxFlow.Components.Validation 4.0.0
 
 Adds canonical JSON Schema validation over immutable workflow values while
