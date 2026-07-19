@@ -20,7 +20,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
             .WithDisplay(
                 displayName: "Event Expectation",
                 category: "Expectations",
-                summary: "Resolves once when a matching projection event appears, times out, or completes.",
+                summary: "Resolves projection-event rules, timeout, completion, and evaluation failures through one result output.",
                 iconKey: "badge-check",
                 preferredNodeName: "expectEvent",
                 suggestedEditorWidth: 460);
@@ -146,8 +146,8 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Event expectation result.",
-                valueType: nameof(EventExpectationResult),
+                summary: "Normal matched, unmet, timeout, completion, or evaluation-failure result.",
+                valueType: "FlowResult<EventExpectationResult>",
                 isPrimary: true);
 
     private static OptionChoiceMetadata KindChoice(

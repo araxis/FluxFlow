@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-19 - vNext Expectation Results
+
+- Added canonical `FlowEventExpectationNode` with one normal
+  `FlowResult<EventExpectationResult>` Output and Events. Matched, unmet,
+  timeout, and ordered completion are successful variants; expected evaluation
+  failure is one normal error result.
+- Added exact-once trigger arbitration, ordered completion after accepted input,
+  deterministic clocks, retained projection-event evidence, stable result/error
+  strings, diagnostics, and strong message lineage.
+- Migrated Expectations Composition registration and Designer metadata to the
+  canonical fixed output and no universal Errors surface while preserving the
+  released standalone node in the runtime package.
+- Moved Expectations to `4.0.0` and Expectations Composition to `2.0.0`,
+  updated package docs/changelog/API baseline, and documented the explicit
+  typed-result boundary.
+- Passed 2,041 Release tests across 63 projects, controlled zero-warning
+  Debug/Release builds across 130 projects, binary compatibility, two release
+  preflights/dry-runs, and a package-only net8 consumer. Full evidence is in
+  [[221-vnext-expectations-flowresult]].
+- Routing is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext FlowValue Assertions
 
 - Added canonical `FlowValueAssertionNode` with one normal

@@ -3,6 +3,7 @@ using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Expectations.Composition;
 
@@ -25,7 +26,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<EventExpectationResult>(
+                CompositionPorts.Metadata<FlowResult<EventExpectationResult>>(
                     ExpectationsCompositionPortNames.Output)
             ]);
     }
@@ -36,7 +37,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<EventExpectationOptions>();
         var clock = context.GetResource<TimeProvider>(
             ExpectationsCompositionResourceNames.Clock);
-        var node = new EventExpectationNode(options, clock);
+        var node = new FlowEventExpectationNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -48,11 +49,11 @@ public static class ExpectationsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<EventExpectationResult>(
+                CompositionPorts.Output<FlowResult<EventExpectationResult>>(
                     ExpectationsCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events,
-            errors: node.Errors));
+            events: node.Events));
     }
+
 }

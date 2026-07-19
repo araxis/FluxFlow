@@ -1,129 +1,90 @@
 # FluxFlow.Components.Expectations
 
-A standalone event-expectation node for FluxFlow.
+Standalone projection-event expectation nodes for FluxFlow.
 
-## What it is
+## Canonical Node
 
-`EventExpectationNode` is a self-contained TPL Dataflow processor built on the
-`FluxFlow.Nodes` kit. You give it options, post `ProjectionEvent`s to its input,
-and it resolves **exactly once** into a single `EventExpectationResult` broadcast
-on its output (failures on the error port, diagnostics on the event port). It
-needs **nothing else** — no engine, registry, or runtime:
+`FlowEventExpectationNode` consumes `FlowMessage<ProjectionEvent>` and resolves
+exactly once through `FlowMessage<FlowResult<EventExpectationResult>>` on
+`Output`. It also exposes lifecycle and result diagnostics through `Events`.
+It does not require Engine or Composition.
 
 ```csharp
-await using var node = new EventExpectationNode(new EventExpectationOptions
-{
-    Kind = EventExpectationNodeKind.Expect,
-    Name = "order-completed",
-    TimeoutMilliseconds = 5000,
-    Filter = new EventFilter
+await using var node = new FlowEventExpectationNode(
+    new EventExpectationOptions
     {
-        Type = "operation.completed",
-        Status = "ok",
-        SubjectPrefix = "orders/"
-    }
-});
+        Kind = EventExpectationNodeKind.Expect,
+        Name = "order-completed",
+        TimeoutMilliseconds = 5000,
+        Filter = new EventFilter
+        {
+            Type = "operation.completed",
+            Status = "ok",
+            SubjectPrefix = "orders/"
+        }
+    });
 
-node.Output.LinkTo(asserter.Input);  // broadcast: link to as many consumers as you like
-
+node.Output.LinkTo(resultConsumer.Input);
 await node.Input.SendAsync(FlowMessage.Create(@event));
 ```
 
-An `Expect` node is satisfied when a matching event arrives; a `Guard` node is
-satisfied when none arrives. The node resolves on the first of three triggers:
+The canonical node emits these `FlowResult.Kind` values:
 
-- a matching event,
-- a configured timeout (armed over the injected `TimeProvider`),
-- input completion via `CompleteWithResultAsync()`.
+| Kind | Meaning | `IsError` |
+|------|---------|-----------|
+| `Matched` | An expected event matched. | `false` |
+| `Unmet` | A guarded event matched and violated the guard. | `false` |
+| `TimedOut` | The configured timeout resolved the expectation. | `false` |
+| `Completed` | Ordered input completion resolved the expectation. | `false` |
+| `EvaluationFailed` | Expected filter evaluation failed. | `true` |
 
-`EventExpectationOptions` validates at construction: non-positive
-`TimeoutMilliseconds`, negative `MaxObservedEvents`, negative `MaxPreviewChars`,
-or non-positive `BoundedCapacity` fails fast as an argument exception.
+`EventExpectationResult.Satisfied` carries the rule decision. Timeout and
+completion satisfy a Guard and leave an Expect unmet. These outcomes are normal
+workflow data; they do not use a universal error port. Static option errors
+still reject construction or activation, and unexpected block faults remain on
+`Completion`.
 
-## Ports
+`Complete()` drains accepted input and then emits the completion variant if no
+earlier match, timeout, or evaluation failure won. `CompleteWithResultAsync()`
+does the same and waits for node completion. Every trigger races through one
+exact-once claim.
 
-| Port | Block | Purpose |
-|------|-------|---------|
-| `Input` | `BufferBlock<FlowMessage<ProjectionEvent>>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<FlowMessage<EventExpectationResult>>` | the single result, fanned out to every linked consumer |
-| `Errors` | `BroadcastBlock<FlowError>` | evaluation failures |
-| `Events` | `BroadcastBlock<FlowEvent>` | `event.expectation.matched` / `.timed-out` / `.completed` diagnostics |
+Output messages derived from an observed event preserve its correlation,
+trace, and headers, create a new message identity, and record the input message
+as causation. Timeout or completion without any observed event starts a new
+exchange.
 
-The result carries the correlation id of the matching event (or, on timeout and
-completion, the last observed event's id) so correlation flows event → result via
-the `FlowMessage<T>` envelope.
+## Options
 
-## Result
+| Option | Default | Meaning |
+|--------|---------|---------|
+| `Kind` | `Expect` | Expect a matching event or guard against one. |
+| `Name` | `null` | Optional result name. |
+| `Filter` | match all | Projection-event filter. |
+| `TimeoutMilliseconds` | `null` | Optional positive timeout. |
+| `MaxObservedEvents` | `10` | Recent event summaries retained in the result. |
+| `MaxPreviewChars` | `256` | Maximum payload-preview characters retained per summary. |
+| `BoundedCapacity` | `128` | Maximum queued inputs. |
 
-`EventExpectationResult` includes:
+The optional `TimeProvider` constructor argument controls timeout and result
+timestamps deterministically. The node snapshots the filter at construction.
 
-- evaluated timestamp
-- expectation name
-- expectation kind
-- satisfied flag
-- matched flag
-- timeout flag
-- matched event summary when one exists
-- recent observed event summaries
-- filter copy
-- reason text
+## Typed Result Boundary
 
-## Filters
+`FlowResult<EventExpectationResult>` is a real payload type. Links do not
+implicitly unwrap `Value`; route or extract it explicitly when a downstream
+component expects `EventExpectationResult`.
 
-Expectations use the same neutral `EventFilter` contract as the Projections
-package (the shared `ProjectionEvent` / `EventFilter` / `EventFilterMatcher`
-contracts come from `FluxFlow.Components.Projections`). Filters support:
+## Compatibility Node
 
-- event type or type prefix
-- subject prefix
-- channel prefix
-- excluded subject prefix
-- excluded channel prefix
-- status
-- source
-- source node id
-- component id through an event attribute named `componentId`
-- attribute key/value pairs
-- event timestamp range
-
-Filters use ordinal string comparison.
-
-## Timing
-
-Pass a `TimeProvider` to the constructor for deterministic timeout and result
-timestamps in tests or hosts. The timeout is armed via `TimeProvider.CreateTimer`,
-so a `FakeTimeProvider` drives it by advancing the clock — no real-time wait.
-
-```csharp
-var node = new EventExpectationNode(options, timeProvider);
-```
+`EventExpectationNode` remains available with its released
+`EventExpectationResult` Output plus Events and Errors. It preserves the
+existing direct-node contract and completion API. New fixed Composition
+definitions use `FlowEventExpectationNode`.
 
 ## Composition
 
-Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the standalone node.
-
-Use `FluxFlow.Components.Expectations.Composition` when a
-`FluxFlow.Composition` host should register the optional `event.expectation`
-factory:
-
-```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterEventExpectation());
-```
-
-The composition adapter binds `EventExpectationOptions` from node configuration
-and can resolve optional host-owned keyed `TimeProvider` and evaluator
-resources. Rule evaluation, fail-fast behavior, and result inclusion remain
-normal node behavior controlled by `EventExpectationOptions`.
-
-The optional composition package also exposes
-`ExpectationsComponentDesignMetadataProvider` for neutral Designer metadata over
-the `event.expectation` composition node type. The standalone Expectations
-package remains free of Designer, Composition, and Engine dependencies.
-
-`CompleteWithResultAsync()` remains a direct node lifecycle feature in v1.
-Composition runtime stop uses normal node completion. Use the direct node API
-when a completion-result flush is required until composition grows an explicit
-final-flush lifecycle hook.
+This runtime package owns standalone nodes, options, filters, result contracts,
+and diagnostics. It does not own JSON definitions, host resources, routing,
+rendering, or engine lifecycle. Optional registration and Designer metadata are
+provided by `FluxFlow.Components.Expectations.Composition`.

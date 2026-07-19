@@ -891,16 +891,24 @@ Main types:
 
 Use `RegisterEventExpectation()` from the optional
 `FluxFlow.Components.Expectations.Composition` package when a composition host
-wants an `event.expectation` node factory. The factory binds existing
-`EventExpectationOptions` and can resolve an optional keyed `TimeProvider`
-resource through the host.
+wants the canonical `event.expectation` node factory. It consumes
+`ProjectionEvent` and emits one `FlowResult<EventExpectationResult>` Output.
+Matched and unmet rules, timeout, and ordered input completion are normal
+successful variants; expected filter evaluation failure is a normal error
+variant. The factory binds `EventExpectationOptions` and can resolve an optional
+host-owned keyed `TimeProvider` through an exact `Resources.{name}` address.
+
+The released `EventExpectationNode` direct-result and Errors surfaces remain in
+the runtime package for code-authored use. Expectations Composition `2.x`
+intentionally registers only the canonical fixed type; existing hosts can stay
+on the published Composition `1.x` line while migrating definitions.
 
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `event.expectation` composition node, including existing expectation
-options, fixed ports, and a resource hint for the optional `clock` resource.
-The provider authors that metadata through the shared validated Designer
-metadata builder. Completion result flushing remains a direct node API in this
-composition pass.
+for the canonical `event.expectation` composition node, including existing
+expectation options, `ProjectionEvent`/`FlowResult<EventExpectationResult>`
+fixed ports, and a resource hint for the optional `clock` resource. The provider
+authors that metadata through the shared validated Designer metadata builder.
+Typed result values are never implicitly unwrapped by links.
 
 ## MQTT Core
 

@@ -492,6 +492,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `220-vnext-assertions-flowvalue.md`: canonical `FlowValue` assertions with
   pass/fail normal results, normal evaluation errors, preserved generic branch
   compatibility, and Composition/package evidence.
+- `221-vnext-expectations-flowresult.md`: canonical projection-event
+  expectations with matched/unmet/timeout/completion normal results, normal
+  evaluation errors, exact-once lifecycle behavior, preserved standalone
+  compatibility, and Composition/package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

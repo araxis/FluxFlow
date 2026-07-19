@@ -10,6 +10,7 @@ using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,7 +34,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         registration.Inputs[ExpectationsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(EventExpectationResult));
+            .ShouldBe(typeof(FlowResult<EventExpectationResult>));
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         output.Name.Value.ShouldBe(ExpectationsCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(nameof(EventExpectationResult));
+        output.ValueType?.Value.ShouldBe("FlowResult<EventExpectationResult>");
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -232,16 +233,20 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 (await input.Target.SendAsync(matched).WaitAsync(Timeout)).ShouldBeTrue();
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                result.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+                result.Payload.IsError.ShouldBeFalse();
+                var value = result.Payload.Value.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(matched.CorrelationId);
-                result.Payload.EvaluatedAt.ShouldBe(timestamp);
-                result.Payload.Name.ShouldBe("failed-order");
-                result.Payload.Kind.ShouldBe(EventExpectationResultKind.Expect);
-                result.Payload.Satisfied.ShouldBeTrue();
-                result.Payload.Matched.ShouldBeTrue();
-                result.Payload.TimedOut.ShouldBeFalse();
-                result.Payload.MatchedEvent.ShouldNotBeNull().Subject.ShouldBe("orders/2");
-                result.Payload.MatchedEvent.PayloadPreview.ShouldBe("abcd");
-                result.Payload.ObservedEvents.Count.ShouldBe(2);
+                result.CausationId.ShouldBe(matched.MessageId);
+                value.EvaluatedAt.ShouldBe(timestamp);
+                value.Name.ShouldBe("failed-order");
+                value.Kind.ShouldBe(EventExpectationResultKind.Expect);
+                value.Satisfied.ShouldBeTrue();
+                value.Matched.ShouldBeTrue();
+                value.TimedOut.ShouldBeFalse();
+                value.MatchedEvent.ShouldNotBeNull().Subject.ShouldBe("orders/2");
+                value.MatchedEvent.PayloadPreview.ShouldBe("abcd");
+                value.ObservedEvents.Count.ShouldBe(2);
             },
             node => node
                 .Configure("name", "failed-order")
@@ -286,11 +291,12 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                     .WaitAsync(Timeout)).ShouldBeTrue();
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                result.Payload.Filter.TypePrefix.ShouldBe("task.");
-                result.Payload.Filter.Status.ShouldBe("failed");
-                result.Payload.Filter.SubjectPrefix.ShouldBe("jobs/");
-                result.Payload.Filter.Attributes["tenant"].ShouldBe("north");
-                result.Payload.Satisfied.ShouldBeTrue();
+                var value = result.Payload.Value.ShouldNotBeNull();
+                value.Filter.TypePrefix.ShouldBe("task.");
+                value.Filter.Status.ShouldBe("failed");
+                value.Filter.SubjectPrefix.ShouldBe("jobs/");
+                value.Filter.Attributes["tenant"].ShouldBe("north");
+                value.Satisfied.ShouldBeTrue();
             },
             node => node.Configure(
                 "filter",
@@ -320,11 +326,14 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 clock.Advance(TimeSpan.FromMilliseconds(500));
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                result.Payload.Kind.ShouldBe(EventExpectationResultKind.Guard);
-                result.Payload.Satisfied.ShouldBeTrue();
-                result.Payload.Matched.ShouldBeFalse();
-                result.Payload.TimedOut.ShouldBeTrue();
-                result.Payload.EvaluatedAt.ShouldBe(clock.GetUtcNow());
+                result.Payload.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
+                result.Payload.IsError.ShouldBeFalse();
+                var value = result.Payload.Value.ShouldNotBeNull();
+                value.Kind.ShouldBe(EventExpectationResultKind.Guard);
+                value.Satisfied.ShouldBeTrue();
+                value.Matched.ShouldBeFalse();
+                value.TimedOut.ShouldBeTrue();
+                value.EvaluatedAt.ShouldBe(clock.GetUtcNow());
             },
             node => node
                 .Configure("kind", EventExpectationNodeKind.Guard)
@@ -339,7 +348,8 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
-            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<EventExpectationResult>>());
+            output.Source.LinkTo(
+                DataflowBlock.NullTarget<FlowMessage<FlowResult<EventExpectationResult>>>());
             var events = Link(descriptor.Events.ShouldNotBeNull());
             var message = FlowMessage.Create(CreateEvent(
                 DateTimeOffset.Parse("2026-06-18T13:30:00Z"),
@@ -356,12 +366,12 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_expectation_emits_errors_and_continues_after_evaluation_failure()
+    public async Task Hosted_expectation_emits_evaluation_failure_as_normal_result()
     {
         await WithNodeAsync(async (input, output, descriptor) =>
         {
             var results = Link(output.Source);
-            var errors = Link(descriptor.Errors.ShouldNotBeNull());
+            descriptor.Errors.ShouldBeNull();
             var bad = FlowMessage.Create(
                 new ProjectionEvent
                 {
@@ -371,26 +381,15 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                     Attributes = new ThrowingDictionary()
                 },
                 new CorrelationId("bad"));
-            var good = FlowMessage.Create(
-                CreateEvent(
-                    DateTimeOffset.Parse("2026-06-18T14:00:01Z"),
-                    "job.finished",
-                    attributes: new Dictionary<string, string>
-                    {
-                        ["k"] = "v"
-                    }),
-                new CorrelationId("good"));
-
             (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
-            (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
-
-            var error = await errors.ReceiveAsync().WaitAsync(Timeout);
             var result = await results.ReceiveAsync().WaitAsync(Timeout);
 
-            error.Code.ShouldBe(ExpectationsErrorCodes.EvaluationFailed);
-            error.CorrelationId.ShouldBe(bad.CorrelationId);
-            result.CorrelationId.ShouldBe(good.CorrelationId);
-            result.Payload.Satisfied.ShouldBeTrue();
+            result.CorrelationId.ShouldBe(bad.CorrelationId);
+            result.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
+            result.Payload.IsError.ShouldBeTrue();
+            result.Payload.Error.ShouldNotBeNull().Code
+                .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
+            result.Payload.Value.ShouldBeNull();
         },
         node => node.Configure(
             "filter",
@@ -519,7 +518,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
     private static async Task WithNodeAsync(
         Func<
             CompositionInputPort<ProjectionEvent>,
-            CompositionOutputPort<EventExpectationResult>,
+            CompositionOutputPort<FlowResult<EventExpectationResult>>,
             ComposedNode,
             Task> run,
         Action<NodeDefinitionBuilder>? configureNode = null,
@@ -548,7 +547,7 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         var input = descriptor.Inputs[ExpectationsCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<ProjectionEvent>>();
         var output = descriptor.Outputs[ExpectationsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<EventExpectationResult>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<EventExpectationResult>>>();
 
         await run(input, output, descriptor);
     }

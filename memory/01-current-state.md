@@ -5,10 +5,11 @@ Date: 2026-07-19
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/assertions-vnext`. The provider-neutral MQTT vertical slice and the
-  first five normal component-family migrations, canonical FlowValue Mapping,
+  `work/expectations-vnext`. The provider-neutral MQTT vertical slice and the
+  first six normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
-  Validation, and FlowValue Assertions, are implemented and verified locally.
+  Validation, FlowValue Assertions, and projection-event Expectations, are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -24,7 +25,7 @@ Date: 2026-07-19
   The reviewed foundation now supports the canonical Composition definition,
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
-  Validation, and Assertions now use this foundation; the remaining
+  Validation, Assertions, and Expectations now use this foundation; the remaining
   component-family migrations continue separately. See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
@@ -154,8 +155,20 @@ Date: 2026-07-19
   host-owned `Resources.{name}` engine, FlowValue context factory, and clock
   addresses. Focused/full tests, zero-warning controlled builds, binary
   compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Expectations is the next bounded family. See
+  passed. Expectations followed as the next bounded family. See
   `220-vnext-assertions-flowvalue.md`.
+- `FluxFlow.Components.Expectations` is now `4.0.0` locally with canonical
+  `FlowEventExpectationNode`. It emits matched, unmet, timeout, and ordered
+  completion as successful `FlowResult<EventExpectationResult>` variants and
+  expected filter evaluation failure as one normal error result. Exact-once
+  arbitration preserves deterministic clocks, retained projection-event
+  evidence, diagnostics, and strong message lineage without a universal Errors
+  port. The released standalone node and direct-result/error contract remain
+  available for code-authored compatibility. Expectations Composition is now
+  `2.0.0` with canonical fixed ports and exact `Resources.{name}` clock
+  addressing. Focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Routing is the next
+  bounded family assessment. See `221-vnext-expectations-flowresult.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

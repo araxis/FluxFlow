@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expectations 4.0.0
+
+Adds a canonical exact-once projection-event expectation node while preserving
+the released standalone node for compatibility.
+
+- Adds `FlowEventExpectationNode` with one
+  `FlowResult<EventExpectationResult>` Output and Events.
+- Emits matched, unmet, timeout, and ordered-completion outcomes as successful
+  result variants; expected evaluation failure is a normal error variant.
+- Preserves projection-event input, deterministic clocks, retained event
+  evidence, message lineage, and exactly-once resolution semantics.
+- Keeps `EventExpectationNode`, its direct result output, Errors port, options,
+  and existing contracts unchanged.
+
+## FluxFlow.Components.Expectations.Composition 2.0.0
+
+Makes the canonical result contract the fixed `event.expectation` registration.
+
+- Changes Output to `FlowResult<EventExpectationResult>` and removes the
+  universal Errors surface from the canonical descriptor.
+- Keeps `ProjectionEvent` Input and the optional host-owned clock resource at
+  an exact `Resources.{name}` address.
+- Keeps the released standalone node available in the runtime package while
+  Composition `2.x` registers only the canonical fixed contract.
+- Updates Designer metadata and package examples to the canonical fixed ports
+  and flat two-section application document.
+
 ## FluxFlow.Components.Assertions 4.0.0
 
 Adds canonical expression assertions over immutable workflow values while
