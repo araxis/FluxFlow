@@ -35,6 +35,13 @@ public sealed class DesignerHostCatalogTests
                     Direction = PortDirection.Input,
                     Order = 0,
                     IsPrimary = true
+                },
+                new PortDesignMetadata
+                {
+                    Name = new ComponentPortName("Ack"),
+                    Direction = PortDirection.Input,
+                    Order = 1,
+                    Attributes = PortDesignMetadataAttributes.CreateSignalMap()
                 }
             ]
         });
@@ -50,6 +57,9 @@ public sealed class DesignerHostCatalogTests
         var input = item.Inputs.ShouldHaveSingleItem();
         input.Name.ShouldBe("Input");
         input.Kind.ShouldBe(PortKind.Input);
+        var signal = item.SignalInputs.ShouldHaveSingleItem();
+        signal.Name.ShouldBe("Ack");
+        signal.Kind.ShouldBe(PortKind.SignalInput);
         var output = item.Outputs.ShouldHaveSingleItem();
         output.Name.ShouldBe("Output");
         output.Kind.ShouldBe(PortKind.Output);
@@ -71,6 +81,7 @@ public sealed class DesignerHostCatalogTests
         item.Category.ShouldBe(DesignerHostCatalog.DefaultCategory);
         item.Summary.ShouldBeNull();
         item.Inputs.ShouldBeEmpty();
+        item.SignalInputs.ShouldBeEmpty();
         item.Outputs.ShouldBeEmpty();
     }
 

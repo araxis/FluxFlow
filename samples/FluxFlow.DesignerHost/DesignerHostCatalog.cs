@@ -64,16 +64,28 @@ public sealed class DesignerHostCatalog
             Summary = metadata.Summary?.Value,
             IconKey = metadata.IconKey?.Value,
             PreferredNodeName = metadata.PreferredNodeName?.Value,
-            Inputs = CreatePorts(metadata, PortDirection.Input, PortKind.Input),
+            Inputs = CreatePorts(
+                metadata,
+                PortDirection.Input,
+                PortKind.Input,
+                includeSignals: false),
+            SignalInputs = CreatePorts(
+                metadata,
+                PortDirection.Input,
+                PortKind.SignalInput,
+                includeSignals: true),
             Outputs = CreatePorts(metadata, PortDirection.Output, PortKind.Output)
         };
 
     private static IReadOnlyList<PortModel> CreatePorts(
         ComponentDesignMetadata metadata,
         PortDirection direction,
-        PortKind kind)
+        PortKind kind,
+        bool? includeSignals = null)
         => metadata.Ports
-            .Where(port => port.Direction == direction)
+            .Where(port =>
+                port.Direction == direction &&
+                (includeSignals is null || IsSignal(port) == includeSignals))
             .OrderBy(port => port.Order)
             .ThenBy(port => port.Name.Value, StringComparer.Ordinal)
             .Select(port => new PortModel
@@ -88,6 +100,15 @@ public sealed class DesignerHostCatalog
                 IsPrimary = port.IsPrimary
             })
             .ToArray();
+
+    private static bool IsSignal(PortDesignMetadata port)
+        => port.Attributes.TryGetValue(
+               new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind),
+               out var kind) &&
+           string.Equals(
+               kind.Value,
+               PortDesignMetadataAttributeValues.Signal,
+               StringComparison.Ordinal);
 
     private static IReadOnlyList<OptionSectionModel> CreateSections(ComponentDesignMetadata metadata)
     {

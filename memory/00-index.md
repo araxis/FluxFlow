@@ -538,6 +538,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `235-vnext-canonical-application-hosting.md`: canonical application sources,
   degraded hosted revision lifecycle, explicit candidate DI, preserved legacy
   Composition hosting, and package evidence.
+- `236-vnext-designer-canonical-persistence.md`: canonical flat Designer
+  persistence, nested resource/reference projection, declaration-side-aware
+  links, signal rendering, runtime diagnostics, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

@@ -2,6 +2,24 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext Designer Canonical Persistence
+
+- Added Designer persistence over the canonical flat `Resources`/`Workflows`
+  application document, shared addresses, and runtime link diagnostics.
+- Preserved loaded link declaration side, made new workflow links source-side,
+  retained malformed raw declarations losslessly, and projected nested
+  resources and metadata-defined resource references.
+- Removed the sample host's parallel graph schema. The host and real Designer
+  application now separate signal inputs, use the package persistence service,
+  and preserve unrendered application content during edits.
+- Moved Designer to additive `2.19.0`; updated docs, changelog, and the
+  source-declaration baseline.
+- Designer (`106`), Designer host (`24`), Release (`94`), and full Release
+  (`2,166`) tests passed. Controlled builds, additive binary validation,
+  preflight, dry-run, and a package-only persistence consumer also passed.
+- The vNext implementation milestones are complete. Coordinated all-package
+  source and consumer validation is the remaining closeout pass.
+
 ## 2026-07-20 - vNext Canonical Application Hosting
 
 - Added static, exact-root, and named-section sources for the canonical flat

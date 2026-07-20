@@ -16,4 +16,13 @@ public sealed class PortDesignMetadataAttributesTests
             .ShouldBe(PortDesignMetadataAttributeValues.Signal);
         PortDesignMetadataAttributeValues.Message.ShouldBe("message");
     }
+
+    [Fact]
+    public void CreateSignalMap_uses_strongly_typed_attribute_keys_and_values()
+    {
+        var attributes = PortDesignMetadataAttributes.CreateSignalMap();
+
+        attributes[new ComponentAttributeName(PortDesignMetadataAttributeNames.Kind)]
+            .ShouldBe(new ComponentAttributeValue(PortDesignMetadataAttributeValues.Signal));
+    }
 }

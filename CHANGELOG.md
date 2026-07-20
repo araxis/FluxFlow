@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Designer 2.19.0
+
+- Added editor-facing persistence for the canonical flat `Resources` and
+  `Workflows` application document.
+- Preserves loaded input-side and output-side link declarations while new
+  workflow links default to source-side persistence.
+- Added nested resource namespace and component resource-reference projections
+  using canonical application addresses.
+- Reuses Composition address resolution and link diagnostics, and keeps
+  malformed link properties lossless as raw component properties.
+- Separates payload-independent signal inputs from typed inputs in the sample
+  host projection while retaining renderer and runtime independence.
+
 ## FluxFlow.Composition.Hosting 2.2.0
 
 - Added canonical `ApplicationDefinition` sources for static definitions,

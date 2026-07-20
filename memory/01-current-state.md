@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/hosting-vnext`. The provider-neutral MQTT vertical slice and the
+  `work/designer-persistence-vnext`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -34,7 +34,8 @@ Date: 2026-07-20
   Validation, Assertions, Expectations, Routing, Control, State, and
   Projections, Metrics, and Observability now use this foundation. The ordinary
   component-family migrations through Sessions and resource/configuration
-  alignment are complete; final Hosting and Designer persistence remain.
+  alignment, canonical Hosting, and canonical Designer persistence are
+  complete. Coordinated all-package source and consumer validation remains.
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
@@ -333,9 +334,18 @@ Date: 2026-07-20
   remain explicit, and Hosting remains Engine-independent. The released
   standalone `CompositionDefinition` host remains available as compatibility.
   Focused/full tests, controlled builds, additive binary validation, preflight,
-  dry-run, and a package-only hosted revision consumer passed. Canonical
-  Designer persistence is the final implementation milestone. See
+  dry-run, and a package-only hosted revision consumer passed. See
   `235-vnext-canonical-application-hosting.md`.
+- `FluxFlow.Components.Designer` is now `2.19.0` locally with canonical flat
+  application persistence over Composition JSON, addresses, and link
+  diagnostics. Editable models preserve loaded declaration side, conditions,
+  nested resources, resource references, malformed raw declarations, and
+  unrendered application content; new workflow links default to source-side
+  declarations. The sample host's parallel graph schema was removed, and the
+  host plus real Designer application now distinguish signal inputs from typed
+  message inputs. Focused/full tests, controlled builds, additive binary
+  validation, preflight/dry-run, and a package-only persistence consumer
+  passed. See `236-vnext-designer-canonical-persistence.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

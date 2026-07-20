@@ -1,8 +1,9 @@
 # Designer Host Layer
 
-This page plans a future Designer host layer that consumes package-owned
+This page defines the Designer host boundary that consumes package-owned
 metadata without moving UI, resource ownership, or runtime policy into component
-packages. It is a planning boundary, not a new public API or package.
+packages. The metadata projection sample and canonical persistence contracts are
+implemented; renderer UI remains future host work.
 
 ## Existing Inputs
 
@@ -16,8 +17,9 @@ A host layer can already compose the current design-time surface:
   pattern, related option names, required flags, value type, and display text.
 - `ComponentResourcePickerHints.Create(...)` for an ordered host-facing view of
   resource picker hints from one metadata item or a validated catalog.
-- `FluxFlow.Composition` definitions and registry metadata when the host needs
-  to save, validate, build, or run standalone composition graphs.
+- `DesignerApplicationPersistence` for canonical flat application load/save,
+  editable links, resource namespaces, resource references, and runtime link
+  diagnostics.
 
 These contracts describe what can be shown or selected. They do not create
 resources, enumerate resource instances, choose a renderer, or bind a graph to a
@@ -47,12 +49,10 @@ editing experience:
 - Persist graph state as component types, node names, option values, resource
   references, port links, and host layout data. Display hints remain derived
   from package metadata rather than copied as the source of truth.
-- Map saved definitions to `FluxFlow.Composition` or another runtime adapter at
-  the host boundary.
+- Use `DesignerApplicationPersistence` as the single mapping to canonical
+  `FluxFlow.Composition` definitions at the host boundary.
 
-## Suggested Implementation Order
-
-Keep the eventual implementation separate from this planning note:
+## Implementation Status
 
 1. Add host-local view models for palette items, node inspectors, option
    editors, resource picker prompts, ports, links, and validation messages.
@@ -60,19 +60,18 @@ Keep the eventual implementation separate from this planning note:
    `ComponentResourcePickerHints` into those host-local models.
 3. Add a resource catalog adapter that resolves picker kind and key pattern
    hints against host-owned resources without creating or disposing them.
-4. Add persistence mapping between the host graph model and
-   `FluxFlow.Composition` definitions.
+4. Use the implemented `DesignerApplicationPersistence` mapping instead of a
+   host-local definition schema.
 5. Add renderer-specific UI only after the host model and mapping behavior are
    covered by focused tests.
 
 ## Non-Goals
 
-This planning pass does not:
+The implemented host-model and persistence layer does not:
 
 - add component package source changes.
-- add new public Designer, Composition, or Engine contracts.
-- add package versions, release notes, changelog entries, tags, or publishing
-  work.
+- add new Composition or Engine contracts.
+- add release tags or publishing work.
 - add renderer UI, visual styling, canvas behavior, or localization.
 - add resource catalogs, keyed resource resolution, resource ownership, or
   lifetime management to component packages.

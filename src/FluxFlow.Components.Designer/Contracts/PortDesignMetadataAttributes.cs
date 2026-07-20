@@ -18,4 +18,9 @@ public static class PortDesignMetadataAttributes
         {
             [PortDesignMetadataAttributeNames.Kind] = PortDesignMetadataAttributeValues.Signal
         };
+
+    public static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> CreateSignalMap()
+        => CreateSignal().ToDictionary(
+            attribute => new ComponentAttributeName(attribute.Key),
+            attribute => new ComponentAttributeValue(attribute.Value));
 }

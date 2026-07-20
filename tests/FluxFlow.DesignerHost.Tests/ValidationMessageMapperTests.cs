@@ -1,5 +1,6 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Links;
 using Shouldly;
 using Xunit;
 
@@ -56,5 +57,23 @@ public sealed class ValidationMessageMapperTests
         ]);
 
         messages.Select(message => message.Message).ShouldBe(["first", "second"]);
+    }
+
+    [Fact]
+    public void Link_diagnostics_map_with_component_context()
+    {
+        var message = ValidationMessageMapper.FromLinkDiagnostic(new ApplicationLinkDiagnostic
+        {
+            Code = ApplicationLinkDiagnosticCode.MissingInputPort,
+            Message = "Input port 'Missing' does not exist.",
+            WorkflowName = "main",
+            ComponentName = "sink",
+            PropertyName = "Input"
+        });
+
+        message.Severity.ShouldBe(ValidationSeverity.Error);
+        message.Source.ShouldBe(ValidationSource.Composition);
+        message.Message.ShouldBe("Input port 'Missing' does not exist.");
+        message.NodeName.ShouldBe("sink");
     }
 }

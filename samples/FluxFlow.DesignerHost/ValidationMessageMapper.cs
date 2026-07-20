@@ -1,5 +1,6 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Links;
 
 namespace FluxFlow.DesignerHost;
 
@@ -46,5 +47,25 @@ public static class ValidationMessageMapper
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         return diagnostics.Select(FromDiagnostic).ToArray();
+    }
+
+    public static ValidationMessageModel FromLinkDiagnostic(ApplicationLinkDiagnostic diagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostic);
+
+        return new ValidationMessageModel
+        {
+            Severity = ValidationSeverity.Error,
+            Source = ValidationSource.Composition,
+            Message = diagnostic.Message,
+            NodeName = diagnostic.ComponentName
+        };
+    }
+
+    public static IReadOnlyList<ValidationMessageModel> FromLinkDiagnostics(
+        IEnumerable<ApplicationLinkDiagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        return diagnostics.Select(FromLinkDiagnostic).ToArray();
     }
 }

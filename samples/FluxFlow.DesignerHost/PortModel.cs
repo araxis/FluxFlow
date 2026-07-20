@@ -19,5 +19,6 @@ public sealed record PortModel
 public enum PortKind
 {
     Input,
+    SignalInput,
     Output
 }

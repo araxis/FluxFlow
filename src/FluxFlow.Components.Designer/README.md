@@ -1,11 +1,15 @@
 # FluxFlow.Components.Designer
 
-Reusable component metadata contracts for FluxFlow.
+Reusable component metadata and canonical application editing contracts for
+FluxFlow.
 
 ## Purpose
 
 This package lets component packages describe how a host can present and edit a
 component without depending on a specific rendering framework.
+It also projects the canonical flat `ApplicationDefinition` into editor-facing
+workflows, links, resource namespaces, and resource references without creating
+a second persistence schema.
 
 ## Contracts
 
@@ -53,6 +57,16 @@ component without depending on a specific rendering framework.
 - `PortDesignMetadataAttributeNames`, `PortDesignMetadataAttributeValues`, and
   `PortDesignMetadataAttributes`: neutral hints that let a host distinguish a
   payload-independent signal input from a normal typed message port.
+- `DesignerApplicationPersistence`: canonical JSON load/save and editor model
+  projection over `FluxFlow.Composition.Model.ApplicationDefinition`.
+- `DesignerApplicationDocument`, `DesignerWorkflow`, and `DesignerComponent`:
+  flat editor-facing application models whose component properties remain raw
+  JSON values.
+- `DesignerApplicationLink`: canonical source and target addresses, optional
+  condition, and the input/output declaration side used by the loaded document.
+- `DesignerResourceNamespace`, `DesignerResource`, and
+  `DesignerResourceReference`: nested resource catalog and component-reference
+  projections using canonical `Resources.*` addresses.
 
 `ComponentDesignMetadataValidator` reports invalid identifiers, duplicate
 options and ports, duplicate primary ports per direction, invalid option
@@ -113,6 +127,8 @@ Normal ports are typed message ports. A component with an
 to that input's attributes. Hosts may then render or validate the input as a
 trace-identity signal whose incoming payload type is irrelevant. This remains
 descriptive metadata; the Designer package does not link or deliver signals.
+`CreateSignalMap()` provides the same hint using the strongly typed attribute
+map required by an already constructed `PortDesignMetadata` record.
 
 Use `ComponentResourcePickerHints.Create(...)` when a host wants an ordered view
 of the host-owned picker hints from one component metadata item or a validated
@@ -120,6 +136,71 @@ catalog. The helper filters to host-owned resources with picker kinds, preserves
 resource order within each component, and parses conditional option names such
 as `predicate,expression` into typed option names. It does not enumerate,
 validate, resolve, create, or dispose host resources.
+
+## Application Persistence
+
+`DesignerApplicationPersistence` reads and writes the canonical two-section
+application document. It delegates JSON shape to `ApplicationDefinitionJson`,
+address parsing to `ApplicationAddress`, and semantic link validation to
+`ApplicationLinkCompiler`. A host therefore displays the same link diagnostics
+that runtime activation uses.
+
+Loaded links retain whether they were declared on an input or output property.
+New workflow links created with `DesignerApplicationLink.Create(...)` default
+to source-side output declarations. System output links necessarily use the
+target input because `System.Events.Output` and `System.Diagnostics.Output`
+have no component property on which to persist a declaration. Malformed link
+properties remain raw component properties and round-trip unchanged.
+
+```csharp
+using FluxFlow.Components.Designer.Persistence;
+using FluxFlow.Composition;
+using FluxFlow.Composition.Addressing;
+
+var persistence = new DesignerApplicationPersistence(registry, metadataCatalog);
+var loaded = persistence.Load(json);
+
+var link = DesignerApplicationLink.Create(
+    ApplicationAddress.WorkflowPort("Orders", "Read", "Output"),
+    ApplicationAddress.WorkflowPort("Orders", "Validate", "Input"));
+
+var edited = loaded.Document with
+{
+    Links = [.. loaded.Document.Links, link]
+};
+
+var savedJson = persistence.Serialize(edited, writeIndented: true);
+```
+
+Provide an `ApplicationLinkCompiler` configured with the host's expression
+engine when conditional links should be compiled during Designer validation.
+Without one, the runtime compiler reports its normal missing-condition-engine
+diagnostic while persistence still preserves the condition text.
+
+```json
+{
+  "Resources": {
+    "Messaging": {
+      "Client1": {
+        "Type": "mqtt.client",
+        "Broker": "Resources.Messaging.Broker1"
+      }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "Read": {
+        "Type": "mqtt.trigger",
+        "Client": "Resources.Messaging.Client1",
+        "Output": "Validate.Input"
+      },
+      "Validate": {
+        "Type": "validation.json"
+      }
+    }
+  }
+}
+```
 
 ## Example
 
@@ -271,13 +352,17 @@ rendering hints separately from package-owned metadata.
 
 ## Boundaries
 
-This package only defines metadata contracts and catalog helpers. Hosts decide
-how metadata is rendered, stored, localized, or combined with their own design
-system. The contracts are neutral and do not depend on `FluxFlow.Engine` or
-`FluxFlow.Composition`; hosts can map them to either runtime model.
+This package defines metadata, editor-facing persistence projections, and
+catalog helpers. `FluxFlow.Composition` remains the only JSON, address, and link
+validation model. Hosts decide how models are rendered, localized, combined
+with their design system, and supplied with expression-engine validation.
+
+The package does not depend on `FluxFlow.Engine`, execute workflows, own or
+resolve resources, build service providers, implement hot reload, or reference
+transport adapters.
 
 ## Composition
 
-This package does not expose standalone workflow nodes or
-`FluxFlow.Composition` factories. It composes design metadata for host palettes,
-editors, validation views, and generated documentation.
+This package does not expose standalone workflow nodes or component factories.
+It consumes canonical `FluxFlow.Composition` definitions and registries only to
+project editable documents and reuse runtime link diagnostics.

@@ -58,7 +58,7 @@ Status values:
 | `FluxFlow.Components.Journal` | journal store contracts and in-memory store | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Resources` | resource descriptor and lookup support | yes | yes | intentional | intentional | support-only |
 | `FluxFlow.Components.Secrets` | secret descriptor and resolution support | yes | yes | intentional | intentional | support-only |
-| `FluxFlow.Components.Designer` | neutral design metadata contracts and catalog | yes | yes | n/a | provider contract | support-only |
+| `FluxFlow.Components.Designer` | neutral metadata plus canonical application editing projections | yes | yes | n/a | provider contract | support-only |
 | `FluxFlow.Components.RequestReply` | transport request/reply correlation support | yes | yes | intentional | intentional | support-only by current decision |
 | `FluxFlow.Components.Storage.FileSystem` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
 | `FluxFlow.Components.Storage.SqlFile` | concrete storage backend | yes | yes | intentional | intentional | backend adapter |
@@ -86,15 +86,17 @@ Release tests currently enforce these consistency rules:
 - Designer metadata validates, is catalog-ready, exposes neutral host-owned
   resource picker hint helpers, and stays aligned with registry metadata, bound
   options, required resources, ports, defaults, and enum choices
+- Designer persistence projects the canonical flat application model, preserves
+  link declaration sides, exposes resource namespaces/references, and reuses
+  Composition addressing and diagnostics
 
 ## Next Isolated Plans
 
 Future work should be explicit and narrow. Good candidates:
 
-- extend the headless Designer host-model layer in
-  `samples/FluxFlow.DesignerHost` (palette, inspector, resource picker, and
-  graph/definition persistence models exist; renderer UI remains a separate
-  bounded pass per `docs/18-designer-host-layer.md`)
+- implement renderer UI over the completed headless Designer host models and
+  canonical persistence contracts as a separate bounded pass per
+  `docs/18-designer-host-layer.md`
 - plan hot reload in `FluxFlow.Composition` as a dedicated lifecycle feature
 - revisit `FluxFlow.Components.RequestReply` only if a real composition node
   surface is explicitly needed
