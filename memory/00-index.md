@@ -523,6 +523,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `230-vnext-http-flowcontent-results.md`: canonical exact-content HTTP
   requests, polymorphic response/error results, preserved direct-use and
   Composition compatibility, and package evidence.
+- `231-vnext-filesystem-flowcontent-results.md`: canonical exact-content file
+  reads/writes, FlowValue directory/watch sources, preserved typed
+  compatibility, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

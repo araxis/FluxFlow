@@ -2,6 +2,7 @@ using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.FileSystem.Composition;
 
@@ -51,8 +52,8 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             builder,
             nameof(FileReadRequest),
             "File read request.",
-            nameof(FileReadResult),
-            "File read result.");
+            "FlowResult<FileReadContent>",
+            "File content or expected read failure.");
 
         return builder.Build();
     }
@@ -69,15 +70,20 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
         builder
             .AddOption(BoundedCapacityOption(WriteDefaults.BoundedCapacity))
             .AddOption(BaseDirectoryOption(OptionDesignMetadataAttributeValues.Primary))
-            .AddOption(AllowAbsolutePathsOption(WriteDefaults.AllowAbsolutePaths))
-            .AddOption(DefaultEncodingOption(WriteDefaults.DefaultEncoding));
+            .AddOption(AllowAbsolutePathsOption(WriteDefaults.AllowAbsolutePaths));
+
+        builder
+            .AddAttribute("omittedOptions", "defaultEncoding")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "Canonical file.write writes exact FlowContent bytes and does not encode text.");
 
         AddTransformPorts(
             builder,
-            nameof(FileWriteRequest),
-            "File write request.",
-            nameof(FileWriteResult),
-            "File write result.");
+            nameof(FileContentWriteRequest),
+            "File content write request.",
+            "FlowResult<FileWriteResult>",
+            "File write receipt or expected write failure.");
 
         return builder.Build();
     }
@@ -135,7 +141,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                     OptionDesignMetadataAttributeValues.Advanced,
                     OptionDesignMetadataAttributeValues.Number));
 
-        AddSourcePort(builder, nameof(DirectoryEnumerateEntry), "Directory entry.");
+        AddSourcePort(builder, nameof(FlowValue), "Directory entry workflow object.");
 
         return builder.Build();
     }
@@ -186,7 +192,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
                     OptionDesignMetadataAttributeValues.Advanced,
                     OptionDesignMetadataAttributeValues.Number));
 
-        AddSourcePort(builder, nameof(FileWatchEvent), "File watch event.");
+        AddSourcePort(builder, nameof(FlowValue), "File change workflow object.");
 
         return builder.Build();
     }

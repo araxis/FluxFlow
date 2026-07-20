@@ -1,97 +1,106 @@
 # FluxFlow.Components.FileSystem.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone file
-system nodes from `FluxFlow.Components.FileSystem`.
+Composition registration and Designer metadata for canonical file-system
+transforms and sources. The adapter binds package options and an optional
+host-owned keyed `TimeProvider`; it does not create file-system resources,
+own path policy, decode content, or scan assemblies.
 
-This package does not scan assemblies, resolve CLR types from strings, create
-file-system abstraction resources, or own path policy. Hosts register file
-system factories explicitly and may provide an optional keyed `TimeProvider`.
-
-## Registration
+## Canonical Registration
 
 ```csharp
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterFileRead()
-        .RegisterFileWrite()
-        .RegisterDirectoryEnumerate()
-        .RegisterFileWatch());
+registry
+    .RegisterFileRead()
+    .RegisterFileWrite()
+    .RegisterDirectoryEnumerate()
+    .RegisterFileWatch();
 ```
 
-## Node Types
+| Type | Node | Input | Output |
+|------|------|-------|--------|
+| `file.read` | `FlowContentFileReadNode` | `FileReadRequest` | `FlowResult<FileReadContent>` |
+| `file.write` | `FlowContentFileWriteNode` | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
+| `directory.enumerate` | `FlowValueDirectoryEnumerateNode` | none | `FlowValue` |
+| `file.watch` | `FlowValueFileWatchNode` | none | `FlowValue` |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `file.read` | `FileReadNode` | `Input`, `Output` |
-| `file.write` | `FileWriteNode` | `Input`, `Output` |
-| `directory.enumerate` | `DirectoryEnumerateNode` | `Output` |
-| `file.watch` | `FileWatchNode` | `Output` |
+Canonical descriptors expose Events and no universal Errors surface. Expected
+read/write failures are normal Output values. Directory and watch failures are
+isolated source completion faults observed by the runtime.
 
-The factories expose `Events` and `Errors`. `clock` is an optional keyed
-`TimeProvider` resource for deterministic result, event, and error timestamps.
-Path safety is still configured through the existing node options such as
-`baseDirectory` and `allowAbsolutePaths`.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "read": {
-              "type": "file.read",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "baseDirectory": "data",
-                "allowAbsolutePaths": false,
-                "defaultEncoding": "utf-8",
-                "maxBytes": 16777216,
-                "boundedCapacity": 128
-              }
-            },
-            "enumerate": {
-              "type": "directory.enumerate",
-              "configuration": {
-                "directory": "inbox",
-                "filter": "*.json",
-                "includeFiles": true,
-                "includeDirectories": false,
-                "baseDirectory": "data"
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Shared": {
+      "Clock": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "FileProcessing": {
+      "Enumerate": {
+        "Type": "directory.enumerate",
+        "directory": "inbox",
+        "filter": "*.json",
+        "includeFiles": true,
+        "includeDirectories": false,
+        "baseDirectory": "data",
+        "clock": "Resources.Shared.Clock",
+        "Output": "BuildRequest.Input"
+      },
+      "BuildRequest": {
+        "Type": "file.read-request",
+        "Output": "Read.Input"
+      },
+      "Read": {
+        "Type": "file.read",
+        "baseDirectory": "data",
+        "maxBytes": 16777216,
+        "boundedCapacity": 128,
+        "Output": ["Handle.Input", "Audit.Input"]
+      },
+      "Handle": {
+        "Type": "file.result"
+      },
+      "Audit": {
+        "Type": "audit.result"
       }
     }
   }
 }
 ```
 
-The adapter binds the existing FileSystem option records from composition
-configuration. `CompositionRuntime.StartAsync()` starts `directory.enumerate`
-and `file.watch`; normal runtime stop/dispose stops `file.watch`.
-Invalid option values fail during composition build through the node factory. If
-build failures are configured as diagnostics, the runtime is not created and the
-host receives a `FactoryFailed` diagnostic with the relevant option name.
+The host example types are not supplied by this package. `BuildRequest`
+represents the explicit conversion from the directory entry object to
+`FileReadRequest`; Composition does not insert that conversion. Links can
+branch on `IsError`, `Kind`, or
+`Error.Code` without a special error edge.
+
+`CompositionRuntime.StartAsync()` starts directory and watch sources. Normal
+runtime stop or disposal stops a live watcher. Invalid options fail activation
+through the node factory.
+
+## Typed Compatibility
+
+Register released typed contracts under distinct node types when needed:
+
+```csharp
+registry
+    .RegisterFileReadResult("file.read.typed")
+    .RegisterFileWriteResult("file.write.typed")
+    .RegisterDirectoryEnumerateEntries("directory.enumerate.typed")
+    .RegisterFileWatchEvents("file.watch.typed");
+```
+
+These explicit registrations retain the 1.x typed ports and Errors/Events
+surfaces. Use distinct type names when canonical and compatibility factories
+share a registry.
 
 ## Design Metadata
 
-`FileSystemComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the four file-system composition nodes. The metadata describes fixed
-request/result ports, source outputs, the existing FileSystem option records,
-option section/importance/editor hints, and optional host-owned `clock`
-resource picker hints for hosts that build palettes, editors, validators, or
-documentation views.
-
-Path safety remains runtime configuration through `baseDirectory` and
-`allowAbsolutePaths`. The optional `clock` resource remains host-owned and is
-not represented as an editable node option.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
+`FileSystemComponentDesignMetadataProvider` describes canonical fixed ports,
+path/traversal/limit option hints, and the optional host-owned clock picker.
+The canonical write metadata omits `defaultEncoding` because exact FlowContent
+bytes are not encoded by the node. Metadata remains descriptive; hosts own UI,
+persistence, validation display, resource resolution, and activation.

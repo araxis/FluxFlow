@@ -7,6 +7,7 @@ using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,19 +34,42 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         read.Inputs[FileSystemCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(FileReadRequest));
         read.Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FileReadResult));
+            .ShouldBe(typeof(FlowResult<FileReadContent>));
 
         var write = registry.Registrations[FileSystemCompositionNodeTypes.Write];
         write.Inputs[FileSystemCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(FileWriteRequest));
+            .ShouldBe(typeof(FileContentWriteRequest));
         write.Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FileWriteResult));
+            .ShouldBe(typeof(FlowResult<FileWriteResult>));
 
         registry.Registrations[FileSystemCompositionNodeTypes.DirectoryEnumerate]
             .Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(DirectoryEnumerateEntry));
+            .ShouldBe(typeof(FlowValue));
 
         registry.Registrations[FileSystemCompositionNodeTypes.Watch]
+            .Outputs[FileSystemCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(FlowValue));
+    }
+
+    [Fact]
+    public void Typed_compatibility_registrations_preserve_released_contracts()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterFileReadResult("file.read.typed")
+            .RegisterFileWriteResult("file.write.typed")
+            .RegisterDirectoryEnumerateEntries("directory.enumerate.typed")
+            .RegisterFileWatchEvents("file.watch.typed");
+
+        registry.Registrations["file.read.typed"]
+            .Outputs[FileSystemCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(FileReadResult));
+        registry.Registrations["file.write.typed"]
+            .Inputs[FileSystemCompositionPortNames.Input].MessageType
+            .ShouldBe(typeof(FileWriteRequest));
+        registry.Registrations["directory.enumerate.typed"]
+            .Outputs[FileSystemCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(DirectoryEnumerateEntry));
+        registry.Registrations["file.watch.typed"]
             .Outputs[FileSystemCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FileWatchEvent));
     }
@@ -78,13 +102,13 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     {
         var metadata = DesignMetadataByType();
 
-        AssertTransformPorts<FileReadRequest, FileReadResult>(
+        AssertTransformPorts<FileReadRequest, FlowResult<FileReadContent>>(
             metadata[FileSystemCompositionNodeTypes.Read]);
-        AssertTransformPorts<FileWriteRequest, FileWriteResult>(
+        AssertTransformPorts<FileContentWriteRequest, FlowResult<FileWriteResult>>(
             metadata[FileSystemCompositionNodeTypes.Write]);
-        AssertSourcePort<DirectoryEnumerateEntry>(
+        AssertSourcePort<FlowValue>(
             metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate]);
-        AssertSourcePort<FileWatchEvent>(
+        AssertSourcePort<FlowValue>(
             metadata[FileSystemCompositionNodeTypes.Watch]);
     }
 
@@ -135,19 +159,16 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             metadata[FileSystemCompositionNodeTypes.Write],
             "boundedCapacity",
             "baseDirectory",
-            "allowAbsolutePaths",
-            "defaultEncoding");
+            "allowAbsolutePaths");
         AssertOption(
             metadata[FileSystemCompositionNodeTypes.Write],
             "boundedCapacity",
             OptionValueKind.Number,
             writeDefaults.BoundedCapacity,
             min: 1);
-        AssertOption(
-            metadata[FileSystemCompositionNodeTypes.Write],
-            "defaultEncoding",
-            OptionValueKind.Text,
-            writeDefaults.DefaultEncoding);
+        metadata[FileSystemCompositionNodeTypes.Write]
+            .Attributes[new ComponentAttributeName("omittedOptions")].Value
+            .ShouldBe("defaultEncoding");
 
         AssertOptionNames(
             metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate],
@@ -264,11 +285,6 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             write["allowAbsolutePaths"],
             "Paths",
             OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(
-            write["defaultEncoding"],
-            "Encoding",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text);
 
         var enumerate = OptionsByName(metadata[FileSystemCompositionNodeTypes.DirectoryEnumerate]);
         AssertOptionHints(
@@ -396,7 +412,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         var timestamp = DateTimeOffset.Parse("2026-06-19T10:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
 
-        await WithTransformNodeAsync<FileReadRequest, FileReadResult>(
+        await WithTransformNodeAsync<FileReadRequest, FlowResult<FileReadContent>>(
             FileSystemCompositionNodeTypes.Read,
             async (input, output, descriptor) =>
             {
@@ -410,9 +426,12 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
                 result.CorrelationId.ShouldBe(message.CorrelationId);
-                result.Payload.Path.ShouldBe(Path.GetFullPath(filePath));
-                result.Payload.Content.ShouldBe("hello");
-                result.Payload.ReadAt.ShouldBe(timestamp);
+                result.Payload.IsError.ShouldBeFalse();
+                result.Payload.Value.ShouldNotBeNull().Path.ShouldBe(Path.GetFullPath(filePath));
+                result.Payload.Value.Content.OriginalBytes.AsSpan().ToArray()
+                    .ShouldBe(System.Text.Encoding.UTF8.GetBytes("hello"));
+                result.Payload.Value.ReadAt.ShouldBe(timestamp);
+                descriptor.Errors.ShouldBeNull();
 
                 var @event = await ReceiveEventAsync(
                     events,
@@ -436,17 +455,20 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         var clock = new FakeTimeProvider(timestamp);
         var expectedPath = Path.Combine(directory.Path, "nested", "output.txt");
 
-        await WithTransformNodeAsync<FileWriteRequest, FileWriteResult>(
+        await WithTransformNodeAsync<FileContentWriteRequest, FlowResult<FileWriteResult>>(
             FileSystemCompositionNodeTypes.Write,
             async (input, output, descriptor) =>
             {
                 var results = Link(output.Source);
                 var events = Link(descriptor.Events.ShouldNotBeNull());
                 var message = FlowMessage.Create(
-                    new FileWriteRequest
+                    new FileContentWriteRequest
                     {
                         Path = "nested/output.txt",
-                        Content = "written"
+                        Content = FlowContent.FromBytes(
+                            System.Text.Encoding.UTF8.GetBytes("written"),
+                            "text/plain",
+                            "utf-8")
                     },
                     new CorrelationId("write"));
 
@@ -454,10 +476,12 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
                 result.CorrelationId.ShouldBe(message.CorrelationId);
-                result.Payload.Path.ShouldBe(Path.GetFullPath(expectedPath));
-                result.Payload.BytesWritten.ShouldBe(7);
-                result.Payload.WrittenAt.ShouldBe(timestamp);
+                result.Payload.IsError.ShouldBeFalse();
+                result.Payload.Value.ShouldNotBeNull().Path.ShouldBe(Path.GetFullPath(expectedPath));
+                result.Payload.Value.BytesWritten.ShouldBe(7);
+                result.Payload.Value.WrittenAt.ShouldBe(timestamp);
                 (await File.ReadAllTextAsync(expectedPath)).ShouldBe("written");
+                descriptor.Errors.ShouldBeNull();
 
                 var @event = await ReceiveEventAsync(
                     events,
@@ -509,7 +533,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var node = runtime.Nodes.ShouldHaveSingleItem();
         var output = node.Descriptor.Outputs[FileSystemCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<DirectoryEnumerateEntry>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var entries = Link(output.Source);
         var events = Link(node.Descriptor.Events.ShouldNotBeNull());
 
@@ -517,10 +541,11 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         await runtime.Completion.WaitAsync(Timeout);
 
         var emitted = await DrainUntilCompletedAsync(entries);
-        emitted.Select(message => message.Payload.Name).Order()
+        emitted.Select(message => message.Payload.GetObject()["name"].GetString()).Order()
             .ShouldBe(["child.txt", "root.txt"]);
         emitted.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
-        emitted.ShouldAllBe(message => message.Payload.EnumeratedAt == timestamp);
+        emitted.ShouldAllBe(message =>
+            message.Payload.GetObject()["enumeratedAt"].GetDateTimeOffset() == timestamp);
         (await DrainUntilCompletedAsync(events))
             .Select(value => value.Name)
             .ShouldContain(FileSystemDiagnosticNames.DirectoryEnumerateCompleted);
@@ -558,7 +583,7 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var node = runtime.Nodes.ShouldHaveSingleItem();
         var output = node.Descriptor.Outputs[FileSystemCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FileWatchEvent>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
         var changes = Link(output.Source);
         var events = Link(node.Descriptor.Events.ShouldNotBeNull());
 
@@ -572,11 +597,12 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
         var change = await ReceiveMatchingAsync(
             changes,
-            value => value.Name == "created.txt" &&
-                     value.ChangeType is FileWatchChangeType.Created or FileWatchChangeType.Changed);
-        change.Payload.Path.ShouldBe(Path.GetFullPath(watchedPath));
-        change.Payload.Directory.ShouldBe(Path.GetFullPath(directory.Path));
-        change.Payload.Timestamp.ShouldBe(timestamp);
+            value => value.GetObject()["name"].GetString() == "created.txt" &&
+                     value.GetObject()["changeType"].GetString() is "Created" or "Changed");
+        var changeValue = change.Payload.GetObject();
+        changeValue["path"].GetString().ShouldBe(Path.GetFullPath(watchedPath));
+        changeValue["directory"].GetString().ShouldBe(Path.GetFullPath(directory.Path));
+        changeValue["timestamp"].GetDateTimeOffset().ShouldBe(timestamp);
         change.CorrelationId.IsEmpty.ShouldBeFalse();
 
         await ReceiveEventAsync(events, FileSystemDiagnosticNames.FileWatchChanged);
@@ -585,18 +611,17 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_file_read_emits_errors_and_continues_after_missing_file()
+    public async Task Hosted_file_read_emits_normal_failure_and_continues_after_missing_file()
     {
         using var directory = TempDirectory.Create("read-errors");
         var validPath = Path.Combine(directory.Path, "valid.txt");
         await File.WriteAllTextAsync(validPath, "ok");
 
-        await WithTransformNodeAsync<FileReadRequest, FileReadResult>(
+        await WithTransformNodeAsync<FileReadRequest, FlowResult<FileReadContent>>(
             FileSystemCompositionNodeTypes.Read,
             async (input, output, descriptor) =>
             {
                 var results = Link(output.Source);
-                var errors = Link(descriptor.Errors.ShouldNotBeNull());
                 var missing = FlowMessage.Create(
                     new FileReadRequest { Path = "missing.txt" },
                     new CorrelationId("missing"));
@@ -607,13 +632,16 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
                 (await input.Target.SendAsync(missing).WaitAsync(Timeout)).ShouldBeTrue();
                 (await input.Target.SendAsync(valid).WaitAsync(Timeout)).ShouldBeTrue();
 
-                var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
 
-                error.Code.ShouldBe(FileSystemErrorCodes.FileReadNotFound);
-                error.CorrelationId.ShouldBe(missing.CorrelationId);
+                failure.CorrelationId.ShouldBe(missing.CorrelationId);
+                failure.Payload.Error.ShouldNotBeNull().Code
+                    .ShouldBe(FileSystemErrorCodeNames.ReadNotFound);
                 result.CorrelationId.ShouldBe(valid.CorrelationId);
-                result.Payload.Content.ShouldBe("ok");
+                result.Payload.Value.ShouldNotBeNull().Content.OriginalBytes.AsSpan().ToArray()
+                    .ShouldBe(System.Text.Encoding.UTF8.GetBytes("ok"));
+                descriptor.Errors.ShouldBeNull();
             },
             node => node.Configure("baseDirectory", directory.Path),
             configureRegistry: registry => registry.RegisterFileRead());
@@ -624,7 +652,6 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     [InlineData(FileSystemCompositionNodeTypes.Read, "maxBytes", 0L, "maxBytes")]
     [InlineData(FileSystemCompositionNodeTypes.Read, "defaultEncoding", "not-a-real-encoding", "defaultEncoding")]
     [InlineData(FileSystemCompositionNodeTypes.Write, "boundedCapacity", 0, "capacity")]
-    [InlineData(FileSystemCompositionNodeTypes.Write, "defaultEncoding", "not-a-real-encoding", "defaultEncoding")]
     [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "boundedCapacity", 0, "boundedCapacity")]
     [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "directory", "", "directory")]
     [InlineData(FileSystemCompositionNodeTypes.DirectoryEnumerate, "filter", "", "filter")]
@@ -761,14 +788,14 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(FileSystemCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(TypeName(typeof(TInput)));
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         output.Name.Value.ShouldBe(FileSystemCompositionPortNames.Output);
         output.Direction.ShouldBe(PortDirection.Output);
         output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe(typeof(TOutput).Name);
+        output.ValueType?.Value.ShouldBe(TypeName(typeof(TOutput)));
         output.IsPrimary.ShouldBeTrue();
     }
 
@@ -901,9 +928,9 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         return items;
     }
 
-    private static async Task<FlowMessage<FileWatchEvent>> ReceiveMatchingAsync(
-        BufferBlock<FlowMessage<FileWatchEvent>> output,
-        Func<FileWatchEvent, bool> predicate)
+    private static async Task<FlowMessage<T>> ReceiveMatchingAsync<T>(
+        BufferBlock<FlowMessage<T>> output,
+        Func<T, bool> predicate)
     {
         using var cancellation = new CancellationTokenSource(Timeout);
         while (!cancellation.IsCancellationRequested)
@@ -916,6 +943,15 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         }
 
         throw new TimeoutException("Timed out waiting for file watch event.");
+    }
+
+    private static string TypeName(Type type)
+    {
+        if (!type.IsGenericType)
+            return type.Name;
+
+        var name = type.Name[..type.Name.IndexOf('`')];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(TypeName))}>";
     }
 
     private static async Task<FlowEvent> ReceiveEventAsync(

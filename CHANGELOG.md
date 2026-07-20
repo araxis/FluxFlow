@@ -7,6 +7,34 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.FileSystem 4.0.0
+
+Adds canonical exact-content file-system operations and immutable workflow
+source values while preserving the released typed nodes.
+
+- Adds `FlowContentFileReadNode` with exact file bytes in
+  `FlowResult<FileReadContent>` and stable normal failure results.
+- Adds `FlowContentFileWriteNode` with exact original-byte writes from
+  `FileContentWriteRequest` and normal write receipts or failures.
+- Adds FlowValue directory-enumeration and file-watch sources with isolated
+  completion faults instead of universal Errors ports.
+- Keeps released typed transforms, sources, path confinement, bounded reads,
+  clocks, options, ports, and direct-use behavior for compatibility.
+
+## FluxFlow.Components.FileSystem.Composition 2.0.0
+
+Makes the four parameterless file-system registrations canonical vNext
+contracts.
+
+- Registers read/write as exact-content normal-result transforms and
+  directory/watch as FlowValue sources, all with Events and no universal
+  Errors surface.
+- Keeps path and clock ownership unchanged and does not add implicit mapping,
+  decoding, encoding, or serialization.
+- Adds explicit typed registration helpers for the released 1.x contracts.
+- Updates Designer metadata and package examples to canonical fixed ports and
+  the flat two-section application document.
+
 ## FluxFlow.Components.Http 4.0.0
 
 Adds the canonical FlowContent HTTP client while preserving the released

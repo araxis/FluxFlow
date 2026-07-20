@@ -2,22 +2,21 @@ using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
-using FluxFlow.Data;
 
 namespace FluxFlow.Components.FileSystem.Composition;
 
-public static class FileSystemCompositionNodeRegistryExtensions
+public static class FileSystemTypedRegistrationExtensions
 {
-    public static CompositionNodeRegistry RegisterFileRead(
+    public static CompositionNodeRegistry RegisterFileReadResult(
         this CompositionNodeRegistry registry,
-        string nodeType = FileSystemCompositionNodeTypes.Read)
+        string nodeType)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
         return registry.Register(
             nodeType,
-            CreateFileReadNode,
+            CreateFileReadResultNode,
             inputs:
             [
                 CompositionPorts.Metadata<FileReadRequest>(
@@ -25,75 +24,73 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FileReadContent>>(
+                CompositionPorts.Metadata<FileReadResult>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
 
-    public static CompositionNodeRegistry RegisterFileWrite(
+    public static CompositionNodeRegistry RegisterFileWriteResult(
         this CompositionNodeRegistry registry,
-        string nodeType = FileSystemCompositionNodeTypes.Write)
+        string nodeType)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
         return registry.Register(
             nodeType,
-            CreateFileWriteNode,
+            CreateFileWriteResultNode,
             inputs:
             [
-                CompositionPorts.Metadata<FileContentWriteRequest>(
+                CompositionPorts.Metadata<FileWriteRequest>(
                     FileSystemCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FileWriteResult>>(
+                CompositionPorts.Metadata<FileWriteResult>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
 
-    public static CompositionNodeRegistry RegisterDirectoryEnumerate(
+    public static CompositionNodeRegistry RegisterDirectoryEnumerateEntries(
         this CompositionNodeRegistry registry,
-        string nodeType = FileSystemCompositionNodeTypes.DirectoryEnumerate)
+        string nodeType)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
         return registry.Register(
             nodeType,
-            CreateDirectoryEnumerateNode,
+            CreateDirectoryEnumerateEntryNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<DirectoryEnumerateEntry>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
 
-    public static CompositionNodeRegistry RegisterFileWatch(
+    public static CompositionNodeRegistry RegisterFileWatchEvents(
         this CompositionNodeRegistry registry,
-        string nodeType = FileSystemCompositionNodeTypes.Watch)
+        string nodeType)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
         return registry.Register(
             nodeType,
-            CreateFileWatchNode,
+            CreateFileWatchEventNode,
             outputs:
             [
-                CompositionPorts.Metadata<FlowValue>(
+                CompositionPorts.Metadata<FileWatchEvent>(
                     FileSystemCompositionPortNames.Output)
             ]);
     }
 
-    private static ValueTask<ComposedNode> CreateFileReadNode(
+    private static ValueTask<ComposedNode> CreateFileReadResultNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FileReadOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            FileSystemCompositionResourceNames.Clock);
-        var node = new FlowContentFileReadNode(options, clock);
-
+        var node = new FileReadNode(
+            context.BindConfiguration<FileReadOptions>(),
+            GetClock(context));
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
@@ -104,73 +101,74 @@ public static class FileSystemCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FileReadContent>>(
+                CompositionPorts.Output<FileReadResult>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events));
+            events: node.Events,
+            errors: node.Errors));
     }
 
-    private static ValueTask<ComposedNode> CreateFileWriteNode(
+    private static ValueTask<ComposedNode> CreateFileWriteResultNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FileWriteOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            FileSystemCompositionResourceNames.Clock);
-        var node = new FlowContentFileWriteNode(options, clock);
-
+        var node = new FileWriteNode(
+            context.BindConfiguration<FileWriteOptions>(),
+            GetClock(context));
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<FileContentWriteRequest>(
+                CompositionPorts.Input<FileWriteRequest>(
                     FileSystemCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FileWriteResult>>(
+                CompositionPorts.Output<FileWriteResult>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events));
+            events: node.Events,
+            errors: node.Errors));
     }
 
-    private static ValueTask<ComposedNode> CreateDirectoryEnumerateNode(
+    private static ValueTask<ComposedNode> CreateDirectoryEnumerateEntryNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<DirectoryEnumerateOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            FileSystemCompositionResourceNames.Clock);
-        var node = new FlowValueDirectoryEnumerateNode(options, clock);
-
+        var node = new DirectoryEnumerateNode(
+            context.BindConfiguration<DirectoryEnumerateOptions>(),
+            GetClock(context));
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<DirectoryEnumerateEntry>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events));
+            events: node.Events,
+            errors: node.Errors));
     }
 
-    private static ValueTask<ComposedNode> CreateFileWatchNode(
+    private static ValueTask<ComposedNode> CreateFileWatchEventNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FileWatchOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            FileSystemCompositionResourceNames.Clock);
-        var node = new FlowValueFileWatchNode(options, clock);
-
+        var node = new FileWatchNode(
+            context.BindConfiguration<FileWatchOptions>(),
+            GetClock(context));
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             outputs:
             [
-                CompositionPorts.Output<FlowValue>(
+                CompositionPorts.Output<FileWatchEvent>(
                     FileSystemCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events));
+            events: node.Events,
+            errors: node.Errors));
     }
+
+    private static TimeProvider? GetClock(CompositionNodeFactoryContext context)
+        => context.GetResource<TimeProvider>(FileSystemCompositionResourceNames.Clock);
 }

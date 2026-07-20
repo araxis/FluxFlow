@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext FileSystem FlowContent And Results
+
+- Added canonical exact-content read/write nodes with stable FlowResult kinds
+  and error codes, strong lineage, and ordinary expected operation failures.
+- Added FlowValue directory-enumeration and file-watch source projections;
+  released typed nodes remain unchanged and source failures are isolated as
+  Completion faults.
+- Made the four default FileSystem Composition registrations canonical while
+  retaining explicit typed compatibility registrations under caller-selected
+  node types.
+- FileSystem moved to `4.0.0` and FileSystem Composition to `2.0.0`; package
+  docs, changelog, Designer metadata, and source-declaration baselines were
+  updated.
+- Runtime (`66`), Composition (`27`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,126`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Storage is the next separately bounded component-family assessment.
+
 ## 2026-07-20 - vNext HTTP FlowContent And Results
 
 - Added canonical `HttpClientRequest` with exact FlowContent request bodies and
