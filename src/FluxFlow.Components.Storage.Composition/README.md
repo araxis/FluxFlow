@@ -1,12 +1,8 @@
 # FluxFlow.Components.Storage.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone storage
-nodes from `FluxFlow.Components.Storage`.
-
-This package does not scan assemblies, register backend stores, or configure
-concrete storage adapters. Hosts register storage node factories explicitly and
-provide either a keyed `IStorageStore` or a keyed `IStorageStoreFactory`; they
-may also provide an optional keyed `TimeProvider`.
+Optional `FluxFlow.Composition` registration helpers for the canonical storage
+nodes. Hosts provide a keyed `IStorageStore` or `IStorageStoreFactory` and may
+provide a keyed `TimeProvider`; this package owns none of those resources.
 
 ## Registration
 
@@ -22,67 +18,87 @@ services
         .RegisterStorageDelete());
 ```
 
-## Node Types
+| Type | Canonical ports |
+|------|-----------------|
+| `storage.put` | `StorageContentPutRequest` Input, `FlowResult<StoragePutOutcome>` Output |
+| `storage.get` | `StorageGetRequest` Input, `FlowResult<StorageGetOutcome>` Output |
+| `storage.query` | `StorageQueryRequest` Input, `FlowResult<StorageQueryOutcome>` Output |
+| `storage.delete` | `StorageDeleteRequest` Input, `FlowResult<StorageDeleteOutcome>` Output |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `storage.put` | `StoragePutNode` | `Input`, `Output` |
-| `storage.get` | `StorageGetNode` | `Input`, `Output`, `Found`, `NotFound` |
-| `storage.query` | `StorageQueryNode` | `Input`, `Output`, `Records` |
-| `storage.delete` | `StorageDeleteNode` | `Input`, `Output` |
+Every canonical node exposes Events and no universal Errors surface. Workflow
+links can branch on `Kind`, `IsError`, `Error.Code`, `Value.Found`, or other
+ordinary result fields.
 
-Each factory exposes `Events` and `Errors`. `store` is a required keyed
-`IStorageStore` or `IStorageStoreFactory` resource. Direct stores remain
-host-owned. Factory leases are opened during composition build and disposed with
-the composed node. `clock` is an optional keyed `TimeProvider` resource for
-deterministic result, event, and error timestamps.
-
-## Configuration
+## Flat Document
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "put": {
-              "type": "storage.put",
-              "resources": {
-                "store": "items-store",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "collection": "items",
-                "mode": "Upsert",
-                "emitStoredRecord": true,
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Storage": {
+      "Primary": {
+        "Type": "host.storage-store"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "BuildContent": {
+        "Type": "serialize.json",
+        "Output": "BuildPut.Input"
+      },
+      "BuildPut": {
+        "Type": "storage.put-request",
+        "collection": "orders",
+        "key": "order-42",
+        "Output": "Save.Input"
+      },
+      "Save": {
+        "Type": "storage.put",
+        "collection": "orders",
+        "mode": "Upsert",
+        "store": "Resources.Storage.Primary",
+        "Output": ["HandleResult.Input", "Audit.Input"]
+      },
+      "HandleResult": {
+        "Type": "storage.result"
+      },
+      "Audit": {
+        "Type": "audit.result"
       }
     }
   }
 }
 ```
 
-The adapter binds the existing storage option records from node configuration.
-Backend packages remain host concerns: register an opened keyed store or a
-keyed store factory in the host, then reference it from composition with the
-`store` resource.
+`BuildContent`, `storage.put-request`, `storage.result`, and `audit.result` are
+host example types. Composition does not insert mapping or serialization. A put
+command must be created explicitly from upstream FlowContent. Resource addresses
+are resolved by the host's application address framework.
+
+Direct keyed stores remain host-owned. Factory leases are opened during
+composition build and disposed with the composed node. The optional `clock`
+resource controls deterministic result and diagnostic timestamps.
+
+## Typed Compatibility
+
+Register released typed contracts under distinct node types when loading a
+legacy definition:
+
+```csharp
+registry
+    .RegisterStoragePutResult("storage.put.typed")
+    .RegisterStorageGetResultBranches("storage.get.typed")
+    .RegisterStorageQueryRecordOutputs("storage.query.typed")
+    .RegisterStorageDeleteResult("storage.delete.typed");
+```
+
+The caller supplies each compatibility type name, so it cannot silently replace
+the canonical registration. Compatibility get/query retain their branch ports
+and all four typed nodes retain Errors and Events.
 
 ## Design Metadata
 
-`StorageComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`storage.put`, `storage.get`, `storage.query`, and `storage.delete` so hosts can
-build palettes, editors, validation hints, or documentation without copying
-package descriptors. The metadata describes the existing storage option
-records, option section/importance/editor hints, fixed ports, and host-owned
-resource picker hints for the required `store` and optional `clock` resources.
-Concrete `IStorageStore` instances, `IStorageStoreFactory` registrations, and
-optional keyed `TimeProvider` clocks remain host-owned resources and are not
-modeled as editable node options.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+`StorageComponentDesignMetadataProvider` describes canonical fixed ports,
+option grouping/editor hints, omitted typed-only branch controls, and host-owned
+resource picker hints for `store` and `clock`. Designer metadata does not create
+stores, open factories, execute nodes, or own runtime state.

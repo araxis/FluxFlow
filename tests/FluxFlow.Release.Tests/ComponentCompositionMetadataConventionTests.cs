@@ -653,8 +653,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
-            var registryContent = File.ReadAllText(registryFile);
+            var registryContent = ReadCompositionImplementationContent(projectDirectory);
             var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
             var resourceConstants = PublicStringConstantRegex()
@@ -692,8 +691,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (resourceNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
-            var registryContent = File.ReadAllText(registryFile);
+            var registryContent = ReadCompositionImplementationContent(projectDirectory);
             var resourceContent = File.ReadAllText(resourceNamesFiles[0]);
             var resourceTypeName = Path.GetFileNameWithoutExtension(resourceNamesFiles[0]);
             var resourceConstants = PublicStringConstantWithValueRegex()
@@ -823,8 +821,7 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             if (portNamesFiles.Length == 0)
                 continue;
 
-            var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
-            var registryContent = File.ReadAllText(registryFile);
+            var registryContent = ReadCompositionImplementationContent(projectDirectory);
             var portTypeName = Path.GetFileNameWithoutExtension(portNamesFiles[0]);
             var portConstants = PublicStringConstantRegex()
                 .Matches(File.ReadAllText(portNamesFiles[0]))
@@ -1267,6 +1264,22 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                 "*CompositionNodeRegistryExtensions.cs",
                 SearchOption.TopDirectoryOnly)
             .ShouldHaveSingleItem($"{packageId} must keep registry extensions in one file.");
+
+    private static string ReadCompositionImplementationContent(string projectDirectory)
+        => string.Join(
+            Environment.NewLine,
+            Directory
+                .EnumerateFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+                .Where(path =>
+                {
+                    var fileName = Path.GetFileName(path);
+                    return !fileName.EndsWith("ComponentDesignMetadataProvider.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("CompositionNodeTypes.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("CompositionPortNames.cs", StringComparison.Ordinal) &&
+                        !fileName.EndsWith("CompositionResourceNames.cs", StringComparison.Ordinal);
+                })
+                .Order(StringComparer.Ordinal)
+                .Select(File.ReadAllText));
 
     private static string[] ReadOptionalResourceNamesFiles(
         string projectDirectory,

@@ -1,4 +1,9 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Storage.Contracts;
+using FluxFlow.Components.Storage.Nodes;
+using FluxFlow.Components.Storage.Options;
+using FluxFlow.Data;
+using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -8,6 +13,37 @@ namespace FluxFlow.Components.Storage.FileSystem.Tests;
 
 public sealed class FileSystemStorageStoreTests
 {
+    [Fact]
+    public async Task Canonical_nodes_round_trip_exact_content_across_store_instances()
+    {
+        using var temp = TempDirectory.Create();
+        byte[] bytes = [0x00, 0x7F, 0xFF];
+        await using (var put = new FlowContentStoragePutNode(
+                         CreateStore(temp.Path),
+                         new StoragePutOptions { Collection = "items" }))
+        {
+            var output = Link(put.Output);
+            await put.Input.SendAsync(FlowMessage.Create(new StorageContentPutRequest
+            {
+                Key = "content",
+                Content = FlowContent.FromBytes(bytes, "application/octet-stream", "binary")
+            }));
+            (await output.ReceiveAsync()).Payload.IsError.ShouldBeFalse();
+        }
+
+        await using var get = new FlowContentStorageGetNode(
+            CreateStore(temp.Path),
+            new StorageGetOptions { Collection = "items" });
+        var results = Link(get.Output);
+        await get.Input.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "content" }));
+
+        var record = (await results.ReceiveAsync()).Payload.Value.ShouldNotBeNull()
+            .Record.ShouldNotBeNull();
+        record.Content.OriginalBytes.AsSpan().ToArray().ShouldBe(bytes);
+        record.Content.ContentType.ShouldBe("application/octet-stream");
+        record.Content.Encoding.ShouldBe("binary");
+    }
+
     [Fact]
     public async Task Put_PersistsRecordAcrossStoreInstances()
     {
@@ -935,6 +971,13 @@ public sealed class FileSystemStorageStoreTests
             {
                 MaxValueBytes = 0
             });
+    }
+
+    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
+    {
+        var buffer = new BufferBlock<T>();
+        source.LinkTo(buffer);
+        return buffer;
     }
 
     private static FileSystemStorageStore CreateStore(

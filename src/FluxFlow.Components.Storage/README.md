@@ -1,225 +1,109 @@
 # FluxFlow.Components.Storage
 
-Standalone storage nodes for FluxFlow: blockified `put`/`get`/`query`/`delete`
-over an injected `IStorageStore`. No engine required.
+Standalone logical-storage nodes over a host-owned `IStorageStore`. The
+canonical nodes carry exact `FlowContent` and return typed normal results; no
+engine, backend, serializer, or resource factory is owned by this package.
 
-Each node is a self-contained TPL Dataflow processor built on
-[`FluxFlow.Nodes`](../FluxFlow.Nodes). Every message travels as a
-`FlowMessage<T>` envelope (payload + correlation id), so the correlation id
-flows request -> result for free — and onto the `Found`/`NotFound` and `Records`
-branches. The host owns the `IStorageStore` lifetime and injects the opened
-store into each node; the nodes never open or dispose it (exactly like the HTTP
-node over an `HttpClient`).
+## Canonical Nodes
 
-## Nodes
+| Node | Input | Output |
+|------|-------|--------|
+| `FlowContentStoragePutNode` | `StorageContentPutRequest` | `FlowResult<StoragePutOutcome>` |
+| `FlowContentStorageGetNode` | `StorageGetRequest` | `FlowResult<StorageGetOutcome>` |
+| `FlowContentStorageQueryNode` | `StorageQueryRequest` | `FlowResult<StorageQueryOutcome>` |
+| `FlowContentStorageDeleteNode` | `StorageDeleteRequest` | `FlowResult<StorageDeleteOutcome>` |
 
-| Node | Shape | Purpose |
-|------|-------|---------|
-| `StoragePutNode` | `Input` -> `Output`, `Errors`, `Events` | Stores or updates a logical record. |
-| `StorageGetNode` | `Input` -> `Output`, `Found`, `NotFound`, `Errors`, `Events` | Reads a logical record and fans found/missing results. |
-| `StorageQueryNode` | `Input` -> `Output`, `Records`, `Errors`, `Events` | Queries records by collection, key prefix, attributes, time bounds, and limit. |
-| `StorageDeleteNode` | `Input` -> `Output`, `Errors`, `Events` | Deletes a logical record and reports whether it existed. |
+Each node has one Input, one broadcast Output, Events, and Completion. There is
+no universal Errors data port. Invalid requests, missing records, backend
+failures, optimistic-write failures, and invalid stored content are ordinary
+results with stable `StorageResultKinds` and `StorageErrorCodeNames`. A later
+accepted input continues after an operation failure.
 
 ```csharp
-// The host owns the store; the node just borrows it.
-IStorageStore store = ...;
-await using var put = new StoragePutNode(store);
+IStorageStore store = ...; // opened and owned by the host
+await using var put = new FlowContentStoragePutNode(
+    store,
+    new StoragePutOptions { Collection = "items" });
 
-var request = FlowMessage.Create(new StoragePutRequest
+var results = new BufferBlock<FlowMessage<FlowResult<StoragePutOutcome>>>();
+put.Output.LinkTo(results);
+
+var command = FlowMessage.Create(new StorageContentPutRequest
 {
-    Collection = "items",
-    Key = "a",
-    Value = "one"
+    Key = "invoice-42",
+    Content = FlowContent.FromBytes(
+        invoiceBytes,
+        "application/json",
+        "utf-8")
 });
-await put.Input.SendAsync(request);
 
-var result = await put.Output.ReceiveAsync();      // FlowMessage<StorageResult>
-// result.CorrelationId == request.CorrelationId   // the envelope carries it
+await put.Input.SendAsync(command);
+var result = await results.ReceiveAsync();
+// result.CorrelationId == command.CorrelationId
+// result.CausationId == command.MessageId
 ```
 
-`Output`, `Found`, `NotFound`, `Records`, `Errors`, and `Events` are all broadcast
-ports — link each to as many downstream consumers as you like.
+`StorageContentPutRequest` requires an original byte representation. A
+value-only `FlowContent` returns `storage.content_unavailable`; use an explicit
+Serialization component before storage. Content type and encoding are stored
+as metadata and no implicit decoding occurs on get or query.
 
-## Put
+The canonical layer writes a private versioned JSON-compatible envelope through
+the existing `IStorageStore.Value` boundary. The built-in FileSystem and
+SqlFile adapters round-trip that envelope without source changes. Custom stores
+used by canonical nodes must preserve JSON object values and record metadata.
+The envelope is not a workflow contract and should not be inspected by hosts.
 
-```csharp
-await using var put = new StoragePutNode(store, new StoragePutOptions
-{
-    Collection = "items",
-    Mode = StorageWriteMode.Upsert,
-    EmitStoredRecord = true,
-    BoundedCapacity = 128
-});
-```
+## Operation Semantics
 
-`StoragePutNode` consumes `StoragePutRequest` and emits `StorageResult`.
-Supported modes are `Upsert`, `Create`, and `Replace`. The request can override
-the node mode per item. Unsupported per-message write modes are reported as
-`InvalidRequest` errors and later messages continue processing.
+- Put supports `Upsert`, `Create`, `Replace`, expected version, expiry, and
+  copied attributes. `EmitStoredRecord` controls whether the successful outcome
+  includes the complete content record.
+- Get returns `StorageGetFound`, `StorageGetNotFound`, or `StorageGetFailed` on
+  the same Output. Missing is not an error.
+- Query returns one outcome with `Count` and, when `EmitRecordsInResult` is
+  enabled, an immutable snapshot of content records. Per-record fan-out belongs
+  to the typed compatibility node or an explicit downstream component.
+- Delete always returns deleted or missing for an accepted command. The legacy
+  `EmitMissingAsResult` option applies only to `StorageDeleteNode`.
 
-## Get
+Result envelopes preserve correlation, trace, and headers, create a new message
+identity, and set causation to the input message. Record attributes and query
+record lists are copied on assignment. Exact content bytes are defensively
+copied by `FlowContent`.
 
-```csharp
-await using var get = new StorageGetNode(store, new StorageGetOptions
-{
-    Collection = "items",
-    IncludeExpired = false
-});
-```
+## Ownership
 
-`StorageGetNode` consumes `StorageGetRequest` and emits `StorageResult` on
-`Output`. Found records are also fanned to `Found`; missing records are also
-fanned to `NotFound`. A missing record is a normal result, not a processing
-error.
+The host opens, registers, and disposes stores. Nodes borrow `IStorageStore` and
+never dispose it. `IStorageStoreFactory`, `StorageStoreLease`, and
+`StorageStoreContext` remain available for host-managed store creation. The
+[FileSystem](../FluxFlow.Components.Storage.FileSystem) and
+[SqlFile](../FluxFlow.Components.Storage.SqlFile) packages are concrete backend
+adapters.
 
-## Query
+Pass a `TimeProvider` when deterministic result and event timestamps are
+required. Supply the same clock through `StorageStoreContext.Clock` when backend
+stored timestamps and expiration checks must use that time source.
 
-```csharp
-await using var query = new StorageQueryNode(store, new StorageQueryOptions
-{
-    Collection = "items",
-    Offset = 0,
-    Limit = 100,
-    IncludeExpired = false,
-    EmitRecordsInResult = true,
-    EmitRecordOutputs = true
-});
-```
+## Typed Compatibility
 
-`StorageQueryNode` consumes `StorageQueryRequest` and emits one
-`StorageQueryResult` on `Output`. The `Records` port emits each returned
-`StorageRecord` (as a `FlowMessage<StorageRecord>`) when `EmitRecordOutputs` is
-true. Requests can filter by collection, key prefix, exact-match attributes,
-stored time bounds, expired-record policy, offset, and limit.
+The released nodes remain unchanged:
 
-## Delete
+- `StoragePutNode`: `StoragePutRequest` to `StorageResult`
+- `StorageGetNode`: `StorageGetRequest` to `StorageResult`, plus `Found` and
+  `NotFound`
+- `StorageQueryNode`: `StorageQueryRequest` to `StorageQueryResult`, plus
+  `Records`
+- `StorageDeleteNode`: `StorageDeleteRequest` to `StorageResult`
 
-```csharp
-await using var delete = new StorageDeleteNode(store, new StorageDeleteOptions
-{
-    Collection = "items",
-    EmitMissingAsResult = true
-});
-```
-
-`StorageDeleteNode` consumes `StorageDeleteRequest` and emits `StorageResult`.
-Missing deletes can be emitted as normal results or suppressed
-(`EmitMissingAsResult`).
-
-## Errors and events
-
-A store failure or an invalid request surfaces a `FlowError` on `Errors`
-(stamped with the in-flight correlation id and a `Code` from
-`StorageErrorCodes`) and the node keeps processing later messages. Each node
-also emits `FlowEvent` diagnostics on `Events` (names in
-`StorageDiagnosticNames`).
-
-## Store Ownership
-
-The package does not include a concrete database. A host supplies an
-`IStorageStore` — see the [FileSystem](../FluxFlow.Components.Storage.FileSystem)
-and [SqlFile](../FluxFlow.Components.Storage.SqlFile) adapter packages — and
-injects it into the nodes.
-
-Adapter packages register a store factory through `StorageComponentOptions`:
-
-```csharp
-var options = new StorageComponentOptions()
-    .UseFileSystemStorage("./data");      // adapter extension
-IStorageStore store = (await options.StoreFactory
-    .OpenAsync(new StorageStoreContext { StoreName = "items-db" })).Store;
-```
-
-`StorageStoreLease.Owned(store)` marks a store the lease should dispose;
-`StorageStoreLease.Shared(store)` marks a host-owned store that must not be
-disposed. The factory receives the store name, default collection, and clock
-through `StorageStoreContext`. Delegate-backed factories registered through
-`StorageComponentOptions.UseStore(...)` must return a non-null
-`StorageStoreLease`; shared-store delegates must return a non-null store.
-`StorageStoreContext` trims store names and default collections, treats blank
-values as absent, and falls back to `TimeProvider.System` when a null clock is
-assigned.
-
-## Runtime Timing
-
-Each node uses `System.TimeProvider` (default `TimeProvider.System`) for result
-timestamps. Pass a deterministic `TimeProvider` (for example
-`Microsoft.Extensions.Time.Testing.FakeTimeProvider`) when tests, replay, or
-deterministic dashboards need stable timestamps:
-
-```csharp
-await using var put = new StoragePutNode(store, clock: fakeTimeProvider);
-```
-
-The same clock can be supplied to a backend store through
-`StorageStoreContext.Clock` so stored records and expiration checks share one
-time source.
-
-## Contracts
-
-Core contracts:
-
-- `StoragePutRequest`
-- `StorageGetRequest`
-- `StorageQueryRequest`
-- `StorageDeleteRequest`
-- `StorageQueryResult`
-- `StorageResult`
-- `StorageRecord`
-- `StorageWriteMode`
-- `IStorageStore`
-- `IStorageStoreFactory`
-- `StorageStoreContext`
-- `StorageStoreLease`
-
-`StorageRecord.Value` is `object?`: hosts own serialization and can compose this
-package with serialization or payload components before storage.
-
-Request contracts trim optional text fields such as collection, key prefix,
-content type, and correlation id, treating blank values as absent. Attribute
-dictionaries are copied on assignment, use ordinal key comparison, and treat
-null as empty. Nodes and stores still own required collection/key validation so
-invalid workflow messages surface as normal storage errors instead of
-constructor failures.
-
-Output contracts follow the same rule: records and results trim textual
-identity/diagnostic fields, normalize blank optional values to absent, copy
-attribute dictionaries with ordinal key comparison, and copy query result record
-lists on assignment.
-
-Node option records trim default collection names and treat blank collections as
-absent. Invalid capacities, query paging values, and write modes are rejected
-when options are assigned so direct-code and configuration-bound callers fail at
-the component boundary.
+Those nodes retain their typed branch ports and `FluxFlow.Nodes.FlowError`
+Errors port. Their `StorageRecord.Value` remains `object?` for existing hosts.
+Use `FluxFlow.Components.Storage.Composition` for canonical factory registration
+or explicit typed compatibility registration.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node package. This package is just the standalone
-nodes and storage contracts.
-
-Use `FluxFlow.Components.Storage.Composition` when a `FluxFlow.Composition`
-host should register the optional storage factories:
-
-```csharp
-services.AddKeyedSingleton<IStorageStore>("items-store", store);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterStoragePut()
-        .RegisterStorageGet()
-        .RegisterStorageQuery()
-        .RegisterStorageDelete());
-```
-
-The composition adapter binds the existing storage option records from node
-configuration, resolves the required store from the keyed `store` resource, and
-can resolve an optional keyed `TimeProvider` resource named `clock`. Concrete
-store setup still belongs to the host or backend adapter packages; the
-composition adapter only consumes an already registered `IStorageStore`.
-
-The optional composition package also exposes
-`StorageComponentDesignMetadataProvider` for neutral Designer metadata over the
-storage composition node types. The standalone Storage package remains free of
-Designer, Composition, and Engine dependencies.
+Workflow definition loading, keyed resource resolution, node construction, and
+linking live in the optional `FluxFlow.Components.Storage.Composition` package.
+The runtime package remains directly usable and has no Composition, Designer,
+Hosting, backend-adapter, or Engine dependency.

@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext Storage FlowContent And Results
+
+- Added canonical exact-content put/get/query/delete nodes with stable normal
+  result kinds and error codes, strong lineage, and ordinary expected operation
+  failures.
+- Added a private versioned JSON-compatible content envelope over the existing
+  store value boundary; FileSystem and SqlFile integration regressions prove
+  exact byte and metadata round-trips without adapter source changes.
+- Made the four default Storage Composition registrations canonical while
+  retaining explicit typed compatibility registrations under caller-selected
+  node types and preserving host-owned store/factory lifetimes.
+- Storage moved to `4.0.0` and Storage Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, source conventions, and source-declaration
+  baselines were updated.
+- Runtime (`70`), Composition (`20`), FileSystem adapter (`30`), SqlFile adapter
+  (`31`), adapter registration (`4`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,136`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- Sessions is the next separately bounded component-family assessment.
+
 ## 2026-07-20 - vNext FileSystem FlowContent And Results
 
 - Added canonical exact-content read/write nodes with stable FlowResult kinds

@@ -26,7 +26,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Put,
             "Storage Put",
-            "Stores or updates a record through a host-owned storage store.",
+            "Stores exact content through a host-owned storage store.",
             "database-plus",
             "putRecord");
 
@@ -55,10 +55,10 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
         AddTransformPorts(
             builder,
-            nameof(StoragePutRequest),
-            "Storage put request.",
-            nameof(StorageResult),
-            "Storage put result.");
+            nameof(StorageContentPutRequest),
+            "Exact-content storage put request.",
+            "FlowResult<StoragePutOutcome>",
+            "Stored or failed operation result.");
 
         return builder.Build();
     }
@@ -68,7 +68,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Get,
             "Storage Get",
-            "Reads a record and routes found or missing results.",
+            "Reads exact content and returns found, missing, or failed results.",
             "database-search",
             "getRecord");
 
@@ -77,37 +77,12 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
             .AddOption(IncludeExpiredOption(GetDefaults.IncludeExpired))
             .AddOption(BoundedCapacityOption(GetDefaults.BoundedCapacity));
 
-        builder
-            .AddInputPort(
-                StorageCompositionPortNames.Input,
-                displayName: "Input",
-                group: "Messages",
-                order: 0,
-                summary: "Storage get request.",
-                valueType: nameof(StorageGetRequest),
-                isPrimary: true)
-            .AddOutputPort(
-                StorageCompositionPortNames.Output,
-                displayName: "Output",
-                group: "Results",
-                order: 1,
-                summary: "Storage get result.",
-                valueType: nameof(StorageResult),
-                isPrimary: true)
-            .AddOutputPort(
-                StorageCompositionPortNames.Found,
-                displayName: "Found",
-                group: "Branches",
-                order: 2,
-                summary: "Storage result when the record exists.",
-                valueType: nameof(StorageResult))
-            .AddOutputPort(
-                StorageCompositionPortNames.NotFound,
-                displayName: "Not Found",
-                group: "Branches",
-                order: 3,
-                summary: "Storage result when the record is missing.",
-                valueType: nameof(StorageResult));
+        AddTransformPorts(
+            builder,
+            nameof(StorageGetRequest),
+            "Storage get request.",
+            "FlowResult<StorageGetOutcome>",
+            "Found, missing, or failed operation result.");
 
         return builder.Build();
     }
@@ -117,7 +92,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
         var builder = CreateStorageMetadataBuilder(
             StorageCompositionNodeTypes.Query,
             "Storage Query",
-            "Queries records and can fan matched records to a separate output.",
+            "Queries exact-content records and returns one result.",
             "database",
             "queryRecords");
 
@@ -155,16 +130,11 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 attributes: OptionAttributes(
                     "Results",
                     OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(
-                "emitRecordOutputs",
-                OptionValueKind.Boolean,
-                displayName: "Emit Record Outputs",
-                helperText: "Fan each matched record to the Records output.",
-                defaultValue: QueryDefaults.EmitRecordOutputs,
-                attributes: OptionAttributes(
-                    "Records",
-                    OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
+            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity))
+            .AddAttribute("omittedOptions", "emitRecordOutputs")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "Canonical storage.query returns one result; per-record fan-out is available through the typed compatibility registration.");
 
         builder
             .AddInputPort(
@@ -180,16 +150,9 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Storage query result.",
-                valueType: nameof(StorageQueryResult),
-                isPrimary: true)
-            .AddOutputPort(
-                StorageCompositionPortNames.Records,
-                displayName: "Records",
-                group: "Records",
-                order: 2,
-                summary: "Matched storage record.",
-                valueType: nameof(StorageRecord));
+                summary: "Completed or failed storage query result.",
+                valueType: "FlowResult<StorageQueryOutcome>",
+                isPrimary: true);
 
         return builder.Build();
     }
@@ -205,23 +168,18 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
         builder
             .AddOption(CollectionOption())
-            .AddOption(
-                "emitMissingAsResult",
-                OptionValueKind.Boolean,
-                displayName: "Emit Missing As Result",
-                helperText: "Emit a normal output result when the record is missing.",
-                defaultValue: DeleteDefaults.EmitMissingAsResult,
-                attributes: OptionAttributes(
-                    "Results",
-                    OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity));
+            .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity))
+            .AddAttribute("omittedOptions", "emitMissingAsResult")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "Canonical storage.delete always returns a deleted or missing result for an accepted command.");
 
         AddTransformPorts(
             builder,
             nameof(StorageDeleteRequest),
             "Storage delete request.",
-            nameof(StorageResult),
-            "Storage delete result.");
+            "FlowResult<StorageDeleteOutcome>",
+            "Deleted, missing, or failed operation result.");
 
         return builder.Build();
     }

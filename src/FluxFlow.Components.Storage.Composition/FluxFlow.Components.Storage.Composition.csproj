@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Storage.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Storage.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage.Composition</RootNamespace>
-    <Version>1.5.0</Version>
+    <Version>2.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Optional FluxFlow.Composition registration helpers for standalone storage nodes over host-owned keyed stores or store factories.</Description>
+    <Description>Optional canonical exact-content storage registrations plus explicit typed compatibility helpers over host-owned keyed stores or factories.</Description>
     <PackageTags>workflow;dataflow;components;storage;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Drops the FluxFlow.Composition.Hosting dependency (host-owned keyed resource resolution moved to the FluxFlow.Composition factory context) and adds the shared package icon.</PackageReleaseNotes>
+    <PackageReleaseNotes>Makes exact FlowContent and typed normal results the default one-input/one-output storage contracts, preserves keyed store/factory ownership, and adds explicit released-contract registrations.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

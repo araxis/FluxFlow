@@ -2,7 +2,7 @@ using FluxFlow.Components.Storage.Contracts;
 using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
-using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Storage.Composition;
 
@@ -20,12 +20,12 @@ public static class StorageCompositionNodeRegistryExtensions
             CreateStoragePutNode,
             inputs:
             [
-                CompositionPorts.Metadata<StoragePutRequest>(
+                CompositionPorts.Metadata<StorageContentPutRequest>(
                     StorageCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<StorageResult>(
+                CompositionPorts.Metadata<FlowResult<StoragePutOutcome>>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -47,12 +47,8 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<StorageResult>(
-                    StorageCompositionPortNames.Output),
-                CompositionPorts.Metadata<StorageResult>(
-                    StorageCompositionPortNames.Found),
-                CompositionPorts.Metadata<StorageResult>(
-                    StorageCompositionPortNames.NotFound)
+                CompositionPorts.Metadata<FlowResult<StorageGetOutcome>>(
+                    StorageCompositionPortNames.Output)
             ]);
     }
 
@@ -73,10 +69,8 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<StorageQueryResult>(
-                    StorageCompositionPortNames.Output),
-                CompositionPorts.Metadata<StorageRecord>(
-                    StorageCompositionPortNames.Records)
+                CompositionPorts.Metadata<FlowResult<StorageQueryOutcome>>(
+                    StorageCompositionPortNames.Output)
             ]);
     }
 
@@ -97,7 +91,7 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<StorageResult>(
+                CompositionPorts.Metadata<FlowResult<StorageDeleteOutcome>>(
                     StorageCompositionPortNames.Output)
             ]);
     }
@@ -106,27 +100,25 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StoragePutOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            StorageCompositionResourceNames.Clock);
-        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
-        var node = new StoragePutNode(store.Store, options, clock);
-
+        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
+        var store = await ResolveStoreAsync(context, options.Collection)
+            .ConfigureAwait(false);
+        var node = new FlowContentStoragePutNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<StoragePutRequest>(
+                CompositionPorts.Input<StorageContentPutRequest>(
                     StorageCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<StorageResult>(
+                CompositionPorts.Output<FlowResult<StoragePutOutcome>>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events,
-            errors: node.Errors,
             disposeAsync: store.DisposeAsync);
     }
 
@@ -134,11 +126,10 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageGetOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            StorageCompositionResourceNames.Clock);
-        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
-        var node = new StorageGetNode(store.Store, options, clock);
-
+        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
+        var store = await ResolveStoreAsync(context, options.Collection)
+            .ConfigureAwait(false);
+        var node = new FlowContentStorageGetNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -149,18 +140,11 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<StorageResult>(
+                CompositionPorts.Output<FlowResult<StorageGetOutcome>>(
                     StorageCompositionPortNames.Output,
-                    node.Output),
-                CompositionPorts.Output<StorageResult>(
-                    StorageCompositionPortNames.Found,
-                    node.Found),
-                CompositionPorts.Output<StorageResult>(
-                    StorageCompositionPortNames.NotFound,
-                    node.NotFound)
+                    node.Output)
             ],
             events: node.Events,
-            errors: node.Errors,
             disposeAsync: store.DisposeAsync);
     }
 
@@ -168,11 +152,10 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageQueryOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            StorageCompositionResourceNames.Clock);
-        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
-        var node = new StorageQueryNode(store.Store, options, clock);
-
+        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
+        var store = await ResolveStoreAsync(context, options.Collection)
+            .ConfigureAwait(false);
+        var node = new FlowContentStorageQueryNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -183,15 +166,11 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<StorageQueryResult>(
+                CompositionPorts.Output<FlowResult<StorageQueryOutcome>>(
                     StorageCompositionPortNames.Output,
-                    node.Output),
-                CompositionPorts.Output<StorageRecord>(
-                    StorageCompositionPortNames.Records,
-                    node.Records)
+                    node.Output)
             ],
             events: node.Events,
-            errors: node.Errors,
             disposeAsync: store.DisposeAsync);
     }
 
@@ -199,11 +178,10 @@ public static class StorageCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context)
     {
         var options = context.BindConfiguration<StorageDeleteOptions>();
-        var clock = context.GetResource<TimeProvider>(
-            StorageCompositionResourceNames.Clock);
-        var store = await ResolveStoreAsync(context, options.Collection).ConfigureAwait(false);
-        var node = new StorageDeleteNode(store.Store, options, clock);
-
+        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
+        var store = await ResolveStoreAsync(context, options.Collection)
+            .ConfigureAwait(false);
+        var node = new FlowContentStorageDeleteNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -214,68 +192,19 @@ public static class StorageCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<StorageResult>(
+                CompositionPorts.Output<FlowResult<StorageDeleteOutcome>>(
                     StorageCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events,
-            errors: node.Errors,
             disposeAsync: store.DisposeAsync);
     }
 
-    private static async ValueTask<ResolvedStorageStore> ResolveStoreAsync(
+    private static ValueTask<ResolvedStorageStore> ResolveStoreAsync(
         CompositionNodeFactoryContext context,
         string? collection)
     {
         var key = context.GetRequiredResourceKey(StorageCompositionResourceNames.Store);
-        var store = context.Services.GetKeyedService<IStorageStore>(key);
-        if (store is not null)
-            return ResolvedStorageStore.Shared(store);
-
-        var factory = context.Services.GetKeyedService<IStorageStoreFactory>(key);
-        if (factory is null)
-        {
-            throw new InvalidOperationException(
-                $"Node '{context.WorkflowName}.{context.NodeName}' resource " +
-                $"'{StorageCompositionResourceNames.Store}' references '{key}', but no keyed " +
-                $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)} service is registered.");
-        }
-
-        var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
-        var lease = await factory
-            .OpenAsync(new StorageStoreContext
-            {
-                StoreName = key,
-                Collection = collection,
-                Clock = clock ?? TimeProvider.System
-            })
-            .ConfigureAwait(false);
-
-        return ResolvedStorageStore.Leased(lease);
-    }
-
-    private sealed class ResolvedStorageStore
-    {
-        private readonly StorageStoreLease? _lease;
-
-        private ResolvedStorageStore(IStorageStore store, StorageStoreLease? lease)
-        {
-            Store = store ?? throw new ArgumentNullException(nameof(store));
-            _lease = lease;
-        }
-
-        public IStorageStore Store { get; }
-
-        public static ResolvedStorageStore Shared(IStorageStore store)
-            => new(store, lease: null);
-
-        public static ResolvedStorageStore Leased(StorageStoreLease lease)
-        {
-            ArgumentNullException.ThrowIfNull(lease);
-            return new ResolvedStorageStore(lease.Store, lease);
-        }
-
-        public ValueTask DisposeAsync()
-            => _lease?.DisposeAsync() ?? ValueTask.CompletedTask;
+        return StorageCompositionStoreResolver.ResolveAsync(context, key, collection);
     }
 }

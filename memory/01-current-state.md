@@ -287,9 +287,20 @@ Date: 2026-07-20
   unchanged. FileSystem Composition is now `2.0.0` with canonical fixed ports,
   no universal Errors surfaces, explicit typed compatibility registrations,
   and updated Designer metadata. Focused/full tests, controlled builds, binary
-  compatibility, preflight/dry-runs, and a package-only consumer passed.
-  Storage is the next bounded family assessment. See
-  `231-vnext-filesystem-flowcontent-results.md`.
+  compatibility, preflight/dry-runs, and a package-only consumer passed. See
+  `231-vnext-filesystem-flowcontent-results.md`; the Storage follow-on is
+  recorded in `232-vnext-storage-flowcontent-results.md`.
+- `FluxFlow.Components.Storage` is now `4.0.0` locally with canonical exact
+  FlowContent records, stable normal result kinds/errors, strong lineage, and a
+  private versioned JSON-compatible envelope over the released store value
+  boundary. Expected operation failures remain ordinary data, while released
+  typed nodes and host-owned store/factory contracts remain available
+  unchanged. Storage Composition is now `2.0.0` with canonical one-output
+  fixed ports, no universal Errors surfaces, explicit typed compatibility
+  registrations, and updated Designer metadata. FileSystem and SqlFile adapter
+  integration, focused/full tests, controlled builds, binary compatibility,
+  preflight/dry-runs, and a package-only consumer passed. Sessions is the next
+  bounded family assessment. See `232-vnext-storage-flowcontent-results.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

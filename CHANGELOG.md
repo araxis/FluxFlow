@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 4.0.0
+
+Adds canonical exact-content logical storage while preserving released typed
+nodes and backend contracts.
+
+- Adds FlowContent put/get/query/delete nodes with one typed FlowResult Output,
+  Events, stable result kinds/error codes, and strong message lineage.
+- Stores exact bytes and content metadata through a private versioned value
+  envelope that existing FileSystem and SqlFile adapters round-trip unchanged.
+- Treats missing records, invalid requests, backend failures, and invalid stored
+  content as ordinary results; value-only content requires explicit upstream
+  serialization.
+- Keeps `IStorageStore`, factories, leases, options, old object-valued records,
+  typed branch ports, and direct-use behavior for compatibility.
+
+## FluxFlow.Components.Storage.Composition 2.0.0
+
+Makes the four parameterless storage registrations canonical vNext contracts.
+
+- Registers one canonical Input and one normal-result Output per storage
+  command, plus Events and no universal Errors surface.
+- Keeps keyed stores, keyed factories, optional clocks, and lease disposal
+  host-owned and unchanged.
+- Adds explicit typed registration helpers for released branch/error contracts.
+- Updates Designer metadata and package examples to canonical fixed ports and
+  the flat two-section application document.
+
 ## FluxFlow.Components.FileSystem 4.0.0
 
 Adds canonical exact-content file-system operations and immutable workflow
