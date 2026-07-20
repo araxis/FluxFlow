@@ -8,8 +8,9 @@ port, system-signal, immutable DI provider-snapshot, transactional revision,
 MQTT vertical slice, canonical FlowValue Mapping, canonical FlowContent
 Payloads inspection, explicit canonical Serialization conversions, canonical
 FlowValue JSON Schema Validation and Assertions, canonical projection-event
-Expectations, and canonical FlowValue/result Window, Correlation, and Join are
-implemented locally. State now uses typed commands with FlowValue state and one
+Expectations, canonical FlowValue/result Window, Correlation, and Join, and the
+canonical hosted runtime assembler are implemented locally. State now uses
+typed commands with FlowValue state and one
 normal FlowResult output, Projections retains typed domain events while
 emitting snapshots and expected failures through one normal FlowResult output,
 and Metrics retains typed samples/snapshots while exposing successful, partial,
@@ -196,6 +197,14 @@ The current runtime revision surface requires stable addresses and exact
 payload types to be registered in advance. Dynamic port registration, payload
 type migration, and automatic mapper insertion remain deferred.
 
+`FluxFlow.Engine.Hosting.ApplicationRuntimeAssembler` is the standard concrete
+candidate factory for this boundary. It consumes explicit Composition node
+registrations and DI service contributors, builds candidate-owned resource and
+workflow providers, validates typed component descriptors without reflection,
+and stages one complete stable-port/link revision. The first activation adopts
+the host-lifetime direct-port runtime; later revisions retain the exact surface
+while replacing resources, components, attachments, and routing.
+
 Standard DI remains the activation and ownership mechanism. Packages register
 explicitly through `IServiceCollection`; no assembly scanning, reflection
 discovery, arbitrary provider merging, or parallel registration framework is
@@ -247,11 +256,12 @@ resource/node binding are complete locally.
 8. MQTT core resource/component vertical slice. Complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
-10. Component-family migration is in progress: Mapping, Payloads,
-    Serialization, Validation, Assertions, Expectations, Routing, Control,
-    State, Projections, Metrics, Observability, and Sources are complete
-    locally. Remaining runtime families continue as separately bounded passes;
-    Designer, hosting, and coordinated releases follow those passes.
+10. Component-family migrations through Sessions, resource/configuration
+    alignment, canonical Hosting and Designer persistence, and coordinated
+    package validation. Complete locally.
+11. Canonical runtime assembly from JSON through resources, components, links,
+    direct stable ports, and complete-definition revision replacement. Complete
+    locally.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

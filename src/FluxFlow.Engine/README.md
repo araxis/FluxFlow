@@ -27,6 +27,10 @@ Use `FluxFlow.Engine.Signals` for canonical runtime status, system-event, and
 diagnostic payloads. These contracts are transport-safe and travel in normal
 `FlowMessage<T>` envelopes.
 
+Use `FluxFlow.Engine.Hosting` with `FluxFlow.Composition.Hosting` when the
+canonical `Resources`/`Workflows` document should be assembled into provider
+snapshots, executable components, compiled routes, and stable direct ports.
+
 If a host only needs to compose standalone nodes from fluent C# or
 `IConfiguration`, use `FluxFlow.Composition` instead.
 
@@ -36,6 +40,44 @@ machines without starting later nodes. Internal error, event, and diagnostic
 fanout queues are bounded to 256 pending items; accepted items remain ordered,
 while producers receive `false` immediately when a slow subscriber causes the
 queue to overflow.
+
+## Canonical Runtime Assembly
+
+`UseRuntimeAssembler(...)` is the concrete candidate factory for canonical
+application hosting. Registration is explicit: node contributors populate a
+`CompositionNodeRegistry`, while service contributors map resource definitions
+into a candidate-owned `IServiceCollection`. There is no assembly scanning,
+reflection-based node activation, or fallback to arbitrary host services.
+
+```csharp
+services
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodeContributor<ApplicationNodeContributor>()
+        .RegisterServicesContributor<ApplicationResourceContributor>());
+
+var host = provider.GetRequiredService<IApplicationRevisionHost>();
+await host.StartApplicationAsync();
+
+var ports = provider.GetRequiredService<IApplicationRuntimeAccess>()
+    .GetRequiredPorts();
+await ports.SendAsync(
+    ApplicationAddress.WorkflowPort("Orders", "Validate", "Input"),
+    FlowMessage.Create(order));
+```
+
+The assembler builds one resource-revision provider and one workflow-revision
+provider per workflow, validates every factory descriptor against its explicit
+registration, and activates all port attachments plus one compiled-link
+snapshot transactionally. The stable direct-port runtime is adopted only after
+the first candidate activates. Rejected preparation or activation disposes all
+partial nodes and providers; a successful replacement drains and disposes the
+old candidate after the new one is current.
+
+The first active revision defines the fixed direct-port surface. Later
+revisions may replace implementations and routing while retaining exact
+addresses, directions, kinds, and payload types. Dynamic port-surface changes
+remain a separate host-lifecycle capability.
 
 ## Stable Ports
 
@@ -169,6 +211,7 @@ The package exposes these public namespaces:
 - `FluxFlow.Engine`
 - `FluxFlow.Engine.Components`
 - `FluxFlow.Engine.Definitions`
+- `FluxFlow.Engine.Hosting`
 - `FluxFlow.Engine.Ports`
 - `FluxFlow.Engine.Runtime`
 - `FluxFlow.Engine.Signals`

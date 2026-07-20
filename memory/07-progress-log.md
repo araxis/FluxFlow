@@ -2,6 +2,23 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - Canonical Application Runtime Assembly
+
+- Added the Engine-hosted concrete candidate factory that assembles canonical
+  `Resources`/`Workflows` definitions through explicit node and DI service
+  contributors without scanning or reflection activation.
+- Added candidate-owned resource/workflow snapshots, descriptor validation,
+  compiled route staging, stable direct port access, and transactional complete
+  revision replacement.
+- Fixed the first external port surface for the assembler lifetime; revisions
+  that change an address, direction, kind, or payload type are rejected while
+  the active candidate remains available.
+- Moved Composition and Engine to additive `2.5.0`. Composition (`128`), Engine
+  (`101`), Hosting (`45`), and Release (`94`) tests passed. Controlled
+  Debug/Release builds were zero-warning, package preflight/dry-runs passed,
+  and SDK validation passed against exact local `2.4.0` package baselines.
+  Complete closeout evidence is recorded in memory note 238.
+
 ## 2026-07-20 - vNext Coordinated Package Validation
 
 - Resolved all 58 current manifest aliases, versions, package IDs, and

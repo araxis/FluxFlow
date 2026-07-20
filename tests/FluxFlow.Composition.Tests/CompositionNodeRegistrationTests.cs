@@ -69,6 +69,35 @@ public sealed class CompositionNodeRegistrationTests
     }
 
     [Fact]
+    public void Port_metadata_dispatches_registered_message_types_without_reflection()
+    {
+        var visitor = new RecordingPortTypeVisitor();
+
+        var typed = CompositionPorts.Metadata<string>("Input");
+        typed.SupportsTypeVisit.ShouldBeTrue();
+        typed.Accept(visitor);
+
+        visitor.MessageType.ShouldBe(typeof(string));
+        visitor.IsSignal.ShouldBeFalse();
+
+        var signal = CompositionPorts.SignalMetadata("Ack");
+        signal.Accept(visitor);
+
+        visitor.MessageType.ShouldBe(typeof(object));
+        visitor.IsSignal.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Runtime_type_metadata_cannot_be_used_for_reflection_free_dispatch()
+    {
+        var metadata = new CompositionPortMetadata("Input", typeof(string));
+
+        metadata.SupportsTypeVisit.ShouldBeFalse();
+        Should.Throw<InvalidOperationException>(() =>
+            metadata.Accept(new RecordingPortTypeVisitor()));
+    }
+
+    [Fact]
     public void Port_metadata_trims_names()
     {
         var metadata = CompositionPortMetadata.Create<string>(" Output ");
@@ -141,5 +170,24 @@ public sealed class CompositionNodeRegistrationTests
 
         inputException.ParamName.ShouldBe("port");
         outputException.ParamName.ShouldBe("port");
+    }
+
+    private sealed class RecordingPortTypeVisitor : ICompositionPortTypeVisitor
+    {
+        public Type? MessageType { get; private set; }
+
+        public bool IsSignal { get; private set; }
+
+        public void Visit<TMessage>(CompositionPortMetadata metadata)
+        {
+            MessageType = typeof(TMessage);
+            IsSignal = false;
+        }
+
+        public void VisitSignal(CompositionPortMetadata metadata)
+        {
+            MessageType = typeof(object);
+            IsSignal = true;
+        }
     }
 }

@@ -2,6 +2,8 @@ namespace FluxFlow.Composition;
 
 public sealed record CompositionPortMetadata
 {
+    private readonly Action<ICompositionPortTypeVisitor, CompositionPortMetadata>? _visit;
+
     public CompositionPortMetadata(string name, Type messageType)
         : this(
             name,
@@ -24,6 +26,16 @@ public sealed record CompositionPortMetadata
         Type messageType,
         CompositionPortLinkCardinality linkCardinality,
         CompositionPortKind kind)
+        : this(name, messageType, linkCardinality, kind, visit: null)
+    {
+    }
+
+    private CompositionPortMetadata(
+        string name,
+        Type messageType,
+        CompositionPortLinkCardinality linkCardinality,
+        CompositionPortKind kind,
+        Action<ICompositionPortTypeVisitor, CompositionPortMetadata>? visit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Enum.IsDefined(linkCardinality))
@@ -35,6 +47,7 @@ public sealed record CompositionPortMetadata
         MessageType = messageType ?? throw new ArgumentNullException(nameof(messageType));
         LinkCardinality = linkCardinality;
         Kind = kind;
+        _visit = visit;
 
         if (kind == CompositionPortKind.Signal && messageType != typeof(object))
         {
@@ -51,6 +64,27 @@ public sealed record CompositionPortMetadata
     public CompositionPortLinkCardinality LinkCardinality { get; }
 
     public CompositionPortKind Kind { get; }
+
+    public bool SupportsTypeVisit => Kind == CompositionPortKind.Signal || _visit is not null;
+
+    public void Accept(ICompositionPortTypeVisitor visitor)
+    {
+        ArgumentNullException.ThrowIfNull(visitor);
+        if (Kind == CompositionPortKind.Signal)
+        {
+            visitor.VisitSignal(this);
+            return;
+        }
+
+        if (_visit is null)
+        {
+            throw new InvalidOperationException(
+                $"Port '{Name}' was created from a runtime Type and cannot dispatch its message type. " +
+                $"Create typed metadata with {nameof(Create)}<TMessage>(...).");
+        }
+
+        _visit(visitor, this);
+    }
 
     public void Deconstruct(out string name, out Type messageType)
     {
@@ -69,12 +103,17 @@ public sealed record CompositionPortMetadata
     }
 
     public static CompositionPortMetadata Create<TMessage>(string name)
-        => new(name, typeof(TMessage));
+        => Create<TMessage>(name, CompositionPortLinkCardinality.Multiple);
 
     public static CompositionPortMetadata Create<TMessage>(
         string name,
         CompositionPortLinkCardinality linkCardinality)
-        => new(name, typeof(TMessage), linkCardinality);
+        => new(
+            name,
+            typeof(TMessage),
+            linkCardinality,
+            CompositionPortKind.Message,
+            static (visitor, metadata) => visitor.Visit<TMessage>(metadata));
 
     public static CompositionPortMetadata CreateSignal(
         string name,

@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Engine</PackageId>
     <AssemblyName>FluxFlow.Engine</AssemblyName>
     <RootNamespace>FluxFlow.Engine</RootNamespace>
-    <Version>2.4.0</Version>
+    <Version>2.5.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, host-provided expression routing, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds bounded payload-independent stable signal inputs, direct signal access, compiled signal routing, status metadata, and transactional signal-target replacement.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical application runtime assembly from explicit composition registrations and DI services, stable direct port access, compiled routing, and transactional hosted revision replacement.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -23,14 +23,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.7" />
     <!-- On net10 Dataflow ships inbox; keeping the explicit ref for net8/9 compat -->
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="9.0.4" NoWarn="NU1510" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FluxFlow.Composition\FluxFlow.Composition.csproj" />
+    <ProjectReference Include="..\FluxFlow.Composition.Hosting\FluxFlow.Composition.Hosting.csproj" />
     <ProjectReference Include="..\FluxFlow.Mapping\FluxFlow.Mapping.csproj" />
     <ProjectReference Include="..\FluxFlow.Nodes\FluxFlow.Nodes.csproj" />
   </ItemGroup>

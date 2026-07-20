@@ -1,9 +1,12 @@
 # Hosting And Observability
 
-The default hosted path is `FluxFlow.Composition.Hosting` over the canonical
-flat `ApplicationDefinition`. It loads exactly `Resources` and `Workflows`,
-delegates concrete candidate construction to an explicitly registered factory,
-and serializes initial activation and later complete-definition revisions.
+The hosted coordination path is `FluxFlow.Composition.Hosting` over the
+canonical flat `ApplicationDefinition`. It loads exactly `Resources` and
+`Workflows`, delegates concrete candidate construction to an explicitly
+registered factory, and serializes initial activation and later
+complete-definition revisions. `FluxFlow.Engine.Hosting` supplies the standard
+runtime assembler when the host wants executable nodes, compiled links, and
+stable directly addressable ports.
 `IApplicationRevisionHost` is the primary lifecycle, status, reload, and direct
 complete-definition update surface.
 
@@ -12,8 +15,9 @@ complete-definition update surface.
 ```csharp
 services
     .AddFluxFlowApplication(configuration)
-    .UseCandidateFactory<ApplicationCandidateFactory>()
-    .UseRevisionEventSink<ApplicationRevisionEventSink>()
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodeContributor<ApplicationNodeContributor>()
+        .RegisterServicesContributor<ApplicationResourceContributor>())
     .Configure(options => options.InitialRevisionId = "deployment-42");
 ```
 
@@ -23,13 +27,21 @@ name when the canonical document is nested under host settings:
 ```csharp
 services
     .AddFluxFlowApplication(configuration, "FluxFlowApplication")
-    .UseCandidateFactory<ApplicationCandidateFactory>();
+    .UseRuntimeAssembler(runtime => runtime
+        .RegisterNodeContributor<ApplicationNodeContributor>()
+        .RegisterServicesContributor<ApplicationResourceContributor>());
 ```
 
-There is no assembly scanning. The candidate factory is a normal DI service and
-owns preparation of resource and workflow provider snapshots, components,
-stable-port attachments, and compiled links. Adapter packages still own
-concrete clients, stores, retry behavior, credentials, and protocol lifetimes.
+There is no assembly scanning. Node contributors register explicit component
+types and factories. Resource contributors read the complete canonical
+definition and add provider-owned or explicitly external services to the
+candidate resource collection. The assembler prepares one resource snapshot,
+one snapshot per workflow, component instances, compiled links, and one stable
+port revision. Adapter packages still own concrete clients, stores, retry
+behavior, credentials, and protocol lifetimes.
+
+Hosts with a different activation model may continue to call
+`UseCandidateFactory<TFactory>()` instead of `UseRuntimeAssembler(...)`.
 
 ## Hosted Lifecycle
 
@@ -55,6 +67,32 @@ if (reload.Update?.Status == ApplicationRevisionUpdateStatus.Rejected)
 `ReloadAsync` loads another complete definition from the configured source.
 `ApplyAsync` accepts an already loaded complete definition. Partial patches,
 file watching, and remote configuration transport belong to the source layer.
+
+## Direct Port Access
+
+After the first revision activates, resolve `IApplicationRuntimeAccess` to send
+to an input or receive, observe, or perform request/reply against an output by
+canonical address:
+
+```csharp
+var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+var ports = access.GetRequiredPorts();
+var input = ApplicationAddress.WorkflowPort("Orders", "Validate", "Input");
+var output = ApplicationAddress.WorkflowPort("Orders", "Validate", "Output");
+
+var request = FlowMessage.Create(order);
+var result = await ports.SendAndReceiveAsync<Order, ValidationResult>(
+    input,
+    output,
+    request,
+    TimeSpan.FromSeconds(10));
+```
+
+Direct output observation is broadcast and does not steal workflow delivery.
+The first active definition fixes the external address, direction, kind, and
+payload-type surface for that assembler instance. Later complete-definition
+revisions replace resources, nodes, links, and port attachments atomically, but
+a surface-changing revision is rejected and leaves the current revision active.
 
 ## Failure Isolation
 

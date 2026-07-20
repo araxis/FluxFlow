@@ -544,6 +544,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `237-vnext-coordinated-package-validation.md`: complete 58-package local
   source, package-origin verification, and warnings-as-errors combined consumer
   closeout evidence.
+- `238-canonical-application-runtime-assembly.md`: explicit canonical JSON to
+  resource/component/link runtime assembly, stable direct ports, transactional
+  replacement, ownership, and verification evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

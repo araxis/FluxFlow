@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/designer-persistence-vnext`. The provider-neutral MQTT vertical slice and the
+  `work/application-runtime-assembly`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -39,21 +39,22 @@ Date: 2026-07-20
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.4.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `2.5.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
   case-sensitive address type. Canonical input/output-side links now normalize
   to absolute addresses, preserve declaration side, compile conditions once,
   and report exact endpoint/type, duplicate, exclusive-claim, and cycle
   diagnostics. Composition ports now distinguish typed messages from
-  payload-independent signals, and canonical component factory contexts bind
-  flat settings and resource references directly. The existing executable
+  payload-independent signals, support reflection-free generic type dispatch,
+  and canonical component factory contexts bind flat settings and resource
+  references directly. The existing executable
   Composition DTOs remain a documented migration surface. Focused and
   complete tests, controlled Debug/Release builds, binary compatibility,
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.4.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.5.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
@@ -70,7 +71,15 @@ Date: 2026-07-20
   Composition, Hosting, and release tests passed; complete build, package, and
   consumer evidence is recorded in `209-vnext-stable-port-runtime.md` and
   `210-vnext-system-events-diagnostics.md`.
-- `FluxFlow.Composition.Hosting` is now `2.1.0` locally with immutable owned
+- Engine now also provides the standard canonical runtime assembler over
+  explicit Composition node registrations and DI service contributors. It
+  creates candidate-owned resource/workflow providers, validates component
+  descriptors, activates compiled links and stable port attachments as one
+  revision, and exposes the host-lifetime port runtime through
+  `IApplicationRuntimeAccess`. JSON start, direct send/receive, resource-backed
+  revision replacement, cleanup, and surface-change rejection are covered in
+  `238-canonical-application-runtime-assembly.md`.
+- `FluxFlow.Composition.Hosting` is now `2.2.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow
   ports, and `IFlowSignalTarget`. Exact external instances/providers cross the

@@ -27,16 +27,18 @@ The current runtime compatibility boundary also owns:
 
 - composition DTOs: workflows, nodes, links, and port references
 - explicit node type to factory registration
+- reflection-free typed port metadata dispatch for executable host assemblers
 - fluent C# definition building
 - `IConfiguration` loading
 - structural validation
 - direct typed Dataflow linking
 - runtime start, stop, completion, event/error aggregation, and disposal
 
-It does not yet activate canonical links or provide stable runtime ports. It
-also does not own broker clients, stores, secrets, resource registration, file
-watching, YAML, live reload, assembly scanning, reflection discovery, or
-engine projection.
+This package does not itself activate canonical links or provide stable runtime
+ports. `FluxFlow.Engine.Hosting` can assemble these contracts into the optional
+Engine port runtime. Composition also does not own broker clients, stores,
+secrets, resource registration, file watching, YAML, live reload, assembly
+scanning, reflection discovery, or engine projection.
 
 ## Canonical Definition
 

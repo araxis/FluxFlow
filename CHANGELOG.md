@@ -7,6 +7,25 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Engine 2.5.0
+
+- Added the standard canonical application runtime assembler over explicit
+  Composition registrations and DI service contributors.
+- Added stable direct port access for hosted applications and transactional
+  resource, component, attachment, and compiled-link revision replacement.
+- Added candidate-owned resource/workflow provider snapshots, descriptor
+  validation, and complete partial-preparation cleanup without reflection or
+  assembly scanning.
+
+## FluxFlow.Composition 2.5.0
+
+- Added reflection-free typed visitation for generic composition port metadata
+  so executable hosts can bind registered payload types without runtime type
+  construction.
+- Preserved the existing runtime-type metadata constructors for validation and
+  link compilation while making their lack of executable type dispatch
+  explicit.
+
 ## FluxFlow.Components.Designer 2.19.0
 
 - Added editor-facing persistence for the canonical flat `Resources` and
