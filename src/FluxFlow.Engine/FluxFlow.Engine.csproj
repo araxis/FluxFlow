@@ -7,12 +7,12 @@
     <PackageId>FluxFlow.Engine</PackageId>
     <AssemblyName>FluxFlow.Engine</AssemblyName>
     <RootNamespace>FluxFlow.Engine</RootNamespace>
-    <Version>2.5.0</Version>
+    <Version>2.6.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Generic dataflow-based workflow engine for typed node graphs with phase-ordered lifecycle, host-provided expression routing, diagnostics, and host lifecycle support.</Description>
     <PackageTags>workflow;dataflow;pipeline;flow-engine;tpl</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical application runtime assembly from explicit composition registrations and DI services, stable direct port access, compiled routing, and transactional hosted revision replacement.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds dynamic application port generations so canonical revisions may add, remove, or retype component ports while same-surface revisions retain stable direct port instances.</PackageReleaseNotes>
     <PackageProjectUrl>https://github.com/araxis/FluxFlow</PackageProjectUrl>
     <RepositoryUrl>https://github.com/araxis/FluxFlow</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

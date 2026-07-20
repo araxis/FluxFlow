@@ -9,11 +9,12 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
 {
     private readonly CompositionRuntime _runtime;
     private readonly ApplicationPortRevision _portRevision;
-    private readonly ApplicationPortRuntime _ports;
     private readonly IReadOnlyList<CompositionServiceProviderSnapshot> _snapshots;
+    private readonly Func<ValueTask> _releasePorts;
+    private readonly bool _releasePortsAfterActivation;
     private readonly Func<ValueTask>? _adoptPorts;
     private ApplicationPortRevisionLease? _portLease;
-    private int _ownsPorts;
+    private int _activationCompleted;
     private int _activated;
     private int _drained;
     private int _disposed;
@@ -28,9 +29,25 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     {
         _runtime = runtime;
         _portRevision = portRevision;
-        _ports = ports;
         _snapshots = snapshots;
-        _ownsPorts = ownsPorts ? 1 : 0;
+        _releasePorts = ownsPorts ? ports.DisposeAsync : NoopReleaseAsync;
+        _releasePortsAfterActivation = false;
+        _adoptPorts = adoptPorts;
+        ProviderSnapshots = snapshots.Select(static snapshot => snapshot.Info).ToArray();
+    }
+
+    internal ApplicationRuntimeRevisionCandidate(
+        CompositionRuntime runtime,
+        ApplicationPortRevision portRevision,
+        IReadOnlyList<CompositionServiceProviderSnapshot> snapshots,
+        Func<ValueTask> releasePorts,
+        Func<ValueTask>? adoptPorts)
+    {
+        _runtime = runtime;
+        _portRevision = portRevision;
+        _snapshots = snapshots;
+        _releasePorts = releasePorts;
+        _releasePortsAfterActivation = true;
         _adoptPorts = adoptPorts;
         ProviderSnapshots = snapshots.Select(static snapshot => snapshot.Info).ToArray();
     }
@@ -46,7 +63,7 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
         _portLease = await _portRevision.ActivateAsync(cancellationToken).ConfigureAwait(false);
         if (_adoptPorts is not null)
             await _adoptPorts().ConfigureAwait(false);
-        Volatile.Write(ref _ownsPorts, 0);
+        Volatile.Write(ref _activationCompleted, 1);
     }
 
     public async ValueTask DrainAsync(CancellationToken cancellationToken = default)
@@ -95,11 +112,11 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
             }
         }
 
-        if (Interlocked.Exchange(ref _ownsPorts, 0) != 0)
+        if (_releasePortsAfterActivation || Volatile.Read(ref _activationCompleted) == 0)
         {
             try
             {
-                await _ports.DisposeAsync().ConfigureAwait(false);
+                await _releasePorts().ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -110,4 +127,6 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
         if (failures.Count > 0)
             throw new AggregateException("Canonical application runtime candidate cleanup failed.", failures);
     }
+
+    private static ValueTask NoopReleaseAsync() => ValueTask.CompletedTask;
 }

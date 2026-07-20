@@ -7,6 +7,15 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Engine 2.6.0
+
+- Added dynamic application port generations for canonical revisions that add,
+  remove, or retype component ports.
+- Preserved the existing direct port runtime for exact surface matches and
+  atomically published a prepared replacement for surface changes.
+- Added reference-counted retirement so old port generations remain available
+  while their candidate drains and complete after cleanup.
+
 ## FluxFlow.Engine 2.5.0
 
 - Added the standard canonical application runtime assembler over explicit

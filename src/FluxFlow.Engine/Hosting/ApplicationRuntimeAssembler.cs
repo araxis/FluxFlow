@@ -31,7 +31,7 @@ public sealed class ApplicationRuntimeAssembler :
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _eventGate = new();
     private readonly Queue<ApplicationRevisionEvent> _pendingRevisionEvents = [];
-    private IReadOnlyList<PortSurfaceEntry>? _surface;
+    private ApplicationPortGeneration? _generation;
     private ApplicationPortRuntime? _ports;
     private int _disposed;
 
@@ -105,12 +105,16 @@ public sealed class ApplicationRuntimeAssembler :
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            var ports = Interlocked.Exchange(ref _ports, null);
-            if (ports is not null)
-                await ports.DisposeAsync().ConfigureAwait(false);
-            _surface = null;
+            ApplicationPortGeneration? generation;
             lock (_eventGate)
+            {
+                Interlocked.Exchange(ref _ports, null);
+                generation = Interlocked.Exchange(ref _generation, null);
                 _pendingRevisionEvents.Clear();
+            }
+
+            if (generation is not null)
+                await generation.ReleaseAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -133,16 +137,14 @@ public sealed class ApplicationRuntimeAssembler :
             throw new ApplicationRuntimeAssemblerException(compilation.Diagnostics);
 
         var surface = CreateSurface(definition);
-        var existingPorts = Ports;
-        if (existingPorts is not null)
-            ValidateStableSurface(surface);
+        var currentGeneration = Volatile.Read(ref _generation);
 
         var snapshots = new List<CompositionServiceProviderSnapshot>();
         var descriptors = new Dictionary<ComponentKey, BuiltComponent>();
         CompositionRuntime? runtime = null;
-        ApplicationPortRuntime? preparedPorts = null;
+        ApplicationPortGeneration? generation = null;
         ApplicationPortRevision? portRevision = null;
-        var ownsPorts = false;
+        var releaseGeneration = false;
 
         try
         {
@@ -203,9 +205,17 @@ public sealed class ApplicationRuntimeAssembler :
             var composedNodes = descriptors.Values.Select(static value => value.Descriptor).ToArray();
             runtime = CompositionRuntime.Create(composedNodes, [], composedNodes);
 
-            preparedPorts = existingPorts ?? CreatePortRuntime(surface);
-            ownsPorts = existingPorts is null;
-            await using (var revisionBuilder = preparedPorts.CreateRevision(context.RevisionId))
+            if (currentGeneration is not null && HasSameSurface(currentGeneration.Surface, surface))
+            {
+                generation = currentGeneration.Acquire();
+            }
+            else
+            {
+                generation = new ApplicationPortGeneration(CreatePortRuntime(surface), surface);
+            }
+
+            releaseGeneration = true;
+            await using (var revisionBuilder = generation.Ports.CreateRevision(context.RevisionId))
             {
                 foreach (var (key, component) in descriptors)
                     ConfigureRevisionPorts(revisionBuilder, key, component);
@@ -216,10 +226,11 @@ public sealed class ApplicationRuntimeAssembler :
             return new ApplicationRuntimeRevisionCandidate(
                 runtime,
                 portRevision,
-                preparedPorts,
                 snapshots,
-                ownsPorts,
-                ownsPorts ? () => AdoptPortsAsync(preparedPorts, surface) : null);
+                generation.ReleaseAsync,
+                ReferenceEquals(generation, currentGeneration)
+                    ? null
+                    : () => AdoptGenerationAsync(generation));
         }
         catch (Exception preparationFailure)
         {
@@ -262,11 +273,11 @@ public sealed class ApplicationRuntimeAssembler :
                 cleanupFailures.Add(exception);
             }
 
-            if (ownsPorts && preparedPorts is not null)
+            if (releaseGeneration && generation is not null)
             {
                 try
                 {
-                    await preparedPorts.DisposeAsync().ConfigureAwait(false);
+                    await generation.ReleaseAsync().ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {
@@ -435,51 +446,68 @@ public sealed class ApplicationRuntimeAssembler :
         return builder.Build();
     }
 
-    private void ValidateStableSurface(IReadOnlyList<PortSurfaceEntry> next)
-    {
-        var current = _surface ?? throw new InvalidOperationException(
-            "The stable port runtime exists without its registered surface.");
-        if (current.Count == next.Count && current.Zip(next).All(static pair => pair.First.IsSame(pair.Second)))
-            return;
+    private static bool HasSameSurface(
+        IReadOnlyList<PortSurfaceEntry> current,
+        IReadOnlyList<PortSurfaceEntry> next)
+        => current.Count == next.Count &&
+           current.Zip(next).All(static pair => pair.First.IsSame(pair.Second));
 
-        throw new ApplicationRuntimeAssemblerException(
-            "The candidate changes the registered port address, direction, kind, or payload type. " +
-            "Dynamic port-surface changes require a new application runtime.");
-    }
-
-    private async ValueTask AdoptPortsAsync(
-        ApplicationPortRuntime ports,
-        IReadOnlyList<PortSurfaceEntry> surface)
+    private async ValueTask AdoptGenerationAsync(ApplicationPortGeneration generation)
     {
-        while (true)
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            ApplicationRevisionEvent[] pending;
-            lock (_eventGate)
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            generation.Acquire();
+            var adopted = false;
+            try
             {
-                if (_pendingRevisionEvents.Count == 0)
+                ApplicationPortGeneration? previous;
+                while (true)
                 {
-                    if (Interlocked.CompareExchange(ref _ports, ports, null) is not null)
+                    ApplicationRevisionEvent[] pending;
+                    lock (_eventGate)
                     {
-                        throw new InvalidOperationException(
-                            "The stable application port runtime is already initialized.");
+                        previous = _generation;
+                        if (previous is not null || _pendingRevisionEvents.Count == 0)
+                        {
+                            Volatile.Write(ref _generation, generation);
+                            Volatile.Write(ref _ports, generation.Ports);
+                            adopted = true;
+                            break;
+                        }
+
+                        pending = _pendingRevisionEvents.ToArray();
+                        _pendingRevisionEvents.Clear();
                     }
 
-                    _surface = surface.ToArray();
-                    return;
+                    foreach (var revisionEvent in pending)
+                    {
+                        if (!await generation.Ports.PublishAsync(revisionEvent, CancellationToken.None)
+                                .ConfigureAwait(false))
+                        {
+                            throw new ApplicationRuntimeAssemblerException(
+                                "The initial revision event stream completed before activation.");
+                        }
+                    }
                 }
 
-                pending = _pendingRevisionEvents.ToArray();
-                _pendingRevisionEvents.Clear();
+                if (previous is not null)
+                    await previous.ReleaseAsync().ConfigureAwait(false);
             }
-
-            foreach (var revisionEvent in pending)
+            catch
             {
-                if (!await ports.PublishAsync(revisionEvent, CancellationToken.None).ConfigureAwait(false))
+                if (!adopted)
                 {
-                    throw new ApplicationRuntimeAssemblerException(
-                        "The initial revision event stream completed before activation.");
+                    await generation.ReleaseAsync().ConfigureAwait(false);
                 }
+
+                throw;
             }
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
@@ -604,6 +632,38 @@ public sealed class ApplicationRuntimeAssembler :
                Direction == other.Direction &&
                Metadata.Kind == other.Metadata.Kind &&
                Metadata.MessageType == other.Metadata.MessageType;
+    }
+
+    private sealed class ApplicationPortGeneration(
+        ApplicationPortRuntime ports,
+        IReadOnlyList<PortSurfaceEntry> surface)
+    {
+        private int _references = 1;
+
+        internal ApplicationPortRuntime Ports { get; } = ports;
+
+        internal IReadOnlyList<PortSurfaceEntry> Surface { get; } = surface.ToArray();
+
+        internal ApplicationPortGeneration Acquire()
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _references);
+                if (current <= 0)
+                    throw new ObjectDisposedException(nameof(ApplicationPortGeneration));
+                if (Interlocked.CompareExchange(ref _references, current + 1, current) == current)
+                    return this;
+            }
+        }
+
+        internal async ValueTask ReleaseAsync()
+        {
+            var remaining = Interlocked.Decrement(ref _references);
+            if (remaining < 0)
+                throw new InvalidOperationException("The application port generation was released too many times.");
+            if (remaining == 0)
+                await Ports.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     private readonly record struct ComponentKey(string WorkflowName, string ComponentName);

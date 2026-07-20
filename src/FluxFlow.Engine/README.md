@@ -69,15 +69,18 @@ await ports.SendAsync(
 The assembler builds one resource-revision provider and one workflow-revision
 provider per workflow, validates every factory descriptor against its explicit
 registration, and activates all port attachments plus one compiled-link
-snapshot transactionally. The stable direct-port runtime is adopted only after
-the first candidate activates. Rejected preparation or activation disposes all
-partial nodes and providers; a successful replacement drains and disposes the
-old candidate after the new one is current.
+snapshot transactionally. Rejected preparation or activation disposes all
+partial nodes, providers, and unadopted port generations; a successful
+replacement drains and disposes the old candidate after the new one is current.
 
-The first active revision defines the fixed direct-port surface. Later
-revisions may replace implementations and routing while retaining exact
-addresses, directions, kinds, and payload types. Dynamic port-surface changes
-remain a separate host-lifecycle capability.
+Revisions with the same addresses, directions, kinds, and payload types retain
+the current `ApplicationPortRuntime`, so direct handles stay stable while
+implementations and routing change. A revision that adds, removes, or retypes a
+port prepares an isolated generation and publishes it atomically after
+activation. `IApplicationRuntimeAccess.Ports` and `GetRequiredPorts()` then
+return the new generation. A previously acquired runtime completes after its
+candidate drains, so long-lived callers should reacquire the current runtime
+after applying a surface-changing definition.
 
 ## Stable Ports
 

@@ -2,6 +2,21 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - Application Runtime Port Generations
+
+- Replaced fixed-lifetime port-surface rejection with generation-aware
+  canonical application assembly.
+- Preserved the same `ApplicationPortRuntime` for exact surface matches and
+  atomically published an isolated runtime for component add, remove, and
+  payload-type changes.
+- Added candidate/assembler generation references so the prior runtime remains
+  alive through drain and completes only after retirement.
+- Moved Engine to `2.6.0` without changing public declarations. Engine (`104`),
+  Hosting (`45`), and Release (`94`) tests passed; controlled Debug/Release
+  builds were zero-warning; exact-local `2.5.0` SDK validation,
+  preflight/dry-run, and package-only consumer verification passed. Complete
+  evidence is recorded in memory note 239.
+
 ## 2026-07-20 - Canonical Application Runtime Assembly
 
 - Added the Engine-hosted concrete candidate factory that assembles canonical

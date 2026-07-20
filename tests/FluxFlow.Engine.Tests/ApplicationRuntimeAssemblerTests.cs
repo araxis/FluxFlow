@@ -1,3 +1,4 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting;
@@ -23,6 +24,10 @@ public sealed class ApplicationRuntimeAssemblerTests
         ApplicationAddress.WorkflowPort("Orders", "First", "Input");
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("Orders", "Second", "Output");
+    private static readonly ApplicationAddress ThirdInput =
+        ApplicationAddress.WorkflowPort("Orders", "Third", "Input");
+    private static readonly ApplicationAddress ThirdOutput =
+        ApplicationAddress.WorkflowPort("Orders", "Third", "Output");
 
     [Fact]
     public async Task Canonical_json_builds_direct_ports_links_resources_and_revisions()
@@ -87,7 +92,63 @@ public sealed class ApplicationRuntimeAssemblerTests
     }
 
     [Fact]
-    public async Task Revision_that_changes_the_direct_port_surface_is_rejected()
+    public async Task Revision_that_changes_the_direct_port_surface_replaces_the_current_generation()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ResourceTracker>();
+        services.AddSingleton<RevisionEventTracker>();
+        services.AddFluxFlowApplication(Definition("one:"))
+            .UseRuntimeAssembler(runtime => runtime
+                .RegisterNodes(RegisterNodes)
+                .ConfigureServices(RegisterResources));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        var resources = provider.GetRequiredService<ResourceTracker>();
+        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var ports = access.GetRequiredPorts();
+
+        var expanded = await host.ApplyAsync("expanded", Definition("two:", includeThird: true));
+
+        expanded.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        host.Current!.RevisionId.ShouldBe("expanded");
+        var expandedPorts = access.GetRequiredPorts();
+        expandedPorts.ShouldNotBeSameAs(ports);
+        expandedPorts.CurrentRevision!.RevisionId.ShouldBe("expanded");
+        await ports.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, FlowMessage.Create("retired")))
+            .Status.ShouldBe(PortSendStatus.Completed);
+
+        var receive = expandedPorts.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
+        (await expandedPorts.SendAsync(Input, FlowMessage.Create("active")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        var received = await receive;
+        received.Message!.Payload.ShouldBe("two:two:active");
+
+        var thirdReceive = expandedPorts.ReceiveAsync<string>(ThirdOutput, TimeSpan.FromSeconds(5));
+        (await expandedPorts.SendAsync(ThirdInput, FlowMessage.Create("direct")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await thirdReceive).Message!.Payload.ShouldBe("two:direct");
+
+        var contracted = await host.ApplyAsync("contracted", Definition("three:"));
+
+        contracted.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        var contractedPorts = access.GetRequiredPorts();
+        contractedPorts.ShouldNotBeSameAs(expandedPorts);
+        await expandedPorts.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        Should.Throw<KeyNotFoundException>(() =>
+            contractedPorts.SendAsync(ThirdInput, FlowMessage.Create("removed")));
+        var contractedReceive = contractedPorts.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
+        (await contractedPorts.SendAsync(Input, FlowMessage.Create("current")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await contractedReceive).Message!.Payload.ShouldBe("three:three:current");
+
+        await host.StopApplicationAsync();
+        resources.Disposed.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Rejected_surface_change_leaves_the_current_generation_active()
     {
         var services = new ServiceCollection();
         services.AddSingleton<ResourceTracker>();
@@ -102,20 +163,86 @@ public sealed class ApplicationRuntimeAssemblerTests
         (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
         var ports = access.GetRequiredPorts();
 
-        var rejected = await host.ApplyAsync("expanded", Definition("two:", includeThird: true));
+        var rejected = await host.ApplyAsync("invalid", InvalidExpandedDefinition());
 
         rejected.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
         rejected.Failures.ShouldHaveSingleItem().Stage
             .ShouldBe(ApplicationRevisionFailureStage.Preparation);
         host.Current!.RevisionId.ShouldBe("initial");
+        access.GetRequiredPorts().ShouldBeSameAs(ports);
         ports.CurrentRevision!.RevisionId.ShouldBe("initial");
         var receive = ports.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
         (await ports.SendAsync(Input, FlowMessage.Create("still-active")))
             .Status.ShouldBe(PortSendStatus.Accepted);
-        var received = await receive;
-        received.Message!.Payload.ShouldBe("one:one:still-active");
+        (await receive).Message!.Payload.ShouldBe("one:one:still-active");
 
         await host.StopApplicationAsync();
+    }
+
+    [Fact]
+    public async Task Revision_that_changes_a_port_payload_type_replaces_the_generation()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(IdentityDefinition("test.identity-string"))
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(RegisterNodes));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var stringPorts = access.GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
+        var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
+
+        var stringReceive = stringPorts.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await stringPorts.SendAsync(input, FlowMessage.Create("one")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await stringReceive).Message!.Payload.ShouldBe("one");
+
+        var revised = await host.ApplyAsync(
+            "integer",
+            IdentityDefinition("test.identity-integer"));
+
+        revised.Status.ShouldBe(ApplicationRevisionUpdateStatus.Activated);
+        var integerPorts = access.GetRequiredPorts();
+        integerPorts.ShouldNotBeSameAs(stringPorts);
+        await stringPorts.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        var integerReceive = integerPorts.ReceiveAsync<int>(output, TimeSpan.FromSeconds(5));
+        (await integerPorts.SendAsync(input, FlowMessage.Create(42)))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await integerReceive).Message!.Payload.ShouldBe(42);
+
+        await host.StopApplicationAsync();
+    }
+
+    [Fact]
+    public async Task Disposed_assembler_rejects_prepared_generation_adoption_and_cleans_the_candidate()
+    {
+        var source = new BlockingStartSource();
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(BlockingSourceDefinition())
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+                registry.Register(
+                    "test.blocking-source",
+                    _ => ValueTask.FromResult(ComposedNode.Create(
+                        source,
+                        outputs: [CompositionPorts.Output<string>("Output", source.Output)])),
+                    outputs: [CompositionPorts.Metadata<string>("Output")])));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        var assembler = provider.GetRequiredService<ApplicationRuntimeAssembler>();
+        var access = provider.GetRequiredService<IApplicationRuntimeAccess>();
+        var start = host.StartApplicationAsync().AsTask();
+        await source.StartEntered.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await assembler.DisposeAsync();
+        source.ReleaseStart();
+        var result = await start;
+
+        result.Succeeded.ShouldBeFalse();
+        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        result.Update.Failures.ShouldContain(static failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Activation);
+        access.Ports.ShouldBeNull();
     }
 
     [Fact]
@@ -183,7 +310,35 @@ public sealed class ApplicationRuntimeAssemblerTests
                         events: node.Events,
                         errors: node.Errors));
                 },
-                inputs: [CompositionPorts.Metadata<ApplicationSystemEvent>("Input")]);
+                inputs: [CompositionPorts.Metadata<ApplicationSystemEvent>("Input")])
+            .Register(
+                "test.identity-string",
+                static _ =>
+                {
+                    var node = new IdentityNode<string>();
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        node,
+                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                        outputs: [CompositionPorts.Output<string>("Output", node.Output)],
+                        events: node.Events,
+                        errors: node.Errors));
+                },
+                inputs: [CompositionPorts.Metadata<string>("Input")],
+                outputs: [CompositionPorts.Metadata<string>("Output")])
+            .Register(
+                "test.identity-integer",
+                static _ =>
+                {
+                    var node = new IdentityNode<int>();
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        node,
+                        inputs: [CompositionPorts.Input<int>("Input", node.Input)],
+                        outputs: [CompositionPorts.Output<int>("Output", node.Output)],
+                        events: node.Events,
+                        errors: node.Errors));
+                },
+                inputs: [CompositionPorts.Metadata<int>("Input")],
+                outputs: [CompositionPorts.Metadata<int>("Output")]);
 
     private static void RegisterResources(ApplicationRuntimeServicesContext context)
     {
@@ -222,6 +377,65 @@ public sealed class ApplicationRuntimeAssemblerTests
                     "Type": "test.revision-events",
                     "Input": "System.Events.Output"
                   }{{(includeThird ? ",\n                  \"Third\": { \"Type\": \"test.prefix\", \"Prefix\": \"Resources.Prefix\" }" : string.Empty)}}
+                }
+              }
+            }
+            """);
+
+    private static ApplicationDefinition InvalidExpandedDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {
+                "Prefix": {
+                  "Type": "test.prefix-resource",
+                  "Value": "invalid:"
+                }
+              },
+              "Workflows": {
+                "Orders": {
+                  "First": {
+                    "Type": "test.prefix",
+                    "Prefix": "Resources.Prefix",
+                    "Output": "Second.Input"
+                  },
+                  "Second": {
+                    "Type": "test.prefix",
+                    "Prefix": "Resources.Prefix"
+                  },
+                  "Third": {
+                    "Type": "test.unknown"
+                  }
+                }
+              }
+            }
+            """);
+
+    private static ApplicationDefinition IdentityDefinition(string type)
+        => ApplicationDefinitionJson.Deserialize(
+            $$"""
+            {
+              "Resources": {},
+              "Workflows": {
+                "Orders": {
+                  "Value": {
+                    "Type": "{{type}}"
+                  }
+                }
+              }
+            }
+            """);
+
+    private static ApplicationDefinition BlockingSourceDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Orders": {
+                  "Wait": {
+                    "Type": "test.blocking-source"
+                  }
                 }
               }
             }
@@ -283,6 +497,49 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             Emit(message.With(prefix + message.Payload));
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class IdentityNode<T> : FlowNode<T, T>
+    {
+        protected override Task ProcessAsync(FlowMessage<T> message)
+        {
+            Emit(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingStartSource : IFlowSource
+    {
+        private readonly BroadcastBlock<FlowMessage<string>> _output = new(static message => message);
+        private readonly TaskCompletionSource _startEntered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseStart =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ISourceBlock<FlowMessage<string>> Output => _output;
+
+        public Task StartEntered => _startEntered.Task;
+
+        public Task Completion => _output.Completion;
+
+        public async Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _startEntered.TrySetResult();
+            await _releaseStart.Task.WaitAsync(cancellationToken);
+        }
+
+        public void ReleaseStart() => _releaseStart.TrySetResult();
+
+        public void Complete() => _output.Complete();
+
+        public void Fault(Exception exception) => ((IDataflowBlock)_output).Fault(exception);
+
+        public async ValueTask DisposeAsync()
+        {
+            Complete();
+            await Completion;
         }
     }
 

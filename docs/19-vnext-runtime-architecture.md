@@ -193,17 +193,22 @@ activation disposes prepared work and leaves the active definition unchanged;
 after activation the new immutable snapshot remains current while every old
 drain/disposal action is attempted.
 
-The current runtime revision surface requires stable addresses and exact
-payload types to be registered in advance. Dynamic port registration, payload
-type migration, and automatic mapper insertion remain deferred.
+Port addresses and exact payload types remain stable within one runtime
+generation. Same-surface revisions reuse that generation. A definition that
+adds, removes, or retypes a component port prepares an isolated generation and
+atomically publishes it after activation; the old generation remains alive
+until its candidate drains. Direct-port callers reacquire the current runtime
+through `IApplicationRuntimeAccess` after a surface-changing update. Automatic
+payload migration and mapper insertion remain deferred.
 
 `FluxFlow.Engine.Hosting.ApplicationRuntimeAssembler` is the standard concrete
 candidate factory for this boundary. It consumes explicit Composition node
 registrations and DI service contributors, builds candidate-owned resource and
 workflow providers, validates typed component descriptors without reflection,
 and stages one complete stable-port/link revision. The first activation adopts
-the host-lifetime direct-port runtime; later revisions retain the exact surface
-while replacing resources, components, attachments, and routing.
+a direct-port generation. Later revisions either reuse it for an exact surface
+match or atomically replace it for a surface change while resources,
+components, attachments, and routing remain transactional.
 
 Standard DI remains the activation and ownership mechanism. Packages register
 explicitly through `IServiceCollection`; no assembly scanning, reflection
@@ -262,6 +267,8 @@ resource/node binding are complete locally.
 11. Canonical runtime assembly from JSON through resources, components, links,
     direct stable ports, and complete-definition revision replacement. Complete
     locally.
+12. Dynamic application port generations for component add, remove, and port
+    type changes with drain-safe retirement. Complete locally.
 
 Supervision, polling or latest-value APIs, durable mailboxes, broker clusters,
 automatic mapper insertion, custom containers, and cyclic graphs remain

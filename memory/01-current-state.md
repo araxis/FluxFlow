@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/application-runtime-assembly`. The provider-neutral MQTT vertical slice and the
+  `work/application-runtime-generations`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -54,7 +54,7 @@ Date: 2026-07-20
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.5.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.6.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
@@ -75,10 +75,13 @@ Date: 2026-07-20
   explicit Composition node registrations and DI service contributors. It
   creates candidate-owned resource/workflow providers, validates component
   descriptors, activates compiled links and stable port attachments as one
-  revision, and exposes the host-lifetime port runtime through
-  `IApplicationRuntimeAccess`. JSON start, direct send/receive, resource-backed
-  revision replacement, cleanup, and surface-change rejection are covered in
-  `238-canonical-application-runtime-assembly.md`.
+  revision, and exposes the current port generation through
+  `IApplicationRuntimeAccess`. Exact-surface revisions retain stable direct
+  handles; component add/remove or payload-type changes atomically publish an
+  isolated generation while the prior candidate drains. JSON start, direct
+  send/receive, resource-backed replacement, cleanup, and generation retirement
+  are covered in `238-canonical-application-runtime-assembly.md` and
+  `239-application-runtime-port-generations.md`.
 - `FluxFlow.Composition.Hosting` is now `2.2.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow

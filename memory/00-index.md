@@ -547,6 +547,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `238-canonical-application-runtime-assembly.md`: explicit canonical JSON to
   resource/component/link runtime assembly, stable direct ports, transactional
   replacement, ownership, and verification evidence.
+- `239-application-runtime-port-generations.md`: dynamic current-port
+  generations for component add/remove/type changes, drain-safe ownership, and
+  verification evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
