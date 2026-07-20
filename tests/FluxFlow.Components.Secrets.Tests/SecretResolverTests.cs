@@ -1,4 +1,6 @@
+using FluxFlow.Components.Resources.Contracts;
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 using Shouldly;
 using System.Text.Json;
 using Xunit;
@@ -12,8 +14,9 @@ public sealed class SecretResolverTests
     {
         var resolver = new InMemorySecretResolverBuilder()
             .Add(
-                " primary-token ",
+                SecretAddress("primary-token"),
                 "runtime-value",
+                ResourceOwnership.ResourceRevision,
                 version: " v1 ",
                 kind: " profile ",
                 displayName: " Primary Token ",
@@ -25,7 +28,8 @@ public sealed class SecretResolverTests
             .BuildResolver();
 
         var descriptor = resolver.GetDescriptors().ShouldHaveSingleItem();
-        descriptor.Name.ShouldBe(new SecretName("primary-token"));
+        descriptor.Name.ShouldBe(Secret("primary-token"));
+        descriptor.Ownership.ShouldBe(ResourceOwnership.ResourceRevision);
         descriptor.Version.ShouldBe("v1");
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Token");
@@ -34,7 +38,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary-token"),
+            Name = Secret("primary-token"),
             Version = "v1",
             Kind = "profile"
         });
@@ -49,8 +53,9 @@ public sealed class SecretResolverTests
     {
         var resolver = new InMemorySecretResolverBuilder()
             .Add(
-                new SecretName(" primary-token "),
+                Secret(" primary-token "),
                 "runtime-value",
+                ResourceOwnership.Host,
                 version: new SecretVersion(" v1 "),
                 kind: new SecretKind(" profile "),
                 displayName: new SecretMetadataText(" Primary Token "),
@@ -63,7 +68,8 @@ public sealed class SecretResolverTests
 
         var descriptor = resolver.GetDescriptors().ShouldHaveSingleItem();
 
-        descriptor.Name.ShouldBe(new SecretName("primary-token"));
+        descriptor.Name.ShouldBe(Secret("primary-token"));
+        descriptor.Ownership.ShouldBe(ResourceOwnership.Host);
         descriptor.Version.ShouldBe("v1");
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Token");
@@ -81,11 +87,11 @@ public sealed class SecretResolverTests
         builder.Add(CreateRecord("secondary", "two"));
 
         records.Count.ShouldBe(1);
-        records[0].Descriptor.Name.ShouldBe(new SecretName("primary"));
+        records[0].Descriptor.Name.ShouldBe(Secret("primary"));
         builder.BuildRecords().Select(record => record.Descriptor.Name).ShouldBe(
         [
-            new SecretName("primary"),
-            new SecretName("secondary")
+            Secret("primary"),
+            Secret("secondary")
         ]);
     }
 
@@ -102,8 +108,8 @@ public sealed class SecretResolverTests
 
         records.Select(record => record.Descriptor.Name).ShouldBe(
         [
-            new SecretName("first"),
-            new SecretName("second")
+            Secret("first"),
+            Secret("second")
         ]);
     }
 
@@ -112,7 +118,7 @@ public sealed class SecretResolverTests
     {
         var value = new SecretValue("runtime-value");
         var record = new InMemorySecretResolverBuilder()
-            .Add("primary", value)
+            .Add(SecretAddress("primary"), value, ResourceOwnership.Host)
             .BuildRecords()
             .ShouldHaveSingleItem();
 
@@ -125,8 +131,9 @@ public sealed class SecretResolverTests
     {
         ISecretDescriptorProvider provider = new InMemorySecretResolverBuilder()
             .Add(
-                "primary",
+                SecretAddress("primary"),
                 "runtime-value",
+                ResourceOwnership.Host,
                 version: "v1",
                 kind: "profile",
                 displayName: "Primary")
@@ -134,7 +141,7 @@ public sealed class SecretResolverTests
 
         var descriptor = provider.GetDescriptors().ShouldHaveSingleItem();
 
-        descriptor.Name.ShouldBe(new SecretName("primary"));
+        descriptor.Name.ShouldBe(Secret("primary"));
         descriptor.Version.ShouldBe("v1");
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary");
@@ -145,8 +152,8 @@ public sealed class SecretResolverTests
     public void Resolver_builder_uses_existing_resolver_validation()
     {
         var builder = new InMemorySecretResolverBuilder()
-            .Add("primary", "one", version: "v1")
-            .Add("primary", "two", version: "v1");
+            .Add(SecretAddress("primary"), "one", ResourceOwnership.Host, version: "v1")
+            .Add(SecretAddress("primary"), "two", ResourceOwnership.Host, version: "v1");
 
         var exception = Should.Throw<InvalidOperationException>(() => builder.BuildResolver());
 
@@ -174,23 +181,36 @@ public sealed class SecretResolverTests
     {
         var builder = new InMemorySecretResolverBuilder();
 
-        Should.Throw<ArgumentNullException>(() => builder.Add("primary", (SecretValue)null!));
-        Should.Throw<ArgumentNullException>(() => builder.Add(new SecretName("primary"), (SecretValue)null!));
+        Should.Throw<ArgumentNullException>(() => builder.Add(
+            SecretAddress("primary"),
+            (SecretValue)null!,
+            ResourceOwnership.Host));
+        Should.Throw<ArgumentNullException>(() => builder.Add(
+            Secret("primary"),
+            (SecretValue)null!,
+            ResourceOwnership.Host));
     }
 
     [Fact]
     public void Resolver_builder_typed_authoring_rejects_default_secret_name()
     {
         Should.Throw<ArgumentException>(() =>
-                new InMemorySecretResolverBuilder().Add(default(SecretName), "value"))
+                new InMemorySecretResolverBuilder().Add(
+                    default(SecretName),
+                    "value",
+                    ResourceOwnership.Host))
             .ParamName.ShouldBe("name");
     }
 
     [Fact]
     public void Resolve_result_factories_reject_invalid_arguments()
     {
-        var reference = new SecretReference { Name = new SecretName("primary") };
-        var descriptor = new SecretDescriptor { Name = new SecretName("primary") };
+        var reference = new SecretReference { Name = Secret("primary") };
+        var descriptor = new SecretDescriptor
+        {
+            Name = Secret("primary"),
+            Ownership = ResourceOwnership.Host
+        };
         var value = new SecretValue("runtime-value");
 
         Should.Throw<ArgumentNullException>(() =>
@@ -237,11 +257,15 @@ public sealed class SecretResolverTests
         var option = new SecretOptionReference
         {
             OptionPath = "credential",
-            Reference = new SecretReference { Name = new SecretName("primary") }
+            Reference = new SecretReference { Name = Secret("primary") }
         };
         var result = SecretResolveResult.ResolvedResult(
             option.Reference,
-            new SecretDescriptor { Name = new SecretName("primary") },
+            new SecretDescriptor
+            {
+                Name = Secret("primary"),
+                Ownership = ResourceOwnership.Host
+            },
             new SecretValue("runtime-value"));
         var diagnostic = new SecretDiagnostic
         {
@@ -277,7 +301,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary-token"),
+            Name = Secret("primary-token"),
             Kind = "profile"
         });
 
@@ -288,13 +312,27 @@ public sealed class SecretResolverTests
     }
 
     [Fact]
-    public void Secret_name_trims_surrounding_whitespace()
+    public void Secret_name_uses_canonical_nested_application_address()
     {
-        var name = new SecretName("  primary-token  ");
+        var address = ApplicationAddress.Resource("Credentials", "PrimaryToken");
+        var name = new SecretName(address);
 
-        name.Value.ShouldBe("primary-token");
-        name.ToString().ShouldBe("primary-token");
-        name.ShouldBe(new SecretName("primary-token"));
+        name.Value.ShouldBe("Resources.Credentials.PrimaryToken");
+        name.ToString().ShouldBe("Resources.Credentials.PrimaryToken");
+        name.Address.ShouldBe(address);
+        new SecretName(address.Value).ShouldBe(name);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("primary-token")]
+    [InlineData("Workflow.Component")]
+    [InlineData(" Resources.Credentials.PrimaryToken ")]
+    public void Secret_name_rejects_noncanonical_or_nonresource_addresses(string value)
+    {
+        Should.Throw<ArgumentException>(() => new SecretName(value))
+            .ParamName.ShouldBe("value");
     }
 
     [Fact]
@@ -377,7 +415,8 @@ public sealed class SecretResolverTests
     {
         var descriptor = new SecretDescriptor
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
+            Ownership = ResourceOwnership.Host,
             Version = " v1 ",
             Kind = " profile ",
             DisplayName = " Primary ",
@@ -385,7 +424,7 @@ public sealed class SecretResolverTests
         };
         var reference = new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Version = " v1 ",
             Kind = " profile "
         };
@@ -408,7 +447,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary-token"),
+            Name = Secret("primary-token"),
             Kind = "profile"
         });
 
@@ -427,7 +466,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary-token"),
+            Name = Secret("primary-token"),
             Version = " v1 ",
             Kind = " profile "
         });
@@ -442,7 +481,8 @@ public sealed class SecretResolverTests
     {
         var descriptor = new SecretDescriptor
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
+            Ownership = ResourceOwnership.Host,
             Metadata = new Dictionary<string, string>
             {
                 [" owner "] = " runtime "
@@ -450,7 +490,7 @@ public sealed class SecretResolverTests
         };
         var reference = new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Attributes = new Dictionary<string, string>
             {
                 [" scope "] = " workflow "
@@ -474,7 +514,8 @@ public sealed class SecretResolverTests
             {
                 Descriptor = new SecretDescriptor
                 {
-                    Name = new SecretName("primary"),
+                    Name = Secret("primary"),
+                    Ownership = ResourceOwnership.Host,
                     Metadata = new Dictionary<string, string>
                     {
                         ["owner"] = "runtime",
@@ -498,7 +539,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("secondary-token")
+            Name = Secret("secondary-token")
         });
 
         result.Resolved.ShouldBeFalse();
@@ -514,7 +555,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Kind = "credential"
         });
 
@@ -535,7 +576,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary")
+            Name = Secret("primary")
         });
 
         result.Resolved.ShouldBeFalse();
@@ -554,7 +595,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Kind = "profile"
         });
 
@@ -574,7 +615,7 @@ public sealed class SecretResolverTests
 
         var result = await resolver.ResolveAsync(new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Version = "v2"
         });
 
@@ -686,7 +727,8 @@ public sealed class SecretResolverTests
             {
                 Descriptor = new SecretDescriptor
                 {
-                    Name = new SecretName("primary"),
+                    Name = Secret("primary"),
+                    Ownership = ResourceOwnership.Host,
                     Metadata = null!
                 },
                 Value = new SecretValue("value")
@@ -694,7 +736,7 @@ public sealed class SecretResolverTests
         ]);
         var referenceDiagnostics = SecretDiagnostics.ValidateReference(new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Attributes = null!
         });
         var optionDiagnostics = SecretDiagnostics.ValidateOptionReference(new SecretOptionReference
@@ -808,8 +850,12 @@ public sealed class SecretResolverTests
     public void SecretResolveResult_json_serialization_does_not_emit_raw_value()
     {
         var result = SecretResolveResult.ResolvedResult(
-            new SecretReference { Name = new SecretName("primary") },
-            new SecretDescriptor { Name = new SecretName("primary") },
+            new SecretReference { Name = Secret("primary") },
+            new SecretDescriptor
+            {
+                Name = Secret("primary"),
+                Ownership = ResourceOwnership.Host
+            },
             new SecretValue("raw-secret-value"));
 
         var json = JsonSerializer.Serialize(result);
@@ -861,7 +907,7 @@ public sealed class SecretResolverTests
         };
 
         var result = SecretResolveResult.Failed(
-            new SecretReference { Name = new SecretName("primary") },
+            new SecretReference { Name = Secret("primary") },
             "Resolution failed.");
 
         diagnostic.ToString().ShouldBe("Error ResolveFailed: Resolution failed.");
@@ -877,9 +923,9 @@ public sealed class SecretResolverTests
         var diagnostics = await SecretDiagnostics.FindUnresolvedSecretsAsync(
             resolver,
             [
-                new SecretReference { Name = new SecretName("primary"), Kind = "profile" },
-                new SecretReference { Name = new SecretName("primary"), Kind = "credential" },
-                new SecretReference { Name = new SecretName("secondary") }
+                new SecretReference { Name = Secret("primary"), Kind = "profile" },
+                new SecretReference { Name = Secret("primary"), Kind = "credential" },
+                new SecretReference { Name = Secret("secondary") }
             ]);
 
         diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
@@ -911,7 +957,8 @@ public sealed class SecretResolverTests
         {
             Descriptor = new SecretDescriptor
             {
-                Name = new SecretName(name),
+                Name = Secret(name),
+                Ownership = ResourceOwnership.Host,
                 Version = version,
                 Kind = kind,
                 DisplayName = "Primary",
@@ -922,4 +969,9 @@ public sealed class SecretResolverTests
             },
             Value = new SecretValue(value)
         };
+
+    private static ApplicationAddress SecretAddress(string name)
+        => ApplicationAddress.Resource("Secrets", name.Trim());
+
+    private static SecretName Secret(string name) => new(SecretAddress(name));
 }

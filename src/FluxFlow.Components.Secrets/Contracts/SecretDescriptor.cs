@@ -1,3 +1,5 @@
+using FluxFlow.Components.Resources.Contracts;
+
 namespace FluxFlow.Components.Secrets.Contracts;
 
 public sealed record SecretDescriptor
@@ -9,6 +11,7 @@ public sealed record SecretDescriptor
     private IReadOnlyDictionary<string, string>? _metadata = new Dictionary<string, string>();
 
     public required SecretName Name { get; init; }
+    public required ResourceOwnership Ownership { get; init; }
     public string? Version
     {
         get => _version;

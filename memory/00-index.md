@@ -532,6 +532,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `233-vnext-sessions-flowcontent-results.md`: canonical exact-content session
   recording/replay, one-output query results, preserved store ownership and
   typed compatibility, and package evidence.
+- `234-vnext-resource-address-ownership.md`: canonical nested resource and
+  secret addresses, explicit host/revision/external ownership, non-owning DI
+  bridges, Configuration alignment, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

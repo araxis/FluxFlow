@@ -1,4 +1,5 @@
 using FluxFlow.Components.Resources.Contracts;
+using FluxFlow.Composition.Addressing;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
@@ -12,7 +13,8 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var catalog = new ResourceDescriptorCatalogBuilder()
             .Add(
-                " primary-profile ",
+                ResourceAddress("primary-profile"),
+                ResourceOwnership.ResourceRevision,
                 kind: " profile ",
                 displayName: " Primary Profile ",
                 summary: " Runtime profile. ",
@@ -23,7 +25,8 @@ public sealed class ResourceDescriptorCatalogTests
             .BuildCatalog();
 
         var descriptor = catalog.GetResources().ShouldHaveSingleItem();
-        descriptor.Name.ShouldBe(new ResourceName("primary-profile"));
+        descriptor.Name.ShouldBe(Resource("primary-profile"));
+        descriptor.Ownership.ShouldBe(ResourceOwnership.ResourceRevision);
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Profile");
         descriptor.Summary.ShouldBe("Runtime profile.");
@@ -31,7 +34,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary-profile"),
+            Name = Resource("primary-profile"),
             Kind = "profile"
         });
 
@@ -44,7 +47,8 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var catalog = new ResourceDescriptorCatalogBuilder()
             .Add(
-                new ResourceName(" primary-profile "),
+                Resource(" primary-profile "),
+                ResourceOwnership.Host,
                 kind: new ResourceKind(" profile "),
                 displayName: new ResourceMetadataText(" Primary Profile "),
                 summary: new ResourceMetadataText(" Runtime profile. "),
@@ -56,7 +60,8 @@ public sealed class ResourceDescriptorCatalogTests
 
         var descriptor = catalog.GetResources().ShouldHaveSingleItem();
 
-        descriptor.Name.ShouldBe(new ResourceName("primary-profile"));
+        descriptor.Name.ShouldBe(Resource("primary-profile"));
+        descriptor.Ownership.ShouldBe(ResourceOwnership.Host);
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Profile");
         descriptor.Summary.ShouldBe("Runtime profile.");
@@ -73,11 +78,11 @@ public sealed class ResourceDescriptorCatalogTests
         builder.Add(CreateDescriptor("secondary", "profile"));
 
         descriptors.Count.ShouldBe(1);
-        descriptors[0].Name.ShouldBe(new ResourceName("primary"));
+        descriptors[0].Name.ShouldBe(Resource("primary"));
         builder.BuildDescriptors().Select(descriptor => descriptor.Name).ShouldBe(
         [
-            new ResourceName("primary"),
-            new ResourceName("secondary")
+            Resource("primary"),
+            Resource("secondary")
         ]);
     }
 
@@ -94,15 +99,15 @@ public sealed class ResourceDescriptorCatalogTests
 
         descriptors.Select(descriptor => descriptor.Name).ShouldBe(
         [
-            new ResourceName("first"),
-            new ResourceName("second")
+            Resource("first"),
+            Resource("second")
         ]);
     }
 
     [Fact]
     public void Lookup_result_factories_reject_invalid_arguments()
     {
-        var reference = new ResourceReference { Name = new ResourceName("primary") };
+        var reference = new ResourceReference { Name = Resource("primary") };
         var descriptor = CreateDescriptor("primary", "profile");
 
         Should.Throw<ArgumentNullException>(() =>
@@ -127,14 +132,16 @@ public sealed class ResourceDescriptorCatalogTests
     {
         IResourceDescriptorProvider provider = new ResourceDescriptorCatalogBuilder()
             .Add(
-                "primary",
+                ResourceAddress("primary"),
+                ResourceOwnership.Host,
                 kind: "profile",
                 displayName: "Primary Profile")
             .BuildCatalog();
 
         var descriptor = provider.GetResources().ShouldHaveSingleItem();
 
-        descriptor.Name.ShouldBe(new ResourceName("primary"));
+        descriptor.Name.ShouldBe(Resource("primary"));
+        descriptor.Ownership.ShouldBe(ResourceOwnership.Host);
         descriptor.Kind.ShouldBe("profile");
         descriptor.DisplayName.ShouldBe("Primary Profile");
     }
@@ -143,22 +150,24 @@ public sealed class ResourceDescriptorCatalogTests
     public async Task Service_registration_registers_keyed_lookup_and_descriptor_provider_alias()
     {
         var catalog = new ResourceDescriptorCatalogBuilder()
-            .Add("primary", kind: "profile")
+            .Add(ResourceAddress("primary"), ResourceOwnership.ResourceRevision, kind: "profile")
             .BuildCatalog();
+        var address = ResourceAddress("catalog");
         var services = new ServiceCollection()
-            .AddFluxFlowResourceLookup("resources", catalog);
+            .AddExternalFluxFlowResourceLookup(address, catalog);
 
         using var provider = services.BuildServiceProvider();
-        var lookup = provider.GetRequiredKeyedService<IResourceLookup>("resources");
-        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources");
+        var lookup = provider.GetRequiredKeyedService<IResourceLookup>(address.Value);
+        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>(address.Value);
         var result = await lookup.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Kind = "profile"
         });
 
         lookup.ShouldBeSameAs(catalog);
-        descriptors.ShouldBeSameAs(catalog);
+        descriptors.GetResources().ShouldHaveSingleItem().ShouldBeSameAs(
+            catalog.GetResources().ShouldHaveSingleItem());
         result.Found.ShouldBeTrue();
     }
 
@@ -167,36 +176,40 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var descriptor = CreateDescriptor("primary", "profile");
         var descriptorProvider = new StaticResourceDescriptorProvider([descriptor]);
+        var address = ResourceAddress("descriptors");
         var services = new ServiceCollection()
-            .AddFluxFlowResourceDescriptorProvider("resources", descriptorProvider);
+            .AddExternalFluxFlowResourceDescriptorProvider(address, descriptorProvider);
 
         using var provider = services.BuildServiceProvider();
-        var resolved = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources");
+        var resolved = provider.GetRequiredKeyedService<IResourceDescriptorProvider>(address.Value);
 
         resolved.ShouldBeSameAs(descriptorProvider);
         resolved.GetResources().ShouldHaveSingleItem().ShouldBeSameAs(descriptor);
     }
 
     [Fact]
-    public void Service_registration_trims_keyed_names()
+    public void Service_registration_uses_canonical_nested_address_keys()
     {
         var catalog = new ResourceDescriptorCatalogBuilder()
-            .Add("primary", kind: "profile")
+            .Add(ResourceAddress("primary"), ResourceOwnership.Host, kind: "profile")
             .BuildCatalog();
         var descriptorProvider = new StaticResourceDescriptorProvider(
         [
             CreateDescriptor("secondary", "profile")
         ]);
 
+        var lookupAddress = ApplicationAddress.Resource("Catalogs", "Primary");
+        var descriptorAddress = ApplicationAddress.Resource("Catalogs", "Declared");
         var services = new ServiceCollection()
-            .AddFluxFlowResourceLookup(" resources ", catalog)
-            .AddFluxFlowResourceDescriptorProvider(" declared-resources ", descriptorProvider);
+            .AddExternalFluxFlowResourceLookup(lookupAddress, catalog)
+            .AddExternalFluxFlowResourceDescriptorProvider(descriptorAddress, descriptorProvider);
 
         using var provider = services.BuildServiceProvider();
 
-        provider.GetRequiredKeyedService<IResourceLookup>("resources").ShouldBeSameAs(catalog);
-        provider.GetRequiredKeyedService<IResourceDescriptorProvider>("resources").ShouldBeSameAs(catalog);
-        provider.GetRequiredKeyedService<IResourceDescriptorProvider>("declared-resources")
+        provider.GetRequiredKeyedService<IResourceLookup>(lookupAddress.Value).ShouldBeSameAs(catalog);
+        provider.GetRequiredKeyedService<IResourceDescriptorProvider>(lookupAddress.Value)
+            .GetResources().ShouldHaveSingleItem();
+        provider.GetRequiredKeyedService<IResourceDescriptorProvider>(descriptorAddress.Value)
             .ShouldBeSameAs(descriptorProvider);
     }
 
@@ -205,14 +218,19 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(new ResourceRegistrationDependency("primary"));
+        var lookupAddress = ResourceAddress("lookup");
+        var providerAddress = ResourceAddress("provider");
         services
             .AddFluxFlowResourceLookup(
-                "lookup",
+                lookupAddress,
                 provider => new ResourceDescriptorCatalogBuilder()
-                    .Add(provider.GetRequiredService<ResourceRegistrationDependency>().Name, kind: "profile")
+                    .Add(
+                        ResourceAddress(provider.GetRequiredService<ResourceRegistrationDependency>().Name),
+                        ResourceOwnership.Host,
+                        kind: "profile")
                     .BuildCatalog())
             .AddFluxFlowResourceDescriptorProvider(
-                "provider",
+                providerAddress,
                 provider => new StaticResourceDescriptorProvider(
                 [
                     CreateDescriptor(
@@ -221,12 +239,12 @@ public sealed class ResourceDescriptorCatalogTests
                 ]));
 
         using var provider = services.BuildServiceProvider();
-        var lookup = provider.GetRequiredKeyedService<IResourceLookup>("lookup");
-        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>("provider")
+        var lookup = provider.GetRequiredKeyedService<IResourceLookup>(lookupAddress.Value);
+        var descriptors = provider.GetRequiredKeyedService<IResourceDescriptorProvider>(providerAddress.Value)
             .GetResources();
 
-        lookup.GetResources().ShouldHaveSingleItem().Name.ShouldBe(new ResourceName("primary"));
-        descriptors.ShouldHaveSingleItem().Name.ShouldBe(new ResourceName("primary"));
+        lookup.GetResources().ShouldHaveSingleItem().Name.ShouldBe(Resource("primary"));
+        descriptors.ShouldHaveSingleItem().Name.ShouldBe(Resource("primary"));
     }
 
     [Fact]
@@ -235,71 +253,113 @@ public sealed class ResourceDescriptorCatalogTests
         var services = new ServiceCollection();
         var lookup = new ResourceDescriptorCatalog([]);
         var descriptorProvider = new StaticResourceDescriptorProvider([]);
+        var address = ResourceAddress("catalog");
+        var componentAddress = ApplicationAddress.WorkflowComponent("Workflow", "Component");
 
         Should.Throw<ArgumentNullException>(() =>
-            ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(null!, "resources", lookup))
+            ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(
+                null!, address, _ => lookup))
             .ParamName.ShouldBe("services");
         Should.Throw<ArgumentNullException>(() =>
-            ResourceServiceCollectionExtensions.AddFluxFlowResourceLookup(null!, "resources", (IResourceLookup)null!))
+            ResourceServiceCollectionExtensions.AddExternalFluxFlowResourceLookup(
+                null!, address, lookup))
             .ParamName.ShouldBe("services");
-        Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowResourceLookup(" ", lookup))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowResourceLookup(" ", (IResourceLookup)null!))
-            .ParamName.ShouldBe("name");
         Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowResourceLookup("resources", (IResourceLookup)null!))
+            services.AddExternalFluxFlowResourceLookup(address, null!))
             .ParamName.ShouldBe("lookup");
         Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowResourceLookup("resources", (Func<IServiceProvider, IResourceLookup>)null!))
+            services.AddFluxFlowResourceLookup(address, null!))
             .ParamName.ShouldBe("lookupFactory");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceLookup(componentAddress, _ => lookup))
+            .ParamName.ShouldBe("address");
+        Should.Throw<ArgumentException>(() =>
+            services.AddExternalFluxFlowResourceLookup(componentAddress, lookup))
+            .ParamName.ShouldBe("address");
 
         Should.Throw<ArgumentNullException>(() =>
             ResourceServiceCollectionExtensions.AddFluxFlowResourceDescriptorProvider(
                 null!,
-                "resources",
+                address,
+                _ => descriptorProvider))
+            .ParamName.ShouldBe("services");
+        Should.Throw<ArgumentNullException>(() =>
+            ResourceServiceCollectionExtensions.AddExternalFluxFlowResourceDescriptorProvider(
+                null!,
+                address,
                 descriptorProvider))
             .ParamName.ShouldBe("services");
         Should.Throw<ArgumentNullException>(() =>
-            ResourceServiceCollectionExtensions.AddFluxFlowResourceDescriptorProvider(
-                null!,
-                "resources",
-                (IResourceDescriptorProvider)null!))
-            .ParamName.ShouldBe("services");
-        Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowResourceDescriptorProvider(" ", descriptorProvider))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentException>(() =>
-            services.AddFluxFlowResourceDescriptorProvider(" ", (IResourceDescriptorProvider)null!))
-            .ParamName.ShouldBe("name");
-        Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowResourceDescriptorProvider(
-                "resources",
-                (IResourceDescriptorProvider)null!))
+            services.AddExternalFluxFlowResourceDescriptorProvider(address, null!))
             .ParamName.ShouldBe("descriptorProvider");
         Should.Throw<ArgumentNullException>(() =>
-            services.AddFluxFlowResourceDescriptorProvider(
-                "resources",
-                (Func<IServiceProvider, IResourceDescriptorProvider>)null!))
+            services.AddFluxFlowResourceDescriptorProvider(address, null!))
             .ParamName.ShouldBe("descriptorProviderFactory");
+        Should.Throw<ArgumentException>(() =>
+            services.AddFluxFlowResourceDescriptorProvider(componentAddress, _ => descriptorProvider))
+            .ParamName.ShouldBe("address");
+        Should.Throw<ArgumentException>(() =>
+            services.AddExternalFluxFlowResourceDescriptorProvider(componentAddress, descriptorProvider))
+            .ParamName.ShouldBe("address");
     }
 
     [Fact]
     public void Service_registration_rejects_null_factory_results()
     {
+        var lookupAddress = ResourceAddress("lookup");
+        var providerAddress = ResourceAddress("provider");
         var services = new ServiceCollection()
-            .AddFluxFlowResourceLookup("lookup", _ => null!)
-            .AddFluxFlowResourceDescriptorProvider("provider", _ => null!);
+            .AddFluxFlowResourceLookup(lookupAddress, _ => null!)
+            .AddFluxFlowResourceDescriptorProvider(providerAddress, _ => null!);
 
         using var provider = services.BuildServiceProvider();
 
         Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<IResourceLookup>("lookup"))
+            provider.GetRequiredKeyedService<IResourceLookup>(lookupAddress.Value))
             .Message.ShouldContain("Resource lookup factory returned null.");
         Should.Throw<InvalidOperationException>(() =>
-            provider.GetRequiredKeyedService<IResourceDescriptorProvider>("provider"))
+            provider.GetRequiredKeyedService<IResourceDescriptorProvider>(providerAddress.Value))
             .Message.ShouldContain("Resource descriptor provider factory returned null.");
+    }
+
+    [Fact]
+    public void Provider_created_lookup_is_disposed_once_and_metadata_alias_is_nonowning()
+    {
+        var address = ResourceAddress("owned-lookup");
+        DisposableResourceLookup? lookup = null;
+        var services = new ServiceCollection()
+            .AddFluxFlowResourceLookup(address, _ => lookup = new DisposableResourceLookup());
+
+        using (var provider = services.BuildServiceProvider())
+        {
+            provider.GetRequiredKeyedService<IResourceLookup>(address.Value)
+                .ShouldBeSameAs(lookup);
+            provider.GetRequiredKeyedService<IResourceDescriptorProvider>(address.Value)
+                .GetResources().ShouldBeEmpty();
+        }
+
+        lookup.ShouldNotBeNull().DisposeCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void External_lookup_registration_does_not_transfer_disposal_ownership()
+    {
+        var address = ResourceAddress("external-lookup");
+        var lookup = new DisposableResourceLookup();
+        var services = new ServiceCollection()
+            .AddExternalFluxFlowResourceLookup(address, lookup);
+
+        using (var provider = services.BuildServiceProvider())
+        {
+            provider.GetRequiredKeyedService<IResourceLookup>(address.Value)
+                .ShouldBeSameAs(lookup);
+            provider.GetRequiredKeyedService<IResourceDescriptorProvider>(address.Value)
+                .GetResources().ShouldBeEmpty();
+        }
+
+        lookup.DisposeCount.ShouldBe(0);
+        lookup.Dispose();
+        lookup.DisposeCount.ShouldBe(1);
     }
 
     [Fact]
@@ -338,7 +398,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary-profile"),
+            Name = Resource("primary-profile"),
             Kind = "profile"
         });
 
@@ -354,7 +414,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("secondary-profile"),
+            Name = Resource("secondary-profile"),
             Kind = "profile"
         });
 
@@ -371,7 +431,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Kind = "credential"
         });
 
@@ -435,13 +495,27 @@ public sealed class ResourceDescriptorCatalogTests
     }
 
     [Fact]
-    public void Resource_name_trims_surrounding_whitespace()
+    public void Resource_name_uses_canonical_nested_application_address()
     {
-        var name = new ResourceName("  primary  ");
+        var address = ApplicationAddress.Resource("Messaging", "Primary");
+        var name = new ResourceName(address);
 
-        name.Value.ShouldBe("primary");
-        name.ToString().ShouldBe("primary");
-        name.ShouldBe(new ResourceName("primary"));
+        name.Value.ShouldBe("Resources.Messaging.Primary");
+        name.ToString().ShouldBe("Resources.Messaging.Primary");
+        name.Address.ShouldBe(address);
+        new ResourceName(address.Value).ShouldBe(name);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("primary")]
+    [InlineData("Workflow.Component")]
+    [InlineData(" Resources.Messaging.Primary ")]
+    public void Resource_name_rejects_noncanonical_or_nonresource_addresses(string value)
+    {
+        Should.Throw<ArgumentException>(() => new ResourceName(value))
+            .ParamName.ShouldBe("value");
     }
 
     [Fact]
@@ -498,7 +572,9 @@ public sealed class ResourceDescriptorCatalogTests
     public void Catalog_builder_typed_authoring_rejects_default_resource_name()
     {
         Should.Throw<ArgumentException>(() =>
-                new ResourceDescriptorCatalogBuilder().Add(default(ResourceName)))
+                new ResourceDescriptorCatalogBuilder().Add(
+                    default(ResourceName),
+                    ResourceOwnership.Host))
             .ParamName.ShouldBe("name");
     }
 
@@ -507,14 +583,15 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var descriptor = new ResourceDescriptor
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
+            Ownership = ResourceOwnership.Host,
             Kind = " profile ",
             DisplayName = " Primary ",
             Summary = " Reusable profile. "
         };
         var reference = new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Kind = " profile "
         };
 
@@ -532,7 +609,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary-profile"),
+            Name = Resource("primary-profile"),
             Kind = "profile"
         });
 
@@ -548,7 +625,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         var result = await catalog.LookupAsync(new ResourceReference
         {
-            Name = new ResourceName("primary-profile"),
+            Name = Resource("primary-profile"),
             Kind = " profile "
         });
 
@@ -561,7 +638,8 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var descriptor = new ResourceDescriptor
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
+            Ownership = ResourceOwnership.Host,
             Metadata = new Dictionary<string, string>
             {
                 [" owner "] = " runtime "
@@ -569,7 +647,7 @@ public sealed class ResourceDescriptorCatalogTests
         };
         var reference = new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Attributes = new Dictionary<string, string>
             {
                 [" scope "] = " workflow "
@@ -591,7 +669,8 @@ public sealed class ResourceDescriptorCatalogTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Metadata = new Dictionary<string, string>
                 {
                     ["owner"] = "runtime",
@@ -617,7 +696,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         diagnostics.Count.ShouldBe(1);
         diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.DuplicateResource);
-        diagnostics[0].Name.ShouldBe(new ResourceName("primary"));
+        diagnostics[0].Name.ShouldBe(Resource("primary"));
     }
 
     [Fact]
@@ -631,7 +710,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         diagnostics.Count.ShouldBe(1);
         diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.DuplicateResource);
-        diagnostics[0].Name.ShouldBe(new ResourceName("primary"));
+        diagnostics[0].Name.ShouldBe(Resource("primary"));
     }
 
     [Fact]
@@ -655,9 +734,9 @@ public sealed class ResourceDescriptorCatalogTests
         var diagnostics = await ResourceDiagnostics.FindMissingResourcesAsync(
             catalog,
             [
-                new ResourceReference { Name = new ResourceName("primary"), Kind = "profile" },
-                new ResourceReference { Name = new ResourceName("primary"), Kind = "credential" },
-                new ResourceReference { Name = new ResourceName("secondary"), Kind = "profile" }
+                new ResourceReference { Name = Resource("primary"), Kind = "profile" },
+                new ResourceReference { Name = Resource("primary"), Kind = "credential" },
+                new ResourceReference { Name = Resource("secondary"), Kind = "profile" }
             ]);
 
         diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
@@ -676,12 +755,12 @@ public sealed class ResourceDescriptorCatalogTests
                 CreateDescriptor("secondary", "profile")
             ],
             [
-                new ResourceReference { Name = new ResourceName("primary"), Kind = "profile" }
+                new ResourceReference { Name = Resource("primary"), Kind = "profile" }
             ]);
 
         diagnostics.Count.ShouldBe(1);
         diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.UnusedResource);
-        diagnostics[0].Name.ShouldBe(new ResourceName("secondary"));
+        diagnostics[0].Name.ShouldBe(Resource("secondary"));
     }
 
     [Fact]
@@ -692,6 +771,7 @@ public sealed class ResourceDescriptorCatalogTests
             new ResourceDescriptor
             {
                 Name = default,
+                Ownership = (ResourceOwnership)0,
                 Kind = " ",
                 Metadata = new Dictionary<string, string>
                 {
@@ -714,7 +794,8 @@ public sealed class ResourceDescriptorCatalogTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Metadata = null!
             }
         ]);
@@ -752,7 +833,7 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var diagnostics = ResourceDiagnostics.ValidateReference(new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Attributes = null!
         });
 
@@ -784,7 +865,7 @@ public sealed class ResourceDescriptorCatalogTests
 
         diagnostics.Count.ShouldBe(1);
         diagnostics[0].Code.ShouldBe(ResourceDiagnosticCode.UnusedResource);
-        diagnostics[0].Name.ShouldBe(new ResourceName("primary"));
+        diagnostics[0].Name.ShouldBe(Resource("primary"));
     }
 
     [Fact]
@@ -792,7 +873,7 @@ public sealed class ResourceDescriptorCatalogTests
     {
         var reference = new ResourceReference
         {
-            Name = new ResourceName("primary"),
+            Name = Resource("primary"),
             Kind = "profile",
             Attributes = new Dictionary<string, string>
             {
@@ -805,7 +886,8 @@ public sealed class ResourceDescriptorCatalogTests
 
     private static ResourceDescriptor CreateDescriptor(string name, string kind) => new()
     {
-        Name = new ResourceName(name),
+        Name = Resource(name),
+        Ownership = ResourceOwnership.ResourceRevision,
         Kind = kind,
         DisplayName = "Primary",
         Summary = "Reusable profile.",
@@ -815,11 +897,30 @@ public sealed class ResourceDescriptorCatalogTests
         }
     };
 
+    private static ApplicationAddress ResourceAddress(string name)
+        => ApplicationAddress.Resource("Tests", name.Trim());
+
+    private static ResourceName Resource(string name) => new(ResourceAddress(name));
+
     private sealed record ResourceRegistrationDependency(string Name);
 
     private sealed class StaticResourceDescriptorProvider(
         IReadOnlyCollection<ResourceDescriptor> descriptors) : IResourceDescriptorProvider
     {
         public IReadOnlyCollection<ResourceDescriptor> GetResources() => descriptors;
+    }
+
+    private sealed class DisposableResourceLookup : IResourceLookup, IDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public IReadOnlyCollection<ResourceDescriptor> GetResources() => [];
+
+        public ValueTask<ResourceLookupResult> LookupAsync(
+            ResourceReference reference,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(ResourceLookupResult.Missing(reference));
+
+        public void Dispose() => DisposeCount++;
     }
 }

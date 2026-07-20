@@ -1,4 +1,5 @@
 using FluxFlow.Components.Resources.Contracts;
+using FluxFlow.Composition.Addressing;
 
 namespace FluxFlow.Components.Resources;
 
@@ -24,17 +25,19 @@ public sealed class ResourceDescriptorCatalogBuilder
     }
 
     public ResourceDescriptorCatalogBuilder Add(
-        string name,
+        ApplicationAddress address,
+        ResourceOwnership ownership,
         string? kind = null,
         string? displayName = null,
         string? summary = null,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
-        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(address);
 
         var descriptor = new ResourceDescriptor
         {
-            Name = new ResourceName(name),
+            Name = new ResourceName(address),
+            Ownership = ownership,
             Kind = kind,
             DisplayName = displayName,
             Summary = summary
@@ -53,6 +56,7 @@ public sealed class ResourceDescriptorCatalogBuilder
 
     public ResourceDescriptorCatalogBuilder Add(
         ResourceName name,
+        ResourceOwnership ownership,
         ResourceKind? kind = null,
         ResourceMetadataText? displayName = null,
         ResourceMetadataText? summary = null,
@@ -64,6 +68,7 @@ public sealed class ResourceDescriptorCatalogBuilder
         var descriptor = new ResourceDescriptor
         {
             Name = name,
+            Ownership = ownership,
             Kind = kind?.Value,
             DisplayName = displayName?.Value,
             Summary = summary?.Value

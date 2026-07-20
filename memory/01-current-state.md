@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/sessions-vnext`. The provider-neutral MQTT vertical slice and the
+  `work/resource-infrastructure-vnext`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -32,8 +32,9 @@ Date: 2026-07-20
   address, link-compilation, stable-port, system-signal, DI-snapshot, and
   transactional-revision milestones. MQTT, Mapping, Payloads, Serialization,
   Validation, Assertions, Expectations, Routing, Control, State, and
-  Projections, Metrics, and Observability now use this foundation; the remaining component-family
-  migrations continue separately.
+  Projections, Metrics, and Observability now use this foundation. The ordinary
+  component-family migrations through Sessions and resource/configuration
+  alignment are complete; final Hosting and Designer persistence remain.
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
@@ -312,9 +313,19 @@ Date: 2026-07-20
   universal Errors surface, explicit typed compatibility registrations, and
   updated Designer metadata. Focused/full tests, controlled builds,
   zero-warning affected rebuilds, binary compatibility, preflight/dry-runs,
-  and a package-only consumer passed. The remaining resource/configuration
-  infrastructure is the next bounded assessment before final Hosting and
-  Designer persistence work. See `233-vnext-sessions-flowcontent-results.md`.
+  and a package-only consumer passed. See
+  `233-vnext-sessions-flowcontent-results.md`.
+- `FluxFlow.Components.Resources`, `FluxFlow.Components.Secrets`, and
+  `FluxFlow.Components.Configuration` are now `2.0.0` locally. Resource and
+  secret names use canonical nested `Resources...` application addresses,
+  descriptors require explicit host/resource-revision/external ownership, and
+  keyed DI APIs distinguish provider-owned factories from non-owning external
+  bridges. Configuration builders and diagnostics use the same contracts.
+  Focused/full tests, controlled builds, release preflight, package dry-runs,
+  and a package-only ownership consumer passed. Package validation against the
+  preceding 1.x packages reported only the intentional major-version API
+  removals. Final Hosting integration is next, with Designer persistence kept
+  separate. See `234-vnext-resource-address-ownership.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

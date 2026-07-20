@@ -8,6 +8,7 @@ public sealed record ResourceDescriptor
     private IReadOnlyDictionary<string, string>? _metadata = new Dictionary<string, string>();
 
     public required ResourceName Name { get; init; }
+    public required ResourceOwnership Ownership { get; init; }
     public string? Kind
     {
         get => _kind;

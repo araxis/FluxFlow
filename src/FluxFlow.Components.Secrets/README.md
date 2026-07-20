@@ -1,214 +1,105 @@
 # FluxFlow.Components.Secrets
 
-Reusable secret reference and resolution contracts for FluxFlow.
+Secret references, non-sensitive descriptors, resolution helpers, and redaction
+contracts for FluxFlow hosts.
 
 ## Purpose
 
-This package lets component packages refer to secret values by name without
-coupling to a concrete secret store. Hosts decide where values live, how access
-is controlled, how values are refreshed, and how ownership is handled.
+Secrets are addressed through the same canonical nested resource address space
+as other host resources. A secret identity therefore looks like
+`Resources.Credentials.CommandClientPassword`, not a flat provider-specific
+name.
+
+The package does not own a secret store. Hosts decide persistence, access,
+refresh, rotation, auditing, and lifetime.
 
 ## Contracts
 
-- `SecretReference`: a name plus optional version, kind, and attributes.
-- `SecretDescriptor`: non-sensitive metadata for a declared secret.
-- `SecretVersion`, `SecretKind`, and `SecretMetadataText`: small value types
-  for code-authored descriptor version, kind, display-name, and summary values.
-- `SecretValue`: resolved value wrapper with redacted string formatting.
-- `ISecretResolver`: runtime abstraction for resolving a reference.
-- `ISecretDescriptorProvider`: optional capability for resolvers that can list
-  non-sensitive secret descriptors.
-- `SecretResolveResult`: resolved value or structured diagnostic.
-- `SecretOptionReference`: an option path plus optional secret reference.
-- `SecretOptionResolver`: helper for resolving required or optional secret
-  option references through a host-provided resolver.
-- `InMemorySecretResolverBuilder`: a fluent helper for declaring local
-  `SecretRecord` values and creating an `InMemorySecretResolver`.
-- `SecretServiceCollectionExtensions`: keyed DI helpers for registering
-  host-owned `ISecretResolver` and `ISecretDescriptorProvider` services.
-- `SecretOptionResolution`: option-level resolved value, missing state, or
-  structured diagnostic.
-- `SecretDiagnostic`: stable diagnostics for missing, duplicate, ambiguous,
-  kind mismatch, denied, failed, and invalid secret references.
-- `SecretRedactor`: helper for redacting text and sensitive attribute values.
+- `SecretName`: a resource-only wrapper over a canonical
+  `ApplicationAddress`.
+- `SecretReference`: an address plus optional version, kind, and attributes.
+- `SecretDescriptor`: non-sensitive metadata with explicit
+  `ResourceOwnership`.
+- `SecretValue`: a resolved value whose string formatting is always redacted.
+- `ISecretResolver`: runtime resolution abstraction.
+- `ISecretDescriptorProvider`: optional non-sensitive descriptor enumeration.
+- `SecretOptionReference` and `SecretOptionResolver`: required/optional option
+  resolution helpers.
+- `InMemorySecretResolverBuilder`: a local/test authoring helper.
+- `SecretDiagnostics` and `SecretRedactor`: structured validation and
+  redaction helpers.
 
-`SecretResolveResult` factory helpers reject null references, descriptors, values,
-match collections, and blank diagnostic messages at the public boundary so
-invalid resolution outcomes fail with clear argument names.
-`SecretOptionResolution` factory helpers reject null option references,
-resolution results, and diagnostics at the same boundary so option-level
-outcomes fail with clear argument names.
+Secret descriptor ownership uses the shared values from
+`FluxFlow.Components.Resources`: `Host`, `ResourceRevision`, or `External`.
 
 ## Example
 
 ```csharp
+using FluxFlow.Components.Resources.Contracts;
 using FluxFlow.Components.Secrets;
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 
-var resolver = new InMemorySecretResolver(
-[
-    new SecretRecord
-    {
-        Descriptor = new SecretDescriptor
-        {
-            Name = new SecretName("primary-token"),
-            Kind = "profile"
-        },
-        Value = new SecretValue("value-from-host")
-    }
-]);
+var passwordAddress = ApplicationAddress.Resource(
+    "Credentials",
+    "CommandClientPassword");
+
+var resolver = new InMemorySecretResolverBuilder()
+    .Add(
+        passwordAddress,
+        "value-from-host",
+        ResourceOwnership.Host,
+        kind: "credential")
+    .BuildResolver();
 
 var result = await resolver.ResolveAsync(new SecretReference
 {
-    Name = new SecretName("primary-token"),
-    Kind = "profile"
+    Name = new SecretName(passwordAddress),
+    Kind = "credential"
 });
 
 Console.WriteLine(result.Resolved);
-Console.WriteLine(result.Value);
+Console.WriteLine(result.Value); // redacted
 ```
 
-Resolvers that can safely list declared non-sensitive descriptors can implement
-`ISecretDescriptorProvider`:
+Component option models retain references, not resolved values. A host or
+resource factory resolves the reference before constructing the client that
+needs it.
+
+## Keyed Registration
+
+Factory registration transfers creation/disposal to the provider:
 
 ```csharp
-if (resolver is ISecretDescriptorProvider descriptorProvider)
-{
-    foreach (var descriptor in descriptorProvider.GetDescriptors())
-        Console.WriteLine(descriptor.Name);
-}
+var resolverAddress = ApplicationAddress.Resource("Infrastructure", "Secrets");
+services.AddFluxFlowSecretResolver(resolverAddress, provider => BuildResolver(provider));
 ```
 
-Fluent in-memory resolver construction is available for local hosts and tests:
+External registration remains non-owning:
 
 ```csharp
-var resolver = new InMemorySecretResolverBuilder()
-    .Add(
-        "primary-token",
-        "value-from-host",
-        kind: "profile",
-        displayName: "Primary Token")
-    .BuildResolver();
+services.AddExternalFluxFlowSecretResolver(resolverAddress, existingResolver);
 ```
 
-Code-authored in-memory records can use value types at the builder boundary
-while the underlying DTOs remain configuration-friendly:
+Descriptor providers use the corresponding provider-owned and external helper
+names. Resolver registration does not automatically expose descriptor metadata
+because descriptor enumeration is optional and may be security-sensitive.
 
-```csharp
-var resolver = new InMemorySecretResolverBuilder()
-    .Add(
-        new SecretName("primary-token"),
-        "value-from-host",
-        version: new SecretVersion("v1"),
-        kind: new SecretKind("profile"),
-        displayName: new SecretMetadataText("Primary Token"),
-        summary: new SecretMetadataText("Runtime credential."))
-    .BuildResolver();
-```
+## Diagnostics And Redaction
 
-Hosts that use keyed service registration can register resolvers and descriptor
-providers explicitly:
-
-```csharp
-services
-    .AddFluxFlowSecretResolver("secrets", resolver)
-    .AddFluxFlowSecretDescriptorProvider("declared-secrets", descriptorProvider);
-```
-
-Keyed DI helper names are trimmed before registration, matching the normalization
-used by `SecretName` and configuration-bound secret references.
-
-Resolver registration does not automatically register a descriptor provider
-because descriptor enumeration is optional. Register
-`ISecretDescriptorProvider` separately when a resolver can safely expose
-non-sensitive declarations.
-
-## Component Options
-
-Component option models should store references, not resolved values:
-
-```csharp
-using FluxFlow.Components.Secrets;
-using FluxFlow.Components.Secrets.Contracts;
-
-public sealed record SenderOptions
-{
-    public SecretReference? Credential { get; init; }
-}
-
-var optionResult = await SecretOptionResolver.ResolveRequiredAsync(
-    hostResolver,
-    options.Credential,
-    "credential",
-    cancellationToken);
-
-if (!optionResult.Resolved)
-{
-    Console.WriteLine(optionResult.Diagnostic);
-    return;
-}
-
-var credential = optionResult.Value.Reveal();
-```
-
-The component owns its option shape and error handling. The host owns the
-resolver implementation and decides where the value comes from.
-
-## Diagnostics
-
-Use `SecretDiagnostics` to:
-
-- validate secret records and references
-- validate option references
-- find duplicate declarations
-- find references that cannot be resolved
-
-Metadata and attribute maps are validated as part of records, references, and
-option references; null maps are reported as structured invalid-secret
-diagnostics.
-Null record entries, null reference entries, and null option entries inside
-batch helpers are reported as structured invalid-secret diagnostics instead of
-surfacing accidental null-reference failures.
-`SecretDiagnostic` copies assigned metadata, treats null diagnostic metadata as
-empty, and formats without exposing metadata values.
-
-`SecretName`, secret `Version`, `Kind`, `DisplayName`, `Summary`, and secret
-option paths trim surrounding whitespace when assigned. `SecretVersion`,
-`SecretKind`, and `SecretMetadataText` provide the same trimming for
-code-authored in-memory records and reject empty values at the builder
-boundary. The descriptor/reference DTOs still keep their string-shaped fields
-so configuration-bound invalid text can be reported as structured diagnostics
-instead of throwing during binding.
-
-`SecretRedactor.RedactValues(...)` copies the input map and normalizes explicit
-protected keys before matching them, so caller-owned maps and padded protected
-key configuration cannot change redaction results after the call.
-
-Valid metadata, attribute, and option metadata maps trim surrounding whitespace
-from keys and values when assigned. Maps with null values, blank keys or values,
-or duplicate keys after trimming are preserved so `SecretDiagnostics` can report
-structured invalid-secret diagnostics.
-
-Secret declarations are unique by name plus optional version. When multiple
-versions exist, callers should provide `Version` or another narrowing field
-such as `Kind`.
+Secret records require a canonical resource address, explicit ownership, and a
+value. References preserve optional version and kind matching. Diagnostic
+formatting and `SecretValue.ToString()` never reveal resolved values.
 
 ## Boundaries
 
-This package does not own concrete secret storage. It only defines neutral
-contracts and helper logic. Hosts own persistence, access control, refresh,
-rotation, auditing, and disposal.
-`ISecretDescriptorProvider` is intentionally separate from `ISecretResolver` so
-resolvers can support runtime resolution without exposing descriptor
-enumeration.
-`InMemorySecretResolverBuilder` only creates in-memory records and resolver
-instances; it is not a storage, refresh, or access-control model.
-Keyed DI helpers only register already host-owned services. They do not create
-stores, load values, rotate credentials, audit access, or own disposal policy.
+This package does not create application resources, parse application JSON,
+choose deployment ownership, build provider snapshots, or participate in
+workflow routing. Composition owns addresses; Hosting owns provider snapshots;
+the host owns secret policy.
 
 ## Composition
 
-This package does not expose standalone nodes or `FluxFlow.Composition`
-factories. Component options should keep secret references; hosts and adapters
-resolve them through a host-owned `ISecretResolver` before constructing
-resources that need secret values.
+This package references `FluxFlow.Composition` only for canonical resource
+addresses. It does not expose composition node factories or participate in
+workflow execution.

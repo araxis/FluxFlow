@@ -432,6 +432,13 @@ public static class ConfigurationValidator
             if (string.IsNullOrWhiteSpace(descriptor.Name.Value))
                 diagnostics.Add(InvalidSecretDescriptor($"{path}.name", "Secret name is required."));
 
+            if (!Enum.IsDefined(descriptor.Ownership))
+            {
+                diagnostics.Add(InvalidSecretDescriptor(
+                    $"{path}.ownership",
+                    "Secret ownership must be Host, ResourceRevision, or External."));
+            }
+
             ValidateOptionalText(descriptor.Version, $"{path}.version", diagnostics);
             ValidateOptionalText(descriptor.Kind, $"{path}.kind", diagnostics);
             ValidateOptionalText(descriptor.DisplayName, $"{path}.displayName", diagnostics);

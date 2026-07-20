@@ -3,6 +3,7 @@ using FluxFlow.Components.Resources;
 using FluxFlow.Components.Resources.Contracts;
 using FluxFlow.Components.Secrets;
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 using Shouldly;
 using Xunit;
 
@@ -16,7 +17,7 @@ public sealed class ConfigurationValidatorTests
         var request = new ConfigurationValidationRequestBuilder()
             .AddResource(
                 " connections.primary ",
-                " primary ",
+                ResourceAddress("primary"),
                 kind: " connection ",
                 metadata: new Dictionary<string, string>
                 {
@@ -24,7 +25,7 @@ public sealed class ConfigurationValidatorTests
                 })
             .AddSecret(
                 " connections.primary.credential ",
-                " primary-credential ",
+                SecretAddress("primary-credential"),
                 version: " v1 ",
                 kind: " credential ",
                 metadata: new Dictionary<string, string>
@@ -36,14 +37,14 @@ public sealed class ConfigurationValidatorTests
         request.Resources.Count.ShouldBe(1);
         request.Resources[0].Path.ShouldBe("connections.primary");
         request.Resources[0].Required.ShouldBeTrue();
-        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(new ResourceName("primary"));
+        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(Resource("primary"));
         request.Resources[0].Reference.ShouldNotBeNull().Kind.ShouldBe("connection");
         request.Resources[0].Metadata["owner"].ShouldBe("runtime");
 
         request.Secrets.Count.ShouldBe(1);
         request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
         request.Secrets[0].Required.ShouldBeTrue();
-        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(new SecretName("primary-credential"));
+        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(Secret("primary-credential"));
         request.Secrets[0].Reference.ShouldNotBeNull().Version.ShouldBe("v1");
         request.Secrets[0].Reference.ShouldNotBeNull().Kind.ShouldBe("credential");
         request.Secrets[0].Metadata["scope"].ShouldBe("workflow");
@@ -55,7 +56,7 @@ public sealed class ConfigurationValidatorTests
         var request = new ConfigurationValidationRequestBuilder()
             .AddResource(
                 new ConfigurationOptionPath(" connections.primary "),
-                new ResourceName(" primary "),
+                Resource(" primary "),
                 kind: new ResourceKind(" connection "),
                 metadata: new Dictionary<string, string>
                 {
@@ -63,7 +64,7 @@ public sealed class ConfigurationValidatorTests
                 })
             .AddSecret(
                 new ConfigurationOptionPath(" connections.primary.credential "),
-                new SecretName(" primary-credential "),
+                Secret(" primary-credential "),
                 version: new SecretVersion(" v1 "),
                 kind: new SecretKind(" credential "),
                 metadata: new Dictionary<string, string>
@@ -77,7 +78,7 @@ public sealed class ConfigurationValidatorTests
         request.Resources.Count.ShouldBe(2);
         request.Resources[0].Path.ShouldBe("connections.primary");
         request.Resources[0].Required.ShouldBeTrue();
-        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(new ResourceName("primary"));
+        request.Resources[0].Reference.ShouldNotBeNull().Name.ShouldBe(Resource("primary"));
         request.Resources[0].Reference.ShouldNotBeNull().Kind.ShouldBe("connection");
         request.Resources[0].Metadata["owner"].ShouldBe("runtime");
         request.Resources[1].Path.ShouldBe("connections.secondary");
@@ -87,7 +88,7 @@ public sealed class ConfigurationValidatorTests
         request.Secrets.Count.ShouldBe(2);
         request.Secrets[0].OptionPath.ShouldBe("connections.primary.credential");
         request.Secrets[0].Required.ShouldBeTrue();
-        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(new SecretName("primary-credential"));
+        request.Secrets[0].Reference.ShouldNotBeNull().Name.ShouldBe(Secret("primary-credential"));
         request.Secrets[0].Reference.ShouldNotBeNull().Version.ShouldBe("v1");
         request.Secrets[0].Reference.ShouldNotBeNull().Kind.ShouldBe("credential");
         request.Secrets[0].Metadata["scope"].ShouldBe("workflow");
@@ -187,7 +188,8 @@ public sealed class ConfigurationValidatorTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Kind = "connection"
             }
         ]);
@@ -196,8 +198,8 @@ public sealed class ConfigurationValidatorTests
             CreateSecret("primary-credential", "runtime-value")
         ]);
         var request = new ConfigurationValidationRequestBuilder()
-            .AddResource("connections.primary", "primary", kind: "connection")
-            .AddSecret("connections.primary.credential", "primary-credential")
+            .AddResource("connections.primary", ResourceAddress("primary"), kind: "connection")
+            .AddSecret("connections.primary.credential", SecretAddress("primary-credential"))
             .Build();
 
         var report = await ConfigurationValidator.ValidateAsync(
@@ -215,7 +217,8 @@ public sealed class ConfigurationValidatorTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Kind = "connection"
             }
         ]);
@@ -223,7 +226,8 @@ public sealed class ConfigurationValidatorTests
         [
             new SecretDescriptor
             {
-                Name = new SecretName("primary-credential"),
+                Name = Secret("primary-credential"),
+                Ownership = ResourceOwnership.Host,
                 Version = "v1",
                 Kind = "credential"
             }
@@ -233,8 +237,12 @@ public sealed class ConfigurationValidatorTests
             resourceDescriptors,
             secretDescriptors,
             new ConfigurationValidationRequestBuilder()
-                .AddResource("connections.primary", "primary", kind: "connection")
-                .AddSecret("connections.primary.credential", "primary-credential", version: "v1", kind: "credential")
+                .AddResource("connections.primary", ResourceAddress("primary"), kind: "connection")
+                .AddSecret(
+                    "connections.primary.credential",
+                    SecretAddress("primary-credential"),
+                    version: "v1",
+                    kind: "credential")
                 .Build());
 
         report.Diagnostics.ShouldBeEmpty();
@@ -248,7 +256,8 @@ public sealed class ConfigurationValidatorTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Kind = "connection"
             }
         ]);
@@ -256,23 +265,29 @@ public sealed class ConfigurationValidatorTests
         [
             new SecretDescriptor
             {
-                Name = new SecretName("primary-credential"),
+                Name = Secret("primary-credential"),
+                Ownership = ResourceOwnership.Host,
                 Version = "v1",
                 Kind = "credential"
             },
             new SecretDescriptor
             {
-                Name = new SecretName("primary-credential"),
+                Name = Secret("primary-credential"),
+                Ownership = ResourceOwnership.Host,
                 Version = "v2",
                 Kind = "credential"
             }
         ]);
         var request = new ConfigurationValidationRequestBuilder()
-            .AddResource("connections.missing", "missing", kind: "connection")
-            .AddResource("connections.primary", "primary", kind: "database")
-            .AddSecret("connections.missing.credential", "missing-credential")
-            .AddSecret("connections.primary.credential", "primary-credential")
-            .AddSecret("connections.primary.profile", "primary-credential", version: "v1", kind: "profile")
+            .AddResource("connections.missing", ResourceAddress("missing"), kind: "connection")
+            .AddResource("connections.primary", ResourceAddress("primary"), kind: "database")
+            .AddSecret("connections.missing.credential", SecretAddress("missing-credential"))
+            .AddSecret("connections.primary.credential", SecretAddress("primary-credential"))
+            .AddSecret(
+                "connections.primary.profile",
+                SecretAddress("primary-credential"),
+                version: "v1",
+                kind: "profile")
             .Build();
 
         var report = ConfigurationValidator.ValidateDeclaredReferences(
@@ -403,6 +418,7 @@ public sealed class ConfigurationValidatorTests
                 new ResourceDescriptor
                 {
                     Name = default,
+                    Ownership = (ResourceOwnership)0,
                     Metadata = new Dictionary<string, string>
                     {
                         [""] = "value"
@@ -412,12 +428,13 @@ public sealed class ConfigurationValidatorTests
             ]),
             []);
 
-        diagnostics.Count.ShouldBe(3);
+        diagnostics.Count.ShouldBe(4);
         diagnostics.ShouldAllBe(diagnostic => diagnostic.Source == ConfigurationDiagnosticSource.Resource);
         diagnostics.ShouldAllBe(diagnostic => diagnostic.Code == nameof(ResourceDiagnosticCode.InvalidResource));
         diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
         [
             "resources[0]",
+            "resources[0].ownership",
             "resources[0].metadata",
             "resources[1]"
         ]);
@@ -432,6 +449,7 @@ public sealed class ConfigurationValidatorTests
                 new SecretDescriptor
                 {
                     Name = default,
+                    Ownership = (ResourceOwnership)0,
                     Metadata = new Dictionary<string, string>
                     {
                         [""] = "value"
@@ -440,19 +458,22 @@ public sealed class ConfigurationValidatorTests
                 null!,
                 new SecretDescriptor
                 {
-                    Name = new SecretName("primary")
+                    Name = Secret("primary"),
+                    Ownership = ResourceOwnership.Host
                 },
                 new SecretDescriptor
                 {
-                    Name = new SecretName("primary")
+                    Name = Secret("primary"),
+                    Ownership = ResourceOwnership.Host
                 }
             ]),
             []);
 
-        diagnostics.Count.ShouldBe(4);
+        diagnostics.Count.ShouldBe(5);
         diagnostics.ShouldAllBe(diagnostic => diagnostic.Source == ConfigurationDiagnosticSource.Secret);
         diagnostics.Select(diagnostic => diagnostic.Code).ShouldBe(
         [
+            nameof(SecretDiagnosticCode.InvalidSecret),
             nameof(SecretDiagnosticCode.InvalidSecret),
             nameof(SecretDiagnosticCode.InvalidSecret),
             nameof(SecretDiagnosticCode.InvalidSecret),
@@ -461,6 +482,7 @@ public sealed class ConfigurationValidatorTests
         diagnostics.Select(diagnostic => diagnostic.Path).ShouldBe(
         [
             "secrets[0].name",
+            "secrets[0].ownership",
             "secrets[0].metadata",
             "secrets[1]",
             "secretDescriptors"
@@ -486,49 +508,49 @@ public sealed class ConfigurationValidatorTests
         var builder = new ConfigurationValidationRequestBuilder();
 
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddResource(null!, "primary"))
+            builder.AddResource(null!, ResourceAddress("primary")))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddResource(null!, (string)null!))
+            builder.AddResource(null!, (ApplicationAddress)null!))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
             builder.AddResource(null!, new ResourceReference
             {
-                Name = new ResourceName("primary")
+                Name = Resource("primary")
             }))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
             builder.AddOptionalResource(null!))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddResource("connections.primary", (string)null!))
-            .ParamName.ShouldBe("resourceName");
+            builder.AddResource("connections.primary", (ApplicationAddress)null!))
+            .ParamName.ShouldBe("resourceAddress");
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddSecret(null!, "primary"))
+            builder.AddSecret(null!, SecretAddress("primary")))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddSecret(null!, (string)null!))
+            builder.AddSecret(null!, (ApplicationAddress)null!))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentNullException>(() =>
             builder.AddSecret(null!, new SecretReference
             {
-                Name = new SecretName("primary")
+                Name = Secret("primary")
             }))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentNullException>(() =>
             builder.AddOptionalSecret(null!))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentNullException>(() =>
-            builder.AddSecret("connections.primary.credential", (string)null!))
-            .ParamName.ShouldBe("secretName");
+            builder.AddSecret("connections.primary.credential", (ApplicationAddress)null!))
+            .ParamName.ShouldBe("secretAddress");
     }
 
     [Fact]
     public async Task Request_builder_preserves_blank_paths_for_structured_validation()
     {
         var request = new ConfigurationValidationRequestBuilder()
-            .AddResource(" ", "primary")
-            .AddSecret(" ", "primary")
+            .AddResource(" ", ResourceAddress("primary"))
+            .AddSecret(" ", SecretAddress("primary"))
             .Build();
 
         var report = await ConfigurationValidator.ValidateAsync(
@@ -585,13 +607,13 @@ public sealed class ConfigurationValidatorTests
         var builder = new ConfigurationValidationRequestBuilder();
 
         Should.Throw<ArgumentException>(() =>
-                builder.AddResource(default(ConfigurationOptionPath), new ResourceName("primary")))
+                builder.AddResource(default(ConfigurationOptionPath), Resource("primary")))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentException>(() =>
                 builder.AddOptionalResource(default(ConfigurationOptionPath)))
             .ParamName.ShouldBe("path");
         Should.Throw<ArgumentException>(() =>
-                builder.AddSecret(default(ConfigurationOptionPath), new SecretName("primary")))
+                builder.AddSecret(default(ConfigurationOptionPath), Secret("primary")))
             .ParamName.ShouldBe("optionPath");
         Should.Throw<ArgumentException>(() =>
                 builder.AddOptionalSecret(default(ConfigurationOptionPath)))
@@ -736,7 +758,8 @@ public sealed class ConfigurationValidatorTests
         [
             new ResourceDescriptor
             {
-                Name = new ResourceName("primary"),
+                Name = Resource("primary"),
+                Ownership = ResourceOwnership.Host,
                 Kind = "connection"
             }
         ]);
@@ -757,7 +780,7 @@ public sealed class ConfigurationValidatorTests
                         Path = "connections.primary",
                         Reference = new ResourceReference
                         {
-                            Name = new ResourceName("primary"),
+                            Name = Resource("primary"),
                             Kind = "connection"
                         }
                     }
@@ -769,7 +792,7 @@ public sealed class ConfigurationValidatorTests
                         OptionPath = "connections.primary.credential",
                         Reference = new SecretReference
                         {
-                            Name = new SecretName("primary-credential")
+                            Name = Secret("primary-credential")
                         }
                     }
                 ]
@@ -797,7 +820,7 @@ public sealed class ConfigurationValidatorTests
                         Path = "connections.primary",
                         Reference = new ResourceReference
                         {
-                            Name = new ResourceName("missing"),
+                            Name = Resource("missing"),
                             Kind = "connection"
                         }
                     }
@@ -809,7 +832,7 @@ public sealed class ConfigurationValidatorTests
                         OptionPath = "connections.primary.credential",
                         Reference = new SecretReference
                         {
-                            Name = new SecretName("missing-credential")
+                            Name = Secret("missing-credential")
                         }
                     }
                 ]
@@ -994,7 +1017,7 @@ public sealed class ConfigurationValidatorTests
                 new SecretOptionReference
                 {
                     OptionPath = "connections.primary.credential",
-                    Reference = new SecretReference { Name = new SecretName("missing") }
+                    Reference = new SecretReference { Name = Secret("missing") }
                 }
             ]);
 
@@ -1013,7 +1036,7 @@ public sealed class ConfigurationValidatorTests
                 new ConfigurationResourceReference
                 {
                     Path = " connections.primary ",
-                    Reference = new ResourceReference { Name = new ResourceName("missing") }
+                    Reference = new ResourceReference { Name = Resource("missing") }
                 }
             ]);
 
@@ -1131,12 +1154,23 @@ public sealed class ConfigurationValidatorTests
         await act.ShouldThrowAsync<OperationCanceledException>();
     }
 
+    private static ApplicationAddress ResourceAddress(string name)
+        => ApplicationAddress.Resource("Resources", name.Trim());
+
+    private static ApplicationAddress SecretAddress(string name)
+        => ApplicationAddress.Resource("Secrets", name.Trim());
+
+    private static ResourceName Resource(string name) => new(ResourceAddress(name));
+
+    private static SecretName Secret(string name) => new(SecretAddress(name));
+
     private static SecretRecord CreateSecret(string name, string value)
         => new()
         {
             Descriptor = new SecretDescriptor
             {
-                Name = new SecretName(name)
+                Name = Secret(name),
+                Ownership = ResourceOwnership.Host
             },
             Value = new SecretValue(value)
         };

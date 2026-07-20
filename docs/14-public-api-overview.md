@@ -1242,39 +1242,22 @@ palette rendering, localization, and resource pickers owned by the host.
 
 These packages are intentionally not standalone node composition adapters:
 
-- `FluxFlow.Components.Configuration` validates resource and secret references,
-  including trimmed resource option paths, typed `ConfigurationOptionPath`
-  values for code-authored validation requests, and resource option metadata
-  diagnostics with normalized valid metadata maps, request collection
-  snapshotting, and a fluent `ConfigurationValidationRequestBuilder` with
-  individual and range additions over the same validation DTOs. The builder
-  rejects null fluent resource and secret option paths while preserving blank
-  config-bound paths for structured validation diagnostics. It supports both
-  runtime validation through `IResourceLookup`/`ISecretResolver` and
-  descriptor-only validation through `IResourceDescriptorProvider` and
-  `ISecretDescriptorProvider`. Public validator entry points reject null
-  collaborator services, requests, and reference collections at the package
-  boundary while preserving request-owned null collections as structured
-  diagnostics.
-- `FluxFlow.Components.Resources` defines named resource contracts and lookup
-  diagnostics, including descriptor-provider separation, trimmed resource
-  names, code-authored `ResourceKind` and `ResourceMetadataText` values,
-  descriptor display text, and null-safe normalized metadata and attribute
-  validation, defensive diagnostic metadata copying, and a fluent
-  `ResourceDescriptorCatalogBuilder` over the existing descriptor/catalog
-  contracts, plus keyed DI registration helpers for host-owned lookups and
-  descriptor providers. Descriptor/reference DTOs keep string-shaped optional
-  text so configuration-bound invalid values can still be reported as
-  diagnostics.
-- `FluxFlow.Components.Secrets` defines secret references, resolution results,
-  option helpers, redaction helpers, trimmed secret names, code-authored
-  `SecretVersion`, `SecretKind`, and `SecretMetadataText` values, option paths,
-  optional non-sensitive descriptor enumeration, null-safe normalized metadata
-  validation, defensive diagnostic metadata copying, and a fluent
-  `InMemorySecretResolverBuilder` for local secret record authoring, plus keyed
-  DI registration helpers for host-owned resolvers and descriptor providers.
-  Descriptor/reference DTOs keep string-shaped optional text so
-  configuration-bound invalid values can still be reported as diagnostics.
+- `FluxFlow.Components.Configuration` validates resource and secret references
+  through canonical nested `ApplicationAddress` resource identities. Its fluent
+  builder accepts application addresses directly, and runtime or descriptor-only
+  validation reports missing declarations, kind/version mismatches, invalid
+  ownership, and malformed option metadata without opening resources during
+  descriptor-only checks.
+- `FluxFlow.Components.Resources` defines canonical resource names,
+  references, descriptor catalogs, lookup diagnostics, and required `Host`,
+  `ResourceRevision`, or `External` ownership. Keyed registration uses exact
+  `ApplicationAddress.Value` identities and separates provider-owned factories
+  from non-owning external bridges.
+- `FluxFlow.Components.Secrets` uses the same resource address and ownership
+  model for secret references and non-sensitive descriptors. It retains
+  version/kind matching, option resolution, redacted values, and local resolver
+  authoring while distinguishing provider-owned resolvers from external
+  bridges.
 - `FluxFlow.Components.Expressions` provides expression engine and context
   factory registries used by adapters that resolve host-owned expression
   services, explicit expression registry argument guards, deterministic

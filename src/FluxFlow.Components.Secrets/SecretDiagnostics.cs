@@ -1,4 +1,5 @@
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Components.Resources.Contracts;
 
 namespace FluxFlow.Components.Secrets;
 
@@ -180,6 +181,13 @@ public static class SecretDiagnostics
     {
         if (string.IsNullOrWhiteSpace(descriptor.Name.Value))
             diagnostics.Add(Invalid($"{path}.name", "Secret name is required."));
+
+        if (!Enum.IsDefined(descriptor.Ownership))
+        {
+            diagnostics.Add(Invalid(
+                $"{path}.ownership",
+                "Secret ownership must be Host, ResourceRevision, or External."));
+        }
 
         ValidateOptionalText(descriptor.Version, $"{path}.version", diagnostics);
         ValidateOptionalText(descriptor.Kind, $"{path}.kind", diagnostics);

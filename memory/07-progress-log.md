@@ -2,6 +2,23 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext Resource Address And Ownership Alignment
+
+- Made Resources, Secrets, and Configuration use the shared canonical
+  `ApplicationAddress` resource namespace instead of flat names.
+- Added required host/resource-revision/external ownership metadata and
+  validation for resource and secret descriptors.
+- Split provider-owned factory registrations from explicit non-owning external
+  bridges, including a non-disposable descriptor view for resource lookups.
+- Moved all three support packages to `2.0.0`; updated docs, changelog, release
+  boundary tests, and source-declaration baselines.
+- Focused tests, the complete 2,158-test Release sweep, controlled Debug and
+  Release builds, release preflight, local-source package dry-runs, and a
+  package-only ownership consumer passed. Package validation against 1.x
+  reported only the intentional major-version API removals.
+- The next bounded milestone is final Hosting integration, followed separately
+  by Designer persistence.
+
 ## 2026-07-20 - vNext Sessions FlowContent And Results
 
 - Added canonical exact-content recorder/replay nodes and a one-output query

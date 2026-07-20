@@ -27,6 +27,13 @@ public static class ResourceDiagnostics
                 diagnostics.Add(Invalid(path, "Resource name is required."));
             }
 
+            if (!Enum.IsDefined(descriptor.Ownership))
+            {
+                diagnostics.Add(Invalid(
+                    $"{path}.ownership",
+                    "Resource ownership must be Host, ResourceRevision, or External."));
+            }
+
             ValidateOptionalText(descriptor.Kind, $"{path}.kind", diagnostics);
             ValidateOptionalText(descriptor.DisplayName, $"{path}.displayName", diagnostics);
             ValidateOptionalText(descriptor.Summary, $"{path}.summary", diagnostics);

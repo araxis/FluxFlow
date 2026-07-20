@@ -34,6 +34,13 @@ public sealed class ComponentPackageBoundaryTests
         "FluxFlow.Components.Storage.SqlFile"
     ];
 
+    private static readonly string[] CanonicalAddressSupportPackageIds =
+    [
+        "FluxFlow.Components.Configuration",
+        "FluxFlow.Components.Resources",
+        "FluxFlow.Components.Secrets"
+    ];
+
     private static readonly string[] ForbiddenSupportOnlyReferences =
     [
         "FluxFlow.Nodes",
@@ -57,6 +64,12 @@ public sealed class ComponentPackageBoundaryTests
 
             foreach (var forbiddenReference in ForbiddenNonCompositionReferences)
             {
+                if (string.Equals(forbiddenReference, "FluxFlow.Composition", StringComparison.Ordinal)
+                    && CanonicalAddressSupportPackageIds.Contains(entry.PackageId, StringComparer.Ordinal))
+                {
+                    continue;
+                }
+
                 referencedPackageIds.ShouldNotContain(
                     forbiddenReference,
                     $"{entry.PackageId} must keep composition, Designer, and engine dependencies in optional adapter packages.");
@@ -88,6 +101,12 @@ public sealed class ComponentPackageBoundaryTests
 
             foreach (var forbiddenReference in ForbiddenSupportOnlyReferences)
             {
+                if (string.Equals(forbiddenReference, "FluxFlow.Composition", StringComparison.Ordinal)
+                    && CanonicalAddressSupportPackageIds.Contains(entry.PackageId, StringComparer.Ordinal))
+                {
+                    continue;
+                }
+
                 referencedPackageIds.ShouldNotContain(
                     forbiddenReference,
                     $"{entry.PackageId} must stay a support package; node runtimes belong in normal component packages or optional adapters.");
@@ -106,6 +125,29 @@ public sealed class ComponentPackageBoundaryTests
 
             nodeFiles.ShouldBeEmpty($"{entry.PackageId} must not ship node classes.");
             nodeDirectories.ShouldBeEmpty($"{entry.PackageId} must not ship a Nodes folder.");
+        }
+    }
+
+    [Fact]
+    public void Address_aware_support_packages_use_the_canonical_composition_address_model()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entriesByPackageId = PackageManifest
+            .Read(root)
+            .ToDictionary(entry => entry.PackageId, StringComparer.Ordinal);
+
+        foreach (var packageId in CanonicalAddressSupportPackageIds)
+        {
+            var entry = entriesByPackageId[packageId];
+            var project = XDocument.Load(ReadProjectPath(root, entry));
+            var referencedPackageIds = ReadAllReferencedPackageIds(
+                    project,
+                    ReadProjectDirectory(root, entry))
+                .ToArray();
+
+            referencedPackageIds.ShouldContain(
+                "FluxFlow.Composition",
+                $"{packageId} must use the one canonical application address model.");
         }
     }
 

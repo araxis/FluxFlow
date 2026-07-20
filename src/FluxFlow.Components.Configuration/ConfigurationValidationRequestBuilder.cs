@@ -1,6 +1,7 @@
 using FluxFlow.Components.Configuration.Contracts;
 using FluxFlow.Components.Resources.Contracts;
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 
 namespace FluxFlow.Components.Configuration;
 
@@ -28,19 +29,19 @@ public sealed class ConfigurationValidationRequestBuilder
 
     public ConfigurationValidationRequestBuilder AddResource(
         string path,
-        string resourceName,
+        ApplicationAddress resourceAddress,
         string? kind = null,
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
         ArgumentNullException.ThrowIfNull(path);
-        ArgumentNullException.ThrowIfNull(resourceName);
+        ArgumentNullException.ThrowIfNull(resourceAddress);
 
         return AddResource(
             path,
             new ResourceReference
             {
-                Name = new ResourceName(resourceName),
+                Name = new ResourceName(resourceAddress),
                 Kind = kind
             },
             required,
@@ -71,6 +72,22 @@ public sealed class ConfigurationValidationRequestBuilder
         }
 
         return AddResource(resource);
+    }
+
+    public ConfigurationValidationRequestBuilder AddResource(
+        ConfigurationOptionPath path,
+        ApplicationAddress resourceAddress,
+        ResourceKind? kind = null,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        ArgumentNullException.ThrowIfNull(resourceAddress);
+        return AddResource(
+            path,
+            new ResourceName(resourceAddress),
+            kind,
+            required,
+            metadata);
     }
 
     public ConfigurationValidationRequestBuilder AddResource(
@@ -145,20 +162,20 @@ public sealed class ConfigurationValidationRequestBuilder
 
     public ConfigurationValidationRequestBuilder AddSecret(
         string optionPath,
-        string secretName,
+        ApplicationAddress secretAddress,
         string? version = null,
         string? kind = null,
         bool required = true,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
         ArgumentNullException.ThrowIfNull(optionPath);
-        ArgumentNullException.ThrowIfNull(secretName);
+        ArgumentNullException.ThrowIfNull(secretAddress);
 
         return AddSecret(
             optionPath,
             new SecretReference
             {
-                Name = new SecretName(secretName),
+                Name = new SecretName(secretAddress),
                 Version = version,
                 Kind = kind
             },
@@ -190,6 +207,24 @@ public sealed class ConfigurationValidationRequestBuilder
         }
 
         return AddSecret(secret);
+    }
+
+    public ConfigurationValidationRequestBuilder AddSecret(
+        ConfigurationOptionPath optionPath,
+        ApplicationAddress secretAddress,
+        SecretVersion? version = null,
+        SecretKind? kind = null,
+        bool required = true,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        ArgumentNullException.ThrowIfNull(secretAddress);
+        return AddSecret(
+            optionPath,
+            new SecretName(secretAddress),
+            version,
+            kind,
+            required,
+            metadata);
     }
 
     public ConfigurationValidationRequestBuilder AddSecret(

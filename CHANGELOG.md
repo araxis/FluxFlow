@@ -7,6 +7,42 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Resources 2.0.0
+
+Aligns resource metadata and keyed registration with the canonical vNext
+application address and ownership model.
+
+- Requires canonical ordinal nested resource addresses such as
+  `Resources.Messaging.Client1`.
+- Adds required `Host`, `ResourceRevision`, or `External` descriptor ownership.
+- Uses canonical address values as keyed service identities.
+- Separates provider-owned factories from non-owning external bridges and
+  avoids duplicate disposal tracking through descriptor aliases.
+
+## FluxFlow.Components.Secrets 2.0.0
+
+Aligns secret references with canonical resource addresses and explicit
+ownership.
+
+- Uses `ApplicationAddress` resource identities for secret names and keyed
+  resolver registrations.
+- Requires ownership metadata on non-sensitive secret descriptors.
+- Separates provider-owned resolver/descriptor factories from non-owning
+  external bridges.
+- Keeps secret values, redaction, versions, kinds, and resolution behavior
+  unchanged.
+
+## FluxFlow.Components.Configuration 2.0.0
+
+Validates the canonical resource/secret identity and ownership contracts.
+
+- Accepts application resource addresses directly in fluent validation
+  requests.
+- Reports missing or invalid resource and secret ownership as structured
+  declaration diagnostics.
+- Keeps option-path, required/optional reference, lookup/resolution, and report
+  behavior unchanged.
+
 ## FluxFlow.Components.Sessions 4.0.0
 
 Adds canonical exact-content session recording and replay plus one-output query

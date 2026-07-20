@@ -1,4 +1,6 @@
+using FluxFlow.Components.Resources.Contracts;
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 using Shouldly;
 using Xunit;
 
@@ -12,7 +14,7 @@ public sealed class SecretOptionResolverTests
         var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value", kind: "profile")]);
         var reference = new SecretReference
         {
-            Name = new SecretName("primary"),
+            Name = Secret("primary"),
             Kind = "profile"
         };
 
@@ -31,7 +33,7 @@ public sealed class SecretOptionResolverTests
         var resolver = new InMemorySecretResolver([CreateRecord("primary", "runtime-value")]);
         var reference = new SecretReference
         {
-            Name = new SecretName("primary")
+            Name = Secret("primary")
         };
 
         var result = await SecretOptionResolver.ResolveRequiredAsync(resolver, reference, " credential ");
@@ -94,12 +96,12 @@ public sealed class SecretOptionResolverTests
                 new SecretOptionReference
                 {
                     OptionPath = "first",
-                    Reference = new SecretReference { Name = new SecretName("primary") }
+                    Reference = new SecretReference { Name = Secret("primary") }
                 },
                 new SecretOptionReference
                 {
                     OptionPath = "second",
-                    Reference = new SecretReference { Name = new SecretName("missing") }
+                    Reference = new SecretReference { Name = Secret("missing") }
                 },
                 new SecretOptionReference
                 {
@@ -204,13 +206,17 @@ public sealed class SecretOptionResolverTests
         {
             Descriptor = new SecretDescriptor
             {
-                Name = new SecretName(name),
+                Name = Secret(name),
+                Ownership = ResourceOwnership.Host,
                 Version = version,
                 Kind = kind,
                 DisplayName = "Primary"
             },
             Value = new SecretValue(value)
         };
+
+    private static SecretName Secret(string name)
+        => new(ApplicationAddress.Resource("Secrets", name.Trim()));
 
     private sealed class CountingSecretResolver : ISecretResolver
     {

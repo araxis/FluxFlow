@@ -1,80 +1,52 @@
 # FluxFlow.Components.Configuration
 
-Reusable configuration validation report helpers for FluxFlow.
+Combined resource-reference and secret-reference validation for FluxFlow hosts.
 
 ## Purpose
 
-This package lets hosts validate resource references and secret option
-references into one neutral report. It does not own resources, secret storage,
-application files, or runtime lifecycle.
+This package turns resource and secret validation into one neutral report. It
+uses canonical nested `ApplicationAddress` resource identities and validates
+the explicit ownership metadata declared by resource and secret descriptor
+providers.
+
+It does not load the application document, own resources, resolve deployment
+policy, or manage runtime revisions.
 
 ## Contracts
 
-- `ConfigurationResourceReference`: a resource option path plus optional
+- `ConfigurationResourceReference`: a component option path plus an optional
   `ResourceReference`.
-- `ConfigurationOptionPath`: non-empty, trimmed option-path value for
-  code-authored validation requests.
-- `ConfigurationValidationRequest`: resource references and secret option
-  references to validate.
-- `ConfigurationDiagnostic`: normalized validation issue with source, code,
-  severity, path, name, kind, and metadata.
-- `ConfigurationValidationReport`: ordered diagnostics plus summary counts.
-- `ConfigurationValidator`: helper for resource-only, secret-only, or combined
-  runtime validation, plus descriptor-only validation for declared references.
-- `ConfigurationValidationRequestBuilder`: fluent helper that builds the same
-  validation request DTOs used by configuration loading.
+- `ConfigurationOptionPath`: a non-empty code-authored option path.
+- `ConfigurationValidationRequest`: resource and secret references to check.
+- `ConfigurationDiagnostic`: normalized source, code, severity, path, address,
+  kind, and metadata.
+- `ConfigurationValidationReport`: ordered diagnostics and summary counts.
+- `ConfigurationValidator`: runtime lookup/resolution validation and
+  descriptor-only validation.
+- `ConfigurationValidationRequestBuilder`: fluent request construction using
+  canonical addresses.
 
 ## Example
 
 ```csharp
 using FluxFlow.Components.Configuration;
-using FluxFlow.Components.Configuration.Contracts;
-using FluxFlow.Components.Resources.Contracts;
-using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Composition.Addressing;
 
-var report = await ConfigurationValidator.ValidateAsync(
-    resourceLookup,
-    secretResolver,
-    new ConfigurationValidationRequest
-    {
-        Resources =
-        [
-            new ConfigurationResourceReference
-            {
-                Path = "connections.primary",
-                Reference = new ResourceReference
-                {
-                    Name = new ResourceName("primary"),
-                    Kind = "connection"
-                }
-            }
-        ],
-        Secrets =
-        [
-            new SecretOptionReference
-            {
-                OptionPath = "connections.primary.credential",
-                Reference = new SecretReference
-                {
-                    Name = new SecretName("primary-credential")
-                }
-            }
-        ]
-    });
+var clientAddress = ApplicationAddress.Resource("Messaging", "Client1");
+var credentialAddress = ApplicationAddress.Resource(
+    "Credentials",
+    "Client1Password");
 
-Console.WriteLine(report.HasErrors);
-```
-
-Fluent request construction is available when code wants the same DTO shape
-without hand-assembling nested objects:
-
-```csharp
 var request = new ConfigurationValidationRequestBuilder()
-    .AddResource("connections.primary", "primary", kind: "connection")
-    .AddSecret("connections.primary.credential", "primary-credential")
-    .AddOptionalResource("connections.secondary")
-    .AddResources(componentResourceReferences)
-    .AddSecrets(componentSecretReferences)
+    .AddResource(
+        "client",
+        clientAddress,
+        kind: "mqtt.client")
+    .AddSecret(
+        "password",
+        credentialAddress,
+        kind: "credential")
+    .AddOptionalResource("retryPolicy")
     .Build();
 
 var report = await ConfigurationValidator.ValidateAsync(
@@ -83,26 +55,14 @@ var report = await ConfigurationValidator.ValidateAsync(
     request);
 ```
 
-Code-authored requests can use typed paths and typed resource or secret
-metadata values at the builder boundary:
+Typed `ResourceName` and `SecretName` overloads remain available when a caller
+already has a reference DTO. Code starting from the application model should
+pass `ApplicationAddress` directly.
 
-```csharp
-var request = new ConfigurationValidationRequestBuilder()
-    .AddResource(
-        new ConfigurationOptionPath("connections.primary"),
-        new ResourceName("primary"),
-        kind: new ResourceKind("connection"))
-    .AddSecret(
-        new ConfigurationOptionPath("connections.primary.credential"),
-        new SecretName("primary-credential"),
-        version: new SecretVersion("v1"),
-        kind: new SecretKind("credential"))
-    .Build();
-```
+## Declared Reference Validation
 
-Design-time or configuration-only hosts can validate references against
-descriptor providers without opening runtime resources or resolving secret
-values:
+Design-time and activation-time callers can validate without opening resources
+or reading secret values:
 
 ```csharp
 var report = ConfigurationValidator.ValidateDeclaredReferences(
@@ -111,58 +71,20 @@ var report = ConfigurationValidator.ValidateDeclaredReferences(
     request);
 ```
 
+Descriptor validation checks canonical addresses, required ownership, duplicate
+declarations, kind mismatches, and ambiguous secret versions. Runtime
+validation additionally calls the host-owned lookup and resolver abstractions.
+
 ## Boundaries
 
-This package only normalizes validation. Hosts still decide where resources and
-secret values live, how they are secured, when they are resolved, and how
-diagnostics are displayed or logged.
-
-The public `ConfigurationValidator` entry points reject null resource lookups,
-secret resolvers, descriptor providers, validation requests, and reference
-collections at the package boundary. Config-bound null resource/secret
-collections inside a request are still reported as structured diagnostics.
-
-Resource option metadata is validated as configuration input. Null maps, empty
-keys, and empty values are reported as structured configuration diagnostics.
-Null request-level resource/secret collections and null validation entries are
-also reported as structured configuration diagnostics, which keeps
-configuration-file binding issues in the validation report instead of surfacing
-as normalization exceptions.
-`ConfigurationValidationRequest` copies assigned resource and secret
-collections, so later caller list mutations do not change what a constructed
-request represents. Null collection assignments are preserved for structured
-request diagnostics.
-`ConfigurationValidationRequestBuilder` is only an authoring helper over these
-same DTOs. It rejects null resource paths and secret option paths immediately,
-before constructing resource or secret references. Blank paths are still
-represented in the DTOs and reported later as structured validation diagnostics.
-`ConfigurationOptionPath` is available for code-authored requests that should
-fail fast on blank paths before constructing DTOs.
-It does not own resource lookup, secret resolution, or validation policy.
-Descriptor-only validation uses host-owned resource and secret descriptor
-providers. It checks declaration presence, kind mismatches, ambiguous secret
-versions, and invalid descriptor provider output, but it does not open
-resources or read secret values.
-The builder can append individual references or existing reference collections
-through `AddResources` and `AddSecrets`; built requests snapshot the current
-builder contents.
-
-Resource option paths trim surrounding whitespace when assigned, matching the
-secret option path behavior from `FluxFlow.Components.Secrets`. Diagnostics and
-metadata therefore report the normalized option path.
-
-Configuration diagnostics trim textual fields when assigned. Diagnostic
-metadata and validation report diagnostic collections are copied on assignment,
-so later caller mutations do not change an already-created report. Null report
-diagnostic collections become empty reports, while null diagnostic entries are
-rejected at the public boundary.
-
-Valid resource option metadata maps trim surrounding whitespace from keys and
-values when assigned. Null maps, blank keys or values, and duplicate keys after
-trimming are reported as structured configuration diagnostics.
+The validator reports configuration facts; it does not select `Host`,
+`ResourceRevision`, or `External` ownership, create resources, transfer
+disposal ownership, build service providers, or apply revisions. Composition
+owns the address model and Hosting owns immutable provider snapshots and
+transactional activation.
 
 ## Composition
 
-This package does not expose standalone nodes or `FluxFlow.Composition`
-factories. Composition adapters may use these validation contracts indirectly
-when a host wants to validate resource and secret references.
+This package references `FluxFlow.Composition` only for canonical application
+resource addresses. It does not expose composition node factories or load the
+application document.

@@ -1,3 +1,4 @@
+using FluxFlow.Composition.Addressing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FluxFlow.Components.Secrets;
@@ -6,63 +7,70 @@ public static class SecretServiceCollectionExtensions
 {
     public static IServiceCollection AddFluxFlowSecretResolver(
         this IServiceCollection services,
-        string name,
-        ISecretResolver resolver)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(resolver);
-
-        return services.AddFluxFlowSecretResolver(name, _ => resolver);
-    }
-
-    public static IServiceCollection AddFluxFlowSecretResolver(
-        this IServiceCollection services,
-        string name,
+        ApplicationAddress address,
         Func<IServiceProvider, ISecretResolver> resolverFactory)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ValidateResourceAddress(address);
         ArgumentNullException.ThrowIfNull(resolverFactory);
 
-        var normalizedName = name.Trim();
-
         services.AddKeyedSingleton<ISecretResolver>(
-            normalizedName,
+            address.Value,
             (provider, _) => resolverFactory(provider)
                 ?? throw new InvalidOperationException("Secret resolver factory returned null."));
 
         return services;
     }
 
-    public static IServiceCollection AddFluxFlowSecretDescriptorProvider(
+    public static IServiceCollection AddExternalFluxFlowSecretResolver(
         this IServiceCollection services,
-        string name,
-        ISecretDescriptorProvider descriptorProvider)
+        ApplicationAddress address,
+        ISecretResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(descriptorProvider);
-
-        return services.AddFluxFlowSecretDescriptorProvider(name, _ => descriptorProvider);
+        ValidateResourceAddress(address);
+        ArgumentNullException.ThrowIfNull(resolver);
+        services.AddKeyedSingleton(address.Value, resolver);
+        return services;
     }
 
     public static IServiceCollection AddFluxFlowSecretDescriptorProvider(
         this IServiceCollection services,
-        string name,
+        ApplicationAddress address,
         Func<IServiceProvider, ISecretDescriptorProvider> descriptorProviderFactory)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ValidateResourceAddress(address);
         ArgumentNullException.ThrowIfNull(descriptorProviderFactory);
 
-        var normalizedName = name.Trim();
-
         services.AddKeyedSingleton<ISecretDescriptorProvider>(
-            normalizedName,
+            address.Value,
             (provider, _) => descriptorProviderFactory(provider)
                 ?? throw new InvalidOperationException("Secret descriptor provider factory returned null."));
 
         return services;
+    }
+
+    public static IServiceCollection AddExternalFluxFlowSecretDescriptorProvider(
+        this IServiceCollection services,
+        ApplicationAddress address,
+        ISecretDescriptorProvider descriptorProvider)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ValidateResourceAddress(address);
+        ArgumentNullException.ThrowIfNull(descriptorProvider);
+        services.AddKeyedSingleton(address.Value, descriptorProvider);
+        return services;
+    }
+
+    private static void ValidateResourceAddress(ApplicationAddress address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        if (address.Kind != ApplicationAddressKind.Resource)
+        {
+            throw new ArgumentException(
+                $"Address '{address}' must be a resource address.",
+                nameof(address));
+        }
     }
 }

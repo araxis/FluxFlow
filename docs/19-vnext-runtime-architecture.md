@@ -20,9 +20,14 @@ compatibility surfaces.
 Sources now emits generated and deterministic sequence data as canonical
 FlowValue messages with natural zero-input lifecycle semantics, while retaining
 released typed standalone and explicit registration compatibility surfaces.
+Resources and Secrets now use canonical nested application resource addresses,
+require explicit host/resource-revision/external ownership metadata, and expose
+provider-owned versus non-owning keyed registration APIs. Configuration validates
+the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
-are migrated incrementally.
+through Sessions are migrated. Final Hosting integration and Designer
+persistence remain separate bounded milestones.
 
 ## Package Ownership
 

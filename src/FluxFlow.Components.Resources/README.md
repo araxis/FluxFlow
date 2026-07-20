@@ -1,159 +1,116 @@
 # FluxFlow.Components.Resources
 
-Reusable named resource contracts for FluxFlow.
+Canonical resource references, descriptor catalogs, diagnostics, and keyed
+registration helpers for FluxFlow hosts.
 
 ## Purpose
 
-This package lets hosts describe and resolve named resources without coupling
-component packages to a concrete owner or lifecycle model.
+This package describes resources without creating protocol clients, stores, or
+other concrete infrastructure. Resource identity uses the same ordinal,
+case-sensitive `ApplicationAddress` model as application definitions, runtime
+ports, and Hosting snapshots.
+
+Every resource name is a canonical nested address beginning with `Resources`,
+for example `Resources.Messaging.Client1`. Flat names and workflow/component
+addresses are rejected.
 
 ## Contracts
 
-- `ResourceReference`: a name plus optional kind and attributes.
-- `ResourceDescriptor`: a declared resource name, optional kind, display fields,
-  and metadata.
-- `ResourceKind` and `ResourceMetadataText`: small value types for code-authored
-  descriptor kind, display-name, and summary values.
-- `IResourceDescriptorProvider`: a small metadata enumeration abstraction for
-  declared resources.
-- `IResourceLookup`: a small lookup abstraction hosts can back with their own
-  resource lifecycle; it also exposes declared descriptors.
-- `ResourceServiceCollectionExtensions`: keyed DI registration helpers for
-  host-owned lookups and descriptor providers.
-- `ResourceDescriptorCatalogBuilder`: a fluent helper that creates
-  `ResourceDescriptor` snapshots or a validated `ResourceDescriptorCatalog`.
-- `ResourceLookupResult`: lookup outcome plus a structured diagnostic when a
-  resource cannot be used.
-- `ResourceDiagnostic`: stable diagnostics for missing, duplicate, unused, kind
-  mismatch, and invalid resources.
+- `ResourceName`: a resource-only wrapper over a canonical
+  `ApplicationAddress`.
+- `ResourceReference`: a resource name plus optional kind and attributes.
+- `ResourceDescriptor`: a declared resource name, explicit ownership, optional
+  kind, display fields, and metadata.
+- `ResourceOwnership`: `Host`, `ResourceRevision`, or `External`.
+- `IResourceDescriptorProvider`: enumerates declared resource metadata.
+- `IResourceLookup`: resolves references and exposes declared metadata.
+- `ResourceDescriptorCatalog`: validates and resolves descriptor snapshots.
+- `ResourceDiagnostics`: validates declarations and references and reports
+  missing, duplicate, unused, kind-mismatched, and invalid resources.
 
-`ResourceLookupResult` factory helpers reject null references or descriptors at
-the public boundary so invalid lookup outcomes fail with clear argument names.
+`ResourceOwnership` records the lifetime decision made by the host:
 
-## Example
+- `Host`: the host-lifetime provider owns creation and disposal.
+- `ResourceRevision`: a resource-revision provider owns creation and disposal.
+- `External`: an instance is bridged without transferring disposal ownership.
+
+Ownership is descriptor metadata. This package does not build provider
+snapshots or decide which ownership value a deployment must use.
+
+## Catalog Example
 
 ```csharp
 using FluxFlow.Components.Resources;
 using FluxFlow.Components.Resources.Contracts;
+using FluxFlow.Composition.Addressing;
 
-var catalog = new ResourceDescriptorCatalog(
-[
-    new ResourceDescriptor
-    {
-        Name = new ResourceName("primary-profile"),
-        Kind = "profile",
-        DisplayName = "Primary Profile",
-        Metadata = new Dictionary<string, string>
-        {
-            ["owner"] = "runtime"
-        }
-    }
-]);
+var clientAddress = ApplicationAddress.Resource("Messaging", "Client1");
+var catalog = new ResourceDescriptorCatalogBuilder()
+    .Add(
+        clientAddress,
+        ResourceOwnership.ResourceRevision,
+        kind: "mqtt.client",
+        displayName: "Command Client")
+    .BuildCatalog();
 
 var result = await catalog.LookupAsync(new ResourceReference
 {
-    Name = new ResourceName("primary-profile"),
-    Kind = "profile"
+    Name = new ResourceName(clientAddress),
+    Kind = "mqtt.client"
 });
 
 Console.WriteLine(result.Found);
 ```
 
-Code that only needs declared resource metadata can depend on
-`IResourceDescriptorProvider` without performing lookups:
+`ResourceName.Address` returns the parsed canonical address. The constructor
+also accepts a canonical address string when a configuration adapter already
+has one.
+
+## Keyed Registration
+
+Factory registration is provider-owned:
 
 ```csharp
-foreach (var descriptor in descriptorProvider.GetResources())
-    Console.WriteLine(descriptor.Name);
+var catalogAddress = ApplicationAddress.Resource("Infrastructure", "Catalog");
+
+services.AddFluxFlowResourceLookup(
+    catalogAddress,
+    provider => BuildCatalog(provider));
 ```
 
-Fluent descriptor construction is available when code wants the same descriptor
-shape with less object setup:
+External registration is explicitly non-owning:
 
 ```csharp
-var catalog = new ResourceDescriptorCatalogBuilder()
-    .Add(
-        "primary-profile",
-        kind: "profile",
-        displayName: "Primary Profile",
-        metadata: new Dictionary<string, string>
-        {
-            ["owner"] = "runtime"
-        })
-    .BuildCatalog();
+services.AddExternalFluxFlowResourceLookup(catalogAddress, existingCatalog);
 ```
 
-Code-authored descriptors can use value types at the builder boundary while the
-underlying DTOs remain configuration-friendly:
+Both lookup registrations expose `IResourceLookup` and a non-owning
+`IResourceDescriptorProvider` view under `catalogAddress.Value`. The view keeps
+one provider-created lookup from being disposal-tracked twice and does not
+transfer ownership of an external lookup.
 
-```csharp
-var catalog = new ResourceDescriptorCatalogBuilder()
-    .Add(
-        new ResourceName("primary-profile"),
-        kind: new ResourceKind("profile"),
-        displayName: new ResourceMetadataText("Primary Profile"),
-        summary: new ResourceMetadataText("Runtime profile."))
-    .BuildCatalog();
-```
+Descriptor-only providers have matching
+`AddFluxFlowResourceDescriptorProvider(...)` and
+`AddExternalFluxFlowResourceDescriptorProvider(...)` helpers.
 
 ## Diagnostics
 
-Use `ResourceDiagnostics` to:
-
-- validate descriptors and references
-- find duplicate descriptors
-- find missing references
-- find unused descriptors
-
-Metadata and attribute maps are validated as part of descriptors and references;
-null maps are reported as structured invalid-resource diagnostics.
-Null descriptor entries and null reference entries inside helper collections are
-reported or ignored by the relevant diagnostic helpers instead of surfacing
-accidental null-reference failures.
-`ResourceDiagnostic` copies assigned metadata, treats null diagnostic metadata
-as empty, and formats as a metadata-safe one-line summary.
-
-`ResourceName`, resource `Kind`, `DisplayName`, and `Summary` trim surrounding
-whitespace when assigned. `ResourceKind` and `ResourceMetadataText` provide the
-same trimming for code-authored descriptors and reject empty values at the
-builder boundary. The descriptor/reference DTOs still keep their string-shaped
-fields so configuration-bound invalid text can be reported as structured
-diagnostics instead of throwing during binding.
-
-Valid metadata and attribute maps trim surrounding whitespace from keys and
-values when assigned. Maps with null values, blank keys or values, or duplicate
-keys after trimming are preserved so `ResourceDiagnostics` can report structured
-invalid-resource diagnostics.
+Descriptor validation requires a canonical name, a defined ownership value,
+valid optional text, and valid metadata. Reference validation requires a
+canonical name and valid optional kind/attributes. Maps are copied and
+normalized when valid; malformed maps remain diagnosable rather than failing
+during configuration binding.
 
 ## Boundaries
 
-This package only defines resource contracts and helper logic. Hosts decide how
-resources are created, secured, refreshed, shared, disposed, and displayed.
-`IResourceDescriptorProvider` separates resource metadata enumeration from
-lookup call sites that resolve a specific `ResourceReference`.
-`ResourceDescriptorCatalogBuilder` is only an authoring helper over the same
-descriptor and catalog contracts; it does not create or own concrete resources.
-
-Hosts using keyed DI can register resource lookups and descriptor providers
-directly:
-
-```csharp
-services
-    .AddFluxFlowResourceLookup("resources", catalog)
-    .AddFluxFlowResourceDescriptorProvider("declared-resources", descriptorProvider);
-```
-
-Keyed DI helper names are trimmed before registration, matching the normalization
-used by `ResourceName` and catalog lookups.
-
-Registering an `IResourceLookup` also exposes it as an
-`IResourceDescriptorProvider` with the same key. These helpers only register
-already-owned services; they do not create clients, stores, secrets, or
-composition node factories.
+This package does not create or dispose concrete application resources, parse
+the application document, build provider snapshots, perform workflow routing,
+or expose standalone nodes. Composition owns definitions and addressing;
+Hosting owns provider boundaries and revisions; concrete resource packages own
+their runtime clients and adapters.
 
 ## Composition
 
-This package does not expose standalone nodes or `FluxFlow.Composition`
-factories. Composition adapters consume host-owned resources through their own
-keyed resource names and may use these contracts for higher-level resource
-catalogs.
+This package references `FluxFlow.Composition` only for the canonical
+`ApplicationAddress` contract. It does not expose composition node factories,
+load application definitions, or perform routing.

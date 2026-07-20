@@ -138,8 +138,8 @@ public sealed class ReleaseScriptTests
             File.Exists(outputPath).ShouldBeTrue();
 
             var notes = File.ReadAllText(outputPath);
-            notes.ShouldContain("Adds the shared FluxFlow package icon.");
-            notes.ShouldContain("No source, public API, dependency, or runtime behavior changes.");
+            notes.ShouldContain("Validates the canonical resource/secret identity and ownership contracts.");
+            notes.ShouldContain("Accepts application resource addresses directly");
             notes.ShouldNotContain("## ");
         }
         finally

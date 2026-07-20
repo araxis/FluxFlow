@@ -1,4 +1,6 @@
 using FluxFlow.Components.Secrets.Contracts;
+using FluxFlow.Components.Resources.Contracts;
+using FluxFlow.Composition.Addressing;
 
 namespace FluxFlow.Components.Secrets;
 
@@ -24,20 +26,22 @@ public sealed class InMemorySecretResolverBuilder
     }
 
     public InMemorySecretResolverBuilder Add(
-        string name,
+        ApplicationAddress address,
         string value,
+        ResourceOwnership ownership,
         string? version = null,
         string? kind = null,
         string? displayName = null,
         string? summary = null,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
-        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(address);
         ArgumentNullException.ThrowIfNull(value);
 
         return Add(
-            name,
+            address,
             new SecretValue(value),
+            ownership,
             version,
             kind,
             displayName,
@@ -46,20 +50,22 @@ public sealed class InMemorySecretResolverBuilder
     }
 
     public InMemorySecretResolverBuilder Add(
-        string name,
+        ApplicationAddress address,
         SecretValue value,
+        ResourceOwnership ownership,
         string? version = null,
         string? kind = null,
         string? displayName = null,
         string? summary = null,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
-        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(address);
         ArgumentNullException.ThrowIfNull(value);
 
         var descriptor = new SecretDescriptor
         {
-            Name = new SecretName(name),
+            Name = new SecretName(address),
+            Ownership = ownership,
             Version = version,
             Kind = kind,
             DisplayName = displayName,
@@ -84,6 +90,7 @@ public sealed class InMemorySecretResolverBuilder
     public InMemorySecretResolverBuilder Add(
         SecretName name,
         string value,
+        ResourceOwnership ownership,
         SecretVersion? version = null,
         SecretKind? kind = null,
         SecretMetadataText? displayName = null,
@@ -95,6 +102,7 @@ public sealed class InMemorySecretResolverBuilder
         return Add(
             name,
             new SecretValue(value),
+            ownership,
             version,
             kind,
             displayName,
@@ -105,6 +113,7 @@ public sealed class InMemorySecretResolverBuilder
     public InMemorySecretResolverBuilder Add(
         SecretName name,
         SecretValue value,
+        ResourceOwnership ownership,
         SecretVersion? version = null,
         SecretKind? kind = null,
         SecretMetadataText? displayName = null,
@@ -118,6 +127,7 @@ public sealed class InMemorySecretResolverBuilder
         var descriptor = new SecretDescriptor
         {
             Name = name,
+            Ownership = ownership,
             Version = version?.Value,
             Kind = kind?.Value,
             DisplayName = displayName?.Value,
