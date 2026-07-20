@@ -1,6 +1,6 @@
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Timers.Contracts;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Timers.Composition;
 
@@ -20,7 +20,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Interval,
             "Interval Timer",
-            "Emits tick messages on a fixed interval.",
+            "Emits immutable workflow tick values on a fixed interval.",
             "timer",
             "interval",
             builder =>
@@ -58,8 +58,8 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 AddBoundedCapacityOption(builder);
                 AddOutputPort(
                     builder,
-                    nameof(TimerTick),
-                    "Timer tick message.",
+                    nameof(FlowValue),
+                    "Immutable timer tick value.",
                     isPrimary: true);
             });
 
@@ -67,7 +67,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Schedule,
             "Schedule Timer",
-            "Emits tick messages from a cron schedule.",
+            "Emits immutable workflow tick values from a cron schedule.",
             "calendar-clock",
             "schedule",
             builder =>
@@ -87,8 +87,8 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 AddBoundedCapacityOption(builder);
                 AddOutputPort(
                     builder,
-                    nameof(ScheduleTick),
-                    "Schedule tick message.",
+                    nameof(FlowValue),
+                    "Immutable schedule tick value.",
                     isPrimary: true);
             },
             attributes: new Dictionary<string, string>
@@ -101,7 +101,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Delay,
             "Delay",
-            "Re-emits each input message after a configured delay.",
+            "Emits a result for each workflow value after a configured delay.",
             "clock",
             "delay",
             builder =>
@@ -124,7 +124,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Throttle,
             "Throttle",
-            "Rate-limits input messages to one output per interval.",
+            "Rate-limits workflow values and emits ordered results.",
             "gauge",
             "throttle",
             builder =>
@@ -157,7 +157,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
         => CreateTimerMetadata(
             TimersCompositionNodeTypes.Debounce,
             "Debounce",
-            "Emits the latest input message after a quiet period.",
+            "Emits a result for the latest workflow value after a quiet period.",
             "timer-reset",
             "debounce",
             builder =>
@@ -271,13 +271,13 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
             displayName: "Input",
             group: "Messages",
             order: 0,
-            summary: "Input message.",
-            valueType: "TInput",
+            summary: "Immutable workflow value.",
+            valueType: nameof(FlowValue),
             isPrimary: true);
         AddOutputPort(
             builder,
-            "TInput",
-            "Original input message after timer processing.",
+            "FlowResult<FlowValue>",
+            "Timer success or expected failure result.",
             isPrimary: true);
     }
 

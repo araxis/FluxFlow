@@ -2,6 +2,25 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext FlowValue Timers And Results
+
+- Added canonical FlowValue Interval and Schedule sources with immutable tick
+  objects, natural zero-input lifecycle, fresh source identity, deterministic
+  clocks, Events, and no universal Errors ports.
+- Added canonical FlowValue Delay, Throttle, and Debounce transforms with one
+  normal FlowResult Output for success and expected timing failures, preserving
+  ordered arrival/rate semantics, latest-only suppression, exact-once
+  completion flush, later-input continuation, and strong lineage.
+- Made parameterless Composition registrations canonical while retaining
+  explicit typed source and generic transform compatibility registrations.
+- Timers moved to `4.0.0` and Timers Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baseline were updated.
+- Runtime (`72`), Composition (`15`), core Composition (`126`), Designer (`98`),
+  Hosting (`38`), Release (`93`), and full Release (`2,110`) tests passed.
+  Controlled Debug/Release builds, binary compatibility, release preflight,
+  package dry-runs, and a package-only consumer also passed.
+- HTTP is the next separately bounded component-family assessment.
+
 ## 2026-07-19 - vNext FlowValue Sources
 
 - Added canonical FlowValue Generated and Sequence source nodes with one normal

@@ -5,6 +5,7 @@ using FluxFlow.Components.Timers.Composition;
 using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,20 +23,36 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         var registry = new CompositionNodeRegistry()
             .RegisterTimerInterval()
             .RegisterTimerSchedule()
-            .RegisterTimerDelay<InputMessage>()
-            .RegisterTimerThrottle<InputMessage>()
-            .RegisterTimerDebounce<InputMessage>();
+            .RegisterTimerDelay()
+            .RegisterTimerThrottle()
+            .RegisterTimerDebounce();
 
         registry.Registrations[TimersCompositionNodeTypes.Interval]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(TimerTick));
+                typeof(FlowValue));
         registry.Registrations[TimersCompositionNodeTypes.Schedule]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(ScheduleTick));
+                typeof(FlowValue));
 
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Delay);
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Throttle);
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Debounce);
+    }
+
+    [Fact]
+    public void Typed_timer_registrations_remain_explicit_compatibility_paths()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterTimerIntervalTicks("timer.interval.typed")
+            .RegisterTimerScheduleTicks("timer.schedule.typed")
+            .RegisterTimerDelay<InputMessage>("timer.delay.typed");
+
+        registry.Registrations["timer.interval.typed"]
+            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(typeof(TimerTick));
+        registry.Registrations["timer.schedule.typed"]
+            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(typeof(ScheduleTick));
+        registry.Registrations["timer.delay.typed"]
+            .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(typeof(InputMessage));
     }
 
     [Fact]
@@ -88,8 +105,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var metadata = MetadataByType();
 
-        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Interval], nameof(TimerTick));
-        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Schedule], nameof(ScheduleTick));
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Interval], nameof(FlowValue));
+        AssertSourcePorts(metadata[TimersCompositionNodeTypes.Schedule], nameof(FlowValue));
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Delay]);
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Throttle]);
         AssertTransformPorts(metadata[TimersCompositionNodeTypes.Debounce]);
@@ -253,8 +270,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var intervalNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = intervalNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<TimerTick>>();
-        var ticks = new BufferBlock<FlowMessage<TimerTick>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
+        var ticks = new BufferBlock<FlowMessage<FlowValue>>();
         var events = new BufferBlock<FlowEvent>();
         output.Source.LinkTo(ticks);
         intervalNode.Descriptor.Events.ShouldNotBeNull().LinkTo(events);
@@ -269,10 +286,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         var second = await ticks.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
         var eventNames = Drain(events).Select(flowEvent => flowEvent.Name).ToArray();
 
-        first.Payload.Name.ShouldBe("poll");
-        first.Payload.Timestamp.ShouldBe(startedAt);
-        second.Payload.Sequence.ShouldBe(2);
-        second.Payload.Timestamp.ShouldBe(startedAt.AddMilliseconds(10));
+        first.Payload.GetObject()["name"].GetString().ShouldBe("poll");
+        first.Payload.GetObject()["timestamp"].GetDateTimeOffset().ShouldBe(startedAt);
+        second.Payload.GetObject()["sequence"].GetInteger().ShouldBe(2);
+        second.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+            .ShouldBe(startedAt.AddMilliseconds(10));
         first.CorrelationId.ShouldNotBe(second.CorrelationId);
         eventNames.ShouldContain("timer.interval.started");
         eventNames.ShouldContain("timer.interval.tick");
@@ -309,8 +327,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var scheduleNode = runtime.Nodes.ShouldHaveSingleItem();
         var output = scheduleNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<ScheduleTick>>();
-        var ticks = new BufferBlock<FlowMessage<ScheduleTick>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
+        var ticks = new BufferBlock<FlowMessage<FlowValue>>();
         output.Source.LinkTo(ticks);
 
         var scheduled = clock.TimerScheduled;
@@ -321,10 +339,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
 
         var tick = await ticks.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
-        tick.Payload.Name.ShouldBe("cron");
-        tick.Payload.Cron.ShouldBe("* * * * * *");
-        tick.Payload.TimeZoneId.ShouldBe(TimeZoneInfo.Utc.Id);
-        tick.Payload.DueAt.ShouldBe(startedAt.AddSeconds(1));
+        var value = tick.Payload.GetObject();
+        value["name"].GetString().ShouldBe("cron");
+        value["cron"].GetString().ShouldBe("* * * * * *");
+        value["timeZoneId"].GetString().ShouldBe(TimeZoneInfo.Utc.Id);
+        value["dueAt"].GetDateTimeOffset().ShouldBe(startedAt.AddSeconds(1));
     }
 
     [Fact]
@@ -339,15 +358,15 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                 .Configure("name", "hold")
                 .Configure("delay", TimeSpan.FromMilliseconds(35))
                 .Configure("boundedCapacity", 8),
-            registry => registry.RegisterTimerDelay<InputMessage>(),
+            registry => registry.RegisterTimerDelay(),
             clock);
 
         await using var provider = services.BuildServiceProvider();
         await BuildCompositionAsync(provider);
 
-        var (input, output) = GetSingleTransform<InputMessage>(provider);
+        var (input, output) = GetSingleFlowValueTransform(provider);
         var message = FlowMessage.Create(
-            new InputMessage("one"),
+            FlowValue.From("one"),
             new CorrelationId("delay-correlation"));
         var scheduled = clock.TimerScheduled;
 
@@ -359,8 +378,11 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         var delayed = await output.Source.ReceiveAsync()
             .WaitAsync(TimeSpan.FromSeconds(5));
 
-        delayed.Payload.ShouldBe(message.Payload);
+        delayed.Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
+        delayed.Payload.Value.ShouldBe(message.Payload);
         delayed.CorrelationId.ShouldBe(new CorrelationId("delay-correlation"));
+        provider.GetRequiredService<ICompositionRuntimeHost>().Runtime!
+            .Nodes.ShouldHaveSingleItem().Descriptor.Errors.ShouldBeNull();
     }
 
     [Fact]
@@ -465,7 +487,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                     TimersCompositionNodeTypes.Delay,
                     node => node.Configure("delay", TimeSpan.FromMilliseconds(-1))))
                 .Build(),
-            registry => registry.RegisterTimerDelay<InputMessage>(),
+            registry => registry.RegisterTimerDelay(),
             "Delay");
 
         await AssertFactoryDiagnosticAsync(
@@ -478,7 +500,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                         .Configure("interval", TimeSpan.FromMilliseconds(1))
                         .Configure("boundedCapacity", 0)))
                 .Build(),
-            registry => registry.RegisterTimerThrottle<InputMessage>(),
+            registry => registry.RegisterTimerThrottle(),
             "BoundedCapacity");
 
         await AssertFactoryDiagnosticAsync(
@@ -489,7 +511,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
                     TimersCompositionNodeTypes.Debounce,
                     node => node.Configure("quietPeriod", TimeSpan.Zero)))
                 .Build(),
-            registry => registry.RegisterTimerDebounce<InputMessage>(),
+            registry => registry.RegisterTimerDebounce(),
             "QuietPeriod");
     }
 
@@ -499,10 +521,10 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         registry.Registrations[nodeType]
             .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(InputMessage));
+                typeof(FlowValue));
         registry.Registrations[nodeType]
             .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(InputMessage));
+                typeof(FlowResult<FlowValue>));
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
@@ -538,8 +560,8 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             port.Order,
             port.IsPrimary,
             port.ValueType?.Value)).ShouldBe([
-            (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, "TInput"),
-            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "TInput")
+            (TimersCompositionPortNames.Input, PortDirection.Input, 0, true, nameof(FlowValue)),
+            (TimersCompositionPortNames.Output, PortDirection.Output, 1, true, "FlowResult<FlowValue>")
         ]);
     }
 
@@ -672,6 +694,22 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             .ShouldBeOfType<CompositionInputPort<TMessage>>();
         var output = timerNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
             .ShouldBeOfType<CompositionOutputPort<TMessage>>();
+
+        return (input, output);
+    }
+
+    private static (
+        CompositionInputPort<FlowValue> Input,
+        CompositionOutputPort<FlowResult<FlowValue>> Output) GetSingleFlowValueTransform(
+            IServiceProvider provider)
+    {
+        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
+            .Runtime.ShouldNotBeNull();
+        var timerNode = runtime.Nodes.ShouldHaveSingleItem();
+        var input = timerNode.Descriptor.Inputs[TimersCompositionPortNames.Input]
+            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
+        var output = timerNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValue>>>();
 
         return (input, output);
     }

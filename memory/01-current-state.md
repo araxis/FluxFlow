@@ -1,18 +1,19 @@
 # Current State
 
-Date: 2026-07-19
+Date: 2026-07-20
 
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/sources-vnext`. The provider-neutral MQTT vertical slice and the
-  first thirteen normal component-family migrations, canonical FlowValue Mapping,
+  `work/timers-vnext`. The provider-neutral MQTT vertical slice and the
+  first fourteen normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
   FlowValue State commands/results, typed-event Projection results, and typed
-  Metric snapshot/results, FlowValue Observability results, and canonical
-  FlowValue Generated/Sequence sources are implemented and verified locally.
+  Metric snapshot/results, FlowValue Observability results, canonical
+  FlowValue Generated/Sequence sources, and canonical FlowValue/result Timers
+  are implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -252,8 +253,20 @@ Date: 2026-07-19
   `SourceSequenceItem` contracts. Sources Composition is now `2.0.0` with
   parameterless canonical registrations, fixed FlowValue metadata, and an exact
   host-owned clock resource. Focused/full tests, controlled builds, binary
-  compatibility, preflight/dry-runs, and a package-only consumer passed. Timers
-  is the next bounded family assessment. See `228-vnext-sources-flowvalue.md`.
+  compatibility, preflight/dry-runs, and a package-only consumer passed. See
+  `228-vnext-sources-flowvalue.md`.
+- `FluxFlow.Components.Timers` is now `4.0.0` locally with canonical FlowValue
+  Interval and Schedule sources plus FlowValue-to-FlowResult Delay, Throttle,
+  and Debounce transforms. Timer sources retain natural lifecycle and fresh identity;
+  transforms preserve ordered temporal semantics, normal expected failures,
+  exact-once debounce completion, later-input continuation, and strong lineage.
+  Released typed nodes remain available unchanged. Timers Composition is now
+  `2.0.0` with parameterless canonical registrations, explicit typed
+  compatibility paths, fixed Designer ports, no canonical Errors surfaces, and
+  an exact host-owned clock resource. Focused/full tests, controlled builds,
+  binary compatibility, preflight/dry-runs, and a package-only consumer passed.
+  HTTP is the next bounded family assessment. See
+  `229-vnext-timers-flowvalue-results.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

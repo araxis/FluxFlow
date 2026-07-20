@@ -1,108 +1,110 @@
 # FluxFlow.Components.Timers.Composition
 
-Optional `FluxFlow.Composition` registration helpers for standalone timer nodes
-from `FluxFlow.Components.Timers`.
+Composition registration and Designer metadata for canonical FlowValue timer
+sources and FlowResult temporal transforms. Canonical descriptors expose
+Events and no universal Errors port.
 
-This package does not scan assemblies, resolve CLR types from strings, add hot
-reload behavior, or convert schedule time zone ids. Hosts register closed
-generic transform node types explicitly and provide optional keyed
-`TimeProvider` services.
+This package does not scan assemblies, resolve CLR types from strings, own
+clock lifetime, add durable scheduling, convert time-zone ids, or depend on
+Engine.
 
-## Registration
-
-```csharp
-services.AddKeyedSingleton<TimeProvider>("fixed", timeProvider);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterTimerInterval()
-        .RegisterTimerSchedule()
-        .RegisterTimerDelay<OrderMessage>()
-        .RegisterTimerThrottle<OrderMessage>()
-        .RegisterTimerDebounce<OrderMessage>());
-```
-
-Use custom node type names when a host needs more than one input shape:
+## Canonical Registration
 
 ```csharp
+services.AddKeyedSingleton<TimeProvider>(
+    "Resources.System.Clock",
+    timeProvider);
+
 registry
-    .RegisterTimerDelay<OrderMessage>("timer.delay.order")
-    .RegisterTimerDebounce<HttpMessage>("timer.debounce.http");
+    .RegisterTimerInterval()
+    .RegisterTimerSchedule()
+    .RegisterTimerDelay()
+    .RegisterTimerThrottle()
+    .RegisterTimerDebounce();
 ```
 
-## Node Types
+| Type | Node | Input | Output | Optional resource |
+|------|------|-------|--------|-------------------|
+| `timer.interval` | `FlowValueTimerIntervalNode` | none | `FlowValue` | `clock` |
+| `timer.schedule` | `FlowValueTimerScheduleNode` | none | `FlowValue` | `clock` |
+| `timer.delay` | `FlowValueTimerDelayNode` | `FlowValue` | `FlowResult<FlowValue>` | `clock` |
+| `timer.throttle` | `FlowValueTimerThrottleNode` | `FlowValue` | `FlowResult<FlowValue>` | `clock` |
+| `timer.debounce` | `FlowValueTimerDebounceNode` | `FlowValue` | `FlowResult<FlowValue>` | `clock` |
 
-| Type | Node | Optional resource | Ports |
-|------|------|-------------------|-------|
-| `timer.interval` | `TimerIntervalNode` | `clock` | `Output` |
-| `timer.schedule` | `TimerScheduleNode` | `clock` | `Output` |
-| `timer.delay` | `TimerDelayNode<TInput>` | `clock` | `Input`, `Output` |
-| `timer.throttle` | `TimerThrottleNode<TInput>` | `clock` | `Input`, `Output` |
-| `timer.debounce` | `TimerDebounceNode<TInput>` | `clock` | `Input`, `Output` |
+The runtime starts Interval and Schedule through `IFlowSource`. Invalid options
+fail activation. Delay and Throttle emit one result per accepted input.
+Debounce intentionally emits no result for values superseded within the quiet
+window.
 
-The composition runtime starts interval and schedule sources through the normal
-`IFlowSource` lifecycle. Transform nodes preserve the input correlation id when
-they re-emit the original payload.
-
-## Design Metadata
-
-`TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for the
-five timer composition nodes. Hosts can add it to a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, or generated documentation.
-
-The provider describes node options, ports, option grouping/editor hints, and a
-resource picker hint for the optional `clock` resource. The clock remains a
-host-owned composition resource with a clock key-pattern hint and is not exposed
-as an editable node option. Schedule metadata covers cron/default UTC
-composition behavior. It declares `timeZone` as an omitted editable option
-because `TimerScheduleSettings.TimeZone` requires typed configuration and this
-package still does not add time-zone id conversion.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "poll": {
-              "type": "timer.interval",
-              "resources": {
-                "clock": "fixed"
-              },
-              "configuration": {
-                "name": "poll",
-                "interval": "00:00:01",
-                "emitImmediately": true,
-                "maxTicks": 10,
-                "boundedCapacity": 128
-              }
-            },
-            "rate-limit": {
-              "type": "timer.throttle",
-              "configuration": {
-                "name": "rate-limit",
-                "interval": "00:00:00.100",
-                "emitFirstImmediately": true,
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "System": {
+      "Clock": {
+        "Type": "host.clock"
+      }
+    }
+  },
+  "Workflows": {
+    "Main": {
+      "Poll": {
+        "Type": "timer.interval",
+        "clock": "Resources.System.Clock",
+        "name": "poll",
+        "interval": "00:00:01",
+        "emitImmediately": true,
+        "maxTicks": 10,
+        "boundedCapacity": 128,
+        "Output": "Hold.Input"
+      },
+      "Hold": {
+        "Type": "timer.delay",
+        "clock": "Resources.System.Clock",
+        "name": "hold",
+        "delay": "00:00:00.250",
+        "boundedCapacity": 128,
+        "Output": ["Audit.Input", "Continue.Input"]
       }
     }
   }
 }
 ```
 
-Timer settings bind to the existing settings records. `timer.schedule` uses the
-existing `TimerScheduleSettings` shape; no additional time zone id conversion is
-added by this adapter.
-Invalid timer settings, such as non-positive intervals, negative delays, or
-non-positive `boundedCapacity`, fail during composition build and surface as
-factory diagnostics when build failures are configured as diagnostics.
+Settings, resource addresses, and links are flat. The sample links require the
+target inputs to accept the exact source payload type; the runtime does not add
+implicit mappers. A link condition can select success or error result variants.
+
+## Host-Owned Clock
+
+`clock` is optional and resolves an exact keyed `TimeProvider` address. Without
+it, nodes use `TimeProvider.System`. The host owns the selected service, its
+lifetime, and disposal.
+
+Schedule Composition binds `TimerScheduleSettings` and uses its UTC default.
+Designer metadata explicitly reports `timeZone` as omitted because this adapter
+does not add string-to-`TimeZoneInfo` conversion.
+
+## Typed Compatibility
+
+Code-authored hosts can retain released typed contracts explicitly:
+
+```csharp
+registry
+    .RegisterTimerIntervalTicks("timer.interval.tick")
+    .RegisterTimerScheduleTicks("timer.schedule.tick")
+    .RegisterTimerDelay<OrderMessage>("timer.delay.order")
+    .RegisterTimerThrottle<OrderMessage>("timer.throttle.order")
+    .RegisterTimerDebounce<OrderMessage>("timer.debounce.order");
+```
+
+Use distinct node type names when typed and canonical registrations share a
+registry. Typed nodes retain their released error ports and behavior.
+
+## Design Metadata
+
+`TimersComponentDesignMetadataProvider` describes canonical fixed ports,
+timing/runtime option sections, and the optional host-owned clock picker.
+Metadata is descriptive: hosts own palettes, inspectors, validation UI,
+resource selection, activation, persistence, and runtime status display.

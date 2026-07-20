@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Timers 4.0.0
+
+Adds canonical immutable workflow-value timers while preserving released typed
+nodes for code-authored compatibility.
+
+- Adds FlowValue Interval and Schedule sources with fresh source identity,
+  deterministic clocks, bounded fan-out, and no universal Errors port.
+- Adds FlowValue Delay, Throttle, and Debounce transforms with one normal
+  FlowResult Output for success and expected timing failures.
+- Preserves delay arrival semantics, queued ordered throttle behavior,
+  latest-only debounce suppression, exact-once completion flush, and lineage.
+- Keeps all released typed timer nodes and their direct Output, Errors, and
+  Events surfaces unchanged for compatibility.
+
+## FluxFlow.Components.Timers.Composition 2.0.0
+
+Makes parameterless timer registrations the canonical fixed contracts.
+
+- Registers Interval and Schedule with FlowValue Output and temporal
+  transforms with FlowValue Input and FlowResult<FlowValue> Output.
+- Removes universal Errors surfaces from canonical descriptors while retaining
+  Events and exact host-owned clock resources.
+- Adds explicit typed Interval/Schedule registration paths and preserves
+  generic transform registrations for compatibility.
+- Updates Designer metadata and package examples to canonical ports and the
+  flat two-section application document.
+
 ## FluxFlow.Components.Sources 4.0.0
 
 Adds canonical immutable workflow-value sources while preserving released
