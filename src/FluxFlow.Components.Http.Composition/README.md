@@ -1,81 +1,99 @@
 # FluxFlow.Components.Http.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone HTTP node
-from `FluxFlow.Components.Http`.
+Composition registration and Designer metadata for the canonical HTTP client
+node. The adapter resolves host-owned keyed `HttpClient` and optional
+`TimeProvider` resources; it does not create clients, own their lifetime, or
+choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
+security policy.
 
-This package does not create `HttpClient` instances, own base addresses, configure
-handlers, or choose retry/auth/security policy. The host or adapter DI registers
-keyed `HttpClient` services. Composition definitions reference those keys as
-resources.
-
-## Registration
+## Canonical Registration
 
 ```csharp
-services.AddKeyedSingleton<HttpClient>("primary", httpClient);
+services.AddKeyedSingleton<HttpClient>(
+    "Resources.External.ApiClient",
+    httpClient);
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterHttpNodes());
+registry.RegisterHttpNodes();
 ```
 
-## Node Types
+| Type | Node | Input | Output | Resources |
+|------|------|-------|--------|-----------|
+| `http.client` | `FlowContentHttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
 
-| Type | Node | Required resource | Ports |
-|------|------|-------------------|-------|
-| `http.client` | `HttpClientNode` | `client` | `Input`, `Output` |
+The descriptor exposes Events and no universal Errors surface. Expected
+request and transport failures are `HttpClientFailureResult` values on Output.
+The runtime does not add an implicit mapper or serializer.
 
-`clock` is an optional keyed `TimeProvider` resource for deterministic timestamps
-and request timeout tests.
-
-## Configuration
+## Flat Definition
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "api": {
-              "type": "http.client",
-              "resources": {
-                "client": "primary"
-              },
-              "configuration": {
-                "boundedCapacity": 32,
-                "maxResponseBodyBytes": 1048576,
-                "treatNonSuccessStatusAsError": false,
-                "maxDegreeOfParallelism": 1,
-                "defaultTimeoutMilliseconds": 30000
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "External": {
+      "ApiClient": {
+        "Type": "host.http_client",
+        "baseAddress": "https://api.example.com/"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "BuildRequest": {
+        "Type": "order.http_request",
+        "Output": "CallApi.Input"
+      },
+      "CallApi": {
+        "Type": "http.client",
+        "client": "Resources.External.ApiClient",
+        "boundedCapacity": 32,
+        "maxResponseBodyBytes": 1048576,
+        "treatNonSuccessStatusAsError": false,
+        "maxDegreeOfParallelism": 1,
+        "defaultTimeoutMilliseconds": 30000,
+        "Output": ["HandleResult.Input", "Audit.Input"]
+      },
+      "HandleResult": {
+        "Type": "order.http_result"
+      },
+      "Audit": {
+        "Type": "audit.result"
       }
     }
   }
 }
 ```
 
-The composition package binds only `HttpClientNodeOptions`. HTTP method, URL,
-headers, body, content type, and per-message timeout still come from
-`HttpRequestInput` messages at runtime. Transport policy stays on the injected
-`HttpClient`.
-Invalid numeric `HttpClientNodeOptions` values fail during composition build and
-surface as factory diagnostics when build failures are configured as
-diagnostics.
+Resources, node options, resource references, and links use the canonical flat
+document shape. The referenced `host.http_client`, request builder, result
+handler, and audit types are host examples rather than types supplied by this
+package. The host resolves the exact `Resources.External.ApiClient` address as
+a keyed `HttpClient`.
+
+`HttpClientRequest` carries method, URL, headers, optional exact `FlowContent`
+body, and optional per-message timeout at runtime. Link conditions or mappers
+can branch on `IsError`, `Kind`, `Error.Code`, response status, or other result
+content without a special error edge.
+
+Invalid numeric options fail activation and surface as composition factory
+diagnostics when build failures are configured as diagnostics.
+
+## Typed Compatibility
+
+Code-authored hosts can retain the released request/response contract under a
+distinct node type:
+
+```csharp
+registry.RegisterHttpResponseOutput("http.client.response-output");
+```
+
+That explicit registration uses `HttpClientNode`, `HttpRequestInput`, and
+`HttpResponseOutput` and retains the released Errors and Events surfaces. Use a
+distinct type when canonical and compatibility registrations share a registry.
 
 ## Design Metadata
 
-`HttpComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`http.client` so hosts can build palettes, editors, validation hints, or
-documentation without copying package descriptors. The metadata describes the
-existing `HttpClientNodeOptions` configuration surface, option grouping/editor
-hints, the required `client` resource picker hint, the optional `clock` resource
-picker hint, and fixed request/result ports.
-The metadata is authored through the shared validated Designer metadata builder
-while preserving the same public metadata contracts consumed by hosts.
-Resource metadata is descriptive only, so `HttpClient` instances and optional
-keyed `TimeProvider` clocks remain host-owned resources with key-pattern hints
-and are not modeled as editable node options.
+`HttpComponentDesignMetadataProvider` describes the canonical fixed ports,
+runtime/limit/timeout option hints, required host-owned client picker, and
+optional host-owned clock picker. Metadata remains descriptive. Hosts own
+palettes, inspectors, validation UI, resource selection, persistence,
+activation, and runtime status display.

@@ -3,11 +3,13 @@ using System.Text;
 using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
+using FluxFlow.Components.Http;
 using FluxFlow.Components.Http.Composition;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,6 +27,20 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
             .RegisterHttpNodes();
 
         var client = registry.Registrations[HttpCompositionNodeTypes.Client];
+        client.Inputs[HttpCompositionPortNames.Input].MessageType.ShouldBe(
+            typeof(HttpClientRequest));
+        client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
+            typeof(HttpClientResult));
+    }
+
+    [Fact]
+    public void Typed_registration_preserves_released_request_and_response_contracts()
+    {
+        const string nodeType = "http.client.response-output";
+        var registry = new CompositionNodeRegistry()
+            .RegisterHttpResponseOutput(nodeType);
+
+        var client = registry.Registrations[nodeType];
         client.Inputs[HttpCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(HttpRequestInput));
         client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
@@ -64,14 +80,14 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var input = metadata.Ports[0];
         input.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Input));
         input.Direction.ShouldBe(PortDirection.Input);
-        input.ValueType?.Value.ShouldBe(nameof(HttpRequestInput));
+        input.ValueType?.Value.ShouldBe(nameof(HttpClientRequest));
         input.IsPrimary.ShouldBeTrue();
         input.Order.ShouldBe(0);
 
         var output = metadata.Ports[1];
         output.Name.ShouldBe(new ComponentPortName(HttpCompositionPortNames.Output));
         output.Direction.ShouldBe(PortDirection.Output);
-        output.ValueType?.Value.ShouldBe(nameof(HttpResponseOutput));
+        output.ValueType?.Value.ShouldBe(nameof(HttpClientResult));
         output.IsPrimary.ShouldBeTrue();
         output.Order.ShouldBe(1);
     }
@@ -216,16 +232,17 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var runtime = host.Runtime.ShouldNotBeNull();
         var clientNode = runtime.Nodes.ShouldHaveSingleItem();
         var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<HttpRequestInput>>();
+            .ShouldBeOfType<CompositionInputPort<HttpClientRequest>>();
         var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<HttpResponseOutput>>();
-        var responses = new BufferBlock<FlowMessage<HttpResponseOutput>>();
+            .ShouldBeOfType<CompositionOutputPort<HttpClientResult>>();
+        clientNode.Descriptor.Errors.ShouldBeNull();
+        var responses = new BufferBlock<FlowMessage<HttpClientResult>>();
         output.Source.LinkTo(
             responses,
             new DataflowLinkOptions { PropagateCompletion = true });
 
         var request = FlowMessage.Create(
-            new HttpRequestInput { Method = "GET", Url = "v1/status" },
+            new HttpClientRequest { Method = "GET", Url = "v1/status" },
             new CorrelationId("http-correlation"));
 
         (await input.Target.SendAsync(request)
@@ -237,8 +254,9 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
         response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
-        response.Payload.StatusCode.ShouldBe(200);
-        response.Payload.Body.ShouldBe("pong");
+        var result = response.Payload.ShouldBeOfType<HttpResponseResult>();
+        result.StatusCode.ShouldBe(200);
+        Encoding.UTF8.GetString(result.Body.OriginalBytes.AsSpan()).ShouldBe("pong");
         handler.LastRequest!.RequestUri!.ToString()
             .ShouldBe("https://api.example.test/v1/status");
     }
@@ -274,23 +292,22 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         var runtime = host.Runtime.ShouldNotBeNull();
         var clientNode = runtime.Nodes.ShouldHaveSingleItem();
         var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<HttpRequestInput>>();
+            .ShouldBeOfType<CompositionInputPort<HttpClientRequest>>();
         var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<HttpResponseOutput>>();
-        var errors = clientNode.Descriptor.Errors.ShouldNotBeNull();
-        var errorSink = new BufferBlock<FlowError>();
-        errors.LinkTo(errorSink);
-        var responseSink = new BufferBlock<FlowMessage<HttpResponseOutput>>();
+            .ShouldBeOfType<CompositionOutputPort<HttpClientResult>>();
+        clientNode.Descriptor.Errors.ShouldBeNull();
+        var responseSink = new BufferBlock<FlowMessage<HttpClientResult>>();
         output.Source.LinkTo(responseSink);
 
         (await input.Target.SendAsync(FlowMessage.Create(
-                new HttpRequestInput { Url = "https://example.test/" }))
+                new HttpClientRequest { Url = "https://example.test/" }))
             .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
 
-        var error = await errorSink.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        responseSink.Count.ShouldBe(0);
-        error.Context.ShouldNotBeNull().ShouldContain("statusCode=500");
+        var result = (await responseSink.ReceiveAsync()
+                .WaitAsync(TimeSpan.FromSeconds(5)))
+            .Payload.ShouldBeOfType<HttpClientFailureResult>();
+        result.Error!.Code.ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
+        result.Response.ShouldNotBeNull().StatusCode.ShouldBe(500);
     }
 
     [Fact]

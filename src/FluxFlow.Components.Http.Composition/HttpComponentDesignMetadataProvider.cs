@@ -19,7 +19,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
             .WithDisplay(
                 displayName: "HTTP Client",
                 category: "HTTP",
-                summary: "Sends HTTP request messages through a host-owned HttpClient and emits response messages.",
+                summary: "Sends FlowContent HTTP requests through a host-owned HttpClient and emits response or error results.",
                 iconKey: "send",
                 preferredNodeName: "httpClient",
                 suggestedEditorWidth: 420);
@@ -59,7 +59,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 "treatNonSuccessStatusAsError",
                 OptionValueKind.Boolean,
                 displayName: "Treat Non-Success Status As Error",
-                helperText: "Emit non-2xx HTTP responses through Errors instead of Output.",
+                helperText: "Return non-2xx HTTP responses as error results instead of response results.",
                 defaultValue: Defaults.TreatNonSuccessStatusAsError,
                 attributes: OptionAttributes(
                     "Response",
@@ -125,14 +125,14 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 group: "Messages",
                 order: 0,
                 summary: "HTTP request message.",
-                valueType: nameof(HttpRequestInput),
+                valueType: nameof(HttpClientRequest),
                 isPrimary: true)
             .AddOutputPort(
                 HttpCompositionPortNames.Output,
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "HTTP response message.",
-                valueType: nameof(HttpResponseOutput),
+                summary: "HTTP response or error result.",
+                valueType: nameof(HttpClientResult),
                 isPrimary: true);
 }

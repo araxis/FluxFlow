@@ -5,29 +5,31 @@ using FluxFlow.Composition;
 
 namespace FluxFlow.Components.Http.Composition;
 
-public static class HttpCompositionNodeRegistryExtensions
+public static class HttpTypedRegistrationExtensions
 {
-    public static CompositionNodeRegistry RegisterHttpNodes(
-        this CompositionNodeRegistry registry)
+    public static CompositionNodeRegistry RegisterHttpResponseOutput(
+        this CompositionNodeRegistry registry,
+        string nodeType)
     {
         ArgumentNullException.ThrowIfNull(registry);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
         return registry.Register(
-            HttpCompositionNodeTypes.Client,
-            CreateClientNode,
+            nodeType,
+            CreateHttpResponseOutputNode,
             inputs:
             [
-                CompositionPorts.Metadata<HttpClientRequest>(
+                CompositionPorts.Metadata<HttpRequestInput>(
                     HttpCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<HttpClientResult>(
+                CompositionPorts.Metadata<HttpResponseOutput>(
                     HttpCompositionPortNames.Output)
             ]);
     }
 
-    private static ValueTask<ComposedNode> CreateClientNode(
+    private static ValueTask<ComposedNode> CreateHttpResponseOutputNode(
         CompositionNodeFactoryContext context)
     {
         var client = context.GetRequiredResource<HttpClient>(
@@ -35,22 +37,23 @@ public static class HttpCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<HttpClientNodeOptions>();
         var clock = context.GetResource<TimeProvider>(
             HttpCompositionResourceNames.Clock);
-        var node = new FlowContentHttpClientNode(client, options, clock);
+        var node = new HttpClientNode(client, options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
             inputs:
             [
-                CompositionPorts.Input<HttpClientRequest>(
+                CompositionPorts.Input<HttpRequestInput>(
                     HttpCompositionPortNames.Input,
                     node.Input)
             ],
             outputs:
             [
-                CompositionPorts.Output<HttpClientResult>(
+                CompositionPorts.Output<HttpResponseOutput>(
                     HttpCompositionPortNames.Output,
                     node.Output)
             ],
-            events: node.Events));
+            events: node.Events,
+            errors: node.Errors));
     }
 }

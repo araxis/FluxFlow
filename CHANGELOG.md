@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http 4.0.0
+
+Adds the canonical FlowContent HTTP client while preserving the released
+direct-use node and request/response contracts.
+
+- Adds `HttpClientRequest` with exact `FlowContent` request bodies.
+- Adds polymorphic `HttpClientResult`, `HttpResponseResult`, and
+  `HttpClientFailureResult` outputs with stable result kinds and string error
+  codes.
+- Adds `FlowContentHttpClientNode` with one Output plus Events and no universal
+  Errors port. Expected request, transport, timeout, response-read, and
+  configured non-success outcomes remain normal result values.
+- Keeps `HttpClientNode`, `HttpRequestInput`, `HttpResponseOutput`, and their
+  released direct-use behavior unchanged for compatibility.
+
+## FluxFlow.Components.Http.Composition 2.0.0
+
+Makes `http.client` the canonical fixed FlowContent/result contract.
+
+- Registers `HttpClientRequest` Input and polymorphic `HttpClientResult`
+  Output, plus Events and no universal Errors surface.
+- Keeps keyed `HttpClient` and optional `TimeProvider` resources host-owned.
+- Adds `RegisterHttpResponseOutput(...)` for explicit use of the released
+  `HttpRequestInput` / `HttpResponseOutput` composition contract.
+- Updates Designer metadata and flat-definition documentation for the
+  canonical ports.
+
 ## FluxFlow.Components.Timers 4.0.0
 
 Adds canonical immutable workflow-value timers while preserving released typed

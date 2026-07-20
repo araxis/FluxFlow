@@ -2,6 +2,26 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext HTTP FlowContent And Results
+
+- Added canonical `HttpClientRequest` with exact FlowContent request bodies and
+  polymorphic `HttpClientResult` response/error variants with stable string
+  kinds, error codes, immutable details, and retained non-success responses.
+- Added `FlowContentHttpClientNode` with one normal Output plus Events and no
+  universal Errors port; expected request, timeout, transport, response-read,
+  and configured status failures remain normal data and later inputs continue.
+- Made `http.client` Composition canonical while retaining explicit
+  `RegisterHttpResponseOutput(...)` compatibility for the released
+  `HttpRequestInput` / `HttpResponseOutput` node contract.
+- HTTP moved to `4.0.0` and HTTP Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baseline were updated.
+- Runtime (`25`), Composition (`15`), HTTP ASP.NET Core (`16`), core
+  Composition (`126`), Hosting (`38`), Designer (`98`), Release (`93`), and
+  full Release (`2,119`) tests passed. Controlled Debug/Release builds, binary
+  compatibility, release preflight, package dry-runs, and a package-only
+  consumer also passed.
+- FileSystem is the next separately bounded component-family assessment.
+
 ## 2026-07-20 - vNext FlowValue Timers And Results
 
 - Added canonical FlowValue Interval and Schedule sources with immutable tick

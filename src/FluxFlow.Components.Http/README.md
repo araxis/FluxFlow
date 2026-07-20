@@ -1,85 +1,124 @@
 # FluxFlow.Components.Http
 
-A standalone HTTP node for FluxFlow — a "blockified" `HttpClient`.
+Standalone HTTP nodes for FluxFlow. The canonical node transports exact
+`FlowContent` bodies and emits one polymorphic result stream. It requires only
+TPL Dataflow through `FluxFlow.Nodes`; it does not require Composition, Engine,
+hosting, reflection, or assembly scanning.
 
-## What it is
+## Canonical Contract
 
-`HttpClientNode` is a self-contained TPL Dataflow processor. You give it an
-`HttpClient`, post `HttpRequestInput`s to its input, and it broadcasts
-`HttpResponseOutput`s on its output (failures on the error port, notes on the
-event port). It needs **nothing else** — no engine, registry, or runtime:
+`FlowContentHttpClientNode` has one typed request Input, one result Output, and
+Events for diagnostics:
+
+| Port | Type | Purpose |
+|------|------|---------|
+| `Input` | `FlowMessage<HttpClientRequest>` | HTTP method, URL, headers, optional exact body, and optional timeout. |
+| `Output` | `FlowMessage<HttpClientResult>` | `HttpResponseResult` or `HttpClientFailureResult`. |
+| `Events` | `FlowEvent` | Best-effort request completion/failure diagnostics. |
+
+There is no universal Errors port. Expected invalid-request, timeout, network,
+send, response-read, and configured non-success outcomes are normal
+`HttpClientFailureResult` values. `IsError`, `Kind`, `Error.Code`, and immutable
+`Error.Details` make those outcomes directly selectable by conditions and
+mappers. Unexpected pipeline faults remain observable through `Completion` and
+host runtime system streams.
 
 ```csharp
-await using var node = new HttpClientNode(httpClient);
+var body = FlowContent.FromBytes(
+    Encoding.UTF8.GetBytes("{\"name\":\"sample\"}"),
+    "application/json",
+    "utf-8");
 
-node.Output.LinkTo(logger.Input);   // broadcast: link the output to as many
-node.Output.LinkTo(mapper.Input);   // downstream nodes as you like
+await using var node = new FlowContentHttpClientNode(httpClient);
+var results = new BufferBlock<FlowMessage<HttpClientResult>>();
+node.Output.LinkTo(results);
 
-await node.Input.SendAsync(new HttpRequestInput
+var request = FlowMessage.Create(new HttpClientRequest
 {
-    Method = "GET",
-    Url = "https://api.example.com/things/42"
+    Method = "POST",
+    Url = "v1/items",
+    Headers = new Dictionary<string, string>
+    {
+        ["X-Request-Source"] = "workflow"
+    },
+    Body = body,
+    Timeout = TimeSpan.FromSeconds(30)
 });
+
+await node.Input.SendAsync(request);
+
+var response = await results.ReceiveAsync();
+if (response.Payload is HttpResponseResult completed)
+{
+    Console.WriteLine(completed.StatusCode);
+}
+else if (response.Payload is HttpClientFailureResult failed)
+{
+    Console.WriteLine($"{failed.Error!.Code}: {failed.Error.Message}");
+}
 ```
 
-## Ports
+The output envelope preserves correlation, trace, and headers, creates a fresh
+message id, and records the request message id as causation.
 
-| Port | Block | Purpose |
-|------|-------|---------|
-| `Input` | `BufferBlock<HttpRequestInput>` | bounded intake — `SendAsync` applies backpressure |
-| `Output` | `BroadcastBlock<HttpResponseOutput>` | the response, fanned out to every linked consumer |
-| `Errors` | `BroadcastBlock<FlowError>` | request failures (invalid URL, timeout, network, send, non-success) |
-| `Events` | `BroadcastBlock<FlowEvent>` | `http.request.succeeded` / `http.request.failed` notes |
+## Content Boundary
 
-Outputs are broadcast (latest-wins, no backpressure): a consumer that keeps up
-sees every message; one that falls badly behind may miss some. That is the
-deliberate trade for simplicity. If a graph genuinely must not drop, bridge that
-edge through its own bounded buffer.
+Request bodies must have `FlowContent.HasOriginalRepresentation == true`.
+HTTP sends those bytes exactly and uses `FlowContent.ContentType` and
+`FlowContent.Encoding` for content headers. A value-only body returns
+`http.invalid_content`; serialize it explicitly upstream with a Serialization
+component. The HTTP node does not silently choose JSON, text, or another codec.
 
-## Transport policy lives on the HttpClient
+Every received response body is captured as `FlowContent`, including empty and
+binary bodies. `MaxResponseBodyBytes` bounds capture and `BodyTruncated` reports
+truncation. Content type and declared charset remain metadata for downstream
+inspection or decoding; the canonical node does not decode the body.
 
-The node owns no transport policy. Base address, connection pooling, redirects,
-default headers, TLS, proxy, and any allow-list / SSRF guard all belong on the
-`HttpClient` you inject — exactly as you configure a regular .NET client
-(typically via `IHttpClientFactory` and a `DelegatingHandler`). The node never
-disposes the client; the host owns its lifetime. A relative `Url` resolves
-against the client's `BaseAddress`.
+By default every received HTTP response, including non-2xx status, is an
+`HttpResponseResult`; its `Success` property reports the status classification.
+Set `TreatNonSuccessStatusAsError` to return `HttpClientFailureResult` instead.
+That failure retains the complete bounded response in `Response`.
 
-## Options
+## Transport Ownership
+
+The host supplies and owns `HttpClient`. Base address, connection pooling,
+redirects, default headers, authentication, TLS, proxy, retries, and endpoint
+allow-list policy belong on that client and its handlers. The node neither
+creates nor disposes it. Relative URLs resolve against `HttpClient.BaseAddress`.
+
+The optional `TimeProvider` controls result and event timestamps. Per-request
+timeouts come from `HttpClientRequest.Timeout`, then
+`HttpClientNodeOptions.DefaultTimeoutMilliseconds`, then the injected
+`HttpClient` policy.
+
+## Processing Options
 
 ```csharp
 new HttpClientNodeOptions
 {
-    BoundedCapacity = 128,            // input buffer size
-    MaxResponseBodyBytes = 1_048_576, // bodies past this are read to the cap, BodyTruncated = true
+    BoundedCapacity = 128,
+    MaxResponseBodyBytes = 1_048_576,
     TreatNonSuccessStatusAsError = false,
-    MaxDegreeOfParallelism = 1,       // >1 to send concurrently (output order not guaranteed)
-    DefaultTimeoutMilliseconds = null // per-request timeout when the input omits one
+    MaxDegreeOfParallelism = 1,
+    DefaultTimeoutMilliseconds = null
 };
 ```
 
-`BoundedCapacity`, `MaxResponseBodyBytes`, and `MaxDegreeOfParallelism` must be
-greater than zero. `DefaultTimeoutMilliseconds`, when set, must also be greater
-than zero. Invalid options fail fast during node construction.
+All positive numeric settings fail fast when invalid. A parallelism of one
+preserves request/result order; higher parallelism allows concurrent sends and
+completion-order output.
 
-`BodyBytes` always contains the captured response bytes. `Body` is populated for
-`text/*`, JSON/XML media types (including `+json` and `+xml` suffixes), or content
-with an explicit charset. Supported response charsets are honored, including
-quoted values; missing, invalid, or unsupported charset values fall back to UTF-8.
+## Typed Compatibility
+
+The released `HttpClientNode`, `HttpRequestInput`, and `HttpResponseOutput`
+remain available unchanged for code-authored pipelines. They retain string and
+byte request fields, decoded response text, and their released Output, Errors,
+and Events behavior. New workflow definitions should use the canonical node so
+all expected outcomes stay on one result stream.
 
 ## Composition
 
-Building a workflow — reading config, creating nodes, linking them — is a
-separate concern from the node. This package is just the node.
-
-Add `FluxFlow.Components.Http.Composition` when a host wants to instantiate
-`HttpClientNode` from `FluxFlow.Composition` fluent/config definitions. That
-optional package registers the `http.client` factory and resolves a host-owned
-keyed `HttpClient` resource named `client`; the host still owns the client
-lifetime and transport policy. An optional host-owned keyed `TimeProvider`
-resource named `clock` can provide deterministic response/error timestamps.
-
-The optional composition package also exposes
-`HttpComponentDesignMetadataProvider` for neutral Designer metadata over the
-`http.client` composition node type. The standalone HTTP package remains free
-of Designer, Composition, and Engine dependencies.
+Install `FluxFlow.Components.Http.Composition` for canonical `http.client`
+registration, Designer metadata, and explicit typed compatibility registration.
+The runtime package remains free of Composition, Designer, Hosting, and Engine
+dependencies.

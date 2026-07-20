@@ -520,6 +520,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `229-vnext-timers-flowvalue-results.md`: canonical FlowValue Interval and
   Schedule sources, FlowResult Delay/Throttle/Debounce transforms, preserved
   typed compatibility, exact-once temporal completion, and package evidence.
+- `230-vnext-http-flowcontent-results.md`: canonical exact-content HTTP
+  requests, polymorphic response/error results, preserved direct-use and
+  Composition compatibility, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

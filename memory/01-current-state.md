@@ -5,15 +5,16 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/timers-vnext`. The provider-neutral MQTT vertical slice and the
-  first fourteen normal component-family migrations, canonical FlowValue Mapping,
+  `work/http-vnext`. The provider-neutral MQTT vertical slice and the
+  first fifteen normal component-family migrations, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
-  FlowValue State commands/results, typed-event Projection results, and typed
+  FlowValue State commands/results, typed-event Projection results, typed
   Metric snapshot/results, FlowValue Observability results, canonical
   FlowValue Generated/Sequence sources, and canonical FlowValue/result Timers
-  are implemented and verified locally.
+  plus exact-content HTTP polymorphic results are implemented and verified
+  locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -265,8 +266,20 @@ Date: 2026-07-20
   compatibility paths, fixed Designer ports, no canonical Errors surfaces, and
   an exact host-owned clock resource. Focused/full tests, controlled builds,
   binary compatibility, preflight/dry-runs, and a package-only consumer passed.
-  HTTP is the next bounded family assessment. See
-  `229-vnext-timers-flowvalue-results.md`.
+  See `229-vnext-timers-flowvalue-results.md`.
+- `FluxFlow.Components.Http` is now `4.0.0` locally with canonical
+  `HttpClientRequest`, exact FlowContent request/response bodies, and
+  polymorphic `HttpClientResult` response/error outcomes. Expected request,
+  timeout, transport, response-read, and configured status failures remain
+  normal data on one Output; host-owned client policy, bounded response reads,
+  diagnostics, and strong message lineage are preserved. The released
+  `HttpClientNode` and request/response contracts remain unchanged. HTTP
+  Composition is now `2.0.0` with canonical fixed ports, no universal Errors
+  surface, unchanged keyed client/clock ownership, and explicit typed
+  compatibility registration. Focused/full tests, controlled builds, binary
+  compatibility, preflight/dry-runs, and a package-only consumer passed.
+  FileSystem is the next bounded family assessment. See
+  `230-vnext-http-flowcontent-results.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer
