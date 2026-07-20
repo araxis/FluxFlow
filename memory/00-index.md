@@ -541,6 +541,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `236-vnext-designer-canonical-persistence.md`: canonical flat Designer
   persistence, nested resource/reference projection, declaration-side-aware
   links, signal rendering, runtime diagnostics, and package evidence.
+- `237-vnext-coordinated-package-validation.md`: complete 58-package local
+  source, package-origin verification, and warnings-as-errors combined consumer
+  closeout evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
