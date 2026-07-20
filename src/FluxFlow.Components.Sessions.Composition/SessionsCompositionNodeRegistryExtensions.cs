@@ -2,7 +2,7 @@ using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Nodes;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Composition;
-using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Data;
 
 namespace FluxFlow.Components.Sessions.Composition;
 
@@ -20,12 +20,12 @@ public static class SessionsCompositionNodeRegistryExtensions
             CreateSessionRecorderNode,
             inputs:
             [
-                CompositionPorts.Metadata<SessionRecordInput>(
+                CompositionPorts.Metadata<SessionContentRecordInput>(
                     SessionsCompositionPortNames.Input)
             ],
             outputs:
             [
-                CompositionPorts.Metadata<SessionRecord>(
+                CompositionPorts.Metadata<FlowResult<SessionContentRecord>>(
                     SessionsCompositionPortNames.Output)
             ]);
     }
@@ -42,7 +42,7 @@ public static class SessionsCompositionNodeRegistryExtensions
             CreateSessionReplayNode,
             outputs:
             [
-                CompositionPorts.Metadata<SessionRecord>(
+                CompositionPorts.Metadata<FlowResult<SessionContentRecord>>(
                     SessionsCompositionPortNames.Output)
             ]);
     }
@@ -64,10 +64,8 @@ public static class SessionsCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<SessionQueryResult>(
-                    SessionsCompositionPortNames.Output),
-                CompositionPorts.Metadata<SessionMetadata>(
-                    SessionsCompositionPortNames.Sessions)
+                CompositionPorts.Metadata<FlowResult<SessionQueryOutcome>>(
+                    SessionsCompositionPortNames.Output)
             ]);
     }
 
@@ -80,24 +78,23 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
-            var node = new SessionRecorderNode(options, store.Store, clock);
+            var node = new SessionContentRecorderNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,
                 inputs:
                 [
-                    CompositionPorts.Input<SessionRecordInput>(
+                    CompositionPorts.Input<SessionContentRecordInput>(
                         SessionsCompositionPortNames.Input,
                         node.Input)
                 ],
                 outputs:
                 [
-                    CompositionPorts.Output<SessionRecord>(
+                    CompositionPorts.Output<FlowResult<SessionContentRecord>>(
                         SessionsCompositionPortNames.Output,
                         node.Output)
                 ],
                 events: node.Events,
-                errors: node.Errors,
                 disposeAsync: store.DisposeAsync);
         }
         catch
@@ -116,18 +113,17 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
-            var node = new SessionReplayNode(options, store.Store, clock);
+            var node = new SessionContentReplayNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,
                 outputs:
                 [
-                    CompositionPorts.Output<SessionRecord>(
+                    CompositionPorts.Output<FlowResult<SessionContentRecord>>(
                         SessionsCompositionPortNames.Output,
                         node.Output)
                 ],
                 events: node.Events,
-                errors: node.Errors,
                 disposeAsync: store.DisposeAsync);
         }
         catch
@@ -146,7 +142,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, sessionId: null).ConfigureAwait(false);
         try
         {
-            var node = new SessionQueryNode(options, store.Store, clock);
+            var node = new SessionContentQueryNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,
@@ -158,15 +154,11 @@ public static class SessionsCompositionNodeRegistryExtensions
                 ],
                 outputs:
                 [
-                    CompositionPorts.Output<SessionQueryResult>(
+                    CompositionPorts.Output<FlowResult<SessionQueryOutcome>>(
                         SessionsCompositionPortNames.Output,
-                        node.Output),
-                    CompositionPorts.Output<SessionMetadata>(
-                        SessionsCompositionPortNames.Sessions,
-                        node.Sessions)
+                        node.Output)
                 ],
                 events: node.Events,
-                errors: node.Errors,
                 disposeAsync: store.DisposeAsync);
         }
         catch
@@ -181,54 +173,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         string? sessionId)
     {
         var key = context.GetRequiredResourceKey(SessionsCompositionResourceNames.Store);
-        var store = context.Services.GetKeyedService<ISessionStore>(key);
-        if (store is not null)
-            return ResolvedSessionStore.Shared(store);
-
-        var factory = context.Services.GetKeyedService<ISessionStoreFactory>(key);
-        if (factory is null)
-        {
-            throw new InvalidOperationException(
-                $"Node '{context.WorkflowName}.{context.NodeName}' resource " +
-                $"'{SessionsCompositionResourceNames.Store}' references '{key}', but no keyed " +
-                $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)} service is registered.");
-        }
-
-        var clock = context.GetResource<TimeProvider>(SessionsCompositionResourceNames.Clock);
-        var lease = await factory
-            .OpenAsync(new SessionStoreContext
-            {
-                StoreName = key,
-                SessionId = sessionId,
-                Clock = clock ?? TimeProvider.System
-            })
+        return await SessionsCompositionStoreResolver.ResolveAsync(context, key, sessionId)
             .ConfigureAwait(false);
-
-        return ResolvedSessionStore.Leased(lease);
-    }
-
-    private sealed class ResolvedSessionStore
-    {
-        private readonly SessionStoreLease? _lease;
-
-        private ResolvedSessionStore(ISessionStore store, SessionStoreLease? lease)
-        {
-            Store = store ?? throw new ArgumentNullException(nameof(store));
-            _lease = lease;
-        }
-
-        public ISessionStore Store { get; }
-
-        public static ResolvedSessionStore Shared(ISessionStore store)
-            => new(store, lease: null);
-
-        public static ResolvedSessionStore Leased(SessionStoreLease lease)
-        {
-            ArgumentNullException.ThrowIfNull(lease);
-            return new ResolvedSessionStore(lease.Store, lease);
-        }
-
-        public ValueTask DisposeAsync()
-            => _lease?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 }

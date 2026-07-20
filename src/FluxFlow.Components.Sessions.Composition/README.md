@@ -1,12 +1,8 @@
 # FluxFlow.Components.Sessions.Composition
 
-Optional `FluxFlow.Composition` registration helpers for the standalone session
-recorder, replay, and query nodes from `FluxFlow.Components.Sessions`.
-
-This package does not scan assemblies, register concrete stores, own retention
-policy, or configure persistence. Hosts register session node factories
-explicitly and provide either a keyed `ISessionStore` or a keyed
-`ISessionStoreFactory`; they may also provide an optional keyed `TimeProvider`.
+Optional `FluxFlow.Composition` registrations for canonical Sessions nodes.
+Hosts provide a keyed `ISessionStore` or `ISessionStoreFactory` and may provide
+a keyed `TimeProvider`; this package owns none of those resources.
 
 ## Registration
 
@@ -21,69 +17,86 @@ services
         .RegisterSessionQuery());
 ```
 
-## Node Types
+| Type | Canonical ports |
+|------|-----------------|
+| `session.recorder` | `SessionContentRecordInput` Input, `FlowResult<SessionContentRecord>` Output |
+| `session.replay` | `FlowResult<SessionContentRecord>` Output |
+| `session.query` | `SessionQueryRequest` Input, `FlowResult<SessionQueryOutcome>` Output |
 
-| Type | Node | Ports |
-|------|------|-------|
-| `session.recorder` | `SessionRecorderNode` | `Input`, `Output` |
-| `session.replay` | `SessionReplayNode` | `Output` |
-| `session.query` | `SessionQueryNode` | `Input`, `Output`, `Sessions` |
+All canonical descriptors expose Events and no universal Errors surface.
+Recorder/replay/query failures are ordinary result values, so links can branch
+on `Kind`, `IsError`, `Error.Code`, or value fields.
 
-Each factory exposes `Events` and `Errors`. `store` is a required keyed
-`ISessionStore` or `ISessionStoreFactory` resource. Direct stores remain
-host-owned. Factory leases are opened during composition build and disposed with
-the composed node. `clock` is an optional keyed `TimeProvider` resource for
-deterministic result, event, error, and replay timing.
-
-## Configuration
+## Flat Document
 
 ```json
 {
-  "FluxFlow": {
-    "Composition": {
-      "workflows": {
-        "main": {
-          "nodes": {
-            "recorder": {
-              "type": "session.recorder",
-              "resources": {
-                "store": "sessions",
-                "clock": "fixed"
-              },
-              "configuration": {
-                "sessionId": "run-1",
-                "name": "integration run",
-                "boundedCapacity": 128
-              }
-            }
-          },
-          "links": []
-        }
+  "Resources": {
+    "Sessions": {
+      "Primary": {
+        "Type": "host.session-store"
+      }
+    }
+  },
+  "Workflows": {
+    "OrderProcessing": {
+      "BuildContent": {
+        "Type": "serialize.json",
+        "Output": "BuildRecord.Input"
+      },
+      "BuildRecord": {
+        "Type": "session.record-request",
+        "name": "received-order",
+        "Output": "Record.Input"
+      },
+      "Record": {
+        "Type": "session.recorder",
+        "sessionId": "run-42",
+        "store": "Resources.Sessions.Primary",
+        "Output": ["HandleResult.Input", "Audit.Input"]
+      },
+      "HandleResult": {
+        "Type": "session.result"
+      },
+      "Audit": {
+        "Type": "audit.result"
       }
     }
   }
 }
 ```
 
-The adapter binds the existing session option records from node configuration.
-The `Store` option remains configuration metadata; the composition adapter
-resolves the concrete `ISessionStore` or `ISessionStoreFactory` from the
-`store` resource.
-Invalid option values fail during composition build through the node factory. If
-build failures are configured as diagnostics, the runtime is not created and the
-host receives a `FactoryFailed` diagnostic with the relevant option name.
+`BuildContent`, `session.record-request`, `session.result`, and `audit.result`
+are host example types. Composition does not insert mapping, serialization, or
+request construction. A recorder command must be built explicitly from
+upstream FlowContent. Resource addresses use the host application address
+framework.
+
+The `store` resource is required. Direct keyed stores remain host-owned;
+factory leases are opened during composition build and disposed with composed
+nodes. The optional `clock` resource controls deterministic timestamps and
+replay pacing. The similarly named `store` option remains diagnostic metadata
+and does not select a DI resource.
+
+## Typed Compatibility
+
+Register released typed contracts under distinct caller-selected node types:
+
+```csharp
+registry
+    .RegisterSessionRecordOutput("session.recorder.typed")
+    .RegisterSessionReplayRecords("session.replay.typed")
+    .RegisterSessionQueryResultBranches("session.query.typed");
+```
+
+Compatibility nodes retain Errors and Events; typed query also retains the
+`Sessions` branch. Requiring explicit type names prevents a compatibility
+registration from silently replacing canonical defaults.
 
 ## Design Metadata
 
-`SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`session.recorder`, `session.replay`, and `session.query` so hosts can build
-palettes, editors, validation hints, or documentation without copying package
-descriptors. The metadata describes the existing session option records with
-section, importance, and editor hints; fixed ports; and resource picker hints
-with key patterns for the required `store` and optional `clock` resources.
-Concrete `ISessionStore` instances, `ISessionStoreFactory` registrations, and
-optional keyed `TimeProvider` clocks remain host-owned resources and are not
-modeled as editable node options; the `store` option remains only
-diagnostic/config metadata.
-The provider authors that metadata through the shared validated Designer
-metadata builder.
+`SessionsComponentDesignMetadataProvider` describes canonical fixed ports,
+option section/importance/editor hints, the omitted typed-only
+`emitSessionOutputs` control, and host-owned picker hints for `store` and
+`clock`. Metadata does not create stores, open leases, execute nodes, or own
+runtime state.

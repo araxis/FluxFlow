@@ -9,6 +9,7 @@ using FluxFlow.Components.Sessions.Nodes;
 using FluxFlow.Components.Sessions.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,24 +24,48 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public void Register_session_nodes_registers_typed_metadata()
+    public void Register_session_nodes_registers_canonical_metadata()
     {
         var registry = RegisterAll(new CompositionNodeRegistry());
 
         var recorder = registry.Registrations[SessionsCompositionNodeTypes.Recorder];
         recorder.Inputs[SessionsCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(SessionRecordInput));
+            .ShouldBe(typeof(SessionContentRecordInput));
         recorder.Outputs[SessionsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(SessionRecord));
+            .ShouldBe(typeof(FlowResult<SessionContentRecord>));
 
         var replay = registry.Registrations[SessionsCompositionNodeTypes.Replay];
         replay.Inputs.ShouldBeEmpty();
         replay.Outputs[SessionsCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(SessionRecord));
+            .ShouldBe(typeof(FlowResult<SessionContentRecord>));
 
         var query = registry.Registrations[SessionsCompositionNodeTypes.Query];
         query.Inputs[SessionsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(SessionQueryRequest));
+        query.Outputs[SessionsCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(FlowResult<SessionQueryOutcome>));
+        query.Outputs.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Typed_compatibility_registrations_preserve_released_port_shapes()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterSessionRecordOutput("session.recorder.typed")
+            .RegisterSessionReplayRecords("session.replay.typed")
+            .RegisterSessionQueryResultBranches("session.query.typed");
+
+        var recorder = registry.Registrations["session.recorder.typed"];
+        recorder.Inputs[SessionsCompositionPortNames.Input].MessageType
+            .ShouldBe(typeof(SessionRecordInput));
+        recorder.Outputs[SessionsCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(SessionRecord));
+
+        var replay = registry.Registrations["session.replay.typed"];
+        replay.Outputs[SessionsCompositionPortNames.Output].MessageType
+            .ShouldBe(typeof(SessionRecord));
+
+        var query = registry.Registrations["session.query.typed"];
         query.Outputs[SessionsCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(SessionQueryResult));
         query.Outputs[SessionsCompositionPortNames.Sessions].MessageType
@@ -74,9 +99,12 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     {
         var metadata = DesignMetadataByType();
 
-        AssertTransformPorts<SessionRecordInput, SessionRecord>(
+        AssertTransformPorts(
+            nameof(SessionContentRecordInput),
+            "FlowResult<SessionContentRecord>",
             metadata[SessionsCompositionNodeTypes.Recorder]);
-        AssertSourcePort<SessionRecord>(
+        AssertSourcePort(
+            "FlowResult<SessionContentRecord>",
             metadata[SessionsCompositionNodeTypes.Replay]);
         AssertQueryPorts(metadata[SessionsCompositionNodeTypes.Query]);
     }
@@ -185,7 +213,6 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             "includeCompleted",
             "limit",
             "emitSessionsInResult",
-            "emitSessionOutputs",
             "boundedCapacity");
         AssertOption(
             metadata[SessionsCompositionNodeTypes.Query],
@@ -208,11 +235,9 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             "emitSessionsInResult",
             OptionValueKind.Boolean,
             queryDefaults.EmitSessionsInResult);
-        AssertOption(
-            metadata[SessionsCompositionNodeTypes.Query],
-            "emitSessionOutputs",
-            OptionValueKind.Boolean,
-            queryDefaults.EmitSessionOutputs);
+        metadata[SessionsCompositionNodeTypes.Query]
+            .Attributes[new ComponentAttributeName("omittedOptions")].Value
+            .ShouldBe("emitSessionOutputs");
     }
 
     [Fact]
@@ -247,7 +272,6 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         AssertOptionHints(query["includeCompleted"], "Filtering", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(query["limit"], "Results", OptionDesignMetadataAttributeValues.Primary, OptionDesignMetadataAttributeValues.Number);
         AssertOptionHints(query["emitSessionsInResult"], "Results", OptionDesignMetadataAttributeValues.Advanced);
-        AssertOptionHints(query["emitSessionOutputs"], "Branches", OptionDesignMetadataAttributeValues.Advanced);
         AssertOptionHints(query["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
@@ -314,7 +338,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .RegisterNodes(registry => registry.RegisterSessionRecorder())
             .Configure(options => options.StartRuntimeWithHost = false);
 
-        SessionRecorderNode recorderNode;
+        SessionContentRecorderNode recorderNode;
         var provider = services.BuildServiceProvider();
         try
         {
@@ -324,18 +348,20 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 .Runtime.ShouldNotBeNull()
                 .Nodes.ShouldHaveSingleItem()
                 .Descriptor;
-            recorderNode = descriptor.Node.ShouldBeOfType<SessionRecorderNode>();
+            recorderNode = descriptor.Node.ShouldBeOfType<SessionContentRecorderNode>();
             var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
-                .ShouldBeOfType<CompositionInputPort<SessionRecordInput>>();
+                .ShouldBeOfType<CompositionInputPort<SessionContentRecordInput>>();
             var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-                .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
+                .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionContentRecord>>>();
             var events = Link(descriptor.Events.ShouldNotBeNull());
             var records = Link(output.Source);
             var message = FlowMessage.Create(
-                new SessionRecordInput
+                new SessionContentRecordInput
                 {
                     Name = "event",
-                    Payload = "payload"
+                    Content = FlowContent.FromBytes(
+                        new byte[] { 1, 2, 3 },
+                        "application/octet-stream")
                 },
                 new CorrelationId("record-1"));
 
@@ -343,11 +369,13 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
 
             var record = await records.ReceiveAsync().WaitAsync(Timeout);
             record.CorrelationId.ShouldBe(message.CorrelationId);
-            record.Payload.SessionId.ShouldBe("session-1");
-            record.Payload.Sequence.ShouldBe(1);
-            record.Payload.Timestamp.ShouldBe(timestamp);
-            record.Payload.Name.ShouldBe("event");
-            record.Payload.Payload.ShouldBe("payload");
+            record.Payload.IsError.ShouldBeFalse();
+            var stored = record.Payload.Value.ShouldNotBeNull();
+            stored.SessionId.ShouldBe("session-1");
+            stored.Sequence.ShouldBe(1);
+            stored.Timestamp.ShouldBe(timestamp);
+            stored.Name.ShouldBe("event");
+            stored.Content.OriginalBytes.ToArray().ShouldBe(new byte[] { 1, 2, 3 });
 
             var started = await events.ReceiveAsync().WaitAsync(Timeout);
             var recorded = await events.ReceiveAsync().WaitAsync(Timeout);
@@ -372,15 +400,12 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         var startedAt = DateTimeOffset.Parse("2026-06-21T09:00:00Z");
         var clock = new TrackingFakeTimeProvider(startedAt);
         var store = new TestSessionStore();
-        store.AddSession(new SessionMetadata
-        {
-            SessionId = "session-1",
-            Name = "run",
-            StartedAt = startedAt,
-            MessageCount = 2
-        });
-        store.Records.Add(CreateRecord("session-1", 1, startedAt, "first"));
-        store.Records.Add(CreateRecord("session-1", 2, startedAt.AddMilliseconds(25), "second"));
+        await SeedContentRecordsAsync(
+            store,
+            clock,
+            "session-1",
+            (startedAt, "first", new byte[] { 1 }),
+            (startedAt.AddMilliseconds(25), "second", new byte[] { 2 }));
 
         var services = new ServiceCollection();
         services.AddKeyedSingleton<ISessionStore>("sessions", store);
@@ -411,7 +436,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .Runtime.ShouldNotBeNull();
         var descriptor = runtime.Nodes.ShouldHaveSingleItem().Descriptor;
         var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
+            .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionContentRecord>>>();
         var records = Link(output.Source);
         var events = Link(descriptor.Events.ShouldNotBeNull());
 
@@ -425,8 +450,8 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .Select(flowEvent => flowEvent.Name)
             .ToArray();
 
-        first.Payload.Sequence.ShouldBe(1);
-        second.Payload.Sequence.ShouldBe(2);
+        first.Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        second.Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(2);
         first.CorrelationId.ShouldNotBe(second.CorrelationId);
         first.CorrelationId.IsEmpty.ShouldBeFalse();
         second.CorrelationId.IsEmpty.ShouldBeFalse();
@@ -448,20 +473,25 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             async descriptor =>
             {
                 var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<SessionRecordInput>>();
+                    .ShouldBeOfType<CompositionInputPort<SessionContentRecordInput>>();
                 var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
+                    .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionContentRecord>>>();
                 var records = Link(output.Source);
                 var message = FlowMessage.Create(
-                    new SessionRecordInput { Name = "event", Payload = "payload" },
+                    new SessionContentRecordInput
+                    {
+                        Name = "event",
+                        Content = FlowContent.FromBytes(new byte[] { 7, 8 })
+                    },
                     new CorrelationId("factory-record"));
 
                 (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
 
                 var record = await records.ReceiveAsync().WaitAsync(Timeout);
                 record.CorrelationId.ShouldBe(message.CorrelationId);
-                record.Payload.SessionId.ShouldBe("session-1");
-                record.Payload.Timestamp.ShouldBe(timestamp);
+                var stored = record.Payload.Value.ShouldNotBeNull();
+                stored.SessionId.ShouldBe("session-1");
+                stored.Timestamp.ShouldBe(timestamp);
             },
             node => node
                 .Resource(SessionsCompositionResourceNames.Store, "factory")
@@ -483,7 +513,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_query_emits_result_sessions_branch_and_uses_clock()
+    public async Task Hosted_query_emits_one_normal_result_and_uses_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-21T10:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
@@ -512,11 +542,8 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
                     .ShouldBeOfType<CompositionInputPort<SessionQueryRequest>>();
                 var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<SessionQueryResult>>();
-                var sessions = descriptor.Outputs[SessionsCompositionPortNames.Sessions]
-                    .ShouldBeOfType<CompositionOutputPort<SessionMetadata>>();
+                    .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionQueryOutcome>>>();
                 var results = Link(output.Source);
-                var sessionOutputs = Link(sessions.Source);
                 var events = Link(descriptor.Events.ShouldNotBeNull());
                 var request = FlowMessage.Create(
                     new SessionQueryRequest
@@ -528,14 +555,13 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 (await input.Target.SendAsync(request).WaitAsync(Timeout)).ShouldBeTrue();
 
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                var session = await sessionOutputs.ReceiveAsync().WaitAsync(Timeout);
 
                 result.CorrelationId.ShouldBe(request.CorrelationId);
                 result.Payload.Timestamp.ShouldBe(timestamp);
-                result.Payload.Count.ShouldBe(1);
-                result.Payload.Sessions.ShouldBeEmpty();
-                session.CorrelationId.ShouldBe(request.CorrelationId);
-                session.Payload.SessionId.ShouldBe("session-1");
+                var outcome = result.Payload.Value.ShouldNotBeNull();
+                outcome.Count.ShouldBe(1);
+                outcome.Sessions.ShouldBeEmpty();
+                descriptor.Outputs.ContainsKey(SessionsCompositionPortNames.Sessions).ShouldBeFalse();
 
                 var eventNames = DrainAvailable(events).Select(flowEvent => flowEvent.Name).ToArray();
                 eventNames.ShouldContain(SessionsDiagnosticNames.QueryStarted);
@@ -547,8 +573,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 .Configure("store", "diagnostic-only")
                 .Configure("namePrefix", "orders")
                 .Configure("limit", 10)
-                .Configure("emitSessionsInResult", false)
-                .Configure("emitSessionOutputs", true),
+                .Configure("emitSessionsInResult", false),
             services =>
             {
                 services.AddKeyedSingleton<ISessionStore>("sessions", store);
@@ -660,7 +685,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             "include active");
 
     [Fact]
-    public async Task Recorder_store_failure_emits_error_and_later_messages_continue()
+    public async Task Recorder_store_failure_emits_normal_result_and_later_messages_continue()
     {
         var store = new TestSessionStore
         {
@@ -672,28 +697,37 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             async descriptor =>
             {
                 var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<SessionRecordInput>>();
+                    .ShouldBeOfType<CompositionInputPort<SessionContentRecordInput>>();
                 var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<SessionRecord>>();
-                var errors = Link(descriptor.Errors.ShouldNotBeNull());
+                    .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionContentRecord>>>();
                 var records = Link(output.Source);
                 var bad = FlowMessage.Create(
-                    new SessionRecordInput { Name = "bad" },
+                    new SessionContentRecordInput
+                    {
+                        Name = "bad",
+                        Content = FlowContent.FromBytes(new byte[] { 1 })
+                    },
                     new CorrelationId("bad"));
                 var good = FlowMessage.Create(
-                    new SessionRecordInput { Name = "good" },
+                    new SessionContentRecordInput
+                    {
+                        Name = "good",
+                        Content = FlowContent.FromBytes(new byte[] { 2 })
+                    },
                     new CorrelationId("good"));
 
                 (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
                 (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
 
-                var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+                var failed = await records.ReceiveAsync().WaitAsync(Timeout);
                 var record = await records.ReceiveAsync().WaitAsync(Timeout);
 
-                error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
-                error.CorrelationId.ShouldBe(bad.CorrelationId);
+                failed.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+                    SessionErrorCodeNames.RecordFailed);
+                failed.CorrelationId.ShouldBe(bad.CorrelationId);
                 record.CorrelationId.ShouldBe(good.CorrelationId);
-                record.Payload.Name.ShouldBe("good");
+                record.Payload.Value.ShouldNotBeNull().Name.ShouldBe("good");
+                descriptor.Errors.ShouldBeNull();
             },
             node => node
                 .Resource(SessionsCompositionResourceNames.Store, "sessions")
@@ -702,7 +736,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Query_store_failure_emits_error_and_later_messages_continue()
+    public async Task Query_store_failure_emits_normal_result_and_later_messages_continue()
     {
         var store = new TestSessionStore
         {
@@ -723,8 +757,7 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 var input = descriptor.Inputs[SessionsCompositionPortNames.Input]
                     .ShouldBeOfType<CompositionInputPort<SessionQueryRequest>>();
                 var output = descriptor.Outputs[SessionsCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<SessionQueryResult>>();
-                var errors = Link(descriptor.Errors.ShouldNotBeNull());
+                    .ShouldBeOfType<CompositionOutputPort<FlowResult<SessionQueryOutcome>>>();
                 var results = Link(output.Source);
                 var bad = FlowMessage.Create(
                     new SessionQueryRequest(),
@@ -736,13 +769,15 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
                 (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
                 (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
 
-                var error = await errors.ReceiveAsync().WaitAsync(Timeout);
+                var failed = await results.ReceiveAsync().WaitAsync(Timeout);
                 var result = await results.ReceiveAsync().WaitAsync(Timeout);
 
-                error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-                error.CorrelationId.ShouldBe(bad.CorrelationId);
+                failed.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+                    SessionErrorCodeNames.QueryFailed);
+                failed.CorrelationId.ShouldBe(bad.CorrelationId);
                 result.CorrelationId.ShouldBe(good.CorrelationId);
-                result.Payload.Count.ShouldBe(1);
+                result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+                descriptor.Errors.ShouldBeNull();
             },
             node => node.Resource(SessionsCompositionResourceNames.Store, "sessions"),
             services => services.AddKeyedSingleton<ISessionStore>("sessions", store));
@@ -817,7 +852,9 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .GetMetadata()
             .ToDictionary(metadata => metadata.Type.Value, StringComparer.Ordinal);
 
-    private static void AssertTransformPorts<TInput, TOutput>(
+    private static void AssertTransformPorts(
+        string inputType,
+        string outputType,
         ComponentDesignMetadata metadata)
     {
         metadata.Ports.Count.ShouldBe(2);
@@ -826,19 +863,20 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         input.Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         input.Direction.ShouldBe(PortDirection.Input);
         input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(typeof(TInput).Name);
+        input.ValueType?.Value.ShouldBe(inputType);
         input.IsPrimary.ShouldBeTrue();
 
         var output = metadata.Ports[1];
         AssertOutputPort(
             output,
             SessionsCompositionPortNames.Output,
-            typeof(TOutput).Name,
+            outputType,
             order: 1,
             isPrimary: true);
     }
 
-    private static void AssertSourcePort<TOutput>(
+    private static void AssertSourcePort(
+        string outputType,
         ComponentDesignMetadata metadata)
     {
         metadata.Ports.Count.ShouldBe(1);
@@ -846,14 +884,14 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         AssertOutputPort(
             metadata.Ports[0],
             SessionsCompositionPortNames.Output,
-            typeof(TOutput).Name,
+            outputType,
             order: 0,
             isPrimary: true);
     }
 
     private static void AssertQueryPorts(ComponentDesignMetadata metadata)
     {
-        metadata.Ports.Count.ShouldBe(3);
+        metadata.Ports.Count.ShouldBe(2);
 
         metadata.Ports[0].Name.Value.ShouldBe(SessionsCompositionPortNames.Input);
         metadata.Ports[0].Direction.ShouldBe(PortDirection.Input);
@@ -864,14 +902,9 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         AssertOutputPort(
             metadata.Ports[1],
             SessionsCompositionPortNames.Output,
-            nameof(SessionQueryResult),
+            "FlowResult<SessionQueryOutcome>",
             order: 1,
             isPrimary: true);
-        AssertOutputPort(
-            metadata.Ports[2],
-            SessionsCompositionPortNames.Sessions,
-            nameof(SessionMetadata),
-            order: 2);
     }
 
     private static void AssertOutputPort(
@@ -1019,19 +1052,32 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
         return items;
     }
 
-    private static SessionRecord CreateRecord(
+    private static async Task SeedContentRecordsAsync(
+        TestSessionStore store,
+        TimeProvider clock,
         string sessionId,
-        long sequence,
-        DateTimeOffset timestamp,
-        string name)
-        => new()
+        params (DateTimeOffset Timestamp, string Name, byte[] Bytes)[] records)
+    {
+        await using var recorder = new SessionContentRecorderNode(
+            new SessionRecorderOptions { SessionId = sessionId },
+            store,
+            clock);
+        recorder.Output.LinkTo(
+            DataflowBlock.NullTarget<FlowMessage<FlowResult<SessionContentRecord>>>());
+        foreach (var record in records)
         {
-            SessionId = sessionId,
-            Sequence = sequence,
-            Timestamp = timestamp,
-            Name = name,
-            Payload = name
-        };
+            await recorder.Input.SendAsync(FlowMessage.Create(new SessionContentRecordInput
+            {
+                Timestamp = record.Timestamp,
+                Name = record.Name,
+                Content = FlowContent.FromBytes(record.Bytes, "application/octet-stream")
+            })).WaitAsync(Timeout);
+        }
+
+        recorder.Complete();
+        await recorder.Completion.WaitAsync(Timeout);
+        await recorder.SessionCompleted.WaitAsync(Timeout);
+    }
 
     private sealed class TrackingFakeTimeProvider : FakeTimeProvider
     {

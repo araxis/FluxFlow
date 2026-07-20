@@ -5,16 +5,17 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/filesystem-vnext`. The provider-neutral MQTT vertical slice and the
-  first sixteen normal component-family migrations, canonical FlowValue Mapping,
+  `work/sessions-vnext`. The provider-neutral MQTT vertical slice and the
+  bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
   FlowValue State commands/results, typed-event Projection results, typed
   Metric snapshot/results, FlowValue Observability results, canonical
   FlowValue Generated/Sequence sources, and canonical FlowValue/result Timers
-  plus exact-content HTTP polymorphic results and exact-content FileSystem
-  results/sources are implemented and verified locally.
+  plus exact-content HTTP polymorphic results, exact-content FileSystem
+  results/sources, exact-content Storage, and exact-content Sessions are
+  implemented and verified locally.
   Nothing from the vNext milestones was pushed, tagged, published, merged, or
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
@@ -299,8 +300,21 @@ Date: 2026-07-20
   fixed ports, no universal Errors surfaces, explicit typed compatibility
   registrations, and updated Designer metadata. FileSystem and SqlFile adapter
   integration, focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Sessions is the next
-  bounded family assessment. See `232-vnext-storage-flowcontent-results.md`.
+  preflight/dry-runs, and a package-only consumer passed. See
+  `232-vnext-storage-flowcontent-results.md`.
+- `FluxFlow.Components.Sessions` is now `4.0.0` locally with canonical exact
+  FlowContent recorder/replay contracts, stable normal result kinds/errors,
+  strong lineage, and a private versioned JSON-compatible envelope over the
+  released object payload boundary. Missing sessions, malformed records,
+  validation failures, and store failures remain ordinary data; released typed
+  nodes and host-owned store/factory contracts remain available. Sessions
+  Composition is now `2.0.0` with canonical fixed one-output ports, no
+  universal Errors surface, explicit typed compatibility registrations, and
+  updated Designer metadata. Focused/full tests, controlled builds,
+  zero-warning affected rebuilds, binary compatibility, preflight/dry-runs,
+  and a package-only consumer passed. The remaining resource/configuration
+  infrastructure is the next bounded assessment before final Hosting and
+  Designer persistence work. See `233-vnext-sessions-flowcontent-results.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

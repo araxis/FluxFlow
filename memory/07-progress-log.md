@@ -2,6 +2,27 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext Sessions FlowContent And Results
+
+- Added canonical exact-content recorder/replay nodes and a one-output query
+  node with stable normal result kinds/error codes, strong lineage, and
+  ordinary expected store/validation failures.
+- Added a private versioned JSON-compatible content envelope over the released
+  session payload boundary; tests cover both in-memory and serialized JSON
+  object round-trips.
+- Made the three default Sessions Composition registrations canonical while
+  retaining explicit typed compatibility registrations and existing
+  host-owned store/factory lease behavior.
+- Sessions moved to `4.0.0` and Sessions Composition to `2.0.0`; package docs,
+  changelog, Designer metadata, and source-declaration baselines were updated.
+- Runtime (`60`), Composition (`26`), core Composition (`126`), Hosting (`38`),
+  Designer (`98`), Release (`93`), and full Release (`2,143`) tests passed.
+  Controlled builds, affected-package zero-warning rebuilds, binary
+  compatibility, release preflight, package dry-runs, and a package-only
+  consumer also passed.
+- The remaining resource/configuration infrastructure is the next separately
+  bounded assessment before final Hosting and Designer persistence work.
+
 ## 2026-07-20 - vNext Storage FlowContent And Results
 
 - Added canonical exact-content put/get/query/delete nodes with stable normal

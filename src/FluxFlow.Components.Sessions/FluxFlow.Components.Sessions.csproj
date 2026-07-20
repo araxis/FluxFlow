@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Sessions</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions</RootNamespace>
-    <Version>3.3.3</Version>
+    <Version>4.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone session recording, replay, and query nodes for FluxFlow: a recorder (input -> stored record), a replay source (stored records out), and a query node (request -> result + session metadata) over a host-provided ISessionStore, with broadcast output/error/event ports. No engine required.</Description>
+    <Description>Standalone canonical session recording, replay, and query nodes with exact FlowContent, typed normal results, and preserved typed compatibility over host-owned stores.</Description>
     <PackageTags>workflow;dataflow;components;sessions;recording;replay</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the shared FluxFlow package icon. No source, API, or dependency changes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical exact-content recorder/replay nodes and a one-output query node with typed normal results, stable result/error names, strong lineage, and preserved released typed nodes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

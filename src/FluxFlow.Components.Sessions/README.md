@@ -1,49 +1,82 @@
 # FluxFlow.Components.Sessions
 
-Standalone session recording, replay, and query nodes for FluxFlow. Each node is a
-self-contained TPL Dataflow processor built on the `FluxFlow.Nodes` kit — `new` it,
-`LinkTo` the next node, and run it without the engine.
+Standalone session recording, replay, and query nodes over a host-owned
+`ISessionStore`. Canonical record transport uses exact `FlowContent` and one
+typed normal-result output; this package owns no store, serializer, composition
+runtime, or engine.
 
-## Nodes
+## Canonical Nodes
 
-| Node | Kit base | Shape |
-|------|----------|-------|
-| `SessionRecorderNode` | `FlowNode<SessionRecordInput, SessionRecord>` | `Input` -> `Output`, `Errors`, `Events` |
-| `SessionReplayNode` | `FlowSource<SessionRecord>` | `Output`, `Errors`, `Events` (started via `StartAsync`) |
-| `SessionQueryNode` | `FlowNode<SessionQueryRequest, SessionQueryResult>` | `Input` -> `Output`, `Sessions`, `Errors`, `Events` |
+| Node | Input | Output |
+|------|-------|--------|
+| `SessionContentRecorderNode` | `SessionContentRecordInput` | `FlowResult<SessionContentRecord>` |
+| `SessionContentReplayNode` | source | `FlowResult<SessionContentRecord>` |
+| `SessionContentQueryNode` | `SessionQueryRequest` | `FlowResult<SessionQueryOutcome>` |
 
-Every message travels as a `FlowMessage<T>` envelope. The recorder and query node carry
-the incoming correlation id forward (`message.With(...)`); the replay source mints a
-fresh correlation id per record. Domain failures surface on the broadcast `Errors` port
-(`FlowError`, with the original correlation id where one exists) and the pump keeps
-processing later messages; diagnostics go to `Events` (`FlowEvent`).
+Every canonical node exposes Events and Completion. Recorder and query have one
+Input and one broadcast Output. Replay has one broadcast Output and is started
+with `StartAsync`. There is no universal Errors data port. Validation, store,
+missing-session, malformed-record, and query failures are ordinary results with
+stable `SessionResultKinds` and `SessionErrorCodeNames`.
 
-`BoundedCapacity` configures bounded input capacity for recorder/query nodes and
-bounded source output capacity for replay. Replay awaits source output
-acceptance while replay pacing remains deterministic. Output remains
-broadcast/latest-wins; use a dedicated durable buffer if replay delivery must
-guarantee no loss.
+```csharp
+ISessionStore store = ...; // opened and owned by the host
+await using var recorder = new SessionContentRecorderNode(
+    new SessionRecorderOptions { SessionId = "run-42" },
+    store);
 
-Session option records normalize optional text and copy tag maps at assignment.
-Invalid capacity, replay range, replay mode, pacing, and query limit values are
-rejected when assigned, so invalid configuration fails during node or factory
-construction.
-Recorder, replay, and query constructors resolve validated options and required
-stores before creating their node/source pipelines, keeping fail-fast option
-errors clear and preventing partially initialized nodes.
+var results = new BufferBlock<FlowMessage<FlowResult<SessionContentRecord>>>();
+recorder.Output.LinkTo(results);
 
-## Storage
+var command = FlowMessage.Create(new SessionContentRecordInput
+{
+    Name = "received-order",
+    Content = FlowContent.FromBytes(orderBytes, "application/json", "utf-8")
+});
 
-Storage is injected by the host through `ISessionStore`, passed directly to each node's
-constructor. This keeps database paths, schemas, workspace ownership, and retention
-policy outside the component package. Hosts that need deterministic recording or replay
-timing inject a `TimeProvider` (use `FakeTimeProvider` in tests).
-Hosts that need explicit open/close ownership can wrap stores with
-`ISessionStoreFactory`, `SessionStoreContext`, and `SessionStoreLease`.
-`SessionComponentOptions` provides direct-code helpers for shared stores,
-factory-backed stores, and a shared clock.
-Hosts using keyed DI can register already-owned direct stores or store
-factories without a composition dependency:
+await recorder.Input.SendAsync(command);
+recorder.Complete();
+var result = await results.ReceiveAsync();
+await recorder.Completion;
+await recorder.SessionCompleted;
+```
+
+The result keeps the command correlation, trace, and headers, receives a new
+message identity, and records the command message as its cause. Recorder opens
+the session lazily after content validation and closes it after accepted input
+and output have drained. A close failure faults `SessionCompleted` and emits a
+diagnostic event without faulting normal node Completion.
+
+`SessionContentRecordInput.Content` must have an original byte representation.
+A value-only `FlowContent` returns `session.content_unavailable`; use an explicit
+Serialization component first. The runtime writes a private versioned,
+JSON-compatible envelope through the released `SessionRecord.Payload` store
+boundary. Stores must preserve JSON object values. Hosts should not inspect or
+depend on that private envelope.
+
+## Replay And Query
+
+`SessionContentReplayNode` preserves stored content bytes, content type,
+encoding, metadata, and record order. Each replay output mints fresh source
+identity. Missing sessions, source-read failures, and malformed stored records
+are normal failure results; malformed records do not prevent later valid
+records from replaying. `Instant`, `FixedInterval`, `RealTime`, and `Multiplier`
+pacing remain available, with optional sequence and count limits.
+
+`SessionContentQueryNode` returns one `SessionQueryOutcome`. `Count` always
+describes the matches; `EmitSessionsInResult` controls whether copied
+`SessionMetadata` entries are included. Store results are checked against the
+normalized filters and limit before emission. The typed-only
+`EmitSessionOutputs` branch option is not used by the canonical node.
+
+## Ownership
+
+The host owns `ISessionStore` and may use `ISessionStoreFactory`,
+`SessionStoreContext`, and `SessionStoreLease` for explicit open/close scope.
+Nodes borrow the store and never dispose it. A supplied `TimeProvider` controls
+record defaults, result/event timestamps, session start/end, and replay pacing.
+
+Keyed DI helpers remain available for direct hosts:
 
 ```csharp
 services
@@ -51,162 +84,23 @@ services
     .AddFluxFlowSessionStoreFactory("session-factory", sessionStoreFactory);
 ```
 
-The direct registration overloads reject null stores and store factories. The
-provider overloads fail with clear diagnostics if they return null.
-Keyed DI helper names are trimmed before registration, matching the store-name
-normalization used by `SessionStoreContext` and session options.
+## Typed Compatibility
 
-Stores are expected to honor the non-null parts of `ISessionStore`; when a store
-returns a null session, record, query result, or replay stream where the contract
-requires a value, the node reports a clear session error instead of surfacing an
-ambiguous null-reference failure.
-Query results are also validated against the normalized query request. A store
-that returns sessions outside the requested filters, or more sessions than the
-requested limit, is reported through the query error port.
+The released typed nodes and contracts remain available:
 
-```csharp
-ISessionStore store = new MySessionStore(...);
-TimeProvider clock = TimeProvider.System;
-```
+- `SessionRecorderNode`: `SessionRecordInput` to `SessionRecord`
+- `SessionReplayNode`: source of `SessionRecord`
+- `SessionQueryNode`: `SessionQueryRequest` to `SessionQueryResult`, plus
+  `Sessions`
 
-```csharp
-var options = new SessionComponentOptions()
-    .UseSharedStore(store)
-    .UseClock(clock);
-
-await using var lease = await options.StoreFactory.OpenAsync(
-    new SessionStoreContext
-    {
-        StoreName = "sessions",
-        SessionId = "sample-session",
-        Clock = options.Clock
-    });
-```
-
-## Recorder
-
-```csharp
-await using var recorder = new SessionRecorderNode(
-    new SessionRecorderOptions { SessionId = "sample-session", BoundedCapacity = 128 },
-    store,
-    clock);
-
-await recorder.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "event", Payload = "..." }));
-recorder.Complete();
-await recorder.Completion;
-```
-
-`SessionRecorderNode` consumes `SessionRecordInput` and broadcasts the stored
-`SessionRecord` returned by the store, carrying the correlation id forward. The session
-is opened lazily on the first message. It is closed (with the final message count) when
-the node is disposed; the close completes the `SessionCompleted` task. The injected
-`TimeProvider` controls the session start/end timestamps and the default message
-timestamp when `SessionRecordInput.Timestamp` is not set.
-
-## Replay
-
-```csharp
-await using var replay = new SessionReplayNode(
-    new SessionReplayOptions
-    {
-        SessionId = "sample-session",
-        Mode = SessionReplayMode.Instant,
-        BoundedCapacity = 128
-    },
-    store,
-    clock);
-
-await replay.StartAsync();
-await replay.Completion;
-```
-
-Replay modes:
-
-- `Instant`: emit records without delay.
-- `FixedInterval`: wait `FixedIntervalMilliseconds` between records.
-- `RealTime`: use timestamp deltas from the stored records.
-- `Multiplier`: use timestamp deltas divided by `SpeedMultiplier`.
-
-`StartSequence` and `MaxMessages` can limit the replay range. The injected
-`TimeProvider` times the inter-record delays, so a `FakeTimeProvider` drives replay
-deterministically. The loop stops when the session is exhausted, when the source is
-completed/disposed, or when the output declines delivery. A missing session or store
-failure surfaces a `FlowError` and faults the source.
-
-## Query
-
-```csharp
-await using var query = new SessionQueryNode(
-    new SessionQueryOptions { NamePrefix = "sample", Limit = 100, BoundedCapacity = 128 },
-    store,
-    clock);
-
-await query.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" }));
-query.Complete();
-await query.Completion;
-```
-
-`SessionQueryNode` consumes `SessionQueryRequest` and broadcasts a `SessionQueryResult`
-on `Output`. When `EmitSessionOutputs` is enabled, each matching `SessionMetadata` is
-also fanned out to the extra `Sessions` port (`FlowMessage<SessionMetadata>`). The
-request can filter by name, name prefix, tags, started/ended ranges, active or completed
-status, and limit; node options provide defaults that the request merges over. Invalid
-requests and query failures surface on `Errors` and later requests continue.
-
-## Contracts
-
-The package owns the recording and replay contracts:
-
-- `SessionRecordInput`
-- `SessionRecord`
-- `SessionMetadata`
-- `SessionQueryRequest`
-- `SessionQueryResult`
-- `SessionStartRequest`, `SessionAppendRequest`, `SessionCompleteRequest`, `SessionReadRequest`
-- `ISessionStore`
-- `ISessionStoreFactory`
-- `SessionStoreContext`
-- `SessionStoreLease`
-- `SessionComponentOptions`
-
-Records carry neutral fields: session id, sequence, timestamp, type, name, payload,
-content type, and string attributes. Hosts can map their own envelope or event types
-into these contracts.
-
-Contract records normalize optional text by trimming it and treating blank values as
-absent. Tag and attribute maps are copied with ordinal key comparison when assigned,
-and nested session/input values are copied by the request/result contracts that carry
-them.
+Those nodes retain their `FluxFlow.Nodes.FlowError` Errors ports and the query
+branch. Their object-valued payload boundary remains unchanged. New workflows
+should use canonical content nodes so byte ownership and operation failures are
+explicit.
 
 ## Composition
 
-Building a workflow, reading config, creating nodes, and linking them is a
-separate concern from the node package. This package is just the standalone
-nodes and session contracts.
-
-Use `FluxFlow.Components.Sessions.Composition` when a `FluxFlow.Composition`
-host should register the optional session factories:
-
-```csharp
-services.AddFluxFlowSessionStoreFactory("sessions", sessionStoreFactory);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterSessionRecorder()
-        .RegisterSessionReplay()
-        .RegisterSessionQuery());
-```
-
-The composition adapter binds the existing session option records from node
-configuration, resolves the required store from either a keyed `ISessionStore`
-or keyed `ISessionStoreFactory` resource, and can resolve an optional keyed
-`TimeProvider` resource named `clock`. Direct stores remain host-owned; factory
-leases are opened during composition build and disposed with composed nodes.
-Store implementation, retention policy, and persistence setup remain host
-concerns.
-
-The optional composition package also exposes
-`SessionsComponentDesignMetadataProvider` for neutral Designer metadata over the
-session composition node types. The standalone Sessions package remains free of
-Designer, Composition, and Engine dependencies.
+The optional `FluxFlow.Components.Sessions.Composition` package owns workflow
+factory registration, keyed store resolution, factory-lease disposal, and
+Designer metadata. The runtime package remains free of Composition, Designer,
+Hosting, concrete store, and Engine dependencies.

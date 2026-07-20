@@ -7,6 +7,33 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 4.0.0
+
+Adds canonical exact-content session recording and replay plus one-output query
+results while preserving released typed nodes and store contracts.
+
+- Adds FlowContent recorder/replay nodes and a typed normal-result query node
+  with stable result kinds/error codes and strong message lineage.
+- Stores exact bytes and content metadata through a private versioned envelope
+  over the existing object payload boundary.
+- Treats expected validation, store, missing-session, malformed-record, and
+  query failures as ordinary results; replay continues past malformed records.
+- Keeps store/factory/lease ownership, options, typed nodes, branch ports, and
+  direct-use behavior available for compatibility.
+
+## FluxFlow.Components.Sessions.Composition 2.0.0
+
+Makes the three parameterless Sessions registrations canonical vNext contracts.
+
+- Registers exact-content recorder/replay results and one query result Output,
+  plus Events and no universal Errors surface.
+- Keeps keyed stores, keyed factories, optional clocks, and lease disposal
+  host-owned and unchanged.
+- Adds explicit typed compatibility registrations for released record, error,
+  and query branch contracts.
+- Updates Designer metadata and package examples to canonical fixed ports and
+  the flat two-section application document.
+
 ## FluxFlow.Components.Storage 4.0.0
 
 Adds canonical exact-content logical storage while preserving released typed

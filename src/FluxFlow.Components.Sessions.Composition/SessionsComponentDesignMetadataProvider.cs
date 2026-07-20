@@ -55,10 +55,10 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
         AddTransformPorts(
             builder,
-            nameof(SessionRecordInput),
-            "Session record input.",
-            nameof(SessionRecord),
-            "Stored session record.");
+            nameof(SessionContentRecordInput),
+            "Exact-content session record input.",
+            "FlowResult<SessionContentRecord>",
+            "Stored or failed session record result.");
 
         return builder.Build();
     }
@@ -134,8 +134,8 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             displayName: "Output",
             group: "Messages",
             order: 0,
-            summary: "Replayed session record.",
-            valueType: nameof(SessionRecord),
+            summary: "Replayed record or normal replay failure result.",
+            valueType: "FlowResult<SessionContentRecord>",
             isPrimary: true);
 
         return builder.Build();
@@ -146,7 +146,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
         var builder = CreateSessionMetadataBuilder(
             SessionsCompositionNodeTypes.Query,
             "Session Query",
-            "Queries sessions and can fan matching sessions to a separate output.",
+            "Queries sessions and returns matching metadata in one normal result.",
             "history-search",
             "querySessions");
 
@@ -209,15 +209,6 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 attributes: OptionAttributes(
                     "Results",
                     OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(
-                "emitSessionOutputs",
-                OptionValueKind.Boolean,
-                displayName: "Emit Session Outputs",
-                helperText: "Fan each matching session to the Sessions output.",
-                defaultValue: QueryDefaults.EmitSessionOutputs,
-                attributes: OptionAttributes(
-                    "Branches",
-                    OptionDesignMetadataAttributeValues.Advanced))
             .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
 
         builder
@@ -234,16 +225,13 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 displayName: "Output",
                 group: "Results",
                 order: 1,
-                summary: "Session query result.",
-                valueType: nameof(SessionQueryResult),
+                summary: "Completed or failed session query result.",
+                valueType: "FlowResult<SessionQueryOutcome>",
                 isPrimary: true)
-            .AddOutputPort(
-                SessionsCompositionPortNames.Sessions,
-                displayName: "Sessions",
-                group: "Sessions",
-                order: 2,
-                summary: "Matching session metadata.",
-                valueType: nameof(SessionMetadata));
+            .AddAttribute("omittedOptions", "emitSessionOutputs")
+            .AddAttribute(
+                "omittedOptionsReason",
+                "Canonical session.query returns matching metadata in one result; use an explicit typed compatibility registration for the released Sessions branch.");
 
         return builder.Build();
     }
