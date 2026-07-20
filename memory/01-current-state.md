@@ -5,7 +5,7 @@ Date: 2026-07-20
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/resource-infrastructure-vnext`. The provider-neutral MQTT vertical slice and the
+  `work/hosting-vnext`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -324,8 +324,18 @@ Date: 2026-07-20
   Focused/full tests, controlled builds, release preflight, package dry-runs,
   and a package-only ownership consumer passed. Package validation against the
   preceding 1.x packages reported only the intentional major-version API
-  removals. Final Hosting integration is next, with Designer persistence kept
-  separate. See `234-vnext-resource-address-ownership.md`.
+  removals. See `234-vnext-resource-address-ownership.md`.
+- `FluxFlow.Composition.Hosting` is now `2.2.0` locally with canonical static
+  and configuration definition sources plus a DI-backed application revision
+  host. Initial source failures are degraded `FlowError` results rather than
+  .NET host failures; rejected reloads preserve an active revision; hosted stop
+  drains and disposes exactly once. Candidate construction and revision events
+  remain explicit, and Hosting remains Engine-independent. The released
+  standalone `CompositionDefinition` host remains available as compatibility.
+  Focused/full tests, controlled builds, additive binary validation, preflight,
+  dry-run, and a package-only hosted revision consumer passed. Canonical
+  Designer persistence is the final implementation milestone. See
+  `235-vnext-canonical-application-hosting.md`.
 - Current architecture direction: standalone nodes are the default,
   `FluxFlow.Composition` is the optional standalone composition layer, component
   `.Composition` packages own factory registration and optional Designer

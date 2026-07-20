@@ -26,8 +26,12 @@ provider-owned versus non-owning keyed registration APIs. Configuration validate
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
-through Sessions are migrated. Final Hosting integration and Designer
-persistence remain separate bounded milestones.
+through Sessions are migrated. Canonical Hosting integration now loads the
+flat application definition, coordinates initial and subsequent
+complete-definition revisions through explicit candidate factories, preserves
+active revisions on rejection, and reports source-load failures as degraded
+host results without adding an Engine dependency. Designer persistence remains
+the final implementation milestone.
 
 ## Package Ownership
 

@@ -2,6 +2,23 @@
 
 Date: 2026-05-31
 
+## 2026-07-20 - vNext Canonical Application Hosting
+
+- Added static, exact-root, and named-section sources for the canonical flat
+  application definition.
+- Added a DI-backed hosted revision lifecycle for initial load, manual reload,
+  direct complete-definition apply, immutable current snapshots, and stop.
+- Made source failures stable degraded results and preserved active revisions
+  after rejected updates; caller cancellation remains cancellation.
+- Kept candidate construction and revision events explicit, preserving
+  Engine-independent Hosting and immutable provider-snapshot boundaries.
+- Moved Composition.Hosting to additive `2.2.0`; retained the standalone
+  `CompositionDefinition` host as an explicit compatibility API.
+- Hosting (`45`), Release (`94`), and full Release (`2,165`) tests passed.
+  Controlled builds, additive binary validation, release preflight, package
+  dry-run, and a package-only hosted revision consumer also passed.
+- Canonical Designer persistence is the final implementation milestone.
+
 ## 2026-07-20 - vNext Resource Address And Ownership Alignment
 
 - Made Resources, Secrets, and Configuration use the shared canonical

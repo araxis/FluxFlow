@@ -19,7 +19,7 @@ Status values:
 |---------|------|-------|--------|---------------------|-------------------|--------|
 | `FluxFlow.Nodes` | standalone node kit | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Composition` | standalone composition DTOs, validation, build, and runtime | yes | yes | n/a | n/a | aligned |
-| `FluxFlow.Composition.Hosting` | DI and hosted composition bridge | yes | yes | n/a | n/a | aligned |
+| `FluxFlow.Composition.Hosting` | canonical application revisions, immutable DI snapshots, and legacy composition bridge | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Mapping` | expression and mapping contracts | yes | yes | n/a | n/a | aligned |
 | `FluxFlow.Engine` | optional advanced `ApplicationDefinition` runtime | yes | yes | intentional | intentional | optional legacy/advanced path |
 

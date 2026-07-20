@@ -76,7 +76,7 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Hosting_docs_keep_composition_hosting_as_the_default_path()
+    public void Hosting_docs_keep_canonical_application_hosting_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "05-hosting-and-observability.md");
@@ -85,20 +85,24 @@ public sealed class DocumentationBoundaryTests
 
         defaultSection.Contains("FluxFlow.Composition.Hosting", StringComparison.Ordinal)
             .ShouldBeTrue("hosting docs should lead with composition hosting.");
-        defaultSection.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
-            .ShouldBeTrue("hosting docs should show the composition host API before optional engine APIs.");
+        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should lead with the canonical application host API.");
+        defaultSection.Contains("AddFluxFlowApplication", StringComparison.Ordinal)
+            .ShouldBeTrue("hosting docs should lead with canonical application registration.");
         defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
-            .ShouldBeFalse("hosting docs must not lead with the optional engine host.");
+            .ShouldBeFalse("hosting docs must not lead with the legacy engine host.");
 
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Host", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var legacyCompositionSectionIndex = text.IndexOf("## Legacy Composition Host", StringComparison.Ordinal);
+        legacyCompositionSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "hosting docs should keep engine hosting in an explicitly optional section.");
+            "hosting docs should keep standalone composition hosting in an explicit legacy section.");
 
-        var engineHostIndex = text.IndexOf("FlowApplicationHost", StringComparison.Ordinal);
-        engineHostIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "FlowApplicationHost should only appear after the optional engine host heading.");
+        var legacyCompositionHostIndex = text.IndexOf("ICompositionRuntimeHost", StringComparison.Ordinal);
+        legacyCompositionHostIndex.ShouldBeGreaterThan(
+            legacyCompositionSectionIndex,
+            "ICompositionRuntimeHost should only appear after the legacy composition heading.");
+        text.Contains("FlowApplicationHost", StringComparison.Ordinal)
+            .ShouldBeFalse("canonical hosting docs should not direct users to the duplicate engine host model.");
     }
 
     [Fact]

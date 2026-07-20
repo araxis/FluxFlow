@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition.Hosting 2.2.0
+
+- Added canonical `ApplicationDefinition` sources for static definitions,
+  exact configuration roots, and named configuration sections.
+- Added an explicit DI-backed application revision host with initial load,
+  manual reload/apply, immutable active snapshots, and hosted stop/disposal.
+- Source-load failures now produce stable degraded results, and rejected
+  revisions preserve an already active application without terminating the
+  surrounding .NET host.
+- Kept candidate construction and revision event publication explicit through
+  existing host-supplied contracts; the package remains Engine-independent and
+  performs no assembly scanning or provider merging.
+
 ## FluxFlow.Components.Resources 2.0.0
 
 Aligns resource metadata and keyed registration with the canonical vNext

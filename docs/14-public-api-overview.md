@@ -179,6 +179,16 @@ FluxFlow.Composition.Hosting
 
 Main types:
 
+- `IApplicationDefinitionSource`
+- `StaticApplicationDefinitionSource`
+- `ConfigurationApplicationDefinitionSource`
+- `ApplicationHostingBuilder`
+- `ApplicationRevisionHostingOptions`
+- `IApplicationRevisionHost`
+- `ApplicationRevisionHost`
+- `ApplicationRevisionLoadResult`
+- `ApplicationRevisionHostState`
+- `FluxFlowApplicationHostingServiceCollectionExtensions`
 - `CompositionHostingOptions`
 - `CompositionHostingBuilder`
 - `ICompositionRuntimeHost`
@@ -199,9 +209,19 @@ Main types:
 - `ApplicationRevisionUpdateResult`
 - `FluxFlowServiceCollectionExtensions`
 
-Use these types when a .NET host wants DI to load, build, start, stop, and
-observe a composition runtime. Resource helpers resolve named node resource
-references from keyed DI services; adapter packages still own the resources.
+Use `AddFluxFlowApplication(...)` when a .NET host wants DI to load the
+canonical flat `ApplicationDefinition`, apply its initial revision, reload or
+apply complete definitions, preserve an active revision after rejection, and
+drain it at host stop. Candidate factories and revision event sinks are
+registered explicitly. Source-load failures are stable degraded results rather
+than .NET host failures, while cancellation remains cancellation. This layer
+does not depend on Engine; the host-supplied candidate factory owns concrete
+runtime preparation.
+
+`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` preserve the older
+standalone `CompositionDefinition` host for existing consumers. Resource
+helpers resolve named node resource references from keyed DI services; adapter
+packages still own the resources.
 Resource helper slot names and configured keyed service references are trimmed
 before lookup so configuration whitespace does not change resource identity.
 `CompositionHostingBuilder` supports direct delegate registration through

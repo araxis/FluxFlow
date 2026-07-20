@@ -535,6 +535,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `234-vnext-resource-address-ownership.md`: canonical nested resource and
   secret addresses, explicit host/revision/external ownership, non-owning DI
   bridges, Configuration alignment, and package evidence.
+- `235-vnext-canonical-application-hosting.md`: canonical application sources,
+  degraded hosted revision lifecycle, explicit candidate DI, preserved legacy
+  Composition hosting, and package evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

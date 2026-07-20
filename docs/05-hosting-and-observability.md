@@ -1,150 +1,122 @@
 # Hosting And Observability
 
-The default hosted path is `FluxFlow.Composition.Hosting`. It loads a
-`CompositionDefinition`, builds a `CompositionRuntime`, starts source nodes, and
-keeps concrete resources in host-owned DI.
+The default hosted path is `FluxFlow.Composition.Hosting` over the canonical
+flat `ApplicationDefinition`. It loads exactly `Resources` and `Workflows`,
+delegates concrete candidate construction to an explicitly registered factory,
+and serializes initial activation and later complete-definition revisions.
+`IApplicationRevisionHost` is the primary lifecycle, status, reload, and direct
+complete-definition update surface.
 
-## Build And Start
+## Register The Application
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
+    .AddFluxFlowApplication(configuration)
+    .UseCandidateFactory<ApplicationCandidateFactory>()
+    .UseRevisionEventSink<ApplicationRevisionEventSink>()
+    .Configure(options => options.InitialRevisionId = "deployment-42");
+```
+
+The configuration object may be the exact application root. Pass a section
+name when the canonical document is nested under host settings:
+
+```csharp
+services
+    .AddFluxFlowApplication(configuration, "FluxFlowApplication")
+    .UseCandidateFactory<ApplicationCandidateFactory>();
+```
+
+There is no assembly scanning. The candidate factory is a normal DI service and
+owns preparation of resource and workflow provider snapshots, components,
+stable-port attachments, and compiled links. Adapter packages still own
+concrete clients, stores, retry behavior, credentials, and protocol lifetimes.
+
+## Hosted Lifecycle
+
+The registered hosted service applies the initial definition with the .NET host
+and drains the active candidate at host stop. Resolve
+`IApplicationRevisionHost` for status, reload, or direct complete-definition
+updates:
+
+```csharp
+var host = services.GetRequiredService<IApplicationRevisionHost>();
+
+var reload = await host.ReloadAsync("deployment-43");
+if (reload.Error is not null)
+    logger.LogError("{Code}: {Message}", reload.Error.Code, reload.Error.Message);
+
+if (reload.Update?.Status == ApplicationRevisionUpdateStatus.Rejected)
+{
+    foreach (var failure in reload.Update.Failures)
+        logger.LogWarning("{Code}: {Message}", failure.Error.Code, failure.Error.Message);
+}
+```
+
+`ReloadAsync` loads another complete definition from the configured source.
+`ApplyAsync` accepts an already loaded complete definition. Partial patches,
+file watching, and remote configuration transport belong to the source layer.
+
+## Failure Isolation
+
+A source-load failure returns `ApplicationRevisionLoadResult.Error` with stable
+code `revision.source.load_failed`. The application host enters `Degraded`, but
+the surrounding .NET host continues running. Caller cancellation still throws
+`OperationCanceledException`.
+
+Planning, preparation, and activation failures return a rejected revision
+result. If an older revision is active, it remains active and the host remains
+`Running`. A successful activation publishes one immutable current snapshot
+before the old candidate drains. Drain and disposal failures are reported after
+all cleanup is attempted and do not roll back the committed revision.
+
+## Provider Snapshots
+
+Compose service descriptors before building immutable snapshots:
+
+```csharp
+var registrations = new ServiceCollection();
+registrations.AddFluxFlowResource<IMessageClient>(
+    ApplicationAddress.Resource("Messaging", "Client1"),
+    services => new MessageClient(
+        services.GetRequiredService<ClientOptions>()));
+
+await using var resources = new CompositionServiceProviderSnapshotBuilder()
+    .AddServices(registrations)
+    .Build(CompositionProviderBoundary.ResourceRevision, "resources-43");
+```
+
+Canonical address strings are keyed-service identities. Factory registrations
+are provider-owned. `AddExternal...`, `BridgeExternal...`, and
+`CreateExternalHost(...)` are explicit non-owning boundaries. Snapshots never
+scan, merge, mutate, or fall back to another provider.
+
+## System Streams
+
+Engine-backed candidates connect lifecycle and revision events to
+`System.Events.Output` and best-effort activity to
+`System.Diagnostics.Output`. Both are ordinary stable output addresses and can
+be observed directly or linked into workflows. Component packages remain free
+of an Engine dependency and may expose explicit domain event outputs when
+workflow logic needs those events.
+
+## Legacy Composition Host
+
+`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` remain available
+for the released standalone `CompositionDefinition` runtime:
+
+```csharp
+services
+    .AddFluxFlowComposition(legacyConfiguration)
     .RegisterNodes(registry => registry.RegisterMyNodes());
+
+var legacyHost = services.GetRequiredService<ICompositionRuntimeHost>();
+var build = await legacyHost.BuildAsync();
+if (build.Succeeded)
+    await legacyHost.StartRuntimeAsync();
 ```
 
-The hosted service builds and starts the runtime with the .NET host by default.
-Use `ICompositionRuntimeHost` when the application needs to inspect diagnostics,
-attach subscribers, or manually control start and stop:
-
-```csharp
-var host = services.GetRequiredService<ICompositionRuntimeHost>();
-
-var build = await host.BuildAsync();
-if (!build.Succeeded)
-{
-    foreach (var diagnostic in build.Diagnostics)
-        Console.Error.WriteLine(diagnostic.Message);
-
-    return;
-}
-
-var runtime = build.Runtime!;
-await host.StartRuntimeAsync();
-```
-
-Use `StartRuntimeWithHost = false` when startup should build only. Use
-`BuildAsync()` plus `StartRuntimeAsync()` when the app needs to attach
-subscribers first.
-
-## Runtime Streams
-
-`CompositionRuntime` exposes:
-
-- `Events`: aggregated `FlowEvent` records from composed nodes.
-- `Errors`: aggregated `FlowError` records from composed nodes.
-- `Completion`: a task that completes when all composed nodes finish.
-
-Each node still owns its typed input and output ports. Composition hosting only
-aggregates observability streams and lifecycle.
-
-## Subscribe Before Startup
-
-When startup diagnostics, source events, or early errors matter, build first,
-attach subscribers, then start the runtime:
-
-```csharp
-var host = services.GetRequiredService<ICompositionRuntimeHost>();
-var build = await host.BuildAsync();
-if (!build.Succeeded || build.Runtime is null)
-    return;
-
-var events = new BufferBlock<FlowEvent>(
-    new DataflowBlockOptions { BoundedCapacity = 128 });
-var errors = new BufferBlock<FlowError>(
-    new DataflowBlockOptions { BoundedCapacity = 128 });
-
-build.Runtime.Events.LinkTo(
-    events,
-    new DataflowLinkOptions { PropagateCompletion = true });
-build.Runtime.Errors.LinkTo(
-    errors,
-    new DataflowLinkOptions { PropagateCompletion = true });
-
-await host.StartRuntimeAsync();
-```
-
-`ICompositionRuntimeHost.Diagnostics` contains build diagnostics. Runtime events
-and errors flow through the built `CompositionRuntime`.
-
-## Resource Resolution
-
-Composition definitions name local resource slots. Adapter packages decide which
-slots they need, and the host maps those slots to keyed services:
-
-```json
-{
-  "workflows": {
-    "main": {
-      "nodes": {
-        "writer": {
-          "type": "storage.put",
-          "resources": {
-            "store": "primary"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-The node factory asks for the local slot:
-
-```csharp
-var store = context.GetRequiredResource<IStorageStore>("store");
-```
-
-The factory context resolves the configured keyed service named `primary`.
-Concrete clients, stores, reconnect policies, secrets, and disposal ownership
-stay with the host or adapter package.
-
-## Stop And Dispose
-
-```csharp
-await host.StopRuntimeAsync();
-await ((IAsyncDisposable)host).DisposeAsync();
-```
-
-`StopRuntimeAsync()` completes entry nodes and waits for graph completion.
-Dispose releases runtime links, diagnostic subscriptions, collectors, and nodes.
-Hosted start/stop calls are idempotent at the hosting boundary.
-
-## Failure Surface
-
-Build failures return `CompositionDiagnostic` records. By default the hosted
-service throws `CompositionHostingException` when the runtime cannot be built.
-Set `ThrowOnBuildFailure = false` when diagnostics should be captured without
-throwing.
-
-Node processing failures can be reported through node error streams. Diagnostic
-records are for build and status; event records are for workflow activity.
-
-## Optional Engine Host
-
-`FluxFlow.Engine` remains available for hosts that intentionally use the older
-`ApplicationDefinition` runtime:
-
-```csharp
-var registry = new RuntimeNodeFactoryRegistry()
-    .RegisterSampleOrderComponents(store);
-
-await using var host = FlowApplicationHost.Create(definition, registry);
-var build = host.Build();
-```
-
-Use this path when an application still needs the engine-specific executable
-model, conditional links, or engine lifecycle APIs. Component packages should
-still expose standalone nodes first and keep engine modules out of normal
-component packages.
+That host exposes `CompositionRuntime.Events`, `Errors`, `Completion`, and build
+diagnostics. New canonical applications should use `AddFluxFlowApplication`;
+do not register both hosting models as competing owners of the same graph.
 
 Next: [Workspace Projection](06-workspace-projection.md).

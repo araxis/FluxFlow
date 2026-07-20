@@ -1,6 +1,6 @@
 # FluxFlow.Composition.Hosting
 
-Optional hosting and immutable provider-snapshot bridge for
+Canonical application hosting and immutable provider-snapshot bridge for
 `FluxFlow.Composition`.
 
 Use this package when a .NET host wants DI/configuration to own composition
@@ -14,13 +14,16 @@ This package owns:
   provider snapshots
 - explicit keyed registration of resources, components, typed ports, and
   payload-independent signal targets by canonical application address
-- registering a single composition runtime with `IServiceCollection`
-- loading a `CompositionDefinition` from an object or `IConfiguration`
-- building the runtime through `CompositionRuntimeBuilder`
-- starting and stopping the runtime through `IHostedService`
-- exposing build diagnostics through `ICompositionRuntimeHost`
+- loading the canonical flat `ApplicationDefinition` from an object, an exact
+  `IConfiguration` root, or a named configuration section
+- registering one canonical application revision host with
+  `IServiceCollection` and `IHostedService`
+- exposing normal source-load and revision-update results without terminating
+  the .NET host for an ordinary rejected activation
 - serializing complete-definition revision preparation, activation, commit,
   drain, and disposal through host-supplied candidates
+- retaining the older `CompositionDefinition` runtime host as an explicit
+  migration surface
 
 Named node resources resolve through the `CompositionNodeFactoryContext`
 instance methods in `FluxFlow.Composition`; this package's role is registering
@@ -34,6 +37,53 @@ adapter-specific options.
 Provider snapshots do not merge service providers and do not fall back to an
 arbitrary parent provider. Compose `IServiceCollection` instances before
 building a snapshot, or bridge an exact external instance explicitly.
+
+## Canonical Application Hosting
+
+Register the complete flat application document and an explicit candidate
+factory. The factory prepares resource providers, workflow providers,
+components, stable-port attachments, and compiled routing for one complete
+candidate. Hosting coordinates its lifecycle but does not discover factories,
+scan assemblies, or depend on Engine.
+
+```csharp
+using FluxFlow.Composition.Hosting;
+
+services
+    .AddFluxFlowApplication(configuration)
+    .UseCandidateFactory<ApplicationCandidateFactory>()
+    .UseRevisionEventSink<ApplicationRevisionEventSink>()
+    .Configure(options => options.InitialRevisionId = "deployment-42");
+```
+
+`configuration` must contain exactly `Resources` and `Workflows` at its root.
+Pass a section name when those two properties live under a host-specific
+configuration section. `StaticApplicationDefinitionSource` and
+`ConfigurationApplicationDefinitionSource` can also be registered directly.
+
+The hosted service loads and applies the initial definition. A source-load
+failure becomes `ApplicationRevisionLoadResult.Error` with stable code
+`revision.source.load_failed`; the host enters `Degraded` and the surrounding
+.NET host continues running. A candidate rejection is returned through
+`ApplicationRevisionUpdateResult` and never replaces an already active
+revision.
+
+```csharp
+var host = services.GetRequiredService<IApplicationRevisionHost>();
+var reload = await host.ReloadAsync("deployment-43");
+
+if (!reload.Succeeded)
+{
+    var sourceError = reload.Error;
+    var revisionFailures = reload.Update?.Failures ?? [];
+}
+```
+
+`ApplyAsync(...)` accepts an already loaded complete definition. `ReloadAsync`
+loads another complete definition from the configured source. Partial patches,
+file watching, and remote configuration transport are source-layer concerns.
+Stop drains and disposes the active candidate exactly once. Cleanup failures
+are reported after all candidate cleanup has been attempted.
 
 ## Provider Snapshots
 
@@ -123,7 +173,12 @@ metadata and must make a failed `ActivateAsync` safe to dispose. The coordinator
 does not depend on Engine, merge service providers, discover registrations, or
 define resource creation policy.
 
-## Hosted Runtime Registration
+## Legacy Composition Runtime
+
+`AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` retain the released
+standalone `CompositionDefinition` runtime for existing consumers. New
+applications should use `AddFluxFlowApplication(...)`; the two hosting models
+must not be registered as competing owners of the same graph.
 
 ```csharp
 services.AddKeyedSingleton<IMessageStore>("primary", new InMemoryMessageStore());
@@ -156,7 +211,7 @@ Contributor registration is explicit and duplicate-safe by implementation type.
 The hosting package does not scan assemblies or discover node factories
 implicitly.
 
-The established hosted runtime configuration records the resource reference by
+The legacy hosted runtime configuration records the resource reference by
 name:
 
 ```json

@@ -1,10 +1,29 @@
 # Runtime Lifecycle
 
+The canonical hosted lifecycle is exposed by `IApplicationRevisionHost`:
+
+| State | Meaning |
+|-------|---------|
+| `Empty` | No source load or revision attempt has completed. |
+| `Starting` | The initial source is loading. |
+| `Running` | A valid application is active; rejected reloads preserve this state. |
+| `Degraded` | No valid application is active after a source or revision failure. |
+| `Stopped` | The active candidate was drained and disposed. |
+| `Disposed` | The host itself was disposed. |
+
+`StartApplicationAsync` loads the configured complete definition.
+`ReloadAsync` loads another complete definition from the same source, while
+`ApplyAsync` accepts one directly. Activation publishes one immutable current
+snapshot before old-candidate drain. Stop and disposal attempt the candidate's
+drain and cleanup exactly once.
+
+## Legacy Composition Runtime
+
 The default runtime path is `CompositionRuntime`. It does not expose a state enum.
 Its lifecycle is observable through build diagnostics, host method results,
 `Completion`, `Events`, and `Errors`.
 
-## Composition Host Lifecycle
+## Legacy Composition Host Lifecycle
 
 `FluxFlow.Composition.Hosting` wraps composition build/start/stop for .NET hosts:
 

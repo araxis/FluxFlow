@@ -100,10 +100,35 @@ Additional build diagnostic codes:
 When build fails after creating nodes, the builder attempts to dispose created
 nodes and links before returning diagnostics.
 
-## Host Build And Start
+## Canonical Application Host
 
-`FluxFlow.Composition.Hosting` wraps definition loading, runtime build, and
-host-owned lifecycle:
+`FluxFlow.Composition.Hosting` loads and applies the canonical flat application
+as a complete revision. Source failures are normal degraded load results;
+planning, preparation, and activation failures are rejected update results.
+An active revision remains active after a rejected reload.
+
+```csharp
+services
+    .AddFluxFlowApplication(configuration)
+    .UseCandidateFactory<ApplicationCandidateFactory>();
+
+var host = services.GetRequiredService<IApplicationRevisionHost>();
+var result = await host.ReloadAsync("deployment-43");
+
+if (result.Error is not null)
+    Console.WriteLine($"{result.Error.Code}: {result.Error.Message}");
+
+foreach (var failure in result.Update?.Failures ?? [])
+    Console.WriteLine($"{failure.Error.Code}: {failure.Error.Message}");
+```
+
+Invalid static configuration never activates a candidate. Caller cancellation
+remains cancellation rather than being converted to a workflow error.
+
+## Legacy Composition Build And Start
+
+The retained standalone composition host wraps legacy definition loading,
+runtime build, and host-owned lifecycle:
 
 ```csharp
 services
