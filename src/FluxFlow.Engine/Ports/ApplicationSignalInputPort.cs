@@ -16,25 +16,7 @@ internal interface IApplicationSignalInputPort : IApplicationInputPort, IFlowSig
 
 internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 {
-    private readonly object _gate = new();
-    private readonly Queue<ISignalEnvelope> _queue = new();
-    private readonly SemaphoreSlim _availableCapacity;
-    private readonly SemaphoreSlim _signal = new(0, 1);
-    private readonly SemaphoreSlim _attachmentGate = new(1, 1);
-    private readonly CancellationTokenSource _abort = new();
-    private readonly Action<ApplicationPortRejection> _report;
-    private readonly Action<ApplicationPortActivity> _activity;
-    private readonly TaskCompletionSource _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Task _pump;
-
-    private IFlowSignalTarget? _target;
-    private ISignalEnvelope? _retry;
-    private TaskCompletionSource _inflightIdle = CompletedSignal();
-    private long _generation;
-    private bool _paused;
-    private bool _completeRequested;
-    private bool _aborted;
+    private readonly ApplicationInputPortCore<ISignalEnvelope, IFlowSignalTarget> _core;
 
     public ApplicationSignalInputPort(
         ApplicationAddress address,
@@ -44,10 +26,23 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
     {
         Address = address;
         Capacity = capacity;
-        _report = report;
-        _activity = activity;
-        _availableCapacity = new SemaphoreSlim(capacity, capacity);
-        _pump = PumpAsync();
+        _core = new ApplicationInputPortCore<ISignalEnvelope, IFlowSignalTarget>(
+            address,
+            ApplicationPortKind.Signal,
+            typeof(object),
+            capacity,
+            "Signal input port",
+            $"an {nameof(IFlowSignalTarget)} target",
+            report,
+            activity,
+            static message => new ApplicationInputMessageIdentity(
+                message.CorrelationId,
+                message.TraceId,
+                message.MessageId),
+            static (message, target, cancellationToken) =>
+                message.SendAsync(target, cancellationToken),
+            static target => target.Completion,
+            static _ => Task.CompletedTask);
     }
 
     public ApplicationAddress Address { get; }
@@ -58,59 +53,14 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 
     public int Capacity { get; }
 
-    public Task Completion => _completion.Task;
+    public Task Completion => _core.Completion;
 
     public PortSendResult TrySend<T>(
         FlowMessage<T> message,
         ApplicationAddress? source = null)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var envelope = new SignalEnvelope<T>(message);
-
-        PortSendStatus status;
-        lock (_gate)
-        {
-            if (_completeRequested || _aborted)
-            {
-                status = PortSendStatus.Completed;
-            }
-            else if (_target is null)
-            {
-                status = PortSendStatus.Unavailable;
-            }
-            else if (!_availableCapacity.Wait(0))
-            {
-                status = PortSendStatus.Full;
-            }
-            else
-            {
-                _queue.Enqueue(envelope);
-                Pulse();
-                status = PortSendStatus.Accepted;
-            }
-        }
-
-        if (status == PortSendStatus.Accepted)
-        {
-            _activity(new ApplicationPortActivity(
-                DateTimeOffset.UtcNow,
-                ApplicationPortActivityKind.InputAccepted,
-                Address,
-                source,
-                envelope.CorrelationId,
-                envelope.TraceId,
-                envelope.MessageId));
-        }
-        else
-        {
-            Report(status, envelope, source);
-        }
-
-        return new PortSendResult
-        {
-            Port = Address,
-            Status = status
-        };
+        return _core.TrySend(new SignalEnvelope<T>(message), source);
     }
 
     public ValueTask<bool> SendAsync<T>(
@@ -123,24 +73,7 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 
     public ApplicationPortStatus GetStatus()
     {
-        lock (_gate)
-        {
-            return new ApplicationPortStatus
-            {
-                Address = Address,
-                Direction = ApplicationPortDirection.Input,
-                Kind = ApplicationPortKind.Signal,
-                PayloadType = typeof(object),
-                Capacity = Capacity,
-                PendingMessages = _aborted ? 0 : Capacity - _availableCapacity.CurrentCount,
-                ActiveAttachments = _target is null ? 0 : 1,
-                Availability = _completeRequested || _aborted
-                    ? ApplicationPortAvailability.Completed
-                    : _target is null
-                        ? ApplicationPortAvailability.Unavailable
-                        : ApplicationPortAvailability.Available
-            };
-        }
+        return _core.GetStatus();
     }
 
     public async ValueTask<IAsyncDisposable> AttachAsync(
@@ -162,383 +95,29 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
     public async ValueTask<IApplicationInputRevision> BeginRevisionAsync(
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        await _attachmentGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            Task waitForIdle;
-            lock (_gate)
-            {
-                ObjectDisposedException.ThrowIf(_aborted, this);
-                if (_completeRequested)
-                    throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
-
-                _paused = true;
-                waitForIdle = _inflightIdle.Task;
-            }
-
-            await waitForIdle.WaitAsync(cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            lock (_gate)
-            {
-                ObjectDisposedException.ThrowIf(_aborted, this);
-                if (_completeRequested)
-                    throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
-            }
-
-            return new InputRevision(this);
-        }
-        catch
-        {
-            EndRevision();
-            throw;
-        }
+        await _core.BeginRevisionAsync(cancellationToken).ConfigureAwait(false);
+        return new InputRevision(this);
     }
 
     public void Complete()
     {
-        lock (_gate)
-        {
-            if (_completeRequested || _aborted)
-                return;
-
-            _completeRequested = true;
-            Pulse();
-        }
+        _core.Complete();
     }
 
     public void Abort()
     {
-        lock (_gate)
-        {
-            if (_aborted)
-                return;
-
-            _aborted = true;
-            _completeRequested = true;
-            _queue.Clear();
-            _retry = null;
-            _target = null;
-            _inflightIdle.TrySetResult();
-            _completion.TrySetResult();
-        }
-
-        _abort.Cancel();
-        Pulse();
-    }
-
-    private async Task PumpAsync()
-    {
-        try
-        {
-            while (true)
-            {
-                await _signal.WaitAsync(_abort.Token).ConfigureAwait(false);
-
-                while (true)
-                {
-                    ISignalEnvelope? message = null;
-                    IFlowSignalTarget? target = null;
-                    List<ISignalEnvelope>? terminalDrops = null;
-                    var finish = false;
-
-                    lock (_gate)
-                    {
-                        if (_aborted)
-                            return;
-                        if (_paused)
-                            break;
-
-                        if (_target is null)
-                        {
-                            if (_completeRequested)
-                            {
-                                terminalDrops = [];
-                                if (_retry is not null)
-                                {
-                                    terminalDrops.Add(_retry);
-                                    _retry = null;
-                                }
-
-                                while (_queue.TryDequeue(out var queued))
-                                    terminalDrops.Add(queued);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            message = _retry;
-                            if (message is not null)
-                                _retry = null;
-                            else if (_queue.Count > 0)
-                                message = _queue.Dequeue();
-
-                            if (message is null)
-                            {
-                                if (_completeRequested)
-                                {
-                                    _target = null;
-                                    finish = true;
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                target = _target;
-                                _inflightIdle = new TaskCompletionSource(
-                                    TaskCreationOptions.RunContinuationsAsynchronously);
-                            }
-                        }
-                    }
-
-                    if (terminalDrops is not null)
-                    {
-                        if (terminalDrops.Count > 0)
-                            _availableCapacity.Release(terminalDrops.Count);
-                        foreach (var dropped in terminalDrops)
-                            Report(PortSendStatus.Completed, dropped, source: null);
-                        _completion.TrySetResult();
-                        return;
-                    }
-
-                    if (finish)
-                    {
-                        _completion.TrySetResult();
-                        return;
-                    }
-
-                    var accepted = false;
-                    Exception? failure = null;
-                    try
-                    {
-                        accepted = await message!.SendAsync(target!, _abort.Token)
-                            .ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) when (_abort.IsCancellationRequested)
-                    {
-                        return;
-                    }
-                    catch (Exception exception)
-                    {
-                        failure = exception;
-                    }
-
-                    lock (_gate)
-                    {
-                        if (accepted)
-                        {
-                            _availableCapacity.Release();
-                        }
-                        else if (!_aborted)
-                        {
-                            _retry = message;
-                            if (ReferenceEquals(_target, target))
-                                _target = null;
-                        }
-
-                        _inflightIdle.TrySetResult();
-                        Pulse();
-                    }
-
-                    if (!accepted && !_aborted)
-                    {
-                        _report(new ApplicationPortRejection
-                        {
-                            Timestamp = DateTimeOffset.UtcNow,
-                            Port = Address,
-                            CorrelationId = message!.CorrelationId,
-                            TraceId = message.TraceId,
-                            MessageId = message.MessageId,
-                            Reason = ApplicationPortRejectionReason.TargetRejected,
-                            Exception = failure
-                        });
-                        break;
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException) when (_abort.IsCancellationRequested)
-        {
-            _completion.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            _completion.TrySetException(exception);
-        }
+        _core.Abort();
     }
 
     private async ValueTask DetachAsync(long generation)
-    {
-        await _attachmentGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            Task waitForIdle;
-            lock (_gate)
-            {
-                if (_aborted || generation != _generation || _target is null)
-                    return;
-
-                _paused = true;
-                waitForIdle = _inflightIdle.Task;
-            }
-
-            await waitForIdle.ConfigureAwait(false);
-
-            lock (_gate)
-            {
-                if (generation == _generation)
-                    _target = null;
-
-                _paused = false;
-                Pulse();
-            }
-        }
-        finally
-        {
-            _attachmentGate.Release();
-        }
-    }
+        => await _core.DetachAsync(generation).ConfigureAwait(false);
 
     private IAsyncDisposable CommitRevision(object? target)
-    {
-        if (target is not null && target is not IFlowSignalTarget)
-        {
-            throw new InvalidOperationException(
-                $"Signal input port '{Address}' requires an {nameof(IFlowSignalTarget)} target.");
-        }
+        => new InputAttachment(this, _core.CommitRevision(target));
 
-        var signalTarget = (IFlowSignalTarget?)target;
-        long generation;
-        lock (_gate)
-        {
-            ObjectDisposedException.ThrowIf(_aborted, this);
-            if (_completeRequested)
-                throw new InvalidOperationException($"Signal input port '{Address}' is completed.");
+    private void EndRevision() => _core.EndRevision();
 
-            _target = signalTarget;
-            generation = ++_generation;
-        }
-
-        if (signalTarget is not null)
-            ObserveTargetCompletion(signalTarget, generation);
-        return new InputAttachment(this, generation);
-    }
-
-    private void ObserveTargetCompletion(IFlowSignalTarget target, long generation)
-    {
-        _ = target.Completion.ContinueWith(
-            static (task, state) =>
-            {
-                var completion = (TargetCompletion)state!;
-                completion.Owner.HandleTargetCompletion(
-                    completion.Target,
-                    completion.Generation,
-                    task);
-            },
-            new TargetCompletion(this, target, generation),
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-    }
-
-    private void EndRevision()
-    {
-        lock (_gate)
-        {
-            _paused = false;
-            Pulse();
-        }
-
-        _attachmentGate.Release();
-    }
-
-    private void HandleTargetCompletion(
-        IFlowSignalTarget target,
-        long generation,
-        Task completion)
-    {
-        Exception? failure = null;
-        lock (_gate)
-        {
-            if (_aborted ||
-                generation != _generation ||
-                !ReferenceEquals(_target, target))
-            {
-                return;
-            }
-
-            _target = null;
-            failure = completion.IsFaulted
-                ? completion.Exception?.GetBaseException() ?? completion.Exception
-                : null;
-            Pulse();
-        }
-
-        if (failure is not null)
-        {
-            _report(new ApplicationPortRejection
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Port = Address,
-                Reason = ApplicationPortRejectionReason.ComponentFaulted,
-                Exception = failure
-            });
-        }
-    }
-
-    private void Report(
-        PortSendStatus status,
-        ISignalEnvelope message,
-        ApplicationAddress? source)
-    {
-        var reason = status switch
-        {
-            PortSendStatus.Full => ApplicationPortRejectionReason.Full,
-            PortSendStatus.Unavailable => ApplicationPortRejectionReason.Unavailable,
-            PortSendStatus.Completed => ApplicationPortRejectionReason.Completed,
-            _ => throw new ArgumentOutOfRangeException(nameof(status))
-        };
-
-        _report(new ApplicationPortRejection
-        {
-            Timestamp = DateTimeOffset.UtcNow,
-            Port = Address,
-            RelatedPort = source,
-            CorrelationId = message.CorrelationId,
-            TraceId = message.TraceId,
-            MessageId = message.MessageId,
-            Reason = reason
-        });
-    }
-
-    private void Pulse()
-    {
-        try
-        {
-            _signal.Release();
-        }
-        catch (SemaphoreFullException)
-        {
-        }
-    }
-
-    private static TaskCompletionSource CompletedSignal()
-    {
-        var source = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        source.SetResult();
-        return source;
-    }
-
-    private interface ISignalEnvelope
+    internal interface ISignalEnvelope
     {
         CorrelationId CorrelationId { get; }
 
@@ -608,9 +187,4 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
             return ValueTask.CompletedTask;
         }
     }
-
-    private sealed record TargetCompletion(
-        ApplicationSignalInputPort Owner,
-        IFlowSignalTarget Target,
-        long Generation);
 }
