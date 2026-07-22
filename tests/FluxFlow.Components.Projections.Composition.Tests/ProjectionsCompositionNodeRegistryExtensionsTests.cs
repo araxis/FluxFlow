@@ -1,4 +1,3 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Projections;
@@ -7,20 +6,30 @@ using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FluxFlow.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Projections.Composition.Tests;
 
 public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", ProjectionsCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", ProjectionsCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
 
     [Fact]
     public void RegisterEventProjection_registers_request_result_metadata()
@@ -197,9 +206,8 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         var clock = new FakeTimeProvider(timestamp);
 
         await WithNodeAsync(
-            async (input, output, _) =>
+            async (ports, _) =>
             {
-                var snapshots = Link(output.Source);
                 var first = FlowMessage.Create(
                     CreateEvent(
                         timestamp.AddSeconds(-10),
@@ -234,12 +242,13 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                         }),
                     new CorrelationId("second"));
 
-                (await input.Target.SendAsync(first).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(ignored).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(second).WaitAsync(Timeout)).ShouldBeTrue();
-
-                var firstSnapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
-                var secondSnapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
+                var firstReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                (await ports.SendAsync(Input, first)).IsAccepted.ShouldBeTrue();
+                var firstSnapshot = (await firstReceive).Message.ShouldNotBeNull();
+                (await ports.SendAsync(Input, ignored)).IsAccepted.ShouldBeTrue();
+                var secondReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                (await ports.SendAsync(Input, second)).IsAccepted.ShouldBeTrue();
+                var secondSnapshot = (await secondReceive).Message.ShouldNotBeNull();
 
                 firstSnapshot.CorrelationId.ShouldBe(first.CorrelationId);
                 firstSnapshot.Payload.Kind.ShouldBe(ProjectionResultKinds.Snapshot);
@@ -257,13 +266,11 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                 secondValue.CurrentRate.ShouldBe(0.2d);
                 secondValue.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
             },
-            node => node
-                .Configure("name", "errors")
-                .Configure("rateWindowSeconds", 10)
-                .Configure("maxPreviewChars", 4)
-                .Configure(
-                    "filter",
-                    new EventFilter
+            Properties(
+                ("name", "errors"),
+                ("rateWindowSeconds", 10),
+                ("maxPreviewChars", 4),
+                ("filter", new EventFilter
                     {
                         Type = "operation.completed",
                         SubjectPrefix = "orders/",
@@ -272,9 +279,12 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                         {
                             ["tenant"] = "north"
                         }
-                    })
-                .Resource(ProjectionsCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+                    }),
+                (ProjectionsCompositionResourceNames.Clock, "Resources.fixed")),
+            resources: ["fixed"],
+            configureRuntime: context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                ApplicationAddress.Resource("fixed"),
+                clock));
     }
 
     [Fact]
@@ -282,11 +292,10 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
     {
         var timestamp = DateTimeOffset.Parse("2026-06-18T12:30:00Z");
         await WithNodeAsync(
-            async (input, output, _) =>
+            async (ports, _) =>
             {
-                var snapshots = Link(output.Source);
-
-                (await input.Target.SendAsync(FlowMessage.Create(CreateEvent(
+                var receive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(CreateEvent(
                         timestamp,
                         "task.completed",
                         source: "worker",
@@ -295,10 +304,9 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                         attributes: new Dictionary<string, string>
                         {
                             ["tenant"] = "north"
-                        })))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
+                        })))).IsAccepted.ShouldBeTrue();
 
-                var snapshot = await snapshots.ReceiveAsync().WaitAsync(Timeout);
+                var snapshot = (await receive).Message.ShouldNotBeNull();
                 var value = snapshot.Payload.Value.ShouldNotBeNull();
                 value.MatchedCount.ShouldBe(1);
                 value.Filter.TypePrefix.ShouldBe("task.");
@@ -306,9 +314,7 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                 value.Filter.SubjectPrefix.ShouldBe("jobs/");
                 value.Filter.Attributes["tenant"].ShouldBe("north");
             },
-            node => node.Configure(
-                "filter",
-                new EventFilter
+            Properties(("filter", new EventFilter
                 {
                     TypePrefix = "task.",
                     SubjectPrefix = "jobs/",
@@ -317,37 +323,34 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                     {
                         ["tenant"] = "north"
                     }
-                }));
+                })));
     }
 
     [Fact]
     public async Task Hosted_event_projection_exposes_events()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
+        await WithNodeAsync(async (ports, _) =>
         {
-            output.Source.LinkTo(
-                DataflowBlock.NullTarget<FlowMessage<FlowResult<EventProjectionSnapshot>>>());
-            var events = Link(descriptor.Events.ShouldNotBeNull());
             var message = FlowMessage.Create(CreateEvent(
                 DateTimeOffset.Parse("2026-06-18T13:00:00Z"),
                 "event.created"));
 
-            (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+            var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
+            (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-            var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+            var eventMessage = (await eventReceive).Message.ShouldNotBeNull();
+            var @event = eventMessage.Payload;
             @event.Name.ShouldBe(ProjectionDiagnosticNames.ProjectionUpdated);
-            @event.CorrelationId.ShouldBe(message.CorrelationId);
+            eventMessage.CorrelationId.ShouldBe(message.CorrelationId);
             @event.Attributes["matchedCount"].ShouldBe(1L);
-            descriptor.Errors.ShouldBeNull();
         });
     }
 
     [Fact]
     public async Task Hosted_event_projection_emits_normal_failure_and_continues()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
+        await WithNodeAsync(async (ports, _) =>
         {
-            var results = Link(output.Source);
             var missing = FlowMessage.Create<ProjectionEvent>(
                 null!,
                 new CorrelationId("missing"));
@@ -357,46 +360,38 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
                     "event.created"),
                 new CorrelationId("valid"));
 
-            (await input.Target.SendAsync(missing).WaitAsync(Timeout)).ShouldBeTrue();
-            (await input.Target.SendAsync(valid).WaitAsync(Timeout)).ShouldBeTrue();
-
-            var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-            var success = await results.ReceiveAsync().WaitAsync(Timeout);
+            var failureReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+            (await ports.SendAsync(Input, missing)).IsAccepted.ShouldBeTrue();
+            var failure = (await failureReceive).Message.ShouldNotBeNull();
+            var successReceive = ports.ReceiveAsync<FlowResult<EventProjectionSnapshot>>(Output, Timeout);
+            (await ports.SendAsync(Input, valid)).IsAccepted.ShouldBeTrue();
+            var success = (await successReceive).Message.ShouldNotBeNull();
             failure.CorrelationId.ShouldBe(missing.CorrelationId);
             failure.Payload.IsError.ShouldBeTrue();
             failure.Payload.Error.ShouldNotBeNull().Code
                 .ShouldBe(ProjectionErrorCodeNames.ProjectionFailed);
             success.CorrelationId.ShouldBe(valid.CorrelationId);
             success.Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
-            descriptor.Errors.ShouldBeNull();
         });
     }
 
     [Fact]
     public async Task Invalid_configuration_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "projection",
-                    ProjectionsCompositionNodeTypes.EventProjection,
-                    node => node.Configure("rateWindowSeconds", 0)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterEventProjection())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                ProjectionsCompositionNodeTypes.EventProjection,
+                Properties(("rateWindowSeconds", 0))),
+            registry => registry.RegisterEventProjection());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
                 "rateWindowSeconds",
                 StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static ComponentDesignMetadata ProjectionDesignMetadata()
@@ -481,53 +476,21 @@ public sealed class ProjectionsCompositionNodeRegistryExtensionsTests
         => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
-        Func<
-            CompositionInputPort<ProjectionEvent>,
-            CompositionOutputPort<FlowResult<EventProjectionSnapshot>>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null)
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        IReadOnlyList<string>? resources = null,
+        Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
-        var services = new ServiceCollection();
-        configureServices?.Invoke(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    ProjectionsCompositionNodeTypes.EventProjection,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterEventProjection())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                ProjectionsCompositionNodeTypes.EventProjection,
+                properties,
+                resources),
+            registry => registry.RegisterEventProjection(),
+            configureRuntimeServices: configureRuntime);
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[ProjectionsCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<ProjectionEvent>>();
-        var output = descriptor.Outputs[ProjectionsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<EventProjectionSnapshot>>>();
-
-        await run(input, output, descriptor);
-    }
-
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
+        await run(host.GetRequiredPorts(), host);
     }
 
     private static ProjectionEvent CreateEvent(
