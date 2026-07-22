@@ -569,6 +569,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `245-mapping-canonical-consolidation.md`: single FlowValue Mapping contract,
   removed generic CLR compatibility, major package versions, and
   package/compatibility evidence.
+- `246-validation-canonical-consolidation.md`: single FlowValue Validation
+  contract, removed generic CLR compatibility and selector alias, major package
+  versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

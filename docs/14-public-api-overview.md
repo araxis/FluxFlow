@@ -520,8 +520,11 @@ composition build, and resolves optional host-owned
 Invalid validator options fail during build as factory diagnostics when the host
 is configured to collect build failures.
 
-Explicit `RegisterJsonSchemaValidator<TInput>(customNodeType)` remains available
-for hosts migrating the prior generic Output/Valid/Invalid/Errors contract.
+Validation now has one maintained application contract. Convert CLR values to
+`FlowValue` at the application boundary, register the parameterless canonical
+factory, and replace prior Valid, Invalid, and Errors links with conditions over
+`FlowResult.Kind`, `IsError`, and `Error.Code`. The removed
+`payloadSelector` alias maps directly to `valueSelector`.
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `json.validate` composition node so hosts can compose palette,

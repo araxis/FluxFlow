@@ -2,6 +2,19 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Validation Consolidation
+
+- Consolidated JSON Schema validation on `FlowValueJsonSchemaValidatorNode`
+  with deterministic immutable-value conversion, custom selection, normal
+  valid/invalid/failure results, diagnostics, fan-out, and message lineage.
+- Removed the generic CLR validator and registration, typed selector/result,
+  numeric error codes, Valid/Invalid/Errors branches, and `payloadSelector`
+  alias after parity coverage.
+- Moved Validation to `5.0.0` and Validation Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[246-validation-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Mapping Consolidation
 
 - Consolidated Mapping on `FlowValueMapperNode` with exact immutable input,

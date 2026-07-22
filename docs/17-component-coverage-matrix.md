@@ -34,7 +34,7 @@ Status values:
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result aligned |
 | Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | canonical FlowValue generated/sequence sources aligned; typed runtime retained for compatibility |
 | Routing | `FluxFlow.Components.Routing` | yes | `FluxFlow.Components.Routing.Composition` | yes | yes | canonical FlowValue/result Window, Correlation, and Join aligned; structural nodes deprecated |
-| Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result aligned |
+| Validation | `FluxFlow.Components.Validation` | yes | `FluxFlow.Components.Validation.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
 | Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | canonical FlowValue/result Counter, Logger, and Metrics aligned; generic runtime retained for compatibility |
 | Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | aligned |

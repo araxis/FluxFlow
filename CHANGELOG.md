@@ -7,6 +7,19 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Validation 5.0.0
+
+- Consolidated JSON Schema validation on `FlowValueJsonSchemaValidatorNode`
+  with deterministic immutable-value conversion, custom selectors, diagnostics,
+  and one normal `FlowResult<JsonSchemaFlowValueValidationResult>` Output.
+- Removed the generic CLR validator, typed selector/result contracts, numeric
+  error codes, Valid/Invalid/Errors branches, and the `payloadSelector` alias.
+
+## FluxFlow.Components.Validation.Composition 3.0.0
+
+- Registers only the canonical `FlowValue` validator and removes generic CLR
+  registration plus the legacy Valid and Invalid port constants.
+
 ## FluxFlow.Components.Mapping 5.0.0
 
 - Consolidated mapping on `FlowValueMapperNode` with exact immutable input,

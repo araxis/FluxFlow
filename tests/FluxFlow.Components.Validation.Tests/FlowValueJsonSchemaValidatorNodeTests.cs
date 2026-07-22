@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Validation.Contracts;
 using FluxFlow.Components.Validation.Diagnostics;
 using FluxFlow.Components.Validation.Nodes;
@@ -143,6 +144,113 @@ public sealed class FlowValueJsonSchemaValidatorNodeTests
     }
 
     [Fact]
+    public async Task Structured_and_special_flow_value_kinds_use_json_schema_values()
+    {
+        var schema = JsonSchema.FromText("""
+            {
+              "type": "object",
+              "required": ["items", "binary", "timestamp", "date", "time", "duration"],
+              "properties": {
+                "items": { "type": "array", "items": { "type": "integer" } },
+                "binary": { "type": "string" },
+                "timestamp": { "type": "string" },
+                "date": { "type": "string" },
+                "time": { "type": "string" },
+                "duration": { "type": "string" }
+              }
+            }
+            """);
+        await using var node = new FlowValueJsonSchemaValidatorNode(schema);
+        var output = Sink(node.Output);
+        var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
+        {
+            ["items"] = FlowValue.FromArray([FlowValue.From(1L), FlowValue.From(2L)]),
+            ["binary"] = FlowValue.FromBinary(new byte[] { 1, 2, 3 }),
+            ["timestamp"] = FlowValue.From(DateTimeOffset.Parse("2026-07-23T12:00:00Z")),
+            ["date"] = FlowValue.From(new DateOnly(2026, 7, 23)),
+            ["time"] = FlowValue.From(new TimeOnly(12, 30, 0)),
+            ["duration"] = FlowValue.From(TimeSpan.FromMinutes(5))
+        });
+
+        await node.Input.SendAsync(FlowMessage.Create(value));
+
+        (await output.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind
+            .ShouldBe(ValidationResultKinds.Valid);
+    }
+
+    [Fact]
+    public async Task Output_fans_out_accepted_results_in_order()
+    {
+        await using var node = new FlowValueJsonSchemaValidatorNode(OrderSchema());
+        var first = Sink(node.Output);
+        var second = Sink(node.Output);
+        var values = new[]
+        {
+            Order("A-500", FlowValue.From(500L)),
+            Order("A-501", FlowValue.From("wrong"))
+        };
+
+        foreach (var value in values)
+            await node.Input.SendAsync(FlowMessage.Create(value));
+
+        var firstKinds = new[]
+        {
+            (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind,
+            (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind
+        };
+        var secondKinds = new[]
+        {
+            (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind,
+            (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind
+        };
+        firstKinds.ShouldBe([ValidationResultKinds.Valid, ValidationResultKinds.Invalid]);
+        secondKinds.ShouldBe(firstKinds);
+    }
+
+    [Fact]
+    public async Task Schema_path_is_loaded_before_processing()
+    {
+        var schemaPath = Path.Combine(
+            Path.GetTempPath(),
+            $"fluxflow-validation-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(schemaPath, OrderSchemaText());
+        try
+        {
+            var options = new JsonSchemaValidatorOptions { SchemaPath = schemaPath };
+            await using var node = new FlowValueJsonSchemaValidatorNode(
+                options.LoadSchema(),
+                schemaPath: options.SchemaPath,
+                options: options);
+            var output = Sink(node.Output);
+
+            await node.Input.SendAsync(
+                FlowMessage.Create(Order("A-600", FlowValue.From(600L))));
+
+            var result = (await output.ReceiveAsync().WaitAsync(Timeout)).Payload;
+            result.Kind.ShouldBe(ValidationResultKinds.Valid);
+            result.Value.ShouldNotBeNull().Value.ShouldBeSameAs(result.Value.Input);
+        }
+        finally
+        {
+            File.Delete(schemaPath);
+        }
+    }
+
+    [Fact]
+    public void Schema_options_fail_fast_for_missing_or_malformed_schema()
+    {
+        Should.Throw<InvalidOperationException>(() =>
+                JsonSchemaValidatorOptions.Default.LoadSchema())
+            .Message.ShouldContain("schema or schemaPath is required");
+        Should.Throw<InvalidOperationException>(() =>
+                new JsonSchemaValidatorOptions
+                {
+                    Schema = JsonSerializer.SerializeToElement("{ not-json")
+                }.LoadSchema())
+            .Message.ShouldContain("could not load schema");
+    }
+
+    [Fact]
     public async Task Events_use_injected_clock_and_describe_result_kind()
     {
         var timestamp = DateTimeOffset.Parse("2026-07-18T18:00:00Z");
@@ -166,18 +274,29 @@ public sealed class FlowValueJsonSchemaValidatorNodeTests
     [Fact]
     public void Canonical_node_rejects_invalid_static_options_and_has_no_error_port()
     {
+        Should.Throw<ArgumentNullException>(() =>
+            new FlowValueJsonSchemaValidatorNode(null!));
         Should.Throw<ArgumentOutOfRangeException>(() =>
             new FlowValueJsonSchemaValidatorNode(
                 OrderSchema(),
                 options: new JsonSchemaValidatorOptions { BoundedCapacity = 0 }))
             .Message.ShouldContain("boundedCapacity");
+        Should.Throw<ArgumentException>(() =>
+            new FlowValueJsonSchemaValidatorNode(
+                OrderSchema(),
+                options: new JsonSchemaValidatorOptions { InputType = " " }))
+            .Message.ShouldContain("inputType");
         typeof(FlowValueJsonSchemaValidatorNode).GetProperty("Errors").ShouldBeNull();
         typeof(FlowValueJsonSchemaValidatorNode).GetProperty("Valid").ShouldBeNull();
         typeof(FlowValueJsonSchemaValidatorNode).GetProperty("Invalid").ShouldBeNull();
+        typeof(JsonSchemaValidatorOptions).GetProperty("PayloadSelector").ShouldBeNull();
     }
 
     private static JsonSchema OrderSchema()
-        => JsonSchema.FromText("""
+        => JsonSchema.FromText(OrderSchemaText());
+
+    private static string OrderSchemaText()
+        => """
             {
               "type": "object",
               "required": ["id", "total"],
@@ -186,7 +305,7 @@ public sealed class FlowValueJsonSchemaValidatorNodeTests
                 "total": { "type": "number" }
               }
             }
-            """);
+            """;
 
     private static FlowValue Order(string id, FlowValue total)
         => FlowValue.FromObject(new Dictionary<string, FlowValue>

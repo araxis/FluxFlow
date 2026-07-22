@@ -1,6 +1,5 @@
 using Json.Schema;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace FluxFlow.Components.Validation.Options;
 
@@ -24,15 +23,10 @@ public sealed record JsonSchemaValidatorOptions
     public string? ValueSelector { get; init; }
     public int BoundedCapacity { get; init; } = 128;
 
-    [JsonPropertyName("payloadSelector")]
-    public string? PayloadSelector { get; init; }
-
     public string EffectiveValueSelector
         => !string.IsNullOrWhiteSpace(ValueSelector)
             ? ValueSelector.Trim()
-            : !string.IsNullOrWhiteSpace(PayloadSelector)
-                ? PayloadSelector.Trim()
-                : DefaultValueSelector;
+            : DefaultValueSelector;
 
     /// <summary>
     /// Compiles the configured schema once. Throws <see cref="InvalidOperationException"/>

@@ -7,9 +7,6 @@ namespace FluxFlow.Components.Validation.Composition;
 
 public sealed class ValidationComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
-    // Explicit generic registrations retain ValidationCompositionPortNames.Valid
-    // and ValidationCompositionPortNames.Invalid as compatibility-only ports.
-    // Fixed canonical metadata intentionally exposes only Input and Output.
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateJsonSchemaValidatorMetadata()];
 
@@ -66,16 +63,6 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 displayName: "Value Selector",
                 defaultValue: JsonSchemaValidatorOptions.DefaultValueSelector,
                 helperText: "Selector name passed to the optional host-owned selector resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Selection",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text,
-                    relatedResource: ValidationCompositionResourceNames.Selector))
-            .AddOption(
-                "payloadSelector",
-                OptionValueKind.Text,
-                displayName: "Payload Selector",
-                helperText: "Compatibility alias used when valueSelector is not configured.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Selection",
                     importance: OptionDesignMetadataAttributeValues.Advanced,

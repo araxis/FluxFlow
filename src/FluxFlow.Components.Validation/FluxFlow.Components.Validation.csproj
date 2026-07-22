@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Validation</PackageId>
     <AssemblyName>FluxFlow.Components.Validation</AssemblyName>
     <RootNamespace>FluxFlow.Components.Validation</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone JSON Schema validation for immutable FluxFlow values, with normal result variants and preserved generic compatibility nodes. No engine required.</Description>
+    <Description>Standalone JSON Schema validation for immutable FluxFlow values with one normal result stream. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;validation;json-schema</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical FlowValue JSON Schema validation with one FlowResult output while preserving the existing generic validator and branch-port contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates JSON Schema validation on the canonical FlowValue node and removes the generic CLR validator, legacy selector alias, branch ports, and numeric error codes.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

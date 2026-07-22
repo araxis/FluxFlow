@@ -3,13 +3,13 @@
 Standalone JSON Schema validation for immutable workflow values. The package
 depends on `FluxFlow.Data` and `FluxFlow.Nodes`, not Engine or JSON composition.
 
-## Canonical Node
+## Node Contract
 
 | Node | Input | Output |
 |------|-------|--------|
 | `FlowValueJsonSchemaValidatorNode` | `FlowMessage<FlowValue>` | `FlowMessage<FlowResult<JsonSchemaFlowValueValidationResult>>` |
 
-The canonical node evaluates ordinary JSON semantics represented by
+The node evaluates ordinary JSON semantics represented by
 `FlowValue`. Objects, arrays, scalar numeric kinds, strings, booleans, null,
 binary values, temporal values, durations, and GUIDs are converted
 deterministically for JSON Schema evaluation without changing the input value.
@@ -39,14 +39,14 @@ node.Output.LinkTo(resultSink);
 await node.Input.SendAsync(FlowMessage.Create(orderValue));
 ```
 
-`Valid` and `Invalid` are both successful result kinds. The domain result keeps
+`Valid` and `Invalid` are successful result kinds. The domain result keeps
 the exact input and selected `FlowValue`, an `IsValid` flag, schema identity,
 selector name, timestamp, and structured validation issues. Missing input,
 selector failure, and schema evaluation failure use stable error result kinds
 and `FlowError` codes on the same Output. Later inputs continue after expected
 failures.
 
-The canonical node has `Input`, `Output`, and `Events`. It does not expose
+The node has `Input`, `Output`, and `Events`. It does not expose
 universal Errors or branch ports. Message correlation, trace, headers, and
 causation are preserved through `FlowMessage.With(...)`.
 
@@ -67,7 +67,8 @@ public sealed class BodySelector : IJsonSchemaFlowValueSelector
 
 The selected value remains a `FlowValue`; selectors do not introduce arbitrary
 CLR object conversion. The configured `valueSelector` is descriptive context
-for the selector and result. `payloadSelector` remains a compatibility alias.
+for the selector and result. Convert CLR values explicitly at the application
+boundary before sending them to the node.
 
 ## Schema And Timing
 
@@ -79,17 +80,6 @@ also reject construction.
 Results and Events use the supplied `TimeProvider`, defaulting to
 `TimeProvider.System`. The package does not own schema files, selectors,
 clocks, or their lifetimes.
-
-## Compatibility Node
-
-`JsonSchemaValidatorNode<TInput>` remains available unchanged. It emits
-`JsonSchemaValidationResult<TInput>` on Output, fans the original message to
-Valid or Invalid, and reports selection/conversion/evaluation failures through
-its legacy Errors port. `IJsonSchemaValueSelector<TInput>` remains available
-for that code-authored surface.
-
-New composition definitions should use the canonical FlowValue node. The
-generic node is retained for explicit migration and strongly typed hosts.
 
 ## Composition
 
@@ -105,13 +95,8 @@ services
     .RegisterNodes(registry => registry.RegisterJsonSchemaValidator());
 ```
 
-The explicit generic overload remains available under a custom node type:
-
-```csharp
-registry.RegisterJsonSchemaValidator<OrderMessage>(
-    "json.validate.legacy-order");
-```
-
 `FlowResult<T>` is a real typed output. FluxFlow does not implicitly unwrap its
 `Value` into a downstream `T` input; route it to a result-aware component or use
-an explicitly registered mapper for that result type.
+an explicitly registered mapper for that result type. Replace older Valid,
+Invalid, and Errors branches with link conditions over `Kind`, `IsError`, and
+`Error.Code`.

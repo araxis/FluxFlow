@@ -72,26 +72,16 @@ The host registers the referenced `IJsonSchemaFlowValueSelector` and
 `TimeProvider` keyed services and owns their lifetime. Both Designer resource
 pickers use `Resources.{name}` addresses.
 
-## Typed Compatibility Registration
-
-The explicit generic overload preserves the previous node and port shape:
-
-```csharp
-registry.RegisterJsonSchemaValidator<OrderMessage>(
-    "json.validate.legacy-order");
-```
-
-That custom type uses `JsonSchemaValidatorNode<OrderMessage>`,
-`IJsonSchemaValueSelector<OrderMessage>`, and Output, Valid, Invalid, Errors,
-and Events. Hosts must choose a custom node type so it does not replace the
-canonical fixed registration.
-
 ## Result Boundary
 
 The Output payload is a typed `FlowResult<JsonSchemaFlowValueValidationResult>`.
 Links do not implicitly extract its Value. Conditions may route by result kind
 or error state, and an explicit result-aware mapper or component can extract
 the validation value when a downstream `FlowValue` input is required.
+Convert CLR inputs explicitly at the application boundary. Existing
+`payloadSelector` settings migrate directly to `valueSelector`; older Valid,
+Invalid, and Errors links migrate to conditions over `Kind`, `IsError`, and
+`Error.Code`.
 
 ## Design Metadata
 

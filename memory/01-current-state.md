@@ -179,19 +179,17 @@ Date: 2026-07-23
   preflight/dry-runs, and a package-only consumer passed. Validation followed
   as the next bounded family. See
   `218-vnext-serialization-flowcontent-flowvalue.md`.
-- `FluxFlow.Components.Validation` is now `4.0.0` locally with a canonical
-  `FlowValueJsonSchemaValidatorNode` that emits valid and invalid evaluations,
-  plus expected selector and schema failures, as one normal
-  `FlowResult<JsonSchemaFlowValueValidationResult>` stream. The transport-neutral
-  selector returns `FlowValue`, deterministic conversion supplies ordinary JSON
-  schema semantics, and message lineage is preserved. The generic standalone
-  node and contracts remain available for code-authored compatibility.
-  `FluxFlow.Components.Validation.Composition` is `2.2.0` with canonical fixed
-  ports, no legacy branch or universal Errors ports, and host-owned
-  `Resources.{name}` selector and clock addresses. Focused/full tests,
-  zero-warning controlled builds, binary compatibility, release
-  preflight/dry-runs, and a package-only consumer passed. Assertions followed
-  as the next bounded family. See `219-vnext-validation-flowvalue.md`.
+- `FluxFlow.Components.Validation` is now `5.0.0` locally with one
+  `FlowValueJsonSchemaValidatorNode` contract. It preserves inline/path schema
+  loading, custom FlowValue selection, deterministic JSON conversion, exact
+  input identity, diagnostics, and normal valid/invalid/failure result variants.
+  `FluxFlow.Components.Validation.Composition` is `3.0.0` and exposes only
+  canonical `RegisterJsonSchemaValidator()`. The generic CLR node/registration,
+  typed selector/result, numeric error codes, Valid/Invalid/Errors branches,
+  and `payloadSelector` alias were removed after parity coverage.
+  Focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, both preflights/dry-runs, and a package-only
+  consumer passed. See `246-validation-canonical-consolidation.md`.
 - `FluxFlow.Components.Assertions` is now `4.0.0` locally with a canonical
   `FlowValueAssertionNode` that emits passed and failed rules as successful
   `FlowResult<FlowValueAssertionResult>` variants and missing/evaluation
