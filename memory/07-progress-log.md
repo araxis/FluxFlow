@@ -2,6 +2,15 @@
 
 Date: 2026-05-31
 
+## 2026-07-22 - Eager Source Activation Ordering
+
+- Activated canonical revision ports and compiled links before starting source
+  components, preventing synchronous startup output from racing route setup.
+- Added an application-assembler regression with an eager source and linked
+  recorder. Engine (`109`) and Composition.Hosting (`46`) tests passed.
+- Moved Engine from `2.7.0` to `2.7.1`; the public declaration baseline is
+  unchanged.
+
 ## 2026-07-22 - Canonical HTTP Consolidation
 
 - Consolidated outbound HTTP on the concise `HttpClientNode` using exact

@@ -210,6 +210,10 @@ a direct-port generation. Later revisions either reuse it for an exact surface
 match or atomically replace it for a surface change while resources,
 components, attachments, and routing remain transactional.
 
+Revision port attachments and compiled links activate before source lifecycle
+startup. A source that emits synchronously from `StartAsync` therefore enters
+the prepared revision routes instead of racing link activation.
+
 Standard DI remains the activation and ownership mechanism. Packages register
 explicitly through `IServiceCollection`; no assembly scanning, reflection
 discovery, arbitrary provider merging, or parallel registration framework is

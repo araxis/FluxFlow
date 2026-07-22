@@ -59,8 +59,8 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
         if (Interlocked.CompareExchange(ref _activated, 1, 0) != 0)
             throw new InvalidOperationException("The runtime candidate was already activated.");
 
-        await _runtime.StartAsync(cancellationToken).ConfigureAwait(false);
         _portLease = await _portRevision.ActivateAsync(cancellationToken).ConfigureAwait(false);
+        await _runtime.StartAsync(cancellationToken).ConfigureAwait(false);
         if (_adoptPorts is not null)
             await _adoptPorts().ConfigureAwait(false);
         Volatile.Write(ref _activationCompleted, 1);

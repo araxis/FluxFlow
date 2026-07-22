@@ -421,6 +421,55 @@ public sealed class ApplicationRuntimeAssemblerTests
         final.Message.ShouldNotBeNull().Payload.ShouldBe("final:held");
     }
 
+    [Fact]
+    public async Task Eager_source_output_is_linked_before_source_start()
+    {
+        var tracker = new SourceOutputTracker();
+        var services = new ServiceCollection();
+        services.AddSingleton(tracker);
+        services.AddFluxFlowApplication(EagerSourceDefinition())
+            .UseRuntimeAssembler(runtime => runtime
+                .RegisterNodes(registry => registry
+                    .Register(
+                        "test.eager-source",
+                        static _ =>
+                        {
+                            var source = new EagerSource();
+                            return ValueTask.FromResult(ComposedNode.Create(
+                                source,
+                                outputs:
+                                [
+                                    CompositionPorts.Output<string>("Output", source.Output)
+                                ]));
+                        },
+                        outputs: [CompositionPorts.Metadata<string>("Output")])
+                    .Register(
+                        "test.source-recorder",
+                        static context =>
+                        {
+                            var node = new SourceRecordingNode(
+                                context.Services.GetRequiredService<SourceOutputTracker>());
+                            return ValueTask.FromResult(ComposedNode.Create(
+                                node,
+                                inputs:
+                                [
+                                    CompositionPorts.Input<string>("Input", node.Input)
+                                ]));
+                        },
+                        inputs: [CompositionPorts.Metadata<string>("Input")]))
+                .ConfigureServices(context => context.Services.AddSingleton(
+                    context.HostServices.GetRequiredService<SourceOutputTracker>())));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+
+        var started = await host.StartApplicationAsync();
+
+        started.Succeeded.ShouldBeTrue();
+        await EventuallyAsync(() => tracker.Values.Count == 1);
+        tracker.Values.ShouldBe(["started"]);
+        await host.StopApplicationAsync();
+    }
+
     private static void RegisterNodes(CompositionNodeRegistry registry)
         => registry
             .Register(
@@ -618,6 +667,25 @@ public sealed class ApplicationRuntimeAssemblerTests
             }
             """);
 
+    private static ApplicationDefinition EagerSourceDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {},
+              "Workflows": {
+                "Orders": {
+                  "Emit": {
+                    "Type": "test.eager-source",
+                    "Output": "Record.Input"
+                  },
+                  "Record": {
+                    "Type": "test.source-recorder"
+                  }
+                }
+              }
+            }
+            """);
+
     private sealed class PrefixResource(string value, ResourceTracker tracker) : IAsyncDisposable
     {
         public string Value { get; } = value;
@@ -750,6 +818,64 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             Complete();
             await Completion;
+        }
+    }
+
+    private sealed class EagerSource : IFlowSource
+    {
+        private readonly BroadcastBlock<FlowMessage<string>> _output =
+            new(static message => message);
+
+        public ISourceBlock<FlowMessage<string>> Output => _output;
+
+        public Task Completion => _output.Completion;
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _output.Post(FlowMessage.Create("started"));
+            _output.Complete();
+            return Task.CompletedTask;
+        }
+
+        public void Complete() => _output.Complete();
+
+        public void Fault(Exception exception) => ((IDataflowBlock)_output).Fault(exception);
+
+        public async ValueTask DisposeAsync()
+        {
+            Complete();
+            await Completion.ConfigureAwait(false);
+        }
+    }
+
+    private sealed class SourceRecordingNode(SourceOutputTracker tracker) : FlowNode<string, string>
+    {
+        protected override Task ProcessAsync(FlowMessage<string> message)
+        {
+            tracker.Add(message.Payload);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SourceOutputTracker
+    {
+        private readonly object _gate = new();
+        private readonly List<string> _values = [];
+
+        public IReadOnlyList<string> Values
+        {
+            get
+            {
+                lock (_gate)
+                    return _values.ToArray();
+            }
+        }
+
+        public void Add(string value)
+        {
+            lock (_gate)
+                _values.Add(value);
         }
     }
 

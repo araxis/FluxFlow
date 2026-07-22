@@ -80,7 +80,9 @@ await ports.SendAsync(
 The assembler builds one resource-revision provider and one workflow-revision
 provider per workflow, validates every factory descriptor against its explicit
 registration, and activates all port attachments plus one compiled-link
-snapshot transactionally. Rejected preparation or activation disposes all
+snapshot transactionally before starting source components. Eager source
+output therefore reaches already-active downstream workflow links. Rejected
+preparation or activation disposes all
 partial nodes, providers, and unadopted port generations; a successful
 replacement drains and disposes the old candidate after the new one is current.
 

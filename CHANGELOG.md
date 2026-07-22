@@ -7,6 +7,12 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Engine 2.7.1
+
+- Activates revision ports and compiled links before starting source
+  components, preventing eager startup output from being lost before its
+  downstream route exists.
+
 ## FluxFlow.Components.Http 5.0.0
 
 - Consolidated outbound HTTP behavior on `HttpClientNode` with exact

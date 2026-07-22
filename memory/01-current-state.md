@@ -76,7 +76,7 @@ Date: 2026-07-22
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.7.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.7.1` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
@@ -87,7 +87,9 @@ Date: 2026-07-22
   events. Stable signal mailboxes now accept any `FlowMessage<T>` payload and
   are addressable through the same runtime and keyed-service surfaces. Prepared
   output activation also observes source faults directly, removing an
-  asynchronous Dataflow propagation race. Accepted diagnostics integrate with
+  asynchronous Dataflow propagation race. Revision ports and compiled links
+  now activate before source startup, so eager source output cannot race its
+  downstream route. Accepted diagnostics integrate with
   standard .NET logging, activity,
   metric, and diagnostic-source surfaces. Focused Engine,
   Composition, Hosting, and release tests passed; complete build, package, and
