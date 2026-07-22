@@ -22,7 +22,7 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 iconKey: "chart-no-axes-combined",
                 preferredNodeName: "aggregateMetrics",
                 suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, MetricsCompositionNodeTypes.LegacyAggregate);
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', MetricsCompositionNodeTypes.AggregateDescriptor.Aliases));
 
         AddAggregateOptions(builder);
         AddAggregateResources(builder);

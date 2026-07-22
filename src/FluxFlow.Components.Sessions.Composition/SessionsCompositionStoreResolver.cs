@@ -20,7 +20,7 @@ internal static class SessionsCompositionStoreResolver
         if (factory is null)
         {
             throw new InvalidOperationException(
-                $"Node '{context.WorkflowName}.{context.NodeName}' resource " +
+                $"Component '{context.WorkflowName}.{context.ComponentName}' resource " +
                 $"'{SessionsCompositionResourceNames.Store}' references '{key}', but no keyed " +
                 $"{nameof(ISessionStore)} or {nameof(ISessionStoreFactory)} service is registered.");
         }

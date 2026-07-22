@@ -24,7 +24,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 iconKey: "check-circle",
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, AssertionsCompositionNodeTypes.LegacyAssert)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', AssertionsCompositionNodeTypes.AssertDescriptor.Aliases))
             .AddAttribute("omittedOptions", "emitPassedInput,emitFailedInput")
             .AddAttribute(
                 "omittedOptionsReason",

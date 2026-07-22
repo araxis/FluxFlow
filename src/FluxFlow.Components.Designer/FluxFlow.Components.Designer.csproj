@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Designer</PackageId>
     <AssemblyName>FluxFlow.Components.Designer</AssemblyName>
     <RootNamespace>FluxFlow.Components.Designer</RootNamespace>
-    <Version>2.20.0</Version>
+    <Version>2.21.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Reusable component metadata and canonical application editing contracts for FluxFlow.</Description>
     <PackageTags>workflow;dataflow;components;metadata;designer</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical metadata alias resolution so legacy component type names remain loadable while palettes expose one harmonized type name.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical catalog projection for addressable component Events and semantic processing profiles while hiding legacy Name and Dataflow-specific options from primary editing surfaces.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Routing.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Routing.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Routing.Composition</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FlowValue routing registration and Designer metadata over host-owned selectors and clocks.</Description>
     <PackageTags>workflow;dataflow;components;routing;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Renames the canonical correlation type to flow.correlate while retaining flow.correlation as a hidden configuration alias.</PackageReleaseNotes>
+    <PackageReleaseNotes>Centralizes canonical correlation aliases in a typed descriptor and keeps structural routing types available only as deprecated compatibility registrations.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

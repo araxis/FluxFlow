@@ -120,8 +120,18 @@ public sealed class ComponentResourcePickerHintsTests
 
         var hints = ComponentResourcePickerHints.Create(catalog);
 
-        hints.Select(hint => hint.ComponentType.Value).ShouldBe(["sample.one", "sample.two"]);
-        hints.Select(hint => hint.ResourceName.Value).ShouldBe(["store", "clock"]);
+        hints.Select(hint => hint.ComponentType.Value).ShouldBe([
+            "sample.one",
+            "sample.one",
+            "sample.two",
+            "sample.two"
+        ]);
+        hints.Select(hint => hint.ResourceName.Value).ShouldBe([
+            "store",
+            "processing",
+            "clock",
+            "processing"
+        ]);
     }
 
     private static ComponentDesignMetadata CreateMetadata(

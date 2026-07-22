@@ -123,6 +123,33 @@ public sealed class DesignerApplicationPersistenceTests
     }
 
     [Fact]
+    public void Legacy_types_load_with_migration_diagnostics_and_serialize_canonically()
+    {
+        var registry = CreateRegistry()
+            .RegisterAlias("test.old-source", "test.source")
+            .RegisterResourceTypeAlias("test.old-client", "test.client");
+        var persistence = new DesignerApplicationPersistence(registry, CreateMetadata());
+
+        var loaded = persistence.Load("""
+            {
+              "Resources": {
+                "Client": { "Type": "test.old-client" }
+              },
+              "Workflows": {
+                "Main": {
+                  "Producer": { "Type": "test.old-source" }
+                }
+              }
+            }
+            """);
+
+        loaded.NormalizationDiagnostics.Count.ShouldBe(2);
+        loaded.Document.Workflows["Main"].Components["Producer"].Type.ShouldBe("test.source");
+        persistence.Serialize(loaded.Document, writeIndented: false)
+            .ShouldBe("{\"Resources\":{\"Client\":{\"Type\":\"test.client\"}},\"Workflows\":{\"Main\":{\"Producer\":{\"Type\":\"test.source\"}}}}");
+    }
+
+    [Fact]
     public void New_workflow_link_defaults_to_source_side_and_uses_local_reference()
     {
         var persistence = CreatePersistence();

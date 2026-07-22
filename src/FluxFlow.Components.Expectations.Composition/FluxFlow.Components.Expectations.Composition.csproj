@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Expectations.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations.Composition</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical projection-event expectation registration and Designer metadata over host-owned keyed clocks.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Renames the canonical expectation type to event.expect while retaining event.expectation as a hidden configuration alias.</PackageReleaseNotes>
+    <PackageReleaseNotes>Centralizes canonical type aliases in a typed descriptor and targets canonical addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

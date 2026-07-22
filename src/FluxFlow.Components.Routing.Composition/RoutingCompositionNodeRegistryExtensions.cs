@@ -135,8 +135,8 @@ public static class RoutingCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterCorrelationAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            RoutingCompositionNodeTypes.CorrelationDescriptor,
             CreateCorrelationNode<TInput>,
             inputs:
             [
@@ -151,7 +151,8 @@ public static class RoutingCompositionNodeRegistryExtensions
                     RoutingCompositionPortNames.Matched),
                 CompositionPorts.Metadata<FlowCorrelationTimeout<TInput>>(
                     RoutingCompositionPortNames.Timeouts)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterCorrelation(
@@ -161,8 +162,8 @@ public static class RoutingCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterCorrelationAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            RoutingCompositionNodeTypes.CorrelationDescriptor,
             CreateFlowValueCorrelationNode,
             inputs:
             [
@@ -173,21 +174,8 @@ public static class RoutingCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
                     RoutingCompositionPortNames.Output)
-            ]), nodeType);
-    }
-
-    private static CompositionNodeRegistry RegisterCorrelationAlias(
-        CompositionNodeRegistry registry,
-        string nodeType)
-    {
-        if (string.Equals(nodeType, RoutingCompositionNodeTypes.Correlation, StringComparison.Ordinal))
-        {
-            registry.RegisterAlias(
-                RoutingCompositionNodeTypes.LegacyCorrelation,
-                RoutingCompositionNodeTypes.Correlation);
-        }
-
-        return registry;
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterJoin<TLeft, TRight>(

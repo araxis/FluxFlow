@@ -61,15 +61,15 @@ public sealed partial class SampleDocumentationTests
     }
 
     [Fact]
-    public void Non_server_samples_run_to_completion()
+    public async Task Non_server_samples_run_to_completion()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
 
-        AssertSampleRun(
+        await AssertSampleRunAsync(
             root,
             "samples/FluxFlow.CompositionSample/FluxFlow.CompositionSample.csproj",
             ["ALPHA", "BETA"]);
-        AssertSampleRun(
+        await AssertSampleRunAsync(
             root,
             "samples/FluxFlow.MqttCompositionSample/FluxFlow.MqttCompositionSample.csproj",
             [
@@ -78,7 +78,7 @@ public sealed partial class SampleDocumentationTests
                 "fluent:",
                 "devices/pump-02/state/reply -> ACK: offline"
             ]);
-        AssertSampleRun(
+        await AssertSampleRunAsync(
             root,
             "samples/FluxFlow.SampleApp/FluxFlow.SampleApp.csproj",
             [
@@ -96,7 +96,7 @@ public sealed partial class SampleDocumentationTests
                relative.Contains("/obj/", StringComparison.Ordinal);
     }
 
-    private static void AssertSampleRun(
+    private static async Task AssertSampleRunAsync(
         string root,
         string project,
         IReadOnlyList<string> expectedOutput)
@@ -114,12 +114,19 @@ public sealed partial class SampleDocumentationTests
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
 
-        if (!process.WaitForExit(milliseconds: 180_000))
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromMinutes(3));
+        }
+        catch (TimeoutException)
         {
             try
             {
                 process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
             }
             catch (InvalidOperationException)
             {
@@ -128,8 +135,8 @@ public sealed partial class SampleDocumentationTests
             throw new TimeoutException($"{project} did not finish within the sample smoke-test timeout.");
         }
 
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
+        var output = await outputTask;
+        var error = await errorTask;
         process.ExitCode.ShouldBe(
             0,
             $"""

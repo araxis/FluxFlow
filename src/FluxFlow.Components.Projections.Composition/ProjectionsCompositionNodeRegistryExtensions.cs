@@ -15,8 +15,8 @@ public static class ProjectionsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        var result = registry.Register(
-            nodeType,
+        return registry.Register(
+            ProjectionsCompositionNodeTypes.EventProjectionDescriptor,
             CreateEventProjectionNode,
             inputs:
             [
@@ -27,16 +27,8 @@ public static class ProjectionsCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<EventProjectionSnapshot>>(
                     ProjectionsCompositionPortNames.Output)
-            ]);
-
-        if (string.Equals(nodeType, ProjectionsCompositionNodeTypes.EventProjection, StringComparison.Ordinal))
-        {
-            result.RegisterAlias(
-                ProjectionsCompositionNodeTypes.LegacyEventProjection,
-                ProjectionsCompositionNodeTypes.EventProjection);
-        }
-
-        return result;
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateEventProjectionNode(

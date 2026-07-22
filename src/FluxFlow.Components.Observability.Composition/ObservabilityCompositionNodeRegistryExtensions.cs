@@ -16,8 +16,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.CounterDescriptor,
             CreateFlowValueCounterNode,
             inputs:
             [
@@ -28,7 +28,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowCounterSnapshot>>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Counter, ObservabilityCompositionNodeTypes.LegacyCounter);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterCounter<TInput>(
@@ -38,8 +39,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.CounterDescriptor,
             CreateCounterNode<TInput>,
             inputs:
             [
@@ -50,7 +51,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowCounterSnapshot>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Counter, ObservabilityCompositionNodeTypes.LegacyCounter);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterLogger(
@@ -60,8 +62,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.LoggerDescriptor,
             CreateFlowValueLoggerNode,
             inputs:
             [
@@ -72,7 +74,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowValueLogEntry>>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Logger, ObservabilityCompositionNodeTypes.LegacyLogger);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterLogger<TInput>(
@@ -82,8 +85,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.LoggerDescriptor,
             CreateLoggerNode<TInput>,
             inputs:
             [
@@ -94,7 +97,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowLogEntry>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Logger, ObservabilityCompositionNodeTypes.LegacyLogger);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterMetrics(
@@ -104,8 +108,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.MetricsDescriptor,
             CreateFlowValueMetricsNode,
             inputs:
             [
@@ -116,7 +120,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowMetricSnapshot>>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Metrics, ObservabilityCompositionNodeTypes.LegacyMetrics);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterMetrics<TInput>(
@@ -126,8 +131,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ObservabilityCompositionNodeTypes.MetricsDescriptor,
             CreateMetricsNode<TInput>,
             inputs:
             [
@@ -138,19 +143,8 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowMetricSnapshot>(
                     ObservabilityCompositionPortNames.Output)
-            ]), nodeType, ObservabilityCompositionNodeTypes.Metrics, ObservabilityCompositionNodeTypes.LegacyMetrics);
-    }
-
-    private static CompositionNodeRegistry RegisterLegacyAlias(
-        CompositionNodeRegistry registry,
-        string nodeType,
-        string canonicalType,
-        string legacyType)
-    {
-        if (string.Equals(nodeType, canonicalType, StringComparison.Ordinal))
-            registry.RegisterAlias(legacyType, canonicalType);
-
-        return registry;
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateFlowValueCounterNode(

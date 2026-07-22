@@ -48,10 +48,8 @@ The runtime does not add an implicit mapper or serializer.
       "CallApi": {
         "Type": "http.request",
         "client": "Resources.External.ApiClient",
-        "boundedCapacity": 32,
         "maxResponseBodyBytes": 1048576,
         "treatNonSuccessStatusAsError": false,
-        "maxDegreeOfParallelism": 1,
         "defaultTimeoutMilliseconds": 30000,
         "Output": ["HandleResult.Input", "Audit.Input"]
       },
@@ -94,6 +92,14 @@ That explicit registration uses `HttpClientNode`, `HttpRequestInput`, and
 distinct type when canonical and compatibility registrations share a registry.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `HttpComponentDesignMetadataProvider` describes the canonical fixed ports,
 runtime/limit/timeout option hints, required host-owned client picker, and

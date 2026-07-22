@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Assertions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions.Composition</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional canonical FlowValue assertion registration and Designer metadata over host-owned keyed expression resources.</Description>
     <PackageTags>workflow;dataflow;components;assertions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Renames the canonical assertion type to data.assert while retaining flow.assert as a hidden configuration alias.</PackageReleaseNotes>
+    <PackageReleaseNotes>Centralizes canonical type aliases in a typed descriptor and targets canonical addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

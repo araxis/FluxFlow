@@ -30,7 +30,10 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
         validator.Inputs.Keys.ShouldBe([ValidationCompositionPortNames.Input]);
         validator.Inputs[ValidationCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(FlowValue));
-        validator.Outputs.Keys.ShouldBe([ValidationCompositionPortNames.Output]);
+        validator.Outputs.Keys.ShouldBe([
+            ValidationCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         validator.Outputs[ValidationCompositionPortNames.Output].MessageType.ShouldBe(
             typeof(FlowResult<JsonSchemaFlowValueValidationResult>));
     }
@@ -220,7 +223,10 @@ public sealed class ValidationCompositionNodeRegistryExtensionsTests
             .ShouldBeOfType<CompositionInputPort<FlowValue>>();
         var output = validatorNode.Descriptor.Outputs[ValidationCompositionPortNames.Output]
             .ShouldBeOfType<CompositionOutputPort<FlowResult<JsonSchemaFlowValueValidationResult>>>();
-        validatorNode.Descriptor.Outputs.Keys.ShouldBe([ValidationCompositionPortNames.Output]);
+        validatorNode.Descriptor.Outputs.Keys.ShouldBe([
+            ValidationCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         validatorNode.Descriptor.Errors.ShouldBeNull();
         var results = new BufferBlock<
             FlowMessage<FlowResult<JsonSchemaFlowValueValidationResult>>>();

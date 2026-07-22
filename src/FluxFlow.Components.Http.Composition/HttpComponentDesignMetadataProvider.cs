@@ -23,7 +23,7 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 iconKey: "send",
                 preferredNodeName: "httpClient",
                 suggestedEditorWidth: 420)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, HttpCompositionNodeTypes.LegacyClient);
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', HttpCompositionNodeTypes.ClientDescriptor.Aliases));
 
         AddClientOptions(builder);
         AddClientResources(builder);

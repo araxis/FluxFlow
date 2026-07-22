@@ -56,8 +56,7 @@ exposes Events and no Valid, Invalid, or universal Errors ports.
           }
         },
         "schemaId": "orders",
-        "valueSelector": "body",
-        "boundedCapacity": 128
+        "valueSelector": "body"
       }
     }
   }
@@ -95,6 +94,14 @@ or error state, and an explicit result-aware mapper or component can extract
 the validation value when a downstream `FlowValue` input is required.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `ValidationComponentDesignMetadataProvider` describes the fixed FlowValue Input
 and single FlowResult Output, schema/selection/runtime option hints, and optional

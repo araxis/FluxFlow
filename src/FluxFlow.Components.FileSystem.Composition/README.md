@@ -60,7 +60,6 @@ isolated source completion faults observed by the runtime.
         "Type": "file.read",
         "baseDirectory": "data",
         "maxBytes": 16777216,
-        "boundedCapacity": 128,
         "Output": ["Handle.Input", "Audit.Input"]
       },
       "Handle": {
@@ -101,6 +100,14 @@ surfaces. Use distinct type names when canonical and compatibility factories
 share a registry.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `FileSystemComponentDesignMetadataProvider` describes canonical fixed ports,
 path/traversal/limit option hints, and the optional host-owned clock picker.

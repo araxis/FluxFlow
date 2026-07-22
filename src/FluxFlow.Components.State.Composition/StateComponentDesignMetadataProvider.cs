@@ -23,7 +23,7 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 iconKey: "database-zap",
                 preferredNodeName: "stateReducer",
                 suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, StateCompositionNodeTypes.LegacyReducer);
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', StateCompositionNodeTypes.ReducerDescriptor.Aliases));
 
         AddReducerOptions(builder);
         AddReducerResources(builder);

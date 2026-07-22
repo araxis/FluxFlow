@@ -22,7 +22,7 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 iconKey: "activity",
                 preferredNodeName: "projectEvents",
                 suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ProjectionsCompositionNodeTypes.LegacyEventProjection);
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ProjectionsCompositionNodeTypes.EventProjectionDescriptor.Aliases));
 
         AddEventProjectionOptions(builder);
         AddEventProjectionResources(builder);

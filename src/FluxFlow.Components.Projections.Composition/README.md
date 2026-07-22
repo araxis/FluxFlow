@@ -42,12 +42,10 @@ error variants on Output.
       "ProjectFailures": {
         "Type": "event.project",
         "clock": "Resources.System.Clock",
-        "name": "failed-operations",
         "rateWindowSeconds": 60,
         "emitEveryMatch": true,
         "emitFinalSnapshot": true,
         "maxPreviewChars": 256,
-        "boundedCapacity": 128,
         "filter": {
           "typePrefix": "operation.",
           "status": "failed",
@@ -69,6 +67,14 @@ final snapshot is emitted automatically after accepted input drains during
 normal composition completion.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `ProjectionsComponentDesignMetadataProvider` describes the typed event input,
 normal result output, option sections/editor hints, and optional host-owned

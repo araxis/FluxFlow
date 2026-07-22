@@ -18,6 +18,7 @@ public static class ResourceDesignMetadataAttributeValues
     public const string Delegate = "delegate";
     public const string ExpressionEngine = "expression-engine";
     public const string Publisher = "publisher";
+    public const string ProcessingProfile = "processing-profile";
     public const string Selector = "selector";
     public const string Store = "store";
     public const string TriggerSource = "trigger-source";

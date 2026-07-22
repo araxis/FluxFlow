@@ -272,7 +272,7 @@ public sealed class RoutingComponentDesignMetadataProvider : IComponentDesignMet
         new Dictionary<string, string>
         {
             ["requiredResources"] = $"{RoutingCompositionResourceNames.KeySelector},{RoutingCompositionResourceNames.SideSelector}",
-            [ComponentDesignMetadataAttributeNames.Aliases] = RoutingCompositionNodeTypes.LegacyCorrelation
+            [ComponentDesignMetadataAttributeNames.Aliases] = string.Join(',', RoutingCompositionNodeTypes.CorrelationDescriptor.Aliases)
         });
 
     private static ComponentDesignMetadata CreateJoinMetadata()

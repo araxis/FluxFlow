@@ -24,7 +24,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 iconKey: "badge-check",
                 preferredNodeName: "expectEvent",
                 suggestedEditorWidth: 460)
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ExpectationsCompositionNodeTypes.LegacyEventExpectation);
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ExpectationsCompositionNodeTypes.EventExpectationDescriptor.Aliases));
 
         AddEventExpectationOptions(builder);
         AddEventExpectationResources(builder);

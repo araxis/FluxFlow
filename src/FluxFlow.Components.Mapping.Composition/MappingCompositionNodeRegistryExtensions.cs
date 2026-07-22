@@ -16,8 +16,8 @@ public static class MappingCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            MappingCompositionNodeTypes.MapperDescriptor,
             CreateFlowValueMapperNode,
             inputs:
             [
@@ -28,7 +28,8 @@ public static class MappingCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowValue>>(
                     MappingCompositionPortNames.Output)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterMapper<TInput, TOutput>(
@@ -38,8 +39,8 @@ public static class MappingCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            MappingCompositionNodeTypes.MapperDescriptor,
             CreateMapperNode<TInput, TOutput>,
             inputs:
             [
@@ -52,7 +53,8 @@ public static class MappingCompositionNodeRegistryExtensions
                     MappingCompositionPortNames.Output),
                 CompositionPorts.Metadata<TInput>(
                     MappingCompositionPortNames.Failed)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateFlowValueMapperNode(
@@ -86,20 +88,6 @@ public static class MappingCompositionNodeRegistryExtensions
                     node.Output)
             ],
             events: node.Events));
-    }
-
-    private static CompositionNodeRegistry RegisterLegacyAlias(
-        CompositionNodeRegistry registry,
-        string nodeType)
-    {
-        if (string.Equals(nodeType, MappingCompositionNodeTypes.Mapper, StringComparison.Ordinal))
-        {
-            registry.RegisterAlias(
-                MappingCompositionNodeTypes.LegacyMapper,
-                MappingCompositionNodeTypes.Mapper);
-        }
-
-        return registry;
     }
 
     private static ValueTask<ComposedNode> CreateMapperNode<TInput, TOutput>(

@@ -286,10 +286,36 @@ public sealed class ComponentDesignMetadataBuilder
             Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(attributes)
         };
 
-        return new ComponentDesignMetadataModule([metadata])
-            .GetMetadata()
-            .Single();
+        ComponentDesignMetadataValidator.ThrowIfInvalid(metadata);
+        return Snapshot(metadata);
     }
+
+    private static ComponentDesignMetadata Snapshot(ComponentDesignMetadata metadata)
+        => metadata with
+        {
+            Options = metadata.Options.Select(static option => option with
+            {
+                Choices = option.Choices.Select(static choice => choice with
+                {
+                    Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+                        choice.Attributes)
+                }).ToArray(),
+                Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+                    option.Attributes)
+            }).ToArray(),
+            Resources = metadata.Resources.Select(static resource => resource with
+            {
+                Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+                    resource.Attributes)
+            }).ToArray(),
+            Ports = metadata.Ports.Select(static port => port with
+            {
+                Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+                    port.Attributes)
+            }).ToArray(),
+            Attributes = new Dictionary<ComponentAttributeName, ComponentAttributeValue>(
+                metadata.Attributes)
+        };
 
     private static IReadOnlyDictionary<ComponentAttributeName, ComponentAttributeValue> CopyAttributes(
         IReadOnlyDictionary<string, string> source)

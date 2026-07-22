@@ -16,8 +16,8 @@ public static class AssertionsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            AssertionsCompositionNodeTypes.AssertDescriptor,
             CreateFlowValueAssertionNode,
             inputs:
             [
@@ -28,7 +28,8 @@ public static class AssertionsCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<FlowValueAssertionResult>>(
                     AssertionsCompositionPortNames.Output)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterAssertion<TInput>(
@@ -38,8 +39,8 @@ public static class AssertionsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            AssertionsCompositionNodeTypes.AssertDescriptor,
             CreateAssertionNode<TInput>,
             inputs:
             [
@@ -54,21 +55,8 @@ public static class AssertionsCompositionNodeRegistryExtensions
                     AssertionsCompositionPortNames.Passed),
                 CompositionPorts.Metadata<TInput>(
                     AssertionsCompositionPortNames.Failed)
-            ]), nodeType);
-    }
-
-    private static CompositionNodeRegistry RegisterLegacyAlias(
-        CompositionNodeRegistry registry,
-        string nodeType)
-    {
-        if (string.Equals(nodeType, AssertionsCompositionNodeTypes.Assert, StringComparison.Ordinal))
-        {
-            registry.RegisterAlias(
-                AssertionsCompositionNodeTypes.LegacyAssert,
-                AssertionsCompositionNodeTypes.Assert);
-        }
-
-        return registry;
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateAssertionNode<TInput>(

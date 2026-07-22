@@ -13,6 +13,7 @@ public sealed class DesignerApplicationPersistence
     private readonly CompositionNodeRegistry _registry;
     private readonly ComponentDesignMetadataCatalog _metadata;
     private readonly ApplicationLinkCompiler _linkCompiler;
+    private readonly ApplicationDefinitionNormalizer _normalizer;
 
     public DesignerApplicationPersistence(
         CompositionNodeRegistry registry,
@@ -22,6 +23,7 @@ public sealed class DesignerApplicationPersistence
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _metadata = metadata ?? new ComponentDesignMetadataCatalog();
         _linkCompiler = linkCompiler ?? new ApplicationLinkCompiler(registry);
+        _normalizer = new ApplicationDefinitionNormalizer(registry);
     }
 
     public DesignerApplicationLoadResult Load(string json)
@@ -33,6 +35,9 @@ public sealed class DesignerApplicationPersistence
     public DesignerApplicationLoadResult Load(ApplicationDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
+
+        var normalization = _normalizer.Normalize(definition);
+        definition = normalization.Definition;
 
         var compilation = _linkCompiler.Compile(definition);
         var links = new List<DesignerApplicationLink>();
@@ -83,7 +88,8 @@ public sealed class DesignerApplicationPersistence
                 Links = links.ToArray(),
                 ResourceReferences = references.ToArray()
             },
-            Diagnostics = compilation.Diagnostics
+            Diagnostics = compilation.Diagnostics,
+            NormalizationDiagnostics = normalization.Diagnostics
         };
     }
 
@@ -166,9 +172,10 @@ public sealed class DesignerApplicationPersistence
                         componentProperties[new ComponentKey(pair.Key, component.Key)])))),
             StringComparer.Ordinal);
 
-        return new ApplicationDefinition(
-            ToResourceDefinitions(document.Resources),
-            workflows);
+        return _normalizer.Normalize(new ApplicationDefinition(
+                ToResourceDefinitions(document.Resources),
+                workflows))
+            .Definition;
     }
 
     public string Serialize(

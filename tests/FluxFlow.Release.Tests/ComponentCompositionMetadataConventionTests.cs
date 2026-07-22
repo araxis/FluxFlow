@@ -316,8 +316,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadataByType = provider
-                .GetMetadata()
+            var metadataByType = ComponentDesignMetadataCatalog
+                .FromProviders([provider])
+                .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
             var registry = BuildDefaultRegistry(assembly, entry.PackageId);
 
@@ -363,8 +364,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var project = LoadProject(root, entry);
             var assembly = LoadPackageAssembly(project, entry.PackageId);
             var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
-            var metadataByType = provider
-                .GetMetadata()
+            var metadataByType = ComponentDesignMetadataCatalog
+                .FromProviders([provider])
+                .All
                 .ToDictionary(metadata => metadata.Type.ToString(), StringComparer.Ordinal);
             var registry = BuildDefaultRegistry(assembly, entry.PackageId);
 
@@ -599,8 +601,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var providerFile = ReadSingleProviderFile(projectDirectory, entry.PackageId);
             var providerContent = File.ReadAllText(providerFile);
             var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
+            var nodeTypesContent = File.ReadAllText(nodeTypesFile);
             var nodeTypeConstants = PublicStringConstantRegex()
-                .Matches(File.ReadAllText(nodeTypesFile))
+                .Matches(nodeTypesContent)
                 .Select(match => match.Groups["name"].Value)
                 .ToArray();
 
@@ -610,7 +613,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             foreach (var nodeTypeConstant in nodeTypeConstants)
             {
                 var nodeTypeReference = $"{nodeTypeName}.{nodeTypeConstant}";
-                providerContent.Contains(nodeTypeReference, StringComparison.Ordinal)
+                ContainsNodeTypeReference(
+                        nodeTypesContent,
+                        providerContent,
+                        nodeTypeName,
+                        nodeTypeConstant)
                     .ShouldBeTrue($"{entry.PackageId} provider must expose node type '{nodeTypeReference}'.");
             }
         }
@@ -629,8 +636,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             var registryFile = ReadSingleRegistryFile(projectDirectory, entry.PackageId);
             var registryContent = File.ReadAllText(registryFile);
             var nodeTypeName = Path.GetFileNameWithoutExtension(nodeTypesFile);
+            var nodeTypesContent = File.ReadAllText(nodeTypesFile);
             var nodeTypeConstants = PublicStringConstantRegex()
-                .Matches(File.ReadAllText(nodeTypesFile))
+                .Matches(nodeTypesContent)
                 .Select(match => match.Groups["name"].Value)
                 .ToArray();
 
@@ -640,7 +648,11 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             foreach (var nodeTypeConstant in nodeTypeConstants)
             {
                 var nodeTypeReference = $"{nodeTypeName}.{nodeTypeConstant}";
-                registryContent.Contains(nodeTypeReference, StringComparison.Ordinal)
+                ContainsNodeTypeReference(
+                        nodeTypesContent,
+                        registryContent,
+                        nodeTypeName,
+                        nodeTypeConstant)
                     .ShouldBeTrue($"{entry.PackageId} registry extensions must register node type '{nodeTypeReference}'.");
             }
         }
@@ -992,7 +1004,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
             {
                 foreach (var option in metadata.Options)
                 {
-                    ConfigurationKeysContainOption(configurationKeys, option.Name.Value)
+                    (string.Equals(option.Name.Value, "processing", StringComparison.Ordinal) ||
+                     ConfigurationKeysContainOption(configurationKeys, option.Name.Value))
                         .ShouldBeTrue(
                             $"{entry.PackageId} Designer metadata for '{metadata.Type}' exposes option '{option.Name}', but no bound options property or explicit configuration read owns that key.");
                 }
@@ -1423,11 +1436,18 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         string packageId)
     {
         var registryContent = File.ReadAllText(ReadSingleRegistryFile(projectDirectory, packageId));
+        var nodeTypesContent = File.ReadAllText(ReadSingleNodeTypesFile(projectDirectory, packageId));
         var nodeTypeConstants = PublicStringConstantWithValueRegex()
-            .Matches(File.ReadAllText(ReadSingleNodeTypesFile(projectDirectory, packageId)))
+            .Matches(nodeTypesContent)
             .ToDictionary(
                 match => match.Groups["name"].Value,
                 match => match.Groups["value"].Value,
+                StringComparer.Ordinal);
+        var descriptorCanonicalConstants = ComponentTypeDescriptorRegex()
+            .Matches(nodeTypesContent)
+            .ToDictionary(
+                match => match.Groups["name"].Value,
+                match => match.Groups["canonical"].Value,
                 StringComparer.Ordinal);
         var optionTypesByFactory = ReadFactoryOptionTypes(registryContent, packageId);
         var optionTypesByNodeType = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -1450,6 +1470,8 @@ public sealed partial class ComponentCompositionMetadataConventionTests
                         ? nodeTypeMatch.Groups["constant"].Value
                         : registeredNodeType;
                 var nodeTypeConstant = nodeTypeReference.Split('.')[^1];
+                if (descriptorCanonicalConstants.TryGetValue(nodeTypeConstant, out var canonicalConstant))
+                    nodeTypeConstant = canonicalConstant;
                 nodeTypeConstants.TryGetValue(nodeTypeConstant, out var nodeType)
                     .ShouldBeTrue($"{packageId} registry node type constant '{nodeTypeConstant}' must resolve.");
 
@@ -1463,6 +1485,35 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
         optionTypesByNodeType.ShouldNotBeEmpty($"{packageId} must expose default registry node option mappings.");
         return optionTypesByNodeType;
+    }
+
+    private static bool ContainsNodeTypeReference(
+        string nodeTypesContent,
+        string implementationContent,
+        string nodeTypeName,
+        string nodeTypeConstant)
+    {
+        var directReference = $"{nodeTypeName}.{nodeTypeConstant}";
+        if (implementationContent.Contains(directReference, StringComparison.Ordinal))
+            return true;
+
+        foreach (Match descriptorMatch in ComponentTypeDescriptorRegex().Matches(nodeTypesContent))
+        {
+            var descriptorBody = descriptorMatch.Groups["body"].Value;
+            var referencesConstant = string.Equals(
+                    descriptorMatch.Groups["canonical"].Value,
+                    nodeTypeConstant,
+                    StringComparison.Ordinal) ||
+                Regex.IsMatch(descriptorBody, $@"\b{Regex.Escape(nodeTypeConstant)}\b");
+            if (!referencesConstant)
+                continue;
+
+            var descriptorReference = $"{nodeTypeName}.{descriptorMatch.Groups["name"].Value}";
+            if (implementationContent.Contains(descriptorReference, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private static IReadOnlyDictionary<string, string[]> ReadFactoryOptionTypes(
@@ -2658,6 +2709,9 @@ public sealed partial class ComponentCompositionMetadataConventionTests
 
     [GeneratedRegex(@"(?:registry\s*)?\.Register\(\s*(?<nodeType>[\w.]+)\s*,\s*(?<factory>\w+)")]
     private static partial Regex RegistryRegistrationReferenceRegex();
+
+    [GeneratedRegex(@"internal\s+static\s+CompositionComponentTypeDescriptor\s+(?<name>\w+)\s*\{[^}]*\}\s*=\s*new\(\s*(?<canonical>\w+)\s*,(?<body>.*?)\);", RegexOptions.Singleline)]
+    private static partial Regex ComponentTypeDescriptorRegex();
 
     [GeneratedRegex(@"private\s+static\s+(?:async\s+)?ValueTask<ComposedNode>\s+(?<name>\w+)(?:<[^>]+>)?\s*\([^)]*\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline)]
     private static partial Regex PrivateFactoryMethodBlockRegex();

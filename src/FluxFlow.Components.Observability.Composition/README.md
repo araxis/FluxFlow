@@ -62,9 +62,7 @@ results carrying usable output values.
         "Type": "metric.count",
         "engine": "Resources.Expressions.Main",
         "clock": "Resources.System.Clock",
-        "name": "accepted-orders",
         "predicate": "input.status = 'accepted'",
-        "boundedCapacity": 128,
         "Input": "OrderSource.Output"
       },
       "LogOrders": {
@@ -75,15 +73,12 @@ results carrying usable output values.
         "level": "Information",
         "category": "orders",
         "messageTemplate": "Observed {kind} item #{sequence}.",
-        "boundedCapacity": 128,
         "Input": "OrderSource.Output"
       },
       "MeasureOrders": {
         "Type": "metric.measure",
         "sizeSelector": "Resources.Selectors.Size",
         "clock": "Resources.System.Clock",
-        "name": "orders",
-        "boundedCapacity": 128,
         "Input": "OrderSource.Output"
       }
     }
@@ -108,6 +103,14 @@ Every selector in the canonical contract implements
 `IObservabilityFlowValueSelector` and returns FlowValue directly.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `ObservabilityComponentDesignMetadataProvider` describes canonical fixed ports,
 option sections/editor hints, conditional expression resources, FlowValue

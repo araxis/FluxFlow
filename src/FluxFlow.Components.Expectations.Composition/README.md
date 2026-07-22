@@ -44,7 +44,6 @@ port.
         "Type": "event.expect",
         "clock": "Resources.Clocks.Workflow",
         "kind": "Expect",
-        "name": "order-completed",
         "filter": {
           "Type": "operation.completed",
           "Status": "ok",
@@ -52,8 +51,7 @@ port.
         },
         "timeoutMilliseconds": 5000,
         "maxObservedEvents": 10,
-        "maxPreviewChars": 256,
-        "boundedCapacity": 128
+        "maxPreviewChars": 256
       }
     }
   }
@@ -73,6 +71,14 @@ the canonical fixed contract. Existing Composition consumers can remain on the
 published `1.x` package while migrating definitions and typed links.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `ExpectationsComponentDesignMetadataProvider` describes only the canonical
 fixed node:

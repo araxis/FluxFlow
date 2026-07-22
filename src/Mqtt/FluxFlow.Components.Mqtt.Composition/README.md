@@ -165,6 +165,14 @@ controller; components remain ordinary workflow nodes.
 
 ## Design Metadata
 
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
+
 `MqttComponentDesignMetadataProvider` describes all four node types, their
 options, fixed ports, signal-port kind, and host-owned `Client`/`Clock` picker
 hints. The metadata is descriptive only; hosts still own resource catalogs,

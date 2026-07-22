@@ -6,6 +6,7 @@ using FluxFlow.Components.Mqtt.Options;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Composition;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FluxFlow.Components.Mqtt.Composition;
 
@@ -18,7 +19,7 @@ public static class MqttCompositionNodeRegistryExtensions
 
         return registry
             .Register(
-                MqttCompositionNodeTypes.Control,
+                MqttCompositionNodeTypes.ControlDescriptor,
                 CreateControlNodeAsync,
                 inputs:
                 [
@@ -40,7 +41,7 @@ public static class MqttCompositionNodeRegistryExtensions
                     CompositionPorts.Metadata<MqttClientResult>(MqttCompositionPortNames.Output)
                 ])
             .Register(
-                MqttCompositionNodeTypes.Trigger,
+                MqttCompositionNodeTypes.TriggerDescriptor,
                 CreateTriggerNodeAsync,
                 inputs:
                 [
@@ -59,12 +60,9 @@ public static class MqttCompositionNodeRegistryExtensions
                 [
                     CompositionPorts.Metadata<MqttClientEvent>(MqttCompositionPortNames.Output)
                 ])
-            .RegisterAlias(
-                MqttCompositionNodeTypes.LegacyControl,
-                MqttCompositionNodeTypes.Control)
-            .RegisterAlias(
-                MqttCompositionNodeTypes.LegacyTrigger,
-                MqttCompositionNodeTypes.Trigger);
+            .RegisterResourceTypeAlias(
+                MqttCompositionResourceTypes.LegacyRetry,
+                MqttCompositionResourceTypes.Retry);
     }
 
     private static async ValueTask<ComposedNode> CreateControlNodeAsync(
@@ -168,7 +166,10 @@ public static class MqttCompositionNodeRegistryExtensions
         CompositionNodeFactoryContext context,
         MqttTriggerCompositionOptions binding)
     {
-        var options = CompositionDefinitionJson.CreateSerializerOptions();
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
         var properties = JsonSerializer.SerializeToElement(binding, options)
             .EnumerateObject()
             .ToDictionary(
@@ -176,11 +177,11 @@ public static class MqttCompositionNodeRegistryExtensions
                 static property => property.Value,
                 StringComparer.Ordinal);
         properties["TriggerId"] = JsonSerializer.SerializeToElement(
-            $"{context.WorkflowName}.{context.NodeName}");
+            $"{context.WorkflowName}.{context.ComponentName}");
         return JsonSerializer.Deserialize<MqttSubscriptionTriggerOptions>(
                    JsonSerializer.Serialize(properties, options),
                    options)
                ?? throw new InvalidOperationException(
-                   $"Configuration for MQTT trigger '{context.WorkflowName}.{context.NodeName}' is invalid.");
+                   $"Configuration for MQTT trigger '{context.WorkflowName}.{context.ComponentName}' is invalid.");
     }
 }

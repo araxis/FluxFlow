@@ -20,7 +20,7 @@ internal static class StorageCompositionStoreResolver
         if (factory is null)
         {
             throw new InvalidOperationException(
-                $"Node '{context.WorkflowName}.{context.NodeName}' resource " +
+                $"Component '{context.WorkflowName}.{context.ComponentName}' resource " +
                 $"'{StorageCompositionResourceNames.Store}' references '{key}', but no keyed " +
                 $"{nameof(IStorageStore)} or {nameof(IStorageStoreFactory)} service is registered.");
         }

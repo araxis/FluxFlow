@@ -54,8 +54,7 @@ contract has no `Passed`, `Failed`, or universal error port.
         "expressionName": "minimum-score",
         "description": "score-check",
         "failureMessage": "Score too low.",
-        "inputType": "order",
-        "boundedCapacity": 128
+        "inputType": "order"
       }
     }
   }
@@ -89,6 +88,14 @@ compatibility registration. Use a distinct node type when canonical and generic
 registrations share one registry.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `AssertionsComponentDesignMetadataProvider` describes the canonical node:
 

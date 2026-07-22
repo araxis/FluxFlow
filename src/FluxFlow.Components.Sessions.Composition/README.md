@@ -98,6 +98,14 @@ registration from silently replacing canonical defaults.
 
 ## Design Metadata
 
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
+
 `SessionsComponentDesignMetadataProvider` describes canonical fixed ports,
 option section/importance/editor hints, the omitted typed-only
 `emitSessionOutputs` control, and host-owned picker hints for `store` and

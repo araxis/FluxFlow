@@ -15,8 +15,8 @@ public static class MetricsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        var result = registry.Register(
-            nodeType,
+        return registry.Register(
+            MetricsCompositionNodeTypes.AggregateDescriptor,
             CreateMetricsAggregateNode,
             inputs:
             [
@@ -27,16 +27,8 @@ public static class MetricsCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<MetricSnapshotOutput>>(
                     MetricsCompositionPortNames.Output)
-            ]);
-
-        if (string.Equals(nodeType, MetricsCompositionNodeTypes.Aggregate, StringComparison.Ordinal))
-        {
-            result.RegisterAlias(
-                MetricsCompositionNodeTypes.LegacyAggregate,
-                MetricsCompositionNodeTypes.Aggregate);
-        }
-
-        return result;
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateMetricsAggregateNode(

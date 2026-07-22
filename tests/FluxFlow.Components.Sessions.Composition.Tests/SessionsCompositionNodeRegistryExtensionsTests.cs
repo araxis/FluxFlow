@@ -44,7 +44,10 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
             .ShouldBe(typeof(SessionQueryRequest));
         query.Outputs[SessionsCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FlowResult<SessionQueryOutcome>));
-        query.Outputs.Count.ShouldBe(1);
+        query.Outputs.Keys.ShouldBe([
+            SessionsCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
     }
 
     [Fact]
@@ -1016,7 +1019,17 @@ public sealed class SessionsCompositionNodeRegistryExtensionsTests
     private static async Task BuildCompositionAsync(IServiceProvider provider)
     {
         var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
+        try
+        {
+            await hostedService.StartAsync(CancellationToken.None);
+        }
+        catch (CompositionHostingException exception)
+        {
+            throw new InvalidOperationException(
+                string.Join(Environment.NewLine, exception.Diagnostics.Select(static diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}")),
+                exception);
+        }
     }
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)

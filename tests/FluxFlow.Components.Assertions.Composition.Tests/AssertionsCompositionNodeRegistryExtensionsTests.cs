@@ -241,7 +241,10 @@ public sealed class AssertionsCompositionNodeRegistryExtensionsTests
             .ShouldBeOfType<CompositionInputPort<FlowValue>>();
         var output = assertionNode.Descriptor.Outputs[AssertionsCompositionPortNames.Output]
             .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValueAssertionResult>>>();
-        assertionNode.Descriptor.Outputs.Count.ShouldBe(1);
+        assertionNode.Descriptor.Outputs.Keys.ShouldBe([
+            AssertionsCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         var results = new BufferBlock<
             FlowMessage<FlowResult<FlowValueAssertionResult>>>();
         output.Source.LinkTo(results);

@@ -1,3 +1,5 @@
+using FluxFlow.Composition;
+
 namespace FluxFlow.Components.Sessions.Composition;
 
 public static class SessionsCompositionNodeTypes
@@ -6,4 +8,7 @@ public static class SessionsCompositionNodeTypes
     public const string LegacyRecorder = "session.recorder";
     public const string Replay = "session.replay";
     public const string Query = "session.query";
+
+    internal static CompositionComponentTypeDescriptor RecorderDescriptor { get; } =
+        new(Recorder, [LegacyRecorder]);
 }

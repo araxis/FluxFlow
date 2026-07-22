@@ -33,12 +33,12 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         var flowSwitch = registry.Registrations[RoutingCompositionNodeTypes.Switch];
         flowSwitch.Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(InputMessage));
-        flowSwitch.Outputs.ShouldBeEmpty();
+        flowSwitch.Outputs.Keys.ShouldBe([CompositionComponentEvents.PortName]);
 
         var fork = registry.Registrations[RoutingCompositionNodeTypes.Fork];
         fork.Inputs[RoutingCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(InputMessage));
-        fork.Outputs.ShouldBeEmpty();
+        fork.Outputs.Keys.ShouldBe([CompositionComponentEvents.PortName]);
 
         registry.Registrations[RoutingCompositionNodeTypes.Merge]
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
@@ -72,7 +72,10 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .Outputs[RoutingCompositionPortNames.Output].MessageType.ShouldBe(
                 typeof(FlowResult<FlowCorrelationOutcome<FlowValue>>));
         registry.Registrations[RoutingCompositionNodeTypes.Correlation]
-            .Outputs.Keys.ShouldBe([RoutingCompositionPortNames.Output]);
+            .Outputs.Keys.ShouldBe([
+                RoutingCompositionPortNames.Output,
+                CompositionComponentEvents.PortName
+            ], ignoreOrder: false);
         registry.Registrations[RoutingCompositionNodeTypes.Join]
             .Inputs.Values.Select(input => input.MessageType).ShouldBe([
                 typeof(FlowValue),
@@ -838,7 +841,10 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             .Descriptor;
         var input = descriptor.Inputs[RoutingCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<FlowValue>>();
-        descriptor.Outputs.Keys.ShouldBe([RoutingCompositionPortNames.Output]);
+        descriptor.Outputs.Keys.ShouldBe([
+            RoutingCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         var output = descriptor.Outputs[RoutingCompositionPortNames.Output]
             .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowCorrelationOutcome<FlowValue>>>>();
         descriptor.Errors.ShouldBeNull();

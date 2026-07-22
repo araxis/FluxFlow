@@ -1,3 +1,5 @@
+using FluxFlow.Composition;
+
 namespace FluxFlow.Components.FileSystem.Composition;
 
 public static class FileSystemCompositionNodeTypes
@@ -10,4 +12,7 @@ public static class FileSystemCompositionNodeTypes
     public const string LegacyDirectoryEnumerate = "directory.enumerate";
 
     public const string Watch = "file.watch";
+
+    internal static CompositionComponentTypeDescriptor DirectoryEnumerateDescriptor { get; } =
+        new(DirectoryEnumerate, [LegacyDirectoryEnumerate]);
 }

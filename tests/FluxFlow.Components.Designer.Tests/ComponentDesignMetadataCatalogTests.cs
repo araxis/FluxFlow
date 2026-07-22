@@ -81,7 +81,7 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         catalog.TryGet(new ComponentType("sample.catalog"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
-        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
+        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output", "Events"]);
     }
 
     [Fact]
@@ -95,6 +95,61 @@ public sealed class ComponentDesignMetadataCatalogTests
         catalog.All.ShouldHaveSingleItem().Type.ShouldBe(new ComponentType("data.map"));
         catalog.TryGet(new ComponentType("flow.mapper"), out var found).ShouldBeTrue();
         found.Type.ShouldBe(new ComponentType("data.map"));
+    }
+
+    [Fact]
+    public void Catalog_adds_the_reserved_component_events_output()
+    {
+        var catalog = new ComponentDesignMetadataCatalog().Add(
+            new ComponentDesignMetadataBuilder("data.map")
+                .AddOutputPort("Output", valueType: "FlowValue", isPrimary: true)
+                .Build());
+
+        catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();
+        var events = metadata.Ports.Single(port => port.Name.Value == "Events");
+        events.Direction.ShouldBe(PortDirection.Output);
+        events.ValueType.ShouldNotBeNull();
+        events.ValueType.Value.Value.ShouldBe("CompositionComponentEvent");
+        events.Group.ShouldNotBeNull();
+        events.Group.Value.Value.ShouldBe("Diagnostics");
+        events.IsPrimary.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Catalog_replaces_identity_and_technical_options_with_a_processing_profile_hint()
+    {
+        var catalog = new ComponentDesignMetadataCatalog().Add(
+            new ComponentDesignMetadata
+            {
+                Type = new ComponentType("data.map"),
+                Options =
+                [
+                    new OptionDesignMetadata
+                    {
+                        Name = new ComponentOptionName("name"),
+                        Kind = OptionValueKind.Text
+                    },
+                    new OptionDesignMetadata
+                    {
+                        Name = new ComponentOptionName("boundedCapacity"),
+                        Kind = OptionValueKind.Number
+                    },
+                    new OptionDesignMetadata
+                    {
+                        Name = new ComponentOptionName("expression"),
+                        Kind = OptionValueKind.Expression
+                    }
+                ]
+            });
+
+        catalog.TryGet(new ComponentType("data.map"), out var metadata).ShouldBeTrue();
+        metadata.Options.Select(static option => option.Name.Value)
+            .ShouldBe(["expression", "processing"]);
+        var processing = metadata.Resources.Single(resource => resource.Name.Value == "processing");
+        processing.Attributes[new ComponentAttributeName(ResourceDesignMetadataAttributeNames.PickerKind)]
+            .Value.ShouldBe(ResourceDesignMetadataAttributeValues.ProcessingProfile);
+        metadata.Attributes[new ComponentAttributeName("omittedOptions")].Value
+            .ShouldBe("name,boundedCapacity");
     }
 
     [Fact]
@@ -407,7 +462,7 @@ public sealed class ComponentDesignMetadataCatalogTests
         catalog.TryGet(new ComponentType("sample.transform"), out var found).ShouldBeTrue();
         found.ShouldNotBeSameAs(metadata);
         found.Options[0].Kind.ShouldBe(OptionValueKind.Expression);
-        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output"]);
+        found.Ports.Select(port => port.Name.Value).ShouldBe(["Input", "Output", "Events"]);
     }
 
     [Fact]
@@ -475,10 +530,13 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         catalog.TryGet(metadata.Type, out var found).ShouldBeTrue();
 
-        found.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].Value.ShouldBe("editable");
+        found.Options.Single(option => option.Name.Value == "mode")
+            .Attributes[Attribute("scope")].Value.ShouldBe("editable");
         found.Options[0].Choices.ShouldHaveSingleItem().Attributes[Attribute("kind")].Value.ShouldBe("mode");
-        found.Resources.ShouldHaveSingleItem().Attributes[Attribute("resource")].Value.ShouldBe("host-owned");
-        found.Ports.ShouldHaveSingleItem().Attributes[Attribute("side")].Value.ShouldBe("input");
+        found.Resources.Single(resource => resource.Name.Value == "engine")
+            .Attributes[Attribute("resource")].Value.ShouldBe("host-owned");
+        found.Ports.Single(port => port.Name.Value == "Input")
+            .Attributes[Attribute("side")].Value.ShouldBe("input");
         found.Attributes[Attribute("shape")].Value.ShouldBe("transform");
     }
 
@@ -614,7 +672,8 @@ public sealed class ComponentDesignMetadataCatalogTests
 
         stored.ShouldNotBeSameAs(metadata);
         stored.Attributes[Attribute("shape")].Value.ShouldBe("transform");
-        stored.Options.ShouldHaveSingleItem().Attributes[Attribute("scope")].Value.ShouldBe("editable");
+        stored.Options.Single(option => option.Name.Value == "expression")
+            .Attributes[Attribute("scope")].Value.ShouldBe("editable");
     }
 
     [Fact]

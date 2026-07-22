@@ -18,14 +18,15 @@ public static class SourcesCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterGeneratedAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            SourcesCompositionNodeTypes.GeneratedDescriptor,
             CreateFlowValueGeneratedSourceNode,
             outputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
                     SourcesCompositionPortNames.Output)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterGeneratedSource<TOutput>(
@@ -35,14 +36,15 @@ public static class SourcesCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterGeneratedAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            SourcesCompositionNodeTypes.GeneratedDescriptor,
             CreateGeneratedSourceNode<TOutput>,
             outputs:
             [
                 CompositionPorts.Metadata<TOutput>(
                     SourcesCompositionPortNames.Output)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterSequenceSource(
@@ -60,20 +62,6 @@ public static class SourcesCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<FlowValue>(
                     SourcesCompositionPortNames.Output)
             ]);
-    }
-
-    private static CompositionNodeRegistry RegisterGeneratedAlias(
-        CompositionNodeRegistry registry,
-        string nodeType)
-    {
-        if (string.Equals(nodeType, SourcesCompositionNodeTypes.Generated, StringComparison.Ordinal))
-        {
-            registry.RegisterAlias(
-                SourcesCompositionNodeTypes.LegacyGenerated,
-                SourcesCompositionNodeTypes.Generated);
-        }
-
-        return registry;
     }
 
     private static ValueTask<ComposedNode> CreateFlowValueGeneratedSourceNode(

@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional canonical session Composition registrations with exact FlowContent results, fixed ports, Designer metadata, and explicit typed compatibility paths.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Renames the canonical session recorder type to session.record while retaining session.recorder as a hidden configuration alias.</PackageReleaseNotes>
+    <PackageReleaseNotes>Centralizes canonical recorder aliases in a typed descriptor and resolves stores from canonical component identity while preserving legacy resource slots.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

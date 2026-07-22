@@ -60,7 +60,6 @@ canonical descriptors do not expose a universal Errors port.
         "responseSide": "response",
         "timeoutMilliseconds": 30000,
         "maxPending": 1024,
-        "boundedCapacity": 128,
         "Input": "Normalize.Output"
       }
     }
@@ -101,6 +100,14 @@ Errors surfaces. Links never implicitly unwrap `FlowResult<T>` or convert
 between `FlowValue` and arbitrary CLR types.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `RoutingComponentDesignMetadataProvider` describes:
 

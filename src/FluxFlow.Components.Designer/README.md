@@ -144,6 +144,14 @@ validate, resolve, create, or dispose host resources.
 
 ## Application Persistence
 
+Load and save normalize registered component and resource aliases. Loads return
+structured migration diagnostics, while serialization always emits canonical
+type names. The catalog projects package-authored metadata into the canonical
+host surface by adding the traced `Events` output and the optional semantic
+`processing` profile picker. It omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing; raw
+provider metadata remains available for compatibility and convention checks.
+
 `DesignerApplicationPersistence` reads and writes the canonical two-section
 application document. It delegates JSON shape to `ApplicationDefinitionJson`,
 address parsing to `ApplicationAddress`, and semantic link validation to

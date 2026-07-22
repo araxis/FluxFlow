@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FlowValue observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Introduces metric.count, log.write, and metric.measure as canonical observability types while retaining the flow.* names as hidden configuration aliases.</PackageReleaseNotes>
+    <PackageReleaseNotes>Centralizes canonical metric and logging aliases in typed descriptors and targets addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

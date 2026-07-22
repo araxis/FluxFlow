@@ -36,14 +36,20 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         var get = registry.Registrations[StorageCompositionNodeTypes.Get];
         get.Inputs[StorageCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(StorageGetRequest));
-        get.Outputs.Keys.ShouldBe([StorageCompositionPortNames.Output]);
+        get.Outputs.Keys.ShouldBe([
+            StorageCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         get.Outputs[StorageCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FlowResult<StorageGetOutcome>));
 
         var query = registry.Registrations[StorageCompositionNodeTypes.Query];
         query.Inputs[StorageCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(StorageQueryRequest));
-        query.Outputs.Keys.ShouldBe([StorageCompositionPortNames.Output]);
+        query.Outputs.Keys.ShouldBe([
+            StorageCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         query.Outputs[StorageCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FlowResult<StorageQueryOutcome>));
 
@@ -67,7 +73,8 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         registry.Registrations["storage.get.typed"].Outputs.Keys.ShouldBe([
             StorageCompositionPortNames.Output,
             StorageCompositionPortNames.Found,
-            StorageCompositionPortNames.NotFound
+            StorageCompositionPortNames.NotFound,
+            CompositionComponentEvents.PortName
         ], ignoreOrder: false);
         registry.Registrations["storage.query.typed"]
             .Outputs[StorageCompositionPortNames.Records].MessageType
@@ -282,7 +289,10 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Get,
             async descriptor =>
             {
-                descriptor.Outputs.Keys.ShouldBe([StorageCompositionPortNames.Output]);
+                descriptor.Outputs.Keys.ShouldBe([
+                    StorageCompositionPortNames.Output,
+                    CompositionComponentEvents.PortName
+                ], ignoreOrder: false);
                 descriptor.Errors.ShouldBeNull();
                 var input = descriptor.Inputs[StorageCompositionPortNames.Input]
                     .ShouldBeOfType<CompositionInputPort<StorageGetRequest>>();
@@ -317,7 +327,10 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             StorageCompositionNodeTypes.Query,
             async descriptor =>
             {
-                descriptor.Outputs.Keys.ShouldBe([StorageCompositionPortNames.Output]);
+                descriptor.Outputs.Keys.ShouldBe([
+                    StorageCompositionPortNames.Output,
+                    CompositionComponentEvents.PortName
+                ], ignoreOrder: false);
                 var input = descriptor.Inputs[StorageCompositionPortNames.Input]
                     .ShouldBeOfType<CompositionInputPort<StorageQueryRequest>>();
                 var output = descriptor.Outputs[StorageCompositionPortNames.Output]
@@ -400,7 +413,8 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         descriptor.Outputs.Keys.ShouldBe([
             StorageCompositionPortNames.Output,
             StorageCompositionPortNames.Found,
-            StorageCompositionPortNames.NotFound
+            StorageCompositionPortNames.NotFound,
+            CompositionComponentEvents.PortName
         ], ignoreOrder: false);
     }
 

@@ -15,8 +15,8 @@ public static class ValidationCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ValidationCompositionNodeTypes.JsonSchemaValidatorDescriptor,
             CreateFlowValueJsonSchemaValidatorNode,
             inputs:
             [
@@ -27,7 +27,8 @@ public static class ValidationCompositionNodeRegistryExtensions
             [
                 CompositionPorts.Metadata<FlowResult<JsonSchemaFlowValueValidationResult>>(
                     ValidationCompositionPortNames.Output)
-            ]), nodeType);
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterJsonSchemaValidator<TInput>(
@@ -37,8 +38,8 @@ public static class ValidationCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return RegisterLegacyAlias(registry.Register(
-            nodeType,
+        return registry.Register(
+            ValidationCompositionNodeTypes.JsonSchemaValidatorDescriptor,
             CreateJsonSchemaValidatorNode<TInput>,
             inputs:
             [
@@ -53,21 +54,8 @@ public static class ValidationCompositionNodeRegistryExtensions
                     ValidationCompositionPortNames.Valid),
                 CompositionPorts.Metadata<TInput>(
                     ValidationCompositionPortNames.Invalid)
-            ]), nodeType);
-    }
-
-    private static CompositionNodeRegistry RegisterLegacyAlias(
-        CompositionNodeRegistry registry,
-        string nodeType)
-    {
-        if (string.Equals(nodeType, ValidationCompositionNodeTypes.JsonSchemaValidator, StringComparison.Ordinal))
-        {
-            registry.RegisterAlias(
-                ValidationCompositionNodeTypes.LegacyJsonSchemaValidator,
-                ValidationCompositionNodeTypes.JsonSchemaValidator);
-        }
-
-        return registry;
+            ],
+            registrationType: nodeType);
     }
 
     private static ValueTask<ComposedNode> CreateJsonSchemaValidatorNode<TInput>(

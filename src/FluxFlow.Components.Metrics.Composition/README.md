@@ -43,7 +43,6 @@ normal error variants on Output.
         "Type": "metric.aggregate",
         "clock": "Resources.System.Clock",
         "rateWindowSeconds": 60,
-        "boundedCapacity": 128,
         "maxGroups": 100,
         "emitEverySample": true,
         "trackLatest": true,
@@ -64,6 +63,14 @@ addresses and component/port names are exact and case-sensitive. With
 accepted input drains during normal composition completion.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `MetricsComponentDesignMetadataProvider` describes the typed sample input,
 normal result output, option sections/editor hints, and optional host-owned

@@ -46,17 +46,14 @@ options fail node activation. Missing generated `items` creates an empty source.
       "Orders": {
         "Type": "source.items",
         "clock": "Resources.System.Clock",
-        "name": "orders",
         "items": [
           { "id": "A-100", "total": 125 },
           { "id": "A-101", "total": 250 }
         ],
-        "boundedCapacity": 128,
         "Output": "Normalize.Input"
       },
       "Numbers": {
         "Type": "source.sequence",
-        "name": "numbers",
         "start": 10,
         "step": 5,
         "count": 3,
@@ -98,6 +95,14 @@ registrations share a registry. Typed nodes retain their released error ports
 and behavior.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `SourcesComponentDesignMetadataProvider` describes canonical fixed `FlowValue`
 outputs, option sections/editor hints, generated JSON items, and the optional

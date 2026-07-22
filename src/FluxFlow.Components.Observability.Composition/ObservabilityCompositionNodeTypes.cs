@@ -1,3 +1,5 @@
+using FluxFlow.Composition;
+
 namespace FluxFlow.Components.Observability.Composition;
 
 public static class ObservabilityCompositionNodeTypes
@@ -10,4 +12,13 @@ public static class ObservabilityCompositionNodeTypes
 
     public const string Metrics = "metric.measure";
     public const string LegacyMetrics = "flow.metrics";
+
+    internal static CompositionComponentTypeDescriptor CounterDescriptor { get; } =
+        new(Counter, [LegacyCounter]);
+
+    internal static CompositionComponentTypeDescriptor LoggerDescriptor { get; } =
+        new(Logger, [LegacyLogger]);
+
+    internal static CompositionComponentTypeDescriptor MetricsDescriptor { get; } =
+        new(Metrics, [LegacyMetrics]);
 }

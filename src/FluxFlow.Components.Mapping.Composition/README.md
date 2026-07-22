@@ -47,8 +47,7 @@ port and no universal error output.
         "expression": "input",
         "expressionName": "normalize-order",
         "inputType": "order.input",
-        "outputType": "order.normalized",
-        "boundedCapacity": 128
+        "outputType": "order.normalized"
       }
     }
   }
@@ -64,8 +63,7 @@ case-sensitive resource address.
 the same `Resources.{name}` pattern. The host owns registration, lifetime, and
 disposal of all three resources.
 
-Invalid options, such as a missing `expression` or non-positive
-`boundedCapacity`, fail during node activation.
+Invalid options, such as a missing `expression`, fail during node activation.
 
 ## Typed Compatibility Registration
 
@@ -83,6 +81,14 @@ and typed registrations share one registry. `InputType`, `OutputType`, and
 the actual typed port contracts.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `MappingComponentDesignMetadataProvider` describes the canonical node:
 

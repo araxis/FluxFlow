@@ -7,6 +7,110 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 2.7.0
+
+- Added deterministic canonical normalization for registered component and
+  resource aliases with structured migration diagnostics.
+- Added typed component descriptors, canonical factory contexts, traced
+  addressable component `Events`, and semantic `processing.profile` resources.
+- Formalized `Output` for normal results, `Events` for component observations,
+  and `Completion` for unrecoverable faults without adding universal Errors.
+- Marked legacy definition, builder, loader, validator, and runtime entry points
+  obsolete while retaining their public declarations and execution behavior.
+
+## FluxFlow.Composition.Hosting 2.3.0
+
+- Normalizes canonical definitions before revision comparison and activation.
+- Exposes migration diagnostics on update results and treats alias-only updates
+  as unchanged revisions.
+
+## FluxFlow.Engine 2.7.0
+
+- Activates canonical aliases through the same registry resolution path.
+- Materializes semantic processing profiles as revision-owned resources and
+  exposes each component's traced `Events` through stable addresses.
+
+## FluxFlow.Components.Designer 2.21.0
+
+- Canonical catalogs add component `Events` and semantic processing-profile
+  hints while hiding legacy Name and Dataflow-specific options.
+- Persistence normalizes aliases on load/save and reports migration diagnostics.
+
+## FluxFlow.Components.Assertions.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Expectations.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.FileSystem.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Http.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata, including parallel processing support.
+
+## FluxFlow.Components.Mapping.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Metrics.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Observability.Composition 2.2.0
+
+- Added package-internal typed canonical descriptors and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Projections.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Routing.Composition 2.2.0
+
+- Added package-internal typed canonical descriptors and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Sessions.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Sources.Composition 2.2.0
+
+- Added package-internal typed canonical descriptors and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.State.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Validation.Composition 2.2.0
+
+- Added a package-internal typed canonical descriptor and alias-derived
+  registration and Designer metadata.
+
+## FluxFlow.Components.Mqtt.Composition 2.2.0
+
+- Added typed canonical node descriptors and canonical retry resource
+  normalization while retaining compatibility aliases.
+
+## FluxFlow.Components.Storage.Composition 2.1.0
+
+- Resolves host-owned stores through canonical component identity while
+  preserving typed compatibility registrations.
+
 ## FluxFlow.Composition 2.6.0
 
 - Added first-class node-type aliases that resolve to canonical registrations

@@ -59,23 +59,15 @@ public static class FileSystemCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        var result = registry.Register(
-            nodeType,
+        return registry.Register(
+            FileSystemCompositionNodeTypes.DirectoryEnumerateDescriptor,
             CreateDirectoryEnumerateNode,
             outputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
                     FileSystemCompositionPortNames.Output)
-            ]);
-
-        if (string.Equals(nodeType, FileSystemCompositionNodeTypes.DirectoryEnumerate, StringComparison.Ordinal))
-        {
-            result.RegisterAlias(
-                FileSystemCompositionNodeTypes.LegacyDirectoryEnumerate,
-                FileSystemCompositionNodeTypes.DirectoryEnumerate);
-        }
-
-        return result;
+            ],
+            registrationType: nodeType);
     }
 
     public static CompositionNodeRegistry RegisterFileWatch(

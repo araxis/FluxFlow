@@ -56,7 +56,6 @@ result data on Output.
           "count": 0
         },
         "maxKeys": 1024,
-        "boundedCapacity": 128,
         "Input": "Normalize.Output"
       }
     }
@@ -74,6 +73,14 @@ required `engine` resource reference. Missing resources and invalid options fail
 activation with composition diagnostics.
 
 ## Design Metadata
+
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
 
 `StateComponentDesignMetadataProvider` describes canonical command/result
 ports, reducer option sections and editor hints, and host-owned expression-engine

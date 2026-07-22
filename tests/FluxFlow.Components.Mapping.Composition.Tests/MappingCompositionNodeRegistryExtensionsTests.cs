@@ -25,7 +25,10 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
 
         var mapper = registry.Registrations[MappingCompositionNodeTypes.Mapper];
         mapper.Inputs.Keys.ShouldBe([MappingCompositionPortNames.Input]);
-        mapper.Outputs.Keys.ShouldBe([MappingCompositionPortNames.Output]);
+        mapper.Outputs.Keys.ShouldBe([
+            MappingCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(
             typeof(FlowValue));
         mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(

@@ -31,7 +31,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             "recordSession");
 
         builder
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, SessionsCompositionNodeTypes.LegacyRecorder)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', SessionsCompositionNodeTypes.RecorderDescriptor.Aliases))
             .AddOption(StoreOption())
             .AddOption(SessionIdOption(isRequired: false))
             .AddOption(

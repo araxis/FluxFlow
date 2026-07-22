@@ -98,6 +98,14 @@ and all four typed nodes retain Errors and Events.
 
 ## Design Metadata
 
+Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
+The canonical catalog adds the traced `Events` output and an optional semantic
+`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
+`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
+Default execution requires no processing profile; raw provider metadata retains
+released declarations for compatibility.
+
+
 `StorageComponentDesignMetadataProvider` describes canonical fixed ports,
 option grouping/editor hints, omitted typed-only branch controls, and host-owned
 resource picker hints for `store` and `clock`. Designer metadata does not create

@@ -32,6 +32,10 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             MqttCompositionNodeTypes.Trigger,
             MqttCompositionNodeTypes.Events
         ], ignoreOrder: false);
+        registry.TryResolveResourceType(
+            MqttCompositionResourceTypes.LegacyRetry,
+            out var canonicalRetryType).ShouldBeTrue();
+        canonicalRetryType.ShouldBe(MqttCompositionResourceTypes.Retry);
 
         AssertMessagePort<MqttClientRequest>(
             registry.Registrations[MqttCompositionNodeTypes.Control].Inputs,
