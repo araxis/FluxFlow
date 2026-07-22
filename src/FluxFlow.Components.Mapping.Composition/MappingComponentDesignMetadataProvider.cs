@@ -53,15 +53,6 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
-                "engine",
-                OptionValueKind.Text,
-                displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
@@ -77,15 +68,6 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 displayName: "Output Type",
                 defaultValue: MapperOptions.ObjectTypeName,
                 helperText: "Optional semantic type name for the mapped FlowValue.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Type Metadata",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
-                "targetType",
-                OptionValueKind.Text,
-                displayName: "Target Type",
-                helperText: "Compatibility alias used when outputType is object.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
                     importance: OptionDesignMetadataAttributeValues.Advanced,

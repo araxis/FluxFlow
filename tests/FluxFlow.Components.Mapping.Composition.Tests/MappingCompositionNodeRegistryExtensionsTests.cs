@@ -1,25 +1,35 @@
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Mapping.Composition;
 using FluxFlow.Components.Mapping.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
-using FluxFlow.Composition.Model;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FluxFlow.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Mapping.Composition.Tests;
 
 public sealed class MappingCompositionNodeRegistryExtensionsTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", MappingCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", MappingCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
+
     [Fact]
-    public void RegisterMapper_registers_canonical_flow_value_contract()
+    public void RegisterMapper_registers_only_the_canonical_flow_value_contract()
     {
         var registry = new CompositionNodeRegistry().RegisterMapper();
 
@@ -29,48 +39,32 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             MappingCompositionPortNames.Output,
             CompositionComponentEvents.PortName
         ], ignoreOrder: false);
-        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(FlowValue));
+        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(typeof(FlowValue));
         mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
             typeof(FlowResult<FlowValue>));
     }
 
     [Fact]
-    public void RegisterMapper_registers_closed_mapper_metadata()
+    public void RegisterMapper_supports_explicit_canonical_component_types()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterMapper<InputMessage, OutputMessage>();
+            .RegisterMapper("data.map.primary")
+            .RegisterMapper("data.map.secondary");
 
-        var mapper = registry.Registrations[MappingCompositionNodeTypes.Mapper];
-        mapper.Inputs[MappingCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(InputMessage));
-        mapper.Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
-            typeof(OutputMessage));
-        mapper.Outputs[MappingCompositionPortNames.Failed].MessageType.ShouldBe(
-            typeof(InputMessage));
+        registry.Registrations.Keys.ShouldBe([
+            "data.map.primary",
+            "data.map.secondary"
+        ], ignoreOrder: false);
+        registry.Registrations.Values.ShouldAllBe(registration =>
+            registration.Inputs[MappingCompositionPortNames.Input].MessageType == typeof(FlowValue) &&
+            registration.Outputs[MappingCompositionPortNames.Output].MessageType ==
+                typeof(FlowResult<FlowValue>));
     }
 
     [Fact]
-    public void RegisterMapper_supports_multiple_custom_node_types()
+    public void Design_metadata_provider_returns_valid_canonical_mapper_metadata()
     {
-        var registry = new CompositionNodeRegistry()
-            .RegisterMapper<InputMessage, OutputMessage>("flow.mapper.input-output")
-            .RegisterMapper<string, int>("flow.mapper.string-int");
-
-        registry.Registrations["flow.mapper.input-output"]
-            .Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(OutputMessage));
-        registry.Registrations["flow.mapper.string-int"]
-            .Outputs[MappingCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(int));
-    }
-
-    [Fact]
-    public void Design_metadata_provider_returns_valid_flow_mapper_metadata()
-    {
-        var metadata = new MappingComponentDesignMetadataProvider()
-            .GetMetadata()
-            .ShouldHaveSingleItem();
+        var metadata = DesignMetadata();
 
         ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
@@ -82,20 +76,17 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             ("expression", OptionValueKind.Expression),
             ("expressionId", OptionValueKind.Text),
             ("expressionName", OptionValueKind.Text),
-            ("engine", OptionValueKind.Text),
             ("inputType", OptionValueKind.Text),
             ("outputType", OptionValueKind.Text),
-            ("targetType", OptionValueKind.Text),
             ("boundedCapacity", OptionValueKind.Number)
         ]);
         metadata.Options.Single(option => option.Name.Value == "expression")
             .IsRequired.ShouldBeTrue();
         metadata.Options.Single(option => option.Name.Value == "boundedCapacity")
             .Min.ShouldBe(1);
-        metadata.Options.Select(option => option.Name.Value)
-            .ShouldNotContain(MappingCompositionResourceNames.ContextFactory);
-        metadata.Options.Select(option => option.Name.Value)
-            .ShouldNotContain(MappingCompositionResourceNames.Clock);
+        metadata.Options.ShouldNotContain(option =>
+            option.Name.Value == MappingCompositionResourceNames.Engine ||
+            option.Name.Value == "targetType");
         metadata.Resources.Select(resource => (
             resource.Name.Value,
             resource.Order,
@@ -110,11 +101,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
     [Fact]
     public void Design_metadata_provider_describes_mapper_option_hints()
     {
-        var metadata = new MappingComponentDesignMetadataProvider()
-            .GetMetadata()
-            .ShouldHaveSingleItem();
-
-        var options = metadata.Options.ToDictionary(
+        var options = DesignMetadata().Options.ToDictionary(
             option => option.Name.Value,
             StringComparer.Ordinal);
 
@@ -127,21 +114,15 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
             relatedResource: MappingCompositionResourceNames.Engine);
         AssertOptionHints(options["expressionId"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["expressionName"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["engine"], "Diagnostics", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["inputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["outputType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(options["targetType"], "Type Metadata", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Text);
         AssertOptionHints(options["boundedCapacity"], "Runtime", OptionDesignMetadataAttributeValues.Advanced, OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_mapper_resource_picker_hints()
     {
-        var metadata = new MappingComponentDesignMetadataProvider()
-            .GetMetadata()
-            .ShouldHaveSingleItem();
-
-        var resources = metadata.Resources.ToDictionary(
+        var resources = DesignMetadata().Resources.ToDictionary(
             resource => resource.Name.Value,
             StringComparer.Ordinal);
 
@@ -160,11 +141,9 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_mapper_ports()
+    public void Design_metadata_provider_describes_only_canonical_mapper_ports()
     {
-        var metadata = new MappingComponentDesignMetadataProvider()
-            .GetMetadata()
-            .ShouldHaveSingleItem();
+        var metadata = DesignMetadata();
 
         metadata.Ports.Select(port => (
             port.Name.Value,
@@ -178,7 +157,21 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Canonical_factory_maps_flow_value_from_flat_definition()
+    public void Design_metadata_provider_loads_into_catalog()
+    {
+        var catalog = ComponentDesignMetadataCatalog.FromProviders([
+            new MappingComponentDesignMetadataProvider()
+        ]);
+
+        catalog.TryGet(
+            new ComponentType(MappingCompositionNodeTypes.Mapper),
+            out var metadata).ShouldBeTrue();
+        metadata.ShouldNotBeNull().Type.ShouldBe(
+            new ComponentType(MappingCompositionNodeTypes.Mapper));
+    }
+
+    [Fact]
+    public async Task Canonical_host_resolves_engine_and_maps_exact_flow_value()
     {
         FlowValue? observedInput = null;
         var engine = new RecordingExpressionEngine(
@@ -191,290 +184,196 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
                     ["mapped"] = observedInput.GetObject()["value"]
                 });
             });
-        var definition = ApplicationDefinitionJson.Deserialize(
-            """
-            {
-              "Resources": {
-                "Expressions": {
-                  "Primary": { "Type": "host.expression" }
-                }
-              },
-              "Workflows": {
-                "Main": {
-                  "Map": {
-                    "Type": "data.map",
-                    "engine": "Resources.Expressions.Primary",
-                    "expression": "map",
-                    "boundedCapacity": 8
-                  }
-                }
-              }
-            }
-            """);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "Resources.Expressions.Primary",
-            engine);
-        await using var provider = services.BuildServiceProvider();
-        var registry = new CompositionNodeRegistry().RegisterMapper();
-        var component = definition.Workflows["Main"].Components["Map"];
-        await using var composed = await registry.Registrations[component.Type].Factory(
-            new CompositionNodeFactoryContext(provider, "Main", "Map", component));
-        var input = composed.Inputs[MappingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
-        var output = composed.Outputs[MappingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValue>>>();
-        var results = new BufferBlock<FlowMessage<FlowResult<FlowValue>>>();
-        output.Source.LinkTo(results);
         var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
         {
             ["value"] = FlowValue.From("input")
         });
+        var request = FlowMessage.Create(value);
 
-        (await input.Target.SendAsync(FlowMessage.Create(value))).ShouldBeTrue();
-
-        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        result.IsError.ShouldBeFalse();
-        result.Value!.GetObject()["mapped"].GetString().ShouldBe("input");
-        observedInput.ShouldBeSameAs(value);
-        composed.Errors.ShouldBeNull();
-        composed.Outputs.ContainsKey(MappingCompositionPortNames.Failed).ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Design_metadata_provider_loads_into_catalog()
-    {
-        var provider = new MappingComponentDesignMetadataProvider();
-
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
-
-        catalog.TryGet(
-            new ComponentType(MappingCompositionNodeTypes.Mapper),
-            out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull();
-        metadata.Type.ShouldBe(new ComponentType(MappingCompositionNodeTypes.Mapper));
-    }
-
-    [Fact]
-    public async Task Hosted_mapper_resolves_keyed_engine_and_maps_message()
-    {
-        var engine = new RecordingExpressionEngine(
-            evaluate: (_, context, resultType) =>
+        await WithNodeAsync(
+            engine,
+            async (ports, _) =>
             {
-                resultType.ShouldBe(typeof(OutputMessage));
-                var input = (InputMessage)context.Variables["input"]!;
-                return new OutputMessage($"{input.Value}-mapped");
+                var resultReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
+
+                (await ports.SendAsync(Input, request)).IsAccepted.ShouldBeTrue();
+
+                var response = (await resultReceive).Message.ShouldNotBeNull();
+                response.Payload.IsError.ShouldBeFalse();
+                response.Payload.Value!.GetObject()["mapped"].GetString().ShouldBe("input");
+                response.CorrelationId.ShouldBe(request.CorrelationId);
+                response.TraceId.ShouldBe(request.TraceId);
+                response.CausationId.ShouldBe(request.MessageId);
+                observedInput.ShouldBeSameAs(value);
+
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
+                @event.CorrelationId.ShouldBe(request.CorrelationId);
+                @event.Payload.Name.ShouldBe("flow.mapper.succeeded");
+            },
+            Properties(
+                ("expression", "map"),
+                ("boundedCapacity", 8)));
+    }
+
+    [Fact]
+    public async Task Canonical_host_uses_optional_context_factory_and_option_metadata()
+    {
+        var contextFactory = new RecordingContextFactory();
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, _) => context.Variables["mapped"]);
+
+        await WithNodeAsync(
+            engine,
+            async (ports, _) =>
+            {
+                var receive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
+                var input = FlowValue.From("value");
+
+                (await ports.SendAsync(Input, FlowMessage.Create(input))).IsAccepted.ShouldBeTrue();
+
+                var result = (await receive).Message.ShouldNotBeNull().Payload;
+                result.Value!.GetString().ShouldBe("custom:value");
+                contextFactory.Input.ShouldBeSameAs(input);
+                contextFactory.Context.ShouldNotBeNull().Options.ExpressionName
+                    .ShouldBe("custom-map");
+                contextFactory.Context.InputType.ShouldBe(typeof(FlowValue));
+                contextFactory.Context.OutputType.ShouldBe(typeof(FlowValue));
+            },
+            Properties(
+                ("expression", "map"),
+                ("expressionName", "custom-map"),
+                ("inputType", "app.input"),
+                ("outputType", "app.output")),
+            contextFactory);
+    }
+
+    [Fact]
+    public async Task Canonical_host_emits_failures_as_normal_results_and_continues()
+    {
+        var calls = 0;
+        var engine = new RecordingExpressionEngine(
+            evaluate: (_, context, _) =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                    throw new InvalidOperationException("invalid value");
+                return context.Variables["input"];
             });
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "map",
-                    MappingCompositionNodeTypes.Mapper,
-                    node => node
-                        .Resource(MappingCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "map")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMapper<InputMessage, OutputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await WithNodeAsync(
+            engine,
+            async (ports, _) =>
+            {
+                var firstReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
+                var invalid = FlowValue.From("invalid");
+                (await ports.SendAsync(Input, FlowMessage.Create(invalid))).IsAccepted.ShouldBeTrue();
+                var failure = (await firstReceive).Message.ShouldNotBeNull().Payload;
+                failure.IsError.ShouldBeTrue();
+                failure.Kind.ShouldBe("MappingFailed");
+                failure.Error.ShouldNotBeNull().Code.ShouldBe("mapping.mapper_failed");
+                failure.Value.ShouldBeSameAs(invalid);
 
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var runtime = host.Runtime.ShouldNotBeNull();
-        var mapperNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = mapperNode.Descriptor.Inputs[MappingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = mapperNode.Descriptor.Outputs[MappingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<OutputMessage>>();
-        var results = new BufferBlock<FlowMessage<OutputMessage>>();
-        output.Source.LinkTo(
-            results,
-            new DataflowLinkOptions { PropagateCompletion = true });
-
-        var request = FlowMessage.Create(
-            new InputMessage("value"),
-            new CorrelationId("map-correlation"));
-
-        (await input.Target.SendAsync(request)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        input.Target.Complete();
-
-        var response = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        response.CorrelationId.ShouldBe(new CorrelationId("map-correlation"));
-        response.Payload.Value.ShouldBe("value-mapped");
+                var secondReceive = ports.ReceiveAsync<FlowResult<FlowValue>>(Output, Timeout);
+                var valid = FlowValue.From("valid");
+                (await ports.SendAsync(Input, FlowMessage.Create(valid))).IsAccepted.ShouldBeTrue();
+                var success = (await secondReceive).Message.ShouldNotBeNull().Payload;
+                success.IsError.ShouldBeFalse();
+                success.Value.ShouldBeSameAs(valid);
+            },
+            Properties(("expression", "map")));
     }
 
     [Fact]
-    public async Task Hosted_mapper_binds_options_from_configuration()
+    public async Task Missing_engine_resource_reference_surfaces_preparation_failure()
     {
-        var engine = new RecordingExpressionEngine(
-            evaluate: (_, context, _) => new OutputMessage($"{context.Variables["input"]}-mapped"));
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "map",
-                    MappingCompositionNodeTypes.Mapper,
-                    node => node
-                        .Resource(MappingCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "map")
-                        .Configure("expressionName", "test-map")
-                        .Configure("inputType", "app.input")
-                        .Configure("outputType", "app.output")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMapper<object, OutputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                MappingCompositionNodeTypes.Mapper,
+                Properties(("expression", "map"))),
+            registry => registry.RegisterMapper());
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var mapperNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = mapperNode.Descriptor.Inputs[MappingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<object>>();
-        var events = mapperNode.Descriptor.Events.ShouldNotBeNull();
-        var eventSink = new BufferBlock<FlowEvent>();
-        events.LinkTo(eventSink);
-
-        (await input.Target.SendAsync(FlowMessage.Create<object>("value"))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var @event = await eventSink.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        @event.Attributes["inputType"].ShouldBe("app.input");
-        @event.Attributes["outputType"].ShouldBe("app.output");
-        @event.Attributes["expressionName"].ShouldBe("test-map");
+        AssertPreparationFailure(host, MappingCompositionResourceNames.Engine);
     }
 
     [Fact]
-    public async Task Hosted_mapper_uses_optional_keyed_context_factory()
+    public async Task Invalid_mapper_configuration_surfaces_preparation_failure()
     {
-        var engine = new RecordingExpressionEngine(
-            evaluate: (_, context, _) => new OutputMessage((string)context.Variables["mapped"]!));
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services.AddKeyedSingleton<IMappingContextFactory>(
-            "custom",
-            new CustomMappingContextFactory());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "map",
-                    MappingCompositionNodeTypes.Mapper,
-                    node => node
-                        .Resource(MappingCompositionResourceNames.Engine, "primary")
-                        .Resource(MappingCompositionResourceNames.ContextFactory, "custom")
-                        .Configure("expression", "map")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMapper<InputMessage, OutputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartHostAsync(
+            new RecordingExpressionEngine(),
+            Properties(
+                ("expression", "map"),
+                ("boundedCapacity", 0)));
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var mapperNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = mapperNode.Descriptor.Inputs[MappingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = mapperNode.Descriptor.Outputs[MappingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<OutputMessage>>();
-        var results = new BufferBlock<FlowMessage<OutputMessage>>();
-        output.Source.LinkTo(results);
-
-        (await input.Target.SendAsync(FlowMessage.Create(new InputMessage("value")))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var result = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        result.Payload.Value.ShouldBe("custom:value");
+        AssertPreparationFailure(host, "Mapper bounded capacity");
     }
 
-    [Fact]
-    public async Task Missing_engine_resource_reference_surfaces_factory_diagnostic()
+    private static ComponentDesignMetadata DesignMetadata()
+        => new MappingComponentDesignMetadataProvider()
+            .GetMetadata()
+            .ShouldHaveSingleItem();
+
+    private static async Task WithNodeAsync(
+        IFlowExpressionEngine engine,
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?> properties,
+        IMappingContextFactory? contextFactory = null,
+        TimeProvider? clock = null)
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "map",
-                    MappingCompositionNodeTypes.Mapper,
-                    node => node.Configure("expression", "map")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMapper<object, object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartHostAsync(engine, properties, contextFactory, clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                MappingCompositionResourceNames.Engine,
-                StringComparison.Ordinal));
+        await run(host.GetRequiredPorts(), host);
     }
 
-    [Fact]
-    public async Task Invalid_mapper_options_surface_factory_diagnostic()
+    private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
+        IFlowExpressionEngine engine,
+        IReadOnlyDictionary<string, object?> properties,
+        IMappingContextFactory? contextFactory = null,
+        TimeProvider? clock = null)
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new RecordingExpressionEngine());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "map",
-                    MappingCompositionNodeTypes.Mapper,
-                    node => node
-                        .Resource(MappingCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "map")
-                        .Configure("boundedCapacity", 0)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMapper<object, object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal);
+        componentProperties[MappingCompositionResourceNames.Engine] = "Resources.engine";
+        var resources = new List<string> { "engine" };
+        if (contextFactory is not null)
+        {
+            componentProperties[MappingCompositionResourceNames.ContextFactory] =
+                "Resources.contextFactory";
+            resources.Add("contextFactory");
+        }
+        if (clock is not null)
+        {
+            componentProperties[MappingCompositionResourceNames.Clock] = "Resources.clock";
+            resources.Add("clock");
+        }
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("Mapper bounded capacity", StringComparison.Ordinal));
+        return CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                MappingCompositionNodeTypes.Mapper,
+                componentProperties,
+                resources),
+            registry => registry.RegisterMapper(),
+            configureRuntimeServices: context =>
+            {
+                context.Services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                    ApplicationAddress.Resource("engine"),
+                    engine);
+                if (contextFactory is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<IMappingContextFactory>(
+                        ApplicationAddress.Resource("contextFactory"),
+                        contextFactory);
+                }
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("clock"),
+                        clock);
+                }
+            });
     }
-
-    private sealed record InputMessage(string Value);
-
-    private sealed record OutputMessage(string Value);
 
     private static void AssertOptionHints(
         OptionDesignMetadata option,
@@ -493,7 +392,8 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
 
         if (syntax is null)
         {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+            option.Attributes.ContainsKey(
+                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
                 .ShouldBeFalse();
         }
         else
@@ -504,7 +404,8 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
 
         if (relatedResource is null)
         {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+            option.Attributes.ContainsKey(
+                new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
                 .ShouldBeFalse();
         }
         else
@@ -532,20 +433,37 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private sealed class CustomMappingContextFactory : IMappingContextFactory
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
     {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
+    }
+
+    private sealed class RecordingContextFactory : IMappingContextFactory
+    {
+        public FlowValue? Input { get; private set; }
+
+        public MappingNodeContext? Context { get; private set; }
+
         public FlowMapContext Create(object? input, MappingNodeContext context)
         {
-            var message = input.ShouldBeOfType<InputMessage>();
+            Input = input.ShouldBeOfType<FlowValue>();
+            Context = context;
             return new FlowMapContext
             {
                 Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
                 {
-                    ["input"] = message,
-                    ["value"] = message,
-                    ["mapped"] = $"custom:{message.Value}",
-                    ["inputType"] = context.InputType.Name,
-                    ["outputType"] = context.OutputType.Name
+                    ["input"] = Input,
+                    ["value"] = Input,
+                    ["mapped"] = FlowValue.From($"custom:{Input.GetString()}")
                 }
             };
         }

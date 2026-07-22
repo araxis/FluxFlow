@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Mapping 5.0.0
+
+- Consolidated mapping on `FlowValueMapperNode` with exact immutable input,
+  custom context factories, compiled expressions, diagnostics, and one normal
+  `FlowResult<FlowValue>` Output.
+- Removed the generic CLR mapper, typed context adapter, numeric error code,
+  `Failed`/`Errors` branches, and ignored `engine` and legacy `targetType`
+  options.
+
+## FluxFlow.Components.Mapping.Composition 3.0.0
+
+- Registers only the canonical `FlowValue` mapper and removes generic CLR
+  registration and the legacy `Failed` port constant.
+
 ## FluxFlow.Components.Storage 5.0.0
 
 - Consolidated exact-content put, get, query, and delete operations on the

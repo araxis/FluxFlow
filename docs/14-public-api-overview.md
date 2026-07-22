@@ -410,8 +410,8 @@ Use parameterless `RegisterMapper()` for the canonical `data.map` contract:
 failures remain normal result data and retain the original value; the canonical
 node has no `Failed` or universal error port. The factory resolves a keyed
 `IFlowExpressionEngine`; optional keyed context factory and clock resources stay
-host-owned. `RegisterMapper<TInput,TOutput>()` remains available as an explicit
-strongly typed compatibility registration.
+host-owned. Mapping Composition 3.x exposes no generic CLR registration;
+convert CLR values explicitly at the application boundary.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `data.map` composition node so hosts can compose palette, editor,

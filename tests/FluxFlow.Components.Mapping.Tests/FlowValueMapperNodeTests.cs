@@ -52,6 +52,30 @@ public sealed class FlowValueMapperNodeTests
     }
 
     [Fact]
+    public async Task Output_fans_out_every_accepted_result_in_order()
+    {
+        var engine = new RecordingExpressionEngine(
+            (_, context, _) => context.Variables["input"]);
+        await using var node = new FlowValueMapperNode(
+            new MapperOptions { Expression = "map" },
+            engine);
+        var first = Sink(node.Output);
+        var second = Sink(node.Output);
+        var values = new[] { FlowValue.From("a"), FlowValue.From("b") };
+
+        foreach (var value in values)
+            (await node.Input.SendAsync(FlowMessage.Create(value))).ShouldBeTrue();
+
+        foreach (var sink in new[] { first, second })
+        {
+            (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+                .Payload.Value.ShouldBeSameAs(values[0]);
+            (await sink.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)))
+                .Payload.Value.ShouldBeSameAs(values[1]);
+        }
+    }
+
+    [Fact]
     public async Task Emits_expected_failures_as_results_and_continues_processing()
     {
         var timestamp = DateTimeOffset.Parse("2026-07-18T10:00:00Z");
@@ -126,6 +150,68 @@ public sealed class FlowValueMapperNodeTests
         contextFactory.Input.ShouldBeSameAs(input);
         contextFactory.Context!.InputType.ShouldBe(typeof(FlowValue));
         contextFactory.Context.OutputType.ShouldBe(typeof(FlowValue));
+    }
+
+    [Fact]
+    public async Task Incompatible_expression_output_is_a_normal_failure_result()
+    {
+        var engine = new RecordingExpressionEngine((_, _, _) => "not-a-flow-value");
+        await using var node = new FlowValueMapperNode(
+            new MapperOptions
+            {
+                Expression = "map",
+                InputType = "app.input",
+                OutputType = "app.output"
+            },
+            engine);
+        var results = Sink(node.Output);
+        var input = FlowValue.From("input");
+
+        (await node.Input.SendAsync(FlowMessage.Create(input))).ShouldBeTrue();
+
+        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
+        result.Kind.ShouldBe(MappingResultKinds.Failed);
+        result.IsError.ShouldBeTrue();
+        result.Value.ShouldBeSameAs(input);
+        result.Error.ShouldNotBeNull().Code.ShouldBe(MappingErrorCodeNames.MapperFailed);
+        var details = result.Error.Details.GetObject();
+        details["inputType"].GetString().ShouldBe("app.input");
+        details["outputType"].GetString().ShouldBe("app.output");
+        details["exceptionType"].GetString().ShouldContain(nameof(InvalidCastException));
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Success_event_uses_configured_clock_and_diagnostic_metadata()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-07-23T08:00:00Z");
+        var engine = new RecordingExpressionEngine(
+            (_, context, _) => context.Variables["input"]);
+        await using var node = new FlowValueMapperNode(
+            new MapperOptions
+            {
+                Expression = "map",
+                ExpressionId = "map-v1",
+                ExpressionName = "normalize",
+                InputType = "app.input",
+                OutputType = "app.output"
+            },
+            engine,
+            clock: new FakeTimeProvider(timestamp));
+        var events = Sink(node.Events);
+        var message = FlowMessage.Create(FlowValue.From("input"));
+
+        (await node.Input.SendAsync(message)).ShouldBeTrue();
+
+        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        @event.Timestamp.ShouldBe(timestamp);
+        @event.CorrelationId.ShouldBe(message.CorrelationId);
+        @event.Name.ShouldBe(FlowValueMapperNode.MapperSucceeded);
+        @event.Attributes["engine"].ShouldBe("test");
+        @event.Attributes["expressionId"].ShouldBe("map-v1");
+        @event.Attributes["expressionName"].ShouldBe("normalize");
+        @event.Attributes["inputType"].ShouldBe("app.input");
+        @event.Attributes["outputType"].ShouldBe("app.output");
     }
 
     [Fact]

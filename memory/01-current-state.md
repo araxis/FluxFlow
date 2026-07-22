@@ -143,16 +143,17 @@ Date: 2026-07-23
   broader component-family migration began with Mapping. See
   `213-vnext-mqtt-core.md`, `214-vnext-mqtt-adapters.md`, and
   `215-vnext-mqtt-composition.md`.
-- `FluxFlow.Components.Mapping` is now `4.0.0` locally with a canonical
-  `FlowValueMapperNode` that consumes `FlowValue` without serialization and
-  emits success or expected failure as one `FlowResult<FlowValue>` output.
-  `FluxFlow.Components.Mapping.Composition` is `2.2.0`; parameterless
-  `RegisterMapper()` owns the canonical `data.map` contract and Designer
-  metadata, while explicit generic registration preserves the prior typed
-  surface. Focused/full tests, zero-warning controlled builds, binary
-  compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Payloads followed as the next bounded family. See
-  `216-vnext-mapping-flowvalue.md`.
+- `FluxFlow.Components.Mapping` is now `5.0.0` locally with one
+  `FlowValueMapperNode` contract: exact immutable `FlowValue` input, custom
+  context factories, compiled expressions, diagnostics, and mapped/failed
+  `FlowResult<FlowValue>` variants on one Output.
+  `FluxFlow.Components.Mapping.Composition` is `3.0.0` and exposes only
+  canonical `RegisterMapper()`. The generic CLR node/registration, typed
+  context adapter, numeric error code, `Failed`/`Errors` branches, and dead
+  option aliases were removed after parity coverage. Focused/shared tests,
+  controlled builds, expected major API diagnostics, 58-package source
+  seeding, both preflights/dry-runs, and a package-only consumer passed. See
+  `245-mapping-canonical-consolidation.md`.
 - `FluxFlow.Components.Payloads` is now `4.0.0` locally with a canonical
   `FlowContentInspectNode` that preserves exact content, exposes its cached
   decoded `FlowValue`, trusts declared media conventions, and emits size,

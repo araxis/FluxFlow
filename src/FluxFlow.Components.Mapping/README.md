@@ -1,6 +1,6 @@
 # FluxFlow.Components.Mapping
 
-Standalone mapping nodes for FluxFlow. The primary `FlowValueMapperNode` maps
+Standalone mapping for FluxFlow. `FlowValueMapperNode` maps
 transport-neutral `FlowValue` payloads without serializing them. The package
 depends on the data, node, and expression contracts only; it does not require an
 Engine runtime or choose an expression language.
@@ -10,9 +10,8 @@ Engine runtime or choose an expression language.
 | Node | Shape | Purpose |
 |------|-------|---------|
 | `FlowValueMapperNode` | `Input` -> `Output` | Maps `FlowValue` and emits `FlowResult<FlowValue>` on one normal output. |
-| `FlowMapperNode<TInput,TOutput>` | `Input` -> `Output`, `Failed` | Preserved strongly typed compatibility surface. |
 
-Both nodes compile `MapperOptions.Expression` once during construction and use
+The node compiles `MapperOptions.Expression` once during construction and uses
 a host-provided `IFlowExpressionEngine` for evaluation.
 
 ## FlowValue Mapper
@@ -72,29 +71,17 @@ await using var node = new FlowValueMapperNode(
     clock: TimeProvider.System);
 ```
 
-The context factory still receives the original `FlowValue`; no conversion is
-performed before context creation.
+The context factory receives the original `FlowValue` plus immutable node
+context containing the resolved options and canonical input/output types. No
+conversion is performed before context creation.
 
-## Typed Compatibility
+## 5.x Migration
 
-`FlowMapperNode<TInput,TOutput>` remains available for code-authored strongly
-typed workflows. Its established `Output`, `Failed`, `Errors`, and `Events`
-behavior is unchanged.
-
-```csharp
-await using var node = new FlowMapperNode<AppInput, AppOutput>(
-    options,
-    expressionEngine,
-    contextFactory: new TypedMappingContextFactory<AppInput>(new AppInputContextFactory()));
-
-node.Output.LinkTo(resultSink);
-node.Failed.LinkTo(deadLetterSink);
-await node.Input.SendAsync(FlowMessage.Create(appInput));
-```
-
-Use this surface when the host deliberately owns closed CLR message types. New
-configuration-authored workflows should prefer the canonical `FlowValue`
-contract.
+Mapping 5.x removes the generic CLR mapper, typed context adapter, numeric
+error code, `Failed`/`Errors` branches, and the ignored `engine` and legacy
+`targetType` options. Convert CLR values explicitly at the application boundary,
+use `FlowValueMapperNode`, and route expected failures by inspecting
+`FlowResult.Kind`, `IsError`, and `Error.Code` on `Output`.
 
 ## Validation And Diagnostics
 
@@ -117,6 +104,5 @@ services.AddKeyedSingleton<IFlowExpressionEngine>(
 registry.RegisterMapper();
 ```
 
-The optional composition package also preserves
-`RegisterMapper<TInput,TOutput>()` for explicit typed compatibility
-registrations.
+The optional composition package exposes one canonical `RegisterMapper()`
+registration. Hosts own expression-engine, context-factory, and clock resources.

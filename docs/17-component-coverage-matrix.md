@@ -29,7 +29,7 @@ Status values:
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | aligned |
 | HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
-| Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | aligned |
+| Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | canonical FlowValue/result contract consolidated |
 | Control | `FluxFlow.Components.Control` | yes | `FluxFlow.Components.Control.Composition` | yes | yes | structural Filter and When deprecated; canonical link conditions replace them |
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result aligned |
 | Sources | `FluxFlow.Components.Sources` | yes | `FluxFlow.Components.Sources.Composition` | yes | yes | canonical FlowValue generated/sequence sources aligned; typed runtime retained for compatibility |

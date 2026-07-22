@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Mapping</PackageId>
     <AssemblyName>FluxFlow.Components.Mapping</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mapping</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone mapping nodes for FluxFlow, including a transport-neutral FlowValue mapper with normal success/error results and the existing strongly typed mapper surface. No engine runtime required.</Description>
+    <Description>Standalone transport-neutral FlowValue mapping for FluxFlow with normal success and error results. No engine runtime required.</Description>
     <PackageTags>workflow;dataflow;components;mapping</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds a standalone FlowValue mapper that evaluates compiled expressions without JSON round trips and emits expected mapping failures as normal FlowResult values.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates mapping on FlowValueMapperNode and removes the generic CLR mapper, typed context adapter, numeric error code, and legacy option aliases.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

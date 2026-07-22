@@ -163,7 +163,7 @@ public sealed class FlowValueMapperNode : IFlowNode
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["inputType"] = _options.InputType,
-            ["outputType"] = _options.EffectiveOutputType,
+            ["outputType"] = _options.OutputType,
             ["engine"] = _engineName
         };
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
@@ -180,7 +180,7 @@ public sealed class FlowValueMapperNode : IFlowNode
             ["engine"] = FlowValue.From(_engineName),
             ["exceptionType"] = FlowValue.From(exception.GetType().FullName ?? exception.GetType().Name),
             ["inputType"] = FlowValue.From(_options.InputType),
-            ["outputType"] = FlowValue.From(_options.EffectiveOutputType)
+            ["outputType"] = FlowValue.From(_options.OutputType)
         };
         if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
             details["expressionId"] = FlowValue.From(_options.ExpressionId);

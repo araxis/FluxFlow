@@ -2,6 +2,18 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Mapping Consolidation
+
+- Consolidated Mapping on `FlowValueMapperNode` with exact immutable input,
+  custom context factories, compiled expressions, one normal result Output,
+  diagnostics, fan-out, and message lineage.
+- Removed the generic CLR mapper and registration, typed context adapter,
+  numeric error code, `Failed`/`Errors` branches, and ignored/legacy options.
+- Moved Mapping to `5.0.0` and Mapping Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[245-mapping-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Storage Consolidation
 
 - Consolidated put/get/query/delete behavior on the concise Storage node names

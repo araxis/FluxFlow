@@ -144,22 +144,14 @@ await using var node = new FlowValueMapperNode(
 The factory receives the same `FlowValue` instance that arrived in the message.
 Keep additional variables immutable and transport-neutral where practical.
 
-## Strongly Typed Compatibility
+## CLR Boundary Migration
 
-`FlowMapperNode<TInput,TOutput>` and
-`RegisterMapper<TInput,TOutput>(nodeType)` remain available for hosts that
-deliberately own CLR message contracts:
-
-```csharp
-registry.RegisterMapper<OrderInput, ReviewedOrder>("data.map.order");
-```
-
-The typed node preserves its established `Output`, `Failed`, `Errors`, and
-`Events` behavior. Closed generic arguments determine the actual port types;
-`InputType`, `OutputType`, and `targetType` remain descriptive diagnostics.
-
-Use a distinct node type when a registry contains both the canonical and typed
-forms.
+Mapping 5.x uses one `FlowValue` component contract. Hosts with CLR domain
+objects convert them explicitly to and from `FlowValue` at the application
+boundary. The removed generic node and registration are not recreated through
+automatic type resolution or reflection. Replace `Failed` and `Errors` links
+with conditions over `FlowResult.Kind`, `IsError`, and `Error.Code` on the
+normal `Output` port.
 
 ## Predicates And Routing
 
@@ -203,7 +195,7 @@ mapper node whenever the value shape changes.
 | mapper activation fails | Ensure `expression` is present and required expression resources resolve. |
 | result has `IsError == true` | Inspect `Error.Code`, `Error.Details`, and the preserved original `Value`. |
 | expression cannot see data | Use `input` or `value`, or provide a keyed `contextFactory`. |
-| typed output is incompatible | Verify the expression returns the closed `TOutput` selected by the typed registration. |
+| expression output is incompatible | Verify the expression returns a `FlowValue`; the normal failure result includes the exception type and preserves the original input. |
 | a link needs to reshape data | Add an explicit mapper component; links do not map payloads. |
 
 Next: [Package Versioning](11-package-versioning.md)

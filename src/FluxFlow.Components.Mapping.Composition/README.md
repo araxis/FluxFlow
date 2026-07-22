@@ -65,20 +65,12 @@ disposal of all three resources.
 
 Invalid options, such as a missing `expression`, fail during node activation.
 
-## Typed Compatibility Registration
+## 3.x Migration
 
-Existing code-authored hosts can retain explicit CLR contracts:
-
-```csharp
-registry.RegisterMapper<InputMessage, OutputMessage>(
-    "data.map.typed");
-```
-
-That overload creates `FlowMapperNode<TInput,TOutput>` and preserves its
-`Input`, `Output`, and `Failed` ports. Use a distinct node type when canonical
-and typed registrations share one registry. `InputType`, `OutputType`, and
-`targetType` remain diagnostic metadata; the closed generic arguments determine
-the actual typed port contracts.
+Composition 3.x removes generic CLR mapper registration and the `Failed` port
+constant. Register `data.map` with `RegisterMapper()`, convert CLR values to
+`FlowValue` at the application boundary, and use conditional links over the
+normal `FlowResult<FlowValue>` output for success and failure routing.
 
 ## Design Metadata
 
@@ -86,8 +78,7 @@ Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
 The canonical catalog adds the traced `Events` output and an optional semantic
 `processing` profile picker, and omits legacy `name`, `boundedCapacity`,
 `maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
+Default execution requires no processing profile.
 
 
 `MappingComponentDesignMetadataProvider` describes the canonical node:
