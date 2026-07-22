@@ -1,5 +1,4 @@
 using System.Threading.Tasks.Dataflow;
-using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting.DependencyInjection;
@@ -29,6 +28,8 @@ public sealed class ApplicationRuntimeAssembler :
     private readonly IServiceProvider _hostServices;
     private readonly ApplicationRuntimeAssemblerOptions _options;
     private readonly ILogger<ApplicationRuntimeAssembler>? _logger;
+    private readonly ApplicationRuntimeResourceSnapshotFactory _resourceSnapshots;
+    private readonly ApplicationRuntimeComponentActivator _componentActivator;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _eventGate = new();
     private readonly Queue<ApplicationRevisionEvent> _pendingRevisionEvents = [];
@@ -49,6 +50,10 @@ public sealed class ApplicationRuntimeAssembler :
         _hostServices = hostServices ?? throw new ArgumentNullException(nameof(hostServices));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger;
+        _resourceSnapshots = new ApplicationRuntimeResourceSnapshotFactory(
+            _hostServices,
+            _serviceContributors);
+        _componentActivator = new ApplicationRuntimeComponentActivator(_registry);
 
         if (_options.InputCapacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), "Input capacity must be greater than zero.");
@@ -141,7 +146,7 @@ public sealed class ApplicationRuntimeAssembler :
         var currentGeneration = Volatile.Read(ref _generation);
 
         var snapshots = new List<CompositionServiceProviderSnapshot>();
-        var descriptors = new Dictionary<ComponentKey, BuiltComponent>();
+        var descriptors = new Dictionary<ApplicationRuntimeComponentKey, ApplicationRuntimeBuiltComponent>();
         CompositionRuntime? runtime = null;
         ApplicationPortGeneration? generation = null;
         ApplicationPortRevision? portRevision = null;
@@ -149,58 +154,25 @@ public sealed class ApplicationRuntimeAssembler :
 
         try
         {
-            var candidateServices = new ServiceCollection();
-            candidateServices.AddSingleton(
-                _hostServices.GetService<ICompositionProcessingProfileMapper>() ??
-                new DefaultCompositionProcessingProfileMapper());
-            RegisterProcessingProfiles(definition.Resources, candidateServices);
-            var servicesContext = new ApplicationRuntimeServicesContext(
+            var resourceSnapshot = _resourceSnapshots.Create(
                 definition,
                 context,
-                _hostServices,
-                candidateServices);
-            foreach (var contributor in _serviceContributors)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                contributor.Configure(servicesContext);
-            }
-
-            var resourceSnapshot = new CompositionServiceProviderSnapshotBuilder()
-                .AddServices(candidateServices)
-                .Build(
-                    CompositionProviderBoundary.ResourceRevision,
-                    $"resources:{context.RevisionId}");
+                cancellationToken);
             snapshots.Add(resourceSnapshot);
 
-            foreach (var (workflowName, workflow) in definition.Workflows)
-            {
-                foreach (var (componentName, component) in workflow.Components)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!_registry.TryGetRegistration(component.Type, out var registration))
-                    {
-                        throw new ApplicationRuntimeAssemblerException(
-                            $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
-                    }
-                    var descriptor = await CreateComponentAsync(
-                            workflowName,
-                            componentName,
-                            component,
-                            registration,
-                            resourceSnapshot.Services)
-                        .ConfigureAwait(false);
-                    descriptors.Add(
-                        new ComponentKey(workflowName, componentName),
-                        new BuiltComponent(registration, descriptor));
-                }
-            }
+            await _componentActivator.PopulateAsync(
+                    definition,
+                    resourceSnapshot.Services,
+                    descriptors,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             foreach (var (workflowName, workflow) in definition.Workflows)
             {
                 var workflowServices = new ServiceCollection();
                 foreach (var componentName in workflow.Components.Keys)
                 {
-                    var key = new ComponentKey(workflowName, componentName);
+                    var key = new ApplicationRuntimeComponentKey(workflowName, componentName);
                     RegisterWorkflowViews(workflowServices, key, descriptors[key]);
                 }
 
@@ -264,7 +236,8 @@ public sealed class ApplicationRuntimeAssembler :
                 }
                 else
                 {
-                    await DisposeDescriptorsAsync(descriptors.Values.Select(static value => value.Descriptor))
+                    await ApplicationRuntimeCleanup.DisposeComponentsAsync(
+                            descriptors.Values.Select(static value => value.Descriptor))
                         .ConfigureAwait(false);
                 }
             }
@@ -275,7 +248,7 @@ public sealed class ApplicationRuntimeAssembler :
 
             try
             {
-                await DisposeSnapshotsAsync(snapshots).ConfigureAwait(false);
+                await ApplicationRuntimeCleanup.DisposeSnapshotsAsync(snapshots).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -301,94 +274,6 @@ public sealed class ApplicationRuntimeAssembler :
             throw new AggregateException(
                 "Canonical application runtime preparation and cleanup failed.",
                 cleanupFailures);
-        }
-    }
-
-    private async ValueTask<ComposedNode> CreateComponentAsync(
-        string workflowName,
-        string componentName,
-        ComponentDefinition definition,
-        CompositionNodeRegistration registration,
-        IServiceProvider services)
-    {
-        ComposedNode descriptor;
-        try
-        {
-            descriptor = await registration.Factory(new CompositionNodeFactoryContext(
-                    services,
-                    workflowName,
-                    componentName,
-                    definition))
-                .ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            throw new ApplicationRuntimeAssemblerException(
-                $"Factory for component '{workflowName}.{componentName}' failed: {exception.Message}",
-                exception);
-        }
-
-        if (descriptor is null)
-        {
-            throw new ApplicationRuntimeAssemblerException(
-                $"Factory for component '{workflowName}.{componentName}' returned null.");
-        }
-
-        try
-        {
-            ValidateDescriptor(workflowName, componentName, registration, descriptor);
-            return descriptor;
-        }
-        catch (Exception validationFailure)
-        {
-            try
-            {
-                await descriptor.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception cleanupFailure)
-            {
-                throw new AggregateException(
-                    $"Component '{workflowName}.{componentName}' validation and cleanup failed.",
-                    validationFailure,
-                    cleanupFailure);
-            }
-
-            throw;
-        }
-    }
-
-    private static void ValidateDescriptor(
-        string workflowName,
-        string componentName,
-        CompositionNodeRegistration registration,
-        ComposedNode descriptor)
-    {
-        if (descriptor.Inputs.Count != registration.Inputs.Count ||
-            descriptor.Outputs.Count != registration.Outputs.Count)
-        {
-            throw new ApplicationRuntimeAssemblerException(
-                $"Component '{workflowName}.{componentName}' descriptor ports do not exactly match its registration.");
-        }
-
-        foreach (var (name, metadata) in registration.Inputs)
-        {
-            if (!descriptor.Inputs.TryGetValue(name, out var input) ||
-                input.Kind != metadata.Kind ||
-                (metadata.Kind == CompositionPortKind.Message && input.MessageType != metadata.MessageType))
-            {
-                throw new ApplicationRuntimeAssemblerException(
-                    $"Component '{workflowName}.{componentName}' input '{name}' does not match its registration.");
-            }
-        }
-
-        foreach (var (name, metadata) in registration.Outputs)
-        {
-            if (!descriptor.Outputs.TryGetValue(name, out var output) ||
-                output.MessageType != metadata.MessageType)
-            {
-                throw new ApplicationRuntimeAssemblerException(
-                    $"Component '{workflowName}.{componentName}' output '{name}' does not match its registration.");
-            }
         }
     }
 
@@ -522,8 +407,8 @@ public sealed class ApplicationRuntimeAssembler :
 
     private static void ConfigureRevisionPorts(
         ApplicationPortRevisionBuilder builder,
-        ComponentKey key,
-        BuiltComponent component)
+        ApplicationRuntimeComponentKey key,
+        ApplicationRuntimeBuiltComponent component)
     {
         foreach (var metadata in component.Registration.Inputs.Values)
         {
@@ -552,8 +437,8 @@ public sealed class ApplicationRuntimeAssembler :
 
     private static void RegisterWorkflowViews(
         IServiceCollection services,
-        ComponentKey key,
-        BuiltComponent component)
+        ApplicationRuntimeComponentKey key,
+        ApplicationRuntimeBuiltComponent component)
     {
         var componentAddress = ApplicationAddress.WorkflowComponent(
             key.WorkflowName,
@@ -587,88 +472,6 @@ public sealed class ApplicationRuntimeAssembler :
                 component.Descriptor.Outputs[metadata.Name]));
         }
     }
-
-    private static void RegisterProcessingProfiles(
-        IReadOnlyDictionary<string, ResourceDefinition> resources,
-        IServiceCollection services)
-    {
-        foreach (var (name, resource) in resources)
-            RegisterProcessingProfile(resource, [name], services);
-    }
-
-    private static void RegisterProcessingProfile(
-        ResourceDefinition resource,
-        IReadOnlyList<string> path,
-        IServiceCollection services)
-    {
-        if (resource is ResourceGroupDefinition group)
-        {
-            foreach (var (name, child) in group.Resources)
-                RegisterProcessingProfile(child, [.. path, name], services);
-            return;
-        }
-
-        var instance = (ResourceInstanceDefinition)resource;
-        if (!string.Equals(
-                instance.Type,
-                CompositionProcessingResourceTypes.Profile,
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        var profile = JsonSerializer.Deserialize<CompositionProcessingProfile>(
-                JsonSerializer.Serialize(instance.Properties),
-                ApplicationDefinitionJson.CreateSerializerOptions())
-            ?? throw new ApplicationRuntimeAssemblerException(
-                $"Processing profile '{string.Join('.', path)}' could not be loaded.");
-        services.AddFluxFlowResource(
-            ApplicationAddress.Resource(path.ToArray()),
-            _ => profile);
-    }
-
-    private static async ValueTask DisposeDescriptorsAsync(IEnumerable<ComposedNode> descriptors)
-    {
-        List<Exception>? failures = null;
-        foreach (var descriptor in descriptors.Reverse())
-        {
-            try
-            {
-                await descriptor.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                (failures ??= []).Add(exception);
-            }
-        }
-
-        if (failures is not null)
-            throw new AggregateException("Component cleanup failed during runtime preparation.", failures);
-    }
-
-    private static async ValueTask DisposeSnapshotsAsync(
-        IEnumerable<CompositionServiceProviderSnapshot> snapshots)
-    {
-        List<Exception>? failures = null;
-        foreach (var snapshot in snapshots.Reverse())
-        {
-            try
-            {
-                await snapshot.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                (failures ??= []).Add(exception);
-            }
-        }
-
-        if (failures is not null)
-            throw new AggregateException("Provider snapshot cleanup failed during runtime preparation.", failures);
-    }
-
-    private sealed record BuiltComponent(
-        CompositionNodeRegistration Registration,
-        ComposedNode Descriptor);
 
     private sealed record PortSurfaceEntry(
         ApplicationAddress Address,
@@ -713,8 +516,6 @@ public sealed class ApplicationRuntimeAssembler :
                 await Ports.DisposeAsync().ConfigureAwait(false);
         }
     }
-
-    private readonly record struct ComponentKey(string WorkflowName, string ComponentName);
 
     private sealed class RuntimePortBuilderVisitor(
         ApplicationPortRuntimeBuilder builder,

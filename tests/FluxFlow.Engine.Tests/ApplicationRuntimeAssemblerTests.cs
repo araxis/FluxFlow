@@ -357,6 +357,46 @@ public sealed class ApplicationRuntimeAssemblerTests
         provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task Later_factory_failure_disposes_components_created_earlier_in_preparation()
+    {
+        var tracker = new DescriptorTracker();
+        var factoryCalls = 0;
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(ApplicationDefinitionJson.Deserialize(
+                """
+                {
+                  "Resources": {},
+                  "Workflows": {
+                    "Orders": {
+                      "First": { "Type": "test.partial" },
+                      "Second": { "Type": "test.partial" }
+                    }
+                  }
+                }
+                """))
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+                registry.Register(
+                    "test.partial",
+                    _ =>
+                    {
+                        if (Interlocked.Increment(ref factoryCalls) == 2)
+                            throw new InvalidOperationException("Factory failed.");
+
+                        return ValueTask.FromResult(ComposedNode.Create(new TrackedNode(tracker)));
+                    })));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+
+        var result = await host.StartApplicationAsync();
+
+        result.Succeeded.ShouldBeFalse();
+        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        factoryCalls.ShouldBe(2);
+        tracker.Disposed.ShouldBe(1);
+        provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
+    }
+
     private static void RegisterNodes(CompositionNodeRegistry registry)
         => registry
             .Register(
