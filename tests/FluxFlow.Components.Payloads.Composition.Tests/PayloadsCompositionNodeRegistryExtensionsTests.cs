@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Text;
-using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Payloads.Composition;
@@ -9,18 +8,17 @@ using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
-using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Hosting.DependencyInjection;
 using FluxFlow.Composition.Hosting.Revisions;
-using FluxFlow.Composition.Model;
 using FluxFlow.Data;
 using FluxFlow.Engine.Hosting;
 using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
+using FluxFlow.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Payloads.Composition.Tests;
 
@@ -274,16 +272,12 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Invalid_configuration_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowApplication(Definition(
-                Properties(("boundedCapacity", 0))))
-            .UseRuntimeAssembler(runtime => runtime
-                .RegisterNodes(registry => registry.RegisterPayloadInspect()));
-
-        await using var provider = services.BuildServiceProvider();
-        var result = await provider.GetRequiredService<IApplicationRevisionHost>()
-            .StartApplicationAsync();
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            CanonicalTestApplication.SingleComponent(
+                PayloadsCompositionNodeTypes.Inspect,
+                CanonicalTestApplication.Properties(("boundedCapacity", 0))),
+            registry => registry.RegisterPayloadInspect());
+        var result = host.StartResult;
 
         result.Succeeded.ShouldBeFalse();
         result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
@@ -292,7 +286,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
                 "boundedCapacity",
                 StringComparison.OrdinalIgnoreCase));
-        provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static async Task<FlowMessage<FlowResult<PayloadInspectionResult>>> RunNodeAsync(
@@ -407,48 +401,17 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         IReadOnlyList<string>? resources = null,
         Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowApplication(Definition(properties, resources))
-            .UseRuntimeAssembler(runtime =>
-            {
-                runtime.RegisterNodes(registry => registry.RegisterPayloadInspect());
-                if (configureRuntime is not null)
-                    runtime.ConfigureServices(configureRuntime);
-            });
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            CanonicalTestApplication.SingleComponent(
+                PayloadsCompositionNodeTypes.Inspect,
+                properties,
+                resources),
+            registry => registry.RegisterPayloadInspect(),
+            configureRuntimeServices: configureRuntime);
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var started = await provider.GetRequiredService<IApplicationRevisionHost>()
-            .StartApplicationAsync();
-        started.Succeeded.ShouldBeTrue();
-
-        await run(provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts());
+        await run(host.GetRequiredPorts());
     }
-
-    private static ApplicationDefinition Definition(
-        IReadOnlyDictionary<string, object?>? properties = null,
-        IReadOnlyList<string>? resources = null)
-    {
-        var resourceDefinitions = resources?.Select(name =>
-            KeyValuePair.Create<string, ResourceDefinition>(
-                name,
-                new ResourceInstanceDefinition("host.external")));
-        var component = new ComponentDefinition(
-            PayloadsCompositionNodeTypes.Inspect,
-            properties?.Select(property => KeyValuePair.Create(
-                property.Key,
-                JsonSerializer.SerializeToElement(property.Value))));
-        return new ApplicationDefinition(
-            resourceDefinitions,
-            [KeyValuePair.Create(
-                "main",
-                new FluxFlow.Composition.Model.WorkflowDefinition(
-                    [KeyValuePair.Create("node", component)]))]);
-    }
-
-    private static IReadOnlyDictionary<string, object?> Properties(
-        params (string Name, object? Value)[] values)
-        => values.ToDictionary(static value => value.Name, static value => value.Value);
 
     private sealed class FixedCodec(FlowValue value) : IFlowContentCodec
     {
