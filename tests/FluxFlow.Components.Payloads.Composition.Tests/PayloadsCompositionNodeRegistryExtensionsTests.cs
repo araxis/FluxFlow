@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
-using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Payloads.Composition;
@@ -8,11 +8,16 @@ using FluxFlow.Components.Payloads.Contracts;
 using FluxFlow.Components.Payloads.Diagnostics;
 using FluxFlow.Components.Payloads.Options;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.Model;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
@@ -22,6 +27,12 @@ namespace FluxFlow.Components.Payloads.Composition.Tests;
 public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", PayloadsCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", PayloadsCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
 
     [Fact]
     public void RegisterPayloadInspect_registers_canonical_content_result_metadata()
@@ -150,7 +161,7 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
         var result = await RunNodeAsync(
             content,
-            node => node.Configure("maxPreviewBytes", 128));
+            Properties(("maxPreviewBytes", 128)));
 
         result.CorrelationId.ShouldBe(new CorrelationId("payload.inspect"));
         result.Payload.IsError.ShouldBeFalse();
@@ -168,9 +179,9 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
             FlowContent.FromBytes(
                 Encoding.UTF8.GetBytes("""{"message":"abcdef"}"""),
                 "application/json"),
-            node => node
-                .Configure("maxPreviewBytes", 3)
-                .Configure("maxFormattedChars", 10));
+            Properties(
+                ("maxPreviewBytes", 3),
+                ("maxFormattedChars", 10)));
 
         var inspection = result.Payload.Value.ShouldNotBeNull();
         inspection.TextPreview.ShouldBe("""{"m""");
@@ -194,13 +205,18 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
 
         var result = await RunNodeAsync(
             content,
-            node => node
-                .Resource(PayloadsCompositionResourceNames.Codecs, "custom")
-                .Resource(PayloadsCompositionResourceNames.Clock, "fixed"),
-            services =>
+            Properties(
+                (PayloadsCompositionResourceNames.Codecs, "Resources.custom"),
+                (PayloadsCompositionResourceNames.Clock, "Resources.fixed")),
+            resources: ["custom", "fixed"],
+            configureRuntime: context =>
             {
-                services.AddKeyedSingleton("custom", catalog);
-                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
+                context.Services.AddExternalFluxFlowResource(
+                    ApplicationAddress.Resource("custom"),
+                    catalog);
+                context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    clock);
             });
 
         result.Payload.Timestamp.ShouldBe(timestamp);
@@ -213,10 +229,8 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Hosted_payload_inspect_emits_expected_failures_as_results_and_continues()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
+        await WithNodeAsync(async ports =>
         {
-            descriptor.Errors.ShouldBeNull();
-            var results = Link(output.Source);
             var bad = FlowMessage.Create(
                 FlowContent.FromBytes(Encoding.UTF8.GetBytes("{"), "application/json"),
                 new CorrelationId("bad"));
@@ -224,11 +238,13 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
                 FlowContent.FromBytes(Encoding.UTF8.GetBytes("{}"), "application/json"),
                 new CorrelationId("good"));
 
-            (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
-            (await input.Target.SendAsync(good).WaitAsync(Timeout)).ShouldBeTrue();
+            var firstResult = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(Output, Timeout);
+            (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
+            var failure = (await firstResult).Message.ShouldNotBeNull();
 
-            var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-            var success = await results.ReceiveAsync().WaitAsync(Timeout);
+            var secondResult = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(Output, Timeout);
+            (await ports.SendAsync(Input, good)).IsAccepted.ShouldBeTrue();
+            var success = (await secondResult).Message.ShouldNotBeNull();
             failure.CorrelationId.ShouldBe(bad.CorrelationId);
             failure.Payload.IsError.ShouldBeTrue();
             failure.Payload.Error!.Code.ShouldBe(PayloadErrorCodeNames.ParseFailed);
@@ -240,18 +256,18 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     [Fact]
     public async Task Hosted_payload_inspect_exposes_events()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
+        await WithNodeAsync(async ports =>
         {
-            output.Source.LinkTo(DataflowBlock.NullTarget<FlowMessage<FlowResult<PayloadInspectionResult>>>());
-            var events = Link(descriptor.Events.ShouldNotBeNull());
             var message = FlowMessage.Create(
                 FlowContent.FromBytes(Encoding.UTF8.GetBytes("hello"), "text/plain"));
 
-            (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+            var eventResult = ports.ReceiveAsync<CompositionComponentEvent>(Events, Timeout);
+            (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-            var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+            var eventMessage = (await eventResult).Message.ShouldNotBeNull();
+            var @event = eventMessage.Payload;
             @event.Name.ShouldBe(PayloadDiagnosticNames.Inspected);
-            @event.CorrelationId.ShouldBe(message.CorrelationId);
+            eventMessage.CorrelationId.ShouldBe(message.CorrelationId);
         });
     }
 
@@ -260,45 +276,48 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
     {
         var services = new ServiceCollection();
         services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "inspect",
-                    PayloadsCompositionNodeTypes.Inspect,
-                    node => node.Configure("boundedCapacity", 0)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterPayloadInspect())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+            .AddFluxFlowApplication(Definition(
+                Properties(("boundedCapacity", 0))))
+            .UseRuntimeAssembler(runtime => runtime
+                .RegisterNodes(registry => registry.RegisterPayloadInspect()));
 
         await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+        var result = await provider.GetRequiredService<IApplicationRevisionHost>()
+            .StartApplicationAsync();
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("boundedCapacity", StringComparison.OrdinalIgnoreCase));
+        result.Succeeded.ShouldBeFalse();
+        result.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        result.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                "boundedCapacity",
+                StringComparison.OrdinalIgnoreCase));
+        provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
     }
 
     private static async Task<FlowMessage<FlowResult<PayloadInspectionResult>>> RunNodeAsync(
         FlowContent content,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null)
+        IReadOnlyDictionary<string, object?>? properties = null,
+        IReadOnlyList<string>? resources = null,
+        Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
         FlowMessage<FlowResult<PayloadInspectionResult>>? result = null;
         await WithNodeAsync(
-            async (input, output, _) =>
+            async ports =>
             {
-                var results = Link(output.Source);
                 var message = FlowMessage.Create(
                     content,
                     new CorrelationId(PayloadsCompositionNodeTypes.Inspect));
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
-                result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var receive = ports.ReceiveAsync<FlowResult<PayloadInspectionResult>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+                result = (await receive).Message.ShouldNotBeNull();
             },
-            configureNode,
-            configureServices);
+            properties,
+            resources,
+            configureRuntime);
 
         return result.ShouldNotBeNull();
     }
@@ -383,54 +402,53 @@ public sealed class PayloadsCompositionNodeRegistryExtensionsTests
         => attributes[new ComponentAttributeName(name)].Value;
 
     private static async Task WithNodeAsync(
-        Func<
-            CompositionInputPort<FlowContent>,
-            CompositionOutputPort<FlowResult<PayloadInspectionResult>>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null)
+        Func<ApplicationPortRuntime, Task> run,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        IReadOnlyList<string>? resources = null,
+        Action<ApplicationRuntimeServicesContext>? configureRuntime = null)
     {
         var services = new ServiceCollection();
-        configureServices?.Invoke(services);
         services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    PayloadsCompositionNodeTypes.Inspect,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterPayloadInspect())
-            .Configure(options => options.StartRuntimeWithHost = false);
+            .AddFluxFlowApplication(Definition(properties, resources))
+            .UseRuntimeAssembler(runtime =>
+            {
+                runtime.RegisterNodes(registry => registry.RegisterPayloadInspect());
+                if (configureRuntime is not null)
+                    runtime.ConfigureServices(configureRuntime);
+            });
 
         await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+        var started = await provider.GetRequiredService<IApplicationRevisionHost>()
+            .StartApplicationAsync();
+        started.Succeeded.ShouldBeTrue();
 
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[PayloadsCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<FlowContent>>();
-        var output = descriptor.Outputs[PayloadsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<PayloadInspectionResult>>>();
-
-        await run(input, output, descriptor);
+        await run(provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts());
     }
 
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
+    private static ApplicationDefinition Definition(
+        IReadOnlyDictionary<string, object?>? properties = null,
+        IReadOnlyList<string>? resources = null)
     {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
+        var resourceDefinitions = resources?.Select(name =>
+            KeyValuePair.Create<string, ResourceDefinition>(
+                name,
+                new ResourceInstanceDefinition("host.external")));
+        var component = new ComponentDefinition(
+            PayloadsCompositionNodeTypes.Inspect,
+            properties?.Select(property => KeyValuePair.Create(
+                property.Key,
+                JsonSerializer.SerializeToElement(property.Value))));
+        return new ApplicationDefinition(
+            resourceDefinitions,
+            [KeyValuePair.Create(
+                "main",
+                new FluxFlow.Composition.Model.WorkflowDefinition(
+                    [KeyValuePair.Create("node", component)]))]);
     }
 
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
-    }
+    private static IReadOnlyDictionary<string, object?> Properties(
+        params (string Name, object? Value)[] values)
+        => values.ToDictionary(static value => value.Name, static value => value.Value);
 
     private sealed class FixedCodec(FlowValue value) : IFlowContentCodec
     {
