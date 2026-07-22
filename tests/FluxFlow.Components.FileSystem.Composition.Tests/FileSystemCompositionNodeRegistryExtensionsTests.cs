@@ -1,4 +1,4 @@
-using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.FileSystem.Composition;
@@ -6,20 +6,35 @@ using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.Model;
 using FluxFlow.Data;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.FileSystem.Composition.Tests;
 
 public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 {
+    private const string WorkflowName = "main";
+    private const string ComponentName = "node";
+    private const string ValueRecorderType = "test.flow-value-recorder";
+    private const string EventRecorderType = "test.component-event-recorder";
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort(WorkflowName, ComponentName, "Input");
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort(WorkflowName, ComponentName, "Output");
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort(WorkflowName, ComponentName, "Events");
 
     [Fact]
     public void RegisterFileSystemNodes_registers_request_result_metadata()
@@ -414,36 +429,38 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
         await WithTransformNodeAsync<FileReadRequest, FlowResult<FileReadContent>>(
             FileSystemCompositionNodeTypes.Read,
-            async (input, output, descriptor) =>
+            async (ports, host) =>
             {
-                var results = Link(output.Source);
-                var events = Link(descriptor.Events.ShouldNotBeNull());
                 var message = FlowMessage.Create(
                     new FileReadRequest { Path = "input.txt" },
                     new CorrelationId("read"));
+                var resultReceive = ports.ReceiveAsync<FlowResult<FileReadContent>>(
+                    Output,
+                    Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
+                    Events,
+                    Timeout);
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(message.CorrelationId);
                 result.Payload.IsError.ShouldBeFalse();
                 result.Payload.Value.ShouldNotBeNull().Path.ShouldBe(Path.GetFullPath(filePath));
                 result.Payload.Value.Content.OriginalBytes.AsSpan().ToArray()
                     .ShouldBe(System.Text.Encoding.UTF8.GetBytes("hello"));
                 result.Payload.Value.ReadAt.ShouldBe(timestamp);
-                descriptor.Errors.ShouldBeNull();
 
-                var @event = await ReceiveEventAsync(
-                    events,
-                    FileSystemDiagnosticNames.FileReadSucceeded);
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
                 @event.CorrelationId.ShouldBe(message.CorrelationId);
-                @event.Timestamp.ShouldBe(timestamp);
+                @event.Payload.Name.ShouldBe(FileSystemDiagnosticNames.FileReadSucceeded);
+                @event.Payload.Timestamp.ShouldBe(timestamp);
+                await host.RevisionHost.StopApplicationAsync();
             },
-            node => node
-                .Configure("baseDirectory", directory.Path)
-                .Configure("maxBytes", 32)
-                .Resource(FileSystemCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock),
+            Properties(
+                ("baseDirectory", directory.Path),
+                ("maxBytes", 32)),
+            clock,
             registry => registry.RegisterFileRead());
     }
 
@@ -457,10 +474,8 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
         await WithTransformNodeAsync<FileContentWriteRequest, FlowResult<FileWriteResult>>(
             FileSystemCompositionNodeTypes.Write,
-            async (input, output, descriptor) =>
+            async (ports, host) =>
             {
-                var results = Link(output.Source);
-                var events = Link(descriptor.Events.ShouldNotBeNull());
                 var message = FlowMessage.Create(
                     new FileContentWriteRequest
                     {
@@ -471,28 +486,31 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
                             "utf-8")
                     },
                     new CorrelationId("write"));
+                var resultReceive = ports.ReceiveAsync<FlowResult<FileWriteResult>>(
+                    Output,
+                    Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
+                    Events,
+                    Timeout);
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(message.CorrelationId);
                 result.Payload.IsError.ShouldBeFalse();
                 result.Payload.Value.ShouldNotBeNull().Path.ShouldBe(Path.GetFullPath(expectedPath));
                 result.Payload.Value.BytesWritten.ShouldBe(7);
                 result.Payload.Value.WrittenAt.ShouldBe(timestamp);
                 (await File.ReadAllTextAsync(expectedPath)).ShouldBe("written");
-                descriptor.Errors.ShouldBeNull();
 
-                var @event = await ReceiveEventAsync(
-                    events,
-                    FileSystemDiagnosticNames.FileWriteSucceeded);
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
                 @event.CorrelationId.ShouldBe(message.CorrelationId);
-                @event.Timestamp.ShouldBe(timestamp);
+                @event.Payload.Name.ShouldBe(FileSystemDiagnosticNames.FileWriteSucceeded);
+                @event.Payload.Timestamp.ShouldBe(timestamp);
+                await host.RevisionHost.StopApplicationAsync();
             },
-            node => node
-                .Configure("baseDirectory", directory.Path)
-                .Resource(FileSystemCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock),
+            Properties(("baseDirectory", directory.Path)),
+            clock,
             registry => registry.RegisterFileWrite());
     }
 
@@ -506,49 +524,33 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "skip.bin"), "skip");
         var timestamp = DateTimeOffset.Parse("2026-06-19T11:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
+        var entries = new MessageTracker<FlowValue>();
+        var events = new MessageTracker<CompositionComponentEvent>();
 
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "enumerate",
-                    FileSystemCompositionNodeTypes.DirectoryEnumerate,
-                    node => node
-                        .Configure("directory", ".")
-                        .Configure("baseDirectory", directory.Path)
-                        .Configure("filter", "*.txt")
-                        .Configure("includeSubdirectories", true)
-                        .Configure("boundedCapacity", 8)
-                        .Resource(FileSystemCompositionResourceNames.Clock, "fixed")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterDirectoryEnumerate())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartSourceNodeAsync(
+            FileSystemCompositionNodeTypes.DirectoryEnumerate,
+            Properties(
+                ("directory", "."),
+                ("baseDirectory", directory.Path),
+                ("filter", "*.txt"),
+                ("includeSubdirectories", true),
+                ("boundedCapacity", 8)),
+            clock,
+            entries,
+            events,
+            registry => registry.RegisterDirectoryEnumerate());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var node = runtime.Nodes.ShouldHaveSingleItem();
-        var output = node.Descriptor.Outputs[FileSystemCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
-        var entries = Link(output.Source);
-        var events = Link(node.Descriptor.Events.ShouldNotBeNull());
-
-        await runtime.StartAsync();
-        await runtime.Completion.WaitAsync(Timeout);
-
-        var emitted = await DrainUntilCompletedAsync(entries);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var completed = await events.WaitForAsync(value =>
+            value.Payload.Name == FileSystemDiagnosticNames.DirectoryEnumerateCompleted);
+        completed.Payload.Timestamp.ShouldBe(timestamp);
+        var emitted = entries.Values;
         emitted.Select(message => message.Payload.GetObject()["name"].GetString()).Order()
             .ShouldBe(["child.txt", "root.txt"]);
         emitted.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
         emitted.ShouldAllBe(message =>
             message.Payload.GetObject()["enumeratedAt"].GetDateTimeOffset() == timestamp);
-        (await DrainUntilCompletedAsync(events))
-            .Select(value => value.Name)
-            .ShouldContain(FileSystemDiagnosticNames.DirectoryEnumerateCompleted);
+        await host.RevisionHost.StopApplicationAsync();
     }
 
     [Fact]
@@ -558,56 +560,39 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         var timestamp = DateTimeOffset.Parse("2026-06-19T11:30:00Z");
         var clock = new FakeTimeProvider(timestamp);
         var watchedPath = Path.Combine(directory.Path, "created.txt");
+        var changes = new MessageTracker<FlowValue>();
+        var events = new MessageTracker<CompositionComponentEvent>();
 
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "watch",
-                    FileSystemCompositionNodeTypes.Watch,
-                    node => node
-                        .Configure("directory", ".")
-                        .Configure("baseDirectory", directory.Path)
-                        .Configure("boundedCapacity", 16)
-                        .Resource(FileSystemCompositionResourceNames.Clock, "fixed")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFileWatch())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var node = runtime.Nodes.ShouldHaveSingleItem();
-        var output = node.Descriptor.Outputs[FileSystemCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
-        var changes = Link(output.Source);
-        var events = Link(node.Descriptor.Events.ShouldNotBeNull());
-
-        await runtime.StartAsync();
-        var started = await ReceiveEventAsync(
+        await using var host = await StartSourceNodeAsync(
+            FileSystemCompositionNodeTypes.Watch,
+            Properties(
+                ("directory", "."),
+                ("baseDirectory", directory.Path),
+                ("boundedCapacity", 16)),
+            clock,
+            changes,
             events,
-            FileSystemDiagnosticNames.FileWatchStarted);
-        started.Timestamp.ShouldBe(timestamp);
+            registry => registry.RegisterFileWatch());
+
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var started = await events.WaitForAsync(value =>
+            value.Payload.Name == FileSystemDiagnosticNames.FileWatchStarted);
+        started.Payload.Timestamp.ShouldBe(timestamp);
 
         await File.WriteAllTextAsync(watchedPath, "hello");
 
-        var change = await ReceiveMatchingAsync(
-            changes,
-            value => value.GetObject()["name"].GetString() == "created.txt" &&
-                     value.GetObject()["changeType"].GetString() is "Created" or "Changed");
+        var change = await changes.WaitForAsync(value =>
+            value.Payload.GetObject()["name"].GetString() == "created.txt" &&
+            value.Payload.GetObject()["changeType"].GetString() is "Created" or "Changed");
         var changeValue = change.Payload.GetObject();
         changeValue["path"].GetString().ShouldBe(Path.GetFullPath(watchedPath));
         changeValue["directory"].GetString().ShouldBe(Path.GetFullPath(directory.Path));
         changeValue["timestamp"].GetDateTimeOffset().ShouldBe(timestamp);
         change.CorrelationId.IsEmpty.ShouldBeFalse();
 
-        await ReceiveEventAsync(events, FileSystemDiagnosticNames.FileWatchChanged);
-        await runtime.StopAsync().AsTask().WaitAsync(Timeout);
-        await runtime.Completion.WaitAsync(Timeout);
+        await events.WaitForAsync(value =>
+            value.Payload.Name == FileSystemDiagnosticNames.FileWatchChanged);
+        await host.RevisionHost.StopApplicationAsync();
     }
 
     [Fact]
@@ -619,9 +604,8 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
 
         await WithTransformNodeAsync<FileReadRequest, FlowResult<FileReadContent>>(
             FileSystemCompositionNodeTypes.Read,
-            async (input, output, descriptor) =>
+            async (ports, host) =>
             {
-                var results = Link(output.Source);
                 var missing = FlowMessage.Create(
                     new FileReadRequest { Path = "missing.txt" },
                     new CorrelationId("missing"));
@@ -629,11 +613,16 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
                     new FileReadRequest { Path = "valid.txt" },
                     new CorrelationId("valid"));
 
-                (await input.Target.SendAsync(missing).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(valid).WaitAsync(Timeout)).ShouldBeTrue();
-
-                var failure = await results.ReceiveAsync().WaitAsync(Timeout);
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var failureReceive = ports.ReceiveAsync<FlowResult<FileReadContent>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, missing)).IsAccepted.ShouldBeTrue();
+                var failure = (await failureReceive).Message.ShouldNotBeNull();
+                var resultReceive = ports.ReceiveAsync<FlowResult<FileReadContent>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, valid)).IsAccepted.ShouldBeTrue();
+                var result = (await resultReceive).Message.ShouldNotBeNull();
 
                 failure.CorrelationId.ShouldBe(missing.CorrelationId);
                 failure.Payload.Error.ShouldNotBeNull().Code
@@ -641,9 +630,9 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
                 result.CorrelationId.ShouldBe(valid.CorrelationId);
                 result.Payload.Value.ShouldNotBeNull().Content.OriginalBytes.AsSpan().ToArray()
                     .ShouldBe(System.Text.Encoding.UTF8.GetBytes("ok"));
-                descriptor.Errors.ShouldBeNull();
+                await host.RevisionHost.StopApplicationAsync();
             },
-            node => node.Configure("baseDirectory", directory.Path),
+            Properties(("baseDirectory", directory.Path)),
             configureRegistry: registry => registry.RegisterFileRead());
     }
 
@@ -667,105 +656,169 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         object value,
         string expectedMessage)
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    nodeType,
-                    node =>
-                    {
-                        if (nodeType is FileSystemCompositionNodeTypes.DirectoryEnumerate or
-                            FileSystemCompositionNodeTypes.Watch)
-                        {
-                            node.Configure("directory", ".");
-                        }
+        var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [optionName] = value
+        };
+        if ((nodeType is FileSystemCompositionNodeTypes.DirectoryEnumerate or
+             FileSystemCompositionNodeTypes.Watch) &&
+            !properties.ContainsKey("directory"))
+        {
+            properties["directory"] = ".";
+        }
 
-                        node.Configure(optionName, value);
-                    }))
-                .Build())
-            .RegisterNodes(registry => registry
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(nodeType, properties),
+            registry => registry
                 .RegisterFileRead()
                 .RegisterFileWrite()
                 .RegisterDirectoryEnumerate()
-                .RegisterFileWatch())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+                .RegisterFileWatch());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, expectedMessage);
     }
 
     [Fact]
     public async Task Invalid_watch_notify_filter_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "watch",
-                    FileSystemCompositionNodeTypes.Watch,
-                    node => node
-                        .Configure("directory", ".")
-                        .Configure("notifyFilters", new[] { "DefinitelyNotAFilter" })))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFileWatch())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                FileSystemCompositionNodeTypes.Watch,
+                Properties(
+                    ("directory", "."),
+                    ("notifyFilters", new[] { "DefinitelyNotAFilter" }))),
+            registry => registry.RegisterFileWatch());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("notifyFilters", StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, "notifyFilters");
     }
 
     private static async Task WithTransformNodeAsync<TInput, TOutput>(
         string nodeType,
-        Func<
-            CompositionInputPort<TInput>,
-            CompositionOutputPort<TOutput>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null,
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?>? properties = null,
+        TimeProvider? clock = null,
         Action<CompositionNodeRegistry>? configureRegistry = null)
     {
-        var services = new ServiceCollection();
-        configureServices?.Invoke(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    nodeType,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registry => configureRegistry?.Invoke(registry))
-            .Configure(options => options.StartRuntimeWithHost = false);
+        var componentProperties = CopyProperties(properties);
+        IReadOnlyList<string>? resources = null;
+        if (clock is not null)
+        {
+            componentProperties[FileSystemCompositionResourceNames.Clock] = "Resources.fixed";
+            resources = ["fixed"];
+        }
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(nodeType, componentProperties, resources),
+            registry => configureRegistry?.Invoke(registry),
+            configureRuntimeServices: clock is null
+                ? null
+                : context => context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    clock));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[FileSystemCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<TInput>>();
-        var output = descriptor.Outputs[FileSystemCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<TOutput>>();
+        await run(host.GetRequiredPorts(), host);
+    }
 
-        await run(input, output, descriptor);
+    private static async ValueTask<CanonicalApplicationTestHost> StartSourceNodeAsync(
+        string nodeType,
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider clock,
+        MessageTracker<FlowValue> values,
+        MessageTracker<CompositionComponentEvent> events,
+        Action<CompositionNodeRegistry> configureRegistry)
+    {
+        var componentProperties = CopyProperties(properties);
+        componentProperties[FileSystemCompositionResourceNames.Clock] = "Resources.fixed";
+        componentProperties[FileSystemCompositionPortNames.Output] = "valueRecorder.Input";
+        componentProperties["Events"] = "eventRecorder.Input";
+
+        return await CanonicalApplicationTestHost.StartAsync(
+            SourceComponent(
+                nodeType,
+                componentProperties,
+                ["fixed"]),
+            registry =>
+            {
+                configureRegistry(registry);
+                RegisterRecorder(registry, ValueRecorderType, values);
+                RegisterRecorder(registry, EventRecorderType, events);
+            },
+            configureRuntimeServices: context =>
+                context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    clock));
+    }
+
+    private static ApplicationDefinition SourceComponent(
+        string nodeType,
+        IReadOnlyDictionary<string, object?> properties,
+        IReadOnlyList<string> resources)
+        => new(
+            resources.Select(name => KeyValuePair.Create<string, ResourceDefinition>(
+                name,
+                new ResourceInstanceDefinition("host.external"))),
+            [KeyValuePair.Create(
+                WorkflowName,
+                new FluxFlow.Composition.Model.WorkflowDefinition(
+                [
+                    KeyValuePair.Create(
+                        ComponentName,
+                        Component(nodeType, properties)),
+                    KeyValuePair.Create(
+                        "valueRecorder",
+                        new ComponentDefinition(ValueRecorderType)),
+                    KeyValuePair.Create(
+                        "eventRecorder",
+                        new ComponentDefinition(EventRecorderType))
+                ]))]);
+
+    private static ComponentDefinition Component(
+        string nodeType,
+        IReadOnlyDictionary<string, object?> properties)
+        => new(
+            nodeType,
+            properties.Select(property => KeyValuePair.Create(
+                property.Key,
+                JsonSerializer.SerializeToElement(property.Value))));
+
+    private static void RegisterRecorder<T>(
+        CompositionNodeRegistry registry,
+        string nodeType,
+        MessageTracker<T> tracker)
+        => registry.Register(
+            nodeType,
+            _ =>
+            {
+                var node = new MessageRecordingNode<T>(tracker);
+                return ValueTask.FromResult(ComposedNode.Create(
+                    node,
+                    inputs:
+                    [
+                        CompositionPorts.Input<T>("Input", node.Input)
+                    ]));
+            },
+            inputs: [CompositionPorts.Metadata<T>("Input")]);
+
+    private static Dictionary<string, object?> CopyProperties(
+        IReadOnlyDictionary<string, object?>? properties)
+        => properties?.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal) ?? new Dictionary<string, object?>(StringComparer.Ordinal);
+
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
+    {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static IReadOnlyDictionary<string, ComponentDesignMetadata> DesignMetadataByType()
@@ -900,51 +953,6 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
-    }
-
-    private static async Task<List<T>> DrainUntilCompletedAsync<T>(
-        BufferBlock<T> sink)
-    {
-        var items = new List<T>();
-        while (await sink.OutputAvailableAsync().WaitAsync(Timeout))
-        {
-            while (sink.TryReceive(out var item))
-            {
-                items.Add(item);
-            }
-        }
-
-        return items;
-    }
-
-    private static async Task<FlowMessage<T>> ReceiveMatchingAsync<T>(
-        BufferBlock<FlowMessage<T>> output,
-        Func<T, bool> predicate)
-    {
-        using var cancellation = new CancellationTokenSource(Timeout);
-        while (!cancellation.IsCancellationRequested)
-        {
-            var value = await output.ReceiveAsync(cancellation.Token);
-            if (predicate(value.Payload))
-            {
-                return value;
-            }
-        }
-
-        throw new TimeoutException("Timed out waiting for file watch event.");
-    }
-
     private static string TypeName(Type type)
     {
         if (!type.IsGenericType)
@@ -954,21 +962,59 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
         return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(TypeName))}>";
     }
 
-    private static async Task<FlowEvent> ReceiveEventAsync(
-        BufferBlock<FlowEvent> events,
-        string name)
+    private sealed class MessageRecordingNode<T>(MessageTracker<T> tracker)
+        : FlowNode<T, T>
     {
-        using var cancellation = new CancellationTokenSource(Timeout);
-        while (!cancellation.IsCancellationRequested)
+        protected override Task ProcessAsync(FlowMessage<T> message)
         {
-            var value = await events.ReceiveAsync(cancellation.Token);
-            if (value.Name == name)
+            tracker.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class MessageTracker<T>
+    {
+        private readonly object _gate = new();
+        private readonly List<FlowMessage<T>> _values = [];
+
+        public IReadOnlyList<FlowMessage<T>> Values
+        {
+            get
             {
-                return value;
+                lock (_gate)
+                    return _values.ToArray();
             }
         }
 
-        throw new TimeoutException($"Timed out waiting for event '{name}'.");
+        public void Add(FlowMessage<T> value)
+        {
+            lock (_gate)
+                _values.Add(value);
+        }
+
+        public async ValueTask<FlowMessage<T>> WaitForAsync(
+            Func<FlowMessage<T>, bool> predicate)
+        {
+            using var cancellation = new CancellationTokenSource(Timeout);
+            try
+            {
+                while (true)
+                {
+                    lock (_gate)
+                    {
+                        var value = _values.FirstOrDefault(predicate);
+                        if (value is not null)
+                            return value;
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(20), cancellation.Token);
+                }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                throw new TimeoutException("Timed out waiting for a recorded workflow message.");
+            }
+        }
     }
 
     private sealed class TempDirectory : IDisposable
