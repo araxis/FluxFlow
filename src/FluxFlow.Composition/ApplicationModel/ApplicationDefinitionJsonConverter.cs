@@ -5,10 +5,6 @@ namespace FluxFlow.Composition.Model;
 
 internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<ApplicationDefinition>
 {
-    private const string ResourcesProperty = "Resources";
-    private const string WorkflowsProperty = "Workflows";
-    private const string TypeProperty = "Type";
-
     public override ApplicationDefinition Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
@@ -37,9 +33,9 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
         ArgumentNullException.ThrowIfNull(value);
 
         writer.WriteStartObject();
-        writer.WritePropertyName(ResourcesProperty);
+        writer.WritePropertyName(CanonicalApplicationProperties.Resources);
         WriteResources(writer, value.Resources);
-        writer.WritePropertyName(WorkflowsProperty);
+        writer.WritePropertyName(CanonicalApplicationProperties.Workflows);
         WriteWorkflows(writer, value.Workflows);
         writer.WriteEndObject();
     }
@@ -60,28 +56,28 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
 
             switch (property.Name)
             {
-                case ResourcesProperty:
+                case CanonicalApplicationProperties.Resources:
                     resources = property.Value;
                     hasResources = true;
                     break;
-                case WorkflowsProperty:
+                case CanonicalApplicationProperties.Workflows:
                     workflows = property.Value;
                     hasWorkflows = true;
                     break;
                 default:
                     throw new JsonException(
-                        $"Application definition supports only '{ResourcesProperty}' and '{WorkflowsProperty}'; found '{property.Name}'.");
+                        $"Application definition supports only '{CanonicalApplicationProperties.Resources}' and '{CanonicalApplicationProperties.Workflows}'; found '{property.Name}'.");
             }
         }
 
         if (!hasResources || !hasWorkflows)
         {
             throw new JsonException(
-                $"Application definition requires exactly '{ResourcesProperty}' and '{WorkflowsProperty}'.");
+                $"Application definition requires exactly '{CanonicalApplicationProperties.Resources}' and '{CanonicalApplicationProperties.Workflows}'.");
         }
 
         return new ApplicationDefinition(
-            ReadResourceMap(resources, ResourcesProperty),
+            ReadResourceMap(resources, CanonicalApplicationProperties.Resources),
             ReadWorkflowMap(workflows));
     }
 
@@ -112,7 +108,7 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
         EnsureUniqueProperties(properties, $"Resource '{path}'");
 
         var typeProperties = properties
-            .Where(property => string.Equals(property.Name, TypeProperty, StringComparison.Ordinal))
+            .Where(property => string.Equals(property.Name, CanonicalApplicationProperties.Type, StringComparison.Ordinal))
             .ToArray();
         if (typeProperties.Length == 0)
             return new ResourceGroupDefinition(ReadResourceMap(element, path));
@@ -121,7 +117,7 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
         return new ResourceInstanceDefinition(
             type,
             properties
-                .Where(property => !string.Equals(property.Name, TypeProperty, StringComparison.Ordinal))
+                .Where(property => !string.Equals(property.Name, CanonicalApplicationProperties.Type, StringComparison.Ordinal))
                 .Select(property => new KeyValuePair<string, JsonElement>(
                     property.Name,
                     property.Value)));
@@ -130,7 +126,7 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
     private static IReadOnlyList<KeyValuePair<string, WorkflowDefinition>> ReadWorkflowMap(
         JsonElement element)
     {
-        RequireObject(element, WorkflowsProperty);
+        RequireObject(element, CanonicalApplicationProperties.Workflows);
         var workflows = new List<KeyValuePair<string, WorkflowDefinition>>();
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var workflow in element.EnumerateObject())
@@ -178,14 +174,14 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
         EnsureUniqueProperties(properties, subject);
 
         var typeProperty = properties.SingleOrDefault(
-            property => string.Equals(property.Name, TypeProperty, StringComparison.Ordinal));
+            property => string.Equals(property.Name, CanonicalApplicationProperties.Type, StringComparison.Ordinal));
         if (typeProperty.Name is null)
-            throw new JsonException($"{subject} requires a string '{TypeProperty}' property.");
+            throw new JsonException($"{subject} requires a string '{CanonicalApplicationProperties.Type}' property.");
 
         return new ComponentDefinition(
             ReadRequiredString(typeProperty.Value, $"{subject} Type"),
             properties
-                .Where(property => !string.Equals(property.Name, TypeProperty, StringComparison.Ordinal))
+                .Where(property => !string.Equals(property.Name, CanonicalApplicationProperties.Type, StringComparison.Ordinal))
                 .Select(property => new KeyValuePair<string, JsonElement>(
                     property.Name,
                     property.Value)));
@@ -248,7 +244,7 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
                 }
                 break;
             case ResourceInstanceDefinition instance:
-                writer.WriteString(TypeProperty, instance.Type);
+                writer.WriteString(CanonicalApplicationProperties.Type, instance.Type);
                 WriteProperties(writer, instance.Properties);
                 break;
             default:
@@ -274,7 +270,7 @@ internal sealed class ApplicationDefinitionJsonConverter : JsonConverter<Applica
             {
                 writer.WritePropertyName(componentName);
                 writer.WriteStartObject();
-                writer.WriteString(TypeProperty, component.Type);
+                writer.WriteString(CanonicalApplicationProperties.Type, component.Type);
                 WriteProperties(writer, component.Properties);
                 writer.WriteEndObject();
             }

@@ -141,6 +141,19 @@ public sealed class ApplicationDefinitionJsonTests
     }
 
     [Fact]
+    public void Omitted_component_defaults_remain_omitted_after_round_trip()
+    {
+        const string json =
+            "{\"Resources\":{},\"Workflows\":{\"Main\":{\"Worker\":{\"Type\":\"sample.worker\"}}}}";
+
+        var definition = ApplicationDefinitionJson.Deserialize(json);
+        var component = definition.Workflows["Main"].Components["Worker"];
+
+        component.Properties.ShouldBeEmpty();
+        ApplicationDefinitionJson.Serialize(definition).ShouldBe(json);
+    }
+
+    [Fact]
     public void PublicConstructorsRejectDuplicateAndReservedNames()
     {
         Should.Throw<ArgumentException>(() => new ApplicationDefinition(
@@ -158,5 +171,8 @@ public sealed class ApplicationDefinitionJsonTests
         Should.Throw<ArgumentException>(() => new ComponentDefinition(
             "sample",
             [new("Configuration", document.RootElement)]));
+        Should.Throw<ArgumentException>(() => new ComponentDefinition(
+            "sample",
+            [new("configuration", document.RootElement)]));
     }
 }

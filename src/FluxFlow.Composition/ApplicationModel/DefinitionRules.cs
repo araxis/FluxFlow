@@ -36,7 +36,7 @@ internal static class DefinitionRules
     public static string RequireWorkflowName(string? value, string parameterName)
     {
         var name = RequireSegment(value, parameterName, "Workflow name");
-        if (string.Equals(name, "Resources", StringComparison.Ordinal) ||
+        if (string.Equals(name, CanonicalApplicationProperties.Resources, StringComparison.Ordinal) ||
             string.Equals(name, "System", StringComparison.Ordinal))
         {
             throw new ArgumentException(
@@ -50,7 +50,7 @@ internal static class DefinitionRules
     public static string RequireResourceName(string? value, string parameterName)
     {
         var name = RequireSegment(value, parameterName, "Resource name");
-        if (string.Equals(name, "Type", StringComparison.Ordinal))
+        if (string.Equals(name, CanonicalApplicationProperties.Type, StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "Resource name 'Type' is reserved as the resource-instance discriminator.",
@@ -94,11 +94,9 @@ internal static class DefinitionRules
         foreach (var (rawName, value) in source)
         {
             var name = RequireSegment(rawName, collectionName, "Property name");
-            if (string.Equals(name, "Type", StringComparison.Ordinal))
+            if (string.Equals(name, CanonicalApplicationProperties.Type, StringComparison.Ordinal))
                 throw new ArgumentException("Property name 'Type' is reserved.", collectionName);
-            if (rejectLegacyComponentWrappers &&
-                (string.Equals(name, "Configuration", StringComparison.OrdinalIgnoreCase) ||
-                 string.Equals(name, "Resources", StringComparison.OrdinalIgnoreCase)))
+            if (rejectLegacyComponentWrappers && CanonicalApplicationProperties.IsLegacyComponentWrapper(name))
             {
                 throw new ArgumentException(
                     $"Component property '{name}' is a legacy wrapper; component settings must be flat.",

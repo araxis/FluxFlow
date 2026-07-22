@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Composition.Links;
 
@@ -23,6 +24,18 @@ internal static class ApplicationLinkDeclarationParser
         }
 
         return new ApplicationLinkDeclarationParseResult(declarations, errors);
+    }
+
+    internal static JsonElement Serialize(IReadOnlyList<ParsedApplicationLinkDeclaration> declarations)
+    {
+        ArgumentNullException.ThrowIfNull(declarations);
+        if (declarations.Count == 0)
+            throw new ArgumentException("At least one link declaration is required.", nameof(declarations));
+
+        var values = declarations.Select(SerializeOne).ToArray();
+        return values.Length == 1
+            ? values[0]
+            : JsonSerializer.SerializeToElement(values);
     }
 
     private static void ParseOne(
@@ -59,17 +72,17 @@ internal static class ApplicationLinkDeclarationParser
         {
             switch (property.Name)
             {
-                case "Port" when property.Value.ValueKind == JsonValueKind.String:
+                case CanonicalApplicationProperties.LinkPort when property.Value.ValueKind == JsonValueKind.String:
                     port = property.Value.GetString();
                     break;
-                case "Condition" when property.Value.ValueKind == JsonValueKind.String:
+                case CanonicalApplicationProperties.LinkCondition when property.Value.ValueKind == JsonValueKind.String:
                     condition = property.Value.GetString();
                     break;
-                case "Port":
+                case CanonicalApplicationProperties.LinkPort:
                     errors.Add(new(location, "'Port' must be a string"));
                     valid = false;
                     break;
-                case "Condition":
+                case CanonicalApplicationProperties.LinkCondition:
                     errors.Add(new(location, "'Condition' must be a string"));
                     valid = false;
                     break;
@@ -97,6 +110,15 @@ internal static class ApplicationLinkDeclarationParser
         if (valid)
             declarations.Add(new ParsedApplicationLinkDeclaration(port!, condition));
     }
+
+    private static JsonElement SerializeOne(ParsedApplicationLinkDeclaration declaration)
+        => declaration.Condition is null
+            ? JsonSerializer.SerializeToElement(declaration.Port)
+            : JsonSerializer.SerializeToElement(new LinkObject(
+                declaration.Port,
+                declaration.Condition));
+
+    private sealed record LinkObject(string Port, string Condition);
 }
 
 internal sealed record ApplicationLinkDeclarationParseResult(

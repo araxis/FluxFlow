@@ -247,6 +247,40 @@ public sealed class DesignerApplicationPersistenceTests
     }
 
     [Fact]
+    public void Partially_valid_link_array_remains_raw_for_lossless_round_trip()
+    {
+        var persistence = CreatePersistence();
+        var loaded = persistence.Load("""
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Producer": { "Type": "test.source" },
+                  "Consumer": {
+                    "Type": "test.sink",
+                    "Input": [
+                      "Producer.Output",
+                      { "port": "Producer.Output" }
+                    ]
+                  }
+                }
+              }
+            }
+            """);
+
+        loaded.IsValid.ShouldBeFalse();
+        loaded.Document.Links.ShouldBeEmpty();
+        var raw = loaded.Document.Workflows["Main"].Components["Consumer"].Properties["Input"];
+        raw.GetArrayLength().ShouldBe(2);
+        raw[0].GetString().ShouldBe("Producer.Output");
+        raw[1].GetProperty("port").GetString().ShouldBe("Producer.Output");
+
+        var roundTripped = persistence.ToDefinition(loaded.Document)
+            .Workflows["Main"].Components["Consumer"].Properties["Input"];
+        roundTripped.GetRawText().ShouldBe(raw.GetRawText());
+    }
+
+    [Fact]
     public void Mixed_link_array_and_conditions_serialize_in_canonical_port_form()
     {
         var persistence = CreatePersistence();

@@ -48,13 +48,13 @@ public sealed class ApplicationDefinitionConfigurationLoader
         if (node is not JsonObject root)
             return;
 
-        RestoreEmptyObject(root, "Resources");
-        RestoreEmptyObject(root, "Workflows");
+        RestoreEmptyObject(root, CanonicalApplicationProperties.Resources);
+        RestoreEmptyObject(root, CanonicalApplicationProperties.Workflows);
 
-        if (root["Resources"] is JsonObject resources)
+        if (root[CanonicalApplicationProperties.Resources] is JsonObject resources)
             RestoreEmptyResourceGroups(resources);
 
-        if (root["Workflows"] is JsonObject workflows)
+        if (root[CanonicalApplicationProperties.Workflows] is JsonObject workflows)
         {
             foreach (var workflowName in workflows.Select(item => item.Key).ToArray())
                 RestoreEmptyObject(workflows, workflowName);
@@ -73,7 +73,7 @@ public sealed class ApplicationDefinitionConfigurationLoader
         {
             RestoreEmptyObject(resources, resourceName);
             if (resources[resourceName] is JsonObject resource &&
-                !resource.ContainsKey("Type"))
+                !resource.ContainsKey(CanonicalApplicationProperties.Type))
             {
                 RestoreEmptyResourceGroups(resource);
             }

@@ -66,12 +66,17 @@ public sealed class CompositionNodeFactoryContext
     public T BindConfiguration<T>()
     {
         var properties = new Dictionary<string, JsonElement>(Component.Properties, StringComparer.Ordinal);
-        RemoveProperty(properties, "Processing");
+        CanonicalApplicationProperties.RemoveIgnoreCase(
+            properties,
+            CanonicalApplicationProperties.Processing);
         if (_legacyDefinition is null &&
-            !properties.Keys.Any(static name =>
-                string.Equals(name, "Name", StringComparison.OrdinalIgnoreCase)))
+            !CanonicalApplicationProperties.ContainsIgnoreCase(
+                properties,
+                CanonicalApplicationProperties.Name))
         {
-            properties.Add("Name", JsonSerializer.SerializeToElement(ComponentName, _serializerOptions));
+            properties.Add(
+                CanonicalApplicationProperties.Name,
+                JsonSerializer.SerializeToElement(ComponentName, _serializerOptions));
         }
         if (_processingSettings is not null)
         {
@@ -157,17 +162,19 @@ public sealed class CompositionNodeFactoryContext
 
     internal void ConfigureProcessing(CompositionProcessingCapabilities capabilities)
     {
-        var processing = FindProperty(Component.Properties, "Processing");
-        if (processing is null)
+        if (!CanonicalApplicationProperties.TryGetIgnoreCase(
+                Component.Properties,
+                CanonicalApplicationProperties.Processing,
+                out var processing))
             return;
-        if (processing.Value.ValueKind != JsonValueKind.String ||
-            string.IsNullOrWhiteSpace(processing.Value.GetString()))
+        if (processing.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(processing.GetString()))
         {
             throw new InvalidOperationException(
                 $"Component '{WorkflowName}.{ComponentName}' processing profile reference must be a non-empty string.");
         }
 
-        var key = processing.Value.GetString()!.Trim();
+        var key = processing.GetString()!.Trim();
         var profile = Services.GetKeyedService<CompositionProcessingProfile>(key)
             ?? throw new InvalidOperationException(
                 $"Component '{WorkflowName}.{ComponentName}' processing profile '{key}' is not registered.");
@@ -206,27 +213,6 @@ public sealed class CompositionNodeFactoryContext
             return;
 
         properties.Add(name, JsonSerializer.SerializeToElement(value, _serializerOptions));
-    }
-
-    private static void RemoveProperty(IDictionary<string, JsonElement> properties, string name)
-    {
-        var key = properties.Keys.FirstOrDefault(key =>
-            string.Equals(key, name, StringComparison.OrdinalIgnoreCase));
-        if (key is not null)
-            properties.Remove(key);
-    }
-
-    private static JsonElement? FindProperty(
-        IReadOnlyDictionary<string, JsonElement> properties,
-        string name)
-    {
-        foreach (var (key, value) in properties)
-        {
-            if (string.Equals(key, name, StringComparison.OrdinalIgnoreCase))
-                return value;
-        }
-
-        return null;
     }
 
     private static NodeDefinition ToNodeDefinition(ComponentDefinition definition)

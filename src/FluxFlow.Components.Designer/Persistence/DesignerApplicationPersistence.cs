@@ -270,12 +270,15 @@ public sealed class DesignerApplicationPersistence
         out IReadOnlyList<DesignerApplicationLink> links)
     {
         links = [];
-        if (!TryParseDeclarations(value, out var declarations) || declarations.Count == 0)
+        var parsed = ApplicationLinkDeclarationParser.Parse(
+            value,
+            $"Workflows.{workflowName}.{componentName}.{propertyName}");
+        if (parsed.Errors.Count > 0 || parsed.Declarations.Count == 0)
             return false;
 
         var declaredPort = ApplicationAddress.WorkflowPort(workflowName, componentName, propertyName);
-        var result = new List<DesignerApplicationLink>(declarations.Count);
-        foreach (var declaration in declarations)
+        var result = new List<DesignerApplicationLink>(parsed.Declarations.Count);
+        foreach (var declaration in parsed.Declarations)
         {
             if (!ApplicationAddress.TryResolvePort(declaration.Port, workflowName, out var reference))
                 return false;
@@ -398,77 +401,6 @@ public sealed class DesignerApplicationPersistence
             StringComparer.Ordinal));
     }
 
-    private static bool TryParseDeclarations(
-        JsonElement value,
-        out IReadOnlyList<ParsedLinkDeclaration> declarations)
-    {
-        var result = new List<ParsedLinkDeclaration>();
-        if (value.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in value.EnumerateArray())
-            {
-                if (!TryParseOne(item, out var declaration))
-                {
-                    declarations = [];
-                    return false;
-                }
-
-                result.Add(declaration);
-            }
-        }
-        else
-        {
-            if (!TryParseOne(value, out var declaration))
-            {
-                declarations = [];
-                return false;
-            }
-
-            result.Add(declaration);
-        }
-
-        declarations = result;
-        return true;
-    }
-
-    private static bool TryParseOne(JsonElement value, out ParsedLinkDeclaration declaration)
-    {
-        declaration = default;
-        if (value.ValueKind == JsonValueKind.String)
-        {
-            var port = value.GetString();
-            if (string.IsNullOrWhiteSpace(port))
-                return false;
-
-            declaration = new ParsedLinkDeclaration(port, null);
-            return true;
-        }
-
-        if (value.ValueKind != JsonValueKind.Object)
-            return false;
-
-        string? objectPort = null;
-        string? condition = null;
-        foreach (var property in value.EnumerateObject())
-        {
-            if (property.Name == "Port" && property.Value.ValueKind == JsonValueKind.String)
-                objectPort = property.Value.GetString();
-            else if (property.Name == "Condition" && property.Value.ValueKind == JsonValueKind.String)
-                condition = property.Value.GetString();
-            else
-                return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(objectPort) ||
-            condition is not null && string.IsNullOrWhiteSpace(condition))
-        {
-            return false;
-        }
-
-        declaration = new ParsedLinkDeclaration(objectPort, condition);
-        return true;
-    }
-
     private static string ToPortReference(ApplicationAddress address, string currentWorkflow)
     {
         if (address.Kind == ApplicationAddressKind.WorkflowPort &&
@@ -481,23 +413,13 @@ public sealed class DesignerApplicationPersistence
     }
 
     private static JsonElement SerializeDeclarations(IReadOnlyList<SerializedLinkDeclaration> values)
-    {
-        if (values.Count == 1)
-            return SerializeDeclaration(values[0]);
-
-        return JsonSerializer.SerializeToElement(values.Select(SerializeDeclaration).ToArray());
-    }
-
-    private static JsonElement SerializeDeclaration(SerializedLinkDeclaration value)
-        => value.Condition is null
-            ? JsonSerializer.SerializeToElement(value.Port)
-            : JsonSerializer.SerializeToElement(new LinkObject(value.Port, value.Condition));
-
-    private readonly record struct ParsedLinkDeclaration(string Port, string? Condition);
+        => ApplicationLinkDeclarationParser.Serialize(values
+            .Select(static value => new ParsedApplicationLinkDeclaration(
+                value.Port,
+                value.Condition))
+            .ToArray());
 
     private readonly record struct SerializedLinkDeclaration(string Port, string? Condition);
-
-    private readonly record struct LinkObject(string Port, string Condition);
 
     private readonly record struct ComponentKey(string Workflow, string Component)
     {
