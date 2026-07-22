@@ -18,7 +18,7 @@ public sealed class DocumentationBoundaryTests
         defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
             .ShouldBeFalse("definition docs must not lead with the legacy runtime definition model.");
 
-        var legacyRuntimeSectionIndex = text.IndexOf("## Legacy Runtime Definition", StringComparison.Ordinal);
+        var legacyRuntimeSectionIndex = text.IndexOf("## Obsolete Runtime Definition", StringComparison.Ordinal);
         legacyRuntimeSectionIndex.ShouldBeGreaterThanOrEqualTo(
             0,
             "definition docs should keep the current executable DTO in an explicitly legacy section.");
@@ -106,85 +106,70 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Workspace_docs_keep_composition_projection_as_the_default_path()
+    public void Workspace_docs_keep_canonical_application_projection_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "06-workspace-projection.md");
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_400)];
 
-        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
-            .ShouldBeTrue("workspace docs should lead with composition projection.");
-        defaultSection.Contains("ToCompositionDefinition", StringComparison.Ordinal)
-            .ShouldBeTrue("workspace docs should show composition projection before optional engine APIs.");
         defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
-            .ShouldBeFalse("workspace docs must not lead with optional engine projection.");
-
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Projection", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "workspace docs should keep engine projection in an explicitly optional section.");
-
-        var engineDefinitionIndex = text.IndexOf("ApplicationDefinition", StringComparison.Ordinal);
-        engineDefinitionIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "ApplicationDefinition should only appear after the optional engine projection heading.");
+            .ShouldBeTrue("workspace docs should lead with canonical application projection.");
+        defaultSection.Contains("ToApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("workspace docs should show the canonical projection boundary.");
+        defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
+            .ShouldBeFalse("workspace docs must not lead with obsolete composition projection.");
+        text.IndexOf("CompositionDefinition", StringComparison.Ordinal).ShouldBeGreaterThan(
+            text.IndexOf("## Activation", StringComparison.Ordinal),
+            "obsolete composition projection should only appear after canonical activation guidance.");
     }
 
     [Fact]
-    public void Validation_docs_keep_composition_validation_as_the_default_path()
+    public void Validation_docs_keep_canonical_revision_validation_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "07-validation-and-errors.md");
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_400)];
 
+        defaultSection.Contains("ApplicationDefinitionNormalizer", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should include canonical alias normalization.");
+        defaultSection.Contains("ApplicationLinkCompiler", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should include canonical link compilation.");
+        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should include canonical revision activation.");
         defaultSection.Contains("CompositionValidator", StringComparison.Ordinal)
-            .ShouldBeTrue("validation docs should lead with composition validation.");
+            .ShouldBeFalse("validation docs must not lead with obsolete composition validation.");
         defaultSection.Contains("CompositionRuntimeBuilder", StringComparison.Ordinal)
-            .ShouldBeTrue("validation docs should show the composition build API before optional engine APIs.");
-        defaultSection.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
-            .ShouldBeFalse("validation docs must not lead with the optional engine build API.");
-        defaultSection.Contains("FlowApplicationHost", StringComparison.Ordinal)
-            .ShouldBeFalse("validation docs must not lead with the optional engine host.");
-
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine Errors", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
-            0,
-            "validation docs should keep engine errors in an explicitly optional section.");
-
-        var engineBuilderIndex = text.IndexOf("ApplicationRuntimeBuilder", StringComparison.Ordinal);
-        engineBuilderIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "ApplicationRuntimeBuilder should only appear after the optional engine errors heading.");
+            .ShouldBeFalse("validation docs must not lead with obsolete runtime construction.");
+        text.Contains("There is no new universal `Errors` port.", StringComparison.Ordinal)
+            .ShouldBeTrue("validation docs should preserve normal-result failure semantics.");
     }
 
     [Fact]
-    public void Runtime_docs_keep_composition_lifecycle_as_the_default_path()
+    public void Runtime_docs_keep_canonical_revision_lifecycle_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "08-runtime-states.md");
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 1_600)];
 
+        defaultSection.Contains("IApplicationRevisionHost", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should lead with canonical revision lifecycle.");
+        defaultSection.Contains("IApplicationRuntimeAccess", StringComparison.Ordinal)
+            .ShouldBeTrue("runtime docs should lead with canonical stable port access.");
         defaultSection.Contains("CompositionRuntime", StringComparison.Ordinal)
-            .ShouldBeTrue("runtime docs should lead with composition runtime lifecycle.");
+            .ShouldBeFalse("runtime docs must not lead with the obsolete composition runtime.");
         defaultSection.Contains("ICompositionRuntimeHost", StringComparison.Ordinal)
-            .ShouldBeTrue("runtime docs should show composition hosting before optional engine state APIs.");
-        defaultSection.Contains("FlowApplicationHostState", StringComparison.Ordinal)
-            .ShouldBeFalse("runtime docs must not lead with optional engine host states.");
-        defaultSection.Contains("ApplicationState", StringComparison.Ordinal)
-            .ShouldBeFalse("runtime docs must not lead with optional engine runtime states.");
+            .ShouldBeFalse("runtime docs must not lead with obsolete composition hosting.");
 
-        var optionalEngineSectionIndex = text.IndexOf("## Optional Engine States", StringComparison.Ordinal);
-        optionalEngineSectionIndex.ShouldBeGreaterThanOrEqualTo(
+        var compatibilityIndex = text.IndexOf("## Obsolete Compatibility Runtime", StringComparison.Ordinal);
+        compatibilityIndex.ShouldBeGreaterThanOrEqualTo(
             0,
-            "runtime docs should keep engine states in an explicitly optional section.");
-
-        var engineStateIndex = text.IndexOf("FlowApplicationHostState", StringComparison.Ordinal);
-        engineStateIndex.ShouldBeGreaterThan(
-            optionalEngineSectionIndex,
-            "FlowApplicationHostState should only appear after the optional engine states heading.");
+            "runtime docs should isolate obsolete runtime APIs in a compatibility section.");
+        text.IndexOf("CompositionRuntime", StringComparison.Ordinal).ShouldBeGreaterThan(
+            compatibilityIndex,
+            "CompositionRuntime should only appear after the compatibility heading.");
     }
 
     [Fact]
@@ -242,21 +227,24 @@ public sealed class DocumentationBoundaryTests
     }
 
     [Fact]
-    public void Component_composition_docs_keep_standalone_composition_as_the_default_path()
+    public void Component_composition_docs_keep_canonical_application_composition_as_the_default_path()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
         var document = Path.Combine(root, "docs", "12-component-composition.md");
         var text = File.ReadAllText(document);
         var defaultSection = text[..Math.Min(text.Length, 2_000)];
 
-        defaultSection.Contains("direct standalone-node composition", StringComparison.Ordinal)
-            .ShouldBeTrue("component composition docs should lead with standalone-node composition.");
+        defaultSection.Contains("ApplicationDefinition", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should lead with canonical applications.");
         defaultSection.Contains("CompositionDefinition", StringComparison.Ordinal)
-            .ShouldBeTrue("component composition docs should keep host workspace projection composition-first.");
-        defaultSection.Contains("host-owned resources", StringComparison.Ordinal)
+            .ShouldBeFalse("component composition docs must not lead with obsolete definitions.");
+        defaultSection.Contains("Hosts own resources", StringComparison.Ordinal)
             .ShouldBeTrue("component composition docs should keep adapter resources host-owned.");
-        text.Contains("ApplicationDefinition", StringComparison.Ordinal)
-            .ShouldBeFalse("component composition docs should not recommend engine definitions as the component default.");
+        text.Contains("Workflow.Component.Events", StringComparison.Ordinal)
+            .ShouldBeTrue("component composition docs should document addressable component events.");
+        text.IndexOf("CompositionDefinition", StringComparison.Ordinal).ShouldBeGreaterThan(
+            text.IndexOf("## Legacy Boundary", StringComparison.Ordinal),
+            "obsolete composition types should only appear in the legacy boundary.");
         text.Contains("IFlowNodeModule", StringComparison.Ordinal)
             .ShouldBeFalse("component composition docs should not imply engine modules are required for component packages.");
     }

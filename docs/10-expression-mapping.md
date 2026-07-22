@@ -118,8 +118,7 @@ Example canonical application document:
         "expression": "input",
         "expressionName": "normalize-order",
         "inputType": "order.input",
-        "outputType": "order.normalized",
-        "boundedCapacity": 128
+        "outputType": "order.normalized"
       }
     }
   }
@@ -168,6 +167,9 @@ forms.
 `IFlowPredicate<TInput>` for component authors. Composition links may carry
 compile-once conditions, but they never reshape payloads or insert mapper nodes.
 Use an explicit mapper component whenever a payload shape changes.
+For delivery-only decisions, declare a condition directly on the target input
+or source output instead of introducing `flow.filter`, `flow.when`,
+`flow.switch`, `flow.fork`, or `flow.merge`.
 
 ## Direct Mapper Contract
 
@@ -198,7 +200,7 @@ mapper node whenever the value shape changes.
 | Symptom | Check |
 |---------|-------|
 | activation reports missing `engine` | Register the exact referenced address as a keyed `IFlowExpressionEngine`; address matching is ordinal and case-sensitive. |
-| mapper activation fails | Ensure `expression` is present and `boundedCapacity` is greater than zero. |
+| mapper activation fails | Ensure `expression` is present and required expression resources resolve. |
 | result has `IsError == true` | Inspect `Error.Code`, `Error.Details`, and the preserved original `Value`. |
 | expression cannot see data | Use `input` or `value`, or provide a keyed `contextFactory`. |
 | typed output is incompatible | Verify the expression returns the closed `TOutput` selected by the typed registration. |

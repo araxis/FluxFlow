@@ -43,8 +43,10 @@ are nouns because they describe reusable configuration or host-owned state:
 ```
 
 `Type` selects the component or resource factory. `Expression`, `Client`, and
-`Input` configure that selected instance. Processing limits, ordering, retry,
-and lifetime settings are configuration properties, not alternate type names.
+`Input` configure that selected instance. Retry and lifetime settings are
+configuration properties, not alternate type names. Canonical processing policy
+uses an optional `processing.profile` resource rather than Dataflow-specific
+component properties.
 
 ## Canonical Component Types
 
@@ -108,5 +110,18 @@ enumeration returns only the canonical entry.
 | `mqtt.trigger` | `mqtt.receive` |
 | `resilience.retry` | `retry.policy` resource |
 
-Aliases are input compatibility only. New definitions, newly created Designer
-components, examples, and documentation should use canonical names.
+Aliases are input compatibility only. `ApplicationDefinitionNormalizer`
+rewrites them after load and returns structured migration diagnostics. New
+definitions, Designer saves, examples, and documentation use canonical names;
+alias-only revisions compare as unchanged.
+
+## Processing Resource Type
+
+| Type | Meaning |
+|------|---------|
+| `processing.profile` | Reusable semantic `Mode`, `Order`, and `Buffer` policy mapped by the host. |
+
+Components reference a profile through one flat `Processing` property. Defaults
+require no profile. `BoundedCapacity`, `MaxDegreeOfParallelism`, and
+`EnsureOrdered` remain direct C# compatibility options rather than normal
+canonical JSON or primary Designer fields.

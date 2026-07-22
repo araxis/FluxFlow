@@ -133,9 +133,10 @@ scan, merge, mutate, or fall back to another provider.
 Engine-backed candidates connect lifecycle and revision events to
 `System.Events.Output` and best-effort activity to
 `System.Diagnostics.Output`. Both are ordinary stable output addresses and can
-be observed directly or linked into workflows. Component packages remain free
-of an Engine dependency and may expose explicit domain event outputs when
-workflow logic needs those events.
+be observed directly or linked into workflows. Every canonical component also
+exposes `Workflow.Component.Events` with traced
+`CompositionComponentEvent` data. Component events are not copied into
+`System.Events.Output`, so hosts may observe both without duplicates.
 
 ## Legacy Composition Host
 

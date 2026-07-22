@@ -94,6 +94,9 @@ Main types:
 - `FluxFlow.Composition.Model.ResourceGroupDefinition`
 - `FluxFlow.Composition.Model.ResourceInstanceDefinition`
 - `FluxFlow.Composition.Model.ApplicationDefinitionJson`
+- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizer`
+- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizationResult`
+- `FluxFlow.Composition.Model.ApplicationDefinitionNormalizationDiagnostic`
 - `FluxFlow.Composition.Addressing.ApplicationAddress`
 - `FluxFlow.Composition.Addressing.ApplicationAddressKind`
 - `FluxFlow.Composition.Links.ApplicationLinkCompiler`
@@ -106,8 +109,20 @@ Main types:
 - `FluxFlow.Composition.Revisions.ApplicationRevisionEvent`
 - `FluxFlow.Composition.Revisions.IApplicationRevisionEventSink`
 - `ApplicationDefinitionConfigurationLoader`
+- `CompositionComponentTypeDescriptor`
+- `CompositionComponentEvent`
+- `CompositionComponentEvents`
+- `CompositionProcessingProfile`
+- `CompositionProcessingMode`
+- `CompositionProcessingOrder`
+- `CompositionProcessingBuffer`
+- `CompositionProcessingCapabilities`
+- `CompositionProcessingSettings`
+- `ICompositionProcessingProfileMapper`
+- `DefaultCompositionProcessingProfileMapper`
+- `CompositionProcessingResourceTypes`
 
-The vNext canonical document is immutable and has exactly two case-sensitive
+The canonical document is immutable and has exactly two case-sensitive
 root objects: `Resources` and `Workflows`. Resource groups form nested address
 namespaces and resource leaves require `Type`; workflows directly contain flat
 component objects that also require `Type`. `ApplicationAddress` represents
@@ -115,6 +130,9 @@ resource paths, absolute workflow components and ports, local port resolution,
 and the reserved system event/diagnostic outputs with ordinal equality.
 `Workflow.Component` is the canonical component key;
 `ResolvePort("Component.Port", workflow)` remains the local-port resolver.
+`ApplicationDefinitionNormalizer` resolves registered component aliases and
+known resource aliases with structured diagnostics before validation,
+revision comparison, Designer projection, or activation.
 
 `ApplicationLinkCompiler` reads links from registered input or output port
 properties, normalizes absolute source/target addresses, compiles expression
@@ -129,8 +147,15 @@ resource/workflow changes and transitive resource dependents, and rejects
 missing resource references or dependency cycles. Shared revision events are
 normal transport records; hosts provide the event sink and activation policy.
 
-The following types remain the current executable composition compatibility
-surface while runtime binding migrates to the canonical model:
+Every `CompositionNodeRegistration` reserves an addressable `Events` output
+carrying traced `CompositionComponentEvent` values. Normal results and expected
+failures remain on `Output`, normally as `FlowResult<T>`; unrecoverable faults
+remain on `Completion`. `CompositionProcessingProfile` provides optional
+semantic mode/order/buffer policy, and the DI mapper translates it to technical
+settings only for registrations that declare matching capabilities.
+
+The following obsolete types remain the executable composition compatibility
+surface until the next major cleanup:
 
 - `CompositionDefinition`
 - `WorkflowDefinition`
@@ -153,8 +178,8 @@ surface while runtime binding migrates to the canonical model:
 - `ICompositionDefinitionSource`
 - `ICompositionReloadPlanner`
 
-Use the compatibility types when the host wants direct standalone-node composition from
-fluent C# or `IConfiguration` JSON without depending on the engine. Definition
+Use the compatibility types only for existing direct standalone-node
+composition from fluent C# or legacy `IConfiguration` JSON. Definition
 DTO collection properties copy assigned dictionaries and lists with ordinal key
 comparison so caller-owned collections cannot mutate a built definition.
 Workflow, node, configuration, and resource dictionary keys are trimmed when
@@ -217,6 +242,9 @@ registered explicitly. Source-load failures are stable degraded results rather
 than .NET host failures, while cancellation remains cancellation. This layer
 does not depend on Engine; the host-supplied candidate factory owns concrete
 runtime preparation.
+When the standard assembler contributes a registry, definitions are normalized
+before planning. Update results expose migration diagnostics, and alias-only
+updates are unchanged revisions.
 
 `AddFluxFlowComposition(...)` and `ICompositionRuntimeHost` preserve the older
 standalone `CompositionDefinition` host for existing consumers. Resource
@@ -1237,11 +1265,15 @@ declared kind, and min/max constraints are limited to number and duration
 options.
 `ComponentDesignMetadataCatalog` validates and snapshots registered metadata so
 caller-owned option, resource, port, choice, and typed attribute collections
-cannot mutate catalog contents after registration.
+cannot mutate catalog contents after registration. Canonical catalog projection
+adds the traced `Events` output and optional semantic `processing` profile
+resource, while omitting legacy `name` and Dataflow-specific options from normal
+editing.
 `ComponentDesignMetadataBuilder` is an authoring helper over the same contracts;
 it supports single and bulk component-level attributes through `AddAttribute`
-and `AddAttributes`, builds through the validated module path, and does not own
-rendering, localization, resource selection, or runtime mapping.
+and `AddAttributes`, validates and snapshots raw provider metadata, and does not
+own rendering, localization, resource selection, or runtime mapping. Canonical
+host projection occurs only when metadata is added to a catalog.
 `OptionDesignMetadataAttributes` provides shared option attribute helpers so
 package metadata can declare section, importance, editor, syntax, and
 related-resource hints without owning host rendering or editor behavior.
@@ -1254,6 +1286,9 @@ attributes from one metadata item or a catalog and returns ordered
 `ComponentResourcePickerHint` values for host resource-picker integrations. It
 does not render controls, enumerate resource instances, resolve keyed services,
 or own resource lifetimes.
+`DesignerApplicationPersistence` normalizes registered component and resource
+aliases on load and save. Load results include structured migration diagnostics;
+serialization emits canonical names.
 `ComponentDesignMetadataServiceCollectionExtensions` registers package-owned
 metadata providers and a singleton validated catalog in host DI, while leaving
 palette rendering, localization, and resource pickers owned by the host.

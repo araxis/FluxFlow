@@ -20,6 +20,11 @@ A host layer can already compose the current design-time surface:
 - `DesignerApplicationPersistence` for canonical flat application load/save,
   editable links, resource namespaces, resource references, and runtime link
   diagnostics.
+- canonical catalog projection that adds `Events`, hides legacy `Name` and
+  Dataflow-specific options, and exposes an optional `processing.profile`
+  resource picker.
+- normalization diagnostics returned on load; saves emit canonical component
+  and resource type names.
 
 These contracts describe what can be shown or selected. They do not create
 resources, enumerate resource instances, choose a renderer, or bind a graph to a
@@ -35,6 +40,9 @@ editing experience:
 - Build node inspector models by grouping options by section, ordering primary
   options before advanced options, and using editor/syntax hints when a precise
   host editor exists.
+- Present semantic processing profiles instead of capacities, parallelism, or
+  Dataflow ordering flags. The host may expose profile creation in its resource
+  catalog without embedding technical mapper values in workflow JSON.
 - Provide conservative editor fallbacks for unknown or omitted editor hints,
   including boolean and duration options that currently have no contract-valued
   editor hint.
@@ -49,6 +57,8 @@ editing experience:
 - Persist graph state as component types, node names, option values, resource
   references, port links, and host layout data. Display hints remain derived
   from package metadata rather than copied as the source of truth.
+- Treat each workflow object key as component identity and keep `DisplayName`
+  in host UI state rather than executable component properties.
 - Use `DesignerApplicationPersistence` as the single mapping to canonical
   `FluxFlow.Composition` definitions at the host boundary.
 

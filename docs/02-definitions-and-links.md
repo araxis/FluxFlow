@@ -193,12 +193,12 @@ sibling links.
 Reserved system streams require host-supplied
 `ApplicationSystemOutputMetadata`. That keeps system payload contracts in the
 Engine while allowing Composition to perform the same exact type check without
-depending on Engine. Canonical runtime activation is still deferred to the
-stable-port Engine milestone.
+depending on Engine. `FluxFlow.Engine.Hosting` activates successful compiled
+links through the stable-port runtime.
 
-## Legacy Runtime Definition
+## Obsolete Runtime Definition
 
-The existing executable Composition runtime still accepts
+The compatibility Composition runtime still accepts
 `CompositionDefinition`, `WorkflowDefinition`, `NodeDefinition`, and
 `LinkDefinition` in the `FluxFlow.Composition` namespace. Its fluent builder
 and `CompositionConfigurationLoader` continue to use the earlier
@@ -214,16 +214,16 @@ var definition = CompositionDefinitionBuilder
     .Build();
 ```
 
-Do not project new persisted application documents into this legacy shape by
-default. A later bounded milestone will bind the canonical model to runtime
-registrations and provide migration guidance before legacy declarations are
-removed.
+Do not project new persisted application documents into this legacy shape.
+Canonical `ComponentDefinition` values now flow directly into registered
+factories. The obsolete declarations remain loadable until the next major
+cleanup.
 
 ## Optional Engine Definition
 
 `FluxFlow.Engine` also retains its older executable `ApplicationDefinition`.
-It is not the canonical persistence or addressing model and will be removed in
-the next appropriate Engine major after the Composition model is proven and a
-legacy reader exists.
+It is not the canonical persistence or addressing model. New Engine-backed
+hosts use `FluxFlow.Composition.Model.ApplicationDefinition` through the
+standard runtime assembler.
 
 Next: [Node Authoring](03-node-authoring.md).

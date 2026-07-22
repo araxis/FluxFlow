@@ -1,259 +1,199 @@
 # Component Composition
 
-Component packages are meant to be composed by an application host. The default
-path is direct standalone-node composition through `FluxFlow.Composition`.
-Packages provide reusable node behavior, optional composition adapters, and
-optional design metadata; the host adapts host-owned resources, storage,
-expressions, and app-specific models. The older engine runtime remains an
-optional path for hosts that intentionally choose it.
-When a host persists a richer workspace, project executable workflows into
-`CompositionDefinition` before validation and build.
+FluxFlow applications use the immutable
+`FluxFlow.Composition.Model.ApplicationDefinition` as the canonical executable
+document. Its JSON root contains exactly `Resources` and `Workflows`.
+Workflows contain component objects directly; a component object key is its
+runtime identity, and `Type` selects its registered factory.
+
+Component packages own reusable request/result behavior. Hosts own resources,
+concrete clients, credentials, stores, lifecycle policy, and application UI.
+`FluxFlow.Engine.Hosting` may activate the canonical model, but component
+packages remain independent from the Engine.
 
 ## Recommended Path
 
-Start with a small graph and add component families only when they remove real
-host code:
+1. Register component factories explicitly in `CompositionNodeRegistry`.
+2. Load and normalize one canonical `ApplicationDefinition`.
+3. Compile links before preparing a runtime revision.
+4. Use ordinary output fan-out when several targets need the same data.
+5. Link several compatible outputs to one shared input for fan-in.
+6. Put decisions on links with `Condition` instead of adding structural routing
+   components.
+7. Insert a mapper only when payload types or shapes must change.
+8. Observe component diagnostics through `Workflow.Component.Events`.
 
-1. Keep source and sink nodes in the host until the behavior is clearly reusable.
-2. Add `source.items` or `source.sequence` for deterministic generated
-   streams that do not depend on a transport or app store.
-3. Add `data.map` to translate from host input shapes into package request
-   contracts.
-4. Add `flow.filter`, `flow.when`, or `flow.switch` for expression-driven
-   decisions.
-5. Add `flow.fork` when several branches must receive every input.
-6. Add `flow.merge` when same-type streams need to converge with source
-   metadata.
-7. Add `data.assert` when a flow needs assertion results or pass/fail streams.
-8. Add `flow.correlate` when a single stream needs request/response pairing
-   by key.
-9. Add `flow.join` when two streams need to be paired by related keys.
-10. Add `state.reduce` when later decisions depend on previous messages.
-11. Add `metric.count`, `metric.measure`, or `log.write` when a stream needs
-   runtime observation.
-12. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
-   `timer.debounce` when time is part of the flow.
-13. Add edge packages for validation, serialization, payload inspection, HTTP,
-   file system operations, recording, replay, storage, or external transport
-   adapters.
+`flow.filter`, `flow.when`, `flow.switch`, `flow.fork`, and `flow.merge` remain
+loadable and renderable for existing definitions. Do not introduce them in new
+workflow guidance. Keep `flow.window`, `flow.correlate`, and `flow.join` when
+they provide actual stateful behavior rather than graph structure.
 
-This keeps early application work direct while leaving a clean path to extract
-generic behavior later.
+## Flat Document
+
+```json
+{
+  "Resources": {
+    "Processing": {
+      "ParallelOrdered": {
+        "Type": "processing.profile",
+        "Mode": "Parallel",
+        "Order": "Preserve",
+        "Buffer": "Standard"
+      }
+    },
+    "External": {
+      "ApiClient": {
+        "Type": "host.http-client"
+      }
+    }
+  },
+  "Workflows": {
+    "Orders": {
+      "Normalize": {
+        "Type": "data.map",
+        "Expression": "payload"
+      },
+      "Validate": {
+        "Type": "json.validate",
+        "Input": "Normalize.Output"
+      },
+      "Send": {
+        "Type": "http.request",
+        "Client": "Resources.External.ApiClient",
+        "Processing": "Resources.Processing.ParallelOrdered",
+        "Input": {
+          "Port": "Validate.Output",
+          "Condition": "payload.isError = false"
+        }
+      },
+      "RecordFailure": {
+        "Type": "session.record",
+        "Input": {
+          "Port": "Validate.Output",
+          "Condition": "payload.isError = true"
+        }
+      },
+      "ObserveValidation": {
+        "Type": "log.write",
+        "Input": "Validate.Events"
+      }
+    }
+  }
+}
+```
+
+One link may be a string. Multiple links use an array. A conditioned link uses
+an object with `Port` and `Condition`. A port property may appear on the input
+or output endpoint, but the same endpoint pair must be declared only once.
+Local `Component.Port` references resolve inside the current workflow; absolute
+`Workflow.Component.Port` references use the same address framework across
+workflows.
+
+## Fan-Out And Fan-In
+
+Declare output fan-out directly:
+
+```json
+{
+  "Type": "source.items",
+  "Output": ["Validate.Input", "Audit.Input"]
+}
+```
+
+Declare shared-input fan-in from the input side:
+
+```json
+{
+  "Type": "data.map",
+  "Input": ["Primary.Output", "Replay.Output"]
+}
+```
+
+Dataflow links do not independently complete a shared input. The runtime
+completes it after every upstream succeeds, and faults it once when the first
+upstream faults.
+
+## Output, Events, And Completion
+
+Canonical components use these channels consistently:
+
+| Surface | Meaning |
+|---------|---------|
+| `Output` | Normal success and expected failure data, normally `FlowResult<T>`. |
+| `Events` | Traced lifecycle, diagnostic, observation, warning, and metric data. |
+| `Completion` | Unrecoverable implementation, infrastructure, or lifecycle failure. |
+
+Do not add a universal `Errors` port. Expected errors are ordinary result data
+and can be mapped, conditioned, recorded, retried, or sent to another workflow.
+Legacy and typed compatibility registrations may retain released error streams.
+
+Every canonical registration reserves `Events` as an output carrying
+`FlowMessage<CompositionComponentEvent>`. The address
+`OrderProcessing.ValidateOrder.Events` participates in links and direct runtime
+observation like any other output. Its message envelope remains the authority
+for trace, correlation, message, and causation identity.
+
+Component events are not copied into `System.Events.Output`. The latter is the
+Engine-owned application/revision event stream, so observing both does not
+produce duplicate component events.
+
+## Component Identity
+
+The component object key is the canonical name. In this example, `Validate` is
+the component identity; a separate `Name` option is unnecessary. Canonical
+factory binding defaults an absent options `Name` from that key. Explicit
+legacy `Name` values remain accepted during migration, and `DisplayName` stays
+a Designer/UI concern.
+
+## Processing Profiles
+
+Normal canonical JSON does not expose `BoundedCapacity`,
+`MaxDegreeOfParallelism`, or `EnsureOrdered`. Defaults require no profile.
+When policy must be reusable, define a `processing.profile` resource with:
+
+- `Mode`: `Sequential` or `Parallel`.
+- `Order`: `Preserve` or `Relaxed`.
+- `Buffer`: `Small`, `Standard`, or `Large`.
+
+Reference it with one flat `Processing` property. The host may replace
+`ICompositionProcessingProfileMapper` in DI to choose technical values.
+Component registrations declare supported concurrency; stateful or strictly
+ordered components reject unsupported profiles before factory execution.
+Standalone C# options retain their technical properties for direct-code and
+advanced compatibility scenarios.
+
+## Normalization And Compatibility
+
+`ApplicationDefinitionNormalizer` runs after load and before validation,
+revision comparison, Designer projection, or runtime preparation. It rewrites
+registered component aliases and known resource aliases, returns structured
+migration diagnostics, and is deterministic and idempotent. Designer saves
+always emit canonical names, and alias-only revisions compare as unchanged.
+
+Package-internal typed descriptors are the single source for canonical type
+names and aliases. Public type constants remain available. Registration and
+metadata use explicit code only: no reflection, assembly scanning, source
+generation, or global discovery.
 
 ## Host Boundary
 
-The host should own:
+The host owns:
 
-- resource lookup and connection names
-- concrete clients and storage implementations
-- expression engine registration
-- app-specific input/output models
-- workspace projection into `CompositionDefinition`
-- composition definition loading, versioning, and app-specific validation
-- dashboard, designer, and activity projection
-- renderer-specific palette layout, localization, and design-system behavior
-- source and sink nodes that are still product-specific
+- canonical definition loading, versioning, validation, and persistence
+- concrete clients, stores, clocks, credentials, secrets, and disposal
+- expression engines and processing-profile mapping
+- resource catalogs and keyed DI registration
+- revision activation, direct port access, dashboards, and Designer rendering
 
-The host should avoid putting reusable processing logic inside adapters. If an
-adapter starts to parse, validate, route, aggregate, or persist in a generic
-way, it is probably hiding a future component package.
+Component packages own neutral contracts, options, standalone nodes, factory
+registrations, and package-authored metadata. They do not own application file
+formats, renderer UI, host resources, or global orchestration.
 
-## Support Package Boundary
+## Legacy Boundary
 
-Not every component package should get a composition adapter. Packages such as
-configuration validation, resource lookup, secret resolution, expression
-registries, journal stores, design metadata, and concrete storage backends are
-support packages. A composition adapter should consume them through host-owned
-resources or setup code only when a real standalone node needs them.
-
-For example, `FluxFlow.Components.Storage.FileSystem` and
-`FluxFlow.Components.Storage.SqlFile` provide store implementations and keyed
-store-factory registration helpers; `FluxFlow.Components.Storage.Composition`
-is the package that registers the `storage.put`, `storage.get`,
-`storage.query`, and `storage.delete` node factories.
-
-## Package Boundary
-
-A component package should own:
-
-- neutral request/result contracts
-- options and option validation
-- typed ports and bounded capacity
-- per-message failures as `FlowError` where continuation is expected
-- startup failures when the node cannot begin safely
-- diagnostics and optional workflow events
-- package-owned design metadata for palettes, editors, validation, docs, and
-  host composition
-- lifecycle, completion, cancellation, and disposal behavior
-- tests that do not require a product host
-
-Packages should not own:
-
-- app workspace models
-- app composition file formats
-- dashboard layout or UI projection
-- product-specific names, scenarios, or storage paths
-- concrete external clients when a host adapter is reasonable
-- assumptions about how another app names sections or resources
-- global discovery, reflection scanning, or host-level orchestration
-
-## Design Metadata Composition
-
-Reusable runtime packages can expose package-owned
-`IComponentDesignMetadataProvider` implementations for their public node type
-constants. Hosts compose those providers into a
-`ComponentDesignMetadataCatalog` to populate palettes, editors, validation
-views, and generated documentation without copying package descriptors into the
-application.
-
-Package metadata should stay neutral: display names, categories, option editor
-hints, port labels, defaults, and documentation hints that travel with the
-package. Hosts can layer app-specific behavior, localization, resource pickers,
-or visual styling after catalog composition. Designer metadata uses its own
-component and port identifiers so component packages can describe nodes without
-referencing either the composition runtime or the engine runtime.
-
-When metadata describes stable composition node types, prefer placing the
-provider in the optional `.Composition` package. This keeps the pure node package
-focused on standalone runtime behavior while the composition package owns the
-composition-facing node type, port names, resource names, and design hints.
-
-## Common Shapes
-
-Use request/result nodes when behavior acts like a function:
-
-```text
-Input:  SomeRequest
-Output: SomeResult
-Errors: FlowError
-```
-
-Use source nodes when the package starts a stream:
-
-```text
-Output: SomeMessage
-Errors: FlowError when recoverable
-Startup failure when the source cannot start
-```
-
-Use observer nodes when the package watches a stream without changing it:
-
-```text
-Input:     Any registered type
-Snapshots: Counter, metric, or log entry contract
-```
-
-For each shape, prefer typed contracts over loosely shaped dictionaries. Hosts
-can map app data into those contracts with `data.map`.
-
-## Composition Examples
-
-Stateful timer flow:
-
-```text
-timer.interval -> data.map -> state.reduce -> metric.count
-                                  |
-                                  +-> host sink
-```
-
-Deterministic source flow:
-
-```text
-source.items -> data.map -> data.assert -> host sink
-```
-
-Validation and routing:
-
-```text
-host source -> data.map -> json.validate -> flow.switch -> host sinks
-```
-
-Switch with direct route outputs:
-
-```text
-host source -> flow.switch
-                  |-> Priority -> host sink
-                  |-> Standard -> host sink
-```
-
-Switch with a route envelope:
-
-```text
-host source -> flow.switch.Routed -> data.map -> host sink
-```
-
-Reliable fan-out:
-
-```text
-host source -> flow.fork
-                  |-> Audit -> host sink
-                  |-> Work  -> data.map -> host sink
-```
-
-Source-tagged merge:
-
-```text
-primary source -> flow.merge -> data.assert -> host sink
-replay source  ->/
-```
-
-Request/response pairing:
-
-```text
-host source -> flow.correlate -> data.assert -> host sink
-```
-
-Windowed processing:
-
-```text
-host source -> flow.window -> data.map -> host sink
-```
-
-Two-stream join:
-
-```text
-left source  -> flow.join -> data.assert -> host sink
-right source ->/
-```
-
-Recording and replay:
-
-```text
-host source -> data.map -> session.record -> host sink
-
-session.replay -> data.map -> host sink
-```
-
-Transport boundary:
-
-```text
-transport source -> data.map -> flow.when -> transport publisher
-```
-
-The transport package should only know its own request/result contracts. The
-application decides how workspace resources map to adapter instances.
-
-## Extraction Checklist
-
-Create a new component package when most of these are true:
-
-- the behavior is useful in more than one application
-- the contracts can be named without product language
-- the node can run with injected adapters or in-memory fakes
-- the host only needs small mappers or context factories
-- tests can cover behavior without a dashboard or workspace store
-- options and diagnostics are stable enough to document
-
-Keep the behavior in the host when:
-
-- it depends on product UI, dashboard, or scenario rules
-- it depends on app-specific storage shape
-- it is still changing because the product workflow is unclear
-- it cannot be tested without the full product runtime
-
-## Release Impact
-
-Adding a component package should not require a core runtime release unless a
-shared contract actually changes. A package can move independently when it only
-adds nodes, contracts, options, composition adapters, design metadata providers,
-tests, and docs under its own project.
+`CompositionDefinition`, `CompositionDefinitionBuilder`,
+`CompositionConfigurationLoader`, `CompositionRuntimeBuilder`, and related
+node-oriented entry points remain for compatibility and are obsolete. New
+persisted applications must not project canonical components back into
+`NodeDefinition`. Public Node-versus-Component terminology cleanup is reserved
+for the next major release rather than adding duplicate APIs now.

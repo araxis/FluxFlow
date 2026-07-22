@@ -5,22 +5,25 @@ FluxFlow is a standalone-node-first workflow toolkit for .NET.
 The default architecture is:
 
 1. Build reusable nodes over `FluxFlow.Nodes`.
-2. Compose those nodes directly with TPL Dataflow, fluent C#, or configuration.
-3. Keep resources such as clients, stores, secrets, and protocol adapters owned by the host or adapter package.
+2. Register component factories explicitly with `FluxFlow.Composition`.
+3. Load the canonical application document with exactly `Resources` and
+   `Workflows`.
+4. Activate it through `FluxFlow.Composition.Hosting` and the optional
+   `FluxFlow.Engine` runtime assembler when addressable runtime ports are needed.
+5. Keep resources such as clients, stores, secrets, and protocol adapters owned by the host or adapter package.
 
-`FluxFlow.Engine` remains available as an optional advanced executable runtime
-for hosts that need its older `ApplicationDefinition` model, conditional links,
-and engine lifecycle. It is no longer the required path for normal component
-packages.
+`FluxFlow.Engine` remains optional for component packages. Canonical hosts use
+its runtime assembler for revisions, compiled links, stable direct ports, and
+system signals without moving resource ownership into the engine.
 
 ## Main Packages
 
 | Package | Purpose |
 |---------|---------|
 | `FluxFlow.Nodes` | Minimal standalone node kit: `FlowNode`, `FlowSource`, `FlowMessage`, `FlowError`, and `FlowEvent`. |
-| `FluxFlow.Composition` | Optional composition layer for fluent C# and `IConfiguration` JSON. It links standalone nodes directly and does not reference `FluxFlow.Engine`. |
-| `FluxFlow.Composition.Hosting` | Optional DI/host bridge that builds and starts a composition runtime and resolves adapter-owned keyed resources. |
-| `FluxFlow.Engine` | Optional legacy/advanced runtime for `ApplicationDefinition`-based execution. |
+| `FluxFlow.Composition` | Canonical application definitions, aliases, addresses, links, component registrations, events, and processing profiles. |
+| `FluxFlow.Composition.Hosting` | DI/host revision lifecycle for complete canonical definitions and immutable resource snapshots. |
+| `FluxFlow.Engine` | Optional canonical runtime assembler with stable direct ports and system signals. |
 
 Component packages should expose normal standalone nodes first. Composition
 factory registration, design metadata, and host-specific DI helpers are optional
@@ -45,8 +48,9 @@ Nodes are plain Dataflow processors. Construct them, link their ports, send
 
 ## Composition Example
 
-`FluxFlow.Composition` adds DTOs, explicit factory registration, validation,
-and runtime lifecycle around standalone nodes:
+`FluxFlow.Composition` adds strict canonical definitions, explicit factory
+registration, normalization, validation, and link compilation around
+standalone nodes:
 
 ```csharp
 var registry = new CompositionNodeRegistry()
@@ -59,33 +63,37 @@ var registry = new CompositionNodeRegistry()
                 node,
                 inputs: [CompositionPorts.Input<string>("Input", node.Input)],
                 outputs: [CompositionPorts.Output<string>("Output", node.Output)],
-                events: node.Events,
-                errors: node.Errors));
+                events: node.Events));
         },
         inputs: [CompositionPorts.Metadata<string>("Input")],
         outputs: [CompositionPorts.Metadata<string>("Output")]);
 
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("upper", "sample.uppercase"))
-    .Build();
-
-var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition);
+var definition = ApplicationDefinitionJson.Deserialize(json);
+var normalized = new ApplicationDefinitionNormalizer(registry).Normalize(definition);
+var links = new ApplicationLinkCompiler(registry).Compile(normalized.Definition);
 ```
 
 There is no reflection, assembly scanning, or engine dependency in this path.
 
-`FluxFlow.Composition.Hosting` can own the host lifecycle around the same model:
+`FluxFlow.Composition.Hosting` and the standard assembler can own the lifecycle
+around the same model:
 
 ```csharp
 services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry.RegisterMyNodes());
+    .AddFluxFlowApplication(configuration)
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+        registry.RegisterMyNodes()));
 ```
 
 Adapter packages still own concrete resources and register them in DI, usually
 as named keyed services.
+
+Expected failures remain normal `Output` values, usually `FlowResult<T>`.
+Every canonical component also exposes traced `Workflow.Component.Events`;
+unrecoverable faults remain on `Completion`. Canonical JSON does not expose
+Dataflow capacities or parallelism settings. An optional `processing.profile`
+resource provides semantic `Mode`, `Order`, and `Buffer` settings when defaults
+are not enough.
 
 ## Samples
 
