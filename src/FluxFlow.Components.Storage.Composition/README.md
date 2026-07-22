@@ -4,18 +4,14 @@ Optional `FluxFlow.Composition` registration helpers for the canonical storage
 nodes. Hosts provide a keyed `IStorageStore` or `IStorageStoreFactory` and may
 provide a keyed `TimeProvider`; this package owns none of those resources.
 
-## Registration
+## Canonical Registration
 
 ```csharp
-services.AddKeyedSingleton<IStorageStoreFactory>("items-store", storeFactory);
-
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterStoragePut()
-        .RegisterStorageGet()
-        .RegisterStorageQuery()
-        .RegisterStorageDelete());
+registry
+    .RegisterStoragePut()
+    .RegisterStorageGet()
+    .RegisterStorageQuery()
+    .RegisterStorageDelete();
 ```
 
 | Type | Canonical ports |
@@ -79,22 +75,12 @@ Direct keyed stores remain host-owned. Factory leases are opened during
 composition build and disposed with the composed node. The optional `clock`
 resource controls deterministic result and diagnostic timestamps.
 
-## Typed Compatibility
+## Migration From 2.x
 
-Register released typed contracts under distinct node types when loading a
-legacy definition:
-
-```csharp
-registry
-    .RegisterStoragePutResult("storage.put.typed")
-    .RegisterStorageGetResultBranches("storage.get.typed")
-    .RegisterStorageQueryRecordOutputs("storage.query.typed")
-    .RegisterStorageDeleteResult("storage.delete.typed");
-```
-
-The caller supplies each compatibility type name, so it cannot silently replace
-the canonical registration. Compatibility get/query retain their branch ports
-and all four typed nodes retain Errors and Events.
+The 3.x adapter removes explicit typed compatibility registration methods.
+Use the four canonical registrations above, route expected failures through
+ordinary result fields, and replace `Found`, `NotFound`, and `Records` branch
+ports with conditional links or explicit downstream components.
 
 ## Design Metadata
 
@@ -107,6 +93,6 @@ released declarations for compatibility.
 
 
 `StorageComponentDesignMetadataProvider` describes canonical fixed ports,
-option grouping/editor hints, omitted typed-only branch controls, and host-owned
-resource picker hints for `store` and `clock`. Designer metadata does not create
+option grouping/editor hints, and host-owned resource picker hints for `store`
+and `clock`. Designer metadata does not create
 stores, open factories, execute nodes, or own runtime state.

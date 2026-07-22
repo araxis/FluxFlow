@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Storage</PackageId>
     <AssemblyName>FluxFlow.Components.Storage</AssemblyName>
     <RootNamespace>FluxFlow.Components.Storage</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone logical-storage nodes with canonical exact FlowContent operations, typed normal results, and preserved typed compatibility over host-owned stores.</Description>
+    <Description>Standalone logical-storage nodes with exact FlowContent operations and normal typed results over host-owned stores.</Description>
     <PackageTags>workflow;dataflow;components;storage;records</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical exact-content put/get/query/delete nodes with one typed normal-result output, stable result/error names, strong message lineage, and preserved released typed nodes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates put, get, query, and delete on concise exact-content nodes with one normal FlowResult output, removing duplicate typed component contracts while preserving store adapter boundaries.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

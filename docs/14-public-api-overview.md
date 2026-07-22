@@ -885,7 +885,9 @@ Main types:
 Use `RegisterStoragePut()`, `RegisterStorageGet()`,
 `RegisterStorageQuery()`, and `RegisterStorageDelete()` from the optional
 `FluxFlow.Components.Storage.Composition` package when a composition host wants
-storage node factories. The factories bind existing storage options, resolve a
+storage node factories. Each descriptor has one Input, one normal
+`FlowResult<T>` Output, Events, and no universal Errors or operation-specific
+branch ports. The factories bind existing storage options, resolve a
 required keyed `IStorageStore` or `IStorageStoreFactory`, and can resolve an
 optional keyed `TimeProvider` resource through the host. Factory resources are
 opened during composition build and released with composed node disposal; direct
@@ -897,6 +899,12 @@ ports, plus resource hints for the required `store` resource and optional
 `clock` resource. The `store` resource may point at either a keyed
 `IStorageStore` or keyed `IStorageStoreFactory`. The provider authors that
 metadata through the shared validated Designer metadata builder.
+
+Storage 5.x uses the concise `StoragePutNode`, `StorageGetNode`,
+`StorageQueryNode`, and `StorageDeleteNode` names for exact `FlowContent`
+operations. The 3.x Composition adapter removes the former typed compatibility
+registrations. Store/factory request, record, and result contracts remain the
+stable boundary implemented by concrete backend packages.
 
 ## Sessions Composition
 

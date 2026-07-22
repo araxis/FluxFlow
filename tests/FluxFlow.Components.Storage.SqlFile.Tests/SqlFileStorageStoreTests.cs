@@ -20,7 +20,7 @@ public sealed class SqlFileStorageStoreTests
         var path = Path.Combine(temp.Path, "content.db");
         byte[] bytes = [0x00, 0x7F, 0xFF];
         await using (var store = CreateStore(path))
-        await using (var put = new FlowContentStoragePutNode(
+        await using (var put = new StoragePutNode(
                          store,
                          new StoragePutOptions { Collection = "items" }))
         {
@@ -34,7 +34,7 @@ public sealed class SqlFileStorageStoreTests
         }
 
         await using var reopened = CreateStore(path);
-        await using var get = new FlowContentStorageGetNode(
+        await using var get = new StorageGetNode(
             reopened,
             new StorageGetOptions { Collection = "items" });
         var results = Link(get.Output);

@@ -8,10 +8,10 @@ engine, backend, serializer, or resource factory is owned by this package.
 
 | Node | Input | Output |
 |------|-------|--------|
-| `FlowContentStoragePutNode` | `StorageContentPutRequest` | `FlowResult<StoragePutOutcome>` |
-| `FlowContentStorageGetNode` | `StorageGetRequest` | `FlowResult<StorageGetOutcome>` |
-| `FlowContentStorageQueryNode` | `StorageQueryRequest` | `FlowResult<StorageQueryOutcome>` |
-| `FlowContentStorageDeleteNode` | `StorageDeleteRequest` | `FlowResult<StorageDeleteOutcome>` |
+| `StoragePutNode` | `StorageContentPutRequest` | `FlowResult<StoragePutOutcome>` |
+| `StorageGetNode` | `StorageGetRequest` | `FlowResult<StorageGetOutcome>` |
+| `StorageQueryNode` | `StorageQueryRequest` | `FlowResult<StorageQueryOutcome>` |
+| `StorageDeleteNode` | `StorageDeleteRequest` | `FlowResult<StorageDeleteOutcome>` |
 
 Each node has one Input, one broadcast Output, Events, and Completion. There is
 no universal Errors data port. Invalid requests, missing records, backend
@@ -21,7 +21,7 @@ accepted input continues after an operation failure.
 
 ```csharp
 IStorageStore store = ...; // opened and owned by the host
-await using var put = new FlowContentStoragePutNode(
+await using var put = new StoragePutNode(
     store,
     new StoragePutOptions { Collection = "items" });
 
@@ -63,9 +63,8 @@ The envelope is not a workflow contract and should not be inspected by hosts.
   the same Output. Missing is not an error.
 - Query returns one outcome with `Count` and, when `EmitRecordsInResult` is
   enabled, an immutable snapshot of content records. Per-record fan-out belongs
-  to the typed compatibility node or an explicit downstream component.
-- Delete always returns deleted or missing for an accepted command. The legacy
-  `EmitMissingAsResult` option applies only to `StorageDeleteNode`.
+  to an explicit downstream component.
+- Delete always returns deleted or missing for an accepted command.
 
 Result envelopes preserve correlation, trace, and headers, create a new message
 identity, and set causation to the input message. Record attributes and query
@@ -85,21 +84,23 @@ Pass a `TimeProvider` when deterministic result and event timestamps are
 required. Supply the same clock through `StorageStoreContext.Clock` when backend
 stored timestamps and expiration checks must use that time source.
 
-## Typed Compatibility
+## Migration From 4.x
 
-The released nodes remain unchanged:
+The concise node names now identify the exact-content/result implementations.
+Replace the temporary `FlowContentStoragePutNode`,
+`FlowContentStorageGetNode`, `FlowContentStorageQueryNode`, and
+`FlowContentStorageDeleteNode` names with the names in the table above.
 
-- `StoragePutNode`: `StoragePutRequest` to `StorageResult`
-- `StorageGetNode`: `StorageGetRequest` to `StorageResult`, plus `Found` and
-  `NotFound`
-- `StorageQueryNode`: `StorageQueryRequest` to `StorageQueryResult`, plus
-  `Records`
-- `StorageDeleteNode`: `StorageDeleteRequest` to `StorageResult`
+The previous component-facing `StoragePutRequest`/`StorageResult` operations,
+`StorageQueryResult`, numeric `StorageErrorCodes`, `Found`, `NotFound`,
+`Records`, and `Errors` ports were removed. Expected operation failures use
+stable string codes in normal `FlowResult<T>` values, and branching belongs on
+result fields or explicit downstream components.
 
-Those nodes retain their typed branch ports and `FluxFlow.Nodes.FlowError`
-Errors port. Their `StorageRecord.Value` remains `object?` for existing hosts.
-Use `FluxFlow.Components.Storage.Composition` for canonical factory registration
-or explicit typed compatibility registration.
+`IStorageStore`, `IStorageStoreFactory`, `StoragePutRequest`, `StorageRecord`,
+and `StorageResult` remain supported adapter-boundary contracts. Their
+`StorageRecord.Value` property remains `object?` so existing stores and the
+built-in backend packages do not need to change.
 
 ## Composition
 

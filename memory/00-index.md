@@ -563,6 +563,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `243-filesystem-canonical-consolidation.md`: concise exact-content FileSystem
   transforms, direct FlowValue sources, removed typed compatibility surfaces,
   major package versions, and package/compatibility evidence.
+- `244-storage-canonical-consolidation.md`: concise exact-content Storage
+  operations, preserved store-adapter boundary, removed typed component
+  compatibility, major package versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

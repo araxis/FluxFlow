@@ -1,13 +1,14 @@
 # Current State
 
-Date: 2026-07-22
+Date: 2026-07-23
 
 ## Repository
 
-- `D:\Projects\FluxFlow` is currently on local `main`. The complete canonical
-  vNext stack was fast-forwarded locally from
-  `work/canonical-composition-simplification` at `e9c9aeea` without squashing
-  or rewriting its seven bounded commits. The provider-neutral MQTT vertical
+- `D:\Projects\FluxFlow` is currently on local branch
+  `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
+  previously fast-forwarded locally to `main` without squashing or rewriting
+  its bounded commits, and the cleanup branch now contains the subsequent
+  canonical family consolidations. The provider-neutral MQTT vertical
   slice and the bounded normal component-family migrations through Sessions,
   canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
   Serialization, FlowValue
@@ -330,17 +331,18 @@ Date: 2026-07-22
   fixed ports. Focused/shared tests, controlled builds, preflight/dry-runs, and
   package-only consumers passed; package validation reports only documented
   major-version removals. See `243-filesystem-canonical-consolidation.md`.
-- `FluxFlow.Components.Storage` is now `4.0.0` locally with canonical exact
-  FlowContent records, stable normal result kinds/errors, strong lineage, and a
-  private versioned JSON-compatible envelope over the released store value
-  boundary. Expected operation failures remain ordinary data, while released
-  typed nodes and host-owned store/factory contracts remain available
-  unchanged. Storage Composition is now `2.1.0` with canonical one-output
-  fixed ports, no universal Errors surfaces, explicit typed compatibility
-  registrations, and updated Designer metadata. FileSystem and SqlFile adapter
-  integration, focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. See
-  `232-vnext-storage-flowcontent-results.md`.
+- `FluxFlow.Components.Storage` is now `5.0.0` locally and consolidated on
+  concise `StoragePutNode`, `StorageGetNode`, `StorageQueryNode`, and
+  `StorageDeleteNode` implementations with exact content and one normal
+  `FlowResult<T>` Output. Temporary names, typed component implementations,
+  `StorageQueryResult`, numeric error codes, branch/Error ports, and
+  legacy-only output options are removed. The public store/factory
+  request/record/result boundary remains unchanged for FileSystem, SqlFile, and
+  custom adapters. Storage Composition is now `3.0.0` with only canonical
+  registrations and fixed ports. Focused/shared tests, controlled builds,
+  preflight/dry-runs, and a combined package-only consumer passed; package
+  validation reports only documented major removals. See
+  `244-storage-canonical-consolidation.md`.
 - `FluxFlow.Components.Sessions` is now `4.0.0` locally with canonical exact
   FlowContent recorder/replay contracts, stable normal result kinds/errors,
   strong lineage, and a private versioned JSON-compatible envelope over the

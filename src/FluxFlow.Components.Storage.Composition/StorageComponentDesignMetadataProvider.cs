@@ -130,11 +130,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
                 attributes: OptionAttributes(
                     "Results",
                     OptionDesignMetadataAttributeValues.Advanced))
-            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity))
-            .AddAttribute("omittedOptions", "emitRecordOutputs")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "Canonical storage.query returns one result; per-record fan-out is available through the typed compatibility registration.");
+            .AddOption(BoundedCapacityOption(QueryDefaults.BoundedCapacity));
 
         builder
             .AddInputPort(
@@ -168,11 +164,7 @@ public sealed class StorageComponentDesignMetadataProvider : IComponentDesignMet
 
         builder
             .AddOption(CollectionOption())
-            .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity))
-            .AddAttribute("omittedOptions", "emitMissingAsResult")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "Canonical storage.delete always returns a deleted or missing result for an accepted command.");
+            .AddOption(BoundedCapacityOption(DeleteDefaults.BoundedCapacity));
 
         AddTransformPorts(
             builder,

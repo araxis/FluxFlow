@@ -7,6 +7,21 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Storage 5.0.0
+
+- Consolidated exact-content put, get, query, and delete operations on the
+  concise `StoragePutNode`, `StorageGetNode`, `StorageQueryNode`, and
+  `StorageDeleteNode` names with one normal `FlowResult<T>` Output.
+- Removed duplicate typed component contracts, numeric error codes, branch and
+  Errors ports, temporary `FlowContentStorage*` names, and legacy-only output options while
+  preserving the public store/factory adapter boundary, content envelopes,
+  expiration, diagnostics, and message lineage.
+
+## FluxFlow.Components.Storage.Composition 3.0.0
+
+- Registers only the concise canonical Storage nodes and removes the typed
+  compatibility registration extensions and legacy branch-port constants.
+
 ## FluxFlow.Components.FileSystem 5.0.0
 
 - Consolidated exact-byte reads, exact-byte writes, directory enumeration, and

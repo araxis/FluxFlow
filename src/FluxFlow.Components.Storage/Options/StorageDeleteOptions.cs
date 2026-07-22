@@ -11,8 +11,6 @@ public sealed record StorageDeleteOptions
         init => _collection = StorageOptionValidation.NormalizeCollection(value);
     }
 
-    public bool EmitMissingAsResult { get; init; } = true;
-
     public int BoundedCapacity
     {
         get => _boundedCapacity;

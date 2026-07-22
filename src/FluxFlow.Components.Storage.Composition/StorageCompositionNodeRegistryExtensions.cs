@@ -103,7 +103,7 @@ public static class StorageCompositionNodeRegistryExtensions
         var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        var node = new FlowContentStoragePutNode(store.Store, options, clock);
+        var node = new StoragePutNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -129,7 +129,7 @@ public static class StorageCompositionNodeRegistryExtensions
         var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        var node = new FlowContentStorageGetNode(store.Store, options, clock);
+        var node = new StorageGetNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -155,7 +155,7 @@ public static class StorageCompositionNodeRegistryExtensions
         var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        var node = new FlowContentStorageQueryNode(store.Store, options, clock);
+        var node = new StorageQueryNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:
@@ -181,7 +181,7 @@ public static class StorageCompositionNodeRegistryExtensions
         var clock = context.GetResource<TimeProvider>(StorageCompositionResourceNames.Clock);
         var store = await ResolveStoreAsync(context, options.Collection)
             .ConfigureAwait(false);
-        var node = new FlowContentStorageDeleteNode(store.Store, options, clock);
+        var node = new StorageDeleteNode(store.Store, options, clock);
         return ComposedNode.Create(
             node,
             inputs:

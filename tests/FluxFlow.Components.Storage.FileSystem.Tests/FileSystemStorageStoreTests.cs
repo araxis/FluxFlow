@@ -18,7 +18,7 @@ public sealed class FileSystemStorageStoreTests
     {
         using var temp = TempDirectory.Create();
         byte[] bytes = [0x00, 0x7F, 0xFF];
-        await using (var put = new FlowContentStoragePutNode(
+        await using (var put = new StoragePutNode(
                          CreateStore(temp.Path),
                          new StoragePutOptions { Collection = "items" }))
         {
@@ -31,7 +31,7 @@ public sealed class FileSystemStorageStoreTests
             (await output.ReceiveAsync()).Payload.IsError.ShouldBeFalse();
         }
 
-        await using var get = new FlowContentStorageGetNode(
+        await using var get = new StorageGetNode(
             CreateStore(temp.Path),
             new StorageGetOptions { Collection = "items" });
         var results = Link(get.Output);

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "target": "canonical-vnext-next-major",
-  "updated": "2026-07-22",
+  "updated": "2026-07-23",
   "canonicalInvariants": [
     "ApplicationDefinition is the persisted application model.",
     "Persisted roots are exactly Resources and Workflows.",
@@ -201,15 +201,17 @@
       "id": "components.storage-typed-compatibility",
       "kind": "public-api",
       "packages": ["components-storage", "components-storage-composition"],
-      "declarations": ["StoragePutNode", "StorageGetNode", "StorageDeleteNode", "typed requests and results", "Found output", "Errors outputs", "typed compatibility registration"],
-      "sourceFiles": ["src/FluxFlow.Components.Storage/Nodes/StorageGetNode.cs", "src/FluxFlow.Components.Storage/Nodes/StoragePutNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageDeleteNode.cs"],
-      "canonicalReplacement": "Concise canonical Storage content nodes with exact FlowContent records and normal result output.",
-      "currentConsumers": ["typed runtime tests", "typed composition registrations", "code-authored integrations"],
-      "uniqueBehavior": ["Released CLR request/result contracts, Found branch behavior, expiration handling, and host-owned store/factory boundaries."],
-      "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for Storage and Storage.Composition after parity is proved.",
-      "migration": "Document canonical record shapes and normal-result routing, preserve expiration and adapter behavior, then migrate typed registration tests.",
-      "verification": ["content ownership", "metadata parity", "found/not-found routing", "storage expiration", "adapter integration"]
+      "declarations": ["FlowContentStoragePutNode", "FlowContentStorageGetNode", "FlowContentStorageQueryNode", "FlowContentStorageDeleteNode", "StorageQueryResult", "StorageErrorCodes", "typed component request/result surfaces", "Found, NotFound, and Records outputs", "Errors outputs", "typed compatibility registration", "EmitRecordOutputs", "EmitMissingAsResult"],
+      "sourceFiles": ["src/FluxFlow.Components.Storage/Nodes/StoragePutNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageGetNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageQueryNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageDeleteNode.cs"],
+      "canonicalReplacement": "Concise StoragePutNode, StorageGetNode, StorageQueryNode, and StorageDeleteNode implementations with exact FlowContent records and one normal FlowResult output.",
+      "currentConsumers": ["canonical runtime tests", "canonical composition registrations", "FileSystem and SqlFile adapter integration tests"],
+      "uniqueBehavior": ["Exact content ownership, put write modes and expected versions, found and missing outcomes, query filtering and paging, expiration, diagnostics, message lineage, and host-owned store/factory boundaries."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major runtime package version 5.0.0 and Composition package version 3.0.0; concrete store adapters remain unchanged.",
+      "publishedBaselines": ["FluxFlow.Components.Storage 4.0.0", "FluxFlow.Components.Storage.Composition 2.1.0"],
+      "apiCompatibilityFindings": ["CP0001: StorageErrorCodes, StorageQueryResult, and four temporary FlowContentStorage node types removed", "CP0007: four concise node names now implement canonical FlowContent/FlowResult contracts instead of legacy FlowNode typed-result contracts", "CP0002: Found, NotFound, Records, EmitMissingAsResult, and EmitRecordOutputs members removed", "CP0001/CP0002: typed Composition registration extensions and branch-port constants removed"],
+      "migration": "Use the concise canonical node names, StorageContentPutRequest and content outcomes, inspect FlowResult fields for failures and branches, and retain IStorageStore request/record/result types only at the adapter boundary.",
+      "verification": ["exact content and metadata ownership", "write modes and result suppression", "found/not-found normal results", "query filtering, paging, and limit enforcement", "expiration through store adapters", "diagnostic and lineage ordering", "canonical composition activation", "FileSystem and SqlFile adapter integration"]
     },
     {
       "id": "components.mapping-validation-typed-compatibility",

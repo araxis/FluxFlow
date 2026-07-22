@@ -1,6 +1,20 @@
 # Progress Log
 
-Date: 2026-05-31
+Date: 2026-07-23
+
+## 2026-07-23 - Canonical Storage Consolidation
+
+- Consolidated put/get/query/delete behavior on the concise Storage node names
+  with exact content and one normal `FlowResult<T>` Output.
+- Removed temporary canonical names, typed component implementations,
+  `StorageQueryResult`, numeric error codes, branch/Error ports, legacy-only
+  options, and typed Composition registration after parity coverage.
+- Preserved all host-owned store/factory and backend request/record/result
+  contracts used by FileSystem, SqlFile, and custom adapters.
+- Moved Storage to `5.0.0` and Storage Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a combined package-only consumer passed. See
+  [[244-storage-canonical-consolidation]].
 
 ## 2026-07-22 - Canonical FileSystem Consolidation
 

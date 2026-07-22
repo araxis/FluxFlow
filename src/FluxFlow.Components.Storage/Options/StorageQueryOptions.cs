@@ -28,7 +28,6 @@ public sealed record StorageQueryOptions
     }
 
     public bool EmitRecordsInResult { get; init; } = true;
-    public bool EmitRecordOutputs { get; init; } = true;
 
     public int BoundedCapacity
     {

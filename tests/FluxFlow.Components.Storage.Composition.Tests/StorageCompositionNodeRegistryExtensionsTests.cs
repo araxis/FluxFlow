@@ -7,20 +7,31 @@ using FluxFlow.Components.Storage.Diagnostics;
 using FluxFlow.Components.Storage.Nodes;
 using FluxFlow.Components.Storage.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Storage.Composition.Tests;
 
 public sealed class StorageCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", StorageCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", StorageCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events =
+        ApplicationAddress.WorkflowPort("main", "node", CompositionComponentEvents.PortName);
 
     [Fact]
     public void Register_storage_nodes_registers_canonical_metadata()
@@ -56,32 +67,6 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         var delete = registry.Registrations[StorageCompositionNodeTypes.Delete];
         delete.Outputs[StorageCompositionPortNames.Output].MessageType
             .ShouldBe(typeof(FlowResult<StorageDeleteOutcome>));
-    }
-
-    [Fact]
-    public void Typed_compatibility_registrations_preserve_released_contracts()
-    {
-        var registry = new CompositionNodeRegistry()
-            .RegisterStoragePutResult("storage.put.typed")
-            .RegisterStorageGetResultBranches("storage.get.typed")
-            .RegisterStorageQueryRecordOutputs("storage.query.typed")
-            .RegisterStorageDeleteResult("storage.delete.typed");
-
-        registry.Registrations["storage.put.typed"]
-            .Inputs[StorageCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(StoragePutRequest));
-        registry.Registrations["storage.get.typed"].Outputs.Keys.ShouldBe([
-            StorageCompositionPortNames.Output,
-            StorageCompositionPortNames.Found,
-            StorageCompositionPortNames.NotFound,
-            CompositionComponentEvents.PortName
-        ], ignoreOrder: false);
-        registry.Registrations["storage.query.typed"]
-            .Outputs[StorageCompositionPortNames.Records].MessageType
-            .ShouldBe(typeof(StorageRecord));
-        registry.Registrations["storage.delete.typed"]
-            .Outputs[StorageCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(StorageResult));
     }
 
     [Fact]
@@ -128,7 +113,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Design_metadata_provider_omits_typed_branch_options()
+    public void Design_metadata_provider_exposes_only_canonical_options()
     {
         var metadata = DesignMetadataByType();
         var query = metadata[StorageCompositionNodeTypes.Query];
@@ -142,12 +127,14 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
             "emitRecordsInResult",
             "boundedCapacity"
         ], ignoreOrder: false);
-        AttributeValue(query.Attributes, "omittedOptions").ShouldBe("emitRecordOutputs");
+        query.Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
+            .ShouldBeFalse();
         delete.Options.Select(option => option.Name.Value).ShouldBe([
             "collection",
             "boundedCapacity"
         ], ignoreOrder: false);
-        AttributeValue(delete.Attributes, "omittedOptions").ShouldBe("emitMissingAsResult");
+        delete.Attributes.ContainsKey(new ComponentAttributeName("omittedOptions"))
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -202,15 +189,8 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Put,
-            async descriptor =>
+            async (ports, host) =>
             {
-                descriptor.Errors.ShouldBeNull();
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageContentPutRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StoragePutOutcome>>>();
-                var results = Link(output.Source);
-                var events = Link(descriptor.Events.ShouldNotBeNull());
                 var message = FlowMessage.Create(
                     new StorageContentPutRequest
                     {
@@ -220,10 +200,16 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                             "application/octet-stream")
                     },
                     new CorrelationId("put-1"));
+                var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                    Output,
+                    Timeout);
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
+                    Events,
+                    Timeout);
 
-                (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(message.CorrelationId);
                 result.CausationId.ShouldBe(message.MessageId);
                 result.Payload.Timestamp.ShouldBe(timestamp);
@@ -231,20 +217,16 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
                 result.Payload.Value.ShouldNotBeNull().Collection.ShouldBe("items");
                 result.Payload.Value.Record.ShouldNotBeNull()
                     .Content.OriginalBytes.AsSpan().ToArray().ShouldBe([0x00, 0xFF]);
-                (await events.ReceiveAsync().WaitAsync(Timeout)).Name
+                (await eventReceive).Message.ShouldNotBeNull().Payload.Name
                     .ShouldBe(StorageDiagnosticNames.PutStored);
+                await host.RevisionHost.StopApplicationAsync();
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "store")
-                .Resource(StorageCompositionResourceNames.Clock, "fixed")
-                .Configure("collection", "items")
-                .Configure("mode", StorageWriteMode.Create)
-                .Configure("boundedCapacity", 8),
-            services =>
-            {
-                services.AddKeyedSingleton<IStorageStore>("store", store);
-                services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-            });
+            Properties(
+                ("collection", "items"),
+                ("mode", StorageWriteMode.Create),
+                ("boundedCapacity", 8)),
+            store,
+            clock);
     }
 
     [Fact]
@@ -255,24 +237,20 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Put,
-            async descriptor =>
+            async (ports, _) =>
             {
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageContentPutRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StoragePutOutcome>>>();
-                var results = Link(output.Source);
-                await input.Target.SendAsync(FlowMessage.Create(new StorageContentPutRequest
+                var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new StorageContentPutRequest
                 {
                     Key = "a",
                     Content = FlowContent.FromBytes(new byte[] { 1 })
-                }));
-                (await results.ReceiveAsync().WaitAsync(Timeout)).Payload.IsError.ShouldBeFalse();
+                }))).IsAccepted.ShouldBeTrue();
+                (await resultReceive).Message.ShouldNotBeNull().Payload.IsError.ShouldBeFalse();
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "factory")
-                .Configure("collection", "items"),
-            services => services.AddKeyedSingleton<IStorageStoreFactory>("factory", factory));
+            Properties(("collection", "items")),
+            factory);
 
         factory.OpenCount.ShouldBe(1);
         factory.Context.ShouldNotBeNull().Collection.ShouldBe("items");
@@ -287,33 +265,34 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Get,
-            async descriptor =>
+            async (ports, _) =>
             {
-                descriptor.Outputs.Keys.ShouldBe([
-                    StorageCompositionPortNames.Output,
-                    CompositionComponentEvents.PortName
-                ], ignoreOrder: false);
-                descriptor.Errors.ShouldBeNull();
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageGetRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StorageGetOutcome>>>();
-                var results = Link(output.Source);
-                await input.Target.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "a" }));
-                await input.Target.SendAsync(FlowMessage.Create(new StorageGetRequest { Key = "missing" }));
+                var foundReceive = ports.ReceiveAsync<FlowResult<StorageGetOutcome>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(
+                    Input,
+                    FlowMessage.Create(new StorageGetRequest { Key = "a" })))
+                    .IsAccepted.ShouldBeTrue();
 
-                var found = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
+                var found = (await foundReceive).Message.ShouldNotBeNull().Payload;
                 found.Kind.ShouldBe(StorageResultKinds.GetFound);
                 found.Value.ShouldNotBeNull().Record.ShouldNotBeNull()
                     .Content.OriginalBytes.AsSpan().ToArray().ShouldBe([1, 2]);
-                var missing = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
+
+                var missingReceive = ports.ReceiveAsync<FlowResult<StorageGetOutcome>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(
+                    Input,
+                    FlowMessage.Create(new StorageGetRequest { Key = "missing" })))
+                    .IsAccepted.ShouldBeTrue();
+                var missing = (await missingReceive).Message.ShouldNotBeNull().Payload;
                 missing.Kind.ShouldBe(StorageResultKinds.GetNotFound);
                 missing.IsError.ShouldBeFalse();
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "store")
-                .Configure("collection", "items"),
-            services => services.AddKeyedSingleton<IStorageStore>("store", store));
+            Properties(("collection", "items")),
+            store);
     }
 
     [Fact]
@@ -325,121 +304,63 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Query,
-            async descriptor =>
+            async (ports, _) =>
             {
-                descriptor.Outputs.Keys.ShouldBe([
-                    StorageCompositionPortNames.Output,
-                    CompositionComponentEvents.PortName
-                ], ignoreOrder: false);
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageQueryRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StorageQueryOutcome>>>();
-                var results = Link(output.Source);
-                await input.Target.SendAsync(FlowMessage.Create(new StorageQueryRequest
+                var resultReceive = ports.ReceiveAsync<FlowResult<StorageQueryOutcome>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new StorageQueryRequest
                 {
                     KeyPrefix = "order:"
-                }));
+                }))).IsAccepted.ShouldBeTrue();
 
-                var result = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
+                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
                 result.Kind.ShouldBe(StorageResultKinds.QueryCompleted);
                 result.Value.ShouldNotBeNull().Count.ShouldBe(1);
                 result.Value.Records.ShouldBeEmpty();
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "store")
-                .Configure("collection", "items")
-                .Configure("limit", 1)
-                .Configure("emitRecordsInResult", false),
-            services => services.AddKeyedSingleton<IStorageStore>("store", store));
+            Properties(
+                ("collection", "items"),
+                ("limit", 1),
+                ("emitRecordsInResult", false)),
+            store);
     }
 
     [Fact]
-    public async Task Hosted_delete_returns_missing_even_when_legacy_suppression_is_configured()
+    public async Task Hosted_delete_returns_missing_as_a_normal_result()
     {
         var store = new InMemoryStorageStore();
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Delete,
-            async descriptor =>
+            async (ports, _) =>
             {
-                descriptor.Errors.ShouldBeNull();
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageDeleteRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StorageDeleteOutcome>>>();
-                var results = Link(output.Source);
-                await input.Target.SendAsync(FlowMessage.Create(new StorageDeleteRequest
+                var resultReceive = ports.ReceiveAsync<FlowResult<StorageDeleteOutcome>>(
+                    Output,
+                    Timeout);
+                (await ports.SendAsync(Input, FlowMessage.Create(new StorageDeleteRequest
                 {
                     Key = "missing"
-                }));
+                }))).IsAccepted.ShouldBeTrue();
 
-                var result = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
+                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
                 result.Kind.ShouldBe(StorageResultKinds.DeleteNotFound);
                 result.IsError.ShouldBeFalse();
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "store")
-                .Configure("collection", "items")
-                .Configure("emitMissingAsResult", false),
-            services => services.AddKeyedSingleton<IStorageStore>("store", store));
-    }
-
-    [Fact]
-    public async Task Typed_compatibility_node_keeps_error_and_branch_ports()
-    {
-        var store = new InMemoryStorageStore();
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IStorageStore>("store", store);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "get",
-                    "storage.get.typed",
-                    node => node
-                        .Resource(StorageCompositionResourceNames.Store, "store")
-                        .Configure("collection", "items")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStorageGetResultBranches("storage.get.typed"))
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem().Descriptor;
-
-        descriptor.Errors.ShouldNotBeNull();
-        descriptor.Outputs.Keys.ShouldBe([
-            StorageCompositionPortNames.Output,
-            StorageCompositionPortNames.Found,
-            StorageCompositionPortNames.NotFound,
-            CompositionComponentEvents.PortName
-        ], ignoreOrder: false);
+            Properties(("collection", "items")),
+            store);
     }
 
     [Fact]
     public async Task Missing_store_resource_reference_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "storage",
-                    StorageCompositionNodeTypes.Put,
-                    node => node.Configure("collection", "items")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterStoragePut())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                StorageCompositionNodeTypes.Put,
+                Properties(("collection", "items"))),
+            registry => registry.RegisterStoragePut());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(StorageCompositionResourceNames.Store));
+        AssertPreparationFailure(host, StorageCompositionResourceNames.Store);
     }
 
     [Theory]
@@ -454,29 +375,22 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         int value,
         string expectedMessage)
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IStorageStore>("store", new InMemoryStorageStore());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "storage",
-                    nodeType,
-                    node => node
-                        .Resource(StorageCompositionResourceNames.Store, "store")
-                        .Configure("collection", "items")
-                        .Configure(optionName, value)))
-                .Build())
-            .RegisterNodes(registry => RegisterAll(registry))
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var properties = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [StorageCompositionResourceNames.Store] = "Resources.store",
+            ["collection"] = "items",
+            [optionName] = value
+        };
+        var store = new InMemoryStorageStore();
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(nodeType, properties, ["store"]),
+            registry => RegisterAll(registry),
+            configureRuntimeServices: context =>
+                context.Services.AddExternalFluxFlowResource<IStorageStore>(
+                    ApplicationAddress.Resource("store"),
+                    store));
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, expectedMessage);
     }
 
     [Fact]
@@ -486,56 +400,86 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
 
         await WithNodeAsync(
             StorageCompositionNodeTypes.Put,
-            async descriptor =>
+            async (ports, _) =>
             {
-                descriptor.Errors.ShouldBeNull();
-                var input = descriptor.Inputs[StorageCompositionPortNames.Input]
-                    .ShouldBeOfType<CompositionInputPort<StorageContentPutRequest>>();
-                var output = descriptor.Outputs[StorageCompositionPortNames.Output]
-                    .ShouldBeOfType<CompositionOutputPort<FlowResult<StoragePutOutcome>>>();
-                var results = Link(output.Source);
                 foreach (var key in new[] { "bad", "good" })
                 {
-                    await input.Target.SendAsync(FlowMessage.Create(new StorageContentPutRequest
+                    var resultReceive = ports.ReceiveAsync<FlowResult<StoragePutOutcome>>(
+                        Output,
+                        Timeout);
+                    (await ports.SendAsync(Input, FlowMessage.Create(new StorageContentPutRequest
                     {
                         Key = key,
                         Content = FlowContent.FromBytes(new byte[] { 1 })
-                    }));
-                }
+                    }))).IsAccepted.ShouldBeTrue();
 
-                var failure = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
-                failure.Kind.ShouldBe(StorageResultKinds.PutFailed);
-                failure.Error.ShouldNotBeNull().Code.ShouldBe(StorageErrorCodeNames.PutFailed);
-                var success = (await results.ReceiveAsync().WaitAsync(Timeout)).Payload;
-                success.Kind.ShouldBe(StorageResultKinds.PutStored);
+                    var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
+                    result.Kind.ShouldBe(key == "bad"
+                        ? StorageResultKinds.PutFailed
+                        : StorageResultKinds.PutStored);
+                    if (key == "bad")
+                    {
+                        result.Error.ShouldNotBeNull().Code
+                            .ShouldBe(StorageErrorCodeNames.PutFailed);
+                    }
+                }
             },
-            node => node
-                .Resource(StorageCompositionResourceNames.Store, "store")
-                .Configure("collection", "items"),
-            services => services.AddKeyedSingleton<IStorageStore>("store", store));
+            Properties(("collection", "items")),
+            store);
     }
 
     private static async Task WithNodeAsync(
         string nodeType,
-        Func<ComposedNode, Task> run,
-        Action<NodeDefinitionBuilder> configureNode,
-        Action<IServiceCollection> configureServices)
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?> properties,
+        object store,
+        TimeProvider? clock = null)
     {
-        var services = new ServiceCollection();
-        configureServices(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node("storage", nodeType, configureNode))
-                .Build())
-            .RegisterNodes(registry => RegisterAll(registry))
-            .Configure(options => options.StartRuntimeWithHost = false);
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal);
+        componentProperties[StorageCompositionResourceNames.Store] = "Resources.store";
+        var resources = new List<string> { "store" };
+        if (clock is not null)
+        {
+            componentProperties[StorageCompositionResourceNames.Clock] = "Resources.clock";
+            resources.Add("clock");
+        }
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem().Descriptor;
-        await run(descriptor);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(nodeType, componentProperties, resources),
+            registry => RegisterAll(registry),
+            configureRuntimeServices: context =>
+            {
+                switch (store)
+                {
+                    case IStorageStore direct:
+                        context.Services.AddExternalFluxFlowResource<IStorageStore>(
+                            ApplicationAddress.Resource("store"),
+                            direct);
+                        break;
+                    case IStorageStoreFactory factory:
+                        context.Services.AddExternalFluxFlowResource<IStorageStoreFactory>(
+                            ApplicationAddress.Resource("store"),
+                            factory);
+                        break;
+                    default:
+                        throw new ArgumentException(
+                            "Store must implement IStorageStore or IStorageStoreFactory.",
+                            nameof(store));
+                }
+
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("clock"),
+                        clock);
+                }
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
+
+        await run(host.GetRequiredPorts(), host);
     }
 
     private static CompositionNodeRegistry RegisterAll(CompositionNodeRegistry registry)
@@ -619,10 +563,18 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
     {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
@@ -638,7 +590,7 @@ public sealed class StorageCompositionNodeRegistryExtensionsTests
         string key,
         byte[] bytes)
     {
-        await using var node = new FlowContentStoragePutNode(
+        await using var node = new StoragePutNode(
             store,
             new StoragePutOptions { Collection = collection });
         var output = Link(node.Output);
