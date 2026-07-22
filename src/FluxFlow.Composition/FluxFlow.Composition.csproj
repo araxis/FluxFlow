@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition</PackageId>
     <AssemblyName>FluxFlow.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Composition</RootNamespace>
-    <Version>2.6.0</Version>
+    <Version>2.7.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FluxFlow application definitions, addressing, and link compilation, plus standalone workflow composition from fluent C# or configuration providers without depending on FluxFlow.Engine.</Description>
     <PackageTags>workflow;dataflow;composition;nodes</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds first-class node-type aliases so configuration can move to clearer canonical names without duplicating registry entries or breaking existing definitions.</PackageReleaseNotes>
+    <PackageReleaseNotes>Adds canonical definition normalization, typed component descriptors, addressable traced component events, semantic processing profiles, and canonical factory contexts while retaining obsolete legacy definition surfaces.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

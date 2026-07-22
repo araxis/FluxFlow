@@ -1,6 +1,7 @@
 using FluxFlow.Composition;
 using FluxFlow.Composition.Hosting;
 using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Composition.Model;
 using FluxFlow.Composition.Revisions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,6 +23,9 @@ public static class ApplicationRuntimeAssemblerHostingExtensions
         }
 
         hosting.Services.AddOptions<ApplicationRuntimeAssemblerOptions>();
+        hosting.Services.TryAddSingleton<
+            ICompositionProcessingProfileMapper,
+            DefaultCompositionProcessingProfileMapper>();
         hosting.Services.TryAddSingleton(static provider =>
         {
             var registry = new CompositionNodeRegistry();
@@ -29,6 +33,9 @@ public static class ApplicationRuntimeAssemblerHostingExtensions
                 contributor.Configure(registry);
             return registry;
         });
+        hosting.Services.TryAddSingleton(static provider =>
+            new ApplicationDefinitionNormalizer(
+                provider.GetRequiredService<CompositionNodeRegistry>()));
         hosting.Services.TryAddSingleton<ApplicationRuntimeAssembler>();
         hosting.Services.TryAddSingleton<IApplicationRuntimeAccess>(static provider =>
             provider.GetRequiredService<ApplicationRuntimeAssembler>());

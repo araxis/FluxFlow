@@ -43,6 +43,17 @@ queue to overflow.
 
 ## Canonical Runtime Assembly
 
+The assembler resolves component registrations through canonical aliases and
+uses the normalized definition selected by the revision host. Every component
+registration exposes a traced `Workflow.Component.Events` output in addition
+to its package ports. Component events are ordinary stable output data and are
+not duplicated into the application-level `System.Events.Output` stream.
+
+The assembler also materializes nested `processing.profile` resources as
+revision-owned keyed services. A flat component `Processing` reference is
+mapped through `ICompositionProcessingProfileMapper`; unsupported concurrency
+is rejected before the component factory runs. Defaults need no profile.
+
 `UseRuntimeAssembler(...)` is the concrete candidate factory for canonical
 application hosting. Registration is explicit: node contributors populate a
 `CompositionNodeRegistry`, while service contributors map resource definitions

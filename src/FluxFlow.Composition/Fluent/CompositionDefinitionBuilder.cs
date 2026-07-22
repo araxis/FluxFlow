@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace FluxFlow.Composition;
 
+[Obsolete("Build FluxFlow.Composition.Model.ApplicationDefinition instances for canonical applications. This legacy builder is planned for removal in the next major version.")]
 public sealed class CompositionDefinitionBuilder
 {
     private readonly Dictionary<string, WorkflowDefinition> _workflows =
@@ -112,7 +113,9 @@ public sealed class NodeDefinitionBuilder
     internal NodeDefinitionBuilder(string type)
     {
         Type = type.Trim();
+#pragma warning disable CS0618 // The legacy builder must preserve its released serializer behavior.
         _serializerOptions = CompositionDefinitionJson.CreateSerializerOptions();
+#pragma warning restore CS0618
     }
 
     public string Type { get; }

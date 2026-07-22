@@ -1,4 +1,5 @@
 using FluxFlow.Composition.Revisions;
+using FluxFlow.Composition.Model;
 
 namespace FluxFlow.Composition.Hosting.Revisions;
 
@@ -10,7 +11,8 @@ public sealed class ApplicationRevisionUpdateResult
         ApplicationRevisionUpdateStatus status,
         ApplicationRevisionPlan? plan,
         ApplicationRevisionSnapshot? snapshot,
-        IEnumerable<ApplicationRevisionFailure> failures)
+        IEnumerable<ApplicationRevisionFailure> failures,
+        IEnumerable<ApplicationDefinitionNormalizationDiagnostic>? normalizationDiagnostics = null)
     {
         Sequence = sequence;
         RevisionId = revisionId;
@@ -18,6 +20,7 @@ public sealed class ApplicationRevisionUpdateResult
         Plan = plan;
         Snapshot = snapshot;
         Failures = failures.ToArray();
+        NormalizationDiagnostics = normalizationDiagnostics?.ToArray() ?? [];
     }
 
     public long Sequence { get; }
@@ -31,6 +34,8 @@ public sealed class ApplicationRevisionUpdateResult
     public ApplicationRevisionSnapshot? Snapshot { get; }
 
     public IReadOnlyList<ApplicationRevisionFailure> Failures { get; }
+
+    public IReadOnlyList<ApplicationDefinitionNormalizationDiagnostic> NormalizationDiagnostics { get; }
 
     public bool IsActivated => Status is ApplicationRevisionUpdateStatus.Activated or
         ApplicationRevisionUpdateStatus.ActivatedWithFailures;

@@ -2,6 +2,7 @@ using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Composition.Hosting.Snapshots;
 using FluxFlow.Composition.Model;
 using FluxFlow.Composition.Revisions;
+using FluxFlow.Composition;
 using Shouldly;
 using Xunit;
 
@@ -238,6 +239,35 @@ public sealed class ApplicationRevisionCoordinatorTests
         }
     }
 
+    [Fact]
+    public async Task Alias_only_revision_normalizes_to_the_active_canonical_definition()
+    {
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "data.map",
+                static _ => throw new InvalidOperationException("Factory should not run."))
+            .RegisterAlias("flow.mapper", "data.map");
+        var normalizer = new ApplicationDefinitionNormalizer(registry);
+        var current = ComponentDefinition("data.map");
+        var factory = new FakeCandidateFactory();
+        await using var coordinator = new ApplicationRevisionCoordinator(
+            current,
+            factory,
+            eventSink: null,
+            currentCandidate: null,
+            planner: null,
+            normalizer: normalizer);
+
+        var result = await coordinator.ApplyAsync("alias-only", ComponentDefinition("flow.mapper"));
+
+        result.Status.ShouldBe(ApplicationRevisionUpdateStatus.Unchanged);
+        result.NormalizationDiagnostics.ShouldHaveSingleItem()
+            .CanonicalType.ShouldBe("data.map");
+        factory.Contexts.ShouldBeEmpty();
+        coordinator.CurrentDefinition.Workflows["Main"].Components["Map"].Type
+            .ShouldBe("data.map");
+    }
+
     private static ApplicationDefinition Definition(string endpoint)
         => ApplicationDefinitionJson.Deserialize(
             $$"""
@@ -249,6 +279,21 @@ public sealed class ApplicationRevisionCoordinatorTests
                 }
               },
               "Workflows": {}
+            }
+            """);
+
+    private static ApplicationDefinition ComponentDefinition(string componentType)
+        => ApplicationDefinitionJson.Deserialize(
+            $$"""
+            {
+              "Resources": {},
+              "Workflows": {
+                "Main": {
+                  "Map": {
+                    "Type": "{{componentType}}"
+                  }
+                }
+              }
             }
             """);
 

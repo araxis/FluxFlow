@@ -4,6 +4,7 @@ namespace FluxFlow.Composition;
 /// Root DTO for a composition document. Fluent builders and configuration loading both
 /// produce this model before validation and linking.
 /// </summary>
+[Obsolete("Use FluxFlow.Composition.Model.ApplicationDefinition. Legacy composition definitions are planned for removal in the next major version.")]
 public sealed record CompositionDefinition
 {
     private Dictionary<string, WorkflowDefinition> _workflows = new(StringComparer.Ordinal);

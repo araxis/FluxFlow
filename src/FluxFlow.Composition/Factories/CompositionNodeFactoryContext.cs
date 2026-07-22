@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FluxFlow.Composition.Model;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,7 +8,11 @@ namespace FluxFlow.Composition;
 public sealed class CompositionNodeFactoryContext
 {
     private readonly JsonSerializerOptions _serializerOptions;
+    private readonly NodeDefinition? _legacyDefinition;
+    private readonly IReadOnlyDictionary<string, string> _legacyResources;
+    private CompositionProcessingSettings? _processingSettings;
 
+    [Obsolete("Use the ComponentDefinition constructor. Legacy NodeDefinition factory contexts are planned for removal in the next major version.")]
     public CompositionNodeFactoryContext(
         IServiceProvider services,
         string workflowName,
@@ -17,9 +22,11 @@ public sealed class CompositionNodeFactoryContext
     {
         Services = services ?? throw new ArgumentNullException(nameof(services));
         WorkflowName = workflowName;
-        NodeName = nodeName;
-        Definition = definition ?? throw new ArgumentNullException(nameof(definition));
-        _serializerOptions = serializerOptions ?? CompositionDefinitionJson.CreateSerializerOptions();
+        ComponentName = nodeName;
+        _legacyDefinition = definition ?? throw new ArgumentNullException(nameof(definition));
+        _legacyResources = definition.Resources;
+        Component = ToComponentDefinition(definition);
+        _serializerOptions = serializerOptions ?? CreateSerializerOptions();
     }
 
     public CompositionNodeFactoryContext(
@@ -28,39 +35,61 @@ public sealed class CompositionNodeFactoryContext
         string componentName,
         ComponentDefinition definition,
         JsonSerializerOptions? serializerOptions = null)
-        : this(
-            services,
-            workflowName,
-            componentName,
-            ToNodeDefinition(definition),
-            serializerOptions)
     {
+        Services = services ?? throw new ArgumentNullException(nameof(services));
+        WorkflowName = workflowName;
+        ComponentName = componentName;
+        Component = definition ?? throw new ArgumentNullException(nameof(definition));
+        _legacyResources = new Dictionary<string, string>(StringComparer.Ordinal);
+        _serializerOptions = serializerOptions ?? CreateSerializerOptions();
     }
 
     public IServiceProvider Services { get; }
 
     public string WorkflowName { get; }
 
-    public string NodeName { get; }
+    public string ComponentName { get; }
 
-    public NodeDefinition Definition { get; }
+    [Obsolete("Use ComponentName. Node terminology is retained for compatibility.")]
+    public string NodeName => ComponentName;
 
-    public IReadOnlyDictionary<string, JsonElement> Configuration => Definition.Configuration;
+    public ComponentDefinition Component { get; }
 
-    public IReadOnlyDictionary<string, string> Resources => Definition.Resources;
+    [Obsolete("Use Component. Legacy wrapped node definitions are retained for compatibility.")]
+    public NodeDefinition Definition => _legacyDefinition ?? ToNodeDefinition(Component);
+
+    public IReadOnlyDictionary<string, JsonElement> Configuration => Component.Properties;
+
+    [Obsolete("Canonical resource references are flat component properties.")]
+    public IReadOnlyDictionary<string, string> Resources => _legacyResources;
 
     public T BindConfiguration<T>()
     {
-        var json = JsonSerializer.Serialize(Definition.Configuration, _serializerOptions);
+        var properties = new Dictionary<string, JsonElement>(Component.Properties, StringComparer.Ordinal);
+        RemoveProperty(properties, "Processing");
+        if (_legacyDefinition is null &&
+            !properties.Keys.Any(static name =>
+                string.Equals(name, "Name", StringComparison.OrdinalIgnoreCase)))
+        {
+            properties.Add("Name", JsonSerializer.SerializeToElement(ComponentName, _serializerOptions));
+        }
+        if (_processingSettings is not null)
+        {
+            AddPropertyIfMissing(properties, "BoundedCapacity", _processingSettings.BufferCapacity);
+            AddPropertyIfMissing(properties, "MaxDegreeOfParallelism", _processingSettings.Concurrency);
+            AddPropertyIfMissing(properties, "EnsureOrdered", _processingSettings.PreserveOrder);
+        }
+
+        var json = JsonSerializer.Serialize(properties, _serializerOptions);
         return JsonSerializer.Deserialize<T>(json, _serializerOptions)
             ?? throw new InvalidOperationException(
-                $"Configuration for node '{WorkflowName}.{NodeName}' could not be bound to {typeof(T).Name}.");
+                $"Configuration for component '{WorkflowName}.{ComponentName}' could not be bound to {typeof(T).Name}.");
     }
 
     public T? GetConfigurationValue<T>(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (!Definition.Configuration.TryGetValue(name, out var value))
+        if (!Component.Properties.TryGetValue(name, out var value))
             return default;
 
         return value.Deserialize<T>(_serializerOptions);
@@ -71,13 +100,13 @@ public sealed class CompositionNodeFactoryContext
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
         var name = resourceName.Trim();
-        if (Resources.TryGetValue(name, out var key)
+        if (_legacyResources.TryGetValue(name, out var key)
             && !string.IsNullOrWhiteSpace(key))
         {
             return key.Trim();
         }
 
-        if (Configuration.TryGetValue(name, out var property) &&
+        if (Component.Properties.TryGetValue(name, out var property) &&
             property.ValueKind == JsonValueKind.String &&
             !string.IsNullOrWhiteSpace(property.GetString()))
         {
@@ -85,7 +114,7 @@ public sealed class CompositionNodeFactoryContext
         }
 
         throw new InvalidOperationException(
-            $"Node '{WorkflowName}.{NodeName}' requires resource '{name}', but no resource reference was configured.");
+            $"Component '{WorkflowName}.{ComponentName}' requires resource '{name}', but no resource reference was configured.");
     }
 
     public TResource GetRequiredResource<TResource>(string resourceName)
@@ -100,7 +129,7 @@ public sealed class CompositionNodeFactoryContext
         catch (InvalidOperationException exception)
         {
             throw new InvalidOperationException(
-                $"Node '{WorkflowName}.{NodeName}' resource '{name}' references '{key}', but no keyed service of type '{typeof(TResource).Name}' is registered.",
+                $"Component '{WorkflowName}.{ComponentName}' resource '{name}' references '{key}', but no keyed service of type '{typeof(TResource).Name}' is registered.",
                 exception);
         }
     }
@@ -111,9 +140,9 @@ public sealed class CompositionNodeFactoryContext
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
         var name = resourceName.Trim();
-        if (!Resources.TryGetValue(name, out var key) || string.IsNullOrWhiteSpace(key))
+        if (!_legacyResources.TryGetValue(name, out var key) || string.IsNullOrWhiteSpace(key))
         {
-            if (!Configuration.TryGetValue(name, out var property) ||
+            if (!Component.Properties.TryGetValue(name, out var property) ||
                 property.ValueKind != JsonValueKind.String ||
                 string.IsNullOrWhiteSpace(property.GetString()))
             {
@@ -124,6 +153,80 @@ public sealed class CompositionNodeFactoryContext
         }
 
         return Services.GetKeyedService<TResource>(key.Trim());
+    }
+
+    internal void ConfigureProcessing(CompositionProcessingCapabilities capabilities)
+    {
+        var processing = FindProperty(Component.Properties, "Processing");
+        if (processing is null)
+            return;
+        if (processing.Value.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(processing.Value.GetString()))
+        {
+            throw new InvalidOperationException(
+                $"Component '{WorkflowName}.{ComponentName}' processing profile reference must be a non-empty string.");
+        }
+
+        var key = processing.Value.GetString()!.Trim();
+        var profile = Services.GetKeyedService<CompositionProcessingProfile>(key)
+            ?? throw new InvalidOperationException(
+                $"Component '{WorkflowName}.{ComponentName}' processing profile '{key}' is not registered.");
+        ValidateProcessingCapabilities(profile, capabilities);
+        var mapper = Services.GetService<ICompositionProcessingProfileMapper>()
+            ?? new DefaultCompositionProcessingProfileMapper();
+        _processingSettings = mapper.Map(profile)
+            ?? throw new InvalidOperationException(
+                $"Processing profile mapper returned null for component '{WorkflowName}.{ComponentName}'.");
+    }
+
+    private void ValidateProcessingCapabilities(
+        CompositionProcessingProfile profile,
+        CompositionProcessingCapabilities capabilities)
+    {
+        if (profile.Mode != CompositionProcessingMode.Parallel)
+            return;
+
+        var required = profile.Order == CompositionProcessingOrder.Preserve
+            ? CompositionProcessingCapabilities.ParallelPreservingOrder
+            : CompositionProcessingCapabilities.ParallelRelaxedOrder;
+        if ((capabilities & required) == required)
+            return;
+
+        throw new InvalidOperationException(
+            $"Component '{WorkflowName}.{ComponentName}' does not support processing mode " +
+            $"'{profile.Mode}' with order '{profile.Order}'.");
+    }
+
+    private void AddPropertyIfMissing<T>(
+        IDictionary<string, JsonElement> properties,
+        string name,
+        T value)
+    {
+        if (properties.Keys.Any(key => string.Equals(key, name, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        properties.Add(name, JsonSerializer.SerializeToElement(value, _serializerOptions));
+    }
+
+    private static void RemoveProperty(IDictionary<string, JsonElement> properties, string name)
+    {
+        var key = properties.Keys.FirstOrDefault(key =>
+            string.Equals(key, name, StringComparison.OrdinalIgnoreCase));
+        if (key is not null)
+            properties.Remove(key);
+    }
+
+    private static JsonElement? FindProperty(
+        IReadOnlyDictionary<string, JsonElement> properties,
+        string name)
+    {
+        foreach (var (key, value) in properties)
+        {
+            if (string.Equals(key, name, StringComparison.OrdinalIgnoreCase))
+                return value;
+        }
+
+        return null;
     }
 
     private static NodeDefinition ToNodeDefinition(ComponentDefinition definition)
@@ -137,5 +240,23 @@ public sealed class CompositionNodeFactoryContext
                 static property => property.Value,
                 StringComparer.Ordinal)
         };
+    }
+
+    private static JsonSerializerOptions CreateSerializerOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+        return options;
+    }
+
+    private static ComponentDefinition ToComponentDefinition(NodeDefinition definition)
+    {
+        var properties = new Dictionary<string, JsonElement>(definition.Configuration, StringComparer.Ordinal);
+        foreach (var (name, key) in definition.Resources)
+            properties.TryAdd(name, JsonSerializer.SerializeToElement(key));
+
+        return new ComponentDefinition(definition.Type, properties);
     }
 }

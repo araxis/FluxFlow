@@ -7,6 +7,8 @@ namespace FluxFlow.Composition;
 public sealed class ComposedNode
 {
     private readonly Func<ValueTask>? _disposeAsync;
+    private readonly Dictionary<string, CompositionOutputPort> _outputs;
+    private CompositionComponentEventBridge? _eventBridge;
 
     public ComposedNode(
         IFlowNode node,
@@ -19,7 +21,8 @@ public sealed class ComposedNode
     {
         Node = node ?? throw new ArgumentNullException(nameof(node));
         Inputs = ToInputDictionary(inputs);
-        Outputs = ToOutputDictionary(outputs);
+        _outputs = ToOutputDictionary(outputs);
+        Outputs = _outputs;
         Events = events;
         Errors = errors;
         Completion = completion ?? node.Completion;
@@ -40,17 +43,16 @@ public sealed class ComposedNode
 
     public async ValueTask DisposeAsync()
     {
-        Exception? nodeException = null;
+        var failures = new List<Exception>();
         try
         {
             await Node.DisposeAsync().ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            nodeException = exception;
+            failures.Add(exception);
         }
 
-        Exception? hookException = null;
         if (_disposeAsync is not null)
         {
             try
@@ -59,22 +61,48 @@ public sealed class ComposedNode
             }
             catch (Exception exception)
             {
-                hookException = exception;
+                failures.Add(exception);
             }
         }
 
-        if (nodeException is null && hookException is null)
-            return;
-
-        if (nodeException is not null && hookException is not null)
+        if (_eventBridge is not null)
         {
-            throw new AggregateException(
-                "Composed node disposal failed for the node and descriptor cleanup hook.",
-                nodeException,
-                hookException);
+            try
+            {
+                await _eventBridge.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
         }
 
-        ExceptionDispatchInfo.Capture(nodeException ?? hookException!).Throw();
+        if (failures.Count == 0)
+            return;
+        if (failures.Count == 1)
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+
+        throw new AggregateException("Composed component cleanup failed.", failures);
+    }
+
+    internal void AttachAddressableEvents(string workflowName, string componentName)
+    {
+        if (_eventBridge is not null)
+            throw new InvalidOperationException("Addressable component events are already attached.");
+        if (_outputs.ContainsKey(CompositionComponentEvents.PortName))
+        {
+            throw new InvalidOperationException(
+                $"Output port '{CompositionComponentEvents.PortName}' is reserved for component events.");
+        }
+
+        _eventBridge = new CompositionComponentEventBridge(
+            workflowName,
+            componentName,
+            Events,
+            Completion);
+        _outputs.Add(
+            CompositionComponentEvents.PortName,
+            CompositionPorts.Output(CompositionComponentEvents.PortName, _eventBridge.Output));
     }
 
     public static ComposedNode Create(
@@ -103,7 +131,7 @@ public sealed class ComposedNode
         return result;
     }
 
-    private static IReadOnlyDictionary<string, CompositionOutputPort> ToOutputDictionary(
+    private static Dictionary<string, CompositionOutputPort> ToOutputDictionary(
         IEnumerable<CompositionOutputPort>? ports)
     {
         var result = new Dictionary<string, CompositionOutputPort>(StringComparer.Ordinal);

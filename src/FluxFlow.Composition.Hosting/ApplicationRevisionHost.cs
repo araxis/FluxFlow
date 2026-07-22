@@ -12,6 +12,7 @@ public sealed class ApplicationRevisionHost : IApplicationRevisionHost, IAsyncDi
     private readonly IApplicationRevisionCandidateFactory _candidateFactory;
     private readonly IApplicationRevisionEventSink? _eventSink;
     private readonly IOptions<ApplicationRevisionHostingOptions> _options;
+    private readonly ApplicationDefinitionNormalizer? _normalizer;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private volatile ApplicationRevisionCoordinator? _coordinator;
     private volatile ApplicationRevisionLoadResult? _lastLoad;
@@ -26,11 +27,22 @@ public sealed class ApplicationRevisionHost : IApplicationRevisionHost, IAsyncDi
         IApplicationRevisionCandidateFactory candidateFactory,
         IOptions<ApplicationRevisionHostingOptions> options,
         IApplicationRevisionEventSink? eventSink = null)
+        : this(definitionSource, candidateFactory, options, eventSink, normalizer: null)
+    {
+    }
+
+    public ApplicationRevisionHost(
+        IApplicationDefinitionSource definitionSource,
+        IApplicationRevisionCandidateFactory candidateFactory,
+        IOptions<ApplicationRevisionHostingOptions> options,
+        IApplicationRevisionEventSink? eventSink,
+        ApplicationDefinitionNormalizer? normalizer)
     {
         _definitionSource = definitionSource ?? throw new ArgumentNullException(nameof(definitionSource));
         _candidateFactory = candidateFactory ?? throw new ArgumentNullException(nameof(candidateFactory));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _eventSink = eventSink;
+        _normalizer = normalizer;
     }
 
     public ApplicationRevisionHostState State => _state;
@@ -197,7 +209,10 @@ public sealed class ApplicationRevisionHost : IApplicationRevisionHost, IAsyncDi
         => _coordinator ??= new ApplicationRevisionCoordinator(
             new ApplicationDefinition(),
             _candidateFactory,
-            _eventSink);
+            _eventSink,
+            currentCandidate: null,
+            planner: null,
+            normalizer: _normalizer);
 
     private void ThrowIfUnavailable()
     {

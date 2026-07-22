@@ -24,6 +24,8 @@ public sealed class ApplicationRuntimeAssemblerTests
         ApplicationAddress.WorkflowPort("Orders", "First", "Input");
     private static readonly ApplicationAddress Output =
         ApplicationAddress.WorkflowPort("Orders", "Second", "Output");
+    private static readonly ApplicationAddress FirstEvents =
+        ApplicationAddress.WorkflowPort("Orders", "First", "Events");
     private static readonly ApplicationAddress ThirdInput =
         ApplicationAddress.WorkflowPort("Orders", "Third", "Input");
     private static readonly ApplicationAddress ThirdOutput =
@@ -64,15 +66,23 @@ public sealed class ApplicationRuntimeAssemblerTests
         ]);
         var ports = access.GetRequiredPorts();
         ports.Ports.Count(static port =>
-            port.Address.Kind == ApplicationAddressKind.WorkflowPort).ShouldBe(5);
+            port.Address.Kind == ApplicationAddressKind.WorkflowPort).ShouldBe(8);
         ports.CurrentRevision!.RevisionId.ShouldBe("initial");
 
         var firstReceive = ports.ReceiveAsync<string>(Output, TimeSpan.FromSeconds(5));
+        var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
+            FirstEvents,
+            TimeSpan.FromSeconds(5));
         (await ports.SendAsync(Input, FlowMessage.Create("value")))
             .Status.ShouldBe(PortSendStatus.Accepted);
         var first = await firstReceive;
         first.Status.ShouldBe(PortReceiveStatus.Received);
         first.Message!.Payload.ShouldBe("one:one:value");
+        var componentEvent = await eventReceive;
+        componentEvent.Status.ShouldBe(PortReceiveStatus.Received);
+        componentEvent.Message!.Payload.ComponentAddress.ShouldBe("Orders.First");
+        componentEvent.Message.Payload.Name.ShouldBe("prefix.processed");
+        componentEvent.Message.TraceId.IsEmpty.ShouldBeFalse();
 
         var revised = await host.ApplyAsync("revision-2", Definition("two:"));
 
@@ -211,6 +221,72 @@ public sealed class ApplicationRuntimeAssemblerTests
             .Status.ShouldBe(PortSendStatus.Accepted);
         (await integerReceive).Message!.Payload.ShouldBe(42);
 
+        await host.StopApplicationAsync();
+    }
+
+    [Fact]
+    public async Task Legacy_component_type_is_normalized_and_executes_through_the_runtime_assembler()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(IdentityDefinition("test.identity-legacy"))
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+            {
+                RegisterNodes(registry);
+                registry.RegisterAlias("test.identity-legacy", "test.identity-string");
+            }));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+
+        var started = await host.StartApplicationAsync();
+
+        started.Succeeded.ShouldBeTrue();
+        started.Update!.NormalizationDiagnostics.ShouldHaveSingleItem()
+            .CanonicalType.ShouldBe("test.identity-string");
+        host.CurrentDefinition!.Workflows["Orders"].Components["Value"].Type
+            .ShouldBe("test.identity-string");
+        var ports = provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
+        var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
+        var receive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(input, FlowMessage.Create("canonical")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        (await receive).Message!.Payload.ShouldBe("canonical");
+
+        await host.StopApplicationAsync();
+    }
+
+    [Fact]
+    public async Task Nested_processing_profile_resources_are_mapped_into_component_options()
+    {
+        ProcessingOptions? captured = null;
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(ProcessingDefinition())
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(registry =>
+                registry.Register(
+                    "test.processing",
+                    context =>
+                    {
+                        captured = context.BindConfiguration<ProcessingOptions>();
+                        var node = new IdentityNode<string>();
+                        return ValueTask.FromResult(ComposedNode.Create(
+                            node,
+                            inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                            outputs: [CompositionPorts.Output<string>("Output", node.Output)]));
+                    },
+                    inputs: [CompositionPorts.Metadata<string>("Input")],
+                    outputs: [CompositionPorts.Metadata<string>("Output")],
+                    processingCapabilities:
+                        CompositionProcessingCapabilities.ParallelRelaxedOrder)));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+
+        var started = await host.StartApplicationAsync();
+
+        started.Succeeded.ShouldBeTrue();
+        captured.ShouldNotBeNull();
+        captured.BoundedCapacity.ShouldBe(512);
+        captured.MaxDegreeOfParallelism.ShouldBe(4);
+        captured.EnsureOrdered.ShouldBeFalse();
         await host.StopApplicationAsync();
     }
 
@@ -411,6 +487,31 @@ public sealed class ApplicationRuntimeAssemblerTests
             }
             """);
 
+    private static ApplicationDefinition ProcessingDefinition()
+        => ApplicationDefinitionJson.Deserialize(
+            """
+            {
+              "Resources": {
+                "Processing": {
+                  "Fast": {
+                    "Type": "processing.profile",
+                    "Mode": "Parallel",
+                    "Order": "Relaxed",
+                    "Buffer": "Large"
+                  }
+                }
+              },
+              "Workflows": {
+                "Orders": {
+                  "Worker": {
+                    "Type": "test.processing",
+                    "Processing": "Resources.Processing.Fast"
+                  }
+                }
+              }
+            }
+            """);
+
     private static ApplicationDefinition IdentityDefinition(string type)
         => ApplicationDefinitionJson.Deserialize(
             $$"""
@@ -496,6 +597,12 @@ public sealed class ApplicationRuntimeAssemblerTests
         protected override Task ProcessAsync(FlowMessage<string> message)
         {
             Emit(message.With(prefix + message.Payload));
+            EmitEvent(new FlowEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                CorrelationId = message.CorrelationId,
+                Name = "prefix.processed"
+            });
             return Task.CompletedTask;
         }
     }
@@ -507,6 +614,15 @@ public sealed class ApplicationRuntimeAssemblerTests
             Emit(message);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed record ProcessingOptions
+    {
+        public int BoundedCapacity { get; init; }
+
+        public int MaxDegreeOfParallelism { get; init; }
+
+        public bool EnsureOrdered { get; init; }
     }
 
     private sealed class BlockingStartSource : IFlowSource

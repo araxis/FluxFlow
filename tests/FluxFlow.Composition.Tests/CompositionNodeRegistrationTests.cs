@@ -6,6 +6,37 @@ namespace FluxFlow.Composition.Tests;
 public sealed class CompositionNodeRegistrationTests
 {
     [Fact]
+    public void Descriptor_registration_registers_canonical_type_and_aliases_once()
+    {
+        var descriptor = new CompositionComponentTypeDescriptor(
+            "data.map",
+            ["flow.mapper", "legacy.mapper", "flow.mapper"]);
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                descriptor,
+                static _ => throw new InvalidOperationException("Factory should not run."));
+
+        descriptor.Type.ShouldBe("data.map");
+        descriptor.Aliases.ShouldBe(["flow.mapper", "legacy.mapper"]);
+        registry.TryResolveType("flow.mapper", out var canonicalType).ShouldBeTrue();
+        canonicalType.ShouldBe("data.map");
+    }
+
+    [Fact]
+    public void Descriptor_registration_does_not_attach_canonical_aliases_to_custom_types()
+    {
+        var descriptor = new CompositionComponentTypeDescriptor("data.map", ["flow.mapper"]);
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                descriptor,
+                static _ => throw new InvalidOperationException("Factory should not run."),
+                registrationType: "custom.map");
+
+        registry.TryGetRegistration("custom.map", out _).ShouldBeTrue();
+        registry.TryGetRegistration("flow.mapper", out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Port_metadata_rejects_invalid_arguments()
     {
         Should.Throw<ArgumentNullException>(() =>
@@ -116,7 +147,8 @@ public sealed class CompositionNodeRegistrationTests
 
         registration.Type.ShouldBe("test.node");
         registration.Inputs.Keys.ShouldBe(["Input"]);
-        registration.Outputs.Keys.ShouldBe(["Output"]);
+        registration.Outputs.Keys.ShouldBe(["Output", "Events"]);
+        registration.Outputs["Events"].MessageType.ShouldBe(typeof(CompositionComponentEvent));
     }
 
     [Fact]
@@ -148,6 +180,8 @@ public sealed class CompositionNodeRegistrationTests
             .RegisterAlias("flow.mapper", "data.map");
 
         registry.Registrations.Keys.ShouldBe(["data.map"]);
+        registry.TryResolveType(" flow.mapper ", out var canonicalType).ShouldBeTrue();
+        canonicalType.ShouldBe("data.map");
         registry.TryGetRegistration(" flow.mapper ", out var registration).ShouldBeTrue();
         registration.Type.ShouldBe("data.map");
     }

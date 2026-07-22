@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Composition.Hosting</PackageId>
     <AssemblyName>FluxFlow.Composition.Hosting</AssemblyName>
     <RootNamespace>FluxFlow.Composition.Hosting</RootNamespace>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional FluxFlow hosting layer for immutable DI provider snapshots, canonical keyed resources and ports, configuration sources, and hosted composition lifecycle.</Description>
     <PackageTags>workflow;dataflow;composition;hosting</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Adds canonical application definition sources and a hosted revision lifecycle with explicit candidate factories, degraded startup results, manual reload, and immutable active snapshots.</PackageReleaseNotes>
+    <PackageReleaseNotes>Normalizes canonical definitions before revision comparison and activation, reports migration diagnostics, and treats alias-equivalent revisions as unchanged.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

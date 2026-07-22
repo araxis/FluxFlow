@@ -40,6 +40,12 @@ building a snapshot, or bridge an exact external instance explicitly.
 
 ## Canonical Application Hosting
 
+When a `CompositionNodeRegistry` is supplied by the standard runtime assembler,
+the host normalizes component and resource aliases immediately after load and
+before revision planning. `ApplicationRevisionUpdateResult` exposes structured
+normalization diagnostics. Alias-only updates compare equal to the active
+canonical definition and do not prepare or activate another candidate.
+
 Register the complete flat application document and an explicit candidate
 factory. The factory prepares resource providers, workflow providers,
 components, stable-port attachments, and compiled routing for one complete

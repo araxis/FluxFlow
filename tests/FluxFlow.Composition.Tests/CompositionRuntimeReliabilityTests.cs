@@ -3,6 +3,8 @@ using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
 
+#pragma warning disable CS0618 // These tests intentionally verify the legacy compatibility surface.
+
 namespace FluxFlow.Composition.Tests;
 
 public sealed class CompositionRuntimeReliabilityTests
@@ -84,7 +86,7 @@ public sealed class CompositionRuntimeReliabilityTests
                     var sources = (ManualSourceCollection)context.Services.GetService(
                         typeof(ManualSourceCollection))!;
                     var node = new ManualSourceNode();
-                    sources.Add(context.NodeName, node);
+                    sources.Add(context.ComponentName, node);
                     return ValueTask.FromResult(ComposedNode.Create(
                         node,
                         outputs: [CompositionPorts.Output<string>("Output", node.Output)]));

@@ -44,7 +44,8 @@ public static class FluxFlowApplicationHostingServiceCollectionExtensions
             provider.GetRequiredService<IApplicationDefinitionSource>(),
             provider.GetRequiredService<IApplicationRevisionCandidateFactory>(),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApplicationRevisionHostingOptions>>(),
-            provider.GetService<IApplicationRevisionEventSink>()));
+            provider.GetService<IApplicationRevisionEventSink>(),
+            provider.GetService<ApplicationDefinitionNormalizer>()));
         services.TryAddSingleton<IApplicationRevisionHost>(
             provider => provider.GetRequiredService<ApplicationRevisionHost>());
         services.TryAddEnumerable(

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace FluxFlow.Composition;
 
+[Obsolete("Use FluxFlow.Composition.Model.ApplicationDefinitionJson. Legacy composition JSON is planned for removal in the next major version.")]
 public static class CompositionDefinitionJson
 {
     public static JsonSerializerOptions CreateSerializerOptions()

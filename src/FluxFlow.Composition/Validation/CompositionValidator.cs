@@ -1,5 +1,6 @@
 namespace FluxFlow.Composition;
 
+[Obsolete("Canonical ApplicationDefinition validation runs through revision planning and ApplicationLinkCompiler. Legacy validation is planned for removal in the next major version.")]
 public sealed class CompositionValidator
 {
     public CompositionValidationResult Validate(

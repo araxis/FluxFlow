@@ -10,6 +10,7 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
     private readonly ApplicationRevisionPlanner _planner;
     private readonly IApplicationRevisionCandidateFactory _candidateFactory;
     private readonly IApplicationRevisionEventSink? _eventSink;
+    private readonly ApplicationDefinitionNormalizer? _normalizer;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ActiveRevision _active;
     private long _sequence;
@@ -21,13 +22,32 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
         IApplicationRevisionEventSink? eventSink = null,
         IApplicationRevisionCandidate? currentCandidate = null,
         ApplicationRevisionPlanner? planner = null)
+        : this(
+            currentDefinition,
+            candidateFactory,
+            eventSink,
+            currentCandidate,
+            planner,
+            normalizer: null)
+    {
+    }
+
+    public ApplicationRevisionCoordinator(
+        ApplicationDefinition currentDefinition,
+        IApplicationRevisionCandidateFactory candidateFactory,
+        IApplicationRevisionEventSink? eventSink,
+        IApplicationRevisionCandidate? currentCandidate,
+        ApplicationRevisionPlanner? planner,
+        ApplicationDefinitionNormalizer? normalizer)
     {
         ArgumentNullException.ThrowIfNull(currentDefinition);
         ArgumentNullException.ThrowIfNull(candidateFactory);
         _planner = planner ?? new ApplicationRevisionPlanner();
         _candidateFactory = candidateFactory;
         _eventSink = eventSink;
-        _active = new ActiveRevision(currentDefinition, currentCandidate, Snapshot: null);
+        _normalizer = normalizer;
+        var normalizedCurrent = _normalizer?.Normalize(currentDefinition).Definition ?? currentDefinition;
+        _active = new ActiveRevision(normalizedCurrent, currentCandidate, Snapshot: null);
     }
 
     public ApplicationDefinition CurrentDefinition => Volatile.Read(ref _active).Definition;
@@ -48,6 +68,8 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
         IApplicationRevisionCandidate? candidate = null;
         IReadOnlyList<CompositionProviderSnapshotInfo>? providerSnapshots = null;
         var failures = new List<ApplicationRevisionFailure>();
+        IReadOnlyList<ApplicationDefinitionNormalizationDiagnostic> normalizationDiagnostics = [];
+        var normalizedNextDefinition = nextDefinition;
         var sequence = 0L;
         ApplicationRevisionPlan? plan = null;
         try
@@ -60,7 +82,14 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
             sequence = ++_sequence;
             try
             {
-                plan = _planner.Plan(active.Definition, nextDefinition);
+                var normalization = _normalizer?.Normalize(nextDefinition);
+                if (normalization is not null)
+                {
+                    normalizedNextDefinition = normalization.Definition;
+                    normalizationDiagnostics = normalization.Diagnostics;
+                }
+
+                plan = _planner.Plan(active.Definition, normalizedNextDefinition);
             }
             catch (Exception exception)
             {
@@ -209,12 +238,12 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
                 sequence,
                 revisionId,
                 DateTimeOffset.UtcNow,
-                nextDefinition,
+                normalizedNextDefinition,
                 plan,
                 providerSnapshots!);
             var previous = Interlocked.Exchange(
                 ref _active,
-                new ActiveRevision(nextDefinition, candidate, snapshot));
+                new ActiveRevision(normalizedNextDefinition, candidate, snapshot));
             candidate = null;
 
             await PublishPhaseAsync(
@@ -279,7 +308,14 @@ public sealed class ApplicationRevisionCoordinator : IAsyncDisposable
         ApplicationRevisionUpdateResult Result(
             ApplicationRevisionUpdateStatus status,
             ApplicationRevisionSnapshot? snapshot)
-            => new(sequence, revisionId, status, plan, snapshot, failures);
+            => new(
+                sequence,
+                revisionId,
+                status,
+                plan,
+                snapshot,
+                failures,
+                normalizationDiagnostics);
 
         async ValueTask RollBackCancellationAsync()
         {

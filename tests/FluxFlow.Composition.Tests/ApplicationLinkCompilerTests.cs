@@ -144,6 +144,41 @@ public sealed class ApplicationLinkCompilerTests
     }
 
     [Fact]
+    public void Component_events_support_normal_addresses_and_conditional_links()
+    {
+        var result = new ApplicationLinkCompiler(CreateRegistry(), new TestExpressionEngine())
+            .Compile(Parse(
+                """
+                {
+                  "Resources": {},
+                  "Workflows": {
+                    "Orders": {
+                      "Source": {
+                        "Type": "source",
+                        "Events": {
+                          "Port": "EventSink.Input",
+                          "Condition": "allow"
+                        }
+                      },
+                      "EventSink": { "Type": "event-sink" }
+                    }
+                  }
+                }
+                """));
+
+        result.IsValid.ShouldBeTrue();
+        var link = result.Links.ShouldHaveSingleItem();
+        link.Source.Value.ShouldBe("Orders.Source.Events");
+        link.Target.Value.ShouldBe("Orders.EventSink.Input");
+        link.MessageType.ShouldBe(typeof(CompositionComponentEvent));
+        link.IsConditional.ShouldBeTrue();
+        link.IsMatch(new FlowMapContext
+        {
+            Variables = new Dictionary<string, object?> { ["allow"] = true }
+        }).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Conditional_links_require_an_expression_engine()
     {
         var definition = Parse(
@@ -551,6 +586,10 @@ public sealed class ApplicationLinkCompilerTests
                 "sink",
                 UnusedFactory,
                 inputs: [CompositionPorts.Metadata<string>("Input", sinkCardinality)])
+            .Register(
+                "event-sink",
+                UnusedFactory,
+                inputs: [CompositionPorts.Metadata<CompositionComponentEvent>("Input")])
             .Register(
                 "transform",
                 UnusedFactory,

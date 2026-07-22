@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 
 namespace FluxFlow.Composition;
 
+[Obsolete("Use the canonical application host and runtime assembler. Legacy CompositionDefinition runtime building is planned for removal in the next major version.")]
 public sealed class CompositionRuntimeBuilder
 {
     private readonly CompositionNodeRegistry _registry;

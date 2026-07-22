@@ -2,6 +2,8 @@ using System.Text.Json;
 using Shouldly;
 using Xunit;
 
+#pragma warning disable CS0618 // These tests intentionally verify the legacy compatibility surface.
+
 namespace FluxFlow.Composition.Tests;
 
 public sealed class CompositionDefinitionBuilderTests

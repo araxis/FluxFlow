@@ -1,4 +1,5 @@
 using System.Threading.Tasks.Dataflow;
+using System.Text.Json;
 using FluxFlow.Composition;
 using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting.DependencyInjection;
@@ -149,6 +150,10 @@ public sealed class ApplicationRuntimeAssembler :
         try
         {
             var candidateServices = new ServiceCollection();
+            candidateServices.AddSingleton(
+                _hostServices.GetService<ICompositionProcessingProfileMapper>() ??
+                new DefaultCompositionProcessingProfileMapper());
+            RegisterProcessingProfiles(definition.Resources, candidateServices);
             var servicesContext = new ApplicationRuntimeServicesContext(
                 definition,
                 context,
@@ -172,7 +177,11 @@ public sealed class ApplicationRuntimeAssembler :
                 foreach (var (componentName, component) in workflow.Components)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var registration = _registry.Registrations[component.Type];
+                    if (!_registry.TryGetRegistration(component.Type, out var registration))
+                    {
+                        throw new ApplicationRuntimeAssemblerException(
+                            $"Component '{workflowName}.{componentName}' uses unregistered type '{component.Type}'.");
+                    }
                     var descriptor = await CreateComponentAsync(
                             workflowName,
                             componentName,
@@ -577,6 +586,45 @@ public sealed class ApplicationRuntimeAssembler :
                 address,
                 component.Descriptor.Outputs[metadata.Name]));
         }
+    }
+
+    private static void RegisterProcessingProfiles(
+        IReadOnlyDictionary<string, ResourceDefinition> resources,
+        IServiceCollection services)
+    {
+        foreach (var (name, resource) in resources)
+            RegisterProcessingProfile(resource, [name], services);
+    }
+
+    private static void RegisterProcessingProfile(
+        ResourceDefinition resource,
+        IReadOnlyList<string> path,
+        IServiceCollection services)
+    {
+        if (resource is ResourceGroupDefinition group)
+        {
+            foreach (var (name, child) in group.Resources)
+                RegisterProcessingProfile(child, [.. path, name], services);
+            return;
+        }
+
+        var instance = (ResourceInstanceDefinition)resource;
+        if (!string.Equals(
+                instance.Type,
+                CompositionProcessingResourceTypes.Profile,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var profile = JsonSerializer.Deserialize<CompositionProcessingProfile>(
+                JsonSerializer.Serialize(instance.Properties),
+                ApplicationDefinitionJson.CreateSerializerOptions())
+            ?? throw new ApplicationRuntimeAssemblerException(
+                $"Processing profile '{string.Join('.', path)}' could not be loaded.");
+        services.AddFluxFlowResource(
+            ApplicationAddress.Resource(path.ToArray()),
+            _ => profile);
     }
 
     private static async ValueTask DisposeDescriptorsAsync(IEnumerable<ComposedNode> descriptors)

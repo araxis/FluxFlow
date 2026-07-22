@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace FluxFlow.Composition;
 
+[Obsolete("Use ApplicationDefinitionConfigurationLoader. Legacy composition loading is planned for removal in the next major version.")]
 public sealed class CompositionConfigurationLoader
 {
     private readonly JsonSerializerOptions _serializerOptions;

@@ -7,12 +7,47 @@ public sealed class CompositionNodeRegistration
         CompositionNodeFactory factory,
         IEnumerable<CompositionPortMetadata>? inputs = null,
         IEnumerable<CompositionPortMetadata>? outputs = null)
+        : this(
+            type,
+            factory,
+            inputs,
+            outputs,
+            CompositionProcessingCapabilities.Sequential)
+    {
+    }
+
+    public CompositionNodeRegistration(
+        string type,
+        CompositionNodeFactory factory,
+        IEnumerable<CompositionPortMetadata>? inputs,
+        IEnumerable<CompositionPortMetadata>? outputs,
+        CompositionProcessingCapabilities processingCapabilities)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        Factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        ArgumentNullException.ThrowIfNull(factory);
         Type = type.Trim();
+        ProcessingCapabilities = processingCapabilities;
         Inputs = ToPortDictionary(inputs);
-        Outputs = ToPortDictionary(outputs);
+        var registeredOutputs = ToPortDictionary(outputs);
+        if (!registeredOutputs.TryAdd(
+                CompositionComponentEvents.PortName,
+                CompositionPorts.Metadata<CompositionComponentEvent>(
+                    CompositionComponentEvents.PortName)))
+        {
+            throw new ArgumentException(
+                $"Output port '{CompositionComponentEvents.PortName}' is reserved for component events.",
+                nameof(outputs));
+        }
+
+        Outputs = registeredOutputs;
+        Factory = async context =>
+        {
+            context.ConfigureProcessing(ProcessingCapabilities);
+            var component = await factory(context).ConfigureAwait(false);
+            if (component is not null)
+                component.AttachAddressableEvents(context.WorkflowName, context.ComponentName);
+            return component!;
+        };
     }
 
     public string Type { get; }
@@ -23,7 +58,9 @@ public sealed class CompositionNodeRegistration
 
     public IReadOnlyDictionary<string, CompositionPortMetadata> Outputs { get; }
 
-    private static IReadOnlyDictionary<string, CompositionPortMetadata> ToPortDictionary(
+    public CompositionProcessingCapabilities ProcessingCapabilities { get; }
+
+    private static Dictionary<string, CompositionPortMetadata> ToPortDictionary(
         IEnumerable<CompositionPortMetadata>? ports)
     {
         var result = new Dictionary<string, CompositionPortMetadata>(StringComparer.Ordinal);
