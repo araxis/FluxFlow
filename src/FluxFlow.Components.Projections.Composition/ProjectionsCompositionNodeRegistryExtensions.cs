@@ -37,7 +37,7 @@ public static class ProjectionsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<EventProjectionOptions>();
         var clock = context.GetResource<TimeProvider>(
             ProjectionsCompositionResourceNames.Clock);
-        var node = new FlowEventProjectionNode(options, clock);
+        var node = new EventProjectionNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

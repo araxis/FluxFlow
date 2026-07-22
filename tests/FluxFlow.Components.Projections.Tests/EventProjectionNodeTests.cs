@@ -1,316 +1,300 @@
-using FluxFlow.Components.Projections;
+using System.Numerics;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Components.Projections.Diagnostics;
 using FluxFlow.Components.Projections.Nodes;
 using FluxFlow.Components.Projections.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Projections.Tests;
 
-// Every test news the node directly — no engine, no registry. Events travel as
-// FlowMessage<ProjectionEvent> envelopes; the correlation id flows event -> snapshot.
 public sealed class EventProjectionNodeTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+
     [Fact]
-    public async Task Projection_CountsLatestPreviewAndRateForMatchingEvents()
+    public async Task Matching_events_emit_ordered_snapshots_with_message_lineage()
     {
-        var timeProvider = new FakeTimeProvider(
-            new DateTimeOffset(2026, 6, 3, 8, 0, 0, TimeSpan.Zero));
+        var timestamp = DateTimeOffset.Parse("2026-07-19T16:00:00Z");
+        var clock = new FakeTimeProvider(timestamp);
         await using var node = new EventProjectionNode(
             new EventProjectionOptions
             {
-                Name = "errors",
+                Name = "orders",
                 RateWindowSeconds = 10,
                 MaxPreviewChars = 4,
-                Filter = new EventFilter
-                {
-                    Type = "operation.completed",
-                    SubjectPrefix = "orders/",
-                    Status = "failed",
-                    Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
-                }
+                Filter = new EventFilter { Status = "failed" }
             },
-            timeProvider);
-        var output = Sink(node.Output);
-        var start = new DateTimeOffset(2026, 6, 3, 7, 59, 50, TimeSpan.Zero);
+            clock);
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+        var first = FlowMessage.Create(
+            Event(timestamp.AddSeconds(-5), "first", status: "failed", preview: "abcdef"),
+            new CorrelationId("first")) with
+        {
+            Headers = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            {
+                ["tenant"] = FlowValue.From("north")
+            }
+        };
+        var ignored = FlowMessage.Create(Event(timestamp.AddSeconds(-2), "ignored", status: "ok"));
+        var second = FlowMessage.Create(
+            Event(timestamp.AddSeconds(-1), "second", status: "failed"),
+            new CorrelationId("second"));
 
-        var firstSent = FlowMessage.Create(CreateEvent(
-            start,
-            "operation.completed",
-            subject: "orders/1",
-            status: "failed",
-            payloadPreview: "abcdef",
-            attributes: new Dictionary<string, string> { ["tenant"] = "north" }));
-        await node.Input.SendAsync(firstSent);
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            start.AddSeconds(5),
-            "operation.completed",
-            subject: "orders/2",
-            status: "ok",
-            payloadPreview: "ignored",
-            attributes: new Dictionary<string, string> { ["tenant"] = "north" })));
-        var thirdSent = FlowMessage.Create(CreateEvent(
-            start.AddSeconds(9),
-            "operation.completed",
-            subject: "orders/3",
-            status: "failed",
-            payloadPreview: "xyz",
-            attributes: new Dictionary<string, string> { ["tenant"] = "north" }));
-        await node.Input.SendAsync(thirdSent);
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(ignored);
+        await node.Input.SendAsync(second);
 
-        var first = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)));
-        var second = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        var firstResult = await results.ReceiveAsync().WaitAsync(Timeout);
+        var secondResult = await results.ReceiveAsync().WaitAsync(Timeout);
 
-        // Correlation flows from the triggering event to the snapshot it produced.
-        first.CorrelationId.ShouldBe(firstSent.CorrelationId);
-        first.Payload.Name.ShouldBe("errors");
-        first.Payload.Timestamp.ShouldBe(timeProvider.GetUtcNow());
-        first.Payload.ObservedCount.ShouldBe(1);
-        first.Payload.MatchedCount.ShouldBe(1);
-        first.Payload.CurrentRate.ShouldBe(0.1);
-        first.Payload.Latest.ShouldNotBeNull();
-        first.Payload.Latest.PayloadPreview.ShouldBe("abcd");
+        firstResult.Payload.Kind.ShouldBe(ProjectionResultKinds.Snapshot);
+        firstResult.CorrelationId.ShouldBe(first.CorrelationId);
+        firstResult.TraceId.ShouldBe(first.TraceId);
+        firstResult.CausationId.ShouldBe(first.MessageId);
+        firstResult.Headers.ShouldBeSameAs(first.Headers);
+        var firstSnapshot = firstResult.Payload.Value.ShouldNotBeNull();
+        firstSnapshot.Name.ShouldBe("orders");
+        firstSnapshot.ObservedCount.ShouldBe(1);
+        firstSnapshot.MatchedCount.ShouldBe(1);
+        firstSnapshot.Latest.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
 
-        second.CorrelationId.ShouldBe(thirdSent.CorrelationId);
-        second.Payload.ObservedCount.ShouldBe(3);
-        second.Payload.MatchedCount.ShouldBe(2);
-        second.Payload.CurrentRate.ShouldBe(0.2);
-        second.Payload.Latest.ShouldNotBeNull();
-        second.Payload.Latest.Subject.ShouldBe("orders/3");
-        second.Payload.Latest.PayloadPreview.ShouldBe("xyz");
+        secondResult.CorrelationId.ShouldBe(second.CorrelationId);
+        var secondSnapshot = secondResult.Payload.Value.ShouldNotBeNull();
+        secondSnapshot.ObservedCount.ShouldBe(3);
+        secondSnapshot.MatchedCount.ShouldBe(2);
+        secondSnapshot.CurrentRate.ShouldBe(0.2d);
+
+        var diagnostic = await events.ReceiveAsync().WaitAsync(Timeout);
+        diagnostic.Name.ShouldBe(ProjectionDiagnosticNames.ProjectionUpdated);
+        diagnostic.CorrelationId.ShouldBe(first.CorrelationId);
+        diagnostic.Attributes["resultKind"].ShouldBe(ProjectionResultKinds.Snapshot);
     }
 
     [Fact]
-    public async Task Output_FansOutEverySnapshotToEveryConsumer()
+    public async Task Missing_event_is_normal_failure_and_later_input_continues()
     {
         await using var node = new EventProjectionNode();
-        var logger = Sink(node.Output);
-        var mapper = Sink(node.Output);
-        var at = new DateTimeOffset(2026, 6, 3, 8, 0, 0, TimeSpan.Zero);
+        var results = Link(node.Output);
+        var missing = FlowMessage.Create<ProjectionEvent>(
+            null!,
+            new CorrelationId("missing"));
+        var valid = FlowMessage.Create(
+            Event(DateTimeOffset.Parse("2026-07-19T16:05:00Z"), "valid"),
+            new CorrelationId("valid"));
 
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(at, "a")));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(at.AddSeconds(1), "b")));
+        await node.Input.SendAsync(missing);
+        await node.Input.SendAsync(valid);
 
-        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.MatchedCount.ShouldBe(1);
-        (await logger.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.MatchedCount.ShouldBe(2);
-        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.MatchedCount.ShouldBe(1);
-        (await mapper.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload.MatchedCount.ShouldBe(2);
+        var failure = await results.ReceiveAsync().WaitAsync(Timeout);
+        var success = await results.ReceiveAsync().WaitAsync(Timeout);
+
+        failure.CorrelationId.ShouldBe(missing.CorrelationId);
+        failure.Payload.Kind.ShouldBe(ProjectionResultKinds.ProjectionFailed);
+        failure.Payload.IsError.ShouldBeTrue();
+        failure.Payload.Error.ShouldNotBeNull().Code
+            .ShouldBe(ProjectionErrorCodeNames.ProjectionFailed);
+        failure.Payload.Error.Details.GetObject()["legacyCode"].GetInteger()
+            .ShouldBe(new BigInteger(ProjectionsErrorCodes.ProjectionFailed));
+        success.CorrelationId.ShouldBe(valid.CorrelationId);
+        success.Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Projection_FiltersByChannelExclusionSourceNodeAndComponent()
+    public async Task Completion_emits_one_final_snapshot_after_accepted_input()
     {
-        var nodeId = Guid.NewGuid().ToString();
+        var eventTime = DateTimeOffset.Parse("2026-06-01T00:00:00Z");
+        var clock = new FakeTimeProvider(eventTime.AddDays(30));
+        await using var node = new EventProjectionNode(
+            new EventProjectionOptions
+            {
+                EmitEveryMatch = false,
+                EmitFinalSnapshot = true,
+                RateWindowSeconds = 10
+            },
+            clock);
+        var results = Link(node.Output);
+        var first = FlowMessage.Create(Event(eventTime, "first"));
+        var last = FlowMessage.Create(
+            Event(eventTime.AddSeconds(1), "last"),
+            new CorrelationId("last"));
+
+        await node.Input.SendAsync(first);
+        await node.Input.SendAsync(last);
+        node.Complete();
+        await node.Completion.WaitAsync(Timeout);
+
+        var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        result.Payload.Kind.ShouldBe(ProjectionResultKinds.FinalSnapshot);
+        result.CorrelationId.ShouldBe(last.CorrelationId);
+        result.TraceId.ShouldBe(last.TraceId);
+        result.CausationId.ShouldBe(last.MessageId);
+        var snapshot = result.Payload.Value.ShouldNotBeNull();
+        snapshot.Timestamp.ShouldBe(clock.GetUtcNow());
+        snapshot.ObservedCount.ShouldBe(2);
+        snapshot.MatchedCount.ShouldBe(2);
+        snapshot.CurrentRate.ShouldBe(0.2d);
+        results.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Filtered_input_completes_without_output_when_final_snapshot_is_disabled()
+    {
+        await using var node = new EventProjectionNode(new EventProjectionOptions
+        {
+            Filter = new EventFilter { Type = "expected" }
+        });
+        var results = Link(node.Output);
+
+        await node.Input.SendAsync(EventMessage("ignored"));
+        node.Complete();
+        await node.Completion.WaitAsync(Timeout);
+
+        results.TryReceive(out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Output_fans_out_each_result_to_every_consumer()
+    {
+        await using var node = new EventProjectionNode();
+        var first = Link(node.Output);
+        var second = Link(node.Output);
+
+        await node.Input.SendAsync(EventMessage("event"));
+
+        (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().MatchedCount.ShouldBe(1);
+        (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Value
+            .ShouldNotBeNull().MatchedCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Invalid_options_fail_before_processing()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new EventProjectionNode(new EventProjectionOptions
+            {
+                RateWindowSeconds = 0
+            })).Message.ShouldContain("rateWindowSeconds");
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new EventProjectionNode(new EventProjectionOptions
+            {
+                BoundedCapacity = 0
+            })).Message.ShouldContain("boundedCapacity");
+    }
+
+    [Fact]
+    public async Task Filter_applies_exclusions_identity_attributes_and_time_range()
+    {
+        var from = DateTimeOffset.Parse("2026-06-03T10:00:00Z");
+        var to = from.AddMinutes(1);
+        var sourceNodeId = Guid.NewGuid().ToString();
         await using var node = new EventProjectionNode(new EventProjectionOptions
         {
             Filter = new EventFilter
             {
+                TypePrefix = "item.",
+                SubjectPrefix = "orders/",
                 ChannelPrefix = "events/",
                 ExcludedChannelPrefix = "events/debug",
                 Source = "processor",
-                SourceNodeId = nodeId,
-                ComponentId = "component-a"
+                SourceNodeId = sourceNodeId,
+                ComponentId = "component-a",
+                Attributes = new Dictionary<string, string> { ["tenant"] = "north" },
+                From = from,
+                To = to
             }
         });
-        var output = Sink(node.Output);
-        var timestamp = new DateTimeOffset(2026, 6, 3, 9, 0, 0, TimeSpan.Zero);
+        var results = Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            timestamp,
-            "item.observed",
-            source: "processor",
-            channel: "events/debug/trace",
-            sourceNodeId: nodeId,
-            attributes: new Dictionary<string, string> { ["componentId"] = "component-a" })));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            timestamp.AddSeconds(1),
-            "item.observed",
-            source: "processor",
+        await node.Input.SendAsync(FlowMessage.Create(Event(
+            from.AddSeconds(-1),
+            "item.created",
+            subject: "orders/1",
             channel: "events/live",
-            sourceNodeId: nodeId,
-            attributes: new Dictionary<string, string> { ["componentId"] = "component-a" })));
+            source: "processor",
+            sourceNodeId: sourceNodeId,
+            attributes: Attributes())));
+        await node.Input.SendAsync(FlowMessage.Create(Event(
+            from.AddSeconds(1),
+            "item.created",
+            subject: "orders/2",
+            channel: "events/debug/trace",
+            source: "processor",
+            sourceNodeId: sourceNodeId,
+            attributes: Attributes())));
+        await node.Input.SendAsync(FlowMessage.Create(Event(
+            from.AddSeconds(30),
+            "item.created",
+            subject: "orders/3",
+            channel: "events/live",
+            source: "processor",
+            sourceNodeId: sourceNodeId,
+            attributes: Attributes())));
 
-        var snapshot = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        snapshot.ObservedCount.ShouldBe(2);
+        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        snapshot.ObservedCount.ShouldBe(3);
         snapshot.MatchedCount.ShouldBe(1);
-        snapshot.Latest.ShouldNotBeNull();
-        snapshot.Latest.Channel.ShouldBe("events/live");
-        snapshot.Latest.SourceNodeId.ShouldBe(nodeId);
-    }
+        snapshot.Latest.ShouldNotBeNull().Subject.ShouldBe("orders/3");
 
-    [Fact]
-    public async Task Projection_AppliesTimeRange()
-    {
-        var from = new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero);
-        var to = from.AddMinutes(1);
-        await using var node = new EventProjectionNode(new EventProjectionOptions
+        static Dictionary<string, string> Attributes() => new(StringComparer.Ordinal)
         {
-            Filter = new EventFilter { From = from, To = to }
-        });
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(from.AddSeconds(-1), "event.before")));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(from.AddSeconds(30), "event.inside")));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(to.AddSeconds(1), "event.after")));
-
-        var snapshot = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        snapshot.ObservedCount.ShouldBe(2);
-        snapshot.MatchedCount.ShouldBe(1);
-        snapshot.Latest.ShouldNotBeNull();
-        snapshot.Latest.Type.ShouldBe("event.inside");
+            ["componentId"] = "component-a",
+            ["tenant"] = "north"
+        };
     }
 
     [Fact]
-    public async Task Projection_EmitsFinalSnapshotWhenConfigured()
-    {
-        var timestamp = new DateTimeOffset(2026, 6, 3, 11, 0, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(timestamp);
-        await using var node = new EventProjectionNode(
-            new EventProjectionOptions
-            {
-                RateWindowSeconds = 10,
-                EmitEveryMatch = false,
-                EmitFinalSnapshot = true,
-                Filter = new EventFilter { TypePrefix = "task." }
-            },
-            timeProvider);
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(timestamp, "task.started")));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(timestamp.AddSeconds(1), "task.completed")));
-        timeProvider.SetUtcNow(timestamp.AddSeconds(20));
-        await node.CompleteWithFinalSnapshotAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        var snapshot = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        snapshot.Timestamp.ShouldBe(timeProvider.GetUtcNow());
-        snapshot.MatchedCount.ShouldBe(2);
-        snapshot.CurrentRate.ShouldBe(0.2);
-        snapshot.Latest.ShouldNotBeNull();
-        snapshot.Latest.Type.ShouldBe("task.completed");
-    }
-
-    [Fact]
-    public async Task Projection_FinalSnapshotKeepsRateForReplayedEventTimestamps()
-    {
-        var eventTime = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(eventTime.AddDays(30));
-        await using var node = new EventProjectionNode(
-            new EventProjectionOptions
-            {
-                RateWindowSeconds = 10,
-                EmitEveryMatch = false,
-                EmitFinalSnapshot = true
-            },
-            timeProvider);
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(eventTime, "replayed.first")));
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(eventTime.AddSeconds(1), "replayed.second")));
-        await node.CompleteWithFinalSnapshotAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        // The rate window is trimmed against the last event timestamp, so replayed
-        // streams with old event timestamps keep a meaningful final rate.
-        var snapshot = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        snapshot.Timestamp.ShouldBe(timeProvider.GetUtcNow());
-        snapshot.MatchedCount.ShouldBe(2);
-        snapshot.CurrentRate.ShouldBe(0.2);
-    }
-
-    [Fact]
-    public async Task Projection_TreatsNullFilterAsMatchAll()
+    public async Task Null_filter_matches_every_event()
     {
         await using var node = new EventProjectionNode(new EventProjectionOptions
         {
             Filter = null!
         });
-        var output = Sink(node.Output);
+        var results = Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            new DateTimeOffset(2026, 6, 3, 11, 30, 0, TimeSpan.Zero),
-            "operation.completed")));
+        await node.Input.SendAsync(EventMessage("operation.completed"));
 
-        var snapshot = (await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))).Payload;
-        snapshot.MatchedCount.ShouldBe(1);
+        (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull().MatchedCount.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Projection_EmitsEventCarryingCorrelationIdForMatches()
+    public void Filter_matcher_supports_attributes_and_prefixes()
     {
-        await using var node = new EventProjectionNode();
-        Sink(node.Output);
-        var events = Sink(node.Events);
-        var timestamp = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
-
-        var sent = FlowMessage.Create(CreateEvent(timestamp, "first"));
-        await node.Input.SendAsync(sent);
-
-        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        @event.Name.ShouldBe(ProjectionDiagnosticNames.ProjectionUpdated);
-        @event.Level.ShouldBe(FlowEventLevel.Information);
-        @event.CorrelationId.ShouldBe(sent.CorrelationId);
-        @event.Attributes["matchedCount"].ShouldBe(1L);
-    }
-
-    [Fact]
-    public void Projection_RejectsInvalidOptions()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventProjectionNode(new EventProjectionOptions { RateWindowSeconds = 0 }));
-
-        exception.Message.ShouldContain("rateWindowSeconds");
-    }
-
-    [Fact]
-    public void Projection_RejectsInvalidBoundedCapacity()
-    {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventProjectionNode(new EventProjectionOptions { BoundedCapacity = 0 }));
-
-        exception.Message.ShouldContain("boundedCapacity");
-    }
-
-    [Fact]
-    public void EventFilterMatcher_MatchesAttributeAndPrefixes()
-    {
-        var flowEvent = CreateEvent(
-            new DateTimeOffset(2026, 6, 3, 13, 0, 0, TimeSpan.Zero),
+        var projectionEvent = Event(
+            DateTimeOffset.Parse("2026-06-03T13:00:00Z"),
             "file.created",
             subject: "files/inbox/report.json",
             channel: "events/files",
             attributes: new Dictionary<string, string> { ["kind"] = "document" });
 
-        EventFilterMatcher.IsMatch(
-            flowEvent,
-            new EventFilter
-            {
-                TypePrefix = "file.",
-                SubjectPrefix = "files/inbox",
-                ChannelPrefix = "events/",
-                Attributes = new Dictionary<string, string> { ["kind"] = "document" }
-            }).ShouldBeTrue();
+        EventFilterMatcher.IsMatch(projectionEvent, new EventFilter
+        {
+            TypePrefix = "file.",
+            SubjectPrefix = "files/inbox",
+            ChannelPrefix = "events/",
+            Attributes = new Dictionary<string, string> { ["kind"] = "document" }
+        }).ShouldBeTrue();
     }
 
-    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
-    {
-        var sink = new BufferBlock<T>();
-        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = false });
-        return sink;
-    }
+    private static FlowMessage<ProjectionEvent> EventMessage(string type)
+        => FlowMessage.Create(Event(DateTimeOffset.UtcNow, type));
 
-    private static ProjectionEvent CreateEvent(
+    private static ProjectionEvent Event(
         DateTimeOffset timestamp,
         string type,
-        string source = "processor",
+        string status = "ok",
+        string? preview = null,
         string? subject = null,
-        string? status = null,
         string? channel = null,
-        string? payloadPreview = null,
+        string source = "test",
         string? sourceNodeId = null,
         IReadOnlyDictionary<string, string>? attributes = null)
         => new()
@@ -320,10 +304,17 @@ public sealed class EventProjectionNodeTests
             Source = source,
             SourceNodeId = sourceNodeId,
             Subject = subject,
-            Status = status,
             Channel = channel,
-            PayloadBytes = payloadPreview?.Length,
-            PayloadPreview = payloadPreview,
+            Status = status,
+            PayloadPreview = preview,
+            PayloadBytes = preview?.Length,
             Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)
         };
+
+    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
+    {
+        var buffer = new BufferBlock<T>();
+        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
+        return buffer;
+    }
 }

@@ -37,7 +37,7 @@ public static class MetricsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<MetricsAggregateOptions>();
         var clock = context.GetResource<TimeProvider>(
             MetricsCompositionResourceNames.Clock);
-        var node = new FlowMetricsAggregateNode(options, clock);
+        var node = new MetricsAggregateNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

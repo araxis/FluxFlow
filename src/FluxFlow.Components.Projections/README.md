@@ -9,13 +9,13 @@ Composition or Engine package is required.
 
 | Node | Input | Output |
 |------|-------|--------|
-| `FlowEventProjectionNode` | `ProjectionEvent` | `FlowResult<EventProjectionSnapshot>` |
+| `EventProjectionNode` | `ProjectionEvent` | `FlowResult<EventProjectionSnapshot>` |
 
 The node also exposes Events for lifecycle and projection diagnostics. It has
 no universal Errors port.
 
 ```csharp
-await using var node = new FlowEventProjectionNode(
+await using var node = new EventProjectionNode(
     new EventProjectionOptions
     {
         Name = "failed-operations",
@@ -83,13 +83,13 @@ A null filter is normalized to match all events.
 lifecycle. `Fault(exception)` remains the unexpected data-path fault surface,
 and `DisposeAsync()` completes and drains the node.
 
-## Direct-Result Compatibility
+## 5.0 Migration
 
-`EventProjectionNode` remains available with its released direct
-`EventProjectionSnapshot` Output, Errors port, Events, and explicit
-`CompleteWithFinalSnapshotAsync()` flush behavior. It is a compatibility surface
-for existing code-authored workflows. No implicit conversion exists between its
-output and `FlowResult<EventProjectionSnapshot>` links.
+`EventProjectionNode` is now the single projection implementation and emits
+`FlowResult<EventProjectionSnapshot>` on Output. The 4.x direct snapshot Output
+and Errors port were removed together with the temporary
+`FlowEventProjectionNode` name. Consumers should inspect `IsError`, `Kind`, and
+`Error`, and read `Value` for successful matching or final snapshots.
 
 ## Composition
 

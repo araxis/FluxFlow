@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Metrics</PackageId>
     <AssemblyName>FluxFlow.Components.Metrics</AssemblyName>
     <RootNamespace>FluxFlow.Components.Metrics</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone metric aggregation nodes with canonical normal-result snapshots and a direct-result compatibility surface.</Description>
+    <Description>Standalone metric aggregation nodes with canonical normal-result snapshots.</Description>
     <PackageTags>workflow;dataflow;components;metrics;rate;dashboard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds FlowMetricsAggregateNode with one normal FlowResult snapshot output, partial group-limit results, ordered final snapshots, stable result/error kinds, and strong message lineage. The released MetricsAggregateNode remains available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates metric aggregation on MetricsAggregateNode with one normal FlowResult snapshot output. Removes the direct-result and Errors compatibility implementation plus the temporary FlowMetricsAggregateNode name while preserving partial group-limit results, ordered final snapshots, stable result/error kinds, and message lineage.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

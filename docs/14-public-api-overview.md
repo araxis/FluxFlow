@@ -664,9 +664,10 @@ applications, and expected failures through one
 Errors port. The factory binds `MetricsAggregateOptions` and can resolve an
 optional keyed `TimeProvider` resource through the host.
 
-The runtime package retains the released `MetricsAggregateNode`, direct
-snapshot Output, Errors port, and aggregation behavior for code-authored
-compatibility. Composition `2.x` registers only the canonical fixed contract.
+Runtime package 5.0 consolidates this contract on `MetricsAggregateNode` and
+removes the 4.x direct snapshot Output, Errors port, and temporary
+`FlowMetricsAggregateNode` name. Code-authored consumers inspect the normal
+result and read its optional snapshot Value.
 
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `metric.aggregate` composition node, including existing metrics aggregate
@@ -964,9 +965,10 @@ factory binds `EventProjectionOptions` and can resolve an optional keyed
 `TimeProvider` through an exact host-owned resource address. A configured final
 snapshot is emitted after accepted input drains during normal completion.
 
-The runtime package retains the released `EventProjectionNode`, direct snapshot
-Output, Errors port, and explicit final-flush API for code-authored
-compatibility. Composition `2.x` registers only the canonical fixed contract.
+Runtime package 5.0 consolidates this contract on `EventProjectionNode` and
+removes the 4.x direct snapshot Output, Errors port, and temporary
+`FlowEventProjectionNode` name. The explicit final-flush helper remains and
+waits for the same canonical completion lifecycle.
 
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `event.project` composition node, including existing projection

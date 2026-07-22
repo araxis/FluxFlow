@@ -9,13 +9,13 @@ output. No Composition or Engine package is required.
 
 | Node | Input | Output |
 |------|-------|--------|
-| `FlowMetricsAggregateNode` | `MetricSampleInput` | `FlowResult<MetricSnapshotOutput>` |
+| `MetricsAggregateNode` | `MetricSampleInput` | `FlowResult<MetricSnapshotOutput>` |
 
 The node also exposes Events for lifecycle and aggregation diagnostics. It has
 no universal Errors port.
 
 ```csharp
-await using var node = new FlowMetricsAggregateNode(
+await using var node = new MetricsAggregateNode(
     new MetricsAggregateOptions
     {
         RateWindowSeconds = 60,
@@ -81,13 +81,14 @@ All result messages preserve correlation, trace, causation, and headers through
 `Fault(exception)` remains the unexpected Dataflow fault surface, and
 `DisposeAsync()` completes and drains the node.
 
-## Direct-Result Compatibility
+## 5.0 Migration
 
-`MetricsAggregateNode` remains available with its released direct
-`MetricSnapshotOutput` Output, Errors port, Events, and aggregation behavior. It
-is a compatibility surface for existing code-authored workflows. No implicit
-conversion exists between its output and
-`FlowResult<MetricSnapshotOutput>` links.
+`MetricsAggregateNode` is now the single aggregation implementation and emits
+`FlowResult<MetricSnapshotOutput>` on Output. The 4.x direct snapshot Output and
+Errors port were removed together with the temporary
+`FlowMetricsAggregateNode` name. Consumers should inspect `IsError`, `Kind`, and
+`Error`, and read `Value` for successful snapshots or partial group-limit
+results.
 
 ## Composition
 

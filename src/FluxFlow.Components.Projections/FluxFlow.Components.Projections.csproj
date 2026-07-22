@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Projections</PackageId>
     <AssemblyName>FluxFlow.Components.Projections</AssemblyName>
     <RootNamespace>FluxFlow.Components.Projections</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone event projection nodes with canonical normal-result snapshots and a direct-result compatibility surface.</Description>
+    <Description>Standalone event projection nodes with canonical normal-result snapshots.</Description>
     <PackageTags>workflow;dataflow;components;events;projections;monitoring</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds FlowEventProjectionNode with one normal FlowResult snapshot output, automatic ordered final snapshots, stable result/error kinds, and strong message lineage. The released EventProjectionNode remains available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates event projection on EventProjectionNode with one normal FlowResult snapshot output. Removes the direct-result and Errors compatibility implementation plus the temporary FlowEventProjectionNode name while preserving ordered final snapshots, stable result/error kinds, and message lineage.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

@@ -140,18 +140,34 @@
       "verification": ["classification parity", "preview limits", "JSON and XML formatting", "base64 detection", "result migration"]
     },
     {
-      "id": "components.direct-result-compatibility",
+      "id": "components.metrics-projections-direct-result-compatibility",
       "kind": "public-api",
-      "packages": ["components-metrics", "components-projections", "components-expectations"],
-      "declarations": ["MetricsAggregateNode", "EventProjectionNode", "EventExpectationNode", "direct result outputs", "Errors outputs"],
-      "sourceFiles": ["src/FluxFlow.Components.Metrics/Nodes/MetricsAggregateNode.cs", "src/FluxFlow.Components.Projections/Nodes/EventProjectionNode.cs", "src/FluxFlow.Components.Expectations/Nodes/EventExpectationNode.cs"],
-      "canonicalReplacement": "FlowMetricsAggregateNode, FlowEventProjectionNode, and FlowEventExpectationNode using FlowResult outputs.",
+      "packages": ["components-metrics", "components-projections"],
+      "declarations": ["MetricsAggregateNode 4.x direct-result implementation", "FlowMetricsAggregateNode", "EventProjectionNode 4.x direct-result implementation", "FlowEventProjectionNode", "direct result outputs", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Metrics/Nodes/MetricsAggregateNode.cs", "src/FluxFlow.Components.Projections/Nodes/EventProjectionNode.cs"],
+      "canonicalReplacement": "MetricsAggregateNode and EventProjectionNode using FlowResult outputs.",
       "currentConsumers": ["direct-node tests", "code-authored integrations", "completion helper callers"],
       "uniqueBehavior": ["Direct result types, dedicated Errors streams, and explicit final-snapshot completion helpers."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major runtime package versions 5.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Metrics 4.0.0", "FluxFlow.Components.Projections 4.0.0"],
+      "apiCompatibilityFindings": ["CP0001: temporary FlowMetricsAggregateNode and FlowEventProjectionNode types removed", "CP0007: concise node names no longer inherit FlowNode<TInput,TDirectOutput> because Output now carries FlowResult<T>"],
+      "migration": "Use the concise node names, inspect FlowResult status, kind, and error fields, and read the optional Value for successful or partial snapshots.",
+      "verification": ["aggregation parity", "paused-consumer ordered delivery", "final snapshot exact-once behavior", "completion concurrency", "failure result mapping", "SDK package validation against 4.0.0 reports only the documented intentional removals"]
+    },
+    {
+      "id": "components.expectations-direct-result-compatibility",
+      "kind": "public-api",
+      "packages": ["components-expectations"],
+      "declarations": ["EventExpectationNode", "FlowEventExpectationNode", "direct result output", "Errors output"],
+      "sourceFiles": ["src/FluxFlow.Components.Expectations/Nodes/EventExpectationNode.cs", "src/FluxFlow.Components.Expectations/Nodes/FlowEventExpectationNode.cs"],
+      "canonicalReplacement": "EventExpectationNode using a FlowResult output after the canonical implementation assumes the concise name.",
+      "currentConsumers": ["direct-node tests", "code-authored integrations", "expectations composition registration"],
+      "uniqueBehavior": ["Direct expectation result type, dedicated Errors stream, custom evaluator behavior, and completion semantics."],
       "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for each affected runtime package.",
-      "migration": "Preserve final-emission lifecycle behavior and provide explicit result extraction guidance before deleting direct-result nodes.",
-      "verification": ["aggregation parity", "final snapshot exact-once behavior", "completion concurrency", "failure result mapping"]
+      "versionImpact": "Major for the Expectations runtime package.",
+      "migration": "Preserve evaluator and completion behavior, then consume expected failures as normal FlowResult values instead of an Errors port.",
+      "verification": ["rule evaluation parity", "custom evaluator behavior", "completion behavior", "failure result mapping"]
     },
     {
       "id": "components.http-typed-compatibility",

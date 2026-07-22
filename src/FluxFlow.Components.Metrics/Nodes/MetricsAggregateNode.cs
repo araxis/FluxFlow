@@ -1,33 +1,36 @@
+using System.Globalization;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Metrics.Contracts;
 using FluxFlow.Components.Metrics.Diagnostics;
 using FluxFlow.Components.Metrics.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
+using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Metrics.Nodes;
 
 /// <summary>
-/// A standalone metrics-aggregation node. Post a
-/// <c>FlowMessage&lt;MetricSampleInput&gt;</c> to <c>Input</c>; the node folds each
-/// sample into a rolling aggregate and broadcasts a
-/// <c>FlowMessage&lt;MetricSnapshotOutput&gt;</c> on <c>Output</c> carrying the same
-/// correlation id (rejected-group / invalid-sample failures on <c>Errors</c>,
-/// diagnostics on <c>Events</c>). Works with nothing but
-/// <c>new MetricsAggregateNode(options, clock)</c> — no engine. Snapshots are
-/// broadcast (latest-wins per consumer); when <see cref="MetricsAggregateOptions.EmitEverySample"/>
-/// is disabled the node coalesces to a single final snapshot emitted as the input drains.
+/// Folds ordered metric samples into snapshots and emits successes, partial
+/// group-limit outcomes, and expected failures through one normal output.
 /// </summary>
-public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSnapshotOutput>
+public sealed class MetricsAggregateNode : IFlowNode
 {
     private const string DefaultGroup = "default";
     private const int MaxTrackedRejectedGroups = 1024;
 
     private readonly MetricsAggregateOptions _options;
-    private readonly TimeProvider _timeProvider;
+    private readonly TimeProvider _clock;
     private readonly TimeSpan _rateWindow;
     private readonly Queue<DateTimeOffset> _rateSamples = new();
     private readonly Dictionary<string, GroupState> _groups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejectedGroups = new(StringComparer.Ordinal);
-    private CorrelationId? _lastCorrelationId;
+    private readonly ActionBlock<FlowMessage<MetricSampleInput>> _processor;
+    private readonly BroadcastBlock<FlowMessage<FlowResult<MetricSnapshotOutput>>> _output =
+        new(static message => message);
+    private readonly BroadcastBlock<FlowEvent> _events = new(static @event => @event);
+    private readonly TaskCompletionSource _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private FlowMessage<MetricSampleInput>? _lastAcceptedMessage;
     private DateTimeOffset? _firstTimestamp;
     private DateTimeOffset? _latestTimestamp;
     private bool _rejectedGroupTrackingCapped;
@@ -40,77 +43,85 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     private double? _minValue;
     private double? _maxValue;
     private long _totalSize;
-    private int _finalSnapshotEmitted;
+    private int _disposed;
 
     public MetricsAggregateNode(
         MetricsAggregateOptions? options = null,
         TimeProvider? clock = null)
-        : this(ResolveOptions(options), clock, validated: true)
     {
-    }
-
-    private MetricsAggregateNode(
-        MetricsAggregateOptions options,
-        TimeProvider? clock,
-        bool validated)
-        : base(new FlowNodeOptions
-        {
-            InputCapacity = options.BoundedCapacity,
-            MaxDegreeOfParallelism = 1
-        })
-    {
-        _options = options;
-        _timeProvider = clock ?? TimeProvider.System;
+        _options = options ?? new MetricsAggregateOptions();
+        _clock = clock ?? TimeProvider.System;
         _rateWindow = TimeSpan.FromSeconds(_options.RateWindowSeconds);
+        _processor = new ActionBlock<FlowMessage<MetricSampleInput>>(
+            Process,
+            new ExecutionDataflowBlockOptions
+            {
+                BoundedCapacity = _options.BoundedCapacity,
+                MaxDegreeOfParallelism = 1,
+                EnsureOrdered = true
+            });
+        _ = MonitorCompletionAsync();
     }
 
-    private static MetricsAggregateOptions ResolveOptions(MetricsAggregateOptions? options)
+    public ITargetBlock<FlowMessage<MetricSampleInput>> Input => _processor;
+
+    public ISourceBlock<FlowMessage<FlowResult<MetricSnapshotOutput>>> Output => _output;
+
+    public ISourceBlock<FlowEvent> Events => _events;
+
+    public Task Completion => _completion.Task;
+
+    public void Complete() => _processor.Complete();
+
+    public void Fault(Exception exception)
     {
-        var resolved = options ?? new MetricsAggregateOptions();
-        return resolved;
+        ArgumentNullException.ThrowIfNull(exception);
+        ((IDataflowBlock)_processor).Fault(exception);
     }
 
-    protected override Task ProcessAsync(FlowMessage<MetricSampleInput> message)
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        Complete();
+        try
+        {
+            await Completion.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Completion remains the authoritative unexpected-fault surface.
+        }
+    }
+
+    private void Process(FlowMessage<MetricSampleInput> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        return AggregateAsync(message);
-    }
-
-    // In coalesce mode (EmitEverySample = false) the single final snapshot is emitted from
-    // the kit's drain hook. The kit guarantees this runs after the input has drained and
-    // every ProcessAsync has completed, and before Output is completed — so the final
-    // snapshot reliably reaches consumers without racing input-buffer completion (the
-    // previous bounded-yield handshake could drop it under scheduling pressure).
-    protected override ValueTask OnInputCompletedAsync()
-    {
-        if (!_options.EmitEverySample)
-        {
-            TryEmitFinalSnapshot();
-        }
-
-        return ValueTask.CompletedTask;
-    }
-
-    private Task AggregateAsync(FlowMessage<MetricSampleInput> message)
-    {
         var sample = message.Payload;
         try
         {
-            _lastCorrelationId = message.CorrelationId;
-            var timestamp = sample.Timestamp ?? _timeProvider.GetUtcNow();
+            if (sample is null)
+            {
+                throw new MetricsOperationException(
+                    MetricsErrorCodeNames.InvalidSample,
+                    MetricsErrorCodes.InvalidSample,
+                    "metrics.aggregate requires a metric sample input.");
+            }
+
+            var timestamp = sample.Timestamp ?? _clock.GetUtcNow();
             var value = ResolveValue(sample);
             var size = ResolveSize(sample);
             var groupKey = ResolveGroup(sample);
 
+            _lastAcceptedMessage = message;
             _firstTimestamp ??= timestamp;
             _latestTimestamp = timestamp;
             _sampleCount++;
             _latestName = Normalize(sample.Name);
             _latestUnit = Normalize(sample.Unit);
             if (_options.TrackLatest)
-            {
                 _latest = CopySample(sample, timestamp);
-            }
 
             AddRateSample(_rateSamples, timestamp);
             if (value.HasValue)
@@ -129,74 +140,122 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
             }
 
             if (_options.TrackSize && size.HasValue)
-            {
                 _totalSize += size.Value;
-            }
 
-            // Samples whose group was rejected by maxGroups intentionally still update
-            // the global aggregates; only the per-group itemization is skipped.
-            UpdateGroup(groupKey, timestamp, value, size);
-            if (_options.EmitEverySample)
+            var groupLimit = UpdateGroup(groupKey, timestamp, value, size);
+            var snapshot = CreateSnapshot(timestamp);
+            if (groupLimit is not null)
             {
-                // Carry the correlation id of the sample that produced this snapshot.
-                Emit(message.With(CreateSnapshot(timestamp)));
+                PublishGroupLimit(message, snapshot, groupLimit);
+            }
+            else if (_options.EmitEverySample)
+            {
+                _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Success(
+                    MetricsResultKinds.Snapshot,
+                    snapshot,
+                    timestamp)));
             }
 
-            TryEmitDiagnostic(
+            PublishEvent(
                 message.CorrelationId,
+                _clock.GetUtcNow(),
                 MetricsDiagnosticNames.AggregateUpdated,
-                level: FlowEventLevel.Information,
-                eventMessage: "metrics.aggregate updated snapshot.",
-                attributes: CreateUpdateAttributes(timestamp));
+                FlowEventLevel.Information,
+                "metrics.aggregate updated snapshot.",
+                MetricsResultKinds.Snapshot,
+                snapshot,
+                isError: false);
         }
-        catch (MetricsAggregateException exception)
+        catch (MetricsOperationException exception)
         {
-            ReportAggregateError(
-                exception.Code,
-                exception.Message,
-                message,
-                exception.InnerException);
+            PublishFailure(message, sample, exception);
         }
         catch (Exception exception)
         {
-            ReportAggregateError(
-                MetricsErrorCodes.AggregateFailed,
-                $"metrics.aggregate failed: {exception.Message}",
+            PublishFailure(
                 message,
-                exception);
+                sample,
+                new MetricsOperationException(
+                    MetricsErrorCodeNames.AggregateFailed,
+                    MetricsErrorCodes.AggregateFailed,
+                    $"metrics.aggregate failed: {exception.Message}",
+                    exception));
         }
-
-        return Task.CompletedTask;
     }
 
-    private void TryEmitFinalSnapshot()
+    private void PublishGroupLimit(
+        FlowMessage<MetricSampleInput> message,
+        MetricSnapshotOutput snapshot,
+        GroupLimitNotice notice)
     {
-        if (_options.EmitEverySample || !_latestTimestamp.HasValue)
+        var timestamp = _clock.GetUtcNow();
+        var details = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
         {
-            return;
-        }
+            ["group"] = FlowValue.From(notice.Group),
+            ["legacyCode"] = FlowValue.From(MetricsErrorCodes.GroupLimitReached),
+            ["maxGroups"] = FlowValue.From(_options.MaxGroups),
+            ["maxTrackedRejectedGroups"] = FlowValue.From(MaxTrackedRejectedGroups),
+            ["rejectedGroupTrackingCapped"] = FlowValue.From(_rejectedGroupTrackingCapped)
+        });
+        var error = new DataFlowError(
+            MetricsErrorCodeNames.GroupLimitReached,
+            notice.Message,
+            category: "Metrics",
+            isTransient: false,
+            details);
+        _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Failure(
+            MetricsResultKinds.GroupLimitReached,
+            error,
+            timestamp,
+            snapshot)));
+        PublishEvent(
+            message.CorrelationId,
+            timestamp,
+            MetricsDiagnosticNames.AggregateGroupLimitReached,
+            FlowEventLevel.Warning,
+            notice.Message,
+            MetricsResultKinds.GroupLimitReached,
+            snapshot,
+            isError: true);
+    }
 
-        if (Interlocked.Exchange(ref _finalSnapshotEmitted, 1) != 0)
-        {
-            return;
-        }
-
-        var snapshot = CreateSnapshot(_latestTimestamp.Value);
-        var correlationId = _lastCorrelationId ?? CorrelationId.New();
-        Emit(new FlowMessage<MetricSnapshotOutput>(correlationId, snapshot));
+    private void PublishFailure(
+        FlowMessage<MetricSampleInput> message,
+        MetricSampleInput? sample,
+        MetricsOperationException exception)
+    {
+        var timestamp = _clock.GetUtcNow();
+        var error = new DataFlowError(
+            exception.Code,
+            exception.Message,
+            category: "Metrics",
+            isTransient: false,
+            details: CreateErrorDetails(sample, exception));
+        _output.Post(message.With(FlowResult<MetricSnapshotOutput>.Failure(
+            MetricsResultKinds.AggregateFailed,
+            error,
+            timestamp)));
+        PublishEvent(
+            message.CorrelationId,
+            timestamp,
+            MetricsDiagnosticNames.AggregateFailed,
+            FlowEventLevel.Warning,
+            error.Message,
+            MetricsResultKinds.AggregateFailed,
+            snapshot: null,
+            isError: true);
     }
 
     private double? ResolveValue(MetricSampleInput sample)
     {
         if (!sample.Value.HasValue)
-        {
             return _options.TreatMissingValueAsZero ? 0 : null;
-        }
 
         var value = sample.Value.Value;
         if (double.IsNaN(value) || double.IsInfinity(value))
         {
-            throw new MetricsAggregateException(
+            throw new MetricsOperationException(
+                MetricsErrorCodeNames.InvalidSample,
                 MetricsErrorCodes.InvalidSample,
                 "metrics.aggregate sample value must be finite.");
         }
@@ -207,13 +266,12 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     private static long? ResolveSize(MetricSampleInput sample)
     {
         if (!sample.Size.HasValue)
-        {
             return null;
-        }
 
         if (sample.Size.Value < 0)
         {
-            throw new MetricsAggregateException(
+            throw new MetricsOperationException(
+                MetricsErrorCodeNames.InvalidSample,
                 MetricsErrorCodes.InvalidSample,
                 "metrics.aggregate sample size cannot be negative.");
         }
@@ -233,7 +291,7 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
         return Normalize(sample.Group) ?? DefaultGroup;
     }
 
-    private void UpdateGroup(
+    private GroupLimitNotice? UpdateGroup(
         string groupKey,
         DateTimeOffset timestamp,
         double? value,
@@ -242,10 +300,7 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
         if (!_groups.TryGetValue(groupKey, out var group))
         {
             if (_groups.Count >= _options.MaxGroups)
-            {
-                ReportGroupLimit(groupKey);
-                return;
-            }
+                return CreateGroupLimitNotice(groupKey);
 
             group = new GroupState(groupKey);
             _groups[groupKey] = group;
@@ -270,75 +325,28 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
         }
 
         if (_options.TrackSize && size.HasValue)
-        {
             group.TotalSize += size.Value;
-        }
+
+        return null;
     }
 
-    private void ReportGroupLimit(string groupKey)
+    private GroupLimitNotice CreateGroupLimitNotice(string groupKey)
     {
-        if (_rejectedGroups.Count >= MaxTrackedRejectedGroups)
+        if (!_rejectedGroups.Contains(groupKey))
         {
-            if (_rejectedGroups.Contains(groupKey) || _rejectedGroupTrackingCapped)
-            {
-                return;
-            }
-
-            _rejectedGroupTrackingCapped = true;
-            var summary =
-                $"metrics.aggregate rejected group tracking limit of {MaxTrackedRejectedGroups} reached; " +
-                "further rejected groups are not itemized.";
-            EmitError(new FlowError
-            {
-                Timestamp = _timeProvider.GetUtcNow(),
-                CorrelationId = _lastCorrelationId,
-                Code = MetricsErrorCodes.GroupLimitReached,
-                Message = summary,
-                Context = $"maxGroups={_options.MaxGroups}; maxTrackedRejectedGroups={MaxTrackedRejectedGroups}"
-            });
-            EmitDiagnostic(
-                _lastCorrelationId,
-                MetricsDiagnosticNames.AggregateGroupLimitReached,
-                FlowEventLevel.Warning,
-                summary,
-                attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["maxGroups"] = _options.MaxGroups,
-                    ["maxTrackedRejectedGroups"] = MaxTrackedRejectedGroups
-                });
-            return;
+            if (_rejectedGroups.Count < MaxTrackedRejectedGroups)
+                _rejectedGroups.Add(groupKey);
+            else
+                _rejectedGroupTrackingCapped = true;
         }
 
-        if (!_rejectedGroups.Add(groupKey))
-        {
-            return;
-        }
-
-        var message = $"metrics.aggregate maxGroups limit reached; group '{groupKey}' was not tracked.";
-        EmitError(new FlowError
-        {
-            Timestamp = _timeProvider.GetUtcNow(),
-            CorrelationId = _lastCorrelationId,
-            Code = MetricsErrorCodes.GroupLimitReached,
-            Message = message,
-            Context = $"group={groupKey}; maxGroups={_options.MaxGroups}"
-        });
-        EmitDiagnostic(
-            _lastCorrelationId,
-            MetricsDiagnosticNames.AggregateGroupLimitReached,
-            FlowEventLevel.Warning,
-            message,
-            attributes: new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["group"] = groupKey,
-                ["maxGroups"] = _options.MaxGroups
-            });
+        return new GroupLimitNotice(
+            groupKey,
+            $"metrics.aggregate maxGroups limit reached; group '{groupKey}' was not tracked.");
     }
 
     private MetricSnapshotOutput CreateSnapshot(DateTimeOffset timestamp)
-    {
-        var averageRate = CalculateAverageRate(timestamp);
-        return new MetricSnapshotOutput
+        => new()
         {
             Timestamp = timestamp,
             Name = _latestName,
@@ -350,7 +358,7 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
             MinValue = _options.TrackMinMax ? _minValue : null,
             MaxValue = _options.TrackMinMax ? _maxValue : null,
             CurrentRate = CalculateWindowRate(_rateSamples, timestamp),
-            AverageRate = averageRate,
+            AverageRate = CalculateAverageRate(timestamp),
             TotalSize = _options.TrackSize ? _totalSize : null,
             Latest = _options.TrackLatest ? _latest : null,
             Groups = _groups.ToDictionary(
@@ -360,6 +368,26 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
                     CalculateWindowRate(group.Value.RateSamples, timestamp)),
                 StringComparer.Ordinal)
         };
+
+    private void PublishFinalSnapshot()
+    {
+        if (_options.EmitEverySample || !_latestTimestamp.HasValue || _lastAcceptedMessage is null)
+            return;
+
+        var snapshot = CreateSnapshot(_latestTimestamp.Value);
+        _output.Post(_lastAcceptedMessage.With(FlowResult<MetricSnapshotOutput>.Success(
+            MetricsResultKinds.FinalSnapshot,
+            snapshot,
+            snapshot.Timestamp)));
+        PublishEvent(
+            _lastAcceptedMessage.CorrelationId,
+            _clock.GetUtcNow(),
+            MetricsDiagnosticNames.AggregateUpdated,
+            FlowEventLevel.Information,
+            "metrics.aggregate emitted final snapshot.",
+            MetricsResultKinds.FinalSnapshot,
+            snapshot,
+            isError: false);
     }
 
     private void AddRateSample(Queue<DateTimeOffset> samples, DateTimeOffset timestamp)
@@ -372,12 +400,12 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     {
         var cutoff = timestamp - _rateWindow;
         while (samples.TryPeek(out var first) && first < cutoff)
-        {
             samples.Dequeue();
-        }
     }
 
-    private double CalculateWindowRate(Queue<DateTimeOffset> samples, DateTimeOffset timestamp)
+    private double CalculateWindowRate(
+        Queue<DateTimeOffset> samples,
+        DateTimeOffset timestamp)
     {
         TrimRateSamples(samples, timestamp);
         return samples.Count / _rateWindow.TotalSeconds;
@@ -386,65 +414,94 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
     private double CalculateAverageRate(DateTimeOffset timestamp)
     {
         if (!_firstTimestamp.HasValue)
-        {
             return 0;
-        }
 
         var seconds = (timestamp - _firstTimestamp.Value).TotalSeconds;
         return seconds <= 0 ? _sampleCount : _sampleCount / seconds;
     }
 
-    private void ReportAggregateError(
-        int code,
-        string message,
-        FlowMessage<MetricSampleInput> source,
-        Exception? exception)
-    {
-        var sample = source.Payload;
-        EmitError(new FlowError
-        {
-            Timestamp = _timeProvider.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(sample),
-            Exception = exception
-        });
-        EmitDiagnostic(
-            source.CorrelationId,
-            MetricsDiagnosticNames.AggregateFailed,
-            FlowEventLevel.Error,
-            message,
-            exception,
-            CreateSampleAttributes(sample));
-    }
-
-    private void TryEmitDiagnostic(
+    private void PublishEvent(
         CorrelationId correlationId,
+        DateTimeOffset timestamp,
         string name,
         FlowEventLevel level,
-        string eventMessage,
-        IReadOnlyDictionary<string, object?> attributes)
-        => EmitDiagnostic(correlationId, name, level, eventMessage, attributes: attributes);
-
-    private void EmitDiagnostic(
-        CorrelationId? correlationId,
-        string name,
-        FlowEventLevel level,
-        string? message,
-        Exception? exception = null,
-        IReadOnlyDictionary<string, object?>? attributes = null)
-        => EmitEvent(new FlowEvent
+        string message,
+        string resultKind,
+        MetricSnapshotOutput? snapshot,
+        bool isError)
+        => _events.Post(new FlowEvent
         {
-            Timestamp = _timeProvider.GetUtcNow(),
+            Timestamp = timestamp,
             CorrelationId = correlationId,
             Name = name,
             Level = level,
             Message = message,
-            Attributes = attributes ?? new Dictionary<string, object?>(StringComparer.Ordinal)
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["averageRate"] = snapshot?.AverageRate,
+                ["currentRate"] = snapshot?.CurrentRate,
+                ["groupCount"] = snapshot?.Groups.Count ?? _groups.Count,
+                ["isError"] = isError,
+                ["resultKind"] = resultKind,
+                ["sampleCount"] = snapshot?.SampleCount ?? _sampleCount,
+                ["totalSize"] = snapshot?.TotalSize,
+                ["valueCount"] = snapshot?.ValueCount ?? _valueCount
+            }
         });
 
-    private static MetricSampleInput CopySample(MetricSampleInput sample, DateTimeOffset timestamp)
+    private static FlowValue CreateErrorDetails(
+        MetricSampleInput? sample,
+        MetricsOperationException exception)
+    {
+        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+        {
+            ["group"] = FlowValue.From(sample?.Group ?? string.Empty),
+            ["legacyCode"] = FlowValue.From(exception.LegacyCode),
+            ["name"] = FlowValue.From(sample?.Name ?? string.Empty),
+            ["size"] = sample?.Size is { } size ? FlowValue.From(size) : FlowValue.Null,
+            ["value"] = FlowValue.From(sample?.Value?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)
+        };
+        if (exception.InnerException is not null)
+        {
+            details["exceptionType"] = FlowValue.From(
+                exception.InnerException.GetType().FullName ??
+                exception.InnerException.GetType().Name);
+        }
+
+        return FlowValue.FromObject(details);
+    }
+
+    private async Task MonitorCompletionAsync()
+    {
+        try
+        {
+            await _processor.Completion.ConfigureAwait(false);
+            PublishFinalSnapshot();
+            _output.Complete();
+            await _output.Completion.ConfigureAwait(false);
+            _events.Complete();
+            await _events.Completion.ConfigureAwait(false);
+            _completion.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                ((IDataflowBlock)_output).Fault(exception);
+            }
+            catch
+            {
+                // The output may already be terminal.
+            }
+
+            _events.Complete();
+            _completion.TrySetException(exception);
+        }
+    }
+
+    private static MetricSampleInput CopySample(
+        MetricSampleInput sample,
+        DateTimeOffset timestamp)
         => sample with
         {
             Timestamp = timestamp,
@@ -453,69 +510,27 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
                 : new Dictionary<string, string>(sample.Tags, StringComparer.Ordinal)
         };
 
-    private Dictionary<string, object?> CreateUpdateAttributes(DateTimeOffset timestamp)
-        => new(StringComparer.Ordinal)
-        {
-            ["sampleCount"] = _sampleCount,
-            ["valueCount"] = _valueCount,
-            ["groupCount"] = _groups.Count,
-            ["currentRate"] = CalculateWindowRate(_rateSamples, timestamp),
-            ["averageRate"] = CalculateAverageRate(timestamp),
-            ["totalSize"] = _options.TrackSize ? _totalSize : (long?)null
-        };
-
-    private static Dictionary<string, object?> CreateSampleAttributes(MetricSampleInput sample)
-    {
-        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            ["name"] = sample.Name,
-            ["group"] = sample.Group,
-            ["hasValue"] = sample.Value.HasValue,
-            ["size"] = sample.Size,
-            ["tagCount"] = sample.Tags?.Count ?? 0
-        };
-        return attributes;
-    }
-
-    private static string CreateErrorContext(MetricSampleInput sample)
-    {
-        var values = new List<string>();
-        if (!string.IsNullOrWhiteSpace(sample.Name))
-        {
-            values.Add($"name={sample.Name}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(sample.Group))
-        {
-            values.Add($"group={sample.Group}");
-        }
-
-        if (sample.Value.HasValue)
-        {
-            values.Add($"value={sample.Value.Value}");
-        }
-
-        if (sample.Size.HasValue)
-        {
-            values.Add($"size={sample.Size.Value}");
-        }
-
-        return string.Join("; ", values);
-    }
-
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private sealed class GroupState(string key)
+    private sealed record GroupLimitNotice(string Group, string Message);
+
+    private sealed record GroupState(string Key)
     {
-        public string Key { get; } = key;
         public long Count { get; set; }
+
         public long ValueCount { get; set; }
+
         public double TotalValue { get; set; }
+
         public double? MinValue { get; set; }
+
         public double? MaxValue { get; set; }
+
         public long TotalSize { get; set; }
+
         public DateTimeOffset LatestTimestamp { get; set; }
+
         public Queue<DateTimeOffset> RateSamples { get; } = new();
 
         public MetricGroupSnapshot CreateSnapshot(
@@ -536,12 +551,15 @@ public sealed class MetricsAggregateNode : FlowNode<MetricSampleInput, MetricSna
             };
     }
 
-    private sealed class MetricsAggregateException(
-        int code,
+    private sealed class MetricsOperationException(
+        string code,
+        int legacyCode,
         string message,
         Exception? innerException = null)
         : Exception(message, innerException)
     {
-        public int Code { get; } = code;
+        public string Code { get; } = code;
+
+        public int LegacyCode { get; } = legacyCode;
     }
 }

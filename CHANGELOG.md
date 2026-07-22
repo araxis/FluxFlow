@@ -7,6 +7,22 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Metrics 5.0.0
+
+- Consolidated metric aggregation on `MetricsAggregateNode` with one normal
+  `FlowResult<MetricSnapshotOutput>` Output.
+- Removed the 4.x direct snapshot Output, Errors port, and temporary
+  `FlowMetricsAggregateNode` name after preserving aggregation, partial
+  group-limit, diagnostics, lineage, and final-snapshot behavior.
+
+## FluxFlow.Components.Projections 5.0.0
+
+- Consolidated event projection on `EventProjectionNode` with one normal
+  `FlowResult<EventProjectionSnapshot>` Output.
+- Removed the 4.x direct snapshot Output, Errors port, and temporary
+  `FlowEventProjectionNode` name after preserving filtering, diagnostics,
+  lineage, and ordered final-snapshot behavior.
+
 ## FluxFlow.Composition 2.7.0
 
 - Added deterministic canonical normalization for registered component and
