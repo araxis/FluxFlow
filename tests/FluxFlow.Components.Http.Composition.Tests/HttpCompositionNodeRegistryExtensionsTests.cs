@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Http;
@@ -8,18 +7,28 @@ using FluxFlow.Components.Http.Composition;
 using FluxFlow.Components.Http.Contracts;
 using FluxFlow.Components.Http.Options;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FluxFlow.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Http.Composition.Tests;
 
 public sealed class HttpCompositionNodeRegistryExtensionsTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "node", HttpCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "node", HttpCompositionPortNames.Output);
+
     [Fact]
     public void RegisterHttpNodes_registers_client_metadata()
     {
@@ -203,139 +212,78 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
     {
         var handler = new RecordingHandler(
             (_, _) => Respond(HttpStatusCode.OK, "pong", "text/plain"));
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton(
-            "primary",
-            (_, _) => new HttpClient(handler)
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.example.test/")
+        };
+
+        await WithClientNodeAsync(
+            client,
+            async (ports, host) =>
             {
-                BaseAddress = new Uri("https://api.example.test/")
-            });
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "api",
-                    HttpCompositionNodeTypes.Client,
-                    node => node
-                        .Resource(HttpCompositionResourceNames.Client, "primary")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterHttpNodes())
-            .Configure(options => options.StartRuntimeWithHost = false);
+                var request = FlowMessage.Create(
+                    new HttpClientRequest { Method = "GET", Url = "v1/status" },
+                    new CorrelationId("http-correlation"));
+                var receive = ports.ReceiveAsync<HttpClientResult>(Output, Timeout);
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+                (await ports.SendAsync(Input, request)).IsAccepted.ShouldBeTrue();
+                var response = (await receive).Message.ShouldNotBeNull();
 
-        await hostedService.StartAsync(CancellationToken.None);
+                response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
+                var result = response.Payload.ShouldBeOfType<HttpResponseResult>();
+                result.StatusCode.ShouldBe(200);
+                Encoding.UTF8.GetString(result.Body.OriginalBytes.AsSpan()).ShouldBe("pong");
+                handler.LastRequest!.RequestUri!.ToString()
+                    .ShouldBe("https://api.example.test/v1/status");
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var runtime = host.Runtime.ShouldNotBeNull();
-        var clientNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<HttpClientRequest>>();
-        var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<HttpClientResult>>();
-        clientNode.Descriptor.Errors.ShouldBeNull();
-        var responses = new BufferBlock<FlowMessage<HttpClientResult>>();
-        output.Source.LinkTo(
-            responses,
-            new DataflowLinkOptions { PropagateCompletion = true });
-
-        var request = FlowMessage.Create(
-            new HttpClientRequest { Method = "GET", Url = "v1/status" },
-            new CorrelationId("http-correlation"));
-
-        (await input.Target.SendAsync(request)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        input.Target.Complete();
-
-        var response = await responses.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
-        response.CorrelationId.ShouldBe(new CorrelationId("http-correlation"));
-        var result = response.Payload.ShouldBeOfType<HttpResponseResult>();
-        result.StatusCode.ShouldBe(200);
-        Encoding.UTF8.GetString(result.Body.OriginalBytes.AsSpan()).ShouldBe("pong");
-        handler.LastRequest!.RequestUri!.ToString()
-            .ShouldBe("https://api.example.test/v1/status");
+                await host.RevisionHost.StopApplicationAsync();
+            },
+            Properties(("boundedCapacity", 8)));
     }
 
     [Fact]
     public async Task Hosted_client_node_binds_options_from_configuration()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton(
-            "primary",
-            (_, _) => new HttpClient(new RecordingHandler(
-                (_, _) => Respond(HttpStatusCode.InternalServerError, "boom", "text/plain"))));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "api",
-                    HttpCompositionNodeTypes.Client,
-                    node => node
-                        .Resource(HttpCompositionResourceNames.Client, "primary")
-                        .Configure("treatNonSuccessStatusAsError", true)
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterHttpNodes())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        using var client = new HttpClient(new RecordingHandler(
+            (_, _) => Respond(HttpStatusCode.InternalServerError, "boom", "text/plain")));
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await WithClientNodeAsync(
+            client,
+            async (ports, _) =>
+            {
+                var receive = ports.ReceiveAsync<HttpClientResult>(Output, Timeout);
+                (await ports.SendAsync(
+                    Input,
+                    FlowMessage.Create(new HttpClientRequest
+                    {
+                        Url = "https://example.test/"
+                    }))).IsAccepted.ShouldBeTrue();
 
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var runtime = host.Runtime.ShouldNotBeNull();
-        var clientNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = clientNode.Descriptor.Inputs[HttpCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<HttpClientRequest>>();
-        var output = clientNode.Descriptor.Outputs[HttpCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<HttpClientResult>>();
-        clientNode.Descriptor.Errors.ShouldBeNull();
-        var responseSink = new BufferBlock<FlowMessage<HttpClientResult>>();
-        output.Source.LinkTo(responseSink);
-
-        (await input.Target.SendAsync(FlowMessage.Create(
-                new HttpClientRequest { Url = "https://example.test/" }))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var result = (await responseSink.ReceiveAsync()
-                .WaitAsync(TimeSpan.FromSeconds(5)))
-            .Payload.ShouldBeOfType<HttpClientFailureResult>();
-        result.Error!.Code.ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
-        result.Response.ShouldNotBeNull().StatusCode.ShouldBe(500);
+                var result = (await receive).Message.ShouldNotBeNull()
+                    .Payload.ShouldBeOfType<HttpClientFailureResult>();
+                result.Error!.Code.ShouldBe(HttpErrorCodeNames.NonSuccessStatus);
+                result.Response.ShouldNotBeNull().StatusCode.ShouldBe(500);
+            },
+            Properties(
+                ("treatNonSuccessStatusAsError", true),
+                ("boundedCapacity", 8)));
     }
 
     [Fact]
     public async Task Missing_client_resource_reference_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "api",
-                    HttpCompositionNodeTypes.Client))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterHttpNodes())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(HttpCompositionNodeTypes.Client),
+            registry => registry.RegisterHttpNodes());
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
                 HttpCompositionResourceNames.Client,
                 StringComparison.Ordinal));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     [Theory]
@@ -348,34 +296,61 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
         int optionValue,
         string expectedMessage)
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton(
-            "primary",
-            (_, _) => new HttpClient(new RecordingHandler(
-                (_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain"))));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "api",
-                    HttpCompositionNodeTypes.Client,
-                    node => node
-                        .Resource(HttpCompositionResourceNames.Client, "primary")
-                        .Configure(optionName, optionValue)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterHttpNodes())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        using var client = new HttpClient(new RecordingHandler(
+            (_, _) => Respond(HttpStatusCode.OK, "ok", "text/plain")));
+        var properties = Properties((optionName, optionValue));
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal);
+        componentProperties[HttpCompositionResourceNames.Client] = "Resources.primary";
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                HttpCompositionNodeTypes.Client,
+                componentProperties,
+                ["primary"]),
+            registry => registry.RegisterHttpNodes(),
+            configureRuntimeServices: context =>
+                context.Services.AddExternalFluxFlowResource<HttpClient>(
+                    ApplicationAddress.Resource("primary"),
+                    client));
 
-        await hostedService.StartAsync(CancellationToken.None);
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.Ordinal));
+        host.RuntimeAccess.Ports.ShouldBeNull();
+    }
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
+    private static async Task WithClientNodeAsync(
+        HttpClient client,
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?>? properties = null)
+    {
+        var componentProperties = (properties ?? new Dictionary<string, object?>())
+            .ToDictionary(
+                static property => property.Key,
+                static property => property.Value,
+                StringComparer.Ordinal);
+        componentProperties[HttpCompositionResourceNames.Client] = "Resources.primary";
+
+        await using var host = await CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                HttpCompositionNodeTypes.Client,
+                componentProperties,
+                ["primary"]),
+            registry => registry.RegisterHttpNodes(),
+            configureRuntimeServices: context =>
+                context.Services.AddExternalFluxFlowResource<HttpClient>(
+                    ApplicationAddress.Resource("primary"),
+                    client));
+        host.StartResult.Succeeded.ShouldBeTrue();
+
+        await run(host.GetRequiredPorts(), host);
     }
 
     private static ComponentDesignMetadata GetClientDesignMetadata()
