@@ -553,6 +553,10 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `240-canonical-component-type-names.md`: harmonized component operation and
   MQTT retry-resource type names, explicit input aliases, canonical-only
   Designer enumeration, package versions, and verification evidence.
+- `241-canonical-composition-simplification.md`: canonical alias normalization,
+  direct component factory contexts, addressable traced Events, semantic
+  processing profiles, canonical Designer projection, obsolete legacy model
+  guidance, versions, and verification evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

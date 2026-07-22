@@ -2039,6 +2039,17 @@ Date: 2026-05-31
   all seven local-source package dry-runs passed. No public baseline, adapter
   version, tag, publication, PR, or merge changed. See
   [[204-runtime-and-component-review-fixes]].
+- 2026-07-22: Simplified canonical Composition end to end. Added deterministic
+  component/resource alias normalization, typed package descriptors, canonical
+  factory contexts, object-key identity, traced addressable component Events,
+  semantic processing profiles, and canonical Designer projection. Preserved
+  obsolete legacy APIs, removed structural-routing and universal-Errors guidance,
+  bumped affected minor package versions, and added focused runtime/revision/
+  persistence/metadata tests. All focused suites, the `95`-test Release sweep,
+  controlled Debug/Release builds, `19` binary compatibility checks, `19`
+  release preflights, and `19` complete-local-source dry-runs passed. Package
+  validation also caught and drove restoration of four exact compatibility
+  signatures before closeout. See [[241-canonical-composition-simplification]].
 
 ## Remaining
 

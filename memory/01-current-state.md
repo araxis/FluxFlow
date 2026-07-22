@@ -5,7 +5,7 @@ Date: 2026-07-22
 ## Repository
 
 - `D:\Projects\FluxFlow` is currently on local branch
-  `work/canonical-type-names`. The provider-neutral MQTT vertical slice and the
+  `work/canonical-composition-simplification`. The provider-neutral MQTT vertical slice and the
   bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
   FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -20,6 +20,20 @@ Date: 2026-07-22
   opened as a pull request.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
+- Canonical Composition simplification is implemented locally. Definitions are
+  normalized before canonical validation, revision comparison, Designer
+  projection, and runtime activation; alias-only revisions are unchanged and
+  Designer saves use canonical names. Factory execution stays on
+  `ComponentDefinition`, workflow object keys provide component identity, every
+  registration exposes traced addressable `Events`, and optional
+  `processing.profile` resources map semantic mode/order/buffer policy through
+  host DI. Expected failures remain normal `Output` data; unrecoverable faults
+  remain on `Completion`; no universal Errors port was added. Legacy definition,
+  loader, builder, validator, and runtime entry points remain available but are
+  obsolete. The `95`-test Release sweep, controlled Debug/Release builds, and
+  binary compatibility, release preflight, and complete-local-source dry-runs
+  for all `19` changed packages passed. No release operation was performed. See
+  `241-canonical-composition-simplification.md`.
 - Added Dataflow-free `FluxFlow.Data` `1.0.0` for immutable `FlowValue`,
   `FlowContent` and codecs, and result/error contracts. `FluxFlow.Nodes` is now
   `2.1.0`; its `FlowMessage<T>` envelope uses strong trace/message identity,
@@ -43,7 +57,7 @@ Date: 2026-07-22
   See
   `205-vnext-data-foundation.md` and
   `206-vnext-data-foundation-api-review.md`.
-- `FluxFlow.Composition` is now `2.6.0` locally with immutable canonical
+- `FluxFlow.Composition` is now `2.7.0` locally with immutable canonical
   `Resources`/`Workflows` definitions, strict deterministic JSON and
   configuration loading, nested resource namespaces, and one ordinal,
   case-sensitive address type. Canonical input/output-side links now normalize
@@ -58,7 +72,7 @@ Date: 2026-07-22
   release preflight, and isolated package dry-run passed. See
   `207-vnext-composition-definition-addressing.md` and
   `208-vnext-composition-link-compilation.md`.
-- `FluxFlow.Engine` is now `2.6.0` locally with additive canonical stable input
+- `FluxFlow.Engine` is now `2.7.0` locally with additive canonical stable input
   mailboxes and output broadcast hubs, revision-safe typed attachment,
   compiled-link activation, explicit direct send/receive/observe/request-reply
   result contracts, bounded rejection reporting, canonical system-event and
@@ -86,7 +100,7 @@ Date: 2026-07-22
   send/receive, resource-backed replacement, cleanup, and generation retirement
   are covered in `238-canonical-application-runtime-assembly.md` and
   `239-application-runtime-port-generations.md`.
-- `FluxFlow.Composition.Hosting` is now `2.2.0` locally with immutable owned
+- `FluxFlow.Composition.Hosting` is now `2.3.0` locally with immutable owned
   host/resource-revision/workflow-revision providers and canonical keyed
   registration for resources, `Workflow.Component` blocks, typed Dataflow
   ports, and `IFlowSignalTarget`. Exact external instances/providers cross the
@@ -112,11 +126,11 @@ Date: 2026-07-22
   `FluxFlow.Components.Mqtt.PulseMqtt` is `2.1.0`. Shared conformance,
   focused/full tests, controlled builds, binary compatibility, release
   preflight/dry-runs, and package-only consumers passed. Canonical MQTT
-  Composition is now `2.1.0` with flat/nested `mqtt.broker`, `mqtt.client`,
+  Composition is now `2.2.0` with flat/nested `mqtt.broker`, `mqtt.client`,
   `mqtt.subscription`, and `retry.policy` resources, one keyed controller
   per client, four fixed node contracts, Ack/Nak signal inputs, strict resource
   validation, and Designer metadata. `FluxFlow.Components.Designer` is now
-  `2.20.0` with message/signal port hints and canonical metadata aliases.
+  `2.21.0` with message/signal port hints and canonical metadata aliases.
   Focused and complete tests,
   controlled builds, package checks, and a package-only consumer passed. The
   broader component-family migration began with Mapping. See
@@ -125,7 +139,7 @@ Date: 2026-07-22
 - `FluxFlow.Components.Mapping` is now `4.0.0` locally with a canonical
   `FlowValueMapperNode` that consumes `FlowValue` without serialization and
   emits success or expected failure as one `FlowResult<FlowValue>` output.
-  `FluxFlow.Components.Mapping.Composition` is `2.1.0`; parameterless
+  `FluxFlow.Components.Mapping.Composition` is `2.2.0`; parameterless
   `RegisterMapper()` owns the canonical `data.map` contract and Designer
   metadata, while explicit generic registration preserves the prior typed
   surface. Focused/full tests, zero-warning controlled builds, binary
@@ -164,7 +178,7 @@ Date: 2026-07-22
   selector returns `FlowValue`, deterministic conversion supplies ordinary JSON
   schema semantics, and message lineage is preserved. The generic standalone
   node and contracts remain available for code-authored compatibility.
-  `FluxFlow.Components.Validation.Composition` is `2.1.0` with canonical fixed
+  `FluxFlow.Components.Validation.Composition` is `2.2.0` with canonical fixed
   ports, no legacy branch or universal Errors ports, and host-owned
   `Resources.{name}` selector and clock addresses. Focused/full tests,
   zero-warning controlled builds, binary compatibility, release
@@ -178,7 +192,7 @@ Date: 2026-07-22
   continuation without branch or universal Errors ports. The generic
   standalone component and branch/error contracts remain available for
   code-authored compatibility. `FluxFlow.Components.Assertions.Composition` is
-  `2.1.0` with canonical fixed ports, parameterless registration, and
+  `2.2.0` with canonical fixed ports, parameterless registration, and
   host-owned `Resources.{name}` engine, FlowValue context factory, and clock
   addresses. Focused/full tests, zero-warning controlled builds, binary
   compatibility, release preflight/dry-runs, and a package-only consumer
@@ -192,7 +206,7 @@ Date: 2026-07-22
   evidence, diagnostics, and strong message lineage without a universal Errors
   port. The released standalone node and direct-result/error contract remain
   available for code-authored compatibility. Expectations Composition is now
-  `2.1.0` with canonical fixed ports and exact `Resources.{name}` clock
+  `2.2.0` with canonical fixed ports and exact `Resources.{name}` clock
   addressing. Focused/full tests, controlled builds, binary compatibility,
   preflight/dry-runs, and a package-only consumer passed. Routing followed as
   the next bounded family. See `221-vnext-expectations-flowresult.md`.
@@ -203,7 +217,7 @@ Date: 2026-07-22
   with preserved message lineage and no universal Errors port. Switch, Fork,
   and Merge remain compatible but are obsolete because canonical links own
   conditional routing, fan-out, and shared-input fan-in. Routing Composition is
-  now `2.1.0` with parameterless canonical registration, fixed FlowValue/result
+  now `2.2.0` with parameterless canonical registration, fixed FlowValue/result
   ports, exact keyed selectors/clocks, and deprecated structural metadata.
   Focused/full tests, controlled builds, binary compatibility,
   preflight/dry-runs, and a package-only consumer passed. Control followed as
@@ -224,7 +238,7 @@ Date: 2026-07-22
   operations are success variants; expected message, key, expression, reducer,
   and key-limit failures are normal error variants with stable string codes.
   The object-based standalone node remains available for compatibility. State
-  Composition is now `2.1.0` with canonical fixed ports, no universal Errors
+  Composition is now `2.2.0` with canonical fixed ports, no universal Errors
   surface, ordinary JSON initial-state decoding, and exact host-owned engine and
   clock resources. Focused/full tests, controlled builds, binary compatibility,
   preflight/dry-runs, and a package-only consumer passed. Projections followed
@@ -236,7 +250,7 @@ Date: 2026-07-22
   Ordered counts, filters, previews, replay-time rates, fan-out, and message
   lineage are preserved; configured final snapshots emit after normal input
   drain. The direct-result standalone node remains available for compatibility.
-  Projections Composition is now `2.1.0` with the canonical fixed Output, no
+  Projections Composition is now `2.2.0` with the canonical fixed Output, no
   universal Errors surface, and an exact host-owned clock resource. Focused/full
   tests, controlled builds, binary compatibility, preflight/dry-runs, and a
   package-only consumer passed. Metrics is the next bounded family assessment.
@@ -248,7 +262,7 @@ Date: 2026-07-22
   `FlowResult<MetricSnapshotOutput>` Output plus Events. Ordered aggregation,
   rates, fan-out, and message lineage are preserved; coalesced final snapshots
   emit after normal input drain. The direct-result standalone node remains
-  available for compatibility. Metrics Composition is now `2.1.0` with the
+  available for compatibility. Metrics Composition is now `2.2.0` with the
   canonical fixed Output, no universal Errors surface, and an exact host-owned
   clock resource. Focused/full tests, controlled builds, binary compatibility,
   preflight/dry-runs, and a package-only consumer passed. Observability is the
@@ -259,7 +273,7 @@ Date: 2026-07-22
   Logger/Metrics selector failures are one partial result carrying usable data.
   FlowValue-native selectors avoid object conversion, and Logger accepts scalar
   or array selector-name configuration. All released generic nodes remain
-  available for compatibility. Observability Composition is now `2.1.0` with
+  available for compatibility. Observability Composition is now `2.2.0` with
   parameterless canonical registrations, explicit generic compatibility
   overloads, no canonical Errors surfaces, and exact host-owned resources.
   Focused/full tests, controlled builds, binary compatibility,
@@ -271,7 +285,7 @@ Date: 2026-07-22
   Events, and no universal Errors port. Ordinary JSON `items` binds as one
   value or an array in Composition. Released typed standalone nodes remain
   available, and explicit typed Composition paths preserve generated and
-  `SourceSequenceItem` contracts. Sources Composition is now `2.1.0` with
+  `SourceSequenceItem` contracts. Sources Composition is now `2.2.0` with
   parameterless canonical registrations, fixed FlowValue metadata, and an exact
   host-owned clock resource. Focused/full tests, controlled builds, binary
   compatibility, preflight/dry-runs, and a package-only consumer passed. See
@@ -294,7 +308,7 @@ Date: 2026-07-22
   normal data on one Output; host-owned client policy, bounded response reads,
   diagnostics, and strong message lineage are preserved. The released
   `HttpClientNode` and request/response contracts remain unchanged. HTTP
-  Composition is now `2.1.0` with canonical fixed ports, no universal Errors
+  Composition is now `2.2.0` with canonical fixed ports, no universal Errors
   surface, unchanged keyed client/clock ownership, and explicit typed
   compatibility registration. Focused/full tests, controlled builds, binary
   compatibility, preflight/dry-runs, and a package-only consumer passed. See
@@ -304,7 +318,7 @@ Date: 2026-07-22
   errors, strong lineage, and FlowValue directory/watch sources. Expected
   operation failures remain ordinary data; source infrastructure failures are
   isolated as Completion faults. Released typed nodes remain available
-  unchanged. FileSystem Composition is now `2.1.0` with canonical fixed ports,
+  unchanged. FileSystem Composition is now `2.2.0` with canonical fixed ports,
   no universal Errors surfaces, explicit typed compatibility registrations,
   and updated Designer metadata. Focused/full tests, controlled builds, binary
   compatibility, preflight/dry-runs, and a package-only consumer passed. See
@@ -315,7 +329,7 @@ Date: 2026-07-22
   private versioned JSON-compatible envelope over the released store value
   boundary. Expected operation failures remain ordinary data, while released
   typed nodes and host-owned store/factory contracts remain available
-  unchanged. Storage Composition is now `2.0.0` with canonical one-output
+  unchanged. Storage Composition is now `2.1.0` with canonical one-output
   fixed ports, no universal Errors surfaces, explicit typed compatibility
   registrations, and updated Designer metadata. FileSystem and SqlFile adapter
   integration, focused/full tests, controlled builds, binary compatibility,
@@ -327,7 +341,7 @@ Date: 2026-07-22
   released object payload boundary. Missing sessions, malformed records,
   validation failures, and store failures remain ordinary data; released typed
   nodes and host-owned store/factory contracts remain available. Sessions
-  Composition is now `2.1.0` with canonical fixed one-output ports, no
+  Composition is now `2.2.0` with canonical fixed one-output ports, no
   universal Errors surface, explicit typed compatibility registrations, and
   updated Designer metadata. Focused/full tests, controlled builds,
   zero-warning affected rebuilds, binary compatibility, preflight/dry-runs,
@@ -343,7 +357,7 @@ Date: 2026-07-22
   and a package-only ownership consumer passed. Package validation against the
   preceding 1.x packages reported only the intentional major-version API
   removals. See `234-vnext-resource-address-ownership.md`.
-- `FluxFlow.Composition.Hosting` is now `2.2.0` locally with canonical static
+- `FluxFlow.Composition.Hosting` is now `2.3.0` locally with canonical static
   and configuration definition sources plus a DI-backed application revision
   host. Initial source failures are degraded `FlowError` results rather than
   .NET host failures; rejected reloads preserve an active revision; hosted stop
@@ -353,7 +367,7 @@ Date: 2026-07-22
   Focused/full tests, controlled builds, additive binary validation, preflight,
   dry-run, and a package-only hosted revision consumer passed. See
   `235-vnext-canonical-application-hosting.md`.
-- `FluxFlow.Components.Designer` is now `2.20.0` locally with canonical flat
+- `FluxFlow.Components.Designer` is now `2.21.0` locally with canonical flat
   application persistence over Composition JSON, addresses, and link
   diagnostics. Editable models preserve loaded declaration side, conditions,
   nested resources, resource references, malformed raw declarations, and
