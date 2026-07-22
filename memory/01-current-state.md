@@ -4,10 +4,13 @@ Date: 2026-07-22
 
 ## Repository
 
-- `D:\Projects\FluxFlow` is currently on local branch
-  `work/canonical-composition-simplification`. The provider-neutral MQTT vertical slice and the
-  bounded normal component-family migrations through Sessions, canonical FlowValue Mapping,
-  FlowContent Payloads, FlowContent/FlowValue Serialization, FlowValue
+- `D:\Projects\FluxFlow` is currently on local `main`. The complete canonical
+  vNext stack was fast-forwarded locally from
+  `work/canonical-composition-simplification` at `e9c9aeea` without squashing
+  or rewriting its seven bounded commits. The provider-neutral MQTT vertical
+  slice and the bounded normal component-family migrations through Sessions,
+  canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
+  Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
   FlowValue/result Routing plus canonical-link Control deprecation and
   FlowValue State commands/results, typed-event Projection results, typed
@@ -16,8 +19,9 @@ Date: 2026-07-22
   plus exact-content HTTP polymorphic results, exact-content FileSystem
   results/sources, exact-content Storage, and exact-content Sessions are
   implemented and verified locally.
-  Nothing from the vNext milestones was pushed, tagged, published, merged, or
-  opened as a pull request.
+  The vNext milestones are integrated into local `main`, but nothing was
+  pushed, tagged, published, remotely merged, or opened as a pull request. See
+  `242-canonical-vnext-local-main-integration.md`.
 - `graphify-out/` is local-only and excluded through `.git/info/exclude`; it is
   not part of the tracked repository state.
 - Canonical Composition simplification is implemented locally. Definitions are

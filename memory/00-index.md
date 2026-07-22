@@ -557,6 +557,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
   direct component factory contexts, addressable traced Events, semantic
   processing profiles, canonical Designer projection, obsolete legacy model
   guidance, versions, and verification evidence.
+- `242-canonical-vnext-local-main-integration.md`: linear ancestry proof,
+  fast-forward integration of the complete canonical vNext stack into local
+  `main`, post-integration verification, and the retained release boundary.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
