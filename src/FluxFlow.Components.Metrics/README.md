@@ -92,6 +92,6 @@ conversion exists between its output and
 ## Composition
 
 Use `FluxFlow.Components.Metrics.Composition` when a Composition host should
-register the canonical `metrics.aggregate` factory and Designer metadata. Hosts
+register the canonical `metric.aggregate` factory and Designer metadata. Hosts
 own optional keyed clocks and decide how snapshots are stored, displayed, or
 forwarded.

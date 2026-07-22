@@ -139,6 +139,42 @@ public sealed class CompositionNodeRegistrationTests
     }
 
     [Fact]
+    public void Node_registry_resolves_aliases_without_exposing_duplicate_registrations()
+    {
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "data.map",
+                static _ => throw new InvalidOperationException("Factory should not run."))
+            .RegisterAlias("flow.mapper", "data.map");
+
+        registry.Registrations.Keys.ShouldBe(["data.map"]);
+        registry.TryGetRegistration(" flow.mapper ", out var registration).ShouldBeTrue();
+        registration.Type.ShouldBe("data.map");
+    }
+
+    [Fact]
+    public void Node_registry_rejects_invalid_aliases_and_alias_collisions()
+    {
+        var registry = new CompositionNodeRegistry()
+            .Register(
+                "data.map",
+                static _ => throw new InvalidOperationException("Factory should not run."));
+
+        Should.Throw<InvalidOperationException>(() =>
+                registry.RegisterAlias("flow.mapper", "missing.type"))
+            .Message.ShouldContain("missing.type");
+        Should.Throw<ArgumentException>(() => registry.RegisterAlias("data.map", "data.map"));
+
+        registry.RegisterAlias("flow.mapper", "data.map");
+        Should.Throw<InvalidOperationException>(() =>
+            registry.RegisterAlias("flow.mapper", "data.map"));
+        Should.Throw<InvalidOperationException>(() =>
+            registry.Register(
+                "flow.mapper",
+                static _ => throw new InvalidOperationException("Factory should not run.")));
+    }
+
+    [Fact]
     public void Node_registration_rejects_duplicate_ports_after_trimming()
     {
         var exception = Should.Throw<ArgumentException>(() =>

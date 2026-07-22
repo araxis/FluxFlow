@@ -94,7 +94,7 @@ generic node is retained for explicit migration and strongly typed hosts.
 ## Composition
 
 `FluxFlow.Components.Validation.Composition` registers the canonical fixed
-`json.schema-validator` type with parameterless `RegisterJsonSchemaValidator()`.
+`json.validate` type with parameterless `RegisterJsonSchemaValidator()`.
 The adapter binds options, loads the schema during composition build, and
 resolves optional host-owned `IJsonSchemaFlowValueSelector` and `TimeProvider`
 resources.
@@ -109,7 +109,7 @@ The explicit generic overload remains available under a custom node type:
 
 ```csharp
 registry.RegisterJsonSchemaValidator<OrderMessage>(
-    "json.schema-validator.legacy-order");
+    "json.validate.legacy-order");
 ```
 
 `FlowResult<T>` is a real typed output. FluxFlow does not implicitly unwrap its

@@ -40,7 +40,11 @@ public sealed class CompositionRuntimeBuilder
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var key = new RuntimeNodeKey(workflowName, nodeName);
-                    var registration = _registry.Registrations[nodeDefinition.Type];
+                    if (!_registry.TryGetRegistration(nodeDefinition.Type, out var registration))
+                    {
+                        throw new InvalidOperationException(
+                            $"Node type '{nodeDefinition.Type}' is not registered.");
+                    }
 
                     ComposedNode descriptor;
                     try

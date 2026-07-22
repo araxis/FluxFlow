@@ -7,6 +7,9 @@ sequence `FlowValue` sources. Both node types have no input, one normal
 This package does not scan assemblies, resolve CLR types from strings, own
 clock lifetime, add polling, persist output, or depend on Engine.
 
+Existing definitions using `source.generated` remain supported as a hidden
+alias; new definitions and Designer palettes use `source.items`.
+
 ## Canonical Registration
 
 ```csharp
@@ -21,7 +24,7 @@ registry
 
 | Type | Node | Output | Optional resource |
 |------|------|--------|-------------------|
-| `source.generated` | `FlowValueGeneratedSourceNode` | `FlowValue` | `clock` |
+| `source.items` | `FlowValueGeneratedSourceNode` | `FlowValue` | `clock` |
 | `source.sequence` | `FlowValueSequenceSourceNode` | `FlowValue` | `clock` |
 
 The composition runtime starts and stops both through `IFlowSource`. Invalid
@@ -41,7 +44,7 @@ options fail node activation. Missing generated `items` creates an empty source.
   "Workflows": {
     "Main": {
       "Orders": {
-        "Type": "source.generated",
+        "Type": "source.items",
         "clock": "Resources.System.Clock",
         "name": "orders",
         "items": [
@@ -85,7 +88,7 @@ Code-authored hosts can retain released typed contracts explicitly:
 
 ```csharp
 registry
-    .RegisterGeneratedSource<OrderMessage>("source.generated.order")
+    .RegisterGeneratedSource<OrderMessage>("source.items.order")
     .RegisterSequenceItemSource("source.sequence.item");
 ```
 

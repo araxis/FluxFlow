@@ -22,6 +22,7 @@ public sealed class ValidationComponentDesignMetadataProvider : IComponentDesign
                 iconKey: "shield-check",
                 preferredNodeName: "validate",
                 suggestedEditorWidth: 460)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ValidationCompositionNodeTypes.LegacyJsonSchemaValidator)
             .AddOption(
                 "schema",
                 OptionValueKind.Json,

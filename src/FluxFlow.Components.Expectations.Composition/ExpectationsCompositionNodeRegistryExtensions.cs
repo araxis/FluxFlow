@@ -16,7 +16,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return registry.Register(
+        var result = registry.Register(
             nodeType,
             CreateEventExpectationNode,
             inputs:
@@ -29,6 +29,15 @@ public static class ExpectationsCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<FlowResult<EventExpectationResult>>(
                     ExpectationsCompositionPortNames.Output)
             ]);
+
+        if (string.Equals(nodeType, ExpectationsCompositionNodeTypes.EventExpectation, StringComparison.Ordinal))
+        {
+            result.RegisterAlias(
+                ExpectationsCompositionNodeTypes.LegacyEventExpectation,
+                ExpectationsCompositionNodeTypes.EventExpectation);
+        }
+
+        return result;
     }
 
     private static ValueTask<ComposedNode> CreateEventExpectationNode(

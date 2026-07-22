@@ -6,7 +6,8 @@ public static class FileSystemCompositionNodeTypes
 
     public const string Write = "file.write";
 
-    public const string DirectoryEnumerate = "directory.enumerate";
+    public const string DirectoryEnumerate = "directory.list";
+    public const string LegacyDirectoryEnumerate = "directory.enumerate";
 
     public const string Watch = "file.watch";
 }

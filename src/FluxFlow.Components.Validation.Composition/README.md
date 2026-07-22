@@ -5,6 +5,9 @@ validation over immutable `FlowValue`. The package binds flat component
 settings and resolves optional host-owned selector and clock resources; it does
 not own resources, scan assemblies, watch schema files, or require Engine.
 
+Existing definitions using `json.schema-validator` remain supported as a
+hidden alias; new definitions and Designer palettes use `json.validate`.
+
 ## Registration
 
 ```csharp
@@ -15,7 +18,7 @@ services
 
 | Type | Input | Output |
 |------|-------|--------|
-| `json.schema-validator` | `FlowValue` | `FlowResult<JsonSchemaFlowValueValidationResult>` |
+| `json.validate` | `FlowValue` | `FlowResult<JsonSchemaFlowValueValidationResult>` |
 
 Valid schema matches use result kind `Valid`. Schema rejection uses `Invalid`
 with issues and is not an error. Missing input, selector failure, and evaluation
@@ -41,7 +44,7 @@ exposes Events and no Valid, Invalid, or universal Errors ports.
   "Workflows": {
     "OrderProcessing": {
       "ValidateOrder": {
-        "Type": "json.schema-validator",
+        "Type": "json.validate",
         "selector": "Resources.Validation.OrderBody",
         "clock": "Resources.Clocks.Business",
         "schema": {
@@ -76,7 +79,7 @@ The explicit generic overload preserves the previous node and port shape:
 
 ```csharp
 registry.RegisterJsonSchemaValidator<OrderMessage>(
-    "json.schema-validator.legacy-order");
+    "json.validate.legacy-order");
 ```
 
 That custom type uses `JsonSchemaValidatorNode<OrderMessage>`,

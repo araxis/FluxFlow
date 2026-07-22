@@ -550,6 +550,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `239-application-runtime-port-generations.md`: dynamic current-port
   generations for component add/remove/type changes, drain-safe ownership, and
   verification evidence.
+- `240-canonical-component-type-names.md`: harmonized component operation and
+  MQTT retry-resource type names, explicit input aliases, canonical-only
+  Designer enumeration, package versions, and verification evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

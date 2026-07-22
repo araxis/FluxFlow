@@ -35,9 +35,9 @@ contract.
 
 | Component class | Canonical type | Shape | Purpose |
 |---|---|---|---|
-| `MqttControlNode` | `mqtt.control` | `Input` -> `Output` | Executes Connect, Disconnect, Status, Publish, Subscribe, and Unsubscribe requests and emits exactly one `MqttClientResult` for every accepted request. |
+| `MqttControlNode` | `mqtt.command` | `Input` -> `Output` | Executes Connect, Disconnect, Status, Publish, Subscribe, and Unsubscribe requests and emits exactly one `MqttClientResult` for every accepted request. |
 | `MqttPublishOperationNode` | `mqtt.publish` | `Input` -> `Output` | Focused convenience component over the same publish request/result path. |
-| `MqttSubscriptionTriggerNode` | `mqtt.trigger` | `Output`, `Ack`, `Nak` | Emits received `FlowContent` messages and accepts payload-independent workflow outcome signals matched by `TraceId`. |
+| `MqttSubscriptionTriggerNode` | `mqtt.receive` | `Output`, `Ack`, `Nak` | Emits received `FlowContent` messages and accepts payload-independent workflow outcome signals matched by `TraceId`. |
 | `MqttClientEventsNode` | `mqtt.events` | `Output` | Emits reliable connection, subscription, and reconnect domain events for workflow use. |
 
 The new components expose no universal `Errors` or `State` port. Expected
@@ -176,7 +176,7 @@ milestone is complete.
     },
     "Resilience": {
       "MqttRetry": {
-        "Type": "resilience.retry",
+        "Type": "retry.policy",
         "Strategy": "Exponential",
         "InitialDelay": "00:00:01",
         "MaximumDelay": "00:01:00",
@@ -187,7 +187,7 @@ milestone is complete.
   "Workflows": {
     "OrderProcessing": {
       "ReceiveCommands": {
-        "Type": "mqtt.trigger",
+        "Type": "mqtt.receive",
         "Client": "Resources.Messaging.TelemetryClient",
         "Subscription": "Resources.Messaging.Commands",
         "WorkflowAcknowledgement": "Required",
@@ -405,7 +405,7 @@ timeouts.
 
 Add `FluxFlow.Components.Mqtt.Composition` when a host wants to instantiate MQTT
 nodes from `FluxFlow.Composition` fluent definitions or `IConfiguration` JSON.
-That optional package registers explicit `mqtt.publish` and `mqtt.trigger`
+That optional package registers explicit `mqtt.publish` and `mqtt.receive`
 factories while this core package stays focused on standalone nodes and neutral
 MQTT contracts.
 
@@ -422,7 +422,7 @@ connect, reconnect, or dispose MQTT clients.
 
 The optional composition package also exposes
 `MqttComponentDesignMetadataProvider` for neutral Designer metadata over the
-`mqtt.publish` and `mqtt.trigger` composition node types. The standalone MQTT
+`mqtt.publish` and `mqtt.receive` composition node types. The standalone MQTT
 package remains free of Designer, Composition, and Engine dependencies.
 
 ### Topic Validation

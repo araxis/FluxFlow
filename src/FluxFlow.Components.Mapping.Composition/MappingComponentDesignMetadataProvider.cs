@@ -21,6 +21,7 @@ public sealed class MappingComponentDesignMetadataProvider : IComponentDesignMet
                 iconKey: "map",
                 preferredNodeName: "map",
                 suggestedEditorWidth: 420)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, MappingCompositionNodeTypes.LegacyMapper)
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,

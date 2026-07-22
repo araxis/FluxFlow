@@ -18,7 +18,7 @@ public static class StateCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return registry.Register(
+        var result = registry.Register(
             nodeType,
             CreateStateReducerNode,
             inputs:
@@ -31,6 +31,15 @@ public static class StateCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<FlowResult<FlowValueStateReducerResult>>(
                     StateCompositionPortNames.Output)
             ]);
+
+        if (string.Equals(nodeType, StateCompositionNodeTypes.Reducer, StringComparison.Ordinal))
+        {
+            result.RegisterAlias(
+                StateCompositionNodeTypes.LegacyReducer,
+                StateCompositionNodeTypes.Reducer);
+        }
+
+        return result;
     }
 
     private static ValueTask<ComposedNode> CreateStateReducerNode(

@@ -1,8 +1,11 @@
 # FluxFlow.Components.Assertions.Composition
 
 Optional `FluxFlow.Composition` registration helpers and Designer metadata for
-assertion components. The canonical `flow.assert` contract consumes `FlowValue`
+assertion components. The canonical `data.assert` contract consumes `FlowValue`
 and emits `FlowResult<FlowValueAssertionResult>` on one normal output.
+
+Existing definitions using `flow.assert` remain supported as a hidden alias;
+new definitions and Designer palettes use `data.assert`.
 
 The package does not choose an expression language, scan assemblies, resolve
 CLR types from strings, or own expression-engine resources.
@@ -19,7 +22,7 @@ registry.RegisterAssertion();
 
 | Type | Node | Input | Output |
 |------|------|-------|--------|
-| `flow.assert` | `FlowValueAssertionNode` | `FlowValue` | `FlowResult<FlowValueAssertionResult>` |
+| `data.assert` | `FlowValueAssertionNode` | `FlowValue` | `FlowResult<FlowValueAssertionResult>` |
 
 Passed and failed assertions are successful result kinds. Missing input and
 expression evaluation failures are normal error results. The canonical
@@ -44,7 +47,7 @@ contract has no `Passed`, `Failed`, or universal error port.
   "Workflows": {
     "OrderChecks": {
       "CheckScore": {
-        "Type": "flow.assert",
+        "Type": "data.assert",
         "engine": "Resources.Expressions.Primary",
         "contextFactory": "Resources.Contexts.Score",
         "expression": "score >= 10",
@@ -76,7 +79,7 @@ fail during node activation.
 Existing code-authored hosts can retain explicit CLR contracts:
 
 ```csharp
-registry.RegisterAssertion<OrderMessage>("flow.assert.order");
+registry.RegisterAssertion<OrderMessage>("data.assert.order");
 ```
 
 That overload creates `FlowAssertionComponent<TInput>` and preserves its

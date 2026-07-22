@@ -56,6 +56,13 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
         var events = registry.Registrations[MqttCompositionNodeTypes.Events];
         events.Inputs.ShouldBeEmpty();
         AssertMessagePort<MqttClientEvent>(events.Outputs, MqttCompositionPortNames.Output);
+
+        registry.TryGetRegistration(MqttCompositionNodeTypes.LegacyControl, out var controlAlias)
+            .ShouldBeTrue();
+        controlAlias.ShouldBeSameAs(registry.Registrations[MqttCompositionNodeTypes.Control]);
+        registry.TryGetRegistration(MqttCompositionNodeTypes.LegacyTrigger, out var triggerAlias)
+            .ShouldBeTrue();
+        triggerAlias.ShouldBeSameAs(trigger);
     }
 
     [Fact]
@@ -157,6 +164,26 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
             .ShouldBeSameAs(firstController);
         provider.GetRequiredKeyedService<IMqttClientController>("Resources.Messaging.Client2")
             .ShouldNotBeSameAs(firstController);
+    }
+
+    [Fact]
+    public async Task Legacy_retry_resource_type_remains_loadable()
+    {
+        var definition = Parse(CanonicalDefinitionJson.Replace(
+            "\"retry.policy\"",
+            "\"resilience.retry\"",
+            StringComparison.Ordinal));
+        var services = new ServiceCollection()
+            .AddSingleton<IMqttTransportFactory, UnusedTransportFactory>();
+        services.AddKeyedSingleton(
+            "Resources.Messaging.Credentials",
+            new MqttCredentialConfiguration { Password = "host-secret" });
+        services.AddMqttCompositionResources(definition);
+
+        await using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredKeyedService<MqttClientConfiguration>(ClientAddress)
+            .Reconnect.Policy.Strategy.ShouldBe(MqttRetryStrategy.Linear);
     }
 
     [Fact]
@@ -337,7 +364,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
                 "UseTls": true
               },
               "Retry": {
-                "Type": "resilience.retry",
+                "Type": "retry.policy",
                 "Strategy": "Linear",
                 "InitialDelay": "00:00:02"
               },
@@ -380,7 +407,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
           "Workflows": {
             "Main": {
               "Control": {
-                "Type": "mqtt.control",
+                "Type": "mqtt.command",
                 "Client": "Resources.Messaging.Client1",
                 "RequestProcessing": "Concurrent",
                 "MaximumConcurrentRequests": 4
@@ -391,7 +418,7 @@ public sealed class MqttCompositionNodeRegistryExtensionsTests
                 "MaximumPendingRequests": 64
               },
               "Trigger": {
-                "Type": "mqtt.trigger",
+                "Type": "mqtt.receive",
                 "Client": "Resources.Messaging.Client1",
                 "Subscription": "Commands",
                 "Ack": "Control.Output",

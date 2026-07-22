@@ -118,6 +118,6 @@ faults remain local to the node and do not define host lifetime.
 ## Composition
 
 The optional `FluxFlow.Components.Routing.Composition` package registers the
-canonical `flow.window`, `flow.correlation`, and `flow.join` factories through
+canonical `flow.window`, `flow.correlate`, and `flow.join` factories through
 parameterless registration methods. Explicit generic overloads remain for
 typed compatibility under host-selected node type names.

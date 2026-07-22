@@ -1,9 +1,12 @@
 # FluxFlow.Components.Expectations.Composition
 
 Optional `FluxFlow.Composition` registration helpers and Designer metadata for
-projection-event expectations. The canonical `event.expectation` contract
+projection-event expectations. The canonical `event.expect` contract
 consumes `ProjectionEvent` and emits one
 `FlowResult<EventExpectationResult>` output.
+
+Existing definitions using `event.expectation` remain supported as a hidden
+alias; new definitions and Designer palettes use `event.expect`.
 
 ## Canonical Registration
 
@@ -17,7 +20,7 @@ registry.RegisterEventExpectation();
 
 | Type | Node | Input | Output |
 |------|------|-------|--------|
-| `event.expectation` | `FlowEventExpectationNode` | `ProjectionEvent` | `FlowResult<EventExpectationResult>` |
+| `event.expect` | `FlowEventExpectationNode` | `ProjectionEvent` | `FlowResult<EventExpectationResult>` |
 
 Matched and unmet rules, timeout, and input completion are successful result
 variants. Expected evaluation failures are normal error variants on the same
@@ -38,7 +41,7 @@ port.
   "Workflows": {
     "OrderMonitoring": {
       "WaitForCompletion": {
-        "Type": "event.expectation",
+        "Type": "event.expect",
         "clock": "Resources.Clocks.Workflow",
         "kind": "Expect",
         "name": "order-completed",

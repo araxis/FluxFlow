@@ -78,6 +78,11 @@ before metadata is registered.
 including nested choices and typed attribute maps, so later mutations to
 provider-owned collections do not change the catalog.
 
+Providers can declare comma-separated legacy component type names with
+`ComponentDesignMetadataAttributeNames.Aliases`. Catalog lookup resolves those
+aliases to the canonical metadata entry, while `All` returns canonical entries
+only so palettes do not duplicate components.
+
 ## Option Kinds
 
 The option kind contract supports:
@@ -190,7 +195,7 @@ diagnostic while persistence still preserves the condition text.
   "Workflows": {
     "Orders": {
       "Read": {
-        "Type": "mqtt.trigger",
+        "Type": "mqtt.receive",
         "Client": "Resources.Messaging.Client1",
         "Output": "Validate.Input"
       },

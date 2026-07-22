@@ -111,7 +111,7 @@ services.AddKeyedSingleton<IFlowExpressionEngine>(
 registry.RegisterAssertion();
 ```
 
-Parameterless registration owns canonical `flow.assert`. Explicit
+Parameterless registration owns canonical `data.assert`. Explicit
 `RegisterAssertion<TInput>(customNodeType)` remains available for typed
 compatibility and should use a distinct node type when both forms share a
 registry.

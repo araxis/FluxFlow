@@ -22,7 +22,8 @@ public sealed class StateComponentDesignMetadataProvider : IComponentDesignMetad
                 summary: "Maintains keyed state by applying a reducer expression to each input message.",
                 iconKey: "database-zap",
                 preferredNodeName: "stateReducer",
-                suggestedEditorWidth: 460);
+                suggestedEditorWidth: 460)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, StateCompositionNodeTypes.LegacyReducer);
 
         AddReducerOptions(builder);
         AddReducerResources(builder);

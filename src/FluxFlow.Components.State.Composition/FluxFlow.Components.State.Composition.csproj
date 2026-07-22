@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.State.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.State.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.State.Composition</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FlowValue state-reducer registration and Designer metadata over host-owned expression and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;state;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Moves state.reducer to the canonical FlowValueStateReducerInput and FlowResult output contract, decodes natural JSON initial state, and removes the universal Errors surface from the fixed descriptor.</PackageReleaseNotes>
+    <PackageReleaseNotes>Renames the canonical state reducer type to state.reduce while retaining state.reducer as a hidden configuration alias.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

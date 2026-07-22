@@ -106,7 +106,7 @@ timestamps use the supplied `TimeProvider` or `TimeProvider.System`.
 
 ## Composition
 
-Add `FluxFlow.Components.Mapping.Composition` for the canonical `flow.mapper`
+Add `FluxFlow.Components.Mapping.Composition` for the canonical `data.map`
 factory and Designer metadata:
 
 ```csharp

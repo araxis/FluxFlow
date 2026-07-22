@@ -43,7 +43,7 @@ ASP.NET Core endpoint and trigger DI integration through `AddFluxFlowHttpTrigger
 and `MapFluxFlowTrigger`; the host owns the ASP.NET Core app, route selection,
 request body policy, and host-owned trigger lifetime registration.
 
-Use `FluxFlow.Components.Http.Composition` only for outbound `http.client`
+Use `FluxFlow.Components.Http.Composition` only for outbound `http.request`
 composition. Config-composed inbound HTTP trigger factories are intentionally
 outside this package boundary.
 

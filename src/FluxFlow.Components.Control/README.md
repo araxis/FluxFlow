@@ -18,7 +18,7 @@ complementary conditions:
   "Workflows": {
     "Orders": {
       "Normalize": {
-        "Type": "flow.mapper",
+        "Type": "data.map",
         "Output": [
           {
             "Port": "Priority.Input",

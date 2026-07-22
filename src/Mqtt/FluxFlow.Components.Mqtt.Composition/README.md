@@ -13,9 +13,13 @@ only for the underlying protocol transport.
   its credentials, certificates, Last Will, desired subscriptions,
   auto-connect mode, and reconnect policy.
 - `mqtt.subscription` names reusable subscription settings.
-- `resilience.retry` names reusable reconnect settings.
-- `mqtt.control`, `mqtt.publish`, `mqtt.trigger`, and `mqtt.events` share the
+- `retry.policy` names reusable reconnect settings.
+- `mqtt.command`, `mqtt.publish`, `mqtt.receive`, and `mqtt.events` share the
   keyed `IMqttClientController` selected by their `Client` property.
+
+Existing resources using `resilience.retry` and nodes using `mqtt.control` or
+`mqtt.trigger` remain supported as hidden aliases. New definitions and Designer
+palettes use the canonical names above.
 
 The host registers an `IMqttTransportFactory`, credentials, certificates, and
 optional clocks. `AddMqttCompositionResources(...)` validates MQTT resource
@@ -60,7 +64,7 @@ declarations sit directly on each component.
         "UseTls": true
       },
       "Reconnect": {
-        "Type": "resilience.retry",
+        "Type": "retry.policy",
         "Strategy": "Exponential",
         "InitialDelay": "00:00:01",
         "MaximumDelay": "00:01:00"
@@ -89,7 +93,7 @@ declarations sit directly on each component.
   "Workflows": {
     "CommandProcessing": {
       "Receive": {
-        "Type": "mqtt.trigger",
+        "Type": "mqtt.receive",
         "Client": "Resources.Messaging.Client1",
         "Subscription": "Commands",
         "Ack": "Handle.Output",
@@ -109,7 +113,7 @@ declarations sit directly on each component.
         "Input": "Handle.Output"
       },
       "Control": {
-        "Type": "mqtt.control",
+        "Type": "mqtt.command",
         "Client": "Resources.Messaging.Client1"
       },
       "ClientEvents": {
@@ -129,9 +133,9 @@ accepts one canonical `Resources...` address or an array of addresses.
 
 | Type | Input | Output |
 |---|---|---|
-| `mqtt.control` | `FlowMessage<MqttClientRequest>` | `FlowMessage<MqttClientResult>` |
+| `mqtt.command` | `FlowMessage<MqttClientRequest>` | `FlowMessage<MqttClientResult>` |
 | `mqtt.publish` | `FlowMessage<MqttPublishMessage>` | `FlowMessage<MqttClientResult>` |
-| `mqtt.trigger` | `Ack`, `Nak` signals | `FlowMessage<MqttReceivedApplicationMessage>` |
+| `mqtt.receive` | `Ack`, `Nak` signals | `FlowMessage<MqttReceivedApplicationMessage>` |
 | `mqtt.events` | none | `FlowMessage<MqttClientEvent>` |
 
 Control and publish failures are normal `MqttClientResult` values with

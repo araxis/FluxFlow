@@ -7,6 +7,9 @@ canonical routing components. Window, Correlation, and Join consume immutable
 This package does not choose an expression language, scan assemblies, resolve
 CLR types from strings, or own selector and clock resources.
 
+Existing definitions using `flow.correlation` remain supported as a hidden
+alias; new definitions and Designer palettes use `flow.correlate`.
+
 ## Canonical Registration
 
 ```csharp
@@ -26,7 +29,7 @@ registry
 | Type | Required resources | Input | Output |
 |------|--------------------|-------|--------|
 | `flow.window` | none | `Input: FlowValue` | `FlowResult<FlowWindow<FlowValue>>` |
-| `flow.correlation` | `keySelector`, `sideSelector` | `Input: FlowValue` | `FlowResult<FlowCorrelationOutcome<FlowValue>>` |
+| `flow.correlate` | `keySelector`, `sideSelector` | `Input: FlowValue` | `FlowResult<FlowCorrelationOutcome<FlowValue>>` |
 | `flow.join` | `leftKeySelector`, `rightKeySelector` | `Left: FlowValue`, `Right: FlowValue` | `FlowResult<FlowJoinOutcome<FlowValue,FlowValue>>` |
 
 `clock` is an optional keyed `TimeProvider` resource. Expected selector,
@@ -50,7 +53,7 @@ canonical descriptors do not expose a universal Errors port.
   "Workflows": {
     "Orders": {
       "Correlate": {
-        "Type": "flow.correlation",
+        "Type": "flow.correlate",
         "keySelector": "Resources.Routing.Key",
         "sideSelector": "Resources.Routing.Side",
         "requestSide": "request",
@@ -88,7 +91,7 @@ Explicit generic overloads preserve the released typed contracts:
 ```csharp
 registry
     .RegisterWindow<OrderMessage>("flow.window.order")
-    .RegisterCorrelation<OrderMessage>("flow.correlation.order")
+    .RegisterCorrelation<OrderMessage>("flow.correlate.order")
     .RegisterJoin<RequestMessage, ResponseMessage>("flow.join.requests");
 ```
 

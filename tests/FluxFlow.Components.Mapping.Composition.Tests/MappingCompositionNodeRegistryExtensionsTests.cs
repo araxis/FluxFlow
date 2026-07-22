@@ -199,7 +199,7 @@ public sealed class MappingCompositionNodeRegistryExtensionsTests
               "Workflows": {
                 "Main": {
                   "Map": {
-                    "Type": "flow.mapper",
+                    "Type": "data.map",
                     "engine": "Resources.Expressions.Primary",
                     "expression": "map",
                     "boundedCapacity": 8

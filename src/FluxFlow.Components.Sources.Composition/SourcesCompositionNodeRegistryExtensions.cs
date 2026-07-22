@@ -18,14 +18,14 @@ public static class SourcesCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return registry.Register(
+        return RegisterGeneratedAlias(registry.Register(
             nodeType,
             CreateFlowValueGeneratedSourceNode,
             outputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
                     SourcesCompositionPortNames.Output)
-            ]);
+            ]), nodeType);
     }
 
     public static CompositionNodeRegistry RegisterGeneratedSource<TOutput>(
@@ -35,14 +35,14 @@ public static class SourcesCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return registry.Register(
+        return RegisterGeneratedAlias(registry.Register(
             nodeType,
             CreateGeneratedSourceNode<TOutput>,
             outputs:
             [
                 CompositionPorts.Metadata<TOutput>(
                     SourcesCompositionPortNames.Output)
-            ]);
+            ]), nodeType);
     }
 
     public static CompositionNodeRegistry RegisterSequenceSource(
@@ -60,6 +60,20 @@ public static class SourcesCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<FlowValue>(
                     SourcesCompositionPortNames.Output)
             ]);
+    }
+
+    private static CompositionNodeRegistry RegisterGeneratedAlias(
+        CompositionNodeRegistry registry,
+        string nodeType)
+    {
+        if (string.Equals(nodeType, SourcesCompositionNodeTypes.Generated, StringComparison.Ordinal))
+        {
+            registry.RegisterAlias(
+                SourcesCompositionNodeTypes.LegacyGenerated,
+                SourcesCompositionNodeTypes.Generated);
+        }
+
+        return registry;
     }
 
     private static ValueTask<ComposedNode> CreateFlowValueGeneratedSourceNode(

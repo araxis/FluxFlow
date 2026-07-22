@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Mqtt.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Mqtt.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Mqtt.Composition</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FluxFlow Composition resources and nodes for provider-neutral MQTT client control, publication, subscriptions, and client events.</Description>
     <PackageTags>workflow;dataflow;components;mqtt;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Replaces the legacy publisher/trigger-source composition surface with canonical broker, client, subscription, and retry resources plus mqtt.control, mqtt.publish, mqtt.trigger, and mqtt.events nodes over one shared logical client controller.</PackageReleaseNotes>
+    <PackageReleaseNotes>Introduces mqtt.command and mqtt.receive canonical node types plus retry.policy resources while retaining mqtt.control, mqtt.trigger, and resilience.retry as compatibility aliases.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

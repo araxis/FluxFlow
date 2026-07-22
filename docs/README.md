@@ -48,6 +48,7 @@ runtime is the right fit for a host.
 18. [Designer Host Layer](18-designer-host-layer.md)
 19. [vNext Runtime Architecture](19-vnext-runtime-architecture.md)
 20. [Flow Data Contracts](20-flow-data-contracts.md)
+21. [Component Type Names](21-component-type-names.md)
 
 Legacy Composition or Engine runtime APIs are labeled where they remain during
 the vNext migration. Treat those as compatibility guidance, not the canonical

@@ -4,6 +4,9 @@ Optional `FluxFlow.Composition` registrations for canonical Sessions nodes.
 Hosts provide a keyed `ISessionStore` or `ISessionStoreFactory` and may provide
 a keyed `TimeProvider`; this package owns none of those resources.
 
+Existing definitions using `session.recorder` remain supported as a hidden
+alias; new definitions and Designer palettes use `session.record`.
+
 ## Registration
 
 ```csharp
@@ -19,7 +22,7 @@ services
 
 | Type | Canonical ports |
 |------|-----------------|
-| `session.recorder` | `SessionContentRecordInput` Input, `FlowResult<SessionContentRecord>` Output |
+| `session.record` | `SessionContentRecordInput` Input, `FlowResult<SessionContentRecord>` Output |
 | `session.replay` | `FlowResult<SessionContentRecord>` Output |
 | `session.query` | `SessionQueryRequest` Input, `FlowResult<SessionQueryOutcome>` Output |
 
@@ -50,7 +53,7 @@ on `Kind`, `IsError`, `Error.Code`, or value fields.
         "Output": "Record.Input"
       },
       "Record": {
-        "Type": "session.recorder",
+        "Type": "session.record",
         "sessionId": "run-42",
         "store": "Resources.Sessions.Primary",
         "Output": ["HandleResult.Input", "Audit.Input"]
@@ -84,7 +87,7 @@ Register released typed contracts under distinct caller-selected node types:
 
 ```csharp
 registry
-    .RegisterSessionRecordOutput("session.recorder.typed")
+    .RegisterSessionRecordOutput("session.record.typed")
     .RegisterSessionReplayRecords("session.replay.typed")
     .RegisterSessionQueryResultBranches("session.query.typed");
 ```

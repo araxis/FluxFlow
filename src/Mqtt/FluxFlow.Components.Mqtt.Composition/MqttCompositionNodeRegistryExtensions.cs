@@ -58,7 +58,13 @@ public static class MqttCompositionNodeRegistryExtensions
                 outputs:
                 [
                     CompositionPorts.Metadata<MqttClientEvent>(MqttCompositionPortNames.Output)
-                ]);
+                ])
+            .RegisterAlias(
+                MqttCompositionNodeTypes.LegacyControl,
+                MqttCompositionNodeTypes.Control)
+            .RegisterAlias(
+                MqttCompositionNodeTypes.LegacyTrigger,
+                MqttCompositionNodeTypes.Trigger);
     }
 
     private static async ValueTask<ComposedNode> CreateControlNodeAsync(

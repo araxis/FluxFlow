@@ -21,7 +21,8 @@ public sealed class MetricsComponentDesignMetadataProvider : IComponentDesignMet
                 summary: "Folds metric samples into rolling count, value, rate, size, and group snapshots.",
                 iconKey: "chart-no-axes-combined",
                 preferredNodeName: "aggregateMetrics",
-                suggestedEditorWidth: 460);
+                suggestedEditorWidth: 460)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, MetricsCompositionNodeTypes.LegacyAggregate);
 
         AddAggregateOptions(builder);
         AddAggregateResources(builder);

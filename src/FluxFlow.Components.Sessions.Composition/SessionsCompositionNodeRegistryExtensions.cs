@@ -15,7 +15,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
 
-        return registry.Register(
+        var result = registry.Register(
             nodeType,
             CreateSessionRecorderNode,
             inputs:
@@ -28,6 +28,15 @@ public static class SessionsCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<FlowResult<SessionContentRecord>>(
                     SessionsCompositionPortNames.Output)
             ]);
+
+        if (string.Equals(nodeType, SessionsCompositionNodeTypes.Recorder, StringComparison.Ordinal))
+        {
+            result.RegisterAlias(
+                SessionsCompositionNodeTypes.LegacyRecorder,
+                SessionsCompositionNodeTypes.Recorder);
+        }
+
+        return result;
     }
 
     public static CompositionNodeRegistry RegisterSessionReplay(

@@ -4,7 +4,7 @@ FluxFlow keeps expression evaluation outside the runtime core. Hosts provide
 expression services, component packages decide where expressions are useful,
 and composition adapters resolve those services through explicit keyed DI.
 Links remain structural and never insert implicit mappings.
-The default configuration-authored mapping component is `flow.mapper`.
+The default configuration-authored mapping component is `data.map`.
 
 ## Core Contracts
 
@@ -84,7 +84,7 @@ services.AddKeyedSingleton<IFlowExpressionEngine>(
 registry.RegisterMapper();
 ```
 
-The default node type is `flow.mapper`:
+The default node type is `data.map`:
 
 | Port | Direction | Message payload |
 |------|-----------|-----------------|
@@ -113,7 +113,7 @@ Example canonical application document:
   "Workflows": {
     "Orders": {
       "Normalize": {
-        "Type": "flow.mapper",
+        "Type": "data.map",
         "engine": "Resources.Expressions.Primary",
         "expression": "input",
         "expressionName": "normalize-order",
@@ -152,7 +152,7 @@ Keep additional variables immutable and transport-neutral where practical.
 deliberately own CLR message contracts:
 
 ```csharp
-registry.RegisterMapper<OrderInput, ReviewedOrder>("flow.mapper.order");
+registry.RegisterMapper<OrderInput, ReviewedOrder>("data.map.order");
 ```
 
 The typed node preserves its established `Output`, `Failed`, `Errors`, and

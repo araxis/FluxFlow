@@ -7,6 +7,10 @@ output plus Events.
 This package does not scan assemblies, own expression engines/selectors/clocks,
 create logging or metric sinks, or add renderer behavior.
 
+The former `flow.counter`, `flow.logger`, and `flow.metrics` names remain
+supported as hidden aliases. New definitions and Designer palettes use the
+canonical names below.
+
 ## Registration
 
 ```csharp
@@ -20,9 +24,9 @@ services
 
 | Type | Input | Output |
 |------|-------|--------|
-| `flow.counter` | `FlowValue` | `FlowResult<FlowCounterSnapshot>` |
-| `flow.logger` | `FlowValue` | `FlowResult<FlowValueLogEntry>` |
-| `flow.metrics` | `FlowValue` | `FlowResult<FlowMetricSnapshot>` |
+| `metric.count` | `FlowValue` | `FlowResult<FlowCounterSnapshot>` |
+| `log.write` | `FlowValue` | `FlowResult<FlowValueLogEntry>` |
+| `metric.measure` | `FlowValue` | `FlowResult<FlowMetricSnapshot>` |
 
 Descriptors expose Events and no universal Errors ports. Counter rejection is a
 successful result. Logger attribute and Metrics size failures are partial error
@@ -55,7 +59,7 @@ results carrying usable output values.
   "Workflows": {
     "Telemetry": {
       "CountAccepted": {
-        "Type": "flow.counter",
+        "Type": "metric.count",
         "engine": "Resources.Expressions.Main",
         "clock": "Resources.System.Clock",
         "name": "accepted-orders",
@@ -64,7 +68,7 @@ results carrying usable output values.
         "Input": "OrderSource.Output"
       },
       "LogOrders": {
-        "Type": "flow.logger",
+        "Type": "log.write",
         "clock": "Resources.System.Clock",
         "attributeSelectors": ["kind"],
         "attribute:kind": "Resources.Selectors.Kind",
@@ -75,7 +79,7 @@ results carrying usable output values.
         "Input": "OrderSource.Output"
       },
       "MeasureOrders": {
-        "Type": "flow.metrics",
+        "Type": "metric.measure",
         "sizeSelector": "Resources.Selectors.Size",
         "clock": "Resources.System.Clock",
         "name": "orders",

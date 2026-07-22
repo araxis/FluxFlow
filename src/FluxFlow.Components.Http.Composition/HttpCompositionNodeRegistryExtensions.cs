@@ -12,7 +12,7 @@ public static class HttpCompositionNodeRegistryExtensions
     {
         ArgumentNullException.ThrowIfNull(registry);
 
-        return registry.Register(
+        var result = registry.Register(
             HttpCompositionNodeTypes.Client,
             CreateClientNode,
             inputs:
@@ -25,6 +25,12 @@ public static class HttpCompositionNodeRegistryExtensions
                 CompositionPorts.Metadata<HttpClientResult>(
                     HttpCompositionPortNames.Output)
             ]);
+
+        result.RegisterAlias(
+            HttpCompositionNodeTypes.LegacyClient,
+            HttpCompositionNodeTypes.Client);
+
+        return result;
     }
 
     private static ValueTask<ComposedNode> CreateClientNode(

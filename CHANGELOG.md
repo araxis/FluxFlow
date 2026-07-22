@@ -7,6 +7,81 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Composition 2.6.0
+
+- Added first-class node-type aliases that resolve to canonical registrations
+  without duplicating registry entries.
+- Runtime validation and construction now accept aliases while canonical
+  registration enumeration remains stable.
+
+## FluxFlow.Components.Designer 2.20.0
+
+- Added metadata alias resolution so existing definitions open against the
+  canonical component metadata entry.
+- Palette enumeration remains canonical-only and does not duplicate aliased
+  component types.
+
+## FluxFlow.Components.Mapping.Composition 2.1.0
+
+- Uses `data.map` as the canonical type and retains `flow.mapper` as an alias.
+
+## FluxFlow.Components.Assertions.Composition 2.1.0
+
+- Uses `data.assert` as the canonical type and retains `flow.assert` as an alias.
+
+## FluxFlow.Components.Validation.Composition 2.1.0
+
+- Uses `json.validate` as the canonical type and retains
+  `json.schema-validator` as an alias.
+
+## FluxFlow.Components.State.Composition 2.1.0
+
+- Uses `state.reduce` as the canonical type and retains `state.reducer` as an alias.
+
+## FluxFlow.Components.Expectations.Composition 2.1.0
+
+- Uses `event.expect` as the canonical type and retains `event.expectation` as an alias.
+
+## FluxFlow.Components.Projections.Composition 2.1.0
+
+- Uses `event.project` as the canonical type and retains `event.projection` as an alias.
+
+## FluxFlow.Components.Metrics.Composition 2.1.0
+
+- Uses `metric.aggregate` as the canonical type and retains `metrics.aggregate` as an alias.
+
+## FluxFlow.Components.Observability.Composition 2.1.0
+
+- Uses `metric.count`, `log.write`, and `metric.measure` as the canonical types.
+- Retains `flow.counter`, `flow.logger`, and `flow.metrics` as aliases.
+
+## FluxFlow.Components.Routing.Composition 2.1.0
+
+- Uses `flow.correlate` as the canonical type and retains `flow.correlation` as an alias.
+
+## FluxFlow.Components.Sources.Composition 2.1.0
+
+- Uses `source.items` as the canonical type and retains `source.generated` as an alias.
+
+## FluxFlow.Components.FileSystem.Composition 2.1.0
+
+- Uses `directory.list` as the canonical type and retains `directory.enumerate` as an alias.
+
+## FluxFlow.Components.Http.Composition 2.1.0
+
+- Uses `http.request` as the canonical type and retains `http.client` as an alias.
+
+## FluxFlow.Components.Sessions.Composition 2.1.0
+
+- Uses `session.record` as the canonical type and retains `session.recorder` as an alias.
+
+## FluxFlow.Components.Mqtt.Composition 2.1.0
+
+- Uses `mqtt.command` and `mqtt.receive` as canonical node types and retains
+  `mqtt.control` and `mqtt.trigger` as aliases.
+- Uses `retry.policy` as the canonical retry resource type while accepting
+  `resilience.retry` for existing resource definitions.
+
 ## FluxFlow.Engine 2.6.0
 
 - Added dynamic application port generations for canonical revisions that add,

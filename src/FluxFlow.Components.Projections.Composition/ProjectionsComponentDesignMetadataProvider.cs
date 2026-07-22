@@ -21,7 +21,8 @@ public sealed class ProjectionsComponentDesignMetadataProvider : IComponentDesig
                 summary: "Folds matching projection events into count, latest-event, and rolling-rate snapshots.",
                 iconKey: "activity",
                 preferredNodeName: "projectEvents",
-                suggestedEditorWidth: 460);
+                suggestedEditorWidth: 460)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ProjectionsCompositionNodeTypes.LegacyEventProjection);
 
         AddEventProjectionOptions(builder);
         AddEventProjectionResources(builder);

@@ -6,6 +6,9 @@ node. The adapter resolves host-owned keyed `HttpClient` and optional
 choose transport, authentication, retry, redirect, TLS, proxy, or endpoint
 security policy.
 
+Existing definitions using `http.client` remain supported as a hidden alias;
+new definitions and Designer palettes use `http.request`.
+
 ## Canonical Registration
 
 ```csharp
@@ -18,7 +21,7 @@ registry.RegisterHttpNodes();
 
 | Type | Node | Input | Output | Resources |
 |------|------|-------|--------|-----------|
-| `http.client` | `FlowContentHttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
+| `http.request` | `FlowContentHttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
 
 The descriptor exposes Events and no universal Errors surface. Expected
 request and transport failures are `HttpClientFailureResult` values on Output.
@@ -43,7 +46,7 @@ The runtime does not add an implicit mapper or serializer.
         "Output": "CallApi.Input"
       },
       "CallApi": {
-        "Type": "http.client",
+        "Type": "http.request",
         "client": "Resources.External.ApiClient",
         "boundedCapacity": 32,
         "maxResponseBodyBytes": 1048576,
@@ -83,7 +86,7 @@ Code-authored hosts can retain the released request/response contract under a
 distinct node type:
 
 ```csharp
-registry.RegisterHttpResponseOutput("http.client.response-output");
+registry.RegisterHttpResponseOutput("http.request.response-output");
 ```
 
 That explicit registration uses `HttpClientNode`, `HttpRequestInput`, and

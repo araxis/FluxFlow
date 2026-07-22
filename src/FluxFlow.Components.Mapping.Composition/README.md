@@ -1,8 +1,11 @@
 # FluxFlow.Components.Mapping.Composition
 
 Optional `FluxFlow.Composition` registration helpers and Designer metadata for
-mapping components. The canonical `flow.mapper` contract consumes `FlowValue`
+mapping components. The canonical `data.map` contract consumes `FlowValue`
 and emits `FlowResult<FlowValue>` on one normal output.
+
+Existing definitions using `flow.mapper` remain supported as a hidden alias;
+new definitions and Designer palettes use `data.map`.
 
 The package does not choose an expression language, scan assemblies, resolve
 CLR types from strings, or own expression-engine resources.
@@ -19,7 +22,7 @@ registry.RegisterMapper();
 
 | Type | Node | Input | Output |
 |------|------|-------|--------|
-| `flow.mapper` | `FlowValueMapperNode` | `FlowValue` | `FlowResult<FlowValue>` |
+| `data.map` | `FlowValueMapperNode` | `FlowValue` | `FlowResult<FlowValue>` |
 
 The output result distinguishes mapped values from expected expression failures
 through `Kind`, `IsError`, and `Error`. The canonical contract has no `Failed`
@@ -39,7 +42,7 @@ port and no universal error output.
   "Workflows": {
     "Main": {
       "MapOrder": {
-        "Type": "flow.mapper",
+        "Type": "data.map",
         "engine": "Resources.Expressions.Primary",
         "expression": "input",
         "expressionName": "normalize-order",
@@ -70,7 +73,7 @@ Existing code-authored hosts can retain explicit CLR contracts:
 
 ```csharp
 registry.RegisterMapper<InputMessage, OutputMessage>(
-    "flow.mapper.typed");
+    "data.map.typed");
 ```
 
 That overload creates `FlowMapperNode<TInput,TOutput>` and preserves its

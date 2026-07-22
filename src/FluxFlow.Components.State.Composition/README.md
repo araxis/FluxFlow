@@ -1,8 +1,11 @@
 # FluxFlow.Components.State.Composition
 
 Composition registration and Designer metadata for the canonical
-`state.reducer` component. It consumes typed commands containing immutable
+`state.reduce` component. It consumes typed commands containing immutable
 `FlowValue` data and emits one normal `FlowResult<T>` output.
+
+Existing definitions using `state.reducer` remain supported as a hidden alias;
+new definitions and Designer palettes use `state.reduce`.
 
 This package does not choose an expression language, scan assemblies, resolve
 CLR types from strings, or own expression-engine and clock resources.
@@ -21,7 +24,7 @@ services
 
 | Type | Required resources | Input | Output |
 |------|--------------------|-------|--------|
-| `state.reducer` | `engine` | `FlowValueStateReducerInput` | `FlowResult<FlowValueStateReducerResult>` |
+| `state.reduce` | `engine` | `FlowValueStateReducerInput` | `FlowResult<FlowValueStateReducerResult>` |
 
 `clock` is an optional keyed `TimeProvider`. The fixed descriptor exposes
 Events and no universal Errors port. Expected operation failures remain normal
@@ -44,7 +47,7 @@ result data on Output.
   "Workflows": {
     "Orders": {
       "TrackState": {
-        "Type": "state.reducer",
+        "Type": "state.reduce",
         "engine": "Resources.State.Engine",
         "clock": "Resources.State.Clock",
         "reducer": "increment-count",

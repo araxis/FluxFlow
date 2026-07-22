@@ -81,6 +81,6 @@ between those contracts and canonical `FlowValue` or `FlowResult<T>` links.
 ## Composition
 
 Use `FluxFlow.Components.State.Composition` when a Composition host should
-register the canonical `state.reducer` factory and Designer metadata. The host
+register the canonical `state.reduce` factory and Designer metadata. The host
 owns keyed expression-engine and clock resources; the component package does
 not create or manage them.

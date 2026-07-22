@@ -22,7 +22,8 @@ public sealed class HttpComponentDesignMetadataProvider : IComponentDesignMetada
                 summary: "Sends FlowContent HTTP requests through a host-owned HttpClient and emits response or error results.",
                 iconKey: "send",
                 preferredNodeName: "httpClient",
-                suggestedEditorWidth: 420);
+                suggestedEditorWidth: 420)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, HttpCompositionNodeTypes.LegacyClient);
 
         AddClientOptions(builder);
         AddClientResources(builder);

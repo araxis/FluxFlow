@@ -98,6 +98,7 @@ public sealed class FileSystemComponentDesignMetadataProvider : IComponentDesign
             "enumerateDirectory");
 
         builder
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, FileSystemCompositionNodeTypes.LegacyDirectoryEnumerate)
             .AddOption(BoundedCapacityOption(EnumerateDefaults.BoundedCapacity))
             .AddOption(DirectoryOption(EnumerateDefaults.Directory))
             .AddOption(FilterOption(EnumerateDefaults.Filter))

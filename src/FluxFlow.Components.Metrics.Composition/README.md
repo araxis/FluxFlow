@@ -1,8 +1,11 @@
 # FluxFlow.Components.Metrics.Composition
 
 Composition registration and Designer metadata for the canonical
-`metrics.aggregate` component. It consumes typed metric samples and emits one
+`metric.aggregate` component. It consumes typed metric samples and emits one
 normal `FlowResult<MetricSnapshotOutput>` output.
+
+Existing definitions using `metrics.aggregate` remain supported as a hidden
+alias; new definitions and Designer palettes use `metric.aggregate`.
 
 This package does not scan assemblies, create metric exporters, own clocks, or
 add renderer behavior.
@@ -17,7 +20,7 @@ services
 
 | Type | Resources | Input | Output |
 |------|-----------|-------|--------|
-| `metrics.aggregate` | optional `clock` | `MetricSampleInput` | `FlowResult<MetricSnapshotOutput>` |
+| `metric.aggregate` | optional `clock` | `MetricSampleInput` | `FlowResult<MetricSnapshotOutput>` |
 
 The descriptor exposes Events and no universal Errors port. Snapshots are
 successful variants; invalid samples and partial group-limit applications are
@@ -37,7 +40,7 @@ normal error variants on Output.
   "Workflows": {
     "Telemetry": {
       "AggregateRequests": {
-        "Type": "metrics.aggregate",
+        "Type": "metric.aggregate",
         "clock": "Resources.System.Clock",
         "rateWindowSeconds": 60,
         "boundedCapacity": 128,

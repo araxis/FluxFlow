@@ -231,7 +231,8 @@ var registry = new CompositionNodeRegistry()
                 events: node.Events,
                 errors: node.Errors));
         },
-        outputs: [CompositionPorts.Metadata<string>("Output")]);
+        outputs: [CompositionPorts.Metadata<string>("Output")])
+    .RegisterAlias("sample.old-source", "sample.source");
 
 var definition = CompositionDefinitionBuilder
     .Create()
@@ -252,6 +253,10 @@ await using var runtime = result.Runtime!;
 await runtime.StartAsync();
 await runtime.Completion;
 ```
+
+Aliases resolve during validation and runtime construction but do not appear in
+`CompositionNodeRegistry.Registrations`. Register canonical types first, then
+add compatibility aliases with `RegisterAlias`.
 
 ## Legacy Configuration Shape
 

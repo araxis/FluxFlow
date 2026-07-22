@@ -1,8 +1,11 @@
 # FluxFlow.Components.Projections.Composition
 
 Composition registration and Designer metadata for the canonical
-`event.projection` component. It consumes typed domain events and emits one
+`event.project` component. It consumes typed domain events and emits one
 normal `FlowResult<EventProjectionSnapshot>` output.
+
+Existing definitions using `event.projection` remain supported as a hidden
+alias; new definitions and Designer palettes use `event.project`.
 
 This package does not scan assemblies, create projection stores, own clocks,
 or add renderer behavior.
@@ -17,7 +20,7 @@ services
 
 | Type | Resources | Input | Output |
 |------|-----------|-------|--------|
-| `event.projection` | optional `clock` | `ProjectionEvent` | `FlowResult<EventProjectionSnapshot>` |
+| `event.project` | optional `clock` | `ProjectionEvent` | `FlowResult<EventProjectionSnapshot>` |
 
 The descriptor exposes Events and no universal Errors port. Matching and final
 snapshots are successful variants; expected projection failures are normal
@@ -37,7 +40,7 @@ error variants on Output.
   "Workflows": {
     "Operations": {
       "ProjectFailures": {
-        "Type": "event.projection",
+        "Type": "event.project",
         "clock": "Resources.System.Clock",
         "name": "failed-operations",
         "rateWindowSeconds": 60,

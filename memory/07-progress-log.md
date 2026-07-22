@@ -2,6 +2,21 @@
 
 Date: 2026-05-31
 
+## 2026-07-22 - Canonical Component Type Names
+
+- Harmonized ambiguous or inconsistent component type values around lowercase
+  `domain.operation` names and renamed the MQTT retry resource to
+  `retry.policy`.
+- Added explicit Composition and Designer alias resolution so previous
+  definitions still load while registry and palette enumeration remain
+  canonical-only.
+- Moved Composition to `2.6.0`, Designer to `2.20.0`, and the 14 affected
+  composition packages to `2.1.0`; runtime component behavior and versions are
+  unchanged.
+- Focused and complete tests, controlled Debug/Release builds, public API and
+  binary compatibility checks, release preflight, and isolated package
+  dry-runs passed. Complete evidence is recorded in memory note 240.
+
 ## 2026-07-20 - Application Runtime Port Generations
 
 - Replaced fixed-lifetime port-surface rejection with generation-aware

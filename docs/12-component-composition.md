@@ -15,21 +15,21 @@ Start with a small graph and add component families only when they remove real
 host code:
 
 1. Keep source and sink nodes in the host until the behavior is clearly reusable.
-2. Add `source.generated` or `source.sequence` for deterministic generated
+2. Add `source.items` or `source.sequence` for deterministic generated
    streams that do not depend on a transport or app store.
-3. Add `flow.mapper` to translate from host input shapes into package request
+3. Add `data.map` to translate from host input shapes into package request
    contracts.
 4. Add `flow.filter`, `flow.when`, or `flow.switch` for expression-driven
    decisions.
 5. Add `flow.fork` when several branches must receive every input.
 6. Add `flow.merge` when same-type streams need to converge with source
    metadata.
-7. Add `flow.assert` when a flow needs assertion results or pass/fail streams.
-8. Add `flow.correlation` when a single stream needs request/response pairing
+7. Add `data.assert` when a flow needs assertion results or pass/fail streams.
+8. Add `flow.correlate` when a single stream needs request/response pairing
    by key.
 9. Add `flow.join` when two streams need to be paired by related keys.
-10. Add `state.reducer` when later decisions depend on previous messages.
-11. Add `flow.counter`, `flow.metrics`, or `flow.logger` when a stream needs
+10. Add `state.reduce` when later decisions depend on previous messages.
+11. Add `metric.count`, `metric.measure`, or `log.write` when a stream needs
    runtime observation.
 12. Add `timer.interval`, `timer.schedule`, `timer.delay`, `timer.throttle`, or
    `timer.debounce` when time is part of the flow.
@@ -144,14 +144,14 @@ Snapshots: Counter, metric, or log entry contract
 ```
 
 For each shape, prefer typed contracts over loosely shaped dictionaries. Hosts
-can map app data into those contracts with `flow.mapper`.
+can map app data into those contracts with `data.map`.
 
 ## Composition Examples
 
 Stateful timer flow:
 
 ```text
-timer.interval -> flow.mapper -> state.reducer -> flow.counter
+timer.interval -> data.map -> state.reduce -> metric.count
                                   |
                                   +-> host sink
 ```
@@ -159,13 +159,13 @@ timer.interval -> flow.mapper -> state.reducer -> flow.counter
 Deterministic source flow:
 
 ```text
-source.generated -> flow.mapper -> flow.assert -> host sink
+source.items -> data.map -> data.assert -> host sink
 ```
 
 Validation and routing:
 
 ```text
-host source -> flow.mapper -> json.schema-validator -> flow.switch -> host sinks
+host source -> data.map -> json.validate -> flow.switch -> host sinks
 ```
 
 Switch with direct route outputs:
@@ -179,7 +179,7 @@ host source -> flow.switch
 Switch with a route envelope:
 
 ```text
-host source -> flow.switch.Routed -> flow.mapper -> host sink
+host source -> flow.switch.Routed -> data.map -> host sink
 ```
 
 Reliable fan-out:
@@ -187,47 +187,47 @@ Reliable fan-out:
 ```text
 host source -> flow.fork
                   |-> Audit -> host sink
-                  |-> Work  -> flow.mapper -> host sink
+                  |-> Work  -> data.map -> host sink
 ```
 
 Source-tagged merge:
 
 ```text
-primary source -> flow.merge -> flow.assert -> host sink
+primary source -> flow.merge -> data.assert -> host sink
 replay source  ->/
 ```
 
 Request/response pairing:
 
 ```text
-host source -> flow.correlation -> flow.assert -> host sink
+host source -> flow.correlate -> data.assert -> host sink
 ```
 
 Windowed processing:
 
 ```text
-host source -> flow.window -> flow.mapper -> host sink
+host source -> flow.window -> data.map -> host sink
 ```
 
 Two-stream join:
 
 ```text
-left source  -> flow.join -> flow.assert -> host sink
+left source  -> flow.join -> data.assert -> host sink
 right source ->/
 ```
 
 Recording and replay:
 
 ```text
-host source -> flow.mapper -> session.recorder -> host sink
+host source -> data.map -> session.record -> host sink
 
-session.replay -> flow.mapper -> host sink
+session.replay -> data.map -> host sink
 ```
 
 Transport boundary:
 
 ```text
-transport source -> flow.mapper -> flow.when -> transport publisher
+transport source -> data.map -> flow.when -> transport publisher
 ```
 
 The transport package should only know its own request/result contracts. The

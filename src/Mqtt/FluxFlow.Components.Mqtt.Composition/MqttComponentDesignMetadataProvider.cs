@@ -37,6 +37,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             "controlMqtt",
             460);
         builder
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, MqttCompositionNodeTypes.LegacyControl)
             .AddOption(EnumOption(
                 "requestProcessing",
                 "Request Processing",
@@ -95,6 +96,7 @@ public sealed class MqttComponentDesignMetadataProvider : IComponentDesignMetada
             "triggerMqtt",
             500);
         builder
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, MqttCompositionNodeTypes.LegacyTrigger)
             .AddOption(
                 "subscription",
                 OptionValueKind.Json,

@@ -10,7 +10,8 @@ public static class RoutingCompositionNodeTypes
 
     public const string Window = "flow.window";
 
-    public const string Correlation = "flow.correlation";
+    public const string Correlation = "flow.correlate";
+    public const string LegacyCorrelation = "flow.correlation";
 
     public const string Join = "flow.join";
 }

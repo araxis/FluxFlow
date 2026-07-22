@@ -23,7 +23,8 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
                 summary: "Resolves projection-event rules, timeout, completion, and evaluation failures through one result output.",
                 iconKey: "badge-check",
                 preferredNodeName: "expectEvent",
-                suggestedEditorWidth: 460);
+                suggestedEditorWidth: 460)
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ExpectationsCompositionNodeTypes.LegacyEventExpectation);
 
         AddEventExpectationOptions(builder);
         AddEventExpectationResources(builder);

@@ -94,6 +94,6 @@ output and `FlowResult<EventProjectionSnapshot>` links.
 ## Composition
 
 Use `FluxFlow.Components.Projections.Composition` when a Composition host should
-register the canonical `event.projection` factory and Designer metadata. Hosts
+register the canonical `event.project` factory and Designer metadata. Hosts
 own optional keyed clocks and decide how snapshots are stored, displayed, or
 forwarded.

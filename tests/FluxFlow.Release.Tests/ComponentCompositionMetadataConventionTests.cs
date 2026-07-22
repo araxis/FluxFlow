@@ -465,6 +465,58 @@ public sealed partial class ComponentCompositionMetadataConventionTests
     }
 
     [Fact]
+    public void Legacy_node_type_constants_are_registered_as_hidden_designer_aliases()
+    {
+        var root = ReleaseTestPaths.FindRepositoryRoot();
+        var entries = ReadComponentCompositionPackages(root);
+
+        foreach (var entry in entries)
+        {
+            var projectDirectory = ReadProjectDirectory(root, entry);
+            var nodeTypesFile = ReadSingleNodeTypesFile(projectDirectory, entry.PackageId);
+            var legacyNodeTypes = PublicStringConstantWithValueRegex()
+                .Matches(File.ReadAllText(nodeTypesFile))
+                .Where(match => match.Groups["name"].Value.StartsWith("Legacy", StringComparison.Ordinal))
+                .Select(match => match.Groups["value"].Value)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (legacyNodeTypes.Count == 0)
+                continue;
+
+            var project = LoadProject(root, entry);
+            var assembly = LoadPackageAssembly(project, entry.PackageId);
+            var provider = CreateSingleMetadataProvider(assembly, entry.PackageId);
+            var metadataAliases = provider
+                .GetMetadata()
+                .SelectMany(ReadMetadataAliases)
+                .ToHashSet(StringComparer.Ordinal);
+
+            metadataAliases.SetEquals(legacyNodeTypes).ShouldBeTrue(
+                $"{entry.PackageId} Designer aliases must match its Legacy* node-type constants.");
+
+            var registeredAliases = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var method in ReadRegistryMethods(assembly, entry.PackageId))
+            {
+                var registry = new CompositionNodeRegistry();
+                InvokeRegistryMethod(method, registry, entry.PackageId);
+
+                foreach (var legacyNodeType in legacyNodeTypes)
+                {
+                    if (!registry.TryGetRegistration(legacyNodeType, out _))
+                        continue;
+
+                    registry.Registrations.ContainsKey(legacyNodeType).ShouldBeFalse(
+                        $"{entry.PackageId} legacy node type '{legacyNodeType}' must not be a canonical registration.");
+                    registeredAliases.Add(legacyNodeType);
+                }
+            }
+
+            registeredAliases.SetEquals(legacyNodeTypes).ShouldBeTrue(
+                $"{entry.PackageId} default registry extensions must register every Legacy* node type as an alias.");
+        }
+    }
+
+    [Fact]
     public void Component_composition_registry_extension_methods_are_documented()
     {
         var root = ReleaseTestPaths.FindRepositoryRoot();
@@ -2113,6 +2165,21 @@ public sealed partial class ComponentCompositionMetadataConventionTests
         return omittedOptions.Value
             .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static IEnumerable<string> ReadMetadataAliases(ComponentDesignMetadata metadata)
+    {
+        if (!metadata.Attributes.TryGetValue(
+                new ComponentAttributeName(ComponentDesignMetadataAttributeNames.Aliases),
+                out var aliases) ||
+            string.IsNullOrWhiteSpace(aliases.Value))
+        {
+            return [];
+        }
+
+        return aliases.Value.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static void AssertNumericMetadataBoundIsAccepted(

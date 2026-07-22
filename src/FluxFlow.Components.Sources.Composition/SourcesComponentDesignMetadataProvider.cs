@@ -25,6 +25,7 @@ public sealed class SourcesComponentDesignMetadataProvider : IComponentDesignMet
             builder =>
             {
                 builder
+                    .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, SourcesCompositionNodeTypes.LegacyGenerated)
                     .AddAttribute("omittedOptions", "outputType")
                     .AddAttribute(
                         "omittedOptionsReason",

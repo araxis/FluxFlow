@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Sessions.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Sessions.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Sessions.Composition</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Optional canonical session Composition registrations with exact FlowContent results, fixed ports, Designer metadata, and explicit typed compatibility paths.</Description>
     <PackageTags>workflow;dataflow;components;sessions;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Makes exact-content normal-result Sessions nodes the defaults, removes universal Errors and query branch ports from canonical descriptors, and adds explicit released typed compatibility registrations.</PackageReleaseNotes>
+    <PackageReleaseNotes>Renames the canonical session recorder type to session.record while retaining session.recorder as a hidden configuration alias.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

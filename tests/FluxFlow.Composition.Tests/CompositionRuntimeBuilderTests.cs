@@ -52,6 +52,32 @@ public sealed class CompositionRuntimeBuilderTests
     }
 
     [Fact]
+    public async Task Runtime_resolves_legacy_node_type_aliases()
+    {
+        var collector = new StringCollector();
+        var registry = TestCompositionRegistry.Create()
+            .RegisterAlias("test.legacy-source", TestNodeTypes.Source);
+        var definition = CompositionDefinitionBuilder
+            .Create()
+            .Workflow("main", workflow => workflow
+                .Node("source", "test.legacy-source", node => node.Configure("messages", new[] { "legacy" }))
+                .Node("sink", TestNodeTypes.Sink)
+                .Link("source.Output", "sink.Input"))
+            .Build();
+
+        var result = await new CompositionRuntimeBuilder(registry)
+            .BuildAsync(definition, new TestServiceProvider().Add(collector));
+
+        result.Succeeded.ShouldBeTrue(string.Join(Environment.NewLine, result.Diagnostics));
+        await using var runtime = result.Runtime.ShouldNotBeNull();
+
+        await runtime.StartAsync();
+        await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+
+        collector.Items.ShouldBe(["legacy"]);
+    }
+
+    [Fact]
     public async Task Runtime_stop_completes_running_source()
     {
         var collector = new StringCollector();

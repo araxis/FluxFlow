@@ -85,6 +85,37 @@ public sealed class ComponentDesignMetadataCatalogTests
     }
 
     [Fact]
+    public void Catalog_resolves_legacy_aliases_to_canonical_metadata_without_listing_duplicates()
+    {
+        var metadata = new ComponentDesignMetadataBuilder("data.map")
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
+            .Build();
+        var catalog = new ComponentDesignMetadataCatalog().Add(metadata);
+
+        catalog.All.ShouldHaveSingleItem().Type.ShouldBe(new ComponentType("data.map"));
+        catalog.TryGet(new ComponentType("flow.mapper"), out var found).ShouldBeTrue();
+        found.Type.ShouldBe(new ComponentType("data.map"));
+    }
+
+    [Fact]
+    public void Catalog_rejects_alias_collisions()
+    {
+        var catalog = new ComponentDesignMetadataCatalog().Add(
+            new ComponentDesignMetadataBuilder("data.map")
+                .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
+                .Build());
+
+        Should.Throw<InvalidOperationException>(() => catalog.Add(
+                new ComponentDesignMetadataBuilder("flow.mapper").Build()))
+            .Message.ShouldContain("flow.mapper");
+        Should.Throw<InvalidOperationException>(() => catalog.Add(
+                new ComponentDesignMetadataBuilder("data.other")
+                    .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, "flow.mapper")
+                    .Build()))
+            .Message.ShouldContain("flow.mapper");
+    }
+
+    [Fact]
     public void Metadata_builder_snapshots_mutable_inputs_and_build_results()
     {
         var optionAttributes = new Dictionary<string, string>

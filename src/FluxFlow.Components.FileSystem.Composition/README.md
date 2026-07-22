@@ -5,6 +5,9 @@ transforms and sources. The adapter binds package options and an optional
 host-owned keyed `TimeProvider`; it does not create file-system resources,
 own path policy, decode content, or scan assemblies.
 
+Existing definitions using `directory.enumerate` remain supported as a hidden
+alias; new definitions and Designer palettes use `directory.list`.
+
 ## Canonical Registration
 
 ```csharp
@@ -19,7 +22,7 @@ registry
 |------|------|-------|--------|
 | `file.read` | `FlowContentFileReadNode` | `FileReadRequest` | `FlowResult<FileReadContent>` |
 | `file.write` | `FlowContentFileWriteNode` | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
-| `directory.enumerate` | `FlowValueDirectoryEnumerateNode` | none | `FlowValue` |
+| `directory.list` | `FlowValueDirectoryEnumerateNode` | none | `FlowValue` |
 | `file.watch` | `FlowValueFileWatchNode` | none | `FlowValue` |
 
 Canonical descriptors expose Events and no universal Errors surface. Expected
@@ -40,7 +43,7 @@ isolated source completion faults observed by the runtime.
   "Workflows": {
     "FileProcessing": {
       "Enumerate": {
-        "Type": "directory.enumerate",
+        "Type": "directory.list",
         "directory": "inbox",
         "filter": "*.json",
         "includeFiles": true,
@@ -89,7 +92,7 @@ Register released typed contracts under distinct node types when needed:
 registry
     .RegisterFileReadResult("file.read.typed")
     .RegisterFileWriteResult("file.write.typed")
-    .RegisterDirectoryEnumerateEntries("directory.enumerate.typed")
+    .RegisterDirectoryEnumerateEntries("directory.list.typed")
     .RegisterFileWatchEvents("file.watch.typed");
 ```
 

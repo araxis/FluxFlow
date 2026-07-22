@@ -223,7 +223,7 @@ public sealed class DocumentationBoundaryTests
 
         defaultSection.Contains("FluxFlow.Mapping", StringComparison.Ordinal)
             .ShouldBeTrue("expression docs should lead with standalone mapping contracts.");
-        defaultSection.Contains("flow.mapper", StringComparison.Ordinal)
+        defaultSection.Contains("data.map", StringComparison.Ordinal)
             .ShouldBeTrue("expression docs should show composition mapper usage before optional engine APIs.");
         defaultSection.Contains("ApplicationRuntimeBuilder", StringComparison.Ordinal)
             .ShouldBeFalse("expression docs must not lead with optional engine build APIs.");

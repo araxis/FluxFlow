@@ -118,7 +118,7 @@ all expected outcomes stay on one result stream.
 
 ## Composition
 
-Install `FluxFlow.Components.Http.Composition` for canonical `http.client`
+Install `FluxFlow.Components.Http.Composition` for canonical `http.request`
 registration, Designer metadata, and explicit typed compatibility registration.
 The runtime package remains free of Composition, Designer, Hosting, and Engine
 dependencies.

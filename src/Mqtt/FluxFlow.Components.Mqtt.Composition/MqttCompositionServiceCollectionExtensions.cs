@@ -32,6 +32,7 @@ public static class MqttCompositionServiceCollectionExtensions
                     RegisterBroker(services, resource);
                     break;
                 case MqttCompositionResourceTypes.Retry:
+                case MqttCompositionResourceTypes.LegacyRetry:
                     RegisterRetry(services, resource);
                     break;
                 case MqttCompositionResourceTypes.Subscription:

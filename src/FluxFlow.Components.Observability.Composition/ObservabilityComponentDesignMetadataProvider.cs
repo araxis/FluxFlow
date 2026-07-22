@@ -29,6 +29,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Counts accepted input messages and emits counter snapshots.",
             "hash",
             "count")
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ObservabilityCompositionNodeTypes.LegacyCounter)
             .AddAttribute("omittedOptions", "inputType,engine")
             .AddAttribute(
                 "omittedOptionsReason",
@@ -54,6 +55,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Renders structured log entries from input messages.",
             "list",
             "log")
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ObservabilityCompositionNodeTypes.LegacyLogger)
             .AddAttribute("omittedOptions", "inputType")
             .AddAttribute(
                 "omittedOptionsReason",
@@ -79,6 +81,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Tracks count, rate, timestamp, and optional size snapshots for inputs.",
             "activity",
             "observeMetrics")
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, ObservabilityCompositionNodeTypes.LegacyMetrics)
             .AddAttribute("omittedOptions", "inputType,sizeSelector")
             .AddAttribute(
                 "omittedOptionsReason",

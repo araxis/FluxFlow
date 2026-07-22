@@ -317,7 +317,7 @@ Main types:
 
 Use `RegisterHttpNodes()` from the optional
 `FluxFlow.Components.Http.Composition` package when a composition host wants an
-`http.client` node factory. The factory resolves a keyed `HttpClient` resource;
+`http.request` node factory. The factory resolves a keyed `HttpClient` resource;
 the host still owns client lifetime and transport policy. Invalid numeric
 `HttpClientNodeOptions` values fail during build as factory diagnostics when the
 host is configured to collect build failures.
@@ -370,7 +370,7 @@ Main types:
 - `MappingCompositionPortNames`
 - `MappingCompositionResourceNames`
 
-Use parameterless `RegisterMapper()` for the canonical `flow.mapper` contract:
+Use parameterless `RegisterMapper()` for the canonical `data.map` contract:
 `FlowValue` input and one `FlowResult<FlowValue>` output. Expected expression
 failures remain normal result data and retain the original value; the canonical
 node has no `Failed` or universal error port. The factory resolves a keyed
@@ -379,7 +379,7 @@ host-owned. `RegisterMapper<TInput,TOutput>()` remains available as an explicit
 strongly typed compatibility registration.
 
 `MappingComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `flow.mapper` composition node so hosts can compose palette, editor,
+the `data.map` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes editable options with section/editor hints, canonical
 `FlowValue`/`FlowResult<FlowValue>` ports, and host-owned resource picker hints
@@ -404,7 +404,7 @@ Main types:
 
 Use parameterless `RegisterAssertion()` from the optional
 `FluxFlow.Components.Assertions.Composition` package for the canonical fixed
-`flow.assert` factory. It consumes `FlowValue` and emits one
+`data.assert` factory. It consumes `FlowValue` and emits one
 `FlowResult<FlowValueAssertionResult>` output. Passed and failed rules are
 normal successful result kinds; missing input and expression evaluation
 failures remain normal error results. The factory resolves a required keyed
@@ -413,7 +413,7 @@ clock resources stay host-owned. `RegisterAssertion<TInput>(customNodeType)`
 remains available as an explicit generic compatibility registration.
 
 `AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `flow.assert` composition node so hosts can compose palette, editor,
+for the `data.assert` composition node so hosts can compose palette, editor,
 validation, or documentation hints without copying package descriptors. The
 metadata includes editable options with section/editor hints, canonical
 `FlowValue`/`FlowResult<FlowValueAssertionResult>` ports, and host-owned resource
@@ -474,7 +474,7 @@ Main types:
 
 Use parameterless `RegisterJsonSchemaValidator()` from the optional
 `FluxFlow.Components.Validation.Composition` package for the canonical fixed
-`json.schema-validator` factory. It consumes `FlowValue` and emits one
+`json.validate` factory. It consumes `FlowValue` and emits one
 `FlowResult<JsonSchemaFlowValueValidationResult>` output. Valid and invalid
 schema outcomes are normal successful result kinds; selector or evaluation
 failures remain normal error results. The factory binds
@@ -489,7 +489,7 @@ Explicit `RegisterJsonSchemaValidator<TInput>(customNodeType)` remains available
 for hosts migrating the prior generic Output/Valid/Invalid/Errors contract.
 
 `ValidationComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `json.schema-validator` composition node so hosts can compose palette,
+for the `json.validate` composition node so hosts can compose palette,
 editor, validation, or documentation hints without copying package descriptors.
 The metadata includes editable options, the fixed FlowValue/single-result port
 pair, and resource hints for the optional `selector` and `clock` resources.
@@ -629,7 +629,7 @@ Main types:
 
 Use `RegisterMetricsAggregate()` from the optional
 `FluxFlow.Components.Metrics.Composition` package when a composition host wants
-a canonical `metrics.aggregate` node factory. It consumes typed
+a canonical `metric.aggregate` node factory. It consumes typed
 `MetricSampleInput` values and emits successful snapshots, partial group-limit
 applications, and expected failures through one
 `FlowResult<MetricSnapshotOutput>` Output. The descriptor has no universal
@@ -641,7 +641,7 @@ snapshot Output, Errors port, and aggregation behavior for code-authored
 compatibility. Composition `2.x` registers only the canonical fixed contract.
 
 `MetricsComponentDesignMetadataProvider` exposes neutral Designer metadata for
-the `metrics.aggregate` composition node, including existing metrics aggregate
+the `metric.aggregate` composition node, including existing metrics aggregate
 options, canonical fixed ports, and a resource hint for the optional `clock`
 resource. The provider authors that metadata through the shared validated
 Designer metadata builder.
@@ -809,7 +809,7 @@ Main types:
 
 Use `RegisterStateReducer()` from the optional
 `FluxFlow.Components.State.Composition` package when a composition host wants a
-`state.reducer` node factory. The canonical factory consumes
+`state.reduce` node factory. The canonical factory consumes
 `FlowValueStateReducerInput` and emits one
 `FlowResult<FlowValueStateReducerResult>` Output plus Events. Updated, reset,
 and cleared operations are successful result variants; expected key,
@@ -824,7 +824,7 @@ contracts for code-authored compatibility; Composition `2.x` registers only
 the canonical fixed contract.
 
 `StateComponentDesignMetadataProvider` exposes neutral Designer metadata for
-`state.reducer`, including canonical reducer options and fixed ports, and
+`state.reduce`, including canonical reducer options and fixed ports, and
 resource hints for the required `engine` resource plus optional `clock`
 resource. The `engine` option is diagnostic/config metadata, not DI selection.
 The provider authors that metadata through the shared validated Designer
@@ -928,7 +928,7 @@ Main types:
 
 Use `RegisterEventProjection()` from the optional
 `FluxFlow.Components.Projections.Composition` package when a composition host
-wants the canonical `event.projection` node factory. It consumes typed
+wants the canonical `event.project` node factory. It consumes typed
 `ProjectionEvent` values and emits matching and final snapshots through one
 `FlowResult<EventProjectionSnapshot>` Output. Expected projection failures are
 normal error variants; the descriptor has no universal Errors port. The
@@ -941,7 +941,7 @@ Output, Errors port, and explicit final-flush API for code-authored
 compatibility. Composition `2.x` registers only the canonical fixed contract.
 
 `ProjectionsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the `event.projection` composition node, including existing projection
+for the `event.project` composition node, including existing projection
 options, fixed ports, and a resource hint for the optional `clock` resource.
 The provider authors that metadata through the shared validated Designer
 metadata builder.
@@ -964,7 +964,7 @@ Main types:
 
 Use `RegisterEventExpectation()` from the optional
 `FluxFlow.Components.Expectations.Composition` package when a composition host
-wants the canonical `event.expectation` node factory. It consumes
+wants the canonical `event.expect` node factory. It consumes
 `ProjectionEvent` and emits one `FlowResult<EventExpectationResult>` Output.
 Matched and unmet rules, timeout, and ordered input completion are normal
 successful variants; expected filter evaluation failure is a normal error
@@ -977,7 +977,7 @@ intentionally registers only the canonical fixed type; existing hosts can stay
 on the published Composition `1.x` line while migrating definitions.
 
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
-for the canonical `event.expectation` composition node, including existing
+for the canonical `event.expect` composition node, including existing
 expectation options, `ProjectionEvent`/`FlowResult<EventExpectationResult>`
 fixed ports, and a resource hint for the optional `clock` resource. The provider
 authors that metadata through the shared validated Designer metadata builder.
@@ -1079,7 +1079,7 @@ Main types:
 
 Use `RegisterMqttNodes()` from the optional
 `FluxFlow.Components.Mqtt.Composition` package when a composition host wants
-`mqtt.publish` and `mqtt.trigger` node factories. The factories resolve keyed
+`mqtt.publish` and `mqtt.receive` node factories. The factories resolve keyed
 `IMqttPublisher` and `IMqttTriggerSource` resources; concrete MQTT adapters or
 the host still own broker/client registration. MQTT adapter registration
 helpers reject invalid service/key/options arguments and null options factory
