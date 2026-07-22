@@ -112,7 +112,7 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
     private async ValueTask DetachAsync(long generation)
         => await _core.DetachAsync(generation).ConfigureAwait(false);
 
-    private IAsyncDisposable CommitRevision(object? target)
+    private IApplicationInputAttachment CommitRevision(object? target)
         => new InputAttachment(this, _core.CommitRevision(target));
 
     private void EndRevision() => _core.EndRevision();
@@ -146,9 +146,12 @@ internal sealed class ApplicationSignalInputPort : IApplicationSignalInputPort
 
     private sealed class InputAttachment(
         ApplicationSignalInputPort owner,
-        long generation) : IAsyncDisposable
+        long generation) : IApplicationInputAttachment
     {
         private int _disposed;
+
+        ValueTask IApplicationInputAttachment.DrainAsync(CancellationToken cancellationToken)
+            => owner._core.DrainAsync(generation, cancellationToken);
 
         public async ValueTask DisposeAsync()
         {

@@ -70,7 +70,11 @@ internal sealed class ApplicationRuntimeRevisionCandidate : IApplicationRevision
     {
         if (Interlocked.Exchange(ref _drained, 1) != 0)
             return;
+        if (_portLease is not null)
+            await _portLease.DrainInputsAsync(cancellationToken).ConfigureAwait(false);
         await _runtime.StopAsync(cancellationToken).ConfigureAwait(false);
+        if (_portLease is not null)
+            await _portLease.DrainOutputsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()

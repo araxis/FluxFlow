@@ -43,6 +43,8 @@ internal interface IPreparedApplicationOutput : IDisposable
     void ThrowIfFaulted();
 
     void Activate();
+
+    ValueTask DrainAsync(CancellationToken cancellationToken);
 }
 
 internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
@@ -346,17 +348,38 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
         _completion.TrySetResult();
     }
 
+    internal async ValueTask DrainAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            await _dispatchGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (_ingress.Count == 0)
+                    return;
+            }
+            finally
+            {
+                _dispatchGate.Release();
+            }
+
+            await Task.Yield();
+        }
+    }
+
     private async Task PumpAsync()
     {
         try
         {
             while (await _ingress.OutputAvailableAsync(_abort.Token).ConfigureAwait(false))
             {
-                while (_ingress.TryReceive(out var message))
+                while (true)
                 {
                     await _dispatchGate.WaitAsync(_abort.Token).ConfigureAwait(false);
                     try
                     {
+                        if (!_ingress.TryReceive(out var message))
+                            break;
                         Dispatch(message);
                     }
                     finally
@@ -718,6 +741,13 @@ internal sealed class ApplicationOutputPort<T> : IApplicationOutputPort
             if (Interlocked.Exchange(ref _activated, 1) != 0)
                 throw new InvalidOperationException($"Prepared output '{Address}' is already active.");
             _activeAttachment = _owner.Attach(_staging);
+        }
+
+        async ValueTask IPreparedApplicationOutput.DrainAsync(
+            CancellationToken cancellationToken)
+        {
+            await _staging.Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _owner.DrainAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public void Dispose()

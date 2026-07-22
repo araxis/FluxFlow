@@ -511,7 +511,7 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
             foreach (var output in revision.PreparedOutputs)
                 output.Activate();
 
-            var inputAttachments = new List<IAsyncDisposable>();
+        var inputAttachments = new List<IApplicationInputAttachment>();
             ApplicationPortRevisionInfo info;
             lock (_gate)
             {
@@ -523,7 +523,10 @@ public sealed class ApplicationPortRuntime : IApplicationRevisionEventSink, IAsy
                 {
                     revision.InputReplacements.TryGetValue(inputRevision.Address, out var target);
                     if (revision.InputReplacements.ContainsKey(inputRevision.Address))
-                        inputAttachments.Add(inputRevision.Commit(target));
+                    {
+                        inputAttachments.Add((IApplicationInputAttachment)
+                            inputRevision.Commit(target));
+                    }
                 }
 
                 if (revision.RoutingConfigured)

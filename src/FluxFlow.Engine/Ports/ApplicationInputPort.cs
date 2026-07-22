@@ -32,6 +32,11 @@ internal interface IApplicationInputRevision : IAsyncDisposable
     IAsyncDisposable Commit(object? target);
 }
 
+internal interface IApplicationInputAttachment : IAsyncDisposable
+{
+    ValueTask DrainAsync(CancellationToken cancellationToken);
+}
+
 internal sealed class ApplicationInputPort<T> : IApplicationInputPort
 {
     private readonly ApplicationInputPortCore<FlowMessage<T>, ITargetBlock<FlowMessage<T>>> _core;
@@ -128,16 +133,19 @@ internal sealed class ApplicationInputPort<T> : IApplicationInputPort
     private async ValueTask DetachAsync(long generation)
         => await _core.DetachAsync(generation).ConfigureAwait(false);
 
-    private IAsyncDisposable CommitRevision(object? target)
+    private IApplicationInputAttachment CommitRevision(object? target)
         => new InputAttachment(this, _core.CommitRevision(target));
 
     private void EndRevision() => _core.EndRevision();
 
     private sealed class InputAttachment(
         ApplicationInputPort<T> owner,
-        long generation) : IAsyncDisposable
+        long generation) : IApplicationInputAttachment
     {
         private int _disposed;
+
+        ValueTask IApplicationInputAttachment.DrainAsync(CancellationToken cancellationToken)
+            => owner._core.DrainAsync(generation, cancellationToken);
 
         public async ValueTask DisposeAsync()
         {

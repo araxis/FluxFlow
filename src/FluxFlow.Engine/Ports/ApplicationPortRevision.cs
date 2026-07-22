@@ -244,13 +244,13 @@ public sealed class ApplicationPortRevision : IAsyncDisposable
 
 public sealed class ApplicationPortRevisionLease : IAsyncDisposable
 {
-    private IReadOnlyList<IAsyncDisposable> _inputAttachments;
+    private IReadOnlyList<IApplicationInputAttachment> _inputAttachments;
     private IReadOnlyList<IPreparedApplicationOutput> _outputAttachments;
     private int _disposed;
 
     internal ApplicationPortRevisionLease(
         ApplicationPortRevisionInfo info,
-        IReadOnlyList<IAsyncDisposable> inputAttachments,
+        IReadOnlyList<IApplicationInputAttachment> inputAttachments,
         IReadOnlyList<IPreparedApplicationOutput> outputAttachments)
     {
         Info = info;
@@ -260,6 +260,38 @@ public sealed class ApplicationPortRevisionLease : IAsyncDisposable
 
     public ApplicationPortRevisionInfo Info { get; }
 
+    internal async ValueTask DrainInputsAsync(CancellationToken cancellationToken)
+    {
+        var drains = _inputAttachments
+            .Select(attachment => attachment.DrainAsync(cancellationToken).AsTask())
+            .ToArray();
+        if (drains.Length > 0)
+            await Task.WhenAll(drains).ConfigureAwait(false);
+    }
+
+    internal async ValueTask DrainOutputsAsync(CancellationToken cancellationToken)
+    {
+        List<Exception>? failures = null;
+        foreach (var output in _outputAttachments)
+        {
+            try
+            {
+                await output.DrainAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                (failures ??= []).Add(exception);
+            }
+        }
+
+        if (failures is not null)
+            throw new AggregateException("Port revision output draining failed.", failures);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -267,7 +299,7 @@ public sealed class ApplicationPortRevisionLease : IAsyncDisposable
 
         var inputs = Interlocked.Exchange(
             ref _inputAttachments,
-            Array.Empty<IAsyncDisposable>());
+            Array.Empty<IApplicationInputAttachment>());
         var outputs = Interlocked.Exchange(
             ref _outputAttachments,
             Array.Empty<IPreparedApplicationOutput>());

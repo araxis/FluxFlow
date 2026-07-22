@@ -33,8 +33,10 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
     private TTarget? _target;
     private TMessage? _retry;
     private TaskCompletionSource _inflightIdle = CompletedSignal();
+    private TaskCompletionSource _stateChanged = PendingSignal();
     private long _generation;
     private bool _paused;
+    private bool _draining;
     private bool _completeRequested;
     private bool _aborted;
 
@@ -85,7 +87,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
         PortSendStatus status;
         lock (_gate)
         {
-            if (_completeRequested || _aborted)
+            if (_completeRequested || _aborted || _draining)
             {
                 status = PortSendStatus.Completed;
             }
@@ -100,6 +102,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
             else
             {
                 _queue.Enqueue(message);
+                NotifyStateChanged();
                 Pulse();
                 status = PortSendStatus.Accepted;
             }
@@ -142,7 +145,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                 Capacity = CapacityCore,
                 PendingMessages = _aborted ? 0 : CapacityCore - _availableCapacity.CurrentCount,
                 ActiveAttachments = _target is null ? 0 : 1,
-                Availability = _completeRequested || _aborted
+                Availability = _completeRequested || _aborted || _draining
                     ? ApplicationPortAvailability.Completed
                     : _target is null
                         ? ApplicationPortAvailability.Unavailable
@@ -167,6 +170,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                     throw new InvalidOperationException($"{_role} '{AddressCore}' is completed.");
 
                 _paused = true;
+                NotifyStateChanged();
                 waitForIdle = _inflightIdle.Task;
             }
 
@@ -195,6 +199,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                 return;
 
             _completeRequested = true;
+            NotifyStateChanged();
             Pulse();
         }
     }
@@ -212,11 +217,47 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
             _retry = default;
             _target = null;
             _inflightIdle.TrySetResult();
+            NotifyStateChanged();
             _completion.TrySetResult();
         }
 
         _abort.Cancel();
         Pulse();
+    }
+
+    internal async ValueTask DrainAsync(
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (true)
+        {
+            Task stateChanged;
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_aborted, this);
+                if (generation != _generation)
+                    return;
+
+                _draining = true;
+                if (_queue.Count == 0 &&
+                    _retry is null &&
+                    _inflightIdle.Task.IsCompleted)
+                {
+                    return;
+                }
+
+                if (_target is null)
+                {
+                    throw new InvalidOperationException(
+                        $"{_role} '{AddressCore}' cannot drain without an active target.");
+                }
+
+                stateChanged = _stateChanged.Task;
+            }
+
+            await stateChanged.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     internal async ValueTask DetachAsync(long generation)
@@ -242,6 +283,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                     _target = null;
 
                 _paused = false;
+                NotifyStateChanged();
                 Pulse();
             }
         }
@@ -268,7 +310,9 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                 throw new InvalidOperationException($"{_role} '{AddressCore}' is completed.");
 
             _target = typedTarget;
+            _draining = false;
             generation = ++_generation;
+            NotifyStateChanged();
         }
 
         if (typedTarget is not null)
@@ -281,6 +325,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
         lock (_gate)
         {
             _paused = false;
+            NotifyStateChanged();
             Pulse();
         }
 
@@ -322,6 +367,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
 
                                 while (_queue.TryDequeue(out var queued))
                                     terminalDrops.Add(queued);
+                                NotifyStateChanged();
                             }
                             else
                             {
@@ -342,6 +388,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                                 {
                                     target = _target;
                                     _target = null;
+                                    NotifyStateChanged();
                                     finish = true;
                                 }
                                 else
@@ -412,6 +459,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
                         }
 
                         _inflightIdle.TrySetResult();
+                        NotifyStateChanged();
                         Pulse();
                     }
 
@@ -479,6 +527,7 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
             failure = completion.IsFaulted
                 ? completion.Exception?.GetBaseException() ?? completion.Exception
                 : null;
+            NotifyStateChanged();
             Pulse();
         }
 
@@ -530,6 +579,13 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
         }
     }
 
+    private void NotifyStateChanged()
+    {
+        var previous = _stateChanged;
+        _stateChanged = PendingSignal();
+        previous.TrySetResult();
+    }
+
     private static TaskCompletionSource CompletedSignal()
     {
         var source = new TaskCompletionSource(
@@ -537,6 +593,9 @@ internal sealed class ApplicationInputPortCore<TMessage, TTarget>
         source.SetResult();
         return source;
     }
+
+    private static TaskCompletionSource PendingSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private sealed record TargetCompletion(
         ApplicationInputPortCore<TMessage, TTarget> Owner,

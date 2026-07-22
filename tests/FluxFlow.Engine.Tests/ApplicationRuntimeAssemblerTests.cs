@@ -397,6 +397,30 @@ public sealed class ApplicationRuntimeAssemblerTests
         provider.GetRequiredService<IApplicationRuntimeAccess>().Ports.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task Stop_drains_final_component_output_before_retiring_the_revision()
+    {
+        var services = new ServiceCollection();
+        services.AddFluxFlowApplication(IdentityDefinition("test.final-output"))
+            .UseRuntimeAssembler(runtime => runtime.RegisterNodes(RegisterNodes));
+        await using var provider = services.BuildServiceProvider();
+        var host = provider.GetRequiredService<IApplicationRevisionHost>();
+        (await host.StartApplicationAsync()).Succeeded.ShouldBeTrue();
+        var ports = provider.GetRequiredService<IApplicationRuntimeAccess>().GetRequiredPorts();
+        var input = ApplicationAddress.WorkflowPort("Orders", "Value", "Input");
+        var output = ApplicationAddress.WorkflowPort("Orders", "Value", "Output");
+
+        (await ports.SendAsync(input, FlowMessage.Create("held")))
+            .Status.ShouldBe(PortSendStatus.Accepted);
+        var finalReceive = ports.ReceiveAsync<string>(output, TimeSpan.FromSeconds(5));
+
+        await host.StopApplicationAsync();
+
+        var final = await finalReceive;
+        final.Status.ShouldBe(PortReceiveStatus.Received);
+        final.Message.ShouldNotBeNull().Payload.ShouldBe("final:held");
+    }
+
     private static void RegisterNodes(CompositionNodeRegistry registry)
         => registry
             .Register(
@@ -454,7 +478,19 @@ public sealed class ApplicationRuntimeAssemblerTests
                         errors: node.Errors));
                 },
                 inputs: [CompositionPorts.Metadata<int>("Input")],
-                outputs: [CompositionPorts.Metadata<int>("Output")]);
+                outputs: [CompositionPorts.Metadata<int>("Output")])
+            .Register(
+                "test.final-output",
+                static _ =>
+                {
+                    var node = new FinalOutputNode();
+                    return ValueTask.FromResult(ComposedNode.Create(
+                        node,
+                        inputs: [CompositionPorts.Input<string>("Input", node.Input)],
+                        outputs: [CompositionPorts.Output<string>("Output", node.Output)]));
+                },
+                inputs: [CompositionPorts.Metadata<string>("Input")],
+                outputs: [CompositionPorts.Metadata<string>("Output")]);
 
     private static void RegisterResources(ApplicationRuntimeServicesContext context)
     {
@@ -653,6 +689,24 @@ public sealed class ApplicationRuntimeAssemblerTests
         {
             Emit(message);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FinalOutputNode : FlowNode<string, string>
+    {
+        private FlowMessage<string>? _last;
+
+        protected override Task ProcessAsync(FlowMessage<string> message)
+        {
+            _last = message;
+            return Task.CompletedTask;
+        }
+
+        protected override ValueTask OnInputCompletedAsync()
+        {
+            if (_last is not null)
+                Emit(_last.With($"final:{_last.Payload}"));
+            return ValueTask.CompletedTask;
         }
     }
 
