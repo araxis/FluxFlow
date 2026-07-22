@@ -305,18 +305,19 @@ Date: 2026-07-22
   an exact host-owned clock resource. Focused/full tests, controlled builds,
   binary compatibility, preflight/dry-runs, and a package-only consumer passed.
   See `229-vnext-timers-flowvalue-results.md`.
-- `FluxFlow.Components.Http` is now `4.0.0` locally with canonical
-  `HttpClientRequest`, exact FlowContent request/response bodies, and
-  polymorphic `HttpClientResult` response/error outcomes. Expected request,
-  timeout, transport, response-read, and configured status failures remain
-  normal data on one Output; host-owned client policy, bounded response reads,
-  diagnostics, and strong message lineage are preserved. The released
-  `HttpClientNode` and request/response contracts remain unchanged. HTTP
-  Composition is now `2.2.0` with canonical fixed ports, no universal Errors
-  surface, unchanged keyed client/clock ownership, and explicit typed
-  compatibility registration. Focused/full tests, controlled builds, binary
-  compatibility, preflight/dry-runs, and a package-only consumer passed. See
-  `230-vnext-http-flowcontent-results.md`.
+- `FluxFlow.Components.Http` is now `5.0.0` locally and consolidated on
+  `HttpClientNode`, `HttpClientRequest`, exact FlowContent request/response
+  bodies, and polymorphic `HttpClientResult` response/error outcomes. Expected
+  request, timeout, transport, response-read, and configured status failures
+  remain normal data on one Output; host-owned client policy, bounded response
+  reads, charset metadata/downstream decoding, diagnostics, fan-out, and strong
+  message lineage are preserved. The legacy string/byte request, direct
+  response, numeric error-code, Errors-port contracts, and temporary canonical
+  node name are removed. HTTP Composition is now `3.0.0` with one canonical
+  registration and unchanged client/clock ownership. Focused tests, Release
+  tests, controlled builds, preflight/dry-runs, and isolated consumers passed;
+  package validation reports only the documented intentional removals against
+  HTTP `4.0.0` and HTTP Composition `2.2.0`.
 - `FluxFlow.Components.FileSystem` is now `4.0.0` locally with canonical
   exact-byte reads/writes, FlowContent metadata, stable normal result kinds and
   errors, strong lineage, and FlowValue directory/watch sources. Expected

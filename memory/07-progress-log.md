@@ -2,6 +2,22 @@
 
 Date: 2026-05-31
 
+## 2026-07-22 - Canonical HTTP Consolidation
+
+- Consolidated outbound HTTP on the concise `HttpClientNode` using exact
+  `FlowContent` bodies and one polymorphic `HttpClientResult` Output.
+- Preserved fan-out, relative URL resolution, timeouts, transport failures,
+  bounded reads, charset metadata and downstream decoding, diagnostics, and
+  message lineage through canonical parity tests.
+- Removed the legacy string/byte request, direct response, numeric error-code,
+  Errors-port contracts, temporary canonical node name, and typed Composition
+  registration. HTTP moved to `5.0.0`; HTTP Composition moved to `3.0.0`.
+- Runtime (`22`), Composition (`14`), ASP.NET Core adapter (`16`), and Release
+  (`96`) tests passed. Controlled Debug and Release builds completed with no
+  errors; full-manifest package seeding, both preflights, both dry-runs, and
+  isolated consumer builds passed. SDK compatibility diagnostics matched only
+  the intentional major-version removals.
+
 ## 2026-07-22 - Canonical vNext Local Main Integration
 
 - Fetched `origin` and proved a linear ancestry chain from `origin/main`

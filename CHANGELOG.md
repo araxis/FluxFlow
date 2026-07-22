@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Http 5.0.0
+
+- Consolidated outbound HTTP behavior on `HttpClientNode` with exact
+  `FlowContent` request and response bodies and one `HttpClientResult` Output.
+- Removed the legacy string/byte request, direct response, numeric error-code,
+  Errors-port contracts, and the temporary `FlowContentHttpClientNode` name
+  after preserving transport, timeout, charset, truncation, diagnostics,
+  fan-out, and message-lineage behavior.
+
+## FluxFlow.Components.Http.Composition 3.0.0
+
+- Removed the legacy typed compatibility registration after consolidating
+  `http.request` on the canonical HTTP request/result contract.
+
 ## FluxFlow.Components.Metrics 5.0.0
 
 - Consolidated metric aggregation on `MetricsAggregateNode` with one normal

@@ -7,7 +7,7 @@ hosting, reflection, or assembly scanning.
 
 ## Canonical Contract
 
-`FlowContentHttpClientNode` has one typed request Input, one result Output, and
+`HttpClientNode` has one typed request Input, one result Output, and
 Events for diagnostics:
 
 | Port | Type | Purpose |
@@ -29,7 +29,7 @@ var body = FlowContent.FromBytes(
     "application/json",
     "utf-8");
 
-await using var node = new FlowContentHttpClientNode(httpClient);
+await using var node = new HttpClientNode(httpClient);
 var results = new BufferBlock<FlowMessage<HttpClientResult>>();
 node.Output.LinkTo(results);
 
@@ -108,17 +108,8 @@ All positive numeric settings fail fast when invalid. A parallelism of one
 preserves request/result order; higher parallelism allows concurrent sends and
 completion-order output.
 
-## Typed Compatibility
-
-The released `HttpClientNode`, `HttpRequestInput`, and `HttpResponseOutput`
-remain available unchanged for code-authored pipelines. They retain string and
-byte request fields, decoded response text, and their released Output, Errors,
-and Events behavior. New workflow definitions should use the canonical node so
-all expected outcomes stay on one result stream.
-
 ## Composition
 
 Install `FluxFlow.Components.Http.Composition` for canonical `http.request`
-registration, Designer metadata, and explicit typed compatibility registration.
-The runtime package remains free of Composition, Designer, Hosting, and Engine
-dependencies.
+registration and Designer metadata. The runtime package remains free of
+Composition, Designer, Hosting, and Engine dependencies.

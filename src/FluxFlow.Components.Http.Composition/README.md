@@ -21,7 +21,7 @@ registry.RegisterHttpNodes();
 
 | Type | Node | Input | Output | Resources |
 |------|------|-------|--------|-----------|
-| `http.request` | `FlowContentHttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
+| `http.request` | `HttpClientNode` | `HttpClientRequest` | `HttpClientResult` | required `client`, optional `clock` |
 
 The descriptor exposes Events and no universal Errors surface. Expected
 request and transport failures are `HttpClientFailureResult` values on Output.
@@ -77,19 +77,6 @@ content without a special error edge.
 
 Invalid numeric options fail activation and surface as composition factory
 diagnostics when build failures are configured as diagnostics.
-
-## Typed Compatibility
-
-Code-authored hosts can retain the released request/response contract under a
-distinct node type:
-
-```csharp
-registry.RegisterHttpResponseOutput("http.request.response-output");
-```
-
-That explicit registration uses `HttpClientNode`, `HttpRequestInput`, and
-`HttpResponseOutput` and retains the released Errors and Events surfaces. Use a
-distinct type when canonical and compatibility registrations share a registry.
 
 ## Design Metadata
 

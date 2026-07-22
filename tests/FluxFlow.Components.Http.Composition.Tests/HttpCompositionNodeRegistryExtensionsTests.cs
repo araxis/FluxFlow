@@ -43,20 +43,6 @@ public sealed class HttpCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Typed_registration_preserves_released_request_and_response_contracts()
-    {
-        const string nodeType = "http.client.response-output";
-        var registry = new CompositionNodeRegistry()
-            .RegisterHttpResponseOutput(nodeType);
-
-        var client = registry.Registrations[nodeType];
-        client.Inputs[HttpCompositionPortNames.Input].MessageType.ShouldBe(
-            typeof(HttpRequestInput));
-        client.Outputs[HttpCompositionPortNames.Output].MessageType.ShouldBe(
-            typeof(HttpResponseOutput));
-    }
-
-    [Fact]
     public void Design_metadata_provider_returns_valid_http_client_metadata()
     {
         var metadata = GetClientDesignMetadata();

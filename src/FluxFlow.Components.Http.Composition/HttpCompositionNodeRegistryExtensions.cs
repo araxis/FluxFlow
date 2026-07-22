@@ -35,7 +35,7 @@ public static class HttpCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<HttpClientNodeOptions>();
         var clock = context.GetResource<TimeProvider>(
             HttpCompositionResourceNames.Clock);
-        var node = new FlowContentHttpClientNode(client, options, clock);
+        var node = new HttpClientNode(client, options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

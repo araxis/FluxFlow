@@ -329,6 +329,13 @@ than once to host several flows in one application.
 
 ## HTTP Composition
 
+The outbound runtime package exposes `HttpClientNode` with
+`FlowMessage<HttpClientRequest>` Input, `FlowMessage<HttpClientResult>` Output,
+and Events. `HttpResponseResult` and `HttpClientFailureResult` share the one
+normal result stream; exact request and response bodies use `FlowContent`.
+Expected validation, timeout, transport, response-read, and configured status
+failures do not require a separate Errors port.
+
 Namespace:
 
 ```text

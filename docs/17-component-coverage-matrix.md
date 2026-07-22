@@ -28,7 +28,7 @@ Status values:
 | Family | Runtime package | Tests | Composition package | Composition tests | Designer metadata provider | Status |
 |--------|-----------------|-------|---------------------|-------------------|----------------------------|--------|
 | MQTT | `FluxFlow.Components.Mqtt` | yes | `FluxFlow.Components.Mqtt.Composition` | yes | yes | aligned |
-| HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | aligned |
+| HTTP client | `FluxFlow.Components.Http` | yes | `FluxFlow.Components.Http.Composition` | yes | yes | canonical `FlowContent`/result contract consolidated |
 | Mapping | `FluxFlow.Components.Mapping` | yes | `FluxFlow.Components.Mapping.Composition` | yes | yes | aligned |
 | Control | `FluxFlow.Components.Control` | yes | `FluxFlow.Components.Control.Composition` | yes | yes | structural Filter and When deprecated; canonical link conditions replace them |
 | Assertions | `FluxFlow.Components.Assertions` | yes | `FluxFlow.Components.Assertions.Composition` | yes | yes | canonical FlowValue/result aligned |
