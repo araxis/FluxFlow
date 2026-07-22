@@ -184,18 +184,32 @@
       "verification": ["request parity", "response byte preservation", "charset behavior", "truncation", "result routing"]
     },
     {
-      "id": "components.filesystem-storage-typed-compatibility",
+      "id": "components.filesystem-typed-compatibility",
       "kind": "public-api",
-      "packages": ["components-filesystem", "components-filesystem-composition", "components-storage", "components-storage-composition"],
-      "declarations": ["FileReadNode", "FileWriteNode", "DirectoryEnumerateNode", "FileWatchNode", "StoragePutNode", "StorageGetNode", "StorageDeleteNode", "typed requests and results", "Errors outputs"],
-      "sourceFiles": ["src/FluxFlow.Components.FileSystem/Nodes/FileReadNode.cs", "src/FluxFlow.Components.FileSystem/Nodes/FileWriteNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageGetNode.cs", "src/FluxFlow.Components.Storage/Nodes/StoragePutNode.cs"],
-      "canonicalReplacement": "FlowContent and FlowValue FileSystem nodes plus canonical Storage content nodes with normal result output.",
+      "packages": ["components-filesystem", "components-filesystem-composition"],
+      "declarations": ["FlowContentFileReadNode", "FlowContentFileWriteNode", "FlowValueDirectoryEnumerateNode", "FlowValueFileWatchNode", "FileReadResult", "FileWriteRequest", "DirectoryEnumerateEntry", "FileWatchEvent", "typed compatibility registration", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.FileSystem/Nodes/FileReadNode.cs", "src/FluxFlow.Components.FileSystem/Nodes/FileWriteNode.cs", "src/FluxFlow.Components.FileSystem/Nodes/DirectoryEnumerateNode.cs", "src/FluxFlow.Components.FileSystem/Nodes/FileWatchNode.cs"],
+      "canonicalReplacement": "Concise FileReadNode and FileWriteNode exact-content transforms plus direct FlowValue DirectoryEnumerateNode and FileWatchNode sources.",
+      "currentConsumers": ["canonical runtime tests", "canonical composition registrations", "application hosting tests"],
+      "uniqueBehavior": ["Path confinement, deterministic bounded reads, exact byte ownership, write modes, source lifecycle, diagnostics, and message lineage."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major for FileSystem and FileSystem.Composition.",
+      "migration": "Use the concise canonical node names, FileReadContent/FileContentWriteRequest, FlowValue source objects, normal FlowResult failure routing, and Completion for source infrastructure faults.",
+      "verification": ["path confinement", "bounded reads", "content ownership", "write modes", "metadata parity", "watch lifecycle", "composition activation"]
+    },
+    {
+      "id": "components.storage-typed-compatibility",
+      "kind": "public-api",
+      "packages": ["components-storage", "components-storage-composition"],
+      "declarations": ["StoragePutNode", "StorageGetNode", "StorageDeleteNode", "typed requests and results", "Found output", "Errors outputs", "typed compatibility registration"],
+      "sourceFiles": ["src/FluxFlow.Components.Storage/Nodes/StorageGetNode.cs", "src/FluxFlow.Components.Storage/Nodes/StoragePutNode.cs", "src/FluxFlow.Components.Storage/Nodes/StorageDeleteNode.cs"],
+      "canonicalReplacement": "Concise canonical Storage content nodes with exact FlowContent records and normal result output.",
       "currentConsumers": ["typed runtime tests", "typed composition registrations", "code-authored integrations"],
-      "uniqueBehavior": ["Released CLR request/result contracts, typed enumeration and watch sources, and branch outputs such as Found."],
+      "uniqueBehavior": ["Released CLR request/result contracts, Found branch behavior, expiration handling, and host-owned store/factory boundaries."],
       "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for affected runtime and composition packages.",
-      "migration": "Document canonical record shapes and normal-result routing, then migrate all typed registration tests.",
-      "verification": ["path confinement", "bounded reads", "content ownership", "metadata parity", "watch lifecycle", "storage expiration"]
+      "versionImpact": "Major for Storage and Storage.Composition after parity is proved.",
+      "migration": "Document canonical record shapes and normal-result routing, preserve expiration and adapter behavior, then migrate typed registration tests.",
+      "verification": ["content ownership", "metadata parity", "found/not-found routing", "storage expiration", "adapter integration"]
     },
     {
       "id": "components.mapping-validation-typed-compatibility",

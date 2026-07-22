@@ -1,6 +1,6 @@
-using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -11,7 +11,7 @@ using static FluxFlow.Components.FileSystem.Tests.FileSystemTestHelpers;
 namespace FluxFlow.Components.FileSystem.Tests;
 
 // directory.enumerate is a FlowSource: StartAsync, then drain Output until it completes.
-// Each entry is minted as a fresh FlowMessage<DirectoryEnumerateEntry>.
+// Each entry is minted as a fresh FlowMessage<FlowValue>.
 public sealed class DirectoryEnumerateNodeTests
 {
     [Fact]
@@ -35,11 +35,16 @@ public sealed class DirectoryEnumerateNodeTests
         await node.StartAsync();
         await node.Completion.WaitAsync(TestTimeout);
 
-        var entries = (await DrainAsync(output)).Select(message => message.Payload).ToList();
-        entries.Select(entry => entry.Name).Order().ShouldBe(["child.txt", "root.txt"]);
-        entries.ShouldAllBe(entry => entry.EntryType == DirectoryEntryType.File);
-        entries.ShouldAllBe(entry => entry.Directory == Path.GetFullPath(directory.Path));
-        entries.Single(entry => entry.Name == "root.txt").Length.ShouldBe(4);
+        var entries = (await DrainAsync(output))
+            .Select(message => message.Payload.GetObject())
+            .ToList();
+        entries.Select(entry => entry["name"].GetString()).Order()
+            .ShouldBe(["child.txt", "root.txt"]);
+        entries.ShouldAllBe(entry => entry["entryType"].GetString() == "File");
+        entries.ShouldAllBe(entry =>
+            entry["directory"].GetString() == Path.GetFullPath(directory.Path));
+        entries.Single(entry => entry["name"].GetString() == "root.txt")["length"]
+            .GetInteger().ShouldBe(4);
     }
 
     [Fact]
@@ -57,7 +62,7 @@ public sealed class DirectoryEnumerateNodeTests
         await node.Completion.WaitAsync(TestTimeout);
 
         var entry = (await DrainAsync(output)).ShouldHaveSingleItem();
-        entry.Payload.EnumeratedAt.ShouldBe(enumeratedAt);
+        entry.Payload.GetObject()["enumeratedAt"].GetDateTimeOffset().ShouldBe(enumeratedAt);
     }
 
     [Fact]
@@ -79,10 +84,10 @@ public sealed class DirectoryEnumerateNodeTests
         await node.StartAsync();
         await node.Completion.WaitAsync(TestTimeout);
 
-        var entry = (await DrainAsync(output)).ShouldHaveSingleItem().Payload;
-        entry.Name.ShouldBe("nested");
-        entry.EntryType.ShouldBe(DirectoryEntryType.Directory);
-        entry.Length.ShouldBeNull();
+        var entry = (await DrainAsync(output)).ShouldHaveSingleItem().Payload.GetObject();
+        entry["name"].GetString().ShouldBe("nested");
+        entry["entryType"].GetString().ShouldBe("Directory");
+        entry["length"].ShouldBe(FlowValue.Null);
     }
 
     [Fact]
@@ -129,7 +134,7 @@ public sealed class DirectoryEnumerateNodeTests
     }
 
     [Fact]
-    public async Task DirectoryEnumerate_MissingDirectoryReportsErrorAndCompletes()
+    public async Task DirectoryEnumerate_MissingDirectoryFaultsCompletion()
     {
         using var directory = TempDirectory.Create("enumerate");
         await using var node = new DirectoryEnumerateNode(new DirectoryEnumerateOptions
@@ -137,14 +142,11 @@ public sealed class DirectoryEnumerateNodeTests
             Directory = "missing",
             BaseDirectory = directory.Path
         });
-        var errors = Sink(node.Errors);
-
         await node.StartAsync();
-        await node.Completion.WaitAsync(TestTimeout);
-
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing);
-        node.Completion.IsFaulted.ShouldBeFalse();
+        var failure = await Should.ThrowAsync<FileSystemSourceException>(
+            () => node.Completion.WaitAsync(TestTimeout));
+        failure.ErrorCode.ShouldBe(FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing);
+        node.Completion.IsFaulted.ShouldBeTrue();
     }
 
     [Fact]
@@ -156,14 +158,11 @@ public sealed class DirectoryEnumerateNodeTests
             Directory = directory.Path,
             BaseDirectory = directory.Path
         });
-        var errors = Sink(node.Errors);
-
         await node.StartAsync();
-        await node.Completion.WaitAsync(TestTimeout);
-
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied);
-        node.Completion.IsFaulted.ShouldBeFalse();
+        var failure = await Should.ThrowAsync<FileSystemSourceException>(
+            () => node.Completion.WaitAsync(TestTimeout));
+        failure.ErrorCode.ShouldBe(FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied);
+        node.Completion.IsFaulted.ShouldBeTrue();
     }
 
     [Fact]

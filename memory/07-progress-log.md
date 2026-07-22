@@ -2,6 +2,21 @@
 
 Date: 2026-05-31
 
+## 2026-07-22 - Canonical FileSystem Consolidation
+
+- Consolidated exact-byte read/write behavior on concise `FileReadNode` and
+  `FileWriteNode` implementations and made directory/watch direct FlowValue
+  sources.
+- Removed typed read/write and source-event contracts, Errors-port source
+  compatibility, projection wrappers, temporary canonical names, and typed
+  Composition registration after parity coverage.
+- Moved FileSystem to `5.0.0` and FileSystem Composition to `3.0.0`; SDK
+  compatibility diagnostics match only the documented major removals.
+- Runtime (`43`), FileSystem Composition (`26`), core Composition (`145`),
+  Hosting (`46`), Designer (`112`), and Release (`96`) tests passed. Controlled
+  builds, 58-package source seeding, preflight/dry-runs, and package-only
+  consumers also passed. See [[243-filesystem-canonical-consolidation]].
+
 ## 2026-07-22 - Eager Source Activation Ordering
 
 - Activated canonical revision ports and compiled links before starting source

@@ -320,17 +320,16 @@ Date: 2026-07-22
   tests, controlled builds, preflight/dry-runs, and isolated consumers passed;
   package validation reports only the documented intentional removals against
   HTTP `4.0.0` and HTTP Composition `2.2.0`.
-- `FluxFlow.Components.FileSystem` is now `4.0.0` locally with canonical
-  exact-byte reads/writes, FlowContent metadata, stable normal result kinds and
-  errors, strong lineage, and FlowValue directory/watch sources. Expected
-  operation failures remain ordinary data; source infrastructure failures are
-  isolated as Completion faults. Released typed nodes remain available
-  unchanged. FileSystem Composition is now `2.2.0` with canonical fixed ports,
-  no universal Errors surfaces, explicit typed compatibility registrations,
-  and updated Designer metadata. Focused/full tests, controlled builds, binary
-  compatibility, preflight/dry-runs, and a package-only consumer passed. See
-  `231-vnext-filesystem-flowcontent-results.md`; the Storage follow-on is
-  recorded in `232-vnext-storage-flowcontent-results.md`.
+- `FluxFlow.Components.FileSystem` is now `5.0.0` locally and consolidated on
+  concise `FileReadNode`, `FileWriteNode`, `DirectoryEnumerateNode`, and
+  `FileWatchNode` implementations. Exact bytes, FlowContent metadata, stable
+  normal results, strong lineage, bounded reads, path confinement, diagnostics,
+  and source lifecycle remain preserved. The older typed contracts, source
+  Errors ports, projection wrappers, and temporary canonical names are removed.
+  FileSystem Composition is now `3.0.0` with only canonical registrations and
+  fixed ports. Focused/shared tests, controlled builds, preflight/dry-runs, and
+  package-only consumers passed; package validation reports only documented
+  major-version removals. See `243-filesystem-canonical-consolidation.md`.
 - `FluxFlow.Components.Storage` is now `4.0.0` locally with canonical exact
   FlowContent records, stable normal result kinds/errors, strong lineage, and a
   private versioned JSON-compatible envelope over the released store value

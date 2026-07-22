@@ -1,19 +1,17 @@
-using FluxFlow.Components.FileSystem.Contracts;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.FileSystem.Diagnostics;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.FileSystem.Nodes;
 
 /// <summary>
-/// A standalone directory-enumeration source. Once <c>StartAsync</c> is called the node
-/// resolves its configured directory, enumerates matching files and/or directories, and
-/// broadcasts each one as a <c>FlowMessage&lt;DirectoryEnumerateEntry&gt;</c> on
-/// <c>Output</c> (each minting a fresh correlation id), then completes. Diagnostics go on
-/// <c>Events</c>; resolution / access / IO failures go on <c>Errors</c>. Works with
-/// nothing but <c>new DirectoryEnumerateNode(options)</c> — no engine.
+/// Enumerates a directory as immutable <see cref="FlowValue"/> objects. Runtime
+/// source failures fault <see cref="Completion"/>; lifecycle diagnostics are
+/// published through <see cref="Events"/>.
 /// </summary>
-public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
+public sealed class DirectoryEnumerateNode : IFlowSource
 {
     public const string EnumerateStarted = FileSystemDiagnosticNames.DirectoryEnumerateStarted;
     public const string EnumerateEntry = FileSystemDiagnosticNames.DirectoryEnumerateEntry;
@@ -22,122 +20,104 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
 
     private readonly DirectoryEnumerateOptions _options;
     private readonly TimeProvider _clock;
+    private readonly FileSystemSourcePipeline _pipeline;
 
     public DirectoryEnumerateNode(
         DirectoryEnumerateOptions options,
         TimeProvider? clock = null)
-        : this(new ResolvedDirectoryEnumerateOptions(ResolveOptions(options)), clock)
     {
-    }
-
-    private DirectoryEnumerateNode(
-        ResolvedDirectoryEnumerateOptions resolved,
-        TimeProvider? clock)
-        : base(new FlowSourceOptions { OutputCapacity = resolved.Options.BoundedCapacity })
-    {
-        _options = resolved.Options;
+        _options = ValidateOptions(options);
         _clock = clock ?? TimeProvider.System;
+        _pipeline = new FileSystemSourcePipeline(
+            _options.BoundedCapacity,
+            RunAsync);
     }
 
-    protected override async Task RunAsync(CancellationToken cancellationToken)
+    public ISourceBlock<FlowMessage<FlowValue>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _pipeline.StartAsync(cancellationToken);
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
-        string resolvedDirectory;
-        try
-        {
-            resolvedDirectory = ResolveDirectory();
-        }
-        catch (FileSystemPathResolutionException exception)
-        {
-            ReportEnumerateError(exception.Code, exception.Message, exception);
-            return;
-        }
-
-        if (!Directory.Exists(resolvedDirectory))
-        {
-            ReportEnumerateError(
-                FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing,
-                $"directory.enumerate directory '{_options.Directory}' was not found.");
-            return;
-        }
-
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Name = EnumerateStarted,
-            Level = FlowEventLevel.Information,
-            Message = $"Started directory enumeration '{resolvedDirectory}'.",
-            Attributes = CreateAttributes(resolvedDirectory)
-        });
-
+        string? resolvedDirectory = null;
         long emitted = 0;
         try
         {
+            resolvedDirectory = ResolveDirectory();
+            if (!Directory.Exists(resolvedDirectory))
+            {
+                throw new FileSystemSourceException(
+                    FileSystemErrorCodes.DirectoryEnumerateDirectoryMissing,
+                    $"directory.enumerate directory '{_options.Directory}' was not found.",
+                    CreateErrorContext(resolvedDirectory));
+            }
+
+            PublishEvent(
+                EnumerateStarted,
+                FlowEventLevel.Information,
+                $"Started directory enumeration '{resolvedDirectory}'.",
+                CreateAttributes(resolvedDirectory));
+
             foreach (var entry in Enumerate(resolvedDirectory))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
                 if (_options.MaxEntries.HasValue && emitted >= _options.MaxEntries.Value)
-                {
                     break;
-                }
 
-                if (!await EmitAsync(FlowMessage.Create(entry), cancellationToken).ConfigureAwait(false))
+                if (!await _pipeline.EmitAsync(
+                        FlowMessage.Create(ToFlowValue(entry)),
+                        cancellationToken)
+                    .ConfigureAwait(false))
                 {
                     break;
                 }
 
                 emitted++;
-
-                EmitEvent(new FlowEvent
-                {
-                    Timestamp = _clock.GetUtcNow(),
-                    Name = EnumerateEntry,
-                    Level = FlowEventLevel.Information,
-                    Message = $"Enumerated '{entry.Path}'.",
-                    Attributes = CreateAttributes(entry, emitted)
-                });
+                PublishEvent(
+                    EnumerateEntry,
+                    FlowEventLevel.Information,
+                    $"Enumerated '{entry.Path}'.",
+                    CreateAttributes(entry, emitted));
             }
 
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Name = EnumerateCompleted,
-                Level = FlowEventLevel.Information,
-                Message = $"Completed directory enumeration '{resolvedDirectory}'.",
-                Attributes = CreateAttributes(resolvedDirectory, emitted)
-            });
+            PublishEvent(
+                EnumerateCompleted,
+                FlowEventLevel.Information,
+                $"Completed directory enumeration '{resolvedDirectory}'.",
+                CreateAttributes(resolvedDirectory, emitted));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                Name = EnumerateCompleted,
-                Level = FlowEventLevel.Information,
-                Message = $"Stopped directory enumeration '{resolvedDirectory}'.",
-                Attributes = CreateAttributes(resolvedDirectory, emitted)
-            });
+            PublishEvent(
+                EnumerateCompleted,
+                FlowEventLevel.Information,
+                resolvedDirectory is null
+                    ? "Stopped directory enumeration."
+                    : $"Stopped directory enumeration '{resolvedDirectory}'.",
+                CreateAttributes(resolvedDirectory, emitted));
+            throw;
         }
-        catch (UnauthorizedAccessException exception)
+        catch (Exception exception)
         {
-            FailEnumeration(
-                FileSystemErrorCodes.DirectoryEnumerateAccessDenied,
-                $"directory.enumerate access was denied for '{resolvedDirectory}'.",
-                exception,
-                resolvedDirectory,
-                emitted);
+            var failure = ClassifyFailure(exception, resolvedDirectory);
+            PublishEvent(
+                EnumerateFailed,
+                FlowEventLevel.Error,
+                failure.Message,
+                CreateAttributes(resolvedDirectory, emitted));
+            throw failure;
         }
-        catch (IOException exception)
-        {
-            FailEnumeration(
-                FileSystemErrorCodes.DirectoryEnumerateIoFailed,
-                $"directory.enumerate failed for '{resolvedDirectory}': {exception.Message}",
-                exception,
-                resolvedDirectory,
-                emitted);
-        }
-
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     private string ResolveDirectory()
@@ -150,7 +130,7 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
                 FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory,
                 FileSystemErrorCodes.DirectoryEnumerateAbsolutePathDenied));
 
-    private IEnumerable<DirectoryEnumerateEntry> Enumerate(string resolvedDirectory)
+    private IEnumerable<EntrySnapshot> Enumerate(string resolvedDirectory)
     {
         var enumerationOptions = new EnumerationOptions
         {
@@ -164,139 +144,127 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
 
         if (_options.IncludeDirectories)
         {
-            foreach (var directory in Directory.EnumerateDirectories(
+            foreach (var path in Directory.EnumerateDirectories(
                          resolvedDirectory,
                          _options.Filter,
                          enumerationOptions))
             {
-                yield return CreateDirectoryEntry(new DirectoryInfo(directory), resolvedDirectory);
+                var directory = new DirectoryInfo(path);
+                yield return new EntrySnapshot(
+                    _clock.GetUtcNow(),
+                    directory.FullName,
+                    resolvedDirectory,
+                    directory.Name,
+                    "Directory",
+                    null,
+                    Timestamp(directory.CreationTimeUtc),
+                    Timestamp(directory.LastWriteTimeUtc),
+                    directory.Attributes);
             }
         }
 
         if (_options.IncludeFiles)
         {
-            foreach (var file in Directory.EnumerateFiles(
+            foreach (var path in Directory.EnumerateFiles(
                          resolvedDirectory,
                          _options.Filter,
                          enumerationOptions))
             {
-                yield return CreateFileEntry(new FileInfo(file), resolvedDirectory);
+                var file = new FileInfo(path);
+                yield return new EntrySnapshot(
+                    _clock.GetUtcNow(),
+                    file.FullName,
+                    resolvedDirectory,
+                    file.Name,
+                    "File",
+                    file.Length,
+                    Timestamp(file.CreationTimeUtc),
+                    Timestamp(file.LastWriteTimeUtc),
+                    file.Attributes);
             }
         }
     }
 
-    private DirectoryEnumerateEntry CreateDirectoryEntry(
-        DirectoryInfo directory,
-        string resolvedDirectory)
-        => new()
-        {
-            EnumeratedAt = _clock.GetUtcNow(),
-            Path = directory.FullName,
-            Directory = resolvedDirectory,
-            Name = directory.Name,
-            EntryType = DirectoryEntryType.Directory,
-            CreatedAt = directory.CreationTimeUtc == DateTime.MinValue
-                ? null
-                : new DateTimeOffset(directory.CreationTimeUtc, TimeSpan.Zero),
-            LastModifiedAt = directory.LastWriteTimeUtc == DateTime.MinValue
-                ? null
-                : new DateTimeOffset(directory.LastWriteTimeUtc, TimeSpan.Zero),
-            Attributes = directory.Attributes
-        };
+    private static DateTimeOffset? Timestamp(DateTime value)
+        => value == DateTime.MinValue
+            ? null
+            : new DateTimeOffset(value, TimeSpan.Zero);
 
-    private DirectoryEnumerateEntry CreateFileEntry(
-        FileInfo file,
-        string resolvedDirectory)
-        => new()
+    private static FlowValue ToFlowValue(EntrySnapshot entry)
+        => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
         {
-            EnumeratedAt = _clock.GetUtcNow(),
-            Path = file.FullName,
-            Directory = resolvedDirectory,
-            Name = file.Name,
-            EntryType = DirectoryEntryType.File,
-            Length = file.Length,
-            CreatedAt = file.CreationTimeUtc == DateTime.MinValue
-                ? null
-                : new DateTimeOffset(file.CreationTimeUtc, TimeSpan.Zero),
-            LastModifiedAt = file.LastWriteTimeUtc == DateTime.MinValue
-                ? null
-                : new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero),
-            Attributes = file.Attributes
-        };
+            ["enumeratedAt"] = FlowValue.From(entry.EnumeratedAt),
+            ["path"] = FlowValue.From(entry.Path),
+            ["directory"] = FlowValue.From(entry.Directory),
+            ["name"] = FlowValue.From(entry.Name),
+            ["entryType"] = FlowValue.From(entry.EntryType),
+            ["length"] = entry.Length.HasValue ? FlowValue.From(entry.Length.Value) : FlowValue.Null,
+            ["createdAt"] = entry.CreatedAt.HasValue
+                ? FlowValue.From(entry.CreatedAt.Value)
+                : FlowValue.Null,
+            ["lastModifiedAt"] = entry.LastModifiedAt.HasValue
+                ? FlowValue.From(entry.LastModifiedAt.Value)
+                : FlowValue.Null,
+            ["attributes"] = FlowValue.From((long)entry.Attributes)
+        });
 
-    private void FailEnumeration(
-        int code,
-        string message,
+    private FileSystemSourceException ClassifyFailure(
         Exception exception,
-        string resolvedDirectory,
-        long emitted)
-    {
-        ReportEnumerateError(code, message, exception, resolvedDirectory);
-        EmitEvent(new FlowEvent
+        string? resolvedDirectory)
+        => exception switch
         {
-            Timestamp = _clock.GetUtcNow(),
-            Name = EnumerateFailed,
-            Level = FlowEventLevel.Error,
-            Message = message,
-            Attributes = CreateAttributes(resolvedDirectory, emitted)
-        });
-    }
+            FileSystemSourceException source => source,
+            FileSystemPathResolutionException path => new FileSystemSourceException(
+                path.Code,
+                path.Message,
+                CreateErrorContext(resolvedDirectory),
+                path),
+            UnauthorizedAccessException access => new FileSystemSourceException(
+                FileSystemErrorCodes.DirectoryEnumerateAccessDenied,
+                $"directory.enumerate access was denied for '{resolvedDirectory}'.",
+                CreateErrorContext(resolvedDirectory),
+                access),
+            IOException io => new FileSystemSourceException(
+                FileSystemErrorCodes.DirectoryEnumerateIoFailed,
+                $"directory.enumerate failed for '{resolvedDirectory}': {io.Message}",
+                CreateErrorContext(resolvedDirectory),
+                io),
+            _ => new FileSystemSourceException(
+                FileSystemErrorCodes.DirectoryEnumerateIoFailed,
+                $"directory.enumerate failed: {exception.Message}",
+                CreateErrorContext(resolvedDirectory),
+                exception)
+        };
 
-    private void ReportEnumerateError(
-        int code,
-        string message,
-        Exception? exception = null,
-        string? resolvedDirectory = null)
-        => EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            Code = code,
-            Message = message,
-            Context = CreateErrorContext(resolvedDirectory),
-            Exception = exception
-        });
-
-    private static DirectoryEnumerateOptions ResolveOptions(DirectoryEnumerateOptions options)
+    private static DirectoryEnumerateOptions ValidateOptions(DirectoryEnumerateOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-
         if (options.BoundedCapacity <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "directory.enumerate option 'boundedCapacity' must be greater than zero.");
-        }
-
+            throw new ArgumentOutOfRangeException(nameof(options), "boundedCapacity must be positive.");
         if (string.IsNullOrWhiteSpace(options.Directory))
-        {
-            throw new ArgumentException(
-                "directory.enumerate option 'directory' cannot be empty.",
-                nameof(options));
-        }
-
+            throw new ArgumentException("directory cannot be empty.", nameof(options));
         if (string.IsNullOrWhiteSpace(options.Filter))
-        {
-            throw new ArgumentException(
-                "directory.enumerate option 'filter' cannot be empty.",
-                nameof(options));
-        }
-
+            throw new ArgumentException("filter cannot be empty.", nameof(options));
         if (!options.IncludeFiles && !options.IncludeDirectories)
-        {
-            throw new ArgumentException(
-                "directory.enumerate requires includeFiles or includeDirectories.",
-                nameof(options));
-        }
-
+            throw new ArgumentException("includeFiles or includeDirectories must be enabled.", nameof(options));
         if (options.MaxEntries is <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "directory.enumerate option 'maxEntries' must be greater than zero when set.");
-        }
-
+            throw new ArgumentOutOfRangeException(nameof(options), "maxEntries must be positive when set.");
         return options;
     }
+
+    private void PublishEvent(
+        string name,
+        FlowEventLevel level,
+        string message,
+        IReadOnlyDictionary<string, object?> attributes)
+        => _pipeline.PublishEvent(new FlowEvent
+        {
+            Timestamp = _clock.GetUtcNow(),
+            Name = name,
+            Level = level,
+            Message = message,
+            Attributes = attributes
+        });
 
     private Dictionary<string, object?> CreateAttributes(
         string? resolvedDirectory = null,
@@ -310,47 +278,31 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
             ["includeFiles"] = _options.IncludeFiles,
             ["includeDirectories"] = _options.IncludeDirectories
         };
-
         if (!string.IsNullOrWhiteSpace(resolvedDirectory))
-        {
             attributes["resolvedDirectory"] = resolvedDirectory;
-        }
-
         if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
-        {
             attributes["baseDirectory"] = _options.BaseDirectory;
-        }
-
         if (_options.MaxEntries.HasValue)
-        {
             attributes["maxEntries"] = _options.MaxEntries.Value;
-        }
-
         if (emitted.HasValue)
-        {
             attributes["entries"] = emitted.Value;
-        }
-
         return attributes;
     }
 
     private Dictionary<string, object?> CreateAttributes(
-        DirectoryEnumerateEntry entry,
+        EntrySnapshot entry,
         long emitted)
     {
         var attributes = CreateAttributes(entry.Directory, emitted);
         attributes["path"] = entry.Path;
         attributes["name"] = entry.Name;
-        attributes["entryType"] = entry.EntryType.ToString();
+        attributes["entryType"] = entry.EntryType;
         if (entry.Length.HasValue)
-        {
             attributes["length"] = entry.Length.Value;
-        }
-
         return attributes;
     }
 
-    private string CreateErrorContext(string? resolvedDirectory = null)
+    private string CreateErrorContext(string? resolvedDirectory)
     {
         var values = new List<string>
         {
@@ -360,25 +312,23 @@ public sealed class DirectoryEnumerateNode : FlowSource<DirectoryEnumerateEntry>
             $"includeFiles={_options.IncludeFiles}",
             $"includeDirectories={_options.IncludeDirectories}"
         };
-
         if (!string.IsNullOrWhiteSpace(resolvedDirectory))
-        {
             values.Add($"resolvedDirectory={resolvedDirectory}");
-        }
-
         if (!string.IsNullOrWhiteSpace(_options.BaseDirectory))
-        {
             values.Add($"baseDirectory={_options.BaseDirectory}");
-        }
-
         if (_options.MaxEntries.HasValue)
-        {
             values.Add($"maxEntries={_options.MaxEntries.Value}");
-        }
-
         return string.Join("; ", values);
     }
 
-    private sealed record ResolvedDirectoryEnumerateOptions(
-        DirectoryEnumerateOptions Options);
+    private sealed record EntrySnapshot(
+        DateTimeOffset EnumeratedAt,
+        string Path,
+        string Directory,
+        string Name,
+        string EntryType,
+        long? Length,
+        DateTimeOffset? CreatedAt,
+        DateTimeOffset? LastModifiedAt,
+        FileAttributes Attributes);
 }

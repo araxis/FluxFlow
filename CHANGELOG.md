@@ -7,6 +7,21 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.FileSystem 5.0.0
+
+- Consolidated exact-byte reads, exact-byte writes, directory enumeration, and
+  file watching on `FileReadNode`, `FileWriteNode`,
+  `DirectoryEnumerateNode`, and `FileWatchNode`.
+- Removed the older typed read/write results, directory/watch event contracts,
+  source Errors ports, and temporary `FlowContent`/`FlowValue` node names after
+  preserving path confinement, bounded reads, write modes, diagnostics,
+  lifecycle behavior, and message lineage.
+
+## FluxFlow.Components.FileSystem.Composition 3.0.0
+
+- Registers only the concise canonical FileSystem nodes and removes the older
+  typed compatibility registration extensions.
+
 ## FluxFlow.Engine 2.7.1
 
 - Activates revision ports and compiled links before starting source

@@ -1,6 +1,7 @@
 using FluxFlow.Components.FileSystem.Contracts;
 using FluxFlow.Components.FileSystem.Nodes;
 using FluxFlow.Components.FileSystem.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -21,12 +22,12 @@ public sealed class FileSystemPathConfinementTests
             return;
 
         await using var node = new FileReadNode(new FileReadOptions { BaseDirectory = directory.Path });
-        var errors = Sink(node.Errors);
+        var results = Sink(node.Output);
 
         await node.Input.SendAsync(FlowMessage.Create(new FileReadRequest { Path = "linked/value.txt" }));
 
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.FileReadInvalidPath);
+        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+            .ShouldBe(FileSystemErrorCodeNames.ReadInvalidPath);
     }
 
     [Fact]
@@ -38,16 +39,16 @@ public sealed class FileSystemPathConfinementTests
             return;
 
         await using var node = new FileWriteNode(new FileWriteOptions { BaseDirectory = directory.Path });
-        var errors = Sink(node.Errors);
+        var results = Sink(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(new FileWriteRequest
+        await node.Input.SendAsync(FlowMessage.Create(new FileContentWriteRequest
         {
             Path = "linked/value.txt",
-            Content = "blocked"
+            Content = FlowContent.FromBytes(new byte[] { 1 }, "application/octet-stream")
         }));
 
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.FileWriteInvalidPath);
+        (await results.ReceiveAsync().WaitAsync(TestTimeout)).Payload.Error.ShouldNotBeNull().Code
+            .ShouldBe(FileSystemErrorCodeNames.WriteInvalidPath);
         File.Exists(Path.Combine(outside.Path, "value.txt")).ShouldBeFalse();
     }
 
@@ -64,13 +65,10 @@ public sealed class FileSystemPathConfinementTests
             Directory = "linked",
             BaseDirectory = directory.Path
         });
-        var errors = Sink(node.Errors);
-
         await node.StartAsync();
-        await node.Completion.WaitAsync(TestTimeout);
-
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory);
+        var failure = await Should.ThrowAsync<FileSystemSourceException>(
+            () => node.Completion.WaitAsync(TestTimeout));
+        failure.ErrorCode.ShouldBe(FileSystemErrorCodes.DirectoryEnumerateInvalidDirectory);
     }
 
     [Fact]
@@ -86,13 +84,10 @@ public sealed class FileSystemPathConfinementTests
             Directory = "linked",
             BaseDirectory = directory.Path
         });
-        var errors = Sink(node.Errors);
-
         await node.StartAsync();
-        await node.Completion.WaitAsync(TestTimeout);
-
-        (await errors.ReceiveAsync().WaitAsync(TestTimeout)).Code
-            .ShouldBe(FileSystemErrorCodes.FileWatchInvalidDirectory);
+        var failure = await Should.ThrowAsync<FileSystemSourceException>(
+            () => node.Completion.WaitAsync(TestTimeout));
+        failure.ErrorCode.ShouldBe(FileSystemErrorCodes.FileWatchInvalidDirectory);
     }
 
     private static bool TryCreateDirectoryLink(string path, string target)

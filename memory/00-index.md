@@ -560,6 +560,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `242-canonical-vnext-local-main-integration.md`: linear ancestry proof,
   fast-forward integration of the complete canonical vNext stack into local
   `main`, post-integration verification, and the retained release boundary.
+- `243-filesystem-canonical-consolidation.md`: concise exact-content FileSystem
+  transforms, direct FlowValue sources, removed typed compatibility surfaces,
+  major package versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

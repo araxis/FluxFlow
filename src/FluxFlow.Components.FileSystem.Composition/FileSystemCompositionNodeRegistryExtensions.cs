@@ -93,7 +93,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<FileReadOptions>();
         var clock = context.GetResource<TimeProvider>(
             FileSystemCompositionResourceNames.Clock);
-        var node = new FlowContentFileReadNode(options, clock);
+        var node = new FileReadNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -118,7 +118,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<FileWriteOptions>();
         var clock = context.GetResource<TimeProvider>(
             FileSystemCompositionResourceNames.Clock);
-        var node = new FlowContentFileWriteNode(options, clock);
+        var node = new FileWriteNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -143,7 +143,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<DirectoryEnumerateOptions>();
         var clock = context.GetResource<TimeProvider>(
             FileSystemCompositionResourceNames.Clock);
-        var node = new FlowValueDirectoryEnumerateNode(options, clock);
+        var node = new DirectoryEnumerateNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -162,7 +162,7 @@ public static class FileSystemCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<FileWatchOptions>();
         var clock = context.GetResource<TimeProvider>(
             FileSystemCompositionResourceNames.Clock);
-        var node = new FlowValueFileWatchNode(options, clock);
+        var node = new FileWatchNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

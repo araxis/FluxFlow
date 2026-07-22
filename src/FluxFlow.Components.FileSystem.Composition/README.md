@@ -20,10 +20,10 @@ registry
 
 | Type | Node | Input | Output |
 |------|------|-------|--------|
-| `file.read` | `FlowContentFileReadNode` | `FileReadRequest` | `FlowResult<FileReadContent>` |
-| `file.write` | `FlowContentFileWriteNode` | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
-| `directory.list` | `FlowValueDirectoryEnumerateNode` | none | `FlowValue` |
-| `file.watch` | `FlowValueFileWatchNode` | none | `FlowValue` |
+| `file.read` | `FileReadNode` | `FileReadRequest` | `FlowResult<FileReadContent>` |
+| `file.write` | `FileWriteNode` | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
+| `directory.list` | `DirectoryEnumerateNode` | none | `FlowValue` |
+| `file.watch` | `FileWatchNode` | none | `FlowValue` |
 
 Canonical descriptors expose Events and no universal Errors surface. Expected
 read/write failures are normal Output values. Directory and watch failures are
@@ -83,21 +83,12 @@ branch on `IsError`, `Kind`, or
 runtime stop or disposal stops a live watcher. Invalid options fail activation
 through the node factory.
 
-## Typed Compatibility
+## Migration From 2.x
 
-Register released typed contracts under distinct node types when needed:
-
-```csharp
-registry
-    .RegisterFileReadResult("file.read.typed")
-    .RegisterFileWriteResult("file.write.typed")
-    .RegisterDirectoryEnumerateEntries("directory.list.typed")
-    .RegisterFileWatchEvents("file.watch.typed");
-```
-
-These explicit registrations retain the 1.x typed ports and Errors/Events
-surfaces. Use distinct type names when canonical and compatibility factories
-share a registry.
+The 3.x adapter removes the explicit typed compatibility registration methods.
+Use the four canonical registrations above, route expected read/write failures
+as normal Output values, and observe directory/watch infrastructure failures
+through component Completion.
 
 ## Design Metadata
 

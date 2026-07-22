@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.FileSystem</PackageId>
     <AssemblyName>FluxFlow.Components.FileSystem</AssemblyName>
     <RootNamespace>FluxFlow.Components.FileSystem</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FluxFlow file-system nodes with exact FlowContent read/write transforms, normal typed operation results, FlowValue directory/watch sources, and preserved typed compatibility. No engine required.</Description>
+    <Description>Standalone FluxFlow file-system nodes with exact FlowContent read/write transforms, normal operation results, and FlowValue directory/watch sources. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;files</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical exact-content read/write transforms with normal typed results and FlowValue directory/watch sources while preserving released typed nodes.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates file-system behavior on concise canonical nodes and removes the older typed result, source-event, and Errors-port compatibility surfaces.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

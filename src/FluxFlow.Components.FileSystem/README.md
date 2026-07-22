@@ -9,10 +9,10 @@ service provider, or file-system abstraction is required for direct use.
 
 | Node | Kind | Input | Output |
 |------|------|-------|--------|
-| `FlowContentFileReadNode` | transform | `FileReadRequest` | `FlowResult<FileReadContent>` |
-| `FlowContentFileWriteNode` | transform | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
-| `FlowValueDirectoryEnumerateNode` | source | none | `FlowValue` |
-| `FlowValueFileWatchNode` | source | none | `FlowValue` |
+| `FileReadNode` | transform | `FileReadRequest` | `FlowResult<FileReadContent>` |
+| `FileWriteNode` | transform | `FileContentWriteRequest` | `FlowResult<FileWriteResult>` |
+| `DirectoryEnumerateNode` | source | none | `FlowValue` |
+| `FileWatchNode` | source | none | `FlowValue` |
 
 Read and write expose one normal Output plus Events and no universal Errors
 port. Path, size, content, access, and I/O outcomes use stable
@@ -27,7 +27,7 @@ watch with `Complete` or disposal.
 ## Exact Content
 
 ```csharp
-await using var read = new FlowContentFileReadNode(new FileReadOptions
+await using var read = new FileReadNode(new FileReadOptions
 {
     BaseDirectory = "data",
     MaxBytes = 16_777_216
@@ -52,7 +52,7 @@ provided. `ReadAs.Bytes` defaults to `application/octet-stream` and does not
 attach an encoding. Decoding belongs to Serialization or Mapping.
 
 ```csharp
-await using var write = new FlowContentFileWriteNode(new FileWriteOptions
+await using var write = new FileWriteNode(new FileWriteOptions
 {
     BaseDirectory = "data"
 });
@@ -73,11 +73,11 @@ upstream when bytes are required.
 
 ## Source Values
 
-`FlowValueDirectoryEnumerateNode` emits objects containing `enumeratedAt`,
+`DirectoryEnumerateNode` emits objects containing `enumeratedAt`,
 `path`, `directory`, `name`, `entryType`, `length`, `createdAt`,
 `lastModifiedAt`, and numeric `attributes`.
 
-`FlowValueFileWatchNode` emits objects containing `timestamp`, `path`,
+`FileWatchNode` emits objects containing `timestamp`, `path`,
 `directory`, `name`, `changeType`, `oldPath`, and `oldName`. File watcher
 callbacks remain nonblocking and bounded by the configured source capacity.
 
@@ -93,18 +93,15 @@ true and are not subject to descendant confinement.
 `MaxBytes + 1` bytes, including when a file grows during the read. Set the
 option to `null` only when unlimited reads are intentional.
 
-## Typed Compatibility
+## Migration From 4.x
 
-The released nodes remain unchanged:
-
-- `FileReadNode`: `FileReadRequest` to `FileReadResult`.
-- `FileWriteNode`: `FileWriteRequest` to `FileWriteResult`.
-- `DirectoryEnumerateNode`: typed `DirectoryEnumerateEntry` source.
-- `FileWatchNode`: typed `FileWatchEvent` source.
-
-Those nodes retain their direct Output, Errors, Events, options, and lifecycle
-behavior. They remain useful for code-authored integrations that depend on the
-3.x contracts.
+The concise names now identify the canonical implementations. Replace
+`FlowContentFileReadNode`, `FlowContentFileWriteNode`,
+`FlowValueDirectoryEnumerateNode`, and `FlowValueFileWatchNode` with the names
+in the table above. The older `FileReadResult`, `FileWriteRequest`, typed
+directory/watch event contracts, and source `Errors` ports were removed.
+Expected read/write failures are normal `FlowResult<T>` values; source
+infrastructure failures are observed through `Completion`.
 
 ## Composition
 

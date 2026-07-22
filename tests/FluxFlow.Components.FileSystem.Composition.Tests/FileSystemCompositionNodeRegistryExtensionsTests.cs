@@ -67,29 +67,6 @@ public sealed class FileSystemCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public void Typed_compatibility_registrations_preserve_released_contracts()
-    {
-        var registry = new CompositionNodeRegistry()
-            .RegisterFileReadResult("file.read.typed")
-            .RegisterFileWriteResult("file.write.typed")
-            .RegisterDirectoryEnumerateEntries("directory.enumerate.typed")
-            .RegisterFileWatchEvents("file.watch.typed");
-
-        registry.Registrations["file.read.typed"]
-            .Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FileReadResult));
-        registry.Registrations["file.write.typed"]
-            .Inputs[FileSystemCompositionPortNames.Input].MessageType
-            .ShouldBe(typeof(FileWriteRequest));
-        registry.Registrations["directory.enumerate.typed"]
-            .Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(DirectoryEnumerateEntry));
-        registry.Registrations["file.watch.typed"]
-            .Outputs[FileSystemCompositionPortNames.Output].MessageType
-            .ShouldBe(typeof(FileWatchEvent));
-    }
-
-    [Fact]
     public void Design_metadata_provider_returns_valid_file_system_metadata()
     {
         var metadata = DesignMetadataByType();
