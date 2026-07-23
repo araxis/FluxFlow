@@ -7,6 +7,17 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Payloads 5.0.0
+
+- Consolidated payload inspection on the concise `PayloadInspectNode` name
+  with canonical `FlowContent` input, exact content and cached `FlowValue`
+  preservation, one normal `FlowResult<PayloadInspectionResult>` Output, and
+  component Events.
+- Removed the request DTO, temporary `FlowContentInspectNode` name, numeric
+  error codes, duplicate inspection pipeline, and universal Errors output
+  while preserving declared-media classification, preview and formatting
+  limits, Base64 detection, host codecs, diagnostics, fan-out, and lineage.
+
 ## FluxFlow.Components.Serialization 5.0.0
 
 - Consolidated JSON, text, and Base64 conversion on the concise

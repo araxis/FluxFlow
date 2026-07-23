@@ -38,7 +38,7 @@ public static class PayloadsCompositionNodeRegistryExtensions
             PayloadsCompositionResourceNames.Codecs);
         var clock = context.GetResource<TimeProvider>(
             PayloadsCompositionResourceNames.Clock);
-        var node = new FlowContentInspectNode(options, codecs, clock);
+        var node = new PayloadInspectNode(options, codecs, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,

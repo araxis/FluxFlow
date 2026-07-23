@@ -2,7 +2,7 @@
 
 Composition registration and Designer metadata for canonical payload
 inspection. The package binds flat node settings, resolves host-owned resources,
-and creates the standalone `FlowContentInspectNode` from
+and creates the standalone `PayloadInspectNode` from
 `FluxFlow.Components.Payloads`.
 
 It does not scan assemblies, resolve CLR types from strings, own resource

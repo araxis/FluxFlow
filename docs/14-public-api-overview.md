@@ -794,8 +794,10 @@ a canonical `payload.inspect` node factory. The factory binds existing
 `PayloadInspectOptions`, consumes `FlowContent`, emits
 `FlowResult<PayloadInspectionResult>` through one normal output, and can resolve
 optional keyed `FlowContentCodecCatalog` and `TimeProvider` resources through
-the host. The request-based `PayloadInspectNode` remains available from the
-runtime package for code-authored compatibility.
+the host. The runtime `PayloadInspectNode` uses the same canonical
+`FlowContent -> FlowResult<PayloadInspectionResult>` boundary; the former
+request DTO, temporary `FlowContentInspectNode` name, numeric error codes, and
+universal error stream were removed in the runtime package's next major line.
 
 `PayloadsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the `payload.inspect` composition node so hosts can compose palette, editor,

@@ -8,8 +8,8 @@ Date: 2026-07-23
   `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
-  canonical family consolidations through State, Expectations, Sessions, and
-  Timers plus Sources.
+  canonical family consolidations through State, Expectations, Sessions,
+  Timers, Sources, Serialization, and Payloads.
   The
   provider-neutral MQTT vertical slice and the bounded normal component-family
   migrations through Sessions,
@@ -157,18 +157,20 @@ Date: 2026-07-23
   controlled builds, expected major API diagnostics, 58-package source
   seeding, both preflights/dry-runs, and a package-only consumer passed. See
   `245-mapping-canonical-consolidation.md`.
-- `FluxFlow.Components.Payloads` is now `4.0.0` locally with a canonical
-  `FlowContentInspectNode` that preserves exact content, exposes its cached
-  decoded `FlowValue`, trusts declared media conventions, and emits size,
+- `FluxFlow.Components.Payloads` is now `5.0.0` locally and consolidated on
+  `PayloadInspectNode`, which preserves exact FlowContent, exposes its cached
+  decoded FlowValue, trusts declared media conventions, and emits size,
   decode, parse, and inspection failures as one normal
-  `FlowResult<PayloadInspectionResult>` output. The request-based
-  `PayloadInspectNode` remains available for code-authored compatibility.
+  `FlowResult<PayloadInspectionResult>` Output. The request DTO, duplicate
+  request pipeline, temporary FlowContent-prefixed node, numeric errors, and
+  Errors surface are removed after parity coverage.
   `FluxFlow.Components.Payloads.Composition` is `2.0.0` with canonical ports,
   no universal error output, and optional host-owned codec-catalog and clock
-  resources. Focused/full tests, zero-warning controlled builds, binary
-  compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Serialization followed as the next bounded family. See
-  `217-vnext-payloads-flowcontent.md`.
+  resources. Focused/shared tests, controlled builds, expected runtime API
+  diagnostics, Composition compatibility, 58-package source seeding, both
+  preflights/dry-runs, and a package-only consumer passed. Observability generic
+  compatibility is the next unresolved component-family ledger item. See
+  `254-payloads-canonical-consolidation.md`.
 - `FluxFlow.Components.Serialization` is now `5.0.0` locally and consolidated
   on six concise JSON, text, and Base64 nodes with canonical FlowContent/
   FlowValue inputs, one normal FlowResult Output, and Events. Request/result
@@ -179,7 +181,8 @@ Date: 2026-07-23
   canonical application hosting. Focused/shared tests, controlled builds,
   expected runtime API diagnostics, Composition compatibility, 58-package
   source seeding, both preflights/dry-runs, and a package-only consumer passed.
-  Payloads request compatibility is the next unresolved family ledger item.
+  Payloads request compatibility is consolidated; Observability generic
+  compatibility is the next unresolved component-family ledger item.
   See `253-serialization-canonical-consolidation.md`.
 - `FluxFlow.Components.Validation` is now `5.0.0` locally with one
   `FlowValueJsonSchemaValidatorNode` contract. It preserves inline/path schema

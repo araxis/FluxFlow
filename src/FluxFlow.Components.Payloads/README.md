@@ -5,9 +5,9 @@ preserves the exact content object and its lazy decoded `FlowValue`, creates
 bounded previews, and returns expected content failures as normal workflow data.
 No Engine runtime is required.
 
-## Canonical Node
+## Node
 
-`FlowContentInspectNode` consumes `FlowMessage<FlowContent>` and emits
+`PayloadInspectNode` consumes `FlowMessage<FlowContent>` and emits
 `FlowMessage<FlowResult<PayloadInspectionResult>>` through one normal output.
 
 ```csharp
@@ -15,7 +15,7 @@ var content = FlowContent.FromBytes(
     Encoding.UTF8.GetBytes("""{"orderId":"order-42"}"""),
     contentType: "application/json");
 
-await using var node = new FlowContentInspectNode();
+await using var node = new PayloadInspectNode();
 var results = new BufferBlock<
     FlowMessage<FlowResult<PayloadInspectionResult>>>();
 node.Output.LinkTo(results);
@@ -64,7 +64,7 @@ Hosts can supply a `FlowContentCodecCatalog` when they own additional media
 conventions:
 
 ```csharp
-await using var node = new FlowContentInspectNode(
+await using var node = new PayloadInspectNode(
     options: PayloadInspectOptions.Default,
     codecs: hostCodecs,
     clock: TimeProvider.System);
@@ -92,14 +92,6 @@ new PayloadInspectOptions
 
 `Input` is bounded and applies backpressure. `Output` and `Events` are
 broadcast sources, matching the standalone node-kit contract.
-
-## Request-Based Compatibility
-
-`PayloadInspectNode` remains available for existing code-authored workflows. It
-keeps its established `PayloadInspectionRequest -> PayloadInspectionResult`
-shape plus `Errors` and `Events`. New configuration-authored workflows should
-use `FlowContentInspectNode`; the compatibility node does not participate in
-the canonical `payload.inspect` Composition registration.
 
 ## Composition
 

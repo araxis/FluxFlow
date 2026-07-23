@@ -38,7 +38,7 @@ Status values:
 | File system | `FluxFlow.Components.FileSystem` | yes | `FluxFlow.Components.FileSystem.Composition` | yes | yes | aligned |
 | Observability | `FluxFlow.Components.Observability` | yes | `FluxFlow.Components.Observability.Composition` | yes | yes | canonical FlowValue/result Counter, Logger, and Metrics aligned; generic runtime retained for compatibility |
 | Timers | `FluxFlow.Components.Timers` | yes | `FluxFlow.Components.Timers.Composition` | yes | yes | canonical concise FlowValue/result nodes consolidated |
-| Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | canonical `FlowContent` aligned |
+| Payloads | `FluxFlow.Components.Payloads` | yes | `FluxFlow.Components.Payloads.Composition` | yes | yes | concise canonical `FlowContent`/result inspector consolidated |
 | Serialization | `FluxFlow.Components.Serialization` | yes | `FluxFlow.Components.Serialization.Composition` | yes | yes | concise canonical `FlowContent`/`FlowValue` result nodes consolidated |
 | Metrics | `FluxFlow.Components.Metrics` | yes | `FluxFlow.Components.Metrics.Composition` | yes | yes | canonical typed-sample/result snapshots aligned; direct-result runtime retained for compatibility |
 | Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | canonical typed-event/result snapshots aligned; direct-result runtime retained for compatibility |

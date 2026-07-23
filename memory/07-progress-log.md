@@ -2303,3 +2303,19 @@ Date: 2026-07-23
   diagnostics against published `3.0.1`, Composition compatibility against
   `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
   See [[253-serialization-canonical-consolidation]].
+
+## 2026-07-23 - Payloads Canonical Consolidation
+
+- Consolidated Payloads on the concise `PayloadInspectNode` with canonical
+  FlowContent input, exact content and cached FlowValue preservation, one
+  normal FlowResult Output, and Events.
+- Removed the request DTO and duplicate request pipeline, temporary
+  FlowContent-prefixed node name, numeric errors, and universal Errors surface
+  after classification, formatting, limits, charset, diagnostics, lineage,
+  continuation, and fan-out parity coverage.
+- Moved the runtime package from local `4.0.0` to `5.0.0`; kept Composition at
+  `2.0.0` because its public fixed registration and metadata did not change.
+- Focused/shared tests, Release tests, controlled builds, expected runtime API
+  diagnostics against published `3.0.1`, Composition compatibility against
+  `1.4.0`, 58-package local-source dry-runs, and a package-only consumer passed.
+  See [[254-payloads-canonical-consolidation]].
