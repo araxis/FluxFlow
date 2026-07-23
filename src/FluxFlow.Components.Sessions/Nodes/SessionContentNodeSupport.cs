@@ -140,7 +140,7 @@ internal static class SessionContentNodeSupport
 
         return input with
         {
-            Name = Normalize(input.Name) ?? Normalize(options.Name),
+            Name = Normalize(input.Name) ?? Normalize(options.SessionName),
             NamePrefix = Normalize(input.NamePrefix) ?? Normalize(options.NamePrefix),
             Tags = MergeTags(options.Tags, input.Tags),
             IncludeActive = includeActive,

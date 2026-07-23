@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Sessions 5.0.0
+
+- Consolidated exact-content recording, replay, and query operations on the
+  concise `SessionRecorderNode`, `SessionReplayNode`, and `SessionQueryNode`
+  names with one normal `FlowResult<T>` Output and component Events.
+- Removed the direct-result typed nodes, temporary `SessionContent*` node names,
+  `SessionQueryResult`, numeric error codes, Errors and query branch outputs,
+  aggregate component options, and duplicate store selectors while preserving
+  the public store/factory adapter boundary and exact-content envelope.
+- Renamed recorder/query option `Name` to `SessionName` so domain filtering no
+  longer collides with component identity derived from the workflow object key.
+
+## FluxFlow.Components.Sessions.Composition 3.0.0
+
+- Registers only the consolidated Sessions nodes, removes typed compatibility
+  registrations and the `Sessions` branch port, and resolves required stores
+  and optional clocks through exact canonical `Resources.*` addresses.
+
 ## FluxFlow.Components.Expectations 5.0.0
 
 - Consolidated projection-event expectations on `EventExpectationNode` with

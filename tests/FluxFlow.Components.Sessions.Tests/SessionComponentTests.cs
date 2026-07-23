@@ -1,4 +1,6 @@
-using FluxFlow.Components.Sessions;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Sessions.Contracts;
 using FluxFlow.Components.Sessions.Diagnostics;
 using FluxFlow.Components.Sessions.Nodes;
@@ -7,281 +9,247 @@ using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
-using FlowError = FluxFlow.Nodes.FlowError;
 
 namespace FluxFlow.Components.Sessions.Tests;
 
-// Every test news the node directly — no engine, no registry. Messages travel as
-// FlowMessage<T> envelopes; the recorder/query carry the correlation id forward, the
-// replay source mints a fresh one per record. Timing is driven by an injected
-// FakeTimeProvider so replay pacing tests never sleep on the wall clock.
 public sealed class SessionComponentTests
 {
-    // ---- Recorder ------------------------------------------------------------------
-
     [Fact]
-    public async Task Recorder_WritesMessagesInOrderAndPreservesCorrelation()
+    public async Task Recorder_preserves_content_lineage_order_and_existing_sequence()
     {
-        var store = new TestSessionStore();
-        var node = new SessionRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-1", Name = "sample", BoundedCapacity = 4 },
+        var store = new TestSessionStore
+        {
+            InitialMessageCount = 5,
+            SerializePayloadAsJsonElement = true
+        };
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions
+            {
+                SessionId = "session-1",
+                SessionName = "sample",
+                BoundedCapacity = 4
+            },
             store);
         var output = Sink(node.Output);
-        var firstTimestamp = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        var first = FlowMessage.Create(ContentInput(1, "first")) with
+        {
+            Headers = new Dictionary<string, FlowValue>
+            {
+                ["tenant"] = FlowValue.From("north")
+            }
+        };
+        var second = FlowMessage.Create(ContentInput(2, "second"));
 
-        var first = FlowMessage.Create(new SessionRecordInput
-        {
-            Timestamp = firstTimestamp,
-            Name = "first",
-            Payload = "a"
-        });
-        var second = FlowMessage.Create(new SessionRecordInput
-        {
-            Timestamp = firstTimestamp.AddSeconds(1),
-            Name = "second",
-            Payload = "b"
-        });
         await node.Input.SendAsync(first);
         await node.Input.SendAsync(second);
         node.Complete();
 
-        var firstRecord = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var secondRecord = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        // The session closes when the node is disposed (after the pump has drained).
-        await node.DisposeAsync();
+        await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
 
-        firstRecord.Payload.Sequence.ShouldBe(1);
-        firstRecord.CorrelationId.ShouldBe(first.CorrelationId);
-        secondRecord.Payload.Sequence.ShouldBe(2);
-        secondRecord.CorrelationId.ShouldBe(second.CorrelationId);
-        store.Records.Select(record => record.Name).ShouldBe(["first", "second"]);
-        store.Metadata.ShouldNotBeNull();
-        store.Metadata.SessionId.ShouldBe("session-1");
-        store.Metadata.MessageCount.ShouldBe(2);
+        results.Count.ShouldBe(2);
+        results.Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+            .ShouldBe([6L, 7L]);
+        results.Select(result => result.Payload.Value.ShouldNotBeNull().Name)
+            .ShouldBe(["first", "second"]);
+        results[0].Payload.Value.ShouldNotBeNull().Content.OriginalBytes.ToArray()
+            .ShouldBe(new byte[] { 1 });
+        results[0].CorrelationId.ShouldBe(first.CorrelationId);
+        results[0].TraceId.ShouldBe(first.TraceId);
+        results[0].CausationId.ShouldBe(first.MessageId);
+        results[0].Headers["tenant"].ShouldBe(FlowValue.From("north"));
+        results[1].CorrelationId.ShouldBe(second.CorrelationId);
+        store.Metadata.ShouldNotBeNull().MessageCount.ShouldBe(7);
         store.Metadata.EndedAt.ShouldNotBeNull();
     }
 
     [Fact]
-    public async Task Recorder_ReportsAppendFailureWithCorrelationAndContinues()
-    {
-        var store = new TestSessionStore { FailNextAppend = true };
-        await using var node = new SessionRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-1" },
-            store);
-        var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
-
-        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
-        await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
-        node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        recorded.Payload.Sequence.ShouldBe(1);
-        recorded.Payload.Name.ShouldBe("good");
-        store.Records.ShouldHaveSingleItem();
-    }
-
-    [Fact]
-    public async Task Recorder_ReportsNullStartSessionWithCorrelationAndContinues()
+    public async Task Recorder_returns_start_failure_as_data_and_continues()
     {
         var store = new TestSessionStore { ReturnNullStartSessionOnce = true };
         await using var node = new SessionRecorderNode(
             new SessionRecorderOptions { SessionId = "session-1" },
             store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var failed = FlowMessage.Create(ContentInput(1, "failed"));
+        var succeeded = FlowMessage.Create(ContentInput(2, "succeeded"));
 
-        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
-        await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
+        await node.Input.SendAsync(failed);
+        await node.Input.SendAsync(succeeded);
         node.Complete();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.StoreUnavailable);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        error.Message.ShouldContain("null session");
-        recorded.Payload.Name.ShouldBe("good");
-        store.Records.ShouldHaveSingleItem();
+        results.Count.ShouldBe(2);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        results[0].CorrelationId.ShouldBe(failed.CorrelationId);
+        results[1].Payload.IsError.ShouldBeFalse();
+        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
     [Fact]
-    public async Task Recorder_ReportsNullAppendResultWithCorrelationAndContinues()
+    public async Task Recorder_returns_content_and_append_failures_as_data_and_continues()
+    {
+        var store = new TestSessionStore { FailNextAppend = true };
+        await using var node = new SessionRecorderNode(
+            new SessionRecorderOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+        var unavailable = FlowMessage.Create(new SessionContentRecordInput
+        {
+            Content = FlowContent.FromValue(FlowValue.From("decoded-only"))
+        });
+        var appendFailure = FlowMessage.Create(ContentInput(1, "append-failure"));
+        var succeeded = FlowMessage.Create(ContentInput(2, "succeeded"));
+
+        await node.Input.SendAsync(unavailable);
+        await node.Input.SendAsync(appendFailure);
+        await node.Input.SendAsync(succeeded);
+        node.Complete();
+
+        var results = await DrainUntilCompletedAsync(output);
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        results.Count.ShouldBe(3);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.ContentUnavailable);
+        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.RecordFailed);
+        results[2].Payload.IsError.ShouldBeFalse();
+        results[2].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Recorder_returns_null_append_result_as_data_and_continues()
     {
         var store = new TestSessionStore { ReturnNullAppendOnce = true };
         await using var node = new SessionRecorderNode(
             new SessionRecorderOptions { SessionId = "session-1" },
             store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
 
-        var bad = FlowMessage.Create(new SessionRecordInput { Name = "bad" });
-        await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "good" }));
+        await node.Input.SendAsync(FlowMessage.Create(ContentInput(1, "failed")));
+        await node.Input.SendAsync(FlowMessage.Create(ContentInput(2, "succeeded")));
         node.Complete();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.RecorderFailed);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        error.Message.ShouldContain("null record");
-        recorded.Payload.Sequence.ShouldBe(1);
-        recorded.Payload.Name.ShouldBe("good");
-        store.Records.ShouldHaveSingleItem();
+        results.Count.ShouldBe(2);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null record");
+        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Recorder_SessionCompletedFaultsWhenStoreReturnsNullCompleteSession()
-    {
-        var store = new TestSessionStore { ReturnNullCompleteOnce = true };
-        var node = new SessionRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-1" },
-            store);
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "only" }));
-        node.Complete();
-
-        await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await node.DisposeAsync();
-
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30)));
-        exception.Message.ShouldContain("null completed session");
-    }
-
-    [Fact]
-    public async Task Recorder_ContinuesFromExistingMessageCountAndCopiesNullAttributes()
-    {
-        var store = new TestSessionStore { InitialMessageCount = 5 };
-        var node = new SessionRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-1" },
-            store);
-        var output = Sink(node.Output);
-
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput
-        {
-            Name = "next",
-            Attributes = null!
-        }));
-        node.Complete();
-
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await node.DisposeAsync();
-
-        recorded.Payload.Sequence.ShouldBe(6);
-        recorded.Payload.Attributes.ShouldBeEmpty();
-        store.Metadata.ShouldNotBeNull();
-        store.Metadata.MessageCount.ShouldBe(6);
-    }
-
-    [Fact]
-    public async Task Recorder_UsesConfiguredClockForDefaultTimestamps()
+    public async Task Recorder_uses_clock_and_emits_lifecycle_events()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(timestamp);
+        var clock = new FakeTimeProvider(timestamp);
         var store = new TestSessionStore();
-        var node = new SessionRecorderNode(
+        await using var node = new SessionRecorderNode(
             new SessionRecorderOptions { SessionId = "session-1" },
             store,
-            timeProvider);
+            clock);
         var output = Sink(node.Output);
+        var events = Sink(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "timed" }));
+        await node.Input.SendAsync(FlowMessage.Create(ContentInput(1, "timed")));
         node.Complete();
 
-        var record = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await node.DisposeAsync();
+        var diagnosticEvents = await DrainUntilCompletedAsync(events);
 
-        record.Payload.Timestamp.ShouldBe(timestamp);
-        store.Metadata.ShouldNotBeNull();
-        store.Metadata.StartedAt.ShouldBe(timestamp);
+        result.Payload.Timestamp.ShouldBe(timestamp);
+        result.Payload.Value.ShouldNotBeNull().Timestamp.ShouldBe(timestamp);
+        store.Metadata.ShouldNotBeNull().StartedAt.ShouldBe(timestamp);
         store.Metadata.EndedAt.ShouldBe(timestamp);
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.RecorderStarted);
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.RecorderRecorded);
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.RecorderCompleted);
     }
 
     [Fact]
-    public async Task Recorder_EmitsStartedAndRecordedEventsAndSignalsSessionCompleted()
+    public async Task Recorder_reports_close_failure_without_faulting_normal_completion()
     {
-        var store = new TestSessionStore();
-        var node = new SessionRecorderNode(
+        var store = new TestSessionStore { ReturnNullCompleteOnce = true };
+        await using var node = new SessionRecorderNode(
             new SessionRecorderOptions { SessionId = "session-1" },
             store);
+        var output = Sink(node.Output);
         var events = Sink(node.Events);
-        node.Output.LinkTo(DataflowBlock.NullTarget<FlowMessage<SessionRecord>>());
 
-        await node.Input.SendAsync(FlowMessage.Create(new SessionRecordInput { Name = "only" }));
+        await node.Input.SendAsync(FlowMessage.Create(ContentInput(1, "only")));
         node.Complete();
+
+        await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var exception = await Should.ThrowAsync<Exception>(
+            () => node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30)));
+        var diagnosticEvents = await DrainUntilCompletedAsync(events);
 
-        // Started/Recorded surface on the Events stream while the ports are open;
-        // the session-close diagnostic surfaces on SessionCompleted at disposal because
-        // the broadcast ports are already completed by then.
-        var names = (await DrainUntilCompletedAsync(events)).Select(@event => @event.Name).ToArray();
-        names.ShouldContain(SessionsDiagnosticNames.RecorderStarted);
-        names.ShouldContain(SessionsDiagnosticNames.RecorderRecorded);
-
-        await node.DisposeAsync();
-        await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
-        store.Metadata.ShouldNotBeNull();
-        store.Metadata.EndedAt.ShouldNotBeNull();
+        exception.Message.ShouldContain("failed to complete session");
+        node.Completion.IsFaulted.ShouldBeFalse();
+        diagnosticEvents.ShouldContain(@event =>
+            @event.Name == SessionsDiagnosticNames.RecorderFailed &&
+            Equals(@event.Attributes["errorCode"], SessionErrorCodeNames.CompleteFailed));
     }
 
     [Fact]
-    public void Recorder_RequiresStore()
-        => Should.Throw<ArgumentNullException>(
+    public void Recorder_validates_dependencies_and_capacity()
+    {
+        Should.Throw<ArgumentNullException>(
             () => new SessionRecorderNode(new SessionRecorderOptions(), null!));
-
-    [Fact]
-    public void Recorder_RejectsInvalidCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+        Should.Throw<ArgumentOutOfRangeException>(
             () => new SessionRecorderNode(
                 new SessionRecorderOptions { BoundedCapacity = 0 },
                 new TestSessionStore()));
-
-    // ---- Replay --------------------------------------------------------------------
+    }
 
     [Fact]
-    public async Task Replay_EmitsMessagesInOrderAndMintsCorrelation()
+    public async Task Replay_emits_exact_content_in_order_and_mints_correlation()
     {
-        var store = CreateStoreWithRecords();
+        var store = CreateStoreWithContentRecords(count: 4);
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            new SessionReplayOptions
+            {
+                SessionId = "session-1",
+                Mode = SessionReplayMode.Instant,
+                StartSequence = 2,
+                MaxMessages = 2
+            },
             store);
         var output = Sink(node.Output);
 
         await node.StartAsync();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
 
-        var records = await DrainUntilCompletedAsync(output);
-        records.Select(record => record.Payload.Sequence).ShouldBe([1, 2, 3]);
-        // The source mints a non-empty correlation id for each emitted record.
-        records.ShouldAllBe(record => !record.CorrelationId.IsEmpty);
-        records.Select(record => record.CorrelationId).Distinct().Count().ShouldBe(3);
+        results.Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+            .ShouldBe([2L, 3L]);
+        results.Select(result => result.Payload.Value.ShouldNotBeNull().Content.OriginalBytes[0])
+            .ShouldBe([(byte)2, (byte)3]);
+        results.ShouldAllBe(result => !result.Payload.IsError);
+        results.ShouldAllBe(result => !result.CorrelationId.IsEmpty);
+        results.Select(result => result.CorrelationId).Distinct().Count().ShouldBe(2);
     }
 
     [Fact]
-    public async Task Replay_SupportsFixedInterval()
+    public async Task Replay_supports_fixed_interval()
     {
-        var timeProvider = new TrackingFakeTimeProvider();
-        var store = CreateStoreWithRecords(count: 3);
+        var clock = new TrackingFakeTimeProvider();
+        var store = CreateStoreWithContentRecords(count: 3);
         await using var node = new SessionReplayNode(
             new SessionReplayOptions
             {
@@ -290,23 +258,46 @@ public sealed class SessionComponentTests
                 FixedIntervalMilliseconds = 40
             },
             store,
-            timeProvider);
+            clock);
         var output = Sink(node.Output);
 
         await node.StartAsync();
+        await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(40));
 
-        // The first record emits immediately; the next two each wait for a 40ms
-        // FakeTimeProvider delay that only fires once time is advanced.
-        await AdvanceUntilCompletedAsync(timeProvider, node, TimeSpan.FromMilliseconds(40));
-
-        var records = await DrainUntilCompletedAsync(output);
-        records.Select(record => record.Payload.Sequence).ShouldBe([1, 2, 3]);
+        (await DrainUntilCompletedAsync(output))
+            .Select(result => result.Payload.Value.ShouldNotBeNull().Sequence)
+            .ShouldBe([1L, 2L, 3L]);
     }
 
     [Fact]
-    public async Task Replay_SupportsCancellation()
+    public async Task Replay_supports_multiplier_timing()
     {
-        var store = CreateStoreWithRecords(count: 3);
+        var clock = new TrackingFakeTimeProvider();
+        var store = CreateStoreWithContentRecords(
+            count: 2,
+            step: TimeSpan.FromMilliseconds(80));
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions
+            {
+                SessionId = "session-1",
+                Mode = SessionReplayMode.Multiplier,
+                SpeedMultiplier = 4
+            },
+            store,
+            clock);
+        var output = Sink(node.Output);
+
+        await node.StartAsync();
+        await AdvanceUntilCompletedAsync(clock, node, TimeSpan.FromMilliseconds(20));
+
+        (await DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
+        clock.CreatedTimerCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Replay_cancellation_completes_without_late_output()
+    {
+        var store = CreateStoreWithContentRecords(count: 3);
         await using var node = new SessionReplayNode(
             new SessionReplayOptions
             {
@@ -322,16 +313,15 @@ public sealed class SessionComponentTests
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        first.Payload.Sequence.ShouldBe(1);
+        first.Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
         node.Completion.IsFaulted.ShouldBeFalse();
         output.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Replay_StopsPromptlyWhenCompletedBeforeStart()
+    public async Task Replay_completed_before_start_stops_promptly()
     {
-        var timeProvider = new FakeTimeProvider();
-        var store = CreateStoreWithRecords(count: 3);
+        var clock = new FakeTimeProvider();
         var node = new SessionReplayNode(
             new SessionReplayOptions
             {
@@ -339,196 +329,193 @@ public sealed class SessionComponentTests
                 Mode = SessionReplayMode.FixedInterval,
                 FixedIntervalMilliseconds = 10
             },
-            store,
-            timeProvider);
+            CreateStoreWithContentRecords(count: 3),
+            clock);
 
-        // Completing the source before it starts cancels the run token, so the read
-        // loop stops at its first cancellation check instead of awaiting any
-        // inter-record delay. Time is never advanced, so if the loop reached a
-        // Task.Delay it would hang and disposal would time out; completing within the
-        // timeout proves the loop broke before awaiting an inter-record delay.
         node.Complete();
         await node.StartAsync();
-
         await node.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
+
         node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Replay_UsesMultiplierTiming()
+    public async Task Replay_pre_canceled_start_does_not_consume_start_state()
     {
-        var timeProvider = new TrackingFakeTimeProvider();
-        var store = CreateStoreWithRecords(count: 2, step: TimeSpan.FromMilliseconds(80));
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions
-            {
-                SessionId = "session-1",
-                Mode = SessionReplayMode.Multiplier,
-                SpeedMultiplier = 4
-            },
-            store,
-            timeProvider);
+            new SessionReplayOptions { SessionId = "session-1" },
+            CreateStoreWithContentRecords(count: 1));
         var output = Sink(node.Output);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
 
+        await Should.ThrowAsync<OperationCanceledException>(() => node.StartAsync(canceled.Token));
         await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        // 80ms stored gap divided by the 4x multiplier yields a single 20ms
-        // FakeTimeProvider delay before the second record; advance to fire it.
-        await AdvanceUntilCompletedAsync(timeProvider, node, TimeSpan.FromMilliseconds(20));
-
-        (await DrainUntilCompletedAsync(output)).Count.ShouldBe(2);
+        (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
     }
 
     [Fact]
-    public async Task Replay_EmitsEvents()
+    public async Task Replay_emits_lifecycle_events()
     {
-        var store = CreateStoreWithRecords(count: 1);
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
-            store);
+            new SessionReplayOptions { SessionId = "session-1" },
+            CreateStoreWithContentRecords(count: 1));
         var output = Sink(node.Output);
         var events = Sink(node.Events);
 
         await node.StartAsync();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
         await DrainUntilCompletedAsync(output);
-        var names = (await DrainUntilCompletedAsync(events)).Select(@event => @event.Name).ToArray();
-        names.ShouldContain(SessionsDiagnosticNames.ReplayStarted);
-        names.ShouldContain(SessionsDiagnosticNames.ReplayEmitted);
-        names.ShouldContain(SessionsDiagnosticNames.ReplayCompleted);
+        var diagnosticEvents = await DrainUntilCompletedAsync(events);
+
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.ReplayStarted);
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.ReplayEmitted);
+        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
+            SessionsDiagnosticNames.ReplayCompleted);
     }
 
     [Fact]
-    public async Task Replay_FaultsAndReportsWhenSessionIsMissing()
+    public async Task Replay_returns_missing_session_as_normal_result()
     {
-        var store = new TestSessionStore();
         await using var node = new SessionReplayNode(
             new SessionReplayOptions { SessionId = "missing" },
-            store);
-        // Don't propagate completion: the source faults its error port right after
-        // posting the error, and the buffered error must still be observable.
-        var errors = new BufferBlock<FlowError>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+            new TestSessionStore());
+        var output = Sink(node.Output);
 
         await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(SessionsErrorCodes.InvalidSession);
-        error.Message.ShouldContain("missing");
-
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
-        exception.Message.ShouldContain("missing");
+        result.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.SessionNotFound);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Replay_ReportsStoreFailureMidEnumerationThenFaults()
+    public async Task Replay_returns_mid_stream_store_failure_as_normal_result()
     {
-        var store = CreateStoreWithRecords(count: 3);
-        // The session loads fine, then the store throws after the first record streams.
+        var store = CreateStoreWithContentRecords(count: 3);
         store.FailReadAfter = 1;
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            new SessionReplayOptions { SessionId = "session-1" },
             store);
-        // Don't propagate completion: the source faults its error port right after posting
-        // the error, and the buffered error must still be observable.
-        var errors = new BufferBlock<FlowError>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+        var output = Sink(node.Output);
 
         await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
-        error.Message.ShouldContain("mid-stream");
-
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+        results.Count.ShouldBe(2);
+        results[0].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
+        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.ReplayFailed);
+        results[1].Payload.Error.ShouldNotBeNull().Message.ShouldContain("mid-stream");
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Replay_ReportsNullReadStreamThenFaults()
+    public async Task Replay_returns_null_stream_as_normal_result()
     {
-        var store = CreateStoreWithRecords(count: 1);
+        var store = CreateStoreWithContentRecords(count: 1);
         store.ReturnNullReadStreamOnce = true;
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            new SessionReplayOptions { SessionId = "session-1" },
             store);
-        var errors = new BufferBlock<FlowError>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+        var output = Sink(node.Output);
 
         await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
-        error.Message.ShouldContain("null message stream");
-
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+        result.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        result.Payload.Error.ShouldNotBeNull().Message.ShouldContain("null message stream");
     }
 
     [Fact]
-    public async Task Replay_ReportsNullRecordThenFaults()
+    public async Task Replay_returns_malformed_records_as_data_and_continues()
     {
-        var store = CreateStoreWithRecords(count: 1);
+        var store = CreateStoreWithContentRecords(count: 2);
+        store.Records.Insert(1, new SessionRecord
+        {
+            SessionId = "session-1",
+            Sequence = 2,
+            Timestamp = store.Records[0].Timestamp.AddMilliseconds(1),
+            Payload = "not-an-envelope"
+        });
+        store.Records[2] = store.Records[2] with { Sequence = 3 };
+        store.Metadata = store.Metadata.ShouldNotBeNull() with { MessageCount = 3 };
+        await using var node = new SessionReplayNode(
+            new SessionReplayOptions { SessionId = "session-1" },
+            store);
+        var output = Sink(node.Output);
+
+        await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
+
+        results.Count.ShouldBe(3);
+        results[0].Payload.IsError.ShouldBeFalse();
+        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoredContentInvalid);
+        results[2].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Replay_returns_null_record_as_data_and_continues()
+    {
+        var store = CreateStoreWithContentRecords(count: 2);
         store.ReturnNullReadRecordOnce = true;
         await using var node = new SessionReplayNode(
-            new SessionReplayOptions { SessionId = "session-1", Mode = SessionReplayMode.Instant },
+            new SessionReplayOptions { SessionId = "session-1" },
             store);
-        var errors = new BufferBlock<FlowError>();
-        node.Errors.LinkTo(errors, new DataflowLinkOptions { PropagateCompletion = false });
+        var output = Sink(node.Output);
 
         await node.StartAsync();
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(SessionsErrorCodes.ReplayFailed);
-        error.Message.ShouldContain("null record");
-
-        await Should.ThrowAsync<InvalidOperationException>(
-            () => node.Completion.WaitAsync(TimeSpan.FromSeconds(30)));
+        results.Count.ShouldBe(2);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        results[1].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(2);
     }
 
     [Fact]
-    public void Replay_RejectsMissingSessionId()
+    public void Replay_validates_options_and_dependencies()
     {
-        var exception = Should.Throw<ArgumentException>(
+        Should.Throw<ArgumentException>(
             () => new SessionReplayNode(new SessionReplayOptions(), new TestSessionStore()));
-
-        exception.Message.ShouldContain("session id");
-    }
-
-    [Fact]
-    public void Replay_RequiresStore()
-        => Should.Throw<ArgumentNullException>(
+        Should.Throw<ArgumentNullException>(
             () => new SessionReplayNode(
                 new SessionReplayOptions { SessionId = "session-1" },
                 null!));
-
-    [Fact]
-    public void Replay_RejectsInvalidCapacity()
-        => Should.Throw<ArgumentOutOfRangeException>(
+        Should.Throw<ArgumentOutOfRangeException>(
             () => new SessionReplayNode(
-                new SessionReplayOptions
-                {
-                    SessionId = "session-1",
-                    BoundedCapacity = 0
-                },
+                new SessionReplayOptions { SessionId = "session-1", BoundedCapacity = 0 },
                 new TestSessionStore()));
-
-    // ---- Query ---------------------------------------------------------------------
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => new SessionReplayNode(
+                new SessionReplayOptions { SessionId = "session-1", SpeedMultiplier = 0 },
+                new TestSessionStore()));
+    }
 
     [Fact]
-    public async Task Query_EmitsResultAndSessionOutputsPreservingCorrelation()
+    public async Task Query_returns_filtered_result_with_clock_and_lineage()
     {
         var timestamp = new DateTimeOffset(2026, 6, 2, 13, 0, 0, TimeSpan.Zero);
-        var timeProvider = new FakeTimeProvider(timestamp);
+        var clock = new FakeTimeProvider(timestamp);
         var store = new TestSessionStore();
         store.Sessions.Add(new SessionMetadata
         {
             SessionId = "session-1",
             Name = "alpha-one",
             StartedAt = timestamp.AddMinutes(-5),
-            Tags = new Dictionary<string, string>(StringComparer.Ordinal) { ["kind"] = "demo" }
+            Tags = new Dictionary<string, string> { ["kind"] = "demo" }
         });
         store.Sessions.Add(new SessionMetadata
         {
@@ -536,147 +523,154 @@ public sealed class SessionComponentTests
             Name = "beta-one",
             StartedAt = timestamp.AddMinutes(-3),
             EndedAt = timestamp.AddMinutes(-1),
-            Tags = new Dictionary<string, string>(StringComparer.Ordinal) { ["kind"] = "demo" }
+            Tags = new Dictionary<string, string> { ["kind"] = "demo" }
         });
         await using var node = new SessionQueryNode(
             new SessionQueryOptions
             {
                 NamePrefix = "alpha",
-                Tags = new Dictionary<string, string> { ["kind"] = "demo" }
+                Tags = new Dictionary<string, string> { ["kind"] = "demo" },
+                EmitSessionsInResult = true
             },
             store,
-            timeProvider);
+            clock);
         var output = Sink(node.Output);
-        var sessions = Sink(node.Sessions);
+        var input = FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" });
 
-        var message = FlowMessage.Create(new SessionQueryRequest { CorrelationId = "corr-1" });
-        await node.Input.SendAsync(message);
+        await node.Input.SendAsync(input);
         node.Complete();
-
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var session = await sessions.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        result.CorrelationId.ShouldBe(message.CorrelationId);
+        result.Payload.IsError.ShouldBeFalse();
         result.Payload.Timestamp.ShouldBe(timestamp);
-        result.Payload.Count.ShouldBe(1);
-        result.Payload.CorrelationId.ShouldBe("corr-1");
-        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-1");
-        session.CorrelationId.ShouldBe(message.CorrelationId);
-        session.Payload.SessionId.ShouldBe("session-1");
-        store.LastQuery.ShouldNotBeNull();
-        store.LastQuery.NamePrefix.ShouldBe("alpha");
+        result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        result.Payload.Value.ShouldNotBeNull().Sessions.ShouldHaveSingleItem()
+            .SessionId.ShouldBe("session-1");
+        result.CorrelationId.ShouldBe(input.CorrelationId);
+        result.CausationId.ShouldBe(input.MessageId);
+        store.LastQuery.ShouldNotBeNull().NamePrefix.ShouldBe("alpha");
         store.LastQuery.Tags["kind"].ShouldBe("demo");
         store.LastQuery.IncludeActive.ShouldBe(true);
         store.LastQuery.IncludeCompleted.ShouldBe(true);
     }
 
     [Fact]
-    public async Task Query_ReportsInvalidRequestWithCorrelationAndContinues()
+    public async Task Query_can_omit_sessions_without_changing_count()
     {
         var store = new TestSessionStore();
         store.Sessions.Add(new SessionMetadata
         {
             SessionId = "session-1",
-            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+            StartedAt = DateTimeOffset.UtcNow
         });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = false },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
 
-        var bad = FlowMessage.Create(new SessionQueryRequest { Limit = 0 });
-        await node.Input.SendAsync(bad);
         await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var result = (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.InvalidQuery);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        result.Payload.Count.ShouldBe(1);
+        result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        result.Payload.Value.ShouldNotBeNull().Sessions.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Query_ReportsStoreFailureAndContinues()
+    public async Task Query_returns_invalid_request_as_data_and_continues()
     {
-        var store = new TestSessionStore { FailNextQuery = true };
-        store.Sessions.Add(new SessionMetadata
-        {
-            SessionId = "session-1",
-            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-        });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var store = CreateStoreWithQuerySession();
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var failed = FlowMessage.Create(new SessionQueryRequest { Limit = 0 });
+        var succeeded = FlowMessage.Create(new SessionQueryRequest());
 
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        await node.Input.SendAsync(failed);
+        await node.Input.SendAsync(succeeded);
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        result.Payload.Count.ShouldBe(1);
+        results.Count.ShouldBe(2);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.InvalidRequest);
+        results[0].CorrelationId.ShouldBe(failed.CorrelationId);
+        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
     }
 
     [Fact]
-    public async Task Query_ReportsNullResultAndContinues()
+    public async Task Query_returns_store_failure_as_data_and_continues()
     {
-        var store = new TestSessionStore { ReturnNullQueryResultOnce = true };
-        store.Sessions.Add(new SessionMetadata
-        {
-            SessionId = "session-1",
-            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-        });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var store = CreateStoreWithQuerySession();
+        store.FailNextQuery = true;
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
 
         await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
         await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        error.Message.ShouldContain("null session query result");
-        result.Payload.Count.ShouldBe(1);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.QueryFailed);
+        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+        node.Completion.IsFaulted.ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Query_ReportsNullSessionAndContinues()
+    public async Task Query_rejects_null_store_results_as_data_and_continues()
     {
-        var store = new TestSessionStore { ReturnNullQuerySessionOnce = true };
-        store.Sessions.Add(new SessionMetadata
-        {
-            SessionId = "session-1",
-            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-        });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        var store = CreateStoreWithQuerySession();
+        store.ReturnNullQueryResultOnce = true;
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
 
         await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
         await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        error.Message.ShouldContain("null session");
-        result.Payload.Count.ShouldBe(1);
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null result");
+        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Query_ReportsStoreSessionOutsideFilterAndContinues()
+    public async Task Query_rejects_null_sessions_as_data_and_continues()
+    {
+        var store = CreateStoreWithQuerySession();
+        store.ReturnNullQuerySessionOnce = true;
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
+        var output = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest()));
+        node.Complete();
+        var results = await DrainUntilCompletedAsync(output);
+        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoreUnavailable);
+        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("null session");
+        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Query_rejects_store_results_outside_filter_as_data_and_continues()
     {
         var store = new TestSessionStore { BypassQueryFilteringOnce = true };
         store.Sessions.Add(new SessionMetadata
@@ -691,27 +685,27 @@ public sealed class SessionComponentTests
             Name = "alpha",
             StartedAt = DateTimeOffset.Parse("2026-01-02T00:00:00Z")
         });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var request = new SessionQueryRequest { NamePrefix = "alpha" };
 
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { NamePrefix = "alpha" }));
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest { NamePrefix = "alpha" }));
+        await node.Input.SendAsync(FlowMessage.Create(request));
+        await node.Input.SendAsync(FlowMessage.Create(request));
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        error.Message.ShouldContain("outside the query filter");
-        error.Message.ShouldContain("namePrefix");
-        result.Payload.Count.ShouldBe(1);
-        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-2");
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoredContentInvalid);
+        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain("namePrefix");
+        results[1].Payload.Value.ShouldNotBeNull().Sessions.ShouldHaveSingleItem()
+            .SessionId.ShouldBe("session-2");
     }
 
     [Fact]
-    public async Task Query_ReportsStoreResultsOverLimitAndContinues()
+    public async Task Query_rejects_store_results_over_limit_as_data_and_continues()
     {
         var store = new TestSessionStore { BypassQueryFilteringOnce = true };
         store.Sessions.Add(new SessionMetadata
@@ -726,309 +720,62 @@ public sealed class SessionComponentTests
             Name = "alpha",
             StartedAt = DateTimeOffset.Parse("2026-01-02T00:00:00Z")
         });
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions { EmitSessionsInResult = true },
+            store);
         var output = Sink(node.Output);
-        var errors = Sink(node.Errors);
+        var request = new SessionQueryRequest { Name = "alpha", Limit = 1 };
 
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest
-        {
-            Name = "alpha",
-            Limit = 1
-        }));
-        await node.Input.SendAsync(FlowMessage.Create(new SessionQueryRequest
-        {
-            Name = "alpha",
-            Limit = 1
-        }));
+        await node.Input.SendAsync(FlowMessage.Create(request));
+        await node.Input.SendAsync(FlowMessage.Create(request));
         node.Complete();
-
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        var result = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await DrainUntilCompletedAsync(output);
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        error.Code.ShouldBe(SessionsErrorCodes.QueryFailed);
-        error.Message.ShouldContain("more sessions than requested");
-        result.Payload.Count.ShouldBe(1);
-        result.Payload.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-1");
+        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
+            SessionErrorCodeNames.StoredContentInvalid);
+        results[0].Payload.Error.ShouldNotBeNull().Message.ShouldContain(
+            "more sessions than requested");
+        results[1].Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
     }
 
     [Fact]
-    public async Task Query_EmitsStartedEventAtConstruction()
+    public async Task Query_emits_started_event()
     {
-        var store = new TestSessionStore();
-        await using var node = new SessionQueryNode(new SessionQueryOptions(), store);
+        await using var node = new SessionQueryNode(
+            new SessionQueryOptions(),
+            new TestSessionStore());
         var events = Sink(node.Events);
 
         var started = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
         started.Name.ShouldBe(SessionsDiagnosticNames.QueryStarted);
     }
 
     [Fact]
-    public void Query_RejectsEmptyInclusion()
-        => Should.Throw<ArgumentException>(
+    public void Query_validates_options_and_dependencies()
+    {
+        Should.Throw<ArgumentException>(
             () => new SessionQueryNode(
                 new SessionQueryOptions { IncludeActive = false, IncludeCompleted = false },
                 new TestSessionStore()));
-
-    [Fact]
-    public void Query_RequiresStore()
-        => Should.Throw<ArgumentNullException>(
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => new SessionQueryNode(
+                new SessionQueryOptions { Limit = 0 },
+                new TestSessionStore()));
+        Should.Throw<ArgumentNullException>(
             () => new SessionQueryNode(new SessionQueryOptions(), null!));
+    }
 
-    // ---- Canonical FlowContent nodes ------------------------------------------------
-
-    [Fact]
-    public async Task ContentRecorder_PreservesExactContentLineageAndClosesAfterDrain()
-    {
-        var store = new TestSessionStore { SerializePayloadAsJsonElement = true };
-        await using var node = new SessionContentRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-content", Name = "content" },
-            store);
-        var output = Sink(node.Output);
-        var events = Sink(node.Events);
-        var bytes = new byte[] { 0, 1, 2, 127, 128, 255 };
-        var input = FlowMessage.Create(new SessionContentRecordInput
+    private static SessionContentRecordInput ContentInput(byte value, string? name = null)
+        => new()
         {
-            Name = "packet",
-            Content = FlowContent.FromBytes(bytes, "application/octet-stream", "binary"),
-            Attributes = new Dictionary<string, string> { ["source"] = "test" }
-        }) with
-        {
-            Headers = new Dictionary<string, FlowValue> { ["tenant"] = FlowValue.From("north") }
+            Name = name,
+            Content = FlowContent.FromBytes(
+                new[] { value },
+                "application/octet-stream",
+                "binary")
         };
-
-        await node.Input.SendAsync(input);
-        node.Complete();
-
-        var recorded = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        await node.SessionCompleted.WaitAsync(TimeSpan.FromSeconds(30));
-        var diagnosticEvents = await DrainUntilCompletedAsync(events);
-
-        recorded.Payload.IsError.ShouldBeFalse();
-        recorded.Payload.Kind.ShouldBe(SessionResultKinds.RecordStored);
-        var recordedValue = recorded.Payload.Value.ShouldNotBeNull();
-        recordedValue.Content.OriginalBytes.ToArray().ShouldBe(bytes);
-        recordedValue.Content.ContentType.ShouldBe("application/octet-stream");
-        recordedValue.Content.Encoding.ShouldBe("binary");
-        recorded.CorrelationId.ShouldBe(input.CorrelationId);
-        recorded.TraceId.ShouldBe(input.TraceId);
-        recorded.CausationId.ShouldBe(input.MessageId);
-        recorded.Headers["tenant"].ShouldBe(FlowValue.From("north"));
-        store.Metadata.ShouldNotBeNull();
-        store.Metadata.MessageCount.ShouldBe(1);
-        store.Metadata.EndedAt.ShouldNotBeNull();
-        diagnosticEvents.Select(@event => @event.Name).ShouldContain(
-            SessionsDiagnosticNames.RecorderCompleted);
-    }
-
-    [Fact]
-    public async Task ContentRecorder_ReturnsNormalFailuresAndContinuesWithNextInput()
-    {
-        var store = new TestSessionStore { FailNextAppend = true };
-        await using var node = new SessionContentRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-content" },
-            store);
-        var output = Sink(node.Output);
-        var unavailable = FlowMessage.Create(new SessionContentRecordInput
-        {
-            Content = FlowContent.FromValue(FlowValue.From("decoded-only"))
-        });
-        var appendFailure = FlowMessage.Create(new SessionContentRecordInput
-        {
-            Content = FlowContent.FromBytes(new byte[] { 1 })
-        });
-        var good = FlowMessage.Create(new SessionContentRecordInput
-        {
-            Content = FlowContent.FromBytes(new byte[] { 2 })
-        });
-
-        await node.Input.SendAsync(unavailable);
-        await node.Input.SendAsync(appendFailure);
-        await node.Input.SendAsync(good);
-        node.Complete();
-
-        var results = await DrainUntilCompletedAsync(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        results.Count.ShouldBe(3);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.ContentUnavailable);
-        results[0].CorrelationId.ShouldBe(unavailable.CorrelationId);
-        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.RecordFailed);
-        results[1].CorrelationId.ShouldBe(appendFailure.CorrelationId);
-        results[2].Payload.IsError.ShouldBeFalse();
-        results[2].Payload.Value.ShouldNotBeNull().Sequence.ShouldBe(1);
-        results[2].CorrelationId.ShouldBe(good.CorrelationId);
-        node.Completion.IsFaulted.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task ContentReplay_EmitsExactContentAndMalformedRecordsAsNormalResults()
-    {
-        var store = new TestSessionStore();
-        await using (var recorder = new SessionContentRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-content" },
-            store))
-        {
-            recorder.Output.LinkTo(
-                DataflowBlock.NullTarget<FlowMessage<FlowResult<SessionContentRecord>>>());
-            await recorder.Input.SendAsync(FlowMessage.Create(new SessionContentRecordInput
-            {
-                Content = FlowContent.FromBytes(new byte[] { 3, 4, 5 }, "application/test", "binary")
-            }));
-            recorder.Complete();
-            await recorder.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        }
-
-        store.Records.Add(new SessionRecord
-        {
-            SessionId = "session-content",
-            Sequence = 2,
-            Timestamp = DateTimeOffset.UtcNow,
-            Payload = "not-an-envelope"
-        });
-        await using var replay = new SessionContentReplayNode(
-            new SessionReplayOptions
-            {
-                SessionId = "session-content",
-                Mode = SessionReplayMode.Instant
-            },
-            store);
-        var output = Sink(replay.Output);
-
-        await replay.StartAsync();
-        await replay.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        var results = await DrainUntilCompletedAsync(output);
-
-        results.Count.ShouldBe(2);
-        results[0].Payload.IsError.ShouldBeFalse();
-        results[0].Payload.Value.ShouldNotBeNull().Content.OriginalBytes.ToArray()
-            .ShouldBe(new byte[] { 3, 4, 5 });
-        results[1].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.StoredContentInvalid);
-        results.Select(result => result.CorrelationId).Distinct().Count().ShouldBe(2);
-        replay.Completion.IsFaulted.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task ContentReplay_ReturnsMissingSessionAndReadFailuresAsNormalResults()
-    {
-        await using var missing = new SessionContentReplayNode(
-            new SessionReplayOptions { SessionId = "missing" },
-            new TestSessionStore());
-        var missingOutput = Sink(missing.Output);
-
-        await missing.StartAsync();
-        await missing.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        var missingResult = (await DrainUntilCompletedAsync(missingOutput)).ShouldHaveSingleItem();
-
-        missingResult.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.SessionNotFound);
-        missing.Completion.IsFaulted.ShouldBeFalse();
-
-        var store = new TestSessionStore
-        {
-            Metadata = new SessionMetadata
-            {
-                SessionId = "session-content",
-                StartedAt = DateTimeOffset.UtcNow,
-                MessageCount = 1
-            },
-            FailReadAfter = 0
-        };
-        store.Records.Add(new SessionRecord
-        {
-            SessionId = "session-content",
-            Sequence = 1,
-            Timestamp = DateTimeOffset.UtcNow,
-            Payload = "unused"
-        });
-        await using var failed = new SessionContentReplayNode(
-            new SessionReplayOptions { SessionId = "session-content" },
-            store);
-        var failedOutput = Sink(failed.Output);
-
-        await failed.StartAsync();
-        await failed.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        var failedResult = (await DrainUntilCompletedAsync(failedOutput)).ShouldHaveSingleItem();
-
-        failedResult.Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.ReplayFailed);
-        failed.Completion.IsFaulted.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task ContentReplay_PreCanceledStartDoesNotConsumeStartState()
-    {
-        var store = new TestSessionStore();
-        await using (var recorder = new SessionContentRecorderNode(
-            new SessionRecorderOptions { SessionId = "session-content" },
-            store))
-        {
-            recorder.Output.LinkTo(
-                DataflowBlock.NullTarget<FlowMessage<FlowResult<SessionContentRecord>>>());
-            await recorder.Input.SendAsync(FlowMessage.Create(new SessionContentRecordInput
-            {
-                Content = FlowContent.FromBytes(new byte[] { 9 })
-            }));
-            recorder.Complete();
-            await recorder.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        }
-
-        await using var replay = new SessionContentReplayNode(
-            new SessionReplayOptions { SessionId = "session-content" },
-            store);
-        var output = Sink(replay.Output);
-        using var canceled = new CancellationTokenSource();
-        canceled.Cancel();
-
-        await Should.ThrowAsync<OperationCanceledException>(() => replay.StartAsync(canceled.Token));
-        await replay.StartAsync();
-        await replay.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        (await DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
-    }
-
-    [Fact]
-    public async Task ContentQuery_ReturnsOneResultAndContinuesAfterStoreFailure()
-    {
-        var store = new TestSessionStore { FailNextQuery = true };
-        store.Sessions.Add(new SessionMetadata
-        {
-            SessionId = "session-content",
-            Name = "sample",
-            StartedAt = DateTimeOffset.UtcNow,
-            MessageCount = 2
-        });
-        await using var node = new SessionContentQueryNode(
-            new SessionQueryOptions { EmitSessionsInResult = true },
-            store);
-        var output = Sink(node.Output);
-        var failed = FlowMessage.Create(new SessionQueryRequest { Name = "sample" });
-        var succeeded = FlowMessage.Create(new SessionQueryRequest { Name = "sample" });
-
-        await node.Input.SendAsync(failed);
-        await node.Input.SendAsync(succeeded);
-        node.Complete();
-        var results = await DrainUntilCompletedAsync(output);
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        results.Count.ShouldBe(2);
-        results[0].Payload.Error.ShouldNotBeNull().Code.ShouldBe(
-            SessionErrorCodeNames.QueryFailed);
-        results[0].CorrelationId.ShouldBe(failed.CorrelationId);
-        results[1].Payload.IsError.ShouldBeFalse();
-        var queryValue = results[1].Payload.Value.ShouldNotBeNull();
-        queryValue.Count.ShouldBe(1);
-        queryValue.Sessions.ShouldHaveSingleItem().SessionId.ShouldBe("session-content");
-        results[1].CorrelationId.ShouldBe(succeeded.CorrelationId);
-        results[1].CausationId.ShouldBe(succeeded.MessageId);
-        node.Completion.IsFaulted.ShouldBeFalse();
-    }
-
-    // ---- Helpers -------------------------------------------------------------------
 
     private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
     {
@@ -1043,15 +790,15 @@ public sealed class SessionComponentTests
         while (await output.OutputAvailableAsync().WaitAsync(TimeSpan.FromSeconds(30)))
         {
             while (output.TryReceive(out var item))
-            {
                 items.Add(item);
-            }
         }
 
         return items;
     }
 
-    private static TestSessionStore CreateStoreWithRecords(int count = 3, TimeSpan? step = null)
+    private static TestSessionStore CreateStoreWithContentRecords(
+        int count = 3,
+        TimeSpan? step = null)
     {
         var store = new TestSessionStore();
         var start = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
@@ -1072,10 +819,28 @@ public sealed class SessionComponentTests
                 Sequence = index + 1,
                 Timestamp = start + (interval * index),
                 Name = $"record-{index + 1}",
-                Payload = index + 1
+                Payload = JsonSerializer.SerializeToElement(new
+                {
+                    formatVersion = 1,
+                    bytes = Convert.ToBase64String([(byte)(index + 1)]),
+                    contentType = "application/octet-stream",
+                    encoding = "binary"
+                }),
+                ContentType = "application/octet-stream"
             });
         }
 
+        return store;
+    }
+
+    private static TestSessionStore CreateStoreWithQuerySession()
+    {
+        var store = new TestSessionStore();
+        store.Sessions.Add(new SessionMetadata
+        {
+            SessionId = "session-1",
+            StartedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+        });
         return store;
     }
 
@@ -1224,45 +989,24 @@ public sealed class SessionComponentTests
             }
 
             if (!string.IsNullOrWhiteSpace(request.Name))
-            {
                 query = query.Where(session => StringComparer.Ordinal.Equals(session.Name, request.Name));
-            }
-
             if (!string.IsNullOrWhiteSpace(request.NamePrefix))
             {
                 query = query.Where(session =>
                     session.Name?.StartsWith(request.NamePrefix, StringComparison.Ordinal) == true);
             }
-
             if (request.StartedFrom.HasValue)
-            {
                 query = query.Where(session => session.StartedAt >= request.StartedFrom.Value);
-            }
-
             if (request.StartedTo.HasValue)
-            {
                 query = query.Where(session => session.StartedAt <= request.StartedTo.Value);
-            }
-
             if (request.EndedFrom.HasValue)
-            {
                 query = query.Where(session => session.EndedAt >= request.EndedFrom.Value);
-            }
-
             if (request.EndedTo.HasValue)
-            {
                 query = query.Where(session => session.EndedAt <= request.EndedTo.Value);
-            }
-
             if (request.IncludeActive == false)
-            {
                 query = query.Where(session => session.EndedAt is not null);
-            }
-
             if (request.IncludeCompleted == false)
-            {
                 query = query.Where(session => session.EndedAt is null);
-            }
 
             foreach (var (key, value) in request.Tags)
             {
@@ -1271,12 +1015,11 @@ public sealed class SessionComponentTests
                     StringComparer.Ordinal.Equals(actual, value));
             }
 
-            var sessions = query
+            return Task.FromResult<IReadOnlyList<SessionMetadata>>(query
                 .OrderBy(session => session.StartedAt)
                 .Take(request.Limit ?? int.MaxValue)
                 .Select(CopySession)
-                .ToArray();
-            return Task.FromResult<IReadOnlyList<SessionMetadata>>(sessions);
+                .ToArray());
         }
 
         public IAsyncEnumerable<SessionRecord> ReadMessagesAsync(
@@ -1300,23 +1043,16 @@ public sealed class SessionComponentTests
                 .Where(record => record.SessionId == request.SessionId)
                 .OrderBy(record => record.Sequence);
             if (request.StartSequence.HasValue)
-            {
                 query = query.Where(record => record.Sequence >= request.StartSequence.Value);
-            }
-
             if (request.MaxMessages.HasValue)
-            {
                 query = query.Take(request.MaxMessages.Value);
-            }
 
             var read = 0;
             foreach (var record in query)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (FailReadAfter.HasValue && read >= FailReadAfter.Value)
-                {
                     throw new InvalidOperationException("session read failed mid-stream.");
-                }
 
                 await Task.Yield();
                 if (ReturnNullReadRecordOnce)
@@ -1337,12 +1073,9 @@ public sealed class SessionComponentTests
         {
             var index = Sessions.FindIndex(existing => existing.SessionId == session.SessionId);
             if (index < 0)
-            {
                 Sessions.Add(CopySession(session));
-                return;
-            }
-
-            Sessions[index] = CopySession(session);
+            else
+                Sessions[index] = CopySession(session);
         }
 
         private static SessionMetadata CopySession(SessionMetadata session)
@@ -1354,13 +1087,6 @@ public sealed class SessionComponentTests
             };
     }
 
-    // Drives a FakeTimeProvider forward until the node finishes. The replay loop arms
-    // each inter-record Task.Delay lazily (only after the previous record is sent), so a
-    // single large Advance cannot fire delays that are not armed yet. This drains them
-    // deterministically: advance exactly once for each newly created timer, gating on
-    // the wrapper's created count (and its registration signal) rather than polling with
-    // sleeps. Counting created timers avoids the lost-wakeup where a delay is armed
-    // before the test looks.
     private static async Task AdvanceUntilCompletedAsync(
         TrackingFakeTimeProvider timeProvider,
         IFlowNode node,
@@ -1369,21 +1095,14 @@ public sealed class SessionComponentTests
         var fired = 0;
         while (!node.Completion.IsCompleted)
         {
-            // Capture the next-timer registration signal BEFORE reading the count, so a
-            // timer armed in the gap between the count check and the await is not a
-            // lost-wakeup: either the count check below sees it, or this captured signal
-            // completes when it is armed.
             var scheduled = timeProvider.TimerScheduled;
-
             if (timeProvider.CreatedTimerCount > fired)
             {
-                // An inter-record delay is armed (or already was) but not yet released.
                 timeProvider.Advance(step);
                 fired++;
                 continue;
             }
 
-            // No unfired timer yet: wait until the loop arms the next one or completes.
             await Task.WhenAny(scheduled, node.Completion)
                 .WaitAsync(TimeSpan.FromSeconds(30));
         }

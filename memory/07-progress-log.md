@@ -2,6 +2,20 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Sessions Consolidation
+
+- Consolidated Sessions on concise recorder, replay, and query nodes with exact
+  content, normal results, deterministic clocks, diagnostics, fan-out, message
+  lineage, and a retained neutral store/factory adapter boundary.
+- Removed direct-result and temporary FlowContent-prefixed nodes, typed
+  Composition registrations, numeric errors, Errors/Sessions branches,
+  aggregate/dead store options, and the identity-colliding `Name` defaults
+  after record, query, replay, lifecycle, and failure parity coverage.
+- Moved Sessions to `5.0.0` and Sessions Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[250-sessions-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Expectations Consolidation
 
 - Consolidated Expectations on `EventExpectationNode` with exact-once matched,

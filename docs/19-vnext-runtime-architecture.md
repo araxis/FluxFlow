@@ -15,6 +15,9 @@ normal FlowResult output, Projections retains typed domain events while
 emitting snapshots and expected failures through one normal FlowResult output,
 and Metrics retains typed samples/snapshots while exposing successful, partial,
 and failed aggregation outcomes through one normal FlowResult output.
+Sessions now uses concise recorder, replay, and query nodes with exact
+`FlowContent`, one normal `FlowResult` output, retained store-adapter contracts,
+and no typed node compatibility layer or universal Errors stream.
 Observability now uses FlowValue-native Counter, Logger, and Metrics components
 with one normal result stream per component while retaining generic standalone
 compatibility surfaces.

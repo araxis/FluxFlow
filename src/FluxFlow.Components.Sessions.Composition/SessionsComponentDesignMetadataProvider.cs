@@ -32,12 +32,11 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
 
         builder
             .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', SessionsCompositionNodeTypes.RecorderDescriptor.Aliases))
-            .AddOption(StoreOption())
             .AddOption(SessionIdOption(isRequired: false))
             .AddOption(
-                "name",
+                "sessionName",
                 OptionValueKind.Text,
-                displayName: "Name",
+                displayName: "Session Name",
                 helperText: "Optional session name stored with session metadata.",
                 attributes: OptionAttributes(
                     "Session",
@@ -74,7 +73,6 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             "replaySession");
 
         builder
-            .AddOption(StoreOption())
             .AddOption(SessionIdOption(isRequired: true))
             .AddOption(
                 "mode",
@@ -152,11 +150,10 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
             "querySessions");
 
         builder
-            .AddOption(StoreOption())
             .AddOption(
-                "name",
+                "sessionName",
                 OptionValueKind.Text,
-                displayName: "Name",
+                displayName: "Session Name",
                 helperText: "Default exact session name filter.",
                 attributes: OptionAttributes(
                     "Filtering",
@@ -228,11 +225,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 order: 1,
                 summary: "Completed or failed session query result.",
                 valueType: "FlowResult<SessionQueryOutcome>",
-                isPrimary: true)
-            .AddAttribute("omittedOptions", "emitSessionOutputs")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "Canonical session.query returns matching metadata in one result; use an explicit typed compatibility registration for the released Sessions branch.");
+                isPrimary: true);
 
         return builder.Build();
     }
@@ -260,7 +253,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 isRequired: true,
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Store,
-                    keyPattern: "session-store:{name}"))
+                    keyPattern: "Resources.{name}"))
             .AddResource(
                 SessionsCompositionResourceNames.Clock,
                 displayName: "Clock",
@@ -269,19 +262,7 @@ public sealed class SessionsComponentDesignMetadataProvider : IComponentDesignMe
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
-
-    private static OptionDesignMetadata StoreOption() => new()
-    {
-        Name = new ComponentOptionName("store"),
-        Kind = OptionValueKind.Text,
-        DisplayName = new ComponentMetadataText("Store"),
-        HelperText = new ComponentMetadataText("Diagnostic store metadata; DI selection uses the required host-owned store resource."),
-        Attributes = OptionAttributeMap(
-            "Diagnostics",
-            OptionDesignMetadataAttributeValues.Advanced,
-            OptionDesignMetadataAttributeValues.Text)
-    };
+                    keyPattern: "Resources.{name}"));
 
     private static OptionDesignMetadata SessionIdOption(bool isRequired) => new()
     {

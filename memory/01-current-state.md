@@ -8,7 +8,8 @@ Date: 2026-07-23
   `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
-  canonical family consolidations through State and Expectations. The
+  canonical family consolidations through State, Expectations, and Sessions.
+  The
   provider-neutral MQTT vertical slice and the bounded normal component-family
   migrations through Sessions,
   canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
@@ -342,18 +343,18 @@ Date: 2026-07-23
   preflight/dry-runs, and a combined package-only consumer passed; package
   validation reports only documented major removals. See
   `244-storage-canonical-consolidation.md`.
-- `FluxFlow.Components.Sessions` is now `4.0.0` locally with canonical exact
-  FlowContent recorder/replay contracts, stable normal result kinds/errors,
-  strong lineage, and a private versioned JSON-compatible envelope over the
-  released object payload boundary. Missing sessions, malformed records,
-  validation failures, and store failures remain ordinary data; released typed
-  nodes and host-owned store/factory contracts remain available. Sessions
-  Composition is now `2.2.0` with canonical fixed one-output ports, no
-  universal Errors surface, explicit typed compatibility registrations, and
-  updated Designer metadata. Focused/full tests, controlled builds,
-  zero-warning affected rebuilds, binary compatibility, preflight/dry-runs,
-  and a package-only consumer passed. See
-  `233-vnext-sessions-flowcontent-results.md`.
+- `FluxFlow.Components.Sessions` is now `5.0.0` locally with one concise
+  exact-content recorder, replay, and query contract. Normal outcomes and
+  expected failures use one `FlowResult<T>` Output plus Events; exact bytes,
+  private store envelopes, lifecycle, pacing, filtering, clocks, diagnostics,
+  fan-out, and lineage are preserved. Direct-result and temporary canonical
+  nodes, numeric errors, Errors/Sessions branches, aggregate/dead options, and
+  typed Composition registrations are removed. The neutral store/factory
+  adapter boundary remains public. Sessions Composition is now `3.0.0` with
+  fixed ports and exact `Resources.{name}` store/clock addresses. Focused and
+  shared tests, controlled builds, expected major API diagnostics, 58-package
+  source seeding, preflight/dry-runs, and a package-only consumer passed. See
+  `250-sessions-canonical-consolidation.md`.
 - `FluxFlow.Components.Resources`, `FluxFlow.Components.Secrets`, and
   `FluxFlow.Components.Configuration` are now `2.0.0` locally. Resource and
   secret names use canonical nested `Resources...` application addresses,

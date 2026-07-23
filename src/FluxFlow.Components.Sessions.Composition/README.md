@@ -10,14 +10,14 @@ alias; new definitions and Designer palettes use `session.record`.
 ## Registration
 
 ```csharp
-services.AddKeyedSingleton<ISessionStoreFactory>("sessions", sessionStoreFactory);
+services.AddKeyedSingleton<ISessionStoreFactory>(
+    "Resources.Sessions.Primary",
+    sessionStoreFactory);
 
-services
-    .AddFluxFlowComposition(configuration)
-    .RegisterNodes(registry => registry
-        .RegisterSessionRecorder()
-        .RegisterSessionReplay()
-        .RegisterSessionQuery());
+var registry = new CompositionNodeRegistry()
+    .RegisterSessionRecorder()
+    .RegisterSessionReplay()
+    .RegisterSessionQuery();
 ```
 
 | Type | Canonical ports |
@@ -56,6 +56,7 @@ on `Kind`, `IsError`, `Error.Code`, or value fields.
         "Type": "session.record",
         "sessionId": "run-42",
         "store": "Resources.Sessions.Primary",
+        "sessionName": "order intake",
         "Output": ["HandleResult.Input", "Audit.Input"]
       },
       "HandleResult": {
@@ -75,39 +76,24 @@ request construction. A recorder command must be built explicitly from
 upstream FlowContent. Resource addresses use the host application address
 framework.
 
-The `store` resource is required. Direct keyed stores remain host-owned;
+The `store` resource property is required and is the only store selector.
+Direct keyed stores remain host-owned;
 factory leases are opened during composition build and disposed with composed
 nodes. The optional `clock` resource controls deterministic timestamps and
-replay pacing. The similarly named `store` option remains diagnostic metadata
-and does not select a DI resource.
-
-## Typed Compatibility
-
-Register released typed contracts under distinct caller-selected node types:
-
-```csharp
-registry
-    .RegisterSessionRecordOutput("session.record.typed")
-    .RegisterSessionReplayRecords("session.replay.typed")
-    .RegisterSessionQueryResultBranches("session.query.typed");
-```
-
-Compatibility nodes retain Errors and Events; typed query also retains the
-`Sessions` branch. Requiring explicit type names prevents a compatibility
-registration from silently replacing canonical defaults.
+replay pacing. Both resource values use exact canonical addresses such as
+`Resources.Sessions.Primary`; metadata does not infer prefixed DI keys.
 
 ## Design Metadata
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
 The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
+`processing` profile picker, and omits low-level `boundedCapacity` plus
+inherited identity/concurrency fields from normal editing. Default execution
+requires no processing profile; domain options such as `sessionName`, replay
+pacing, and query filters remain available through provider metadata.
 
 
 `SessionsComponentDesignMetadataProvider` describes canonical fixed ports,
-option section/importance/editor hints, the omitted typed-only
-`emitSessionOutputs` control, and host-owned picker hints for `store` and
-`clock`. Metadata does not create stores, open leases, execute nodes, or own
-runtime state.
+option section/importance/editor hints, and host-owned picker hints for `store`
+and `clock`. Metadata does not create stores, open leases, execute nodes, or
+own runtime state.

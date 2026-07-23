@@ -43,7 +43,7 @@ Status values:
 | Metrics | `FluxFlow.Components.Metrics` | yes | `FluxFlow.Components.Metrics.Composition` | yes | yes | canonical typed-sample/result snapshots aligned; direct-result runtime retained for compatibility |
 | Projections | `FluxFlow.Components.Projections` | yes | `FluxFlow.Components.Projections.Composition` | yes | yes | canonical typed-event/result snapshots aligned; direct-result runtime retained for compatibility |
 | Expectations | `FluxFlow.Components.Expectations` | yes | `FluxFlow.Components.Expectations.Composition` | yes | yes | canonical projection-event/result contract consolidated |
-| Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | aligned |
+| Sessions | `FluxFlow.Components.Sessions` | yes | `FluxFlow.Components.Sessions.Composition` | yes | yes | canonical exact-content/result contract consolidated |
 | State | `FluxFlow.Components.State` | yes | `FluxFlow.Components.State.Composition` | yes | yes | canonical FlowValue command/result contract consolidated |
 | Storage | `FluxFlow.Components.Storage` | yes | `FluxFlow.Components.Storage.Composition` | yes | yes | aligned |
 

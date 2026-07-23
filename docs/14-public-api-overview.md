@@ -928,10 +928,15 @@ Main types:
 Related base Sessions types:
 
 - `SessionStoreServiceCollectionExtensions`
+- `ISessionStore`
 - `ISessionStoreFactory`
 - `SessionStoreContext`
 - `SessionStoreLease`
-- `SessionComponentOptions`
+- `SessionRecordInput`
+- `SessionRecord`
+- `SessionContentRecordInput`
+- `SessionContentRecord`
+- `SessionQueryOutcome`
 
 Use `RegisterSessionRecorder()`, `RegisterSessionReplay()`, and
 `RegisterSessionQuery()` from the optional
@@ -945,17 +950,25 @@ Invalid session option values fail during composition build through the factory
 path, so hosts that collect build diagnostics receive `FactoryFailed` entries
 instead of a partially created runtime.
 
+Sessions `5.x` exposes one maintained node set: `SessionRecorderNode` accepts
+`SessionContentRecordInput`, `SessionReplayNode` emits exact-content records as
+a source, and `SessionQueryNode` accepts `SessionQueryRequest`. Their successful
+and expected failure outcomes use one `FlowResult<T>` Output plus Events; there
+is no typed-node compatibility layer, query branch, numeric error-code surface,
+or universal Errors port. `SessionRecordInput` and `SessionRecord` remain the
+stable object-valued store adapter boundary rather than alternate node ports.
+
 `SessionsComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the three session composition nodes, including existing session options and fixed
 ports, plus resource hints for the required `store` resource and optional
 `clock` resource. The `store` resource may point at either a keyed
-`ISessionStore` or keyed `ISessionStoreFactory`; the `store` option is
-diagnostic/config metadata, not DI selection. The provider authors that
-metadata through the shared validated Designer metadata builder.
+`ISessionStore` or keyed `ISessionStoreFactory`; it is the only store selector.
+Both picker patterns use exact `Resources.{name}` addresses. The provider
+authors that metadata through the shared validated Designer metadata builder.
 
-The base Sessions package owns the neutral store factory, context, lease,
-component option, and keyed DI registration helpers used by direct hosts and
-composition adapters; it still does not own any concrete persistence backend.
+The base Sessions package owns the neutral store contracts, factory, context,
+lease, and keyed DI registration helpers used by direct hosts and composition
+adapters; it still does not own any concrete persistence backend.
 
 ## Projections Composition
 

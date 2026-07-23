@@ -4,7 +4,6 @@ namespace FluxFlow.Components.Sessions.Options;
 
 public sealed record SessionReplayOptions
 {
-    private string? _store;
     private string? _sessionId;
     private SessionReplayMode _mode = SessionReplayMode.Instant;
     private int _boundedCapacity = 128;
@@ -12,12 +11,6 @@ public sealed record SessionReplayOptions
     private int? _maxMessages;
     private double _fixedIntervalMilliseconds = 1000;
     private double _speedMultiplier = 1;
-
-    public string? Store
-    {
-        get => _store;
-        init => _store = SessionOptionValidation.Normalize(value);
-    }
 
     public string? SessionId
     {

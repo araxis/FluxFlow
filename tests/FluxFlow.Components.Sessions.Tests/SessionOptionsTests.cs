@@ -9,69 +9,6 @@ namespace FluxFlow.Components.Sessions.Tests;
 public sealed class SessionOptionsTests
 {
     [Fact]
-    public async Task UseStore_rejects_null_lease_from_delegate()
-    {
-        var options = new SessionComponentOptions()
-            .UseStore((_, _) => ValueTask.FromResult<SessionStoreLease>(null!));
-
-        var act = async () => await options.StoreFactory.OpenAsync(new SessionStoreContext());
-
-        var exception = await act.ShouldThrowAsync<InvalidOperationException>();
-        exception.Message.ShouldBe("Session store factory delegate returned a null lease.");
-    }
-
-    [Fact]
-    public async Task UseSharedStore_rejects_null_store_from_delegate()
-    {
-        var options = new SessionComponentOptions()
-            .UseSharedStore(_ => null!);
-
-        var act = async () => await options.StoreFactory.OpenAsync(new SessionStoreContext());
-
-        var exception = await act.ShouldThrowAsync<InvalidOperationException>();
-        exception.Message.ShouldBe("Shared session store factory returned null.");
-    }
-
-    [Fact]
-    public async Task UseStore_rejects_null_context_before_invoking_delegate()
-    {
-        var invoked = false;
-        var options = new SessionComponentOptions()
-            .UseStore((_, _) =>
-            {
-                invoked = true;
-                return ValueTask.FromResult(SessionStoreLease.Shared(new EmptySessionStore()));
-            });
-
-        var act = async () => await options.StoreFactory.OpenAsync(null!);
-
-        await act.ShouldThrowAsync<ArgumentNullException>();
-        invoked.ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task UseStore_receives_normalized_context_values()
-    {
-        SessionStoreContext? received = null;
-        var options = new SessionComponentOptions()
-            .UseStore((context, _) =>
-            {
-                received = context;
-                return ValueTask.FromResult(SessionStoreLease.Shared(new EmptySessionStore()));
-            });
-
-        await using var lease = await options.StoreFactory.OpenAsync(new SessionStoreContext
-        {
-            StoreName = " tenant-a ",
-            SessionId = " session-1 "
-        });
-
-        received.ShouldNotBeNull();
-        received.StoreName.ShouldBe("tenant-a");
-        received.SessionId.ShouldBe("session-1");
-    }
-
-    [Fact]
     public void SessionStoreContext_normalizes_blank_values_and_null_clock()
     {
         var context = new SessionStoreContext
@@ -187,9 +124,8 @@ public sealed class SessionOptionsTests
 
         var options = new SessionRecorderOptions
         {
-            Store = " store ",
             SessionId = " session-1 ",
-            Name = " sample ",
+            SessionName = " sample ",
             Notes = " note ",
             Tags = tags,
             BoundedCapacity = 4
@@ -197,9 +133,8 @@ public sealed class SessionOptionsTests
         tags["tenant"] = "changed";
         tags["new"] = "value";
 
-        options.Store.ShouldBe("store");
         options.SessionId.ShouldBe("session-1");
-        options.Name.ShouldBe("sample");
+        options.SessionName.ShouldBe("sample");
         options.Notes.ShouldBe("note");
         options.Tags.Comparer.ShouldBe(StringComparer.Ordinal);
         options.Tags["tenant"].ShouldBe("north");
@@ -212,7 +147,6 @@ public sealed class SessionOptionsTests
     {
         var options = new SessionReplayOptions
         {
-            Store = " store ",
             SessionId = " session-1 ",
             Mode = SessionReplayMode.FixedInterval,
             BoundedCapacity = 4,
@@ -222,7 +156,6 @@ public sealed class SessionOptionsTests
             SpeedMultiplier = 2
         };
 
-        options.Store.ShouldBe("store");
         options.SessionId.ShouldBe("session-1");
         options.Mode.ShouldBe(SessionReplayMode.FixedInterval);
         options.BoundedCapacity.ShouldBe(4);
@@ -255,8 +188,7 @@ public sealed class SessionOptionsTests
 
         var options = new SessionQueryOptions
         {
-            Store = " store ",
-            Name = " exact ",
+            SessionName = " exact ",
             NamePrefix = " pre ",
             Tags = tags,
             Limit = 10,
@@ -265,8 +197,7 @@ public sealed class SessionOptionsTests
         tags["kind"] = "changed";
         tags["new"] = "value";
 
-        options.Store.ShouldBe("store");
-        options.Name.ShouldBe("exact");
+        options.SessionName.ShouldBe("exact");
         options.NamePrefix.ShouldBe("pre");
         options.Tags.Comparer.ShouldBe(StringComparer.Ordinal);
         options.Tags["kind"].ShouldBe("demo");
@@ -285,35 +216,29 @@ public sealed class SessionOptionsTests
     {
         var recorder = new SessionRecorderOptions
         {
-            Store = " ",
             SessionId = "\t",
-            Name = "\r\n",
+            SessionName = "\r\n",
             Notes = " ",
             Tags = null!
         };
         var replay = new SessionReplayOptions
         {
-            Store = " ",
             SessionId = "\t"
         };
         var query = new SessionQueryOptions
         {
-            Store = " ",
-            Name = "\t",
+            SessionName = "\t",
             NamePrefix = "\r\n",
             Tags = null!
         };
 
-        recorder.Store.ShouldBeNull();
         recorder.SessionId.ShouldBeNull();
-        recorder.Name.ShouldBeNull();
+        recorder.SessionName.ShouldBeNull();
         recorder.Notes.ShouldBeNull();
         recorder.Tags.ShouldBeEmpty();
         recorder.Tags.Comparer.ShouldBe(StringComparer.Ordinal);
-        replay.Store.ShouldBeNull();
         replay.SessionId.ShouldBeNull();
-        query.Store.ShouldBeNull();
-        query.Name.ShouldBeNull();
+        query.SessionName.ShouldBeNull();
         query.NamePrefix.ShouldBeNull();
         query.Tags.ShouldBeEmpty();
         query.Tags.Comparer.ShouldBe(StringComparer.Ordinal);

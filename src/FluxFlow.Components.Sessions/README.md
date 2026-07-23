@@ -9,9 +9,9 @@ runtime, or engine.
 
 | Node | Input | Output |
 |------|-------|--------|
-| `SessionContentRecorderNode` | `SessionContentRecordInput` | `FlowResult<SessionContentRecord>` |
-| `SessionContentReplayNode` | source | `FlowResult<SessionContentRecord>` |
-| `SessionContentQueryNode` | `SessionQueryRequest` | `FlowResult<SessionQueryOutcome>` |
+| `SessionRecorderNode` | `SessionContentRecordInput` | `FlowResult<SessionContentRecord>` |
+| `SessionReplayNode` | source | `FlowResult<SessionContentRecord>` |
+| `SessionQueryNode` | `SessionQueryRequest` | `FlowResult<SessionQueryOutcome>` |
 
 Every canonical node exposes Events and Completion. Recorder and query have one
 Input and one broadcast Output. Replay has one broadcast Output and is started
@@ -21,8 +21,12 @@ stable `SessionResultKinds` and `SessionErrorCodeNames`.
 
 ```csharp
 ISessionStore store = ...; // opened and owned by the host
-await using var recorder = new SessionContentRecorderNode(
-    new SessionRecorderOptions { SessionId = "run-42" },
+await using var recorder = new SessionRecorderNode(
+    new SessionRecorderOptions
+    {
+        SessionId = "run-42",
+        SessionName = "order intake"
+    },
     store);
 
 var results = new BufferBlock<FlowMessage<FlowResult<SessionContentRecord>>>();
@@ -56,18 +60,18 @@ depend on that private envelope.
 
 ## Replay And Query
 
-`SessionContentReplayNode` preserves stored content bytes, content type,
+`SessionReplayNode` preserves stored content bytes, content type,
 encoding, metadata, and record order. Each replay output mints fresh source
 identity. Missing sessions, source-read failures, and malformed stored records
 are normal failure results; malformed records do not prevent later valid
 records from replaying. `Instant`, `FixedInterval`, `RealTime`, and `Multiplier`
 pacing remain available, with optional sequence and count limits.
 
-`SessionContentQueryNode` returns one `SessionQueryOutcome`. `Count` always
+`SessionQueryNode` returns one `SessionQueryOutcome`. `Count` always
 describes the matches; `EmitSessionsInResult` controls whether copied
-`SessionMetadata` entries are included. Store results are checked against the
-normalized filters and limit before emission. The typed-only
-`EmitSessionOutputs` branch option is not used by the canonical node.
+`SessionMetadata` entries are included. `SessionName` supplies the default exact
+name filter without colliding with the component key-derived identity. Store
+results are checked against the normalized filters and limit before emission.
 
 ## Ownership
 
@@ -84,19 +88,12 @@ services
     .AddFluxFlowSessionStoreFactory("session-factory", sessionStoreFactory);
 ```
 
-## Typed Compatibility
+## Store Boundary
 
-The released typed nodes and contracts remain available:
-
-- `SessionRecorderNode`: `SessionRecordInput` to `SessionRecord`
-- `SessionReplayNode`: source of `SessionRecord`
-- `SessionQueryNode`: `SessionQueryRequest` to `SessionQueryResult`, plus
-  `Sessions`
-
-Those nodes retain their `FluxFlow.Nodes.FlowError` Errors ports and the query
-branch. Their object-valued payload boundary remains unchanged. New workflows
-should use canonical content nodes so byte ownership and operation failures are
-explicit.
+`SessionRecordInput` and `SessionRecord` remain the neutral object-valued
+contracts implemented by session-store adapters. They are not alternate node
+inputs or outputs. The nodes encode and decode a private exact-content envelope
+at that boundary so adapter packages do not depend on `FlowContent` internals.
 
 ## Composition
 

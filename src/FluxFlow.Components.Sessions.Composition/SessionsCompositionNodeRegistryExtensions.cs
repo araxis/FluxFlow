@@ -79,7 +79,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
-            var node = new SessionContentRecorderNode(options, store.Store, clock);
+            var node = new SessionRecorderNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,
@@ -114,7 +114,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, options.SessionId).ConfigureAwait(false);
         try
         {
-            var node = new SessionContentReplayNode(options, store.Store, clock);
+            var node = new SessionReplayNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,
@@ -143,7 +143,7 @@ public static class SessionsCompositionNodeRegistryExtensions
         var store = await ResolveStoreAsync(context, sessionId: null).ConfigureAwait(false);
         try
         {
-            var node = new SessionContentQueryNode(options, store.Store, clock);
+            var node = new SessionQueryNode(options, store.Store, clock);
 
             return ComposedNode.Create(
                 node,

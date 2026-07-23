@@ -32,11 +32,4 @@ internal static class SessionContractNormalization
                 Attributes = CopyMap(input.Attributes)
             };
 
-    public static IReadOnlyList<SessionMetadata> CopySessions(
-        IEnumerable<SessionMetadata>? sessions)
-        => sessions is null
-            ? []
-            : sessions
-                .Select(session => CopySession(session)!)
-                .ToArray();
 }

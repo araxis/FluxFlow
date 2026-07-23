@@ -581,6 +581,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `249-expectations-canonical-consolidation.md`: single projection-event
   Expectations contract, exact-once timeout/completion publication, removed
   direct-result compatibility, and package/compatibility evidence.
+- `250-sessions-canonical-consolidation.md`: concise exact-content Sessions
+  nodes, retained store-adapter boundary, removed typed node/branch/error
+  compatibility, major package versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.
