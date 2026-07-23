@@ -4,14 +4,19 @@ using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Routing.Composition;
 using FluxFlow.Components.Routing.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Routing.Composition.Tests;
 
@@ -510,56 +515,38 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_switch_resolves_selector_and_exposes_configured_ports()
+    public async Task Canonical_factory_switch_resolves_selector_and_exposes_configured_ports()
     {
         var services = new ServiceCollection();
-        services.AddKeyedSingleton<Func<InputMessage, string?>>(
-            "route",
+        services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+            ApplicationAddress.Resource("route"),
             input => input.Route);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "switch",
-                    RoutingCompositionNodeTypes.Switch,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.RouteKeySelector, "route")
-                        .Configure("routes", new[] { "priority", "standard" })
-                        .Configure(
-                            "routeOutputs",
-                            new Dictionary<string, string>
-                            {
-                                ["priority"] = "Priority"
-                            })
-                        .Configure("emitRouteEnvelope", true)
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterSwitch<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
         await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var input = node.Descriptor.Inputs[RoutingCompositionPortNames.Input]
+        await using var node = await CreateNodeAsync(
+            provider,
+            RoutingCompositionNodeTypes.Switch,
+            Properties(
+                (RoutingCompositionResourceNames.RouteKeySelector, "Resources.route"),
+                ("routes", new[] { "priority", "standard" }),
+                ("routeOutputs", new Dictionary<string, string>
+                {
+                    ["priority"] = "Priority"
+                }),
+                ("emitRouteEnvelope", true),
+                ("boundedCapacity", 8)),
+            registry => registry.RegisterSwitch<InputMessage>());
+        var input = node.Inputs[RoutingCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var matched = node.Descriptor.Outputs[RoutingCompositionPortNames.Matched]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var defaults = node.Descriptor.Outputs[RoutingCompositionPortNames.Default]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var routed = node.Descriptor.Outputs[RoutingCompositionPortNames.Routed]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var priority = node.Descriptor.Outputs["Priority"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var outputResults = Link(output.Source);
-        var matchedResults = Link(matched.Source);
-        var defaultResults = Link(defaults.Source);
-        var routedResults = Link(routed.Source);
-        var priorityResults = Link(priority.Source);
+        var outputResults = Link(node.Outputs[RoutingCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var matchedResults = Link(node.Outputs[RoutingCompositionPortNames.Matched]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var defaultResults = Link(node.Outputs[RoutingCompositionPortNames.Default]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var routedResults = Link(node.Outputs[RoutingCompositionPortNames.Routed]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var priorityResults = Link(node.Outputs["Priority"]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
 
         var first = FlowMessage.Create(
             new InputMessage("priority", "A-100"),
@@ -568,23 +555,17 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
             new InputMessage("unknown", "A-101"),
             new CorrelationId("default"));
 
-        (await input.Target.SendAsync(first)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(second)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await input.Target.SendAsync(first).WaitAsync(Timeout)).ShouldBeTrue();
+        (await input.Target.SendAsync(second).WaitAsync(Timeout)).ShouldBeTrue();
 
-        (await outputResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(first.CorrelationId);
-        (await matchedResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(first.CorrelationId);
-        (await priorityResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).Payload.Id.ShouldBe("A-100");
-        (await defaultResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(second.CorrelationId);
+        (await outputResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(first.CorrelationId);
+        (await matchedResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(first.CorrelationId);
+        (await priorityResults.ReceiveAsync().WaitAsync(Timeout)).Payload.Id.ShouldBe("A-100");
+        (await defaultResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(second.CorrelationId);
         var routedMessages = new[]
         {
-            await routedResults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5)),
-            await routedResults.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5))
+            await routedResults.ReceiveAsync().WaitAsync(Timeout),
+            await routedResults.ReceiveAsync().WaitAsync(Timeout)
         };
         routedMessages.Select(message => message.CorrelationId).ShouldBe(
             [first.CorrelationId, second.CorrelationId],
@@ -592,141 +573,91 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
-    public async Task Hosted_fork_emits_to_configured_ports_and_output_alias()
+    public async Task Canonical_factory_fork_emits_to_configured_ports_and_output_alias()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "fork",
-                    RoutingCompositionNodeTypes.Fork,
-                    node => node
-                        .Configure("outputs", new[] { "Audit", "Work" })
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFork<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var input = node.Descriptor.Inputs[RoutingCompositionPortNames.Input]
+        await using var provider = new ServiceCollection().BuildServiceProvider();
+        await using var node = await CreateNodeAsync(
+            provider,
+            RoutingCompositionNodeTypes.Fork,
+            Properties(
+                ("outputs", new[] { "Audit", "Work" }),
+                ("boundedCapacity", 8)),
+            registry => registry.RegisterFork<InputMessage>());
+        var input = node.Inputs[RoutingCompositionPortNames.Input]
             .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var audit = node.Descriptor.Outputs["Audit"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var work = node.Descriptor.Outputs["Work"]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var outputResults = Link(output.Source);
-        var auditResults = Link(audit.Source);
-        var workResults = Link(work.Source);
+        var outputResults = Link(node.Outputs[RoutingCompositionPortNames.Output]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var auditResults = Link(node.Outputs["Audit"]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
+        var workResults = Link(node.Outputs["Work"]
+            .ShouldBeOfType<CompositionOutputPort<InputMessage>>().Source);
 
         var message = FlowMessage.Create(
             new InputMessage("work", "A-200"),
             new CorrelationId("forked"));
 
-        (await input.Target.SendAsync(message)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
 
-        (await outputResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(message.CorrelationId);
-        (await auditResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).Payload.Id.ShouldBe("A-200");
-        (await workResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(message.CorrelationId);
+        (await outputResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(message.CorrelationId);
+        (await auditResults.ReceiveAsync().WaitAsync(Timeout)).Payload.Id.ShouldBe("A-200");
+        (await workResults.ReceiveAsync().WaitAsync(Timeout)).CorrelationId.ShouldBe(message.CorrelationId);
     }
 
     [Fact]
     public async Task Hosted_merge_forwards_inputs_and_uses_keyed_clock_for_events()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T12:00:00Z");
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>(
-            "fixed",
-            new FakeTimeProvider(timestamp));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "merge",
-                    RoutingCompositionNodeTypes.Merge,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.Clock, "fixed")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterMerge<string>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Merge,
+            Properties(
+                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
+                ("boundedCapacity", 8)),
+            ["fixed"],
+            registry => registry.RegisterMerge<string>(),
+            services => services.AddExternalFluxFlowResource<TimeProvider>(
+                ApplicationAddress.Resource("fixed"),
+                new FakeTimeProvider(timestamp)));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var input = node.Descriptor.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<string>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<string>>();
-        var results = Link(output.Source);
-        var events = Link(node.Descriptor.Events.ShouldNotBeNull());
+        var ports = host.GetRequiredPorts();
+        var outputResult = ports.ReceiveAsync<string>(Port(RoutingCompositionPortNames.Output), Timeout);
+        var eventResult = ports.ReceiveAsync<CompositionComponentEvent>(Port(CompositionComponentEvents.PortName), Timeout);
         var message = FlowMessage.Create("value", new CorrelationId("merge"));
 
-        (await input.Target.SendAsync(message)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), message))
+            .IsAccepted.ShouldBeTrue();
 
-        (await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).CorrelationId.ShouldBe(message.CorrelationId);
-        (await events.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5))).Timestamp.ShouldBe(timestamp);
+        (await outputResult).Message.ShouldNotBeNull().CorrelationId.ShouldBe(message.CorrelationId);
+        (await eventResult).Message.ShouldNotBeNull().Payload.Timestamp.ShouldBe(timestamp);
     }
 
     [Fact]
     public async Task Hosted_window_binds_options_and_uses_keyed_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T12:30:00Z");
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>(
-            "fixed",
-            new FakeTimeProvider(timestamp));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "window",
-                    RoutingCompositionNodeTypes.Window,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.Clock, "fixed")
-                        .Configure("maxItems", 2)
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterWindow<int>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Window,
+            Properties(
+                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
+                ("maxItems", 2),
+                ("boundedCapacity", 8)),
+            ["fixed"],
+            registry => registry.RegisterWindow<int>(),
+            services => services.AddExternalFluxFlowResource<TimeProvider>(
+                ApplicationAddress.Resource("fixed"),
+                new FakeTimeProvider(timestamp)));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var input = node.Descriptor.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<int>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowWindow<int>>>();
-        var results = Link(output.Source);
+        var ports = host.GetRequiredPorts();
+        var outputResult = ports.ReceiveAsync<FlowWindow<int>>(Port(RoutingCompositionPortNames.Output), Timeout);
         var first = FlowMessage.Create(10, new CorrelationId("window"));
 
-        (await input.Target.SendAsync(first)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(FlowMessage.Create(20))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), first))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(20)))
+            .IsAccepted.ShouldBeTrue();
 
-        var window = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+        var window = (await outputResult).Message.ShouldNotBeNull();
 
         window.CorrelationId.ShouldBe(first.CorrelationId);
         window.Payload.Items.ShouldBe([10, 20]);
@@ -738,65 +669,50 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public async Task Hosted_correlation_resolves_selectors_and_routes_matches()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<Func<InputMessage, string?>>(
-            "key",
-            input => input.Id);
-        services.AddKeyedSingleton<Func<InputMessage, string?>>(
-            "side",
-            input => input.Route);
-        services.AddKeyedSingleton<TimeProvider>(
-            "fixed",
-            new FakeTimeProvider(timestamp));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "correlate",
-                    RoutingCompositionNodeTypes.Correlation,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
-                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
-                        .Resource(RoutingCompositionResourceNames.Clock, "fixed")
-                        .Configure("requestSide", "request")
-                        .Configure("responseSide", "response")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterCorrelation<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Correlation,
+            Properties(
+                (RoutingCompositionResourceNames.KeySelector, "Resources.key"),
+                (RoutingCompositionResourceNames.SideSelector, "Resources.side"),
+                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
+                ("requestSide", "request"),
+                ("responseSide", "response"),
+                ("boundedCapacity", 8)),
+            ["key", "side", "fixed"],
+            registry => registry.RegisterCorrelation<InputMessage>(),
+            services =>
+            {
+                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                    ApplicationAddress.Resource("key"),
+                    input => input.Id);
+                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                    ApplicationAddress.Resource("side"),
+                    input => input.Route);
+                services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    new FakeTimeProvider(timestamp));
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var input = node.Descriptor.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowCorrelationMatch<InputMessage>>>();
-        var matched = node.Descriptor.Outputs[RoutingCompositionPortNames.Matched]
-            .ShouldBeOfType<CompositionOutputPort<FlowCorrelationMatch<InputMessage>>>();
-        var timeouts = node.Descriptor.Outputs[RoutingCompositionPortNames.Timeouts]
-            .ShouldBeOfType<CompositionOutputPort<FlowCorrelationTimeout<InputMessage>>>();
-        var outputResults = Link(output.Source);
-        var matchedResults = Link(matched.Source);
-        var timeoutResults = Link(timeouts.Source);
+        var ports = host.GetRequiredPorts();
+        var outputResult = ports.ReceiveAsync<FlowCorrelationMatch<InputMessage>>(Port(RoutingCompositionPortNames.Output), Timeout);
+        var matchedResult = ports.ReceiveAsync<FlowCorrelationMatch<InputMessage>>(Port(RoutingCompositionPortNames.Matched), Timeout);
+        var timeoutObservation = (await ports.ObserveAsync<FlowCorrelationTimeout<InputMessage>>(Port(RoutingCompositionPortNames.Timeouts)))
+            .Observation.ShouldNotBeNull();
+        await using var timeoutScope = timeoutObservation;
         var request = FlowMessage.Create(
             new InputMessage("request", "A-300"),
             new CorrelationId("request"));
 
-        (await input.Target.SendAsync(request)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(FlowMessage.Create(
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), request))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(
                 new InputMessage("response", "A-300"),
-                new CorrelationId("response")))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+                new CorrelationId("response"))))
+            .IsAccepted.ShouldBeTrue();
 
-        var result = await outputResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        var aliasResult = await matchedResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+        var result = (await outputResult).Message.ShouldNotBeNull();
+        var aliasResult = (await matchedResult).Message.ShouldNotBeNull();
 
         result.CorrelationId.ShouldBe(request.CorrelationId);
         result.Payload.Key.ShouldBe("A-300");
@@ -804,64 +720,62 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         result.Payload.Response.Route.ShouldBe("response");
         result.Payload.MatchedAt.ShouldBe(timestamp);
         aliasResult.Payload.Key.ShouldBe("A-300");
-        timeoutResults.TryReceive(out _).ShouldBeFalse();
+        timeoutObservation.Messages
+            .ShouldBeAssignableTo<IReceivableSourceBlock<FlowMessage<FlowCorrelationTimeout<InputMessage>>>>()!
+            .TryReceive(out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
     public async Task Hosted_canonical_correlation_resolves_flow_value_selectors()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<Func<FlowValue, string?>>(
-            "key",
-            value => value.GetObject()["key"].GetString());
-        services.AddKeyedSingleton<Func<FlowValue, string?>>(
-            "side",
-            value => value.GetObject()["side"].GetString());
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "correlate",
-                    RoutingCompositionNodeTypes.Correlation,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
-                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
-                        .Configure("requestSide", "request")
-                        .Configure("responseSide", "response")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterCorrelation())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Correlation,
+            Properties(
+                (RoutingCompositionResourceNames.KeySelector, "Resources.key"),
+                (RoutingCompositionResourceNames.SideSelector, "Resources.side"),
+                ("requestSide", "request"),
+                ("responseSide", "response")),
+            ["key", "side"],
+            registry => registry.RegisterCorrelation(),
+            services =>
+            {
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                    ApplicationAddress.Resource("key"),
+                    value => value.GetObject()["key"].GetString());
+                services.AddExternalFluxFlowResource<Func<FlowValue, string?>>(
+                    ApplicationAddress.Resource("side"),
+                    value => value.GetObject()["side"].GetString());
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[RoutingCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
-        descriptor.Outputs.Keys.ShouldBe([
-            RoutingCompositionPortNames.Output,
-            CompositionComponentEvents.PortName
-        ], ignoreOrder: false);
-        var output = descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowCorrelationOutcome<FlowValue>>>>();
-        descriptor.Errors.ShouldBeNull();
-        var results = Link(output.Source);
+        var ports = host.GetRequiredPorts();
+        ports.Ports
+            .Where(port =>
+                port.Direction == ApplicationPortDirection.Output &&
+                port.Address.Kind == ApplicationAddressKind.WorkflowPort &&
+                port.Address.Segments[0] == "main" &&
+                port.Address.Segments[1] == "node")
+            .Select(port => port.Address.Segments[^1])
+            .ShouldBe([
+                CompositionComponentEvents.PortName,
+                RoutingCompositionPortNames.Output
+            ], ignoreOrder: false);
+        var outputResult = ports.ReceiveAsync<FlowResult<FlowCorrelationOutcome<FlowValue>>>(
+            Port(RoutingCompositionPortNames.Output),
+            Timeout);
         var request = FlowMessage.Create(
             RoutingItem("A-350", "request", "left"),
             new CorrelationId("request"));
 
-        (await input.Target.SendAsync(request)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(FlowMessage.Create(
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), request))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Input), FlowMessage.Create(
                 RoutingItem("A-350", "response", "right"),
-                new CorrelationId("response")))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+                new CorrelationId("response"))))
+            .IsAccepted.ShouldBeTrue();
 
-        var result = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+        var result = (await outputResult).Message.ShouldNotBeNull();
         result.CorrelationId.ShouldBe(request.CorrelationId);
         result.Payload.Kind.ShouldBe(RoutingResultKinds.Matched);
         result.Payload.Value
@@ -873,201 +787,145 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
     public async Task Hosted_join_resolves_selectors_and_routes_matches()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:30:00Z");
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<Func<LeftMessage, string?>>(
-            "left",
-            input => input.Key);
-        services.AddKeyedSingleton<Func<RightMessage, string?>>(
-            "right",
-            input => input.Key);
-        services.AddKeyedSingleton<TimeProvider>(
-            "fixed",
-            new FakeTimeProvider(timestamp));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "join",
-                    RoutingCompositionNodeTypes.Join,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.LeftKeySelector, "left")
-                        .Resource(RoutingCompositionResourceNames.RightKeySelector, "right")
-                        .Resource(RoutingCompositionResourceNames.Clock, "fixed")
-                        .Configure("boundedCapacity", 8)
-                        .Configure("timeoutMilliseconds", 5000)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterJoin<LeftMessage, RightMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Join,
+            Properties(
+                (RoutingCompositionResourceNames.LeftKeySelector, "Resources.left"),
+                (RoutingCompositionResourceNames.RightKeySelector, "Resources.right"),
+                (RoutingCompositionResourceNames.Clock, "Resources.fixed"),
+                ("boundedCapacity", 8),
+                ("timeoutMilliseconds", 5000)),
+            ["left", "right", "fixed"],
+            registry => registry.RegisterJoin<LeftMessage, RightMessage>(),
+            services =>
+            {
+                services.AddExternalFluxFlowResource<Func<LeftMessage, string?>>(
+                    ApplicationAddress.Resource("left"),
+                    input => input.Key);
+                services.AddExternalFluxFlowResource<Func<RightMessage, string?>>(
+                    ApplicationAddress.Resource("right"),
+                    input => input.Key);
+                services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    new FakeTimeProvider(timestamp));
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var node = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem();
-        var left = node.Descriptor.Inputs[RoutingCompositionPortNames.Left]
-            .ShouldBeOfType<CompositionInputPort<LeftMessage>>();
-        var right = node.Descriptor.Inputs[RoutingCompositionPortNames.Right]
-            .ShouldBeOfType<CompositionInputPort<RightMessage>>();
-        var output = node.Descriptor.Outputs[RoutingCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowJoinResult<LeftMessage, RightMessage>>>();
-        var timeouts = node.Descriptor.Outputs[RoutingCompositionPortNames.Timeouts]
-            .ShouldBeOfType<CompositionOutputPort<FlowJoinTimeout<LeftMessage, RightMessage>>>();
-        var results = Link(output.Source);
-        var timeoutResults = Link(timeouts.Source);
+        var ports = host.GetRequiredPorts();
+        var outputResult = ports.ReceiveAsync<FlowJoinResult<LeftMessage, RightMessage>>(
+            Port(RoutingCompositionPortNames.Output),
+            Timeout);
+        var timeoutObservation = (await ports.ObserveAsync<FlowJoinTimeout<LeftMessage, RightMessage>>(
+                Port(RoutingCompositionPortNames.Timeouts)))
+            .Observation.ShouldNotBeNull();
+        await using var timeoutScope = timeoutObservation;
         var leftMessage = FlowMessage.Create(
             new LeftMessage("A-400", "left"),
             new CorrelationId("left"));
 
-        (await left.Target.SendAsync(leftMessage)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await right.Target.SendAsync(FlowMessage.Create(
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Left), leftMessage))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(RoutingCompositionPortNames.Right), FlowMessage.Create(
                 new RightMessage("A-400", "right"),
-                new CorrelationId("right")))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+                new CorrelationId("right"))))
+            .IsAccepted.ShouldBeTrue();
 
-        var result = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+        var result = (await outputResult).Message.ShouldNotBeNull();
 
         result.CorrelationId.ShouldBe(leftMessage.CorrelationId);
         result.Payload.Key.ShouldBe("A-400");
         result.Payload.Left.Payload.ShouldBe("left");
         result.Payload.Right.Payload.ShouldBe("right");
         result.Payload.JoinedAt.ShouldBe(timestamp);
-        timeoutResults.TryReceive(out _).ShouldBeFalse();
+        timeoutObservation.Messages
+            .ShouldBeAssignableTo<IReceivableSourceBlock<FlowMessage<FlowJoinTimeout<LeftMessage, RightMessage>>>>()!
+            .TryReceive(out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
     public async Task Missing_required_selector_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "switch",
-                    RoutingCompositionNodeTypes.Switch,
-                    node => node.Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterSwitch<InputMessage>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Switch,
+            Properties(("boundedCapacity", 8)),
+            null,
+            registry => registry.RegisterSwitch<InputMessage>());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                RoutingCompositionResourceNames.RouteKeySelector,
-                StringComparison.Ordinal));
+        AssertPreparationFailure(host, RoutingCompositionResourceNames.RouteKeySelector);
     }
 
     [Fact]
     public async Task Invalid_dynamic_output_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "fork",
-                    RoutingCompositionNodeTypes.Fork,
-                    node => node.Configure("outputs", new[] { "Output" })))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFork<InputMessage>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartNodeAsync(
+            RoutingCompositionNodeTypes.Fork,
+            Properties(("outputs", new[] { "Output" })),
+            null,
+            registry => registry.RegisterFork<InputMessage>());
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("built-in", StringComparison.OrdinalIgnoreCase));
+        AssertPreparationFailure(host, "built-in");
     }
 
     [Fact]
     public async Task Invalid_routing_options_surface_factory_diagnostic()
     {
         await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "switch",
-                    RoutingCompositionNodeTypes.Switch,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.RouteKeySelector, "route")
-                        .Configure("boundedCapacity", 0)))
-                .Build(),
-            services => services.AddKeyedSingleton<Func<InputMessage, string?>>(
-                "route",
+            RoutingCompositionNodeTypes.Switch,
+            Properties(
+                (RoutingCompositionResourceNames.RouteKeySelector, "Resources.route"),
+                ("boundedCapacity", 0)),
+            ["route"],
+            services => services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                ApplicationAddress.Resource("route"),
                 input => input.Route),
             registry => registry.RegisterSwitch<InputMessage>(),
-            "boundedCapacity");
+            "BoundedCapacity");
 
         await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "fork",
-                    RoutingCompositionNodeTypes.Fork,
-                    node => node
-                        .Configure("outputs", new[] { "Audit" })
-                        .Configure("inputType", " ")))
-                .Build(),
+            RoutingCompositionNodeTypes.Fork,
+            Properties(
+                ("outputs", new[] { "Audit" }),
+                ("inputType", " ")),
+            null,
             null,
             registry => registry.RegisterFork<InputMessage>(),
-            "inputType");
+            "InputType");
 
         await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "merge",
-                    RoutingCompositionNodeTypes.Merge,
-                    node => node.Configure("boundedCapacity", 0)))
-                .Build(),
+            RoutingCompositionNodeTypes.Merge,
+            Properties(("boundedCapacity", 0)),
+            null,
             null,
             registry => registry.RegisterMerge<InputMessage>(),
-            "boundedCapacity");
+            "BoundedCapacity");
 
         await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "window",
-                    RoutingCompositionNodeTypes.Window,
-                    node => node.Configure("maxItems", -1)))
-                .Build(),
+            RoutingCompositionNodeTypes.Window,
+            Properties(("maxItems", -1)),
+            null,
             null,
             registry => registry.RegisterWindow<InputMessage>(),
-            "maxItems");
+            "MaxItems");
 
         await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "correlate",
-                    RoutingCompositionNodeTypes.Correlation,
-                    node => node
-                        .Resource(RoutingCompositionResourceNames.KeySelector, "key")
-                        .Resource(RoutingCompositionResourceNames.SideSelector, "side")
-                        .Configure("timeoutMilliseconds", 0)))
-                .Build(),
+            RoutingCompositionNodeTypes.Correlation,
+            Properties(
+                (RoutingCompositionResourceNames.KeySelector, "Resources.key"),
+                (RoutingCompositionResourceNames.SideSelector, "Resources.side"),
+                ("timeoutMilliseconds", 0)),
+            ["key", "side"],
             services =>
             {
-                services.AddKeyedSingleton<Func<InputMessage, string?>>(
-                    "key",
+                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                    ApplicationAddress.Resource("key"),
                     input => input.Id);
-                services.AddKeyedSingleton<Func<InputMessage, string?>>(
-                    "side",
+                services.AddExternalFluxFlowResource<Func<InputMessage, string?>>(
+                    ApplicationAddress.Resource("side"),
                     input => input.Route);
             },
             registry => registry.RegisterCorrelation<InputMessage>(),
-            "timeoutMilliseconds");
+            "TimeoutMilliseconds");
     }
 
     private static Dictionary<string, ComponentDesignMetadata> MetadataByType()
@@ -1209,33 +1067,70 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
     private static async Task AssertFactoryDiagnosticAsync(
-        CompositionDefinition definition,
-        Action<IServiceCollection>? configureServices,
+        string componentType,
+        IReadOnlyDictionary<string, object?> properties,
+        IReadOnlyList<string>? resources,
+        Action<IServiceCollection>? configureRuntimeServices,
         Action<CompositionNodeRegistry> registerNodes,
         string expectedMessage)
     {
-        var services = new ServiceCollection();
-        configureServices?.Invoke(services);
-        services
-            .AddFluxFlowComposition(definition)
-            .RegisterNodes(registerNodes)
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartNodeAsync(
+            componentType,
+            properties,
+            resources,
+            registerNodes,
+            configureRuntimeServices);
+        AssertPreparationFailure(host, expectedMessage);
+    }
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
+    private static ValueTask<CanonicalApplicationTestHost> StartNodeAsync(
+        string componentType,
+        IReadOnlyDictionary<string, object?> properties,
+        IReadOnlyList<string>? resources,
+        Action<CompositionNodeRegistry> registerNodes,
+        Action<IServiceCollection>? configureRuntimeServices = null)
+        => CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(componentType, properties, resources),
+            registerNodes,
+            configureRuntimeServices: configureRuntimeServices is null
+                ? null
+                : context => configureRuntimeServices(context.Services));
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase));
+    private static ApplicationAddress Port(string name)
+        => ApplicationAddress.WorkflowPort("main", "node", name);
+
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
+    {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
+    }
+
+    private static async ValueTask<ComposedNode> CreateNodeAsync(
+        IServiceProvider services,
+        string componentType,
+        IReadOnlyDictionary<string, object?> properties,
+        Action<CompositionNodeRegistry> registerNodes)
+    {
+        var registry = new CompositionNodeRegistry();
+        registerNodes(registry);
+        var component = SingleComponent(componentType, properties)
+            .Workflows["main"]
+            .Components["node"];
+        return await registry.Registrations[componentType].Factory(
+            new CompositionNodeFactoryContext(
+                services,
+                "main",
+                "node",
+                component));
     }
 
     private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
@@ -1244,6 +1139,8 @@ public sealed class RoutingCompositionNodeRegistryExtensionsTests
         source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
         return buffer;
     }
+
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     private static FlowValue RoutingItem(string key, string side, string value)
         => FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)

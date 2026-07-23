@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluxFlow.Components.Mqtt.Client;
 using FluxFlow.Components.Mqtt.Composition;
 using FluxFlow.Components.Mqtt.Contracts;
@@ -5,12 +6,16 @@ using FluxFlow.Components.Mqtt.Events;
 using FluxFlow.Components.Mqtt.Subscriptions;
 using FluxFlow.Components.Mqtt.Transport;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Model;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
 
 var messages = new[]
 {
@@ -21,8 +26,8 @@ var messages = new[]
 var configurationPublished = await RunConfigurationCompositionAsync(messages);
 PrintPublished("configuration", configurationPublished);
 
-var fluentPublished = await RunFluentCompositionAsync(messages);
-PrintPublished("fluent", fluentPublished);
+var definitionPublished = await RunDefinitionApplicationAsync(messages);
+PrintPublished("definition", definitionPublished);
 
 return 0;
 
@@ -34,58 +39,87 @@ static async Task<IReadOnlyList<MqttPublishMessage>> RunConfigurationComposition
         .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
         .Build();
 
-    return await RunHostedCompositionAsync(
+    return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowComposition(configuration));
+        services => services.AddFluxFlowApplication(configuration));
 }
 
-static async Task<IReadOnlyList<MqttPublishMessage>> RunFluentCompositionAsync(
+static async Task<IReadOnlyList<MqttPublishMessage>> RunDefinitionApplicationAsync(
     IReadOnlyList<SampleMessage> messages)
 {
-    var definition = CompositionDefinitionBuilder
-        .Create()
-        .Workflow("main", workflow => workflow
-            .Node("source", SampleNodeTypes.PublishSource)
-            .Node("outbound", MqttCompositionNodeTypes.Publish, node => node
-                .Resource(MqttCompositionResourceNames.Client, "memory")
-                .Configure("maximumPendingRequests", 16))
-            .Link("source.Output", "outbound.Input"))
-        .Build();
+    var definition = new ApplicationDefinition(
+        resources:
+        [
+            new("memory", new ResourceInstanceDefinition("host.external"))
+        ],
+        workflows:
+        [
+            new("main", new ApplicationWorkflowDefinition(
+            [
+                new("source", Component(
+                    SampleNodeTypes.PublishSource,
+                    (MqttCompositionPortNames.Output, "outbound.Input"))),
+                new("outbound", Component(
+                    MqttCompositionNodeTypes.Publish,
+                    (MqttCompositionResourceNames.Client, "Resources.memory"),
+                    ("maximumPendingRequests", 16)))
+            ]))
+        ]);
 
-    return await RunHostedCompositionAsync(
+    return await RunHostedApplicationAsync(
         messages,
-        services => services.AddFluxFlowComposition(definition));
+        services => services.AddFluxFlowApplication(definition));
 }
 
-static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedCompositionAsync(
+static async Task<IReadOnlyList<MqttPublishMessage>> RunHostedApplicationAsync(
     IReadOnlyList<SampleMessage> messages,
-    Func<IServiceCollection, CompositionHostingBuilder> addComposition)
+    Func<IServiceCollection, ApplicationHostingBuilder> addApplication)
 {
     var controller = new RecordingMqttController();
     var services = new ServiceCollection();
-    services.AddSingleton(new SampleMessages(messages));
-    services.AddKeyedSingleton<IMqttClientController>("memory", controller);
-
-    addComposition(services)
-        .RegisterNodes(RegisterSampleNodes);
+    addApplication(services)
+        .UseRuntimeAssembler(runtime => runtime
+            .RegisterNodes(RegisterSampleNodes)
+            .ConfigureServices(context =>
+            {
+                context.Services.AddSingleton(new SampleMessages(messages));
+                context.Services.AddExternalFluxFlowResource<IMqttClientController>(
+                    ApplicationAddress.Resource("memory"),
+                    controller);
+            }));
 
     await using var provider = services.BuildServiceProvider();
-    var hostedService = provider.GetServices<IHostedService>().Single();
-
-    await hostedService.StartAsync(CancellationToken.None);
-
-    var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-    await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-    await hostedService.StopAsync(CancellationToken.None);
-
-    if (host.Diagnostics.Count > 0)
+    var host = provider.GetRequiredService<IApplicationRevisionHost>();
+    var result = await host.StartApplicationAsync();
+    if (!result.Succeeded)
     {
         throw new InvalidOperationException(string.Join(
             Environment.NewLine,
-            host.Diagnostics.Select(diagnostic => diagnostic.Message)));
+            result.Update!.Failures.Select(failure => failure.Error.Message)));
     }
 
+    await WaitForPublishedAsync(controller, messages.Count, TimeSpan.FromSeconds(5));
+    await host.StopApplicationAsync();
     return controller.Published;
+}
+
+static ComponentDefinition Component(
+    string type,
+    params (string Name, object? Value)[] properties)
+    => new(
+        type,
+        properties.Select(property => KeyValuePair.Create(
+            property.Name,
+            JsonSerializer.SerializeToElement(property.Value))));
+
+static async Task WaitForPublishedAsync(
+    RecordingMqttController controller,
+    int expectedCount,
+    TimeSpan timeout)
+{
+    using var cancellation = new CancellationTokenSource(timeout);
+    while (controller.Published.Count < expectedCount)
+        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
 }
 
 static void RegisterSampleNodes(CompositionNodeRegistry registry)

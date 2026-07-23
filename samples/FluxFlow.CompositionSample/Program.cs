@@ -1,5 +1,11 @@
+using System.Text.Json;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Model;
+using FluxFlow.Engine.Hosting;
 using FluxFlow.Nodes;
+using Microsoft.Extensions.DependencyInjection;
+using ApplicationWorkflowDefinition = FluxFlow.Composition.Model.WorkflowDefinition;
 
 var collector = new StringCollector();
 
@@ -44,30 +50,46 @@ var registry = new CompositionNodeRegistry()
         },
         inputs: [CompositionPorts.Metadata<string>("Input")]);
 
-var definition = CompositionDefinitionBuilder
-    .Create()
-    .Workflow("main", workflow => workflow
-        .Node("source", "sample.source", node => node.Configure("messages", new[] { "alpha", "beta" }))
-        .Node("upper", "sample.uppercase")
-        .Node("sink", "sample.sink")
-        .Link("source.Output", "upper.Input")
-        .Link("upper.Output", "sink.Input"))
-    .Build();
+var definition = new ApplicationDefinition(
+    workflows:
+    [
+        new("main", new ApplicationWorkflowDefinition(
+        [
+            new("source", Component(
+                "sample.source",
+                ("messages", new[] { "alpha", "beta" }),
+                ("Output", "upper.Input"))),
+            new("upper", Component(
+                "sample.uppercase",
+                ("Output", "sink.Input"))),
+            new("sink", Component("sample.sink"))
+        ]))
+    ]);
 
-var result = await new CompositionRuntimeBuilder(registry).BuildAsync(definition);
-if (!result.Succeeded || result.Runtime is null)
-{
-    foreach (var diagnostic in result.Diagnostics)
+var services = new ServiceCollection();
+services
+    .AddFluxFlowApplication(definition)
+    .UseRuntimeAssembler(runtime => runtime.RegisterNodes(nodes =>
     {
-        Console.Error.WriteLine(diagnostic.Message);
+        foreach (var registration in registry.Registrations.Values)
+            nodes.Register(registration);
+    }));
+
+await using var provider = services.BuildServiceProvider();
+var host = provider.GetRequiredService<IApplicationRevisionHost>();
+var result = await host.StartApplicationAsync();
+if (!result.Succeeded)
+{
+    foreach (var failure in result.Update!.Failures)
+    {
+        Console.Error.WriteLine(failure.Error.Message);
     }
 
     return 1;
 }
 
-await using var runtime = result.Runtime;
-await runtime.StartAsync();
-await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+await WaitForItemsAsync(collector, expectedCount: 2, TimeSpan.FromSeconds(5));
+await host.StopApplicationAsync();
 
 foreach (var item in collector.Items)
 {
@@ -75,6 +97,25 @@ foreach (var item in collector.Items)
 }
 
 return 0;
+
+static ComponentDefinition Component(
+    string type,
+    params (string Name, object? Value)[] properties)
+    => new(
+        type,
+        properties.Select(property => KeyValuePair.Create(
+            property.Name,
+            JsonSerializer.SerializeToElement(property.Value))));
+
+static async Task WaitForItemsAsync(
+    StringCollector collector,
+    int expectedCount,
+    TimeSpan timeout)
+{
+    using var cancellation = new CancellationTokenSource(timeout);
+    while (collector.Items.Count < expectedCount)
+        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellation.Token);
+}
 
 internal sealed record SourceOptions
 {

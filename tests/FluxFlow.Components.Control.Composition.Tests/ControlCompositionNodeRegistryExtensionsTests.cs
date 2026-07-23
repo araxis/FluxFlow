@@ -4,14 +4,21 @@ using FluxFlow.Components.Control.Diagnostics;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Composition;
+using FluxFlow.Composition.Addressing;
 using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
+using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Control.Composition.Tests;
 
@@ -337,39 +344,23 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
                 var input = (InputMessage)context.Variables["input"]!;
                 return input.Value >= 10;
             });
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "input.Value >= 10")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                ("expression", "input.Value >= 10"),
+                ("boundedCapacity", 8)),
+            ["primary"],
+            registry => registry.RegisterFilter<InputMessage>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var runtime = host.Runtime.ShouldNotBeNull();
-        var filterNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = filterNode.Descriptor.Inputs[ControlCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var output = filterNode.Descriptor.Outputs[ControlCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var results = new BufferBlock<FlowMessage<InputMessage>>();
-        output.Source.LinkTo(
-            results,
-            new DataflowLinkOptions { PropagateCompletion = true });
-
+        var ports = host.GetRequiredPorts();
+        var observation = (await ports.ObserveAsync<InputMessage>(Port(ControlCompositionPortNames.Output)))
+            .Observation.ShouldNotBeNull();
+        await using var observationScope = observation;
         var rejected = FlowMessage.Create(
             new InputMessage(3),
             new CorrelationId("filter-rejected"));
@@ -377,19 +368,19 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             new InputMessage(12),
             new CorrelationId("filter-accepted"));
 
-        (await input.Target.SendAsync(rejected)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(accepted)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        input.Target.Complete();
+        (await ports.SendAsync(Port(ControlCompositionPortNames.Input), rejected))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(ControlCompositionPortNames.Input), accepted))
+            .IsAccepted.ShouldBeTrue();
 
-        var response = await results.ReceiveAsync()
+        var response = await observation.Messages.ReceiveAsync()
             .WaitAsync(TimeSpan.FromSeconds(5));
-        await host.Completion.WaitAsync(TimeSpan.FromSeconds(5));
-
         response.CorrelationId.ShouldBe(new CorrelationId("filter-accepted"));
         response.Payload.Value.ShouldBe(12);
-        results.TryReceive(out _).ShouldBeFalse();
+        observation.Messages
+            .ShouldBeAssignableTo<IReceivableSourceBlock<FlowMessage<InputMessage>>>()
+            .TryReceive(out _)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -401,44 +392,23 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
                 var input = (InputMessage)context.Variables["input"]!;
                 return input.Value >= 10;
             });
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "when",
-                    ControlCompositionNodeTypes.When,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "input.Value >= 10")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterWhen<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.When,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                ("expression", "input.Value >= 10"),
+                ("boundedCapacity", 8)),
+            ["primary"],
+            registry => registry.RegisterWhen<InputMessage>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var whenNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = whenNode.Descriptor.Inputs[ControlCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var whenTrue = whenNode.Descriptor.Outputs[ControlCompositionPortNames.WhenTrue]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var whenFalse = whenNode.Descriptor.Outputs[ControlCompositionPortNames.WhenFalse]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var output = whenNode.Descriptor.Outputs[ControlCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var trueResults = new BufferBlock<FlowMessage<InputMessage>>();
-        var falseResults = new BufferBlock<FlowMessage<InputMessage>>();
-        var outputResults = new BufferBlock<FlowMessage<InputMessage>>();
-        whenTrue.Source.LinkTo(trueResults);
-        whenFalse.Source.LinkTo(falseResults);
-        output.Source.LinkTo(outputResults);
-
+        var ports = host.GetRequiredPorts();
+        var trueResult = ports.ReceiveAsync<InputMessage>(Port(ControlCompositionPortNames.WhenTrue), TimeSpan.FromSeconds(5));
+        var falseResult = ports.ReceiveAsync<InputMessage>(Port(ControlCompositionPortNames.WhenFalse), TimeSpan.FromSeconds(5));
+        var outputResult = ports.ReceiveAsync<InputMessage>(Port(ControlCompositionPortNames.Output), TimeSpan.FromSeconds(5));
         var rejected = FlowMessage.Create(
             new InputMessage(3),
             new CorrelationId("when-false"));
@@ -446,18 +416,20 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
             new InputMessage(12),
             new CorrelationId("when-true"));
 
-        (await input.Target.SendAsync(rejected)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        (await input.Target.SendAsync(accepted)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
+        (await ports.SendAsync(Port(ControlCompositionPortNames.Input), rejected))
+            .IsAccepted.ShouldBeTrue();
+        (await ports.SendAsync(Port(ControlCompositionPortNames.Input), accepted))
+            .IsAccepted.ShouldBeTrue();
 
-        var falseResponse = await falseResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        var trueResponse = await trueResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-        var outputResponse = await outputResults.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
+        PortReceiveResult<InputMessage> falseReceive = await falseResult;
+        PortReceiveResult<InputMessage> trueReceive = await trueResult;
+        PortReceiveResult<InputMessage> outputReceive = await outputResult;
+        var falseResponse = falseReceive.Message;
+        var trueResponse = trueReceive.Message;
+        var outputResponse = outputReceive.Message;
+        falseResponse.ShouldNotBeNull();
+        trueResponse.ShouldNotBeNull();
+        outputResponse.ShouldNotBeNull();
         falseResponse.CorrelationId.ShouldBe(new CorrelationId("when-false"));
         falseResponse.Payload.Value.ShouldBe(3);
         trueResponse.CorrelationId.ShouldBe(new CorrelationId("when-true"));
@@ -470,45 +442,35 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
     public async Task Hosted_filter_binds_options_from_configuration()
     {
         var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "pass")
-                        .Configure("expressionName", "configured-filter")
-                        .Configure("inputType", "app.input")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<object>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                ("expression", "pass"),
+                ("expressionName", "configured-filter"),
+                ("inputType", "app.input"),
+                ("boundedCapacity", 8)),
+            ["primary"],
+            registry => registry.RegisterFilter<object>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        var ports = host.GetRequiredPorts();
+        var eventResult = ports.ReceiveAsync<CompositionComponentEvent>(
+            Port(CompositionComponentEvents.PortName),
+            TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(
+            Port(ControlCompositionPortNames.Input),
+            FlowMessage.Create<object>("value"))).IsAccepted.ShouldBeTrue();
 
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var filterNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = filterNode.Descriptor.Inputs[ControlCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<object>>();
-        var events = filterNode.Descriptor.Events.ShouldNotBeNull();
-        var eventSink = new BufferBlock<FlowEvent>();
-        events.LinkTo(eventSink);
-
-        (await input.Target.SendAsync(FlowMessage.Create<object>("value"))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var @event = await eventSink.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        @event.Attributes["inputType"].ShouldBe("app.input");
-        @event.Attributes["expressionName"].ShouldBe("configured-filter");
+        PortReceiveResult<CompositionComponentEvent> eventReceive = await eventResult;
+        var eventMessage = eventReceive.Message;
+        eventMessage.ShouldNotBeNull();
+        var @event = eventMessage.Payload;
+        @event.Attributes["inputType"].GetString().ShouldBe("app.input");
+        @event.Attributes["expressionName"].GetString().ShouldBe("configured-filter");
     }
 
     [Fact]
@@ -516,50 +478,39 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
     {
         var engine = new RecordingExpressionEngine(
             evaluate: (_, context, _) => context.Variables["matches"]);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services.AddKeyedSingleton<IFlowMapContextFactory<InputMessage>>(
-            "custom",
-            new CustomContextFactory(matches: true));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "when",
-                    ControlCompositionNodeTypes.When,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Resource(ControlCompositionResourceNames.ContextFactory, "custom")
-                        .Configure("expression", "matches")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterWhen<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.When,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                (ControlCompositionResourceNames.ContextFactory, "Resources.custom"),
+                ("expression", "matches"),
+                ("boundedCapacity", 8)),
+            ["primary", "custom"],
+            registry => registry.RegisterWhen<InputMessage>(),
+            services =>
+            {
+                services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                    ApplicationAddress.Resource("primary"),
+                    engine);
+                services.AddExternalFluxFlowResource<IFlowMapContextFactory<InputMessage>>(
+                    ApplicationAddress.Resource("custom"),
+                    new CustomContextFactory(matches: true));
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var whenNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = whenNode.Descriptor.Inputs[ControlCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var whenTrue = whenNode.Descriptor.Outputs[ControlCompositionPortNames.WhenTrue]
-            .ShouldBeOfType<CompositionOutputPort<InputMessage>>();
-        var results = new BufferBlock<FlowMessage<InputMessage>>();
-        whenTrue.Source.LinkTo(results);
-
+        var ports = host.GetRequiredPorts();
+        var receive = ports.ReceiveAsync<InputMessage>(
+            Port(ControlCompositionPortNames.WhenTrue),
+            TimeSpan.FromSeconds(5));
         var message = FlowMessage.Create(
             new InputMessage(1),
             new CorrelationId("custom-context"));
+        (await ports.SendAsync(Port(ControlCompositionPortNames.Input), message))
+            .IsAccepted.ShouldBeTrue();
 
-        (await input.Target.SendAsync(message)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var result = await results.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
+        PortReceiveResult<InputMessage> receiveResult = await receive;
+        var result = receiveResult.Message;
+        result.ShouldNotBeNull();
         result.CorrelationId.ShouldBe(new CorrelationId("custom-context"));
         result.Payload.Value.ShouldBe(1);
     }
@@ -569,171 +520,134 @@ public sealed class ControlCompositionNodeRegistryExtensionsTests
     {
         var timestamp = DateTimeOffset.Parse("2026-06-02T13:00:00Z");
         var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>("primary", engine);
-        services.AddKeyedSingleton<TimeProvider>(
-            "fixed",
-            new FakeTimeProvider(timestamp));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Resource(ControlCompositionResourceNames.Clock, "fixed")
-                        .Configure("expression", "pass")
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<InputMessage>())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                (ControlCompositionResourceNames.Clock, "Resources.fixed"),
+                ("expression", "pass"),
+                ("boundedCapacity", 8)),
+            ["primary", "fixed"],
+            registry => registry.RegisterFilter<InputMessage>(),
+            services =>
+            {
+                services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                    ApplicationAddress.Resource("primary"),
+                    engine);
+                services.AddExternalFluxFlowResource<TimeProvider>(
+                    ApplicationAddress.Resource("fixed"),
+                    new FakeTimeProvider(timestamp));
+            });
+        host.StartResult.Succeeded.ShouldBeTrue();
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        var ports = host.GetRequiredPorts();
+        var eventResult = ports.ReceiveAsync<CompositionComponentEvent>(
+            Port(CompositionComponentEvents.PortName),
+            TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(
+            Port(ControlCompositionPortNames.Input),
+            FlowMessage.Create(new InputMessage(1)))).IsAccepted.ShouldBeTrue();
 
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        var filterNode = host.Runtime.ShouldNotBeNull().Nodes.ShouldHaveSingleItem();
-        var input = filterNode.Descriptor.Inputs[ControlCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<InputMessage>>();
-        var events = filterNode.Descriptor.Events.ShouldNotBeNull();
-        var eventSink = new BufferBlock<FlowEvent>();
-        events.LinkTo(eventSink);
-
-        (await input.Target.SendAsync(FlowMessage.Create(new InputMessage(1)))
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-
-        var @event = await eventSink.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        @event.Timestamp.ShouldBe(timestamp);
+        PortReceiveResult<CompositionComponentEvent> eventReceive = await eventResult;
+        var eventMessage = eventReceive.Message;
+        eventMessage.ShouldNotBeNull();
+        eventMessage.Payload.Timestamp.ShouldBe(timestamp);
     }
 
     [Fact]
     public async Task Missing_engine_resource_reference_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node.Configure("expression", "pass")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties(("expression", "pass")),
+            null,
+            registry => registry.RegisterFilter<object>());
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(
-                ControlCompositionResourceNames.Engine,
-                StringComparison.Ordinal));
+        AssertPreparationFailure(host, ControlCompositionResourceNames.Engine);
     }
 
     [Fact]
     public async Task Invalid_filter_options_surface_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "pass")
-                        .Configure("boundedCapacity", 0)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                ("expression", "pass"),
+                ("boundedCapacity", 0)),
+            ["primary"],
+            registry => registry.RegisterFilter<object>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("boundedCapacity", StringComparison.Ordinal));
+        AssertPreparationFailure(host, "BoundedCapacity");
     }
 
     [Fact]
     public async Task Missing_filter_expression_surfaces_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "filter",
-                    ControlCompositionNodeTypes.Filter,
-                    node => node.Resource(ControlCompositionResourceNames.Engine, "primary")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterFilter<object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.Filter,
+            Properties((ControlCompositionResourceNames.Engine, "Resources.primary")),
+            ["primary"],
+            registry => registry.RegisterFilter<object>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-
-        await hostedService.StartAsync(CancellationToken.None);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("expression", StringComparison.Ordinal));
+        AssertPreparationFailure(host, "Expression");
     }
 
     [Fact]
     public async Task Invalid_when_options_surface_factory_diagnostic()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IFlowExpressionEngine>(
-            "primary",
-            new RecordingExpressionEngine(evaluate: (_, _, _) => true));
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "when",
-                    ControlCompositionNodeTypes.When,
-                    node => node
-                        .Resource(ControlCompositionResourceNames.Engine, "primary")
-                        .Configure("expression", "route")
-                        .Configure("inputType", " ")))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterWhen<object>())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
+        await using var host = await StartNodeAsync(
+            ControlCompositionNodeTypes.When,
+            Properties(
+                (ControlCompositionResourceNames.Engine, "Resources.primary"),
+                ("expression", "route"),
+                ("inputType", " ")),
+            ["primary"],
+            registry => registry.RegisterWhen<object>(),
+            services => services.AddExternalFluxFlowResource<IFlowExpressionEngine>(
+                ApplicationAddress.Resource("primary"),
+                engine));
 
-        await using var provider = services.BuildServiceProvider();
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
+        AssertPreparationFailure(host, "InputType");
+    }
 
-        await hostedService.StartAsync(CancellationToken.None);
+    private static ValueTask<CanonicalApplicationTestHost> StartNodeAsync(
+        string componentType,
+        IReadOnlyDictionary<string, object?> properties,
+        IReadOnlyList<string>? resources,
+        Action<CompositionNodeRegistry> registerNodes,
+        Action<IServiceCollection>? configureRuntimeServices = null)
+        => CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(componentType, properties, resources),
+            registerNodes,
+            configureRuntimeServices: configureRuntimeServices is null
+                ? null
+                : context => configureRuntimeServices(context.Services));
 
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains("inputType", StringComparison.Ordinal));
+    private static ApplicationAddress Port(string name)
+        => ApplicationAddress.WorkflowPort("main", "node", name);
+
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
+    {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private sealed record InputMessage(int Value);
