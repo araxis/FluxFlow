@@ -1,6 +1,6 @@
-using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
 using System.Threading.Tasks.Dataflow;
@@ -38,9 +38,10 @@ public sealed class TimerIntervalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = TimerTestSink.Drain(output);
-        ticks.Select(message => message.Payload.Sequence).ShouldBe([1, 2, 3]);
-        ticks.ShouldAllBe(message => message.Payload.Name == "poll");
-        ticks.ShouldAllBe(message => message.Payload.Interval == TimeSpan.FromMilliseconds(10));
+        ticks.Select(message => Tick(message)["sequence"].GetInteger()).ShouldBe([1L, 2L, 3L]);
+        ticks.ShouldAllBe(message => Tick(message)["name"].GetString() == "poll");
+        ticks.ShouldAllBe(message =>
+            Tick(message)["interval"].GetDuration() == TimeSpan.FromMilliseconds(10));
     }
 
     [Fact]
@@ -67,9 +68,10 @@ public sealed class TimerIntervalNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var tick = TimerTestSink.Drain(output).ShouldHaveSingleItem();
-        tick.Payload.Sequence.ShouldBe(1);
-        tick.Payload.DueAt.ShouldBe(startedAt.AddMilliseconds(40));
-        tick.Payload.Timestamp.ShouldBe(startedAt.AddMilliseconds(40));
+        var value = Tick(tick);
+        value["sequence"].GetInteger().ShouldBe(1);
+        value["dueAt"].GetDateTimeOffset().ShouldBe(startedAt.AddMilliseconds(40));
+        value["timestamp"].GetDateTimeOffset().ShouldBe(startedAt.AddMilliseconds(40));
     }
 
     [Fact]
@@ -203,4 +205,8 @@ public sealed class TimerIntervalNodeTests
     [Fact]
     public void Interval_RejectsNullSettings()
         => Should.Throw<ArgumentNullException>(() => new TimerIntervalNode(null!));
+
+    private static IReadOnlyDictionary<string, FlowValue> Tick(
+        FlowMessage<FlowValue> message)
+        => message.Payload.GetObject();
 }

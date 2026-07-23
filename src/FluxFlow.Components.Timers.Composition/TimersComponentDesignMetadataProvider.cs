@@ -201,7 +201,7 @@ public sealed class TimersComponentDesignMetadataProvider : IComponentDesignMeta
                 valueType: nameof(TimeProvider),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Clock,
-                    keyPattern: "clock:{name}"));
+                    keyPattern: "Resources.{name}"));
 
         if (attributes is not null)
         {

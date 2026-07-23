@@ -1,33 +1,56 @@
-using FluxFlow.Components.Timers.Contracts;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using System.Globalization;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// A standalone cron-schedule source. Call <c>StartAsync</c> and the node broadcasts a
-/// <c>FlowMessage&lt;ScheduleTick&gt;</c> on <c>Output</c> at each occurrence of the
-/// configured cron expression (plus diagnostic notes on <c>Events</c>), minting a fresh
-/// correlation id per tick. It runs until <see cref="TimerScheduleSettings.MaxTicks"/>
-/// is reached (source complete) or it is stopped via <c>Complete</c>/dispose. Timing is
-/// driven by the injected <see cref="TimeProvider"/>, so tests can advance a
-/// FakeTimeProvider to fire ticks deterministically. Works with nothing but
-/// <c>new TimerScheduleNode(settings)</c> — no engine.
+/// Emits immutable workflow tick objects at occurrences of a cron schedule.
 /// </summary>
-public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
+public sealed class TimerScheduleNode : IFlowSource
 {
     public const string Started = TimerDiagnosticNames.ScheduleStarted;
     public const string Tick = TimerDiagnosticNames.ScheduleTick;
     public const string Stopped = TimerDiagnosticNames.ScheduleStopped;
     public const string Failed = TimerDiagnosticNames.ScheduleFailed;
 
+    private readonly TimerScheduleSource _source;
+
+    public TimerScheduleNode(
+        TimerScheduleSettings settings,
+        TimeProvider? clock = null)
+        => _source = new TimerScheduleSource(settings, clock);
+
+    public ISourceBlock<FlowMessage<FlowValue>> Output => _source.Output;
+
+    public ISourceBlock<FlowEvent> Events => _source.Events;
+
+    public Task Completion => _source.Completion;
+
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _source.StartAsync(cancellationToken);
+
+    public void Complete() => _source.Complete();
+
+    public void Fault(Exception exception) => _source.Fault(exception);
+
+    public ValueTask DisposeAsync() => _source.DisposeAsync();
+}
+
+internal sealed class TimerScheduleSource : FlowSource<FlowValue>
+{
+    private const string Started = TimerScheduleNode.Started;
+    private const string Tick = TimerScheduleNode.Tick;
+    private const string Stopped = TimerScheduleNode.Stopped;
+
     private readonly TimerScheduleSettings _settings;
     private readonly TimeProvider _clock;
     private readonly CronSchedule _schedule;
 
-    public TimerScheduleNode(
+    public TimerScheduleSource(
         TimerScheduleSettings settings,
         TimeProvider? clock = null)
         : base(BuildSourceOptions(settings))
@@ -105,17 +128,18 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
         CancellationToken cancellationToken)
     {
         var timestamp = _clock.GetUtcNow();
-        var tick = new ScheduleTick
+        var drift = timestamp - dueAt;
+        var tick = FlowValue.FromObject(new Dictionary<string, FlowValue>(StringComparer.Ordinal)
         {
-            Timestamp = timestamp,
-            Name = _settings.Name,
-            Sequence = sequence,
-            StartedAt = startedAt,
-            DueAt = dueAt,
-            Cron = _settings.Cron,
-            TimeZoneId = _settings.TimeZone.Id,
-            Drift = timestamp - dueAt
-        };
+            ["timestamp"] = FlowValue.From(timestamp),
+            ["name"] = FlowValue.From(_settings.Name),
+            ["sequence"] = FlowValue.From(sequence),
+            ["startedAt"] = FlowValue.From(startedAt),
+            ["dueAt"] = FlowValue.From(dueAt),
+            ["cron"] = FlowValue.From(_settings.Cron),
+            ["timeZoneId"] = FlowValue.From(_settings.TimeZone.Id),
+            ["drift"] = FlowValue.From(drift)
+        });
 
         if (!await EmitAsync(FlowMessage.Create(tick), cancellationToken).ConfigureAwait(false))
         {
@@ -128,7 +152,7 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
             Name = Tick,
             Level = FlowEventLevel.Information,
             Message = $"Emitted timer schedule tick {sequence.ToString(CultureInfo.InvariantCulture)}.",
-            Attributes = CreateAttributes(tick)
+            Attributes = CreateAttributes(sequence, dueAt, drift: drift)
         });
         return true;
     }
@@ -152,25 +176,14 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
             Name = Stopped,
             Level = FlowEventLevel.Information,
             Message = $"Stopped timer schedule '{_settings.Name}'.",
-            Attributes = CreateAttributes(sequence, _clock.GetUtcNow() - startedAt)
+            Attributes = CreateAttributes(sequence, elapsed: _clock.GetUtcNow() - startedAt)
         });
 
-    private Dictionary<string, object?> CreateAttributes(ScheduleTick? tick = null)
-    {
-        var attributes = CreateAttributes(tick?.Sequence);
-        if (tick is null)
-        {
-            return attributes;
-        }
-
-        attributes["dueAt"] = tick.DueAt;
-        attributes["driftMilliseconds"] = tick.Drift.TotalMilliseconds;
-        return attributes;
-    }
-
     private Dictionary<string, object?> CreateAttributes(
-        long? sequence,
-        TimeSpan? elapsed = null)
+        long? sequence = null,
+        DateTimeOffset? dueAt = null,
+        TimeSpan? elapsed = null,
+        TimeSpan? drift = null)
     {
         var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
@@ -192,6 +205,16 @@ public sealed class TimerScheduleNode : FlowSource<ScheduleTick>
         if (elapsed.HasValue)
         {
             attributes["elapsedMilliseconds"] = elapsed.Value.TotalMilliseconds;
+        }
+
+        if (dueAt.HasValue)
+        {
+            attributes["dueAt"] = dueAt.Value;
+        }
+
+        if (drift.HasValue)
+        {
+            attributes["driftMilliseconds"] = drift.Value.TotalMilliseconds;
         }
 
         return attributes;

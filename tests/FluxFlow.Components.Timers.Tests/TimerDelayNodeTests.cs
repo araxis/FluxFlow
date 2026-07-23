@@ -1,9 +1,10 @@
-using FluxFlow.Components.Timers;
+using System.Threading.Tasks.Dataflow;
+using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Timers.Tests;
@@ -11,10 +12,11 @@ namespace FluxFlow.Components.Timers.Tests;
 public sealed class TimerDelayNodeTests
 {
     [Fact]
-    public async Task Delay_EmitsInputAfterConfiguredDelay_PreservingCorrelation()
+    public async Task Delay_emits_input_after_configured_delay_with_lineage()
     {
-        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        await using var node = new TimerDelayNode<InputMessage>(
+        var clock = new TrackingFakeTimeProvider(
+            new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings
             {
                 Name = "hold",
@@ -23,24 +25,26 @@ public sealed class TimerDelayNodeTests
             },
             clock);
         var output = TimerTestSink.Link(node.Output);
-        var message = FlowMessage.Create(new InputMessage("one"));
+        var message = FlowMessage.Create(FlowValue.From("one"));
 
         var scheduled = clock.TimerScheduled;
         await node.Input.SendAsync(message);
         await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
-        // Nothing should be emitted before the delay elapses.
         output.TryReceive(out _).ShouldBeFalse();
         clock.Advance(TimeSpan.FromMilliseconds(35));
 
         var delayed = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        delayed.Payload.ShouldBe(message.Payload);
+        delayed.Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
+        delayed.Payload.Value.ShouldBe(message.Payload);
         delayed.CorrelationId.ShouldBe(message.CorrelationId);
+        delayed.TraceId.ShouldBe(message.TraceId);
+        delayed.CausationId.ShouldBe(message.MessageId);
     }
 
     [Fact]
-    public async Task Delay_PreservesOrder()
+    public async Task Delay_preserves_order()
     {
-        await using var node = new TimerDelayNode<int>(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings
             {
                 Delay = TimeSpan.FromMilliseconds(1),
@@ -48,22 +52,23 @@ public sealed class TimerDelayNodeTests
             });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create(1));
-        await node.Input.SendAsync(FlowMessage.Create(2));
-        await node.Input.SendAsync(FlowMessage.Create(3));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3)));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload)
-            .ShouldBe([1, 2, 3]);
+            .Select(message => message.Payload.Value!.GetInteger())
+            .ShouldBe([1L, 2L, 3L]);
     }
 
     [Fact]
-    public async Task Delay_BurstSharesOneConstantOffsetFromArrival()
+    public async Task Delay_burst_shares_one_constant_offset_from_arrival()
     {
-        var clock = new TrackingFakeTimeProvider(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        await using var node = new TimerDelayNode<int>(
+        var clock = new TrackingFakeTimeProvider(
+            new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings
             {
                 Delay = TimeSpan.FromMilliseconds(40),
@@ -72,104 +77,102 @@ public sealed class TimerDelayNodeTests
             clock);
         var output = TimerTestSink.Link(node.Output);
 
-        // The burst arrives at the same instant, so all three share one due time
-        // (arrival + 40ms) — only the first item arms a timer; the rest are already due.
         var scheduled = clock.TimerScheduled;
-        await node.Input.SendAsync(FlowMessage.Create(1));
-        await node.Input.SendAsync(FlowMessage.Create(2));
-        await node.Input.SendAsync(FlowMessage.Create(3));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(2)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(3)));
         await scheduled.WaitAsync(TimeSpan.FromSeconds(30));
         output.TryReceive(out _).ShouldBeFalse();
-
-        // A single advance by one Delay releases the whole burst (constant offset), rather
-        // than accumulating one delay per item (which would need three advances).
         clock.Advance(TimeSpan.FromMilliseconds(40));
 
         var first = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var second = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
         var third = await output.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        new[] { first.Payload, second.Payload, third.Payload }.ShouldBe([1, 2, 3]);
+        new[]
+        {
+            first.Payload.Value!.GetInteger(),
+            second.Payload.Value!.GetInteger(),
+            third.Payload.Value!.GetInteger()
+        }.ShouldBe([1L, 2L, 3L]);
     }
 
     [Fact]
-    public async Task Delay_ZeroDelayPassesThroughImmediately()
+    public async Task Delay_zero_delay_passes_through_immediately()
     {
-        await using var node = new TimerDelayNode<string>(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.Zero });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create("hello"));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload)
+            .Select(message => message.Payload.Value!.GetString())
             .ShouldBe(["hello"]);
     }
 
     [Fact]
-    public async Task Delay_EmitsEvents()
+    public async Task Delay_emits_result_event()
     {
-        await using var node = new TimerDelayNode<string>(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.Zero });
         var output = TimerTestSink.Link(node.Output);
         var events = TimerTestSink.Link(node.Events);
 
-        await node.Input.SendAsync(FlowMessage.Create("hello"));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("hello")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         (await TimerTestSink.DrainUntilCompletedAsync(output)).ShouldHaveSingleItem();
         var flowEvent = (await TimerTestSink.DrainUntilCompletedAsync(events))
             .ShouldHaveSingleItem();
-        flowEvent.Name.ShouldBe(TimerDelayNode<string>.Emitted);
-        flowEvent.Attributes["inputType"].ShouldBe(nameof(String));
+        flowEvent.Name.ShouldBe(TimerDiagnosticNames.DelayEmitted);
+        flowEvent.Attributes["resultKind"].ShouldBe(TimerResultKinds.Delayed);
+        flowEvent.Attributes["nodeType"].ShouldBe("timer.delay");
     }
 
     [Fact]
-    public async Task Delay_DisposeDrainsAndCompletesOutput()
+    public async Task Delay_dispose_drains_and_completes_output()
     {
-        await using var node = new TimerDelayNode<string>(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.Zero });
         var output = TimerTestSink.Link(node.Output);
 
-        await node.Input.SendAsync(FlowMessage.Create("one"));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("one")));
         await node.DisposeAsync();
 
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
         (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload)
+            .Select(message => message.Payload.Value!.GetString())
             .ShouldBe(["one"]);
     }
 
     [Fact]
-    public async Task Delay_ErrorsPortReceivesPerMessageFailures()
+    public async Task Delay_failure_is_a_normal_result_and_later_input_continues()
     {
-        var clock = new ThrowOnFirstTimerProvider();
-        await using var node = new TimerDelayNode<string>(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(5) },
-            clock);
+            new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
-        var errors = TimerTestSink.Link(node.Errors);
+        var bad = FlowMessage.Create(FlowValue.From("bad"));
 
-        var bad = FlowMessage.Create("bad");
         await node.Input.SendAsync(bad);
-        await node.Input.SendAsync(FlowMessage.Create("good"));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From("good")));
         node.Complete();
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(TimerErrorCodes.DelayFailed);
-        error.CorrelationId.ShouldBe(bad.CorrelationId);
-        (await TimerTestSink.DrainUntilCompletedAsync(output))
-            .Select(message => message.Payload)
-            .ShouldBe(["good"]);
+        var results = await TimerTestSink.DrainUntilCompletedAsync(output);
+        results.Count.ShouldBe(2);
+        results[0].Payload.Error!.Code.ShouldBe(TimerErrorCodeNames.DelayFailed);
+        results[0].CorrelationId.ShouldBe(bad.CorrelationId);
+        results[1].Payload.Value!.GetString().ShouldBe("good");
     }
 
     [Fact]
-    public async Task Delay_DisposeAfterFaultDoesNotThrow()
+    public async Task Delay_dispose_after_fault_does_not_throw()
     {
-        var node = new TimerDelayNode<string>(
+        var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(1) });
         TimerTestSink.Link(node.Output);
 
@@ -180,16 +183,16 @@ public sealed class TimerDelayNodeTests
     }
 
     [Fact]
-    public void Delay_RejectsNegativeDelay()
+    public void Delay_rejects_negative_delay()
         => Should.Throw<ArgumentOutOfRangeException>(
-            () => new TimerDelayNode<string>(
+            () => new TimerDelayNode(
                 new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(-1) }))
             .Message.ShouldContain("Delay");
 
     [Fact]
-    public void Delay_RejectsInvalidBoundedCapacity()
+    public void Delay_rejects_invalid_bounded_capacity()
         => Should.Throw<ArgumentOutOfRangeException>(
-            () => new TimerDelayNode<string>(
+            () => new TimerDelayNode(
                 new TimerDelaySettings
                 {
                     Delay = TimeSpan.FromMilliseconds(1),
@@ -198,15 +201,9 @@ public sealed class TimerDelayNodeTests
             .Message.ShouldContain("BoundedCapacity");
 
     [Fact]
-    public void Delay_RejectsNullSettings()
-        => Should.Throw<ArgumentNullException>(() => new TimerDelayNode<string>(null!));
+    public void Delay_rejects_null_settings()
+        => Should.Throw<ArgumentNullException>(() => new TimerDelayNode(null!));
 
-    private sealed record InputMessage(string Value);
-
-    // FakeTimeProvider cannot be told to throw from a delay, so this bespoke provider
-    // throws from the timer path exactly once to exercise per-message fault handling.
-    // GetUtcNow returns a fixed instant so the node sees a positive remaining delay and
-    // actually reaches Task.Delay (which creates a timer).
     private sealed class ThrowOnFirstTimerProvider : TimeProvider
     {
         private int _calls;
@@ -221,9 +218,7 @@ public sealed class TimerDelayNodeTests
             TimeSpan period)
         {
             if (Interlocked.Increment(ref _calls) == 1)
-            {
                 throw new InvalidOperationException("clock failed");
-            }
 
             return System.CreateTimer(callback, state, dueTime, period);
         }

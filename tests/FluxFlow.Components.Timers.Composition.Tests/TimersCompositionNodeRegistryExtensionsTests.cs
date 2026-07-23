@@ -2,21 +2,30 @@ using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
 using FluxFlow.Components.Timers.Composition;
-using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
+using FluxFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Timers.Composition.Tests;
 
 public sealed class TimersCompositionNodeRegistryExtensionsTests
 {
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input =
+        ApplicationAddress.WorkflowPort("main", "timer", TimersCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output =
+        ApplicationAddress.WorkflowPort("main", "timer", TimersCompositionPortNames.Output);
+
     [Fact]
     public void RegisterTimerNodes_registers_timer_metadata()
     {
@@ -37,45 +46,31 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Delay);
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Throttle);
         AssertTransformMetadata(registry, TimersCompositionNodeTypes.Debounce);
+
+        typeof(TimersCompositionNodeRegistryExtensions).GetMethods()
+            .ShouldNotContain(static method => method.IsGenericMethodDefinition);
     }
 
     [Fact]
-    public void Typed_timer_registrations_remain_explicit_compatibility_paths()
+    public void RegisterTimerNodes_support_explicit_canonical_component_types()
     {
         var registry = new CompositionNodeRegistry()
-            .RegisterTimerIntervalTicks("timer.interval.typed")
-            .RegisterTimerScheduleTicks("timer.schedule.typed")
-            .RegisterTimerDelay<InputMessage>("timer.delay.typed");
+            .RegisterTimerDelay("timer.delay.primary")
+            .RegisterTimerDelay("timer.delay.secondary")
+            .RegisterTimerDebounce("timer.debounce.custom")
+            .RegisterTimerThrottle("timer.throttle.custom");
 
-        registry.Registrations["timer.interval.typed"]
-            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(typeof(TimerTick));
-        registry.Registrations["timer.schedule.typed"]
-            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(typeof(ScheduleTick));
-        registry.Registrations["timer.delay.typed"]
-            .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(typeof(InputMessage));
-    }
-
-    [Fact]
-    public void RegisterTimerTransforms_supports_multiple_custom_node_types()
-    {
-        var registry = new CompositionNodeRegistry()
-            .RegisterTimerDelay<InputMessage>("timer.delay.input")
-            .RegisterTimerDelay<string>("timer.delay.string")
-            .RegisterTimerDebounce<InputMessage>("timer.debounce.input")
-            .RegisterTimerThrottle<string>("timer.throttle.string");
-
-        registry.Registrations["timer.delay.input"]
-            .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(InputMessage));
-        registry.Registrations["timer.delay.string"]
-            .Inputs[TimersCompositionPortNames.Input].MessageType.ShouldBe(
-                typeof(string));
-        registry.Registrations["timer.debounce.input"]
-            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(InputMessage));
-        registry.Registrations["timer.throttle.string"]
-            .Outputs[TimersCompositionPortNames.Output].MessageType.ShouldBe(
-                typeof(string));
+        registry.Registrations.Keys.ShouldBe([
+            "timer.delay.primary",
+            "timer.delay.secondary",
+            "timer.debounce.custom",
+            "timer.throttle.custom"
+        ], ignoreOrder: false);
+        registry.Registrations.Values.ShouldAllBe(registration =>
+            registration.Inputs[TimersCompositionPortNames.Input].MessageType ==
+                typeof(FlowValue) &&
+            registration.Outputs[TimersCompositionPortNames.Output].MessageType ==
+                typeof(FlowResult<FlowValue>));
     }
 
     [Fact]
@@ -220,7 +215,7 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
             AssertResourceHints(
                 item.Resources.ShouldHaveSingleItem(),
                 ResourceDesignMetadataAttributeValues.Clock,
-                "clock:{name}");
+                "Resources.{name}");
         }
     }
 
@@ -244,57 +239,38 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var startedAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startedAt);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "poll",
-                    TimersCompositionNodeTypes.Interval,
-                    node => node
-                        .Resource(TimersCompositionResourceNames.Clock, "fixed")
-                        .Configure("name", "poll")
-                        .Configure("interval", TimeSpan.FromMilliseconds(10))
-                        .Configure("emitImmediately", true)
-                        .Configure("maxTicks", 2)
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterTimerInterval())
-            .Configure(options => options.StartRuntimeWithHost = false);
+        var firstScheduled = clock.TimerScheduled;
+        await using var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Interval,
+            Properties(
+                ("name", "poll"),
+                ("interval", TimeSpan.FromMilliseconds(10)),
+                ("initialDelay", TimeSpan.FromMilliseconds(10)),
+                ("maxTicks", 2),
+                ("boundedCapacity", 8)),
+            clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        await firstScheduled.WaitAsync(Timeout);
+        var ports = host.GetRequiredPorts();
+        var observed = (await ports.ObserveAsync<FlowValue>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var observation = observed;
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var intervalNode = runtime.Nodes.ShouldHaveSingleItem();
-        var output = intervalNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
-        var ticks = new BufferBlock<FlowMessage<FlowValue>>();
-        var events = new BufferBlock<FlowEvent>();
-        output.Source.LinkTo(ticks);
-        intervalNode.Descriptor.Events.ShouldNotBeNull().LinkTo(events);
-
-        var scheduled = clock.TimerScheduled;
-        await runtime.StartAsync();
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        var secondScheduled = clock.TimerScheduled;
         clock.Advance(TimeSpan.FromMilliseconds(10));
-        await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await secondScheduled.WaitAsync(Timeout);
+        clock.Advance(TimeSpan.FromMilliseconds(10));
 
-        var first = await ticks.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var second = await ticks.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        var eventNames = Drain(events).Select(flowEvent => flowEvent.Name).ToArray();
+        var first = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
+        var second = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
         first.Payload.GetObject()["name"].GetString().ShouldBe("poll");
-        first.Payload.GetObject()["timestamp"].GetDateTimeOffset().ShouldBe(startedAt);
+        first.Payload.GetObject()["timestamp"].GetDateTimeOffset()
+            .ShouldBe(startedAt.AddMilliseconds(10));
         second.Payload.GetObject()["sequence"].GetInteger().ShouldBe(2);
         second.Payload.GetObject()["timestamp"].GetDateTimeOffset()
-            .ShouldBe(startedAt.AddMilliseconds(10));
+            .ShouldBe(startedAt.AddMilliseconds(20));
         first.CorrelationId.ShouldNotBe(second.CorrelationId);
-        eventNames.ShouldContain("timer.interval.started");
-        eventNames.ShouldContain("timer.interval.tick");
-        eventNames.ShouldContain("timer.interval.stopped");
     }
 
     [Fact]
@@ -302,42 +278,23 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var startedAt = new DateTimeOffset(2026, 6, 2, 11, 59, 59, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startedAt);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "schedule",
-                    TimersCompositionNodeTypes.Schedule,
-                    node => node
-                        .Resource(TimersCompositionResourceNames.Clock, "fixed")
-                        .Configure("name", "cron")
-                        .Configure("cron", "* * * * * *")
-                        .Configure("maxTicks", 1)
-                        .Configure("boundedCapacity", 8)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterTimerSchedule())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var scheduleNode = runtime.Nodes.ShouldHaveSingleItem();
-        var output = scheduleNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowValue>>();
-        var ticks = new BufferBlock<FlowMessage<FlowValue>>();
-        output.Source.LinkTo(ticks);
-
         var scheduled = clock.TimerScheduled;
-        await runtime.StartAsync();
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
-        clock.Advance(TimeSpan.FromSeconds(1));
-        await runtime.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        await using var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Schedule,
+            Properties(
+                ("name", "cron"),
+                ("cron", "* * * * * *"),
+                ("maxTicks", 1),
+                ("boundedCapacity", 8)),
+            clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        await scheduled.WaitAsync(Timeout);
+        var observed = (await host.GetRequiredPorts().ObserveAsync<FlowValue>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var observation = observed;
 
-        var tick = await ticks.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var tick = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
         var value = tick.Payload.GetObject();
         value["name"].GetString().ShouldBe("cron");
@@ -351,38 +308,31 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        var services = CreateTransformServices(
+        await using var host = await StartHostAsync(
             TimersCompositionNodeTypes.Delay,
-            node => node
-                .Resource(TimersCompositionResourceNames.Clock, "fixed")
-                .Configure("name", "hold")
-                .Configure("delay", TimeSpan.FromMilliseconds(35))
-                .Configure("boundedCapacity", 8),
-            registry => registry.RegisterTimerDelay(),
+            Properties(
+                ("name", "hold"),
+                ("delay", TimeSpan.FromMilliseconds(35)),
+                ("boundedCapacity", 8)),
             clock);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var (input, output) = GetSingleFlowValueTransform(provider);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var ports = host.GetRequiredPorts();
+        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var observation = observed;
         var message = FlowMessage.Create(
             FlowValue.From("one"),
             new CorrelationId("delay-correlation"));
         var scheduled = clock.TimerScheduled;
 
-        (await input.Target.SendAsync(message)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+        await scheduled.WaitAsync(Timeout);
         clock.Advance(TimeSpan.FromMilliseconds(35));
-
-        var delayed = await output.Source.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
+        var delayed = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
         delayed.Payload.Kind.ShouldBe(TimerResultKinds.Delayed);
         delayed.Payload.Value.ShouldBe(message.Payload);
         delayed.CorrelationId.ShouldBe(new CorrelationId("delay-correlation"));
-        provider.GetRequiredService<ICompositionRuntimeHost>().Runtime!
-            .Nodes.ShouldHaveSingleItem().Descriptor.Errors.ShouldBeNull();
     }
 
     [Fact]
@@ -390,35 +340,31 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        var services = CreateTransformServices(
+        await using var host = await StartHostAsync(
             TimersCompositionNodeTypes.Throttle,
-            node => node
-                .Resource(TimersCompositionResourceNames.Clock, "fixed")
-                .Configure("name", "rate")
-                .Configure("interval", TimeSpan.FromMilliseconds(40))
-                .Configure("emitFirstImmediately", false)
-                .Configure("boundedCapacity", 8),
-            registry => registry.RegisterTimerThrottle<InputMessage>(),
+            Properties(
+                ("name", "rate"),
+                ("interval", TimeSpan.FromMilliseconds(40)),
+                ("emitFirstImmediately", false),
+                ("boundedCapacity", 8)),
             clock);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var (input, output) = GetSingleTransform<InputMessage>(provider);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var ports = host.GetRequiredPorts();
+        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var observation = observed;
         var message = FlowMessage.Create(
-            new InputMessage("one"),
+            FlowValue.From("one"),
             new CorrelationId("throttle-correlation"));
         var scheduled = clock.TimerScheduled;
 
-        (await input.Target.SendAsync(message)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        await scheduled.WaitAsync(TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+        await scheduled.WaitAsync(Timeout);
         clock.Advance(TimeSpan.FromMilliseconds(40));
+        var throttled = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        var throttled = await output.Source.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        throttled.Payload.ShouldBe(message.Payload);
+        throttled.Payload.Kind.ShouldBe(TimerResultKinds.Throttled);
+        throttled.Payload.Value.ShouldBe(message.Payload);
         throttled.CorrelationId.ShouldBe(new CorrelationId("throttle-correlation"));
     }
 
@@ -427,92 +373,71 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
     {
         var clock = new TrackingFakeTimeProvider(
             new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
-        var services = CreateTransformServices(
+        await using var host = await StartHostAsync(
             TimersCompositionNodeTypes.Debounce,
-            node => node
-                .Resource(TimersCompositionResourceNames.Clock, "fixed")
-                .Configure("name", "quiet")
-                .Configure("quietPeriod", TimeSpan.FromMilliseconds(25))
-                .Configure("boundedCapacity", 8),
-            registry => registry.RegisterTimerDebounce<InputMessage>(),
+            Properties(
+                ("name", "quiet"),
+                ("quietPeriod", TimeSpan.FromMilliseconds(25)),
+                ("boundedCapacity", 8)),
             clock);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var (input, output) = GetSingleTransform<InputMessage>(provider);
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var ports = host.GetRequiredPorts();
+        var observed = (await ports.ObserveAsync<FlowResult<FlowValue>>(Output))
+            .Observation.ShouldNotBeNull();
+        await using var observation = observed;
         var first = FlowMessage.Create(
-            new InputMessage("one"),
+            FlowValue.From("one"),
             new CorrelationId("debounce-old"));
         var latest = FlowMessage.Create(
-            new InputMessage("two"),
+            FlowValue.From("two"),
             new CorrelationId("debounce-latest"));
 
         var scheduled1 = clock.TimerScheduled;
-        (await input.Target.SendAsync(first)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        await scheduled1.WaitAsync(TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, first)).IsAccepted.ShouldBeTrue();
+        await scheduled1.WaitAsync(Timeout);
         var scheduled2 = clock.TimerScheduled;
-        (await input.Target.SendAsync(latest)
-            .WaitAsync(TimeSpan.FromSeconds(5))).ShouldBeTrue();
-        await scheduled2.WaitAsync(TimeSpan.FromSeconds(5));
+        (await ports.SendAsync(Input, latest)).IsAccepted.ShouldBeTrue();
+        await scheduled2.WaitAsync(Timeout);
         clock.Advance(TimeSpan.FromMilliseconds(25));
+        var debounced = await observation.Messages.ReceiveAsync().WaitAsync(Timeout);
 
-        var debounced = await output.Source.ReceiveAsync()
-            .WaitAsync(TimeSpan.FromSeconds(5));
-
-        debounced.Payload.Value.ShouldBe("two");
+        debounced.Payload.Kind.ShouldBe(TimerResultKinds.Debounced);
+        debounced.Payload.Value!.GetString().ShouldBe("two");
         debounced.CorrelationId.ShouldBe(new CorrelationId("debounce-latest"));
     }
 
     [Fact]
     public async Task Invalid_timer_configuration_surfaces_factory_diagnostic()
     {
-        await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "poll",
-                    TimersCompositionNodeTypes.Interval,
-                    node => node.Configure("interval", TimeSpan.Zero)))
-                .Build(),
-            registry => registry.RegisterTimerInterval(),
-            "Interval");
+        await using (var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Interval,
+            Properties(("interval", TimeSpan.Zero))))
+        {
+            AssertPreparationFailure(host, "Interval");
+        }
 
-        await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "delay",
-                    TimersCompositionNodeTypes.Delay,
-                    node => node.Configure("delay", TimeSpan.FromMilliseconds(-1))))
-                .Build(),
-            registry => registry.RegisterTimerDelay(),
-            "Delay");
+        await using (var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Delay,
+            Properties(("delay", TimeSpan.FromMilliseconds(-1)))))
+        {
+            AssertPreparationFailure(host, "Delay");
+        }
 
-        await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "throttle",
-                    TimersCompositionNodeTypes.Throttle,
-                    node => node
-                        .Configure("interval", TimeSpan.FromMilliseconds(1))
-                        .Configure("boundedCapacity", 0)))
-                .Build(),
-            registry => registry.RegisterTimerThrottle(),
-            "BoundedCapacity");
+        await using (var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Throttle,
+            Properties(
+                ("interval", TimeSpan.FromMilliseconds(1)),
+                ("boundedCapacity", 0))))
+        {
+            AssertPreparationFailure(host, "BoundedCapacity");
+        }
 
-        await AssertFactoryDiagnosticAsync(
-            CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "debounce",
-                    TimersCompositionNodeTypes.Debounce,
-                    node => node.Configure("quietPeriod", TimeSpan.Zero)))
-                .Build(),
-            registry => registry.RegisterTimerDebounce(),
-            "QuietPeriod");
+        await using (var host = await StartHostAsync(
+            TimersCompositionNodeTypes.Debounce,
+            Properties(("quietPeriod", TimeSpan.Zero))))
+        {
+            AssertPreparationFailure(host, "QuietPeriod");
+        }
     }
 
     private static void AssertTransformMetadata(
@@ -633,99 +558,61 @@ public sealed class TimersCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static IServiceCollection CreateTransformServices(
-        string nodeType,
-        Action<NodeDefinitionBuilder> configureNode,
-        Action<CompositionNodeRegistry> registerNode,
-        TimeProvider clock)
+    private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
+        string componentType,
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider? clock = null)
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<TimeProvider>("fixed", clock);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "timer",
-                    nodeType,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registerNode)
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        return services;
-    }
-
-    private static async Task BuildCompositionAsync(ServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
-    private static async Task AssertFactoryDiagnosticAsync(
-        CompositionDefinition definition,
-        Action<CompositionNodeRegistry> registerNodes,
-        string expectedMessage)
-    {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(definition)
-            .RegisterNodes(registerNodes)
-            .Configure(options => options.ThrowOnBuildFailure = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            diagnostic.Message.Contains(expectedMessage, StringComparison.Ordinal));
-    }
-
-    private static (
-        CompositionInputPort<TMessage> Input,
-        CompositionOutputPort<TMessage> Output) GetSingleTransform<TMessage>(
-            IServiceProvider provider)
-    {
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var timerNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = timerNode.Descriptor.Inputs[TimersCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<TMessage>>();
-        var output = timerNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<TMessage>>();
-
-        return (input, output);
-    }
-
-    private static (
-        CompositionInputPort<FlowValue> Input,
-        CompositionOutputPort<FlowResult<FlowValue>> Output) GetSingleFlowValueTransform(
-            IServiceProvider provider)
-    {
-        var runtime = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull();
-        var timerNode = runtime.Nodes.ShouldHaveSingleItem();
-        var input = timerNode.Descriptor.Inputs[TimersCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<FlowValue>>();
-        var output = timerNode.Descriptor.Outputs[TimersCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<FlowValue>>>();
-
-        return (input, output);
-    }
-
-    private static List<T> Drain<T>(BufferBlock<T> sink)
-    {
-        var items = new List<T>();
-        while (sink.TryReceive(out var item))
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
+            StringComparer.Ordinal);
+        IReadOnlyList<string>? resources = null;
+        if (clock is not null)
         {
-            items.Add(item);
+            componentProperties[TimersCompositionResourceNames.Clock] = "Resources.fixed";
+            resources = ["fixed"];
         }
 
-        return items;
+        return CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(
+                componentType,
+                componentProperties,
+                resources,
+                componentName: "timer"),
+            RegisterAll,
+            configureRuntimeServices: context =>
+            {
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("fixed"),
+                        clock);
+                }
+            });
     }
 
-    private sealed record InputMessage(string Value);
+    private static void RegisterAll(CompositionNodeRegistry registry)
+        => registry
+            .RegisterTimerInterval()
+            .RegisterTimerSchedule()
+            .RegisterTimerDelay()
+            .RegisterTimerThrottle()
+            .RegisterTimerDebounce();
+
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
+    {
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
+    }
 
     private sealed class TrackingFakeTimeProvider : FakeTimeProvider
     {

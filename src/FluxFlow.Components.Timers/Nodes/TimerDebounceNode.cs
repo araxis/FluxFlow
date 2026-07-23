@@ -1,117 +1,136 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// A standalone debounce node: post <c>FlowMessage&lt;TInput&gt;</c> values to <c>Input</c>
-/// and the node re-broadcasts only the latest payload on <c>Output</c> once no new input
-/// has arrived for the configured quiet period, carrying that message's correlation id
-/// forward. A pending item is flushed when the input completes. Timing uses the injected
-/// <see cref="TimeProvider"/>, so a FakeTimeProvider drives it deterministically. Works
-/// with nothing but <c>new TimerDebounceNode&lt;T&gt;(settings)</c> — no engine.
+/// Debounces immutable workflow values and emits timing failures as normal results.
+/// Superseded inputs intentionally produce no result.
 /// </summary>
-/// <remarks>
-/// Intake is serial (<c>MaxDegreeOfParallelism = 1</c>) so the latest item is decided by
-/// arrival order, not by which concurrent handler happened to run first. Each arrival
-/// records the latest payload and arms a fresh quiet-period timer against the clock,
-/// superseding the previous one; whichever timer survives the quiet window emits the
-/// latest. The wait lives in the timer callback rather than inside <see cref="ProcessAsync"/>,
-/// so a parked window never blocks the next arrival.
-/// </remarks>
-public sealed class TimerDebounceNode<TInput> : FlowNode<TInput, TInput>
+public sealed class TimerDebounceNode : IFlowNode
 {
-    public const string Emitted = TimerDiagnosticNames.DebounceEmitted;
-    public const string Failed = TimerDiagnosticNames.DebounceFailed;
-
+    private const string NodeType = "timer.debounce";
     private readonly TimerDebounceSettings _settings;
     private readonly TimeProvider _clock;
-    private readonly string _inputType = typeof(TInput).Name;
+    private readonly TimerResultPipeline _pipeline;
     private readonly object _gate = new();
-    private long _latestSeq;
-    private long _emitted;
-    private FlowMessage<TInput>? _pending;
+    private long _latestSequence;
+    private FlowMessage<FlowValue>? _pending;
     private ITimer? _timer;
 
     public TimerDebounceNode(
         TimerDebounceSettings settings,
         TimeProvider? clock = null)
-        : base(BuildNodeOptions(settings))
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = ValidateSettings(settings);
         _clock = clock ?? TimeProvider.System;
+        _pipeline = new TimerResultPipeline(
+            _settings.BoundedCapacity,
+            ProcessAsync,
+            FlushPendingAsync,
+            DisposeTimerAsync);
     }
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
+    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private Task ProcessAsync(FlowMessage<FlowValue> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-
-        try
+        if (message.Payload is null)
         {
-            lock (_gate)
+            PublishFailure(
+                message,
+                TimerErrorCodeNames.MissingInput,
+                "timer.debounce requires FlowValue input.");
+            return Task.CompletedTask;
+        }
+
+        Exception? failure = null;
+        lock (_gate)
+        {
+            var sequence = ++_latestSequence;
+            _pending = message;
+            try
             {
-                // Record this item as the latest pending and supersede the prior window:
-                // dispose the previous timer (so it cannot fire) and arm a fresh one.
-                var mySeq = ++_latestSeq;
-                _pending = message;
                 _timer?.Dispose();
+                _timer = null;
                 _timer = _clock.CreateTimer(
-                    OnQuietElapsed, mySeq, _settings.QuietPeriod, Timeout.InfiniteTimeSpan);
+                    OnQuietElapsed,
+                    sequence,
+                    _settings.QuietPeriod,
+                    Timeout.InfiniteTimeSpan);
+            }
+            catch (Exception exception)
+            {
+                _timer = null;
+                _pending = null;
+                failure = exception;
             }
         }
-        catch (Exception exception)
+
+        if (failure is not null)
         {
-            ReportFailure(message, exception);
+            PublishFailure(
+                message,
+                TimerErrorCodeNames.DebounceFailed,
+                $"timer.debounce failed: {failure.Message}",
+                failure);
         }
 
-        // The wait happens in the timer callback; the pump stays free for the next arrival.
         return Task.CompletedTask;
     }
 
-    // Fired once the quiet period elapses for the arrival identified by <paramref name="state"/>.
-    // Emits only if that arrival is still the latest and nothing has flushed it yet.
     private void OnQuietElapsed(object? state)
     {
-        var seq = (long)state!;
+        var sequence = (long)state!;
         lock (_gate)
         {
-            if (seq == _latestSeq && _pending is { } pending)
-            {
-                _pending = null;
-                EmitLatest(pending);
-            }
+            if (sequence != _latestSequence || _pending is not { } pending)
+                return;
+
+            _pending = null;
+            _timer?.Dispose();
+            _timer = null;
+            EmitLatest(pending);
         }
     }
 
-    /// <summary>
-    /// Flushes the pending latest item when the input drains, rather than waiting out a full
-    /// quiet window (which may never elapse). Runs after the pump has stopped and before the
-    /// outputs complete, so the emitted item reaches linked consumers.
-    /// </summary>
-    protected override ValueTask OnInputCompletedAsync()
+    private ValueTask FlushPendingAsync()
     {
-        FlowMessage<TInput>? toEmit = null;
+        FlowMessage<FlowValue>? pending = null;
         lock (_gate)
         {
             _timer?.Dispose();
             _timer = null;
-            if (_pending is { } pending)
+            if (_pending is { } current)
             {
                 _pending = null;
-                toEmit = pending;
+                pending = current;
             }
         }
 
-        if (toEmit is { } message)
-        {
-            EmitLatest(message);
-        }
+        if (pending is not null)
+            EmitLatest(pending);
 
         return ValueTask.CompletedTask;
     }
 
-    protected override ValueTask OnDisposeAsync()
+    private ValueTask DisposeTimerAsync()
     {
         lock (_gate)
         {
@@ -122,96 +141,102 @@ public sealed class TimerDebounceNode<TInput> : FlowNode<TInput, TInput>
         return ValueTask.CompletedTask;
     }
 
-    private void EmitLatest(FlowMessage<TInput> message)
+    private void EmitLatest(FlowMessage<FlowValue> message)
     {
         try
         {
-            // Carry the correlation id forward onto the (unchanged) latest payload.
-            Emit(message.With(message.Payload));
-            var sequence = Interlocked.Increment(ref _emitted);
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = Emitted,
-                Level = FlowEventLevel.Information,
-                Message = "timer.debounce emitted input.",
-                Attributes = CreateAttributes(sequence)
-            });
+            var timestamp = _clock.GetUtcNow();
+            _pipeline.Emit(TimerNodeSupport.Success(
+                message,
+                TimerResultKinds.Debounced,
+                timestamp));
+            _pipeline.PublishEvent(TimerNodeSupport.Event(
+                message,
+                timestamp,
+                TimerDiagnosticNames.DebounceEmitted,
+                FlowEventLevel.Information,
+                "timer.debounce emitted input.",
+                TimerResultKinds.Debounced,
+                NodeType,
+                _settings.Name,
+                errorCode: null,
+                CreateEventTiming()));
         }
         catch (Exception exception)
         {
-            ReportFailure(message, exception);
+            PublishFailure(
+                message,
+                TimerErrorCodeNames.DebounceFailed,
+                $"timer.debounce failed: {exception.Message}",
+                exception);
         }
     }
 
-    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
+    private void PublishFailure(
+        FlowMessage<FlowValue> message,
+        string errorCode,
+        string text,
+        Exception? exception = null)
     {
-        EmitError(new FlowError
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = TimerErrorCodes.DebounceFailed,
-            Message = $"timer.debounce failed: {exception.Message}",
-            Context = CreateErrorContext(),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = Failed,
-            Level = FlowEventLevel.Error,
-            Message = "timer.debounce failed.",
-            Attributes = CreateAttributes()
-        });
+        var timestamp = GetTimestamp(message);
+        _pipeline.Emit(TimerNodeSupport.Failure(
+            message,
+            TimerResultKinds.DebounceFailed,
+            errorCode,
+            text,
+            NodeType,
+            _settings.Name,
+            timestamp,
+            exception,
+            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            {
+                ["quietPeriod"] = FlowValue.From(_settings.QuietPeriod)
+            }));
+        _pipeline.PublishEvent(TimerNodeSupport.Event(
+            message,
+            timestamp,
+            TimerDiagnosticNames.DebounceFailed,
+            FlowEventLevel.Warning,
+            text,
+            TimerResultKinds.DebounceFailed,
+            NodeType,
+            _settings.Name,
+            errorCode,
+            CreateEventTiming()));
     }
 
-    private Dictionary<string, object?> CreateAttributes(long? sequence = null)
-    {
-        var attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+    private Dictionary<string, object?> CreateEventTiming()
+        => new(StringComparer.Ordinal)
         {
-            ["name"] = _settings.Name,
-            ["inputType"] = _inputType,
             ["quietPeriodMilliseconds"] = _settings.QuietPeriod.TotalMilliseconds
         };
 
-        if (sequence.HasValue)
+    private DateTimeOffset GetTimestamp(FlowMessage<FlowValue> message)
+    {
+        try
         {
-            attributes["sequence"] = sequence.Value;
+            return _clock.GetUtcNow();
         }
-
-        return attributes;
+        catch
+        {
+            return message.Timestamp;
+        }
     }
 
-    private string CreateErrorContext()
-        => string.Join("; ",
-            $"name={_settings.Name}",
-            $"inputType={_inputType}",
-            $"quietPeriodMilliseconds={_settings.QuietPeriod.TotalMilliseconds}");
-
-    private static FlowNodeOptions BuildNodeOptions(TimerDebounceSettings? settings)
+    private static TimerDebounceSettings ValidateSettings(TimerDebounceSettings? settings)
     {
-        var resolved = settings ?? throw new ArgumentNullException(nameof(settings));
-
-        if (resolved.QuietPeriod <= TimeSpan.Zero)
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.QuietPeriod <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(settings), "timer.debounce 'QuietPeriod' must be greater than zero.");
         }
-
-        if (resolved.BoundedCapacity <= 0)
+        if (settings.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(settings), "timer.debounce 'BoundedCapacity' must be greater than zero.");
         }
 
-        return new FlowNodeOptions
-        {
-            InputCapacity = resolved.BoundedCapacity,
-            // Serial intake: a newer arrival must supersede the previous pending item in
-            // strict arrival order, so handlers must not run concurrently.
-            MaxDegreeOfParallelism = 1
-        };
+        return settings;
     }
 }

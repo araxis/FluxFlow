@@ -296,18 +296,34 @@
       "verification": ["exact byte/content metadata fidelity", "store envelope round trip", "existing sequence continuation", "query filter and result parity", "replay order, pacing, cancellation, and source lifecycle", "normal validation, store, missing-session, and malformed-record failure results", "session completion behavior", "deterministic clocks", "diagnostics", "fan-out", "message lineage", "canonical composition activation"]
     },
     {
-      "id": "components.timers-sources-serialization-typed-compatibility",
+      "id": "components.timers-typed-compatibility",
       "kind": "public-api",
-      "packages": ["components-timers", "components-timers-composition", "components-sources", "components-sources-composition", "components-serialization", "components-serialization-composition"],
-      "declarations": ["typed timer nodes", "typed source nodes", "legacy serialization request nodes", "typed composition registrations", "Errors outputs"],
-      "sourceFiles": ["src/FluxFlow.Components.Timers/README.md", "src/FluxFlow.Components.Sources/README.md", "src/FluxFlow.Components.Serialization/README.md"],
-      "canonicalReplacement": "FlowValue timer and source nodes plus FlowContent serialization nodes with normal result output.",
+      "packages": ["components-timers", "components-timers-composition"],
+      "declarations": ["TimerTick", "ScheduleTick", "generic timer transform nodes", "temporary FlowValueTimer node names", "typed composition registrations", "TimerErrorCodes", "TimerEventNames", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Timers/README.md", "src/FluxFlow.Components.Timers.Composition/TimersCompositionNodeRegistryExtensions.cs", "src/FluxFlow.Components.Timers.Composition/README.md"],
+      "canonicalReplacement": "Concise Timer nodes with FlowValue source ticks, FlowValue transform inputs, one normal FlowResult output, and Events.",
+      "currentConsumers": ["migrated runtime tests", "migrated canonical-host Composition tests"],
+      "uniqueBehavior": ["Interval and schedule lifecycle", "fresh source identity", "cron and time-zone timing", "delay arrival-relative ordering", "queued throttle ordering", "latest-only debounce suppression", "exact-once timer/completion flush", "deterministic clocks", "diagnostics", "fault and disposal behavior"],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major runtime package version 5.0.0 and Composition package version 3.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Timers 4.0.0", "FluxFlow.Components.Timers.Composition 2.0.0"],
+      "apiCompatibilityFindings": ["CP0001: TimerTick, ScheduleTick, TimerErrorCodes, TimerEventNames, temporary FlowValueTimer nodes, and generic typed transform types removed", "CP0007/CP0002: concise TimerIntervalNode and TimerScheduleNode now expose FlowValue without inherited Errors; concise transform nodes now expose FlowResult<FlowValue>", "CP0001: TimersTypedRegistrationExtensions and generic transform registration overloads removed"],
+      "migration": "Use concise Timer nodes; read tick fields from immutable FlowValue objects; convert typed inputs at the application boundary; inspect FlowResult Kind, IsError, Error.Code, and Value; remove typed registration calls and Errors links.",
+      "verification": ["source lifecycle and pre-canceled startup", "fresh source identity", "cron and time-zone behavior", "delay arrival timing and order", "throttle timing and order", "debounce latest-only and exact-once completion", "normal failure continuation", "diagnostics", "fault and disposal behavior", "message lineage", "canonical composition activation"]
+    },
+    {
+      "id": "components.sources-serialization-typed-compatibility",
+      "kind": "public-api",
+      "packages": ["components-sources", "components-sources-composition", "components-serialization", "components-serialization-composition"],
+      "declarations": ["typed source nodes", "legacy serialization request nodes", "typed composition registrations", "Errors outputs"],
+      "sourceFiles": ["src/FluxFlow.Components.Sources/README.md", "src/FluxFlow.Components.Serialization/README.md"],
+      "canonicalReplacement": "FlowValue source nodes plus FlowContent serialization nodes with normal result output.",
       "currentConsumers": ["typed runtime tests", "typed registration tests", "code-authored workflows"],
-      "uniqueBehavior": ["Closed CLR output types and request-specific encoding or serialization contracts."],
+      "uniqueBehavior": ["Closed CLR source output types and request-specific encoding or serialization contracts."],
       "readiness": "blocked-behavior-gap",
       "versionImpact": "Major only for packages whose public typed declarations are removed.",
       "migration": "Inventory each typed declaration separately and prove value/content conversion and lifecycle parity.",
-      "verification": ["timer exact-once completion", "source lifecycle", "sequence parity", "encoding fallback", "size limits"]
+      "verification": ["source lifecycle", "sequence parity", "encoding fallback", "size limits"]
     },
     {
       "id": "components.observability-generic-compatibility",

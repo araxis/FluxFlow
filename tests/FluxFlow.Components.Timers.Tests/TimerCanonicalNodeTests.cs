@@ -8,14 +8,14 @@ using Xunit;
 
 namespace FluxFlow.Components.Timers.Tests;
 
-public sealed class FlowValueTimerNodeTests
+public sealed class TimerCanonicalNodeTests
 {
     [Fact]
     public async Task Interval_emits_flow_value_tick_without_error_port()
     {
         var startedAt = new DateTimeOffset(2026, 7, 19, 10, 0, 0, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startedAt);
-        await using var node = new FlowValueTimerIntervalNode(
+        await using var node = new TimerIntervalNode(
             new TimerIntervalSettings
             {
                 Name = "heartbeat",
@@ -36,7 +36,7 @@ public sealed class FlowValueTimerNodeTests
         tick["sequence"].GetInteger().ShouldBe(1);
         tick["interval"].GetDuration().ShouldBe(TimeSpan.FromSeconds(5));
         message.CausationId.ShouldBeNull();
-        typeof(FlowValueTimerIntervalNode).GetProperty("Errors").ShouldBeNull();
+        typeof(TimerIntervalNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class FlowValueTimerNodeTests
     {
         var startedAt = new DateTimeOffset(2026, 7, 19, 10, 0, 0, TimeSpan.Zero);
         var clock = new TrackingFakeTimeProvider(startedAt);
-        await using var node = new FlowValueTimerScheduleNode(
+        await using var node = new TimerScheduleNode(
             new TimerScheduleSettings
             {
                 Name = "cron",
@@ -65,13 +65,13 @@ public sealed class FlowValueTimerNodeTests
         tick["cron"].GetString().ShouldBe("* * * * * *");
         tick["timeZoneId"].GetString().ShouldBe(TimeZoneInfo.Utc.Id);
         tick["dueAt"].GetDateTimeOffset().ShouldBe(startedAt.AddSeconds(1));
-        typeof(FlowValueTimerScheduleNode).GetProperty("Errors").ShouldBeNull();
+        typeof(TimerScheduleNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
     public async Task Pre_canceled_interval_start_does_not_consume_start_state()
     {
-        await using var node = new FlowValueTimerIntervalNode(
+        await using var node = new TimerIntervalNode(
             new TimerIntervalSettings
             {
                 Interval = TimeSpan.FromSeconds(1),
@@ -94,7 +94,7 @@ public sealed class FlowValueTimerNodeTests
     public async Task Delay_emits_success_result_with_lineage()
     {
         var clock = new TrackingFakeTimeProvider();
-        await using var node = new FlowValueTimerDelayNode(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(20) },
             clock);
         var output = TimerTestSink.Link(node.Output);
@@ -116,13 +116,13 @@ public sealed class FlowValueTimerNodeTests
         message.CorrelationId.ShouldBe(input.CorrelationId);
         message.TraceId.ShouldBe(input.TraceId);
         message.CausationId.ShouldBe(input.MessageId);
-        typeof(FlowValueTimerDelayNode).GetProperty("Errors").ShouldBeNull();
+        typeof(TimerDelayNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
     public async Task Delay_emits_failure_result_and_continues()
     {
-        await using var node = new FlowValueTimerDelayNode(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(1) },
             new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
@@ -143,7 +143,7 @@ public sealed class FlowValueTimerNodeTests
     [Fact]
     public async Task Throttle_emits_failure_result_and_continues_in_order()
     {
-        await using var node = new FlowValueTimerThrottleNode(
+        await using var node = new TimerThrottleNode(
             new TimerThrottleSettings
             {
                 Interval = TimeSpan.FromMilliseconds(1),
@@ -164,13 +164,13 @@ public sealed class FlowValueTimerNodeTests
         ]);
         results[0].Payload.Error!.Code.ShouldBe(TimerErrorCodeNames.ThrottleFailed);
         results[1].Payload.Value!.GetString().ShouldBe("good");
-        typeof(FlowValueTimerThrottleNode).GetProperty("Errors").ShouldBeNull();
+        typeof(TimerThrottleNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
     public async Task Debounce_emits_only_latest_result_and_flushes_on_completion()
     {
-        await using var node = new FlowValueTimerDebounceNode(
+        await using var node = new TimerDebounceNode(
             new TimerDebounceSettings { QuietPeriod = TimeSpan.FromHours(1) });
         var output = TimerTestSink.Link(node.Output);
         var first = FlowMessage.Create(FlowValue.From("one"));
@@ -186,13 +186,13 @@ public sealed class FlowValueTimerNodeTests
         message.Payload.Value!.GetString().ShouldBe("two");
         message.CorrelationId.ShouldBe(latest.CorrelationId);
         message.CausationId.ShouldBe(latest.MessageId);
-        typeof(FlowValueTimerDebounceNode).GetProperty("Errors").ShouldBeNull();
+        typeof(TimerDebounceNode).GetProperty("Errors").ShouldBeNull();
     }
 
     [Fact]
     public async Task Debounce_emits_timer_creation_failure_once_and_continues()
     {
-        await using var node = new FlowValueTimerDebounceNode(
+        await using var node = new TimerDebounceNode(
             new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(1) },
             new ThrowOnFirstTimerProvider());
         var output = TimerTestSink.Link(node.Output);
@@ -216,7 +216,7 @@ public sealed class FlowValueTimerNodeTests
         for (var iteration = 0; iteration < 20; iteration++)
         {
             var clock = new TrackingFakeTimeProvider();
-            await using var node = new FlowValueTimerDebounceNode(
+            await using var node = new TimerDebounceNode(
                 new TimerDebounceSettings { QuietPeriod = TimeSpan.FromMilliseconds(1) },
                 clock);
             var output = TimerTestSink.Link(node.Output);
@@ -246,7 +246,7 @@ public sealed class FlowValueTimerNodeTests
     [Fact]
     public async Task Missing_input_is_a_normal_failure_result()
     {
-        await using var node = new FlowValueTimerDelayNode(
+        await using var node = new TimerDelayNode(
             new TimerDelaySettings { Delay = TimeSpan.Zero });
         var output = TimerTestSink.Link(node.Output);
         await node.Input.SendAsync(FlowMessage.Create<FlowValue>(null!));

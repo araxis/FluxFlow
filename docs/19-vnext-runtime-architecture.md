@@ -18,6 +18,9 @@ and failed aggregation outcomes through one normal FlowResult output.
 Sessions now uses concise recorder, replay, and query nodes with exact
 `FlowContent`, one normal `FlowResult` output, retained store-adapter contracts,
 and no typed node compatibility layer or universal Errors stream.
+Timers now uses concise interval, schedule, delay, throttle, and debounce nodes
+with immutable `FlowValue` ticks, normal transform results, deterministic
+clocks, and no typed compatibility layer or universal Errors stream.
 Observability now uses FlowValue-native Counter, Logger, and Metrics components
 with one normal result stream per component while retaining generic standalone
 compatibility surfaces.
@@ -30,7 +33,7 @@ provider-owned versus non-owning keyed registration APIs. Configuration validate
 the same addresses and ownership declarations.
 Structural Switch, Fork, and Merge routing plus Filter and When control nodes
 are deprecated in favor of canonical links. The remaining component families
-through Sessions are migrated. Canonical Hosting integration now loads the
+through Timers are migrated. Canonical Hosting integration now loads the
 flat application definition, coordinates initial and subsequent
 complete-definition revisions through explicit candidate factories, preserves
 active revisions on rejection, and reports source-load failures as degraded
@@ -268,7 +271,7 @@ resource/node binding are complete locally.
 8. MQTT core resource/component vertical slice. Complete locally.
 9. Concrete MQTT adapters and canonical MQTT Composition binding. Complete
    locally.
-10. Component-family migrations through Sessions, resource/configuration
+10. Component-family migrations through Timers, resource/configuration
     alignment, canonical Hosting and Designer persistence, and coordinated
     package validation. Complete locally.
 11. Canonical runtime assembly from JSON through resources, components, links,

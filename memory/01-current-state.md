@@ -8,7 +8,8 @@ Date: 2026-07-23
   `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
-  canonical family consolidations through State, Expectations, and Sessions.
+  canonical family consolidations through State, Expectations, Sessions, and
+  Timers.
   The
   provider-neutral MQTT vertical slice and the bounded normal component-family
   migrations through Sessions,
@@ -297,17 +298,18 @@ Date: 2026-07-23
   host-owned clock resource. Focused/full tests, controlled builds, binary
   compatibility, preflight/dry-runs, and a package-only consumer passed. See
   `228-vnext-sources-flowvalue.md`.
-- `FluxFlow.Components.Timers` is now `4.0.0` locally with canonical FlowValue
-  Interval and Schedule sources plus FlowValue-to-FlowResult Delay, Throttle,
-  and Debounce transforms. Timer sources retain natural lifecycle and fresh identity;
-  transforms preserve ordered temporal semantics, normal expected failures,
-  exact-once debounce completion, later-input continuation, and strong lineage.
-  Released typed nodes remain available unchanged. Timers Composition is now
-  `2.0.0` with parameterless canonical registrations, explicit typed
-  compatibility paths, fixed Designer ports, no canonical Errors surfaces, and
-  an exact host-owned clock resource. Focused/full tests, controlled builds,
-  binary compatibility, preflight/dry-runs, and a package-only consumer passed.
-  See `229-vnext-timers-flowvalue-results.md`.
+- `FluxFlow.Components.Timers` is now `5.0.0` locally and consolidated on
+  concise Interval and Schedule FlowValue sources plus FlowValue-to-FlowResult
+  Delay, Throttle, and Debounce transforms. Source lifecycle, fresh identity,
+  deterministic clocks, ordered temporal semantics, normal expected failures,
+  exact-once debounce completion, later-input continuation, diagnostics, and
+  strong lineage are preserved. Typed ticks, generic direct-output transforms,
+  temporary canonical node names, numeric/duplicate diagnostics, and Errors
+  surfaces are removed. Timers Composition is now `3.0.0` with only fixed
+  canonical registrations and exact host-owned clock addresses. Focused/shared
+  tests, controlled builds, expected major API diagnostics, preflight/dry-runs,
+  and a package-only consumer passed. Sources is the next bounded family
+  assessment. See `251-timers-canonical-consolidation.md`.
 - `FluxFlow.Components.Http` is now `5.0.0` locally and consolidated on
   `HttpClientNode`, `HttpClientRequest`, exact FlowContent request/response
   bodies, and polymorphic `HttpClientResult` response/error outcomes. Expected

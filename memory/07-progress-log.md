@@ -2,6 +2,20 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Timers Consolidation
+
+- Consolidated Timers on concise interval, schedule, delay, throttle, and
+  debounce nodes with immutable ticks, normal results, deterministic clocks,
+  diagnostics, exact-once debounce completion, and strong message lineage.
+- Removed typed tick contracts, generic direct-output transforms, temporary
+  FlowValue-prefixed nodes, numeric/duplicate diagnostics, Errors surfaces,
+  typed Composition registrations, and obsolete composition host tests after
+  lifecycle and temporal parity coverage.
+- Moved Timers to `5.0.0` and Timers Composition to `3.0.0`; focused/shared
+  tests, controlled builds, expected major API diagnostics, 58-package source
+  seeding, preflight/dry-runs, and a package-only consumer passed. See
+  [[251-timers-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Sessions Consolidation
 
 - Consolidated Sessions on concise recorder, replay, and query nodes with exact

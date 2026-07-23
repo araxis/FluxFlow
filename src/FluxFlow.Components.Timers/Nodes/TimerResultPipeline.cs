@@ -4,7 +4,7 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-internal sealed class FlowValueTimerResultPipeline : IFlowNode
+internal sealed class TimerResultPipeline : IFlowNode
 {
     private readonly BufferBlock<FlowMessage<FlowValue>> _input;
     private readonly ActionBlock<FlowMessage<FlowValue>> _processor;
@@ -18,7 +18,7 @@ internal sealed class FlowValueTimerResultPipeline : IFlowNode
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposed;
 
-    public FlowValueTimerResultPipeline(
+    public TimerResultPipeline(
         int boundedCapacity,
         Func<FlowMessage<FlowValue>, Task> process,
         Func<ValueTask>? onInputCompleted = null,

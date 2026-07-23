@@ -549,13 +549,21 @@ Main types:
 - `TimersCompositionResourceNames`
 
 Use `RegisterTimerInterval()`, `RegisterTimerSchedule()`,
-`RegisterTimerDelay<TInput>()`, `RegisterTimerThrottle<TInput>()`, and
-`RegisterTimerDebounce<TInput>()` from the optional
+`RegisterTimerDelay()`, `RegisterTimerThrottle()`, and
+`RegisterTimerDebounce()` from the optional
 `FluxFlow.Components.Timers.Composition` package when a composition host wants
-timer source and transform node factories. The factories bind existing timer
-settings and resolve optional keyed `TimeProvider` resources through the host.
+canonical timer source and transform factories. Interval and Schedule emit
+immutable `FlowValue` tick objects. Delay, Throttle, and Debounce consume
+`FlowValue` and emit one normal `FlowResult<FlowValue>` Output. The factories
+bind timer settings and resolve optional host-owned `TimeProvider` resources
+through exact `Resources.{name}` addresses.
 Invalid timer settings fail during build as factory diagnostics when the host is
 configured to collect build failures.
+
+Timers now has one maintained application contract. Replace temporary
+`FlowValueTimer*` names with concise `Timer*Node` names, convert typed values at
+the application boundary, and replace typed tick, generic transform, or Errors
+links with immutable tick fields and normal result conditions.
 
 `TimersComponentDesignMetadataProvider` exposes neutral Designer metadata for
 the five timer composition nodes so hosts can compose palette, editor,

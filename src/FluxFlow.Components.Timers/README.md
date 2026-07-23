@@ -1,40 +1,34 @@
 # FluxFlow.Components.Timers
 
-Standalone temporal nodes for FluxFlow. Canonical timer sources emit immutable
-`FlowValue` messages; canonical delay, throttle, and debounce nodes consume
-`FlowValue` and emit one normal `FlowResult<FlowValue>` stream. All canonical
-nodes also publish lifecycle `Events` and have no universal `Errors` port.
+Standalone temporal nodes over immutable workflow values. Interval and
+Schedule are sources of `FlowValue`; Delay, Throttle, and Debounce consume
+`FlowValue` and emit one normal `FlowResult<FlowValue>` stream. Every node also
+publishes component Events and has no universal Errors port.
 
 The package uses TPL Dataflow through `FluxFlow.Nodes`, but does not require
-Composition, Engine, hosting, reflection, or assembly scanning. Every duration
-is driven by an injected `TimeProvider`, so tests can advance time
-deterministically.
+Composition, Engine, hosting, reflection, or assembly scanning. An optional
+`TimeProvider` controls all scheduling and diagnostic timestamps.
 
-## Canonical Nodes
+## Nodes
 
 | Node | Input | Output | Purpose |
 |------|-------|--------|---------|
-| `FlowValueTimerIntervalNode` | none | `FlowValue` | Emits fixed-interval tick objects. |
-| `FlowValueTimerScheduleNode` | none | `FlowValue` | Emits cron-schedule tick objects. |
-| `FlowValueTimerDelayNode` | `FlowValue` | `FlowResult<FlowValue>` | Delays every input from its arrival time. |
-| `FlowValueTimerThrottleNode` | `FlowValue` | `FlowResult<FlowValue>` | Queues and rate-limits inputs in order. |
-| `FlowValueTimerDebounceNode` | `FlowValue` | `FlowResult<FlowValue>` | Emits only the latest value after a quiet period. |
+| `TimerIntervalNode` | none | `FlowValue` | Emits fixed-interval tick objects. |
+| `TimerScheduleNode` | none | `FlowValue` | Emits cron-schedule tick objects. |
+| `TimerDelayNode` | `FlowValue` | `FlowResult<FlowValue>` | Delays each accepted value from arrival. |
+| `TimerThrottleNode` | `FlowValue` | `FlowResult<FlowValue>` | Queues and rate-limits values in order. |
+| `TimerDebounceNode` | `FlowValue` | `FlowResult<FlowValue>` | Emits the latest value after a quiet period. |
 
 Sources start once through `StartAsync()` and stop through `Complete()` or
-disposal. Every source tick has fresh message identity. Interval tick objects
-contain `timestamp`, `name`, `sequence`, `startedAt`, `dueAt`, `elapsed`,
-`interval`, and `drift`. Schedule tick objects contain `timestamp`, `name`,
-`sequence`, `startedAt`, `dueAt`, `cron`, `timeZoneId`, and `drift`.
+disposal. Every tick has fresh message identity. Interval objects contain
+`timestamp`, `name`, `sequence`, `startedAt`, `dueAt`, `elapsed`, `interval`,
+and `drift`. Schedule objects contain `timestamp`, `name`, `sequence`,
+`startedAt`, `dueAt`, `cron`, `timeZoneId`, and `drift`.
 
-Configuration errors fail construction. Unexpected source or pipeline faults
-fault `Completion` and are surfaced by the host through runtime system streams.
-Expected per-message timing failures remain ordinary results with stable
-`TimerResultKinds` and `TimerErrorCodeNames`; later inputs continue.
-
-## Interval And Schedule
+## Direct Use
 
 ```csharp
-await using var interval = new FlowValueTimerIntervalNode(
+await using var interval = new TimerIntervalNode(
     new TimerIntervalSettings
     {
         Name = "poll",
@@ -43,75 +37,51 @@ await using var interval = new FlowValueTimerIntervalNode(
         MaxTicks = 10
     });
 
-interval.Output.LinkTo(downstream);
+interval.Output.LinkTo(ticks);
 await interval.StartAsync();
 
-await using var schedule = new FlowValueTimerScheduleNode(
-    new TimerScheduleSettings
-    {
-        Name = "weekday-noon",
-        Cron = "0 12 ? * MON-FRI",
-        TimeZone = TimeZoneInfo.Utc,
-        MaxTicks = 10
-    });
-```
-
-A pre-canceled start does not consume the source's one-start state.
-`BoundedCapacity` bounds source output. Output is live broadcast fan-out, not
-durable replay storage.
-
-## Delay, Throttle, And Debounce
-
-```csharp
 var value = FlowValue.FromObject(new Dictionary<string, FlowValue>
 {
     ["id"] = FlowValue.From("A-100")
 });
 
-await using var delay = new FlowValueTimerDelayNode(
+await using var delay = new TimerDelayNode(
     new TimerDelaySettings { Delay = TimeSpan.FromMilliseconds(250) });
 
 delay.Output.LinkTo(results);
 await delay.Input.SendAsync(FlowMessage.Create(value));
 ```
 
-- Delay preserves arrival order and measures each due time from intake, so a
-  burst does not accidentally become a throttle.
-- Throttle preserves order and queues inputs through bounded intake; it does
-  not drop values.
-- Debounce intentionally produces no result for superseded inputs. It emits
-  the selected latest value after the quiet period or flushes it once when the
-  input completes. Concurrent timer expiry and completion cannot duplicate it.
-- Success results carry the original immutable value and preserve correlation,
-  trace, headers, and causation. Timing failures carry immutable error details
-  on the same Output.
+A pre-canceled source start does not consume the one-start state.
+`BoundedCapacity` bounds accepted work. Outputs are live broadcast fan-out,
+not durable replay storage.
 
-## Typed Compatibility
+Delay preserves arrival order and measures each due time from intake, so a
+burst does not become a throttle. Throttle queues accepted values and preserves
+order. Debounce intentionally produces no result for superseded inputs and
+emits its latest value exactly once when its timer expires or input completes.
 
-Released direct-use nodes remain available unchanged:
+Configuration errors fail construction. Unexpected source or pipeline faults
+fault `Completion`. Expected per-message timing failures remain ordinary
+results with stable `TimerResultKinds` and `TimerErrorCodeNames`; later inputs
+continue. Success and failure results preserve correlation, trace, headers,
+and causation.
 
-- `TimerIntervalNode` emits `TimerTick`.
-- `TimerScheduleNode` emits `ScheduleTick`.
-- `TimerDelayNode<T>`, `TimerThrottleNode<T>`, and `TimerDebounceNode<T>` emit
-  the original typed payload.
+## Migration From 4.x
 
-Those types retain their released Output, Errors, and Events surfaces. They are
-compatibility APIs for code-authored typed pipelines; canonical workflow
-definitions use the FlowValue/result nodes.
+The concise node names now own the canonical contracts. Replace
+`FlowValueTimerIntervalNode`, `FlowValueTimerScheduleNode`,
+`FlowValueTimerDelayNode`, `FlowValueTimerThrottleNode`, and
+`FlowValueTimerDebounceNode` with their corresponding concise names.
+
+The typed `TimerTick`, `ScheduleTick`, and generic timer transform APIs were
+removed. Read source tick fields from immutable `FlowValue` objects, convert
+typed inputs to `FlowValue` at the application boundary, read successful
+transform values from `FlowResult.Value`, and route failures using `Kind`,
+`IsError`, and `Error.Code` on the normal Output.
 
 ## Composition
 
 Install `FluxFlow.Components.Timers.Composition` for canonical factories,
-Designer metadata, flat configuration binding, and optional host-owned keyed
-clocks:
-
-```csharp
-registry
-    .RegisterTimerInterval()
-    .RegisterTimerSchedule()
-    .RegisterTimerDelay()
-    .RegisterTimerThrottle()
-    .RegisterTimerDebounce();
-```
-
+Designer metadata, flat configuration binding, and optional host-owned clocks.
 The adapter owns neither clock lifetime nor durable output storage.

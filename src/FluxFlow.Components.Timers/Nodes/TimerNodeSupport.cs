@@ -4,7 +4,7 @@ using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
-internal static class FlowValueTimerNodeSupport
+internal static class TimerNodeSupport
 {
     public static FlowMessage<FlowResult<FlowValue>> Success(
         FlowMessage<FlowValue> message,

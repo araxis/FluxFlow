@@ -1,47 +1,28 @@
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Timers.Diagnostics;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
-using System.Threading.Tasks.Dataflow;
 
 namespace FluxFlow.Components.Timers.Nodes;
 
 /// <summary>
-/// A standalone delay node: post a <c>FlowMessage&lt;TInput&gt;</c> to <c>Input</c> and the
-/// node re-broadcasts the same payload on <c>Output</c> after the configured delay,
-/// carrying the original correlation id forward. Order is preserved. Timing uses the
-/// injected <see cref="TimeProvider"/>, so a FakeTimeProvider drives it deterministically.
-/// Works with nothing but <c>new TimerDelayNode&lt;T&gt;(settings)</c> — no engine.
+/// Delays immutable workflow values and emits timing failures as normal results.
 /// </summary>
-/// <remarks>
-/// A delay is measured from each item's ARRIVAL: a burst that arrives together is emitted a
-/// constant offset later (all at arrival+Delay), not staggered one delay per item. That is
-/// achieved with two serial stages — a fast intake that stamps the absolute due time the
-/// instant the item arrives (so a burst shares one due time), and an ordered delay line that
-/// waits only the remaining time to that instant before re-broadcasting. Doing the wait
-/// inside a single intake step would instead accumulate one full delay per item (that is
-/// throttle behavior, not delay).
-/// </remarks>
-public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
+public sealed class TimerDelayNode : IFlowNode
 {
-    public const string Emitted = TimerDiagnosticNames.DelayEmitted;
-    public const string Failed = TimerDiagnosticNames.DelayFailed;
-
+    private const string NodeType = "timer.delay";
     private readonly TimerDelaySettings _settings;
     private readonly TimeProvider _clock;
-    private readonly string _inputType = typeof(TInput).Name;
     private readonly ActionBlock<PendingItem> _delayLine;
+    private readonly TimerResultPipeline _pipeline;
 
     public TimerDelayNode(
         TimerDelaySettings settings,
         TimeProvider? clock = null)
-        : base(BuildNodeOptions(settings))
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = ValidateSettings(settings);
         _clock = clock ?? TimeProvider.System;
-
-        // Stage 2: serial + ordered so emission order matches arrival order even though all
-        // items in a burst share one due time. Bounded so a slow delay line backpressures
-        // intake (and, through it, Input).
         _delayLine = new ActionBlock<PendingItem>(
             EmitWhenDueAsync,
             new ExecutionDataflowBlockOptions
@@ -50,20 +31,63 @@ public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
                 MaxDegreeOfParallelism = 1,
                 EnsureOrdered = true
             });
+        _pipeline = new TimerResultPipeline(
+            _settings.BoundedCapacity,
+            ProcessAsync,
+            CompleteDelayLineAsync,
+            DisposeDelayLineAsync);
     }
 
-    // Stage 1 (fast, no await on the delay): stamp the absolute due time at arrival and hand
-    // off to the serial delay line. Because it does not wait here, a burst is stamped within
-    // the same instant, so every item shares one due time.
-    protected override async Task ProcessAsync(FlowMessage<TInput> message)
+    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<FlowResult<FlowValue>>> Output => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private async Task ProcessAsync(FlowMessage<FlowValue> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var dueAt = _clock.GetUtcNow() + _settings.Delay;
-        await _delayLine.SendAsync(new PendingItem(message, dueAt), Stopping).ConfigureAwait(false);
+        if (message.Payload is null)
+        {
+            PublishFailure(
+                message,
+                TimerErrorCodeNames.MissingInput,
+                "timer.delay requires FlowValue input.");
+            return;
+        }
+
+        try
+        {
+            var dueAt = _clock.GetUtcNow() + _settings.Delay;
+            if (!await _delayLine.SendAsync(
+                    new PendingItem(message, dueAt),
+                    _pipeline.Stopping).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("timer.delay delay line declined input.");
+            }
+        }
+        catch (OperationCanceledException) when (_pipeline.Stopping.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            PublishFailure(
+                message,
+                TimerErrorCodeNames.DelayFailed,
+                $"timer.delay failed: {exception.Message}",
+                exception);
+        }
     }
 
-    // Stage 2: wait only the time remaining to the stamped due instant, then re-broadcast.
-    // Items whose due time already passed (e.g. later items in a burst) emit immediately.
     private async Task EmitWhenDueAsync(PendingItem pending)
     {
         try
@@ -71,106 +95,124 @@ public sealed class TimerDelayNode<TInput> : FlowNode<TInput, TInput>
             var remaining = pending.DueAt - _clock.GetUtcNow();
             if (remaining > TimeSpan.Zero)
             {
-                await Task.Delay(remaining, _clock, Stopping).ConfigureAwait(false);
+                await Task.Delay(
+                    remaining,
+                    _clock,
+                    _pipeline.Stopping).ConfigureAwait(false);
             }
+
+            var timestamp = _clock.GetUtcNow();
+            _pipeline.Emit(TimerNodeSupport.Success(
+                pending.Message,
+                TimerResultKinds.Delayed,
+                timestamp));
+            _pipeline.PublishEvent(TimerNodeSupport.Event(
+                pending.Message,
+                timestamp,
+                TimerDiagnosticNames.DelayEmitted,
+                FlowEventLevel.Information,
+                "timer.delay emitted input.",
+                TimerResultKinds.Delayed,
+                NodeType,
+                _settings.Name,
+                errorCode: null,
+                CreateEventTiming()));
         }
-        catch (OperationCanceledException) when (Stopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (_pipeline.Stopping.IsCancellationRequested)
         {
-            // Faulting/disposing; outputs are torn down, so drop the pending item.
-            return;
+            // Unexpected-fault teardown drops work that cannot be emitted safely.
         }
         catch (Exception exception)
         {
-            // A per-message timing failure surfaces as a domain error; the line keeps
-            // processing later items instead of faulting the whole pump.
-            ReportFailure(pending.Message, exception);
-            return;
+            PublishFailure(
+                pending.Message,
+                TimerErrorCodeNames.DelayFailed,
+                $"timer.delay failed: {exception.Message}",
+                exception);
         }
-
-        // Carry the correlation id forward onto the (unchanged) payload.
-        Emit(pending.Message.With(pending.Message.Payload));
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = pending.Message.CorrelationId,
-            Name = Emitted,
-            Level = FlowEventLevel.Information,
-            Message = "timer.delay emitted input.",
-            Attributes = CreateAttributes()
-        });
     }
 
-    // After the input has drained, complete the delay line and let every still-pending item
-    // emit (in order) before the kit completes Output, so nothing is dropped on completion.
-    protected override async ValueTask OnInputCompletedAsync()
+    private void PublishFailure(
+        FlowMessage<FlowValue> message,
+        string errorCode,
+        string text,
+        Exception? exception = null)
+    {
+        var timestamp = GetTimestamp(message);
+        _pipeline.Emit(TimerNodeSupport.Failure(
+            message,
+            TimerResultKinds.DelayFailed,
+            errorCode,
+            text,
+            NodeType,
+            _settings.Name,
+            timestamp,
+            exception,
+            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            {
+                ["delay"] = FlowValue.From(_settings.Delay)
+            }));
+        _pipeline.PublishEvent(TimerNodeSupport.Event(
+            message,
+            timestamp,
+            TimerDiagnosticNames.DelayFailed,
+            FlowEventLevel.Warning,
+            text,
+            TimerResultKinds.DelayFailed,
+            NodeType,
+            _settings.Name,
+            errorCode,
+            CreateEventTiming()));
+    }
+
+    private Dictionary<string, object?> CreateEventTiming()
+        => new(StringComparer.Ordinal)
+        {
+            ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
+        };
+
+    private async ValueTask CompleteDelayLineAsync()
     {
         _delayLine.Complete();
         await _delayLine.Completion.ConfigureAwait(false);
     }
 
-    protected override ValueTask OnDisposeAsync()
+    private ValueTask DisposeDelayLineAsync()
     {
         _delayLine.Complete();
         return ValueTask.CompletedTask;
     }
 
-    private void ReportFailure(FlowMessage<TInput> source, Exception exception)
+    private DateTimeOffset GetTimestamp(FlowMessage<FlowValue> message)
     {
-        EmitError(new FlowError
+        try
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Code = TimerErrorCodes.DelayFailed,
-            Message = $"timer.delay failed: {exception.Message}",
-            Context = CreateErrorContext(),
-            Exception = exception
-        });
-        EmitEvent(new FlowEvent
+            return _clock.GetUtcNow();
+        }
+        catch
         {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = source.CorrelationId,
-            Name = Failed,
-            Level = FlowEventLevel.Error,
-            Message = "timer.delay failed.",
-            Attributes = CreateAttributes()
-        });
+            return message.Timestamp;
+        }
     }
 
-    private string CreateErrorContext()
-        => string.Join("; ",
-            $"name={_settings.Name}",
-            $"inputType={_inputType}",
-            $"delayMilliseconds={_settings.Delay.TotalMilliseconds}");
-
-    private Dictionary<string, object?> CreateAttributes()
-        => new(StringComparer.Ordinal)
-        {
-            ["name"] = _settings.Name,
-            ["inputType"] = _inputType,
-            ["delayMilliseconds"] = _settings.Delay.TotalMilliseconds
-        };
-
-    private static FlowNodeOptions BuildNodeOptions(TimerDelaySettings? settings)
+    private static TimerDelaySettings ValidateSettings(TimerDelaySettings? settings)
     {
-        var resolved = settings ?? throw new ArgumentNullException(nameof(settings));
-
-        if (resolved.Delay < TimeSpan.Zero)
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.Delay < TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(settings), "timer.delay 'Delay' cannot be negative.");
         }
-
-        if (resolved.BoundedCapacity <= 0)
+        if (settings.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(settings), "timer.delay 'BoundedCapacity' must be greater than zero.");
         }
 
-        return new FlowNodeOptions
-        {
-            InputCapacity = resolved.BoundedCapacity
-        };
+        return settings;
     }
 
-    private readonly record struct PendingItem(FlowMessage<TInput> Message, DateTimeOffset DueAt);
+    private readonly record struct PendingItem(
+        FlowMessage<FlowValue> Message,
+        DateTimeOffset DueAt);
 }

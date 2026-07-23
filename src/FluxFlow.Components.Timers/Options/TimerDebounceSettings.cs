@@ -1,7 +1,7 @@
 namespace FluxFlow.Components.Timers.Options;
 
 /// <summary>
-/// Configuration for <see cref="Nodes.TimerDebounceNode{TInput}"/>. <see cref="QuietPeriod"/>
+/// Configuration for <see cref="Nodes.TimerDebounceNode"/>. <see cref="QuietPeriod"/>
 /// is required and must be greater than zero; the node validates these in its constructor.
 /// </summary>
 public sealed record TimerDebounceSettings

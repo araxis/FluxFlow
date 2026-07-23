@@ -7,6 +7,22 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Timers 5.0.0
+
+- Consolidated interval, schedule, delay, throttle, and debounce behavior on
+  the concise `Timer*Node` names with immutable `FlowValue` inputs/ticks,
+  normal `FlowResult<FlowValue>` transform outputs, and component Events.
+- Removed typed tick contracts, generic direct-output transforms, temporary
+  `FlowValueTimer*` names, numeric error codes, duplicate diagnostic names, and
+  universal Errors surfaces while preserving source lifecycle, deterministic
+  clocks, temporal ordering, exact-once debounce completion, and lineage.
+
+## FluxFlow.Components.Timers.Composition 3.0.0
+
+- Registers only the consolidated Timers nodes, removes typed and generic
+  compatibility registrations, uses fixed canonical ports, and resolves
+  optional clocks through exact `Resources.*` addresses.
+
 ## FluxFlow.Components.Sessions 5.0.0
 
 - Consolidated exact-content recording, replay, and query operations on the

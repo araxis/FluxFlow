@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Timers</PackageId>
     <AssemblyName>FluxFlow.Components.Timers</AssemblyName>
     <RootNamespace>FluxFlow.Components.Timers</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone timer nodes for FluxFlow: canonical FlowValue interval, schedule, delay, throttle, and debounce nodes plus typed compatibility APIs over an injected TimeProvider. No engine required.</Description>
+    <Description>Standalone concise timer nodes for FluxFlow with immutable FlowValue ticks, normal FlowResult transform outcomes, Events, and an injected TimeProvider. No engine required.</Description>
     <PackageTags>workflow;dataflow;components;timers</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds canonical FlowValue timer sources and FlowResult timer transforms without universal error ports; typed timer nodes remain available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates Timers on concise FlowValue and FlowResult nodes, removes typed tick and generic transform compatibility APIs, numeric errors, duplicate diagnostics, and universal Errors surfaces while preserving timing, lifecycle, diagnostics, and lineage.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

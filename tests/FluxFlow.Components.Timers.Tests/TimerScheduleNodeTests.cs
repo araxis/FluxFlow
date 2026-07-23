@@ -1,6 +1,7 @@
-using FluxFlow.Components.Timers.Contracts;
 using FluxFlow.Components.Timers.Nodes;
 using FluxFlow.Components.Timers.Options;
+using FluxFlow.Data;
+using FluxFlow.Nodes;
 using Shouldly;
 using Xunit;
 
@@ -35,10 +36,11 @@ public sealed class TimerScheduleNodeTests
         await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
         var ticks = TimerTestSink.Drain(output);
-        ticks.Select(message => message.Payload.Sequence).ShouldBe([1, 2]);
-        ticks.ShouldAllBe(message => message.Payload.Name == "cron");
-        ticks.ShouldAllBe(message => message.Payload.Cron == "* * * * * *");
-        ticks.ShouldAllBe(message => message.Payload.TimeZoneId == TimeZoneInfo.Utc.Id);
+        ticks.Select(message => Tick(message)["sequence"].GetInteger()).ShouldBe([1L, 2L]);
+        ticks.ShouldAllBe(message => Tick(message)["name"].GetString() == "cron");
+        ticks.ShouldAllBe(message => Tick(message)["cron"].GetString() == "* * * * * *");
+        ticks.ShouldAllBe(message =>
+            Tick(message)["timeZoneId"].GetString() == TimeZoneInfo.Utc.Id);
         ticks.ShouldAllBe(message => !message.CorrelationId.IsEmpty);
     }
 
@@ -65,9 +67,10 @@ public sealed class TimerScheduleNodeTests
 
         var dueAt = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
         var tick = TimerTestSink.Drain(output).ShouldHaveSingleItem();
-        tick.Payload.StartedAt.ShouldBe(startedAt);
-        tick.Payload.DueAt.ShouldBe(dueAt);
-        tick.Payload.Timestamp.ShouldBe(dueAt);
+        var value = Tick(tick);
+        value["startedAt"].GetDateTimeOffset().ShouldBe(startedAt);
+        value["dueAt"].GetDateTimeOffset().ShouldBe(dueAt);
+        value["timestamp"].GetDateTimeOffset().ShouldBe(dueAt);
     }
 
     [Fact]
@@ -187,4 +190,8 @@ public sealed class TimerScheduleNodeTests
             return TimeZoneInfo.FindSystemTimeZoneById(windowsId);
         }
     }
+
+    private static IReadOnlyDictionary<string, FlowValue> Tick(
+        FlowMessage<FlowValue> message)
+        => message.Payload.GetObject();
 }
