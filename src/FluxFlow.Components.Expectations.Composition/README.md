@@ -20,7 +20,7 @@ registry.RegisterEventExpectation();
 
 | Type | Node | Input | Output |
 |------|------|-------|--------|
-| `event.expect` | `FlowEventExpectationNode` | `ProjectionEvent` | `FlowResult<EventExpectationResult>` |
+| `event.expect` | `EventExpectationNode` | `ProjectionEvent` | `FlowResult<EventExpectationResult>` |
 
 Matched and unmet rules, timeout, and input completion are successful result
 variants. Expected evaluation failures are normal error variants on the same
@@ -63,13 +63,6 @@ the clock as a keyed `TimeProvider` using the exact, ordinal,
 case-sensitive resource address. The host owns resource lifetime and disposal.
 Invalid static options fail node activation.
 
-## Compatibility Boundary
-
-The existing `EventExpectationNode` remains in the runtime package for direct
-code-authored use. The Composition `2.x` package intentionally registers only
-the canonical fixed contract. Existing Composition consumers can remain on the
-published `1.x` package while migrating definitions and typed links.
-
 ## Design Metadata
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
@@ -78,7 +71,6 @@ The canonical catalog adds the traced `Events` output and an optional semantic
 `maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
 Default execution requires no processing profile; raw provider metadata retains
 released declarations for compatibility.
-
 
 `ExpectationsComponentDesignMetadataProvider` describes only the canonical
 fixed node:
@@ -90,3 +82,7 @@ fixed node:
 
 The metadata is descriptive. This package does not own rendering, resource
 creation, persistence, runtime updates, or implicit result extraction.
+
+Composition `3.x` targets the single canonical runtime contract. Existing
+`event.expectation` type names remain accepted as a hidden load-time alias and
+are normalized to `event.expect` when saved.

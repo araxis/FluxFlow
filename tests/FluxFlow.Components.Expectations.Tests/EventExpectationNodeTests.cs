@@ -1,382 +1,374 @@
+using System.Collections;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
+using FluxFlow.Data;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
-using System.Threading.Tasks.Dataflow;
 using Xunit;
 
 namespace FluxFlow.Components.Expectations.Tests;
 
-// Every test news the node directly — no engine, no registry. Events travel as
-// FlowMessage<ProjectionEvent> envelopes; the correlation id flows event -> result.
-// FakeTimeProvider drives the timeout deterministically: the node arms its timer in
-// the constructor over the injected TimeProvider, so advancing the clock — never a
-// real-time wait — is what fires it.
 public sealed class EventExpectationNodeTests
 {
+    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
-    public async Task Expect_MatchesEventAndEmitsSatisfiedResultPreservingCorrelation()
+    public async Task Expect_match_is_normal_result_with_message_lineage()
     {
-        var timeProvider = new FakeTimeProvider(
-            new DateTimeOffset(2026, 6, 3, 8, 0, 0, TimeSpan.Zero));
+        var now = DateTimeOffset.Parse("2026-07-19T10:00:00Z");
+        var clock = new FakeTimeProvider(now);
         await using var node = new EventExpectationNode(
             new EventExpectationOptions
             {
-                Kind = EventExpectationNodeKind.Expect,
-                Name = "failed-order",
-                MaxObservedEvents = 2,
-                MaxPreviewChars = 4,
-                Filter = new EventFilter
-                {
-                    Type = "operation.completed",
-                    Status = "failed",
-                    SubjectPrefix = "orders/"
-                }
+                Name = "order-completed",
+                Filter = new EventFilter { Type = "order.completed" }
             },
-            timeProvider);
-        var results = Sink(node.Output);
-        var timestamp = new DateTimeOffset(2026, 6, 3, 7, 59, 0, TimeSpan.Zero);
-
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            timestamp,
-            "operation.completed",
-            status: "ok",
-            subject: "orders/1")));
-        var matchSent = FlowMessage.Create(CreateEvent(
-            timestamp.AddSeconds(1),
-            "operation.completed",
-            status: "failed",
-            subject: "orders/2",
-            payloadPreview: "abcdef"));
-        await node.Input.SendAsync(matchSent);
-
-        var received = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        received.CorrelationId.ShouldBe(matchSent.CorrelationId);   // correlation flows event -> result
-        var result = received.Payload;
-        result.EvaluatedAt.ShouldBe(timeProvider.GetUtcNow());
-        result.Name.ShouldBe("failed-order");
-        result.Kind.ShouldBe(EventExpectationResultKind.Expect);
-        result.Satisfied.ShouldBeTrue();
-        result.Matched.ShouldBeTrue();
-        result.TimedOut.ShouldBeFalse();
-        result.MatchedEvent.ShouldNotBeNull();
-        result.MatchedEvent.Subject.ShouldBe("orders/2");
-        result.MatchedEvent.PayloadPreview.ShouldBe("abcd");
-        result.ObservedEvents.Count.ShouldBe(2);
-    }
-
-    [Fact]
-    public async Task Expect_TimesOutWhenMatchIsNotObserved()
-    {
-        var timeProvider = new FakeTimeProvider(
-            new DateTimeOffset(2026, 6, 3, 9, 0, 0, TimeSpan.Zero));
-        await using var node = new EventExpectationNode(
-            new EventExpectationOptions
+            clock);
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+        var input = FlowMessage.Create(
+            CreateEvent(now, "order.completed"),
+            new CorrelationId("order-42"),
+            new TraceId("trace-42")) with
+        {
+            Headers = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
             {
-                Kind = EventExpectationNodeKind.Expect,
-                TimeoutMilliseconds = 500,
-                Filter = new EventFilter { Type = "job.finished" }
-            },
-            timeProvider);
-        var results = Sink(node.Output);
+                ["tenant"] = FlowValue.From("north")
+            }
+        };
 
-        // Send a non-matching event, then wait until the node has recorded it so the
-        // timeout cannot resolve against an empty observation list. The timeout timer
-        // was armed synchronously in the constructor, so advancing the clock fires it.
-        await node.Input.SendAsync(FlowMessage.Create(
-            CreateEvent(timeProvider.GetUtcNow(), "job.started")));
-        await WaitUntilAsync(() => node.ObservedEventCount == 1);
-        timeProvider.Advance(TimeSpan.FromMilliseconds(500));
+        (await node.Input.SendAsync(input).WaitAsync(WaitTimeout)).ShouldBeTrue();
 
-        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
-        result.Satisfied.ShouldBeFalse();
-        result.Matched.ShouldBeFalse();
-        result.TimedOut.ShouldBeTrue();
-        result.ObservedEvents.ShouldHaveSingleItem();
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+        output.Payload.IsError.ShouldBeFalse();
+        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBeTrue();
+        output.Payload.Value.Matched.ShouldBeTrue();
+        output.Payload.Value.Name.ShouldBe("order-completed");
+        output.CorrelationId.ShouldBe(input.CorrelationId);
+        output.TraceId.ShouldBe(input.TraceId);
+        output.CausationId.ShouldBe(input.MessageId);
+        output.MessageId.ShouldNotBe(input.MessageId);
+        output.Headers.ShouldBeSameAs(input.Headers);
+
+        var diagnostic = await events.ReceiveAsync().WaitAsync(WaitTimeout);
+        diagnostic.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
+        diagnostic.CorrelationId.ShouldBe(input.CorrelationId);
+        diagnostic.Attributes["resultKind"].ShouldBe(ExpectationResultKinds.Matched);
+        diagnostic.Attributes["isError"].ShouldBe(false);
     }
 
     [Fact]
-    public async Task Guard_SucceedsOnTimeoutWhenNoMatchArrives()
+    public async Task Guard_match_is_normal_unmet_result()
     {
-        var timeProvider = new FakeTimeProvider(
-            new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero));
+        var now = DateTimeOffset.Parse("2026-07-19T10:05:00Z");
         await using var node = new EventExpectationNode(
             new EventExpectationOptions
             {
                 Kind = EventExpectationNodeKind.Guard,
-                TimeoutMilliseconds = 1000,
                 Filter = new EventFilter { Status = "failed" }
             },
-            timeProvider);
-        var results = Sink(node.Output);
+            new FakeTimeProvider(now));
+        var results = Link(node.Output);
 
-        // The timer is armed in the constructor; advancing the clock past the timeout
-        // is all it takes to fire it — no real-time wait, fully deterministic.
-        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        await node.Input.SendAsync(CreateMessage(now, status: "failed"));
 
-        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
-        result.Kind.ShouldBe(EventExpectationResultKind.Guard);
-        result.Satisfied.ShouldBeTrue();
-        result.Matched.ShouldBeFalse();
-        result.TimedOut.ShouldBeTrue();
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Unmet);
+        output.Payload.IsError.ShouldBeFalse();
+        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBeFalse();
+        output.Payload.Value.Matched.ShouldBeTrue();
+        output.Payload.Value.Kind.ShouldBe(EventExpectationResultKind.Guard);
     }
 
-    [Fact]
-    public async Task Guard_FailsWhenMatchingEventArrives()
+    [Theory]
+    [InlineData(EventExpectationNodeKind.Expect, false)]
+    [InlineData(EventExpectationNodeKind.Guard, true)]
+    public async Task Timeout_is_normal_result(
+        EventExpectationNodeKind kind,
+        bool satisfied)
     {
+        var now = DateTimeOffset.Parse("2026-07-19T10:10:00Z");
+        var clock = new FakeTimeProvider(now);
         await using var node = new EventExpectationNode(
             new EventExpectationOptions
             {
-                Kind = EventExpectationNodeKind.Guard,
-                Filter = new EventFilter
-                {
-                    ChannelPrefix = "events/",
-                    Attributes = new Dictionary<string, string> { ["severity"] = "critical" }
-                }
-            });
-        var results = Sink(node.Output);
-
-        var sent = FlowMessage.Create(CreateEvent(
-            new DateTimeOffset(2026, 6, 3, 11, 0, 0, TimeSpan.Zero),
-            "operation.failed",
-            channel: "events/orders",
-            attributes: new Dictionary<string, string> { ["severity"] = "critical" }));
-        await node.Input.SendAsync(sent);
-
-        var received = await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        received.CorrelationId.ShouldBe(sent.CorrelationId);
-        var result = received.Payload;
-        result.Kind.ShouldBe(EventExpectationResultKind.Guard);
-        result.Satisfied.ShouldBeFalse();
-        result.Matched.ShouldBeTrue();
-        result.TimedOut.ShouldBeFalse();
-        result.MatchedEvent.ShouldNotBeNull();
-        result.MatchedEvent.Channel.ShouldBe("events/orders");
-    }
-
-    [Fact]
-    public async Task Expect_EmitsNotMatchedWhenInputCompletes()
-    {
-        await using var node = new EventExpectationNode(
-            new EventExpectationOptions
-            {
-                Kind = EventExpectationNodeKind.Expect,
-                Filter = new EventFilter { TypePrefix = "task." }
-            });
-        var results = Sink(node.Output);
-
-        // The kit closes the output port as soon as the input drains, so the
-        // completion-resolution rides an in-band flush sent through the ordered pump.
-        await node.CompleteWithResultAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
-        result.Satisfied.ShouldBeFalse();
-        result.Matched.ShouldBeFalse();
-        result.TimedOut.ShouldBeFalse();
-        result.Reason.ShouldNotBeNullOrWhiteSpace();
-    }
-
-    [Fact]
-    public async Task CompleteWithResult_ResolvesAsCompletedEvenWithAnArmedTimeout()
-    {
-        var timeProvider = new FakeTimeProvider(
-            new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
-        await using var node = new EventExpectationNode(
-            new EventExpectationOptions
-            {
-                Kind = EventExpectationNodeKind.Expect,
-                TimeoutMilliseconds = 1000
+                Kind = kind,
+                TimeoutMilliseconds = 250,
+                Filter = new EventFilter { Type = "never" }
             },
-            timeProvider);
-        var results = Sink(node.Output);
+            clock);
+        var results = Link(node.Output);
 
-        // A timeout is armed but the clock is never advanced, so completion is the
-        // first trigger to resolve: a "completed", not "timed out", result.
-        await node.CompleteWithResultAsync();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        clock.Advance(TimeSpan.FromMilliseconds(250));
 
-        var result = (await results.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30))).Payload;
-        result.Satisfied.ShouldBeFalse();
-        result.TimedOut.ShouldBeFalse();
-        await results.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
+        output.Payload.IsError.ShouldBeFalse();
+        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBe(satisfied);
+        output.Payload.Value.TimedOut.ShouldBeTrue();
+        output.Payload.Timestamp.ShouldBe(clock.GetUtcNow());
     }
 
-    [Fact]
-    public async Task Output_FansOutTheResultToEveryConsumer()
+    [Theory]
+    [InlineData(EventExpectationNodeKind.Expect, false)]
+    [InlineData(EventExpectationNodeKind.Guard, true)]
+    public async Task Completion_drains_input_then_emits_one_normal_result(
+        EventExpectationNodeKind kind,
+        bool satisfied)
     {
-        // No engine: one node's output linked to two downstream consumers. Both see
-        // the single resolved result (a broadcast port).
+        var now = DateTimeOffset.Parse("2026-07-19T10:15:00Z");
         await using var node = new EventExpectationNode(
             new EventExpectationOptions
             {
-                Kind = EventExpectationNodeKind.Expect,
-                Filter = new EventFilter { Type = "job.finished" }
-            });
-        var first = Sink(node.Output);
-        var second = Sink(node.Output);
+                Kind = kind,
+                Filter = new EventFilter { Type = "match" }
+            },
+            new FakeTimeProvider(now));
+        var results = Link(node.Output);
+        var input = CreateMessage(now, type: "ignored");
 
-        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
-            new DateTimeOffset(2026, 6, 3, 13, 0, 0, TimeSpan.Zero),
-            "job.finished")));
+        (await node.Input.SendAsync(input).WaitAsync(WaitTimeout)).ShouldBeTrue();
+        node.Complete();
+        await node.Completion.WaitAsync(WaitTimeout);
 
-        (await first.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.Satisfied.ShouldBeTrue();
-        (await second.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30)))
-            .Payload.Satisfied.ShouldBeTrue();
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Completed);
+        output.Payload.IsError.ShouldBeFalse();
+        output.Payload.Value.ShouldNotBeNull().Satisfied.ShouldBe(satisfied);
+        output.Payload.Value.ObservedEvents.Count.ShouldBe(1);
+        output.CorrelationId.ShouldBe(input.CorrelationId);
+        output.CausationId.ShouldBe(input.MessageId);
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public async Task Match_EmitsMatchedDiagnosticOnEventsPortCarryingCorrelation()
+    public async Task Evaluation_failure_is_one_normal_error_result()
     {
+        var now = DateTimeOffset.Parse("2026-07-19T10:20:00Z");
         await using var node = new EventExpectationNode(
             new EventExpectationOptions
             {
-                Kind = EventExpectationNodeKind.Expect,
-                Filter = new EventFilter { Type = "job.finished" }
-            });
-        Sink(node.Output);
-        var events = Sink(node.Events);
-
-        var sent = FlowMessage.Create(CreateEvent(
-            new DateTimeOffset(2026, 6, 3, 14, 0, 0, TimeSpan.Zero),
-            "job.finished"));
-        await node.Input.SendAsync(sent);
-
-        var @event = await events.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        @event.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
-        @event.Level.ShouldBe(FlowEventLevel.Information);
-        @event.CorrelationId.ShouldBe(sent.CorrelationId);
-    }
-
-    [Fact]
-    public async Task EvaluationFailure_ReportsErrorOnErrorPortAndDoesNotFault()
-    {
-        // Drive the failure path through a poisoned attribute bag on the event: the
-        // node enumerates it while summarizing/matching, and the throw surfaces as a
-        // FlowError on the error port instead of faulting the pump.
-        await using var node = new EventExpectationNode(
-            new EventExpectationOptions
-            {
-                Kind = EventExpectationNodeKind.Expect,
+                TimeoutMilliseconds = 100,
                 Filter = new EventFilter
                 {
-                    Attributes = new Dictionary<string, string> { ["k"] = "v" }
+                    Attributes = new Dictionary<string, string> { ["tenant"] = "north" }
                 }
-            });
-        var errors = Sink(node.Errors);
+            },
+            new FakeTimeProvider(now));
+        var results = Link(node.Output);
+        var events = Link(node.Events);
+        var bad = FlowMessage.Create(
+            CreateEvent(now, "job.finished", new ThrowingDictionary()),
+            new CorrelationId("bad"));
 
-        var sent = FlowMessage.Create(new ProjectionEvent
-        {
-            Timestamp = new DateTimeOffset(2026, 6, 3, 15, 0, 0, TimeSpan.Zero),
-            Type = "job.finished",
-            Source = "processor",
-            Attributes = new ThrowingDictionary()
-        });
-        await node.Input.SendAsync(sent);
+        (await node.Input.SendAsync(bad).WaitAsync(WaitTimeout)).ShouldBeTrue();
 
-        var error = await errors.ReceiveAsync().WaitAsync(TimeSpan.FromSeconds(30));
-        error.Code.ShouldBe(ExpectationsErrorCodes.EvaluationFailed);
-        error.CorrelationId.ShouldBe(sent.CorrelationId);
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
+        output.Payload.IsError.ShouldBeTrue();
+        output.Payload.Value.ShouldBeNull();
+        output.Payload.Error.ShouldNotBeNull().Code
+            .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
+        output.Payload.Error.Category.ShouldBe("Expectations");
+        output.CorrelationId.ShouldBe(bad.CorrelationId);
+        output.CausationId.ShouldBe(bad.MessageId);
+
+        var diagnostic = await events.ReceiveAsync().WaitAsync(WaitTimeout);
+        diagnostic.Name.ShouldBe(ExpectationDiagnosticNames.EvaluationFailed);
+        diagnostic.Attributes["isError"].ShouldBe(true);
 
         node.Complete();
-        await node.Completion.WaitAsync(TimeSpan.FromSeconds(30));
-        node.Completion.IsFaulted.ShouldBeFalse();
+        await node.Completion.WaitAsync(WaitTimeout);
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public void Expectation_RejectsInvalidTimeout()
+    public async Task Match_wins_once_over_later_timeout_and_completion()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventExpectationNode(new EventExpectationOptions
+        var now = DateTimeOffset.Parse("2026-07-19T10:25:00Z");
+        var clock = new FakeTimeProvider(now);
+        await using var node = new EventExpectationNode(
+            new EventExpectationOptions
             {
-                TimeoutMilliseconds = 0
-            }));
+                TimeoutMilliseconds = 100,
+                Filter = new EventFilter { Type = "match" }
+            },
+            clock);
+        var results = Link(node.Output);
 
-        exception.Message.ShouldContain("timeoutMilliseconds");
+        await node.Input.SendAsync(CreateMessage(now, type: "match"));
+        var output = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+        output.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+
+        clock.Advance(TimeSpan.FromMilliseconds(100));
+        await node.CompleteWithResultAsync().WaitAsync(WaitTimeout);
+        results.TryReceive(out _).ShouldBeFalse();
     }
 
     [Fact]
-    public void Expectation_RejectsInvalidObservedEventLimit()
+    public async Task Output_fans_out_one_result_to_every_consumer()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventExpectationNode(new EventExpectationOptions
+        var now = DateTimeOffset.Parse("2026-07-19T10:30:00Z");
+        await using var node = new EventExpectationNode(
+            new EventExpectationOptions
             {
-                MaxObservedEvents = -1
-            }));
+                Filter = new EventFilter { Type = "match" }
+            },
+            new FakeTimeProvider(now));
+        var first = Link(node.Output);
+        var second = Link(node.Output);
 
-        exception.Message.ShouldContain("maxObservedEvents");
+        await node.Input.SendAsync(CreateMessage(now, type: "match"));
+
+        (await first.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
+        (await second.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
     }
 
     [Fact]
-    public void Expectation_RejectsInvalidPreviewLimit()
+    public async Task Result_caps_observed_events_and_previews_and_snapshots_filter()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventExpectationNode(new EventExpectationOptions
+        var now = DateTimeOffset.Parse("2026-07-19T10:35:00Z");
+        var requiredAttributes = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "north"
+        };
+        await using var node = new EventExpectationNode(
+            new EventExpectationOptions
             {
-                MaxPreviewChars = -1
-            }));
+                Filter = new EventFilter
+                {
+                    Type = "match",
+                    Attributes = requiredAttributes
+                },
+                MaxObservedEvents = 2,
+                MaxPreviewChars = 4
+            },
+            new FakeTimeProvider(now));
+        var results = Link(node.Output);
+        requiredAttributes.Clear();
+        var eventAttributes = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["tenant"] = "north"
+        };
 
-        exception.Message.ShouldContain("maxPreviewChars");
+        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
+            now,
+            "ignored-1",
+            eventAttributes,
+            payloadPreview: "first")));
+        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
+            now,
+            "ignored-2",
+            eventAttributes,
+            payloadPreview: "second")));
+        await node.Input.SendAsync(FlowMessage.Create(CreateEvent(
+            now,
+            "match",
+            eventAttributes,
+            payloadPreview: "abcdef")));
+
+        var value = (await results.ReceiveAsync().WaitAsync(WaitTimeout))
+            .Payload.Value.ShouldNotBeNull();
+        value.ObservedEvents.Select(@event => @event.Type)
+            .ShouldBe(["ignored-2", "match"], ignoreOrder: false);
+        value.ObservedEvents.Select(@event => @event.PayloadPreview)
+            .ShouldBe(["seco", "abcd"], ignoreOrder: false);
+        value.MatchedEvent.ShouldNotBeNull().PayloadPreview.ShouldBe("abcd");
+        value.Filter.Attributes["tenant"].ShouldBe("north");
     }
 
     [Fact]
-    public void Expectation_RejectsInvalidBoundedCapacity()
+    public async Task Concurrent_timeout_and_completion_emit_exactly_one_result()
     {
-        var exception = Should.Throw<ArgumentOutOfRangeException>(
-            () => new EventExpectationNode(new EventExpectationOptions
+        var now = DateTimeOffset.Parse("2026-07-19T10:40:00Z");
+        var clock = new FakeTimeProvider(now);
+        await using var node = new EventExpectationNode(
+            new EventExpectationOptions { TimeoutMilliseconds = 100 },
+            clock);
+        var results = Link(node.Output);
+        using var barrier = new Barrier(2);
+
+        var timeout = Task.Run(() =>
+        {
+            barrier.SignalAndWait();
+            clock.Advance(TimeSpan.FromMilliseconds(100));
+        });
+        var completion = Task.Run(() =>
+        {
+            barrier.SignalAndWait();
+            node.Complete();
+        });
+
+        await Task.WhenAll(timeout, completion).WaitAsync(WaitTimeout);
+        await node.Completion.WaitAsync(WaitTimeout);
+        var result = await results.ReceiveAsync().WaitAsync(WaitTimeout);
+
+        result.Payload.Kind.ShouldBeOneOf(
+            ExpectationResultKinds.TimedOut,
+            ExpectationResultKinds.Completed);
+        results.TryReceive(out _).ShouldBeFalse();
+        results.Completion.IsCompletedSuccessfully.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(0d, 10, 256, 128)]
+    [InlineData(null, -1, 256, 128)]
+    [InlineData(null, 10, -1, 128)]
+    [InlineData(null, 10, 256, 0)]
+    public void Invalid_options_are_rejected(
+        double? timeoutMilliseconds,
+        int maxObservedEvents,
+        int maxPreviewChars,
+        int boundedCapacity)
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new EventExpectationNode(
+            new EventExpectationOptions
             {
-                BoundedCapacity = 0
+                TimeoutMilliseconds = timeoutMilliseconds,
+                MaxObservedEvents = maxObservedEvents,
+                MaxPreviewChars = maxPreviewChars,
+                BoundedCapacity = boundedCapacity
             }));
-
-        exception.Message.ShouldContain("boundedCapacity");
     }
 
-    private static BufferBlock<T> Sink<T>(ISourceBlock<T> source)
+    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
     {
-        var sink = new BufferBlock<T>();
-        source.LinkTo(sink, new DataflowLinkOptions { PropagateCompletion = true });
-        return sink;
+        var buffer = new BufferBlock<T>();
+        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
+        return buffer;
     }
+
+    private static FlowMessage<ProjectionEvent> CreateMessage(
+        DateTimeOffset timestamp,
+        string type = "event",
+        string? status = null)
+        => FlowMessage.Create(CreateEvent(timestamp, type, status: status));
 
     private static ProjectionEvent CreateEvent(
         DateTimeOffset timestamp,
         string type,
-        string source = "processor",
-        string? subject = null,
+        IReadOnlyDictionary<string, string>? attributes = null,
         string? status = null,
-        string? channel = null,
-        string? payloadPreview = null,
-        IReadOnlyDictionary<string, string>? attributes = null)
+        string? payloadPreview = null)
         => new()
         {
             Timestamp = timestamp,
             Type = type,
-            Source = source,
-            Subject = subject,
+            Source = "test",
             Status = status,
-            Channel = channel,
             PayloadBytes = payloadPreview?.Length,
             PayloadPreview = payloadPreview,
-            Attributes = attributes ?? new Dictionary<string, string>(StringComparer.Ordinal)
+            Attributes = attributes ?? new Dictionary<string, string>()
         };
 
-    private static async Task WaitUntilAsync(Func<bool> condition)
-    {
-        var startedAt = Environment.TickCount64;
-        while (!condition())
-        {
-            (Environment.TickCount64 - startedAt).ShouldBeLessThan(30000);
-            await Task.Delay(10);
-        }
-    }
-
-    // An attribute bag that throws when read, forcing the node's catch -> EmitError
-    // path (it copies/enumerates the event's attributes while summarizing/matching).
     private sealed class ThrowingDictionary : IReadOnlyDictionary<string, string>
     {
         public string this[string key] => throw new InvalidOperationException("boom");
@@ -384,10 +376,10 @@ public sealed class EventExpectationNodeTests
         public IEnumerable<string> Values => throw new InvalidOperationException("boom");
         public int Count => throw new InvalidOperationException("boom");
         public bool ContainsKey(string key) => throw new InvalidOperationException("boom");
-        public bool TryGetValue(string key, out string value) => throw new InvalidOperationException("boom");
+        public bool TryGetValue(string key, out string value)
+            => throw new InvalidOperationException("boom");
         public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
             => throw new InvalidOperationException("boom");
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-            => throw new InvalidOperationException("boom");
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

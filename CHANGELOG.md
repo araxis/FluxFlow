@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Expectations 5.0.0
+
+- Consolidated projection-event expectations on `EventExpectationNode` with
+  exact-once matched, unmet, timeout, completion, and evaluation-failure
+  outcomes through one normal `FlowResult<EventExpectationResult>` Output.
+- Removed the direct-result implementation, temporary
+  `FlowEventExpectationNode` name, numeric error codes, and Errors stream.
+
+## FluxFlow.Components.Expectations.Composition 3.0.0
+
+- Targets the consolidated runtime, uses canonical resource picker addresses,
+  and validates fixed Input/Output/Events behavior through the canonical
+  application host while preserving the hidden `event.expectation` alias.
+
 ## FluxFlow.Components.State 5.0.0
 
 - Consolidated keyed state reduction on `FlowValueStateReducerNode` with typed

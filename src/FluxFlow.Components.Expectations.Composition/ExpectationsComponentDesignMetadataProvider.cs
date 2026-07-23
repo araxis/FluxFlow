@@ -121,7 +121,7 @@ public sealed class ExpectationsComponentDesignMetadataProvider : IComponentDesi
             valueType: nameof(TimeProvider),
             attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                 ResourceDesignMetadataAttributeValues.Clock,
-                keyPattern: "clock:{name}"));
+                keyPattern: "Resources.{name}"));
 
     private static IReadOnlyDictionary<string, string> OptionAttributes(
         string section,

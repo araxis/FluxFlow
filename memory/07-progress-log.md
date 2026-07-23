@@ -2,6 +2,19 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Expectations Consolidation
+
+- Consolidated Expectations on `EventExpectationNode` with exact-once matched,
+  unmet, timeout, completion, and evaluation-failure results, bounded evidence,
+  diagnostics, fan-out, and message lineage.
+- Removed the direct-result implementation, temporary Flow-prefixed node,
+  numeric errors, Errors stream, and obsolete composition host tests after
+  parity and timeout/completion concurrency coverage.
+- Moved Expectations to `5.0.0` and Expectations Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[249-expectations-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical State Consolidation
 
 - Consolidated State on `FlowValueStateReducerNode` with typed commands,

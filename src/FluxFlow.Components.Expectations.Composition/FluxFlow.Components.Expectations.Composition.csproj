@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Expectations.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Expectations.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Expectations.Composition</RootNamespace>
-    <Version>2.2.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Canonical projection-event expectation registration and Designer metadata over host-owned keyed clocks.</Description>
+    <Description>Canonical projection-event expectation registration and Designer metadata over exact host-owned clock addresses.</Description>
     <PackageTags>workflow;dataflow;components;events;expectations;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Centralizes canonical type aliases in a typed descriptor and targets canonical addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Targets the consolidated EventExpectationNode, uses canonical Resources addresses for clock selection, and validates activation through the canonical application host.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

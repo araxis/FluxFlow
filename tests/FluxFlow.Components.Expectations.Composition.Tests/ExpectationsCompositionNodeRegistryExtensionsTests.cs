@@ -1,36 +1,55 @@
-using System.Threading.Tasks.Dataflow;
+using System.Collections;
 using FluxFlow.Components.Designer;
 using FluxFlow.Components.Designer.Contracts;
-using FluxFlow.Components.Expectations;
-using FluxFlow.Components.Expectations.Composition;
 using FluxFlow.Components.Expectations.Contracts;
 using FluxFlow.Components.Expectations.Diagnostics;
 using FluxFlow.Components.Expectations.Nodes;
 using FluxFlow.Components.Expectations.Options;
 using FluxFlow.Components.Projections.Contracts;
 using FluxFlow.Composition;
-using FluxFlow.Composition.Hosting;
+using FluxFlow.Composition.Addressing;
+using FluxFlow.Composition.Hosting.DependencyInjection;
+using FluxFlow.Composition.Hosting.Revisions;
 using FluxFlow.Data;
+using FluxFlow.Engine.Hosting;
+using FluxFlow.Engine.Ports;
 using FluxFlow.Nodes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using FluxFlow.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Xunit;
+using static FluxFlow.Testing.CanonicalTestApplication;
 
 namespace FluxFlow.Components.Expectations.Composition.Tests;
 
 public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly ApplicationAddress Input = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        ExpectationsCompositionPortNames.Input);
+    private static readonly ApplicationAddress Output = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        ExpectationsCompositionPortNames.Output);
+    private static readonly ApplicationAddress Events = ApplicationAddress.WorkflowPort(
+        "main",
+        "node",
+        CompositionComponentEvents.PortName);
 
     [Fact]
-    public void RegisterEventExpectation_registers_request_result_metadata()
+    public void RegisterEventExpectation_registers_only_the_canonical_contract()
     {
-        var registry = new CompositionNodeRegistry()
-            .RegisterEventExpectation();
+        var registry = new CompositionNodeRegistry().RegisterEventExpectation();
 
-        var registration = registry.Registrations[ExpectationsCompositionNodeTypes.EventExpectation];
+        var registration = registry.Registrations[
+            ExpectationsCompositionNodeTypes.EventExpectation];
+        registration.Inputs.Keys.ShouldBe([ExpectationsCompositionPortNames.Input]);
+        registration.Outputs.Keys.ShouldBe([
+            ExpectationsCompositionPortNames.Output,
+            CompositionComponentEvents.PortName
+        ], ignoreOrder: false);
         registration.Inputs[ExpectationsCompositionPortNames.Input].MessageType
             .ShouldBe(typeof(ProjectionEvent));
         registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType
@@ -38,46 +57,64 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
     }
 
     [Fact]
+    public void RegisterEventExpectation_supports_explicit_canonical_component_types()
+    {
+        var registry = new CompositionNodeRegistry()
+            .RegisterEventExpectation("event.expect.primary")
+            .RegisterEventExpectation("event.expect.secondary");
+
+        registry.Registrations.Keys.ShouldBe([
+            "event.expect.primary",
+            "event.expect.secondary"
+        ], ignoreOrder: false);
+        registry.Registrations.Values.ShouldAllBe(registration =>
+            registration.Inputs[ExpectationsCompositionPortNames.Input].MessageType ==
+                typeof(ProjectionEvent) &&
+            registration.Outputs[ExpectationsCompositionPortNames.Output].MessageType ==
+                typeof(FlowResult<EventExpectationResult>));
+    }
+
+    [Fact]
     public void Design_metadata_provider_returns_valid_expectation_metadata()
     {
-        var metadata = ExpectationDesignMetadata();
+        var metadata = DesignMetadata();
 
-        metadata.Type.Value.ShouldBe(ExpectationsCompositionNodeTypes.EventExpectation);
+        metadata.Type.ShouldBe(new ComponentType(
+            ExpectationsCompositionNodeTypes.EventExpectation));
         metadata.DisplayName?.Value.ShouldBe("Event Expectation");
         metadata.Category.ShouldBe(new ComponentCategory("Expectations"));
+        metadata.PreferredNodeName.ShouldBe(new ComponentPreferredNodeName("expectEvent"));
         metadata.SuggestedEditorWidth.ShouldBe(460);
-        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
         metadata.Options.ShouldNotContain(option =>
             option.Name.Value == ExpectationsCompositionResourceNames.Clock);
+        AttributeValue(metadata.Attributes, ComponentDesignMetadataAttributeNames.Aliases)
+            .ShouldBe(ExpectationsCompositionNodeTypes.LegacyEventExpectation);
         AssertClockResource(metadata);
+        ComponentDesignMetadataValidator.Validate(metadata).ShouldBeEmpty();
     }
 
     [Fact]
     public void Design_metadata_provider_describes_expectation_ports()
     {
-        var metadata = ExpectationDesignMetadata();
+        var metadata = DesignMetadata();
 
-        metadata.Ports.Count.ShouldBe(2);
-
-        var input = metadata.Ports[0];
-        input.Name.Value.ShouldBe(ExpectationsCompositionPortNames.Input);
-        input.Direction.ShouldBe(PortDirection.Input);
-        input.Order.ShouldBe(0);
-        input.ValueType?.Value.ShouldBe(nameof(ProjectionEvent));
-        input.IsPrimary.ShouldBeTrue();
-
-        var output = metadata.Ports[1];
-        output.Name.Value.ShouldBe(ExpectationsCompositionPortNames.Output);
-        output.Direction.ShouldBe(PortDirection.Output);
-        output.Order.ShouldBe(1);
-        output.ValueType?.Value.ShouldBe("FlowResult<EventExpectationResult>");
-        output.IsPrimary.ShouldBeTrue();
+        metadata.Ports.Select(port => (
+            port.Name.Value,
+            port.Direction,
+            port.Order,
+            port.ValueType?.Value,
+            port.IsPrimary)).ShouldBe([
+                (ExpectationsCompositionPortNames.Input, PortDirection.Input, 0,
+                    nameof(ProjectionEvent), true),
+                (ExpectationsCompositionPortNames.Output, PortDirection.Output, 1,
+                    "FlowResult<EventExpectationResult>", true)
+            ], ignoreOrder: false);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_expectation_options()
     {
-        var metadata = ExpectationDesignMetadata();
+        var metadata = DesignMetadata();
         var defaults = new EventExpectationOptions();
 
         metadata.Options.Select(option => option.Name.Value).ShouldBe([
@@ -98,115 +135,84 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
             EventExpectationNodeKind.Guard.ToString()
         ], ignoreOrder: false);
 
-        AssertOption(metadata, "name", OptionValueKind.Text, defaultValue: null);
-
+        AssertOption(metadata, "name", OptionValueKind.Text);
         var filter = metadata.Options.Single(option => option.Name.Value == "filter");
         filter.Kind.ShouldBe(OptionValueKind.Json);
         filter.DefaultValue.ShouldBeOfType<EventFilter>();
-
-        AssertOption(
-            metadata,
-            "timeoutMilliseconds",
-            OptionValueKind.Number,
-            defaultValue: null,
-            min: 0.000001);
-        AssertOption(
-            metadata,
-            "maxObservedEvents",
-            OptionValueKind.Number,
-            defaults.MaxObservedEvents,
-            min: 0);
-        AssertOption(
-            metadata,
-            "maxPreviewChars",
-            OptionValueKind.Number,
-            defaults.MaxPreviewChars,
-            min: 0);
-        AssertOption(
-            metadata,
-            "boundedCapacity",
-            OptionValueKind.Number,
-            defaults.BoundedCapacity,
-            min: 1);
+        AssertOption(metadata, "timeoutMilliseconds", OptionValueKind.Number, min: 0.000001);
+        AssertOption(metadata, "maxObservedEvents", OptionValueKind.Number,
+            defaults.MaxObservedEvents, min: 0);
+        AssertOption(metadata, "maxPreviewChars", OptionValueKind.Number,
+            defaults.MaxPreviewChars, min: 0);
+        AssertOption(metadata, "boundedCapacity", OptionValueKind.Number,
+            defaults.BoundedCapacity, min: 1);
     }
 
     [Fact]
     public void Design_metadata_provider_describes_expectation_option_hints()
     {
-        var metadata = ExpectationDesignMetadata();
-        var options = OptionsByName(metadata);
+        var options = DesignMetadata().Options.ToDictionary(
+            option => option.Name.Value,
+            StringComparer.Ordinal);
 
-        AssertOptionHints(
-            options["kind"],
-            "Expectation",
+        AssertOptionHints(options["kind"], "Expectation",
             OptionDesignMetadataAttributeValues.Primary);
-        AssertOptionHints(
-            options["name"],
-            "Diagnostics",
+        AssertOptionHints(options["name"], "Diagnostics",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Text);
-        AssertOptionHints(
-            options["filter"],
-            "Filtering",
+        AssertOptionHints(options["filter"], "Filtering",
             OptionDesignMetadataAttributeValues.Primary,
             OptionDesignMetadataAttributeValues.Json);
-        AssertOptionHints(
-            options["timeoutMilliseconds"],
-            "Runtime",
+        AssertOptionHints(options["timeoutMilliseconds"], "Runtime",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["maxObservedEvents"],
-            "Results",
+        AssertOptionHints(options["maxObservedEvents"], "Results",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["maxPreviewChars"],
-            "Preview",
+        AssertOptionHints(options["maxPreviewChars"], "Preview",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
-        AssertOptionHints(
-            options["boundedCapacity"],
-            "Runtime",
+        AssertOptionHints(options["boundedCapacity"], "Runtime",
             OptionDesignMetadataAttributeValues.Advanced,
             OptionDesignMetadataAttributeValues.Number);
     }
 
     [Fact]
-    public void Design_metadata_provider_describes_expectation_resource_picker_hints()
+    public void Design_metadata_provider_uses_canonical_resource_picker_address()
     {
-        var metadata = ExpectationDesignMetadata();
+        var resource = DesignMetadata().Resources.ShouldHaveSingleItem();
 
         AssertResourceHints(
-            metadata.Resources.ShouldHaveSingleItem(),
+            resource,
             ResourceDesignMetadataAttributeValues.Clock,
-            "clock:{name}");
+            "Resources.{name}");
     }
 
     [Fact]
     public void Design_metadata_provider_loads_into_catalog()
     {
-        var provider = new ExpectationsComponentDesignMetadataProvider();
-        var catalog = ComponentDesignMetadataCatalog.FromProviders([provider]);
+        var catalog = ComponentDesignMetadataCatalog.FromProviders(
+            [new ExpectationsComponentDesignMetadataProvider()]);
 
         catalog.All.ShouldHaveSingleItem();
         catalog.TryGet(
             new ComponentType(ExpectationsCompositionNodeTypes.EventExpectation),
             out var metadata).ShouldBeTrue();
-        metadata.ShouldNotBeNull()
-            .DisplayName?.Value.ShouldBe("Event Expectation");
+        metadata.ShouldNotBeNull().DisplayName?.Value.ShouldBe("Event Expectation");
     }
 
     [Fact]
-    public async Task Hosted_expectation_matches_events_and_preserves_correlation_id()
+    public async Task Canonical_host_matches_events_preserves_lineage_and_uses_clock()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-18T12:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
 
         await WithNodeAsync(
-            async (input, output, _) =>
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
+                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                    Output,
+                    Timeout);
                 var ignored = FlowMessage.Create(CreateEvent(
                     timestamp.AddSeconds(-1),
                     "operation.completed",
@@ -227,17 +233,19 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                         {
                             ["tenant"] = "north"
                         }),
-                    new CorrelationId("matched"));
+                    new CorrelationId("matched"),
+                    new TraceId("trace-matched"));
 
-                (await input.Target.SendAsync(ignored).WaitAsync(Timeout)).ShouldBeTrue();
-                (await input.Target.SendAsync(matched).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, ignored)).IsAccepted.ShouldBeTrue();
+                (await ports.SendAsync(Input, matched)).IsAccepted.ShouldBeTrue();
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
+                var result = (await resultReceive).Message.ShouldNotBeNull();
                 result.Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
                 result.Payload.IsError.ShouldBeFalse();
-                var value = result.Payload.Value.ShouldNotBeNull();
                 result.CorrelationId.ShouldBe(matched.CorrelationId);
+                result.TraceId.ShouldBe(matched.TraceId);
                 result.CausationId.ShouldBe(matched.MessageId);
+                var value = result.Payload.Value.ShouldNotBeNull();
                 value.EvaluatedAt.ShouldBe(timestamp);
                 value.Name.ShouldBe("failed-order");
                 value.Kind.ShouldBe(EventExpectationResultKind.Expect);
@@ -248,208 +256,246 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 value.MatchedEvent.PayloadPreview.ShouldBe("abcd");
                 value.ObservedEvents.Count.ShouldBe(2);
             },
-            node => node
-                .Configure("name", "failed-order")
-                .Configure("maxObservedEvents", 2)
-                .Configure("maxPreviewChars", 4)
-                .Configure(
-                    "filter",
-                    new EventFilter
+            Properties(
+                ("name", "failed-order"),
+                ("maxObservedEvents", 2),
+                ("maxPreviewChars", 4),
+                ("filter", new EventFilter
+                {
+                    Type = "operation.completed",
+                    SubjectPrefix = "orders/",
+                    Status = "failed",
+                    Attributes = new Dictionary<string, string>
                     {
-                        Type = "operation.completed",
-                        SubjectPrefix = "orders/",
-                        Status = "failed",
-                        Attributes = new Dictionary<string, string>
-                        {
-                            ["tenant"] = "north"
-                        }
-                    })
-                .Resource(ExpectationsCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+                        ["tenant"] = "north"
+                    }
+                })),
+            clock);
     }
 
     [Fact]
-    public async Task Hosted_expectation_binds_nested_filter_configuration()
+    public async Task Canonical_host_binds_nested_filter_configuration()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-18T12:30:00Z");
 
         await WithNodeAsync(
-            async (input, output, _) =>
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
+                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                    Output,
+                    Timeout);
+                var message = FlowMessage.Create(CreateEvent(
+                    timestamp,
+                    "task.completed",
+                    source: "worker",
+                    subject: "jobs/42",
+                    status: "failed",
+                    attributes: new Dictionary<string, string>
+                    {
+                        ["tenant"] = "north"
+                    }));
 
-                (await input.Target.SendAsync(FlowMessage.Create(CreateEvent(
-                        timestamp,
-                        "task.completed",
-                        source: "worker",
-                        subject: "jobs/42",
-                        status: "failed",
-                        attributes: new Dictionary<string, string>
-                        {
-                            ["tenant"] = "north"
-                        })))
-                    .WaitAsync(Timeout)).ShouldBeTrue();
-
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                var value = result.Payload.Value.ShouldNotBeNull();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
+                var value = (await resultReceive).Message.ShouldNotBeNull()
+                    .Payload.Value.ShouldNotBeNull();
                 value.Filter.TypePrefix.ShouldBe("task.");
                 value.Filter.Status.ShouldBe("failed");
                 value.Filter.SubjectPrefix.ShouldBe("jobs/");
                 value.Filter.Attributes["tenant"].ShouldBe("north");
                 value.Satisfied.ShouldBeTrue();
             },
-            node => node.Configure(
-                "filter",
-                new EventFilter
+            Properties(("filter", new EventFilter
+            {
+                TypePrefix = "task.",
+                SubjectPrefix = "jobs/",
+                Status = "failed",
+                Attributes = new Dictionary<string, string>
                 {
-                    TypePrefix = "task.",
-                    SubjectPrefix = "jobs/",
-                    Status = "failed",
-                    Attributes = new Dictionary<string, string>
-                    {
-                        ["tenant"] = "north"
-                    }
-                }));
+                    ["tenant"] = "north"
+                }
+            })));
     }
 
     [Fact]
-    public async Task Hosted_guard_uses_keyed_clock_for_timeout_result()
+    public async Task Canonical_host_uses_keyed_clock_for_timeout_result()
     {
         var timestamp = DateTimeOffset.Parse("2026-06-18T13:00:00Z");
         var clock = new FakeTimeProvider(timestamp);
 
         await WithNodeAsync(
-            async (_, output, _) =>
+            async (ports, _) =>
             {
-                var results = Link(output.Source);
-
+                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                    Output,
+                    Timeout);
                 clock.Advance(TimeSpan.FromMilliseconds(500));
 
-                var result = await results.ReceiveAsync().WaitAsync(Timeout);
-                result.Payload.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
-                result.Payload.IsError.ShouldBeFalse();
-                var value = result.Payload.Value.ShouldNotBeNull();
+                var result = (await resultReceive).Message.ShouldNotBeNull().Payload;
+                result.Kind.ShouldBe(ExpectationResultKinds.TimedOut);
+                result.IsError.ShouldBeFalse();
+                var value = result.Value.ShouldNotBeNull();
                 value.Kind.ShouldBe(EventExpectationResultKind.Guard);
                 value.Satisfied.ShouldBeTrue();
                 value.Matched.ShouldBeFalse();
                 value.TimedOut.ShouldBeTrue();
                 value.EvaluatedAt.ShouldBe(clock.GetUtcNow());
             },
-            node => node
-                .Configure("kind", EventExpectationNodeKind.Guard)
-                .Configure("timeoutMilliseconds", 500)
-                .Configure("filter", new EventFilter { Status = "failed" })
-                .Resource(ExpectationsCompositionResourceNames.Clock, "fixed"),
-            services => services.AddKeyedSingleton<TimeProvider>("fixed", clock));
+            Properties(
+                ("kind", EventExpectationNodeKind.Guard),
+                ("timeoutMilliseconds", 500),
+                ("filter", new EventFilter { Status = "failed" })),
+            clock);
     }
 
     [Fact]
-    public async Task Hosted_expectation_exposes_events()
+    public async Task Canonical_host_exposes_correlated_events()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
-        {
-            output.Source.LinkTo(
-                DataflowBlock.NullTarget<FlowMessage<FlowResult<EventExpectationResult>>>());
-            var events = Link(descriptor.Events.ShouldNotBeNull());
-            var message = FlowMessage.Create(CreateEvent(
-                DateTimeOffset.Parse("2026-06-18T13:30:00Z"),
-                "job.finished"));
+        await WithNodeAsync(
+            async (ports, _) =>
+            {
+                var eventReceive = ports.ReceiveAsync<CompositionComponentEvent>(
+                    Events,
+                    Timeout);
+                var message = FlowMessage.Create(CreateEvent(
+                    DateTimeOffset.Parse("2026-06-18T13:30:00Z"),
+                    "job.finished"));
 
-            (await input.Target.SendAsync(message).WaitAsync(Timeout)).ShouldBeTrue();
+                (await ports.SendAsync(Input, message)).IsAccepted.ShouldBeTrue();
 
-            var @event = await events.ReceiveAsync().WaitAsync(Timeout);
-            @event.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
-            @event.CorrelationId.ShouldBe(message.CorrelationId);
-            @event.Attributes["satisfied"].ShouldBe(true);
-        },
-        node => node.Configure("filter", new EventFilter { Type = "job.finished" }));
+                var @event = (await eventReceive).Message.ShouldNotBeNull();
+                @event.CorrelationId.ShouldBe(message.CorrelationId);
+                @event.Payload.Name.ShouldBe(ExpectationDiagnosticNames.Matched);
+                @event.Payload.Attributes["satisfied"].GetBoolean().ShouldBeTrue();
+                @event.Payload.Attributes["isError"].GetBoolean().ShouldBeFalse();
+            },
+            Properties(("filter", new EventFilter { Type = "job.finished" })));
     }
 
     [Fact]
-    public async Task Hosted_expectation_emits_evaluation_failure_as_normal_result()
+    public async Task Canonical_host_emits_evaluation_failure_as_normal_result()
     {
-        await WithNodeAsync(async (input, output, descriptor) =>
-        {
-            var results = Link(output.Source);
-            descriptor.Errors.ShouldBeNull();
-            var bad = FlowMessage.Create(
-                new ProjectionEvent
-                {
-                    Timestamp = DateTimeOffset.Parse("2026-06-18T14:00:00Z"),
-                    Type = "job.finished",
-                    Source = "processor",
-                    Attributes = new ThrowingDictionary()
-                },
-                new CorrelationId("bad"));
-            (await input.Target.SendAsync(bad).WaitAsync(Timeout)).ShouldBeTrue();
-            var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        await WithNodeAsync(
+            async (ports, _) =>
+            {
+                var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+                    Output,
+                    Timeout);
+                var bad = FlowMessage.Create(
+                    new ProjectionEvent
+                    {
+                        Timestamp = DateTimeOffset.Parse("2026-06-18T14:00:00Z"),
+                        Type = "job.finished",
+                        Source = "processor",
+                        Attributes = new ThrowingDictionary()
+                    },
+                    new CorrelationId("bad"));
 
-            result.CorrelationId.ShouldBe(bad.CorrelationId);
-            result.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
-            result.Payload.IsError.ShouldBeTrue();
-            result.Payload.Error.ShouldNotBeNull().Code
-                .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
-            result.Payload.Value.ShouldBeNull();
-        },
-        node => node.Configure(
-            "filter",
-            new EventFilter
+                (await ports.SendAsync(Input, bad)).IsAccepted.ShouldBeTrue();
+                var result = (await resultReceive).Message.ShouldNotBeNull();
+
+                result.CorrelationId.ShouldBe(bad.CorrelationId);
+                result.CausationId.ShouldBe(bad.MessageId);
+                result.Payload.Kind.ShouldBe(ExpectationResultKinds.EvaluationFailed);
+                result.Payload.IsError.ShouldBeTrue();
+                result.Payload.Error.ShouldNotBeNull().Code
+                    .ShouldBe(ExpectationErrorCodeNames.EvaluationFailed);
+                result.Payload.Value.ShouldBeNull();
+            },
+            Properties(("filter", new EventFilter
             {
                 Type = "job.finished",
                 Attributes = new Dictionary<string, string>
                 {
                     ["k"] = "v"
                 }
-            }));
+            })));
+    }
+
+    [Fact]
+    public async Task Canonical_host_accepts_hidden_legacy_type_alias()
+    {
+        await using var host = await StartHostAsync(
+            Properties(("filter", new EventFilter { Type = "match" })),
+            componentType: ExpectationsCompositionNodeTypes.LegacyEventExpectation);
+
+        host.StartResult.Succeeded.ShouldBeTrue();
+        var ports = host.GetRequiredPorts();
+        var resultReceive = ports.ReceiveAsync<FlowResult<EventExpectationResult>>(
+            Output,
+            Timeout);
+        (await ports.SendAsync(Input, FlowMessage.Create(CreateEvent(
+            DateTimeOffset.Parse("2026-06-18T14:30:00Z"),
+            "match")))).IsAccepted.ShouldBeTrue();
+        (await resultReceive).Message.ShouldNotBeNull()
+            .Payload.Kind.ShouldBe(ExpectationResultKinds.Matched);
     }
 
     [Theory]
-    [InlineData("timeoutMilliseconds", 0)]
-    [InlineData("maxObservedEvents", -1)]
-    [InlineData("boundedCapacity", 0)]
-    public async Task Invalid_configuration_surfaces_factory_diagnostic(
+    [InlineData("timeoutMilliseconds", 0, "timeoutMilliseconds")]
+    [InlineData("maxObservedEvents", -1, "maxObservedEvents")]
+    [InlineData("maxPreviewChars", -1, "maxPreviewChars")]
+    [InlineData("boundedCapacity", 0, "capacity")]
+    public async Task Invalid_configuration_surfaces_preparation_failure(
         string optionName,
-        object value)
+        object value,
+        string expectedMessage)
     {
-        var services = new ServiceCollection();
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "expectation",
-                    ExpectationsCompositionNodeTypes.EventExpectation,
-                    node => node.Configure(optionName, value)))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterEventExpectation())
-            .Configure(options => options.ThrowOnBuildFailure = false);
+        await using var host = await StartHostAsync(Properties((optionName, value)));
 
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var host = provider.GetRequiredService<ICompositionRuntimeHost>();
-        host.Runtime.ShouldBeNull();
-        host.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.Code == CompositionDiagnosticCode.FactoryFailed &&
-            (diagnostic.Message.Contains(optionName, StringComparison.OrdinalIgnoreCase) ||
-             diagnostic.Message.Contains("capacity", StringComparison.OrdinalIgnoreCase)));
+        AssertPreparationFailure(host, expectedMessage);
     }
 
-    private static ComponentDesignMetadata ExpectationDesignMetadata()
+    private static ComponentDesignMetadata DesignMetadata()
         => new ExpectationsComponentDesignMetadataProvider()
             .GetMetadata()
             .ShouldHaveSingleItem();
 
-    private static Dictionary<string, OptionDesignMetadata> OptionsByName(
-        ComponentDesignMetadata metadata)
-        => metadata.Options.ToDictionary(
-            option => option.Name.Value,
+    private static async Task WithNodeAsync(
+        Func<ApplicationPortRuntime, CanonicalApplicationTestHost, Task> run,
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider? clock = null)
+    {
+        await using var host = await StartHostAsync(properties, clock);
+        host.StartResult.Succeeded.ShouldBeTrue();
+
+        await run(host.GetRequiredPorts(), host);
+    }
+
+    private static ValueTask<CanonicalApplicationTestHost> StartHostAsync(
+        IReadOnlyDictionary<string, object?> properties,
+        TimeProvider? clock = null,
+        string componentType = ExpectationsCompositionNodeTypes.EventExpectation)
+    {
+        var componentProperties = properties.ToDictionary(
+            static property => property.Key,
+            static property => property.Value,
             StringComparer.Ordinal);
+        IReadOnlyList<string>? resources = null;
+        if (clock is not null)
+        {
+            componentProperties[ExpectationsCompositionResourceNames.Clock] = "Resources.clock";
+            resources = ["clock"];
+        }
+
+        return CanonicalApplicationTestHost.StartAsync(
+            SingleComponent(componentType, componentProperties, resources),
+            registry => registry.RegisterEventExpectation(),
+            configureRuntimeServices: context =>
+            {
+                if (clock is not null)
+                {
+                    context.Services.AddExternalFluxFlowResource<TimeProvider>(
+                        ApplicationAddress.Resource("clock"),
+                        clock);
+                }
+            });
+    }
 
     private static void AssertOption(
         ComponentDesignMetadata metadata,
         string name,
         OptionValueKind kind,
-        object? defaultValue,
+        object? defaultValue = null,
         double? min = null)
     {
         var option = metadata.Options.Single(option => option.Name.Value == name);
@@ -471,7 +517,8 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
 
         if (editor is null)
         {
-            option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
+            option.Attributes.ContainsKey(
+                new ComponentAttributeName(OptionDesignMetadataAttributeNames.Editor))
                 .ShouldBeFalse();
         }
         else
@@ -480,9 +527,11 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
                 .ShouldBe(editor);
         }
 
-        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
+        option.Attributes.ContainsKey(
+            new ComponentAttributeName(OptionDesignMetadataAttributeNames.Syntax))
             .ShouldBeFalse();
-        option.Attributes.ContainsKey(new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
+        option.Attributes.ContainsKey(
+            new ComponentAttributeName(OptionDesignMetadataAttributeNames.RelatedResource))
             .ShouldBeFalse();
     }
 
@@ -515,54 +564,18 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         string name)
         => attributes[new ComponentAttributeName(name)].Value;
 
-    private static async Task WithNodeAsync(
-        Func<
-            CompositionInputPort<ProjectionEvent>,
-            CompositionOutputPort<FlowResult<EventExpectationResult>>,
-            ComposedNode,
-            Task> run,
-        Action<NodeDefinitionBuilder>? configureNode = null,
-        Action<IServiceCollection>? configureServices = null)
+    private static void AssertPreparationFailure(
+        CanonicalApplicationTestHost host,
+        string expectedMessage)
     {
-        var services = new ServiceCollection();
-        configureServices?.Invoke(services);
-        services
-            .AddFluxFlowComposition(CompositionDefinitionBuilder
-                .Create()
-                .Workflow("main", workflow => workflow.Node(
-                    "node",
-                    ExpectationsCompositionNodeTypes.EventExpectation,
-                    configureNode))
-                .Build())
-            .RegisterNodes(registry => registry.RegisterEventExpectation())
-            .Configure(options => options.StartRuntimeWithHost = false);
-
-        await using var provider = services.BuildServiceProvider();
-        await BuildCompositionAsync(provider);
-
-        var descriptor = provider.GetRequiredService<ICompositionRuntimeHost>()
-            .Runtime.ShouldNotBeNull()
-            .Nodes.ShouldHaveSingleItem()
-            .Descriptor;
-        var input = descriptor.Inputs[ExpectationsCompositionPortNames.Input]
-            .ShouldBeOfType<CompositionInputPort<ProjectionEvent>>();
-        var output = descriptor.Outputs[ExpectationsCompositionPortNames.Output]
-            .ShouldBeOfType<CompositionOutputPort<FlowResult<EventExpectationResult>>>();
-
-        await run(input, output, descriptor);
-    }
-
-    private static async Task BuildCompositionAsync(IServiceProvider provider)
-    {
-        var hostedService = provider.GetServices<IHostedService>().ShouldHaveSingleItem();
-        await hostedService.StartAsync(CancellationToken.None);
-    }
-
-    private static BufferBlock<T> Link<T>(ISourceBlock<T> source)
-    {
-        var buffer = new BufferBlock<T>();
-        source.LinkTo(buffer, new DataflowLinkOptions { PropagateCompletion = true });
-        return buffer;
+        host.StartResult.Succeeded.ShouldBeFalse();
+        host.StartResult.Update!.Status.ShouldBe(ApplicationRevisionUpdateStatus.Rejected);
+        host.StartResult.Update.Failures.ShouldContain(failure =>
+            failure.Stage == ApplicationRevisionFailureStage.Preparation &&
+            failure.Error.Details.GetObject()["exceptionMessage"].GetString().Contains(
+                expectedMessage,
+                StringComparison.OrdinalIgnoreCase));
+        host.RuntimeAccess.Ports.ShouldBeNull();
     }
 
     private static ProjectionEvent CreateEvent(
@@ -596,10 +609,10 @@ public sealed class ExpectationsCompositionNodeRegistryExtensionsTests
         public IEnumerable<string> Values => throw new InvalidOperationException("boom");
         public int Count => throw new InvalidOperationException("boom");
         public bool ContainsKey(string key) => throw new InvalidOperationException("boom");
-        public bool TryGetValue(string key, out string value) => throw new InvalidOperationException("boom");
+        public bool TryGetValue(string key, out string value)
+            => throw new InvalidOperationException("boom");
         public IEnumerator<KeyValuePair<string, string>> GetEnumerator()
             => throw new InvalidOperationException("boom");
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-            => throw new InvalidOperationException("boom");
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

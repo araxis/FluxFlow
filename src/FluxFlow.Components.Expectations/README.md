@@ -1,16 +1,16 @@
 # FluxFlow.Components.Expectations
 
-Standalone projection-event expectation nodes for FluxFlow.
+Standalone projection-event expectations for FluxFlow.
 
 ## Canonical Node
 
-`FlowEventExpectationNode` consumes `FlowMessage<ProjectionEvent>` and resolves
+`EventExpectationNode` consumes `FlowMessage<ProjectionEvent>` and resolves
 exactly once through `FlowMessage<FlowResult<EventExpectationResult>>` on
 `Output`. It also exposes lifecycle and result diagnostics through `Events`.
 It does not require Engine or Composition.
 
 ```csharp
-await using var node = new FlowEventExpectationNode(
+await using var node = new EventExpectationNode(
     new EventExpectationOptions
     {
         Kind = EventExpectationNodeKind.Expect,
@@ -75,12 +75,13 @@ timestamps deterministically. The node snapshots the filter at construction.
 implicitly unwrap `Value`; route or extract it explicitly when a downstream
 component expects `EventExpectationResult`.
 
-## Compatibility Node
+## CLR Boundaries
 
-`EventExpectationNode` remains available with its released
-`EventExpectationResult` Output plus Events and Errors. It preserves the
-existing direct-node contract and completion API. New fixed Composition
-definitions use `FlowEventExpectationNode`.
+`EventExpectationNode` is the single maintained Expectations runtime. Hosts
+route results through `FlowResult.Kind`, `IsError`, and `Error.Code`, and read
+the optional `Value` for matched, unmet, timeout, and completion details. The
+package does not expose a direct-result compatibility node, numeric error
+codes, or a universal Errors stream.
 
 ## Composition
 

@@ -38,7 +38,7 @@ public static class ExpectationsCompositionNodeRegistryExtensions
         var options = context.BindConfiguration<EventExpectationOptions>();
         var clock = context.GetResource<TimeProvider>(
             ExpectationsCompositionResourceNames.Clock);
-        var node = new FlowEventExpectationNode(options, clock);
+        var node = new EventExpectationNode(options, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -56,5 +56,4 @@ public static class ExpectationsCompositionNodeRegistryExtensions
             ],
             events: node.Events));
     }
-
 }

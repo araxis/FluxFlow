@@ -1019,17 +1019,19 @@ successful variants; expected filter evaluation failure is a normal error
 variant. The factory binds `EventExpectationOptions` and can resolve an optional
 host-owned keyed `TimeProvider` through an exact `Resources.{name}` address.
 
-The released `EventExpectationNode` direct-result and Errors surfaces remain in
-the runtime package for code-authored use. Expectations Composition `2.x`
-intentionally registers only the canonical fixed type; existing hosts can stay
-on the published Composition `1.x` line while migrating definitions.
+Expectations `5.x` has one maintained `EventExpectationNode` contract. Its
+matched, unmet, timeout, completion, and expected evaluation-failure outcomes
+all use the normal `FlowResult<EventExpectationResult>` Output; there is no
+direct-result compatibility node, numeric error code surface, or universal
+Errors port. Expectations Composition `3.x` registers that fixed contract.
 
 `ExpectationsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the canonical `event.expect` composition node, including existing
 expectation options, `ProjectionEvent`/`FlowResult<EventExpectationResult>`
-fixed ports, and a resource hint for the optional `clock` resource. The provider
-authors that metadata through the shared validated Designer metadata builder.
-Typed result values are never implicitly unwrapped by links.
+fixed ports, and a canonical `Resources.{name}` picker hint for the optional
+host-owned `clock` resource. The provider authors that metadata through the
+shared validated Designer metadata builder. Typed result values are never
+implicitly unwrapped by links.
 
 ## MQTT Core
 

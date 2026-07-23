@@ -158,16 +158,18 @@
     {
       "id": "components.expectations-direct-result-compatibility",
       "kind": "public-api",
-      "packages": ["components-expectations"],
-      "declarations": ["EventExpectationNode", "FlowEventExpectationNode", "direct result output", "Errors output"],
-      "sourceFiles": ["src/FluxFlow.Components.Expectations/Nodes/EventExpectationNode.cs", "src/FluxFlow.Components.Expectations/Nodes/FlowEventExpectationNode.cs"],
-      "canonicalReplacement": "EventExpectationNode using a FlowResult output after the canonical implementation assumes the concise name.",
-      "currentConsumers": ["direct-node tests", "code-authored integrations", "expectations composition registration"],
-      "uniqueBehavior": ["Direct expectation result type, dedicated Errors stream, custom evaluator behavior, and completion semantics."],
-      "readiness": "blocked-behavior-gap",
-      "versionImpact": "Major for the Expectations runtime package.",
-      "migration": "Preserve evaluator and completion behavior, then consume expected failures as normal FlowResult values instead of an Errors port.",
-      "verification": ["rule evaluation parity", "custom evaluator behavior", "completion behavior", "failure result mapping"]
+      "packages": ["components-expectations", "components-expectations-composition"],
+      "declarations": ["FlowEventExpectationNode", "direct EventExpectationNode result output", "ExpectationsErrorCodes", "Errors output"],
+      "sourceFiles": ["src/FluxFlow.Components.Expectations/Nodes/EventExpectationNode.cs", "src/FluxFlow.Components.Expectations.Composition/ExpectationsCompositionNodeRegistryExtensions.cs"],
+      "canonicalReplacement": "EventExpectationNode with one normal FlowResult<EventExpectationResult> output and Events.",
+      "currentConsumers": ["canonical runtime tests", "canonical composition registration", "canonical application host tests"],
+      "uniqueBehavior": ["Expect and guard rules, filter snapshots, bounded observed summaries, preview truncation, deterministic timeout, ordered completion, exact-once resolution, fan-out, diagnostics, and message lineage."],
+      "readiness": "removed-after-parity",
+      "versionImpact": "Major runtime package version 5.0.0 and Composition package version 3.0.0.",
+      "publishedBaselines": ["FluxFlow.Components.Expectations 4.0.0", "FluxFlow.Components.Expectations.Composition 2.2.0"],
+      "apiCompatibilityFindings": ["CP0001: ExpectationsErrorCodes and FlowEventExpectationNode removed", "CP0007: EventExpectationNode no longer inherits FlowNode<ProjectionEvent, EventExpectationResult> because Output now carries FlowResult<EventExpectationResult>"],
+      "migration": "Use EventExpectationNode, inspect FlowResult Kind, IsError, and Error.Code, read EventExpectationResult from Value, and replace Errors links with normal result conditions.",
+      "verification": ["expect and guard match parity", "timeout and ordered completion", "concurrent timeout/completion exact-once publication", "filter snapshotting", "observed-event and preview bounds", "normal evaluation-failure mapping", "fan-out", "diagnostics", "message lineage", "canonical composition activation"]
     },
     {
       "id": "components.http-typed-compatibility",

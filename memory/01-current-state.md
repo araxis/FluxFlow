@@ -8,8 +8,9 @@ Date: 2026-07-23
   `work/canonical-vnext-cleanup`. The complete canonical vNext stack was
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
-  canonical family consolidations through State. The provider-neutral MQTT vertical
-  slice and the bounded normal component-family migrations through Sessions,
+  canonical family consolidations through State and Expectations. The
+  provider-neutral MQTT vertical slice and the bounded normal component-family
+  migrations through Sessions,
   canonical FlowValue Mapping, FlowContent Payloads, FlowContent/FlowValue
   Serialization, FlowValue
   Validation, FlowValue Assertions, projection-event Expectations, and
@@ -202,18 +203,18 @@ Date: 2026-07-23
   diagnostics, 58-package source seeding, both preflights/dry-runs, and a
   package-only consumer passed. See
   `247-assertions-canonical-consolidation.md`.
-- `FluxFlow.Components.Expectations` is now `4.0.0` locally with canonical
-  `FlowEventExpectationNode`. It emits matched, unmet, timeout, and ordered
-  completion as successful `FlowResult<EventExpectationResult>` variants and
-  expected filter evaluation failure as one normal error result. Exact-once
-  arbitration preserves deterministic clocks, retained projection-event
-  evidence, diagnostics, and strong message lineage without a universal Errors
-  port. The released standalone node and direct-result/error contract remain
-  available for code-authored compatibility. Expectations Composition is now
-  `2.2.0` with canonical fixed ports and exact `Resources.{name}` clock
-  addressing. Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Routing followed as
-  the next bounded family. See `221-vnext-expectations-flowresult.md`.
+- `FluxFlow.Components.Expectations` is now `5.0.0` locally with one canonical
+  `EventExpectationNode`. Matched, unmet, timeout, ordered completion, and
+  expected evaluation failure use one `FlowResult<EventExpectationResult>`
+  Output. Exact-once arbitration, bounded event evidence, deterministic clocks,
+  diagnostics, fan-out, and message lineage are preserved. The direct-result
+  implementation, temporary Flow-prefixed node, numeric errors, and Errors
+  stream are removed. Expectations Composition is now `3.0.0` with canonical
+  fixed ports, the hidden type alias, exact `Resources.{name}` clock addressing,
+  and canonical application-host coverage. Focused/shared tests, controlled
+  builds, expected major API diagnostics, 58-package source seeding, both
+  preflights/dry-runs, and a package-only consumer passed. See
+  `249-expectations-canonical-consolidation.md`.
 - `FluxFlow.Components.Routing` is now `4.0.0` locally with canonical
   `FlowValueWindowNode`, `FlowValueCorrelationNode`, and `FlowValueJoinNode`.
   Windows, matches, and timeouts are successful `FlowResult<T>` variants;
