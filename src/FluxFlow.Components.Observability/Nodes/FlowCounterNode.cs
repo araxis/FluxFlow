@@ -1,62 +1,42 @@
-using FluxFlow.Components.Observability.Diagnostics;
+using System.Threading.Tasks.Dataflow;
 using FluxFlow.Components.Observability.Contracts;
+using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Options;
+using FluxFlow.Data;
 using FluxFlow.Mapping;
 using FluxFlow.Nodes;
+using DataFlowError = FluxFlow.Data.FlowError;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
 /// <summary>
-/// A standalone counter node. Post a <c>FlowMessage&lt;TInput&gt;</c> to <c>Input</c>;
-/// the node counts accepted inputs and broadcasts a
-/// <c>FlowMessage&lt;FlowCounterSnapshot&gt;</c> on <c>Output</c> carrying the same
-/// correlation id. When an expression engine and predicate are configured, the
-/// predicate is compiled once at construction and evaluated per message; inputs the
-/// predicate rejects are not counted (and not emitted) but are tallied in the
-/// snapshot's rejected count. With no predicate every input is counted and no engine
-/// is required. Predicate-evaluation failures surface on <c>Errors</c> (with the
-/// original correlation id) and the node keeps processing. Diagnostics flow on
-/// <c>Events</c>.
+/// Counts immutable workflow values and emits counted, rejected, and expected
+/// evaluation outcomes through one normal result output.
 /// </summary>
-public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapshot>
+public sealed class FlowCounterNode : IFlowNode
 {
-    public const string NodeType = "flow.counter";
-    public const string Incremented = ObservabilityDiagnosticNames.CounterIncremented;
-    public const string Rejected = ObservabilityDiagnosticNames.CounterRejected;
-    public const string Failed = ObservabilityDiagnosticNames.CounterFailed;
+    private const string ComponentType = "metric.count";
+    private const string InputType = nameof(FlowValue);
 
     private readonly FlowCounterOptions _options;
-    private readonly IFlowPredicate<TInput>? _acceptPredicate;
+    private readonly IFlowPredicate<FlowValue>? _predicate;
     private readonly string? _engineName;
     private readonly TimeProvider _clock;
+    private readonly ObservabilityPipeline<FlowCounterSnapshot> _pipeline;
     private long _count;
     private long _rejectedCount;
 
     public FlowCounterNode(
         FlowCounterOptions options,
         IFlowExpressionEngine? expressionEngine = null,
-        IFlowMapContextFactory<TInput>? contextFactory = null,
+        IFlowMapContextFactory<FlowValue>? contextFactory = null,
         TimeProvider? clock = null)
-        : this(ValidateOptions(options), expressionEngine, contextFactory, clock)
     {
-    }
-
-    private FlowCounterNode(
-        ValidatedOptions options,
-        IFlowExpressionEngine? expressionEngine,
-        IFlowMapContextFactory<TInput>? contextFactory,
-        TimeProvider? clock)
-        : base(options.FlowNodeOptions)
-    {
-        _options = options.CounterOptions;
+        _options = ValidateOptions(options);
         _clock = clock ?? TimeProvider.System;
         _engineName = expressionEngine?.Name;
 
-        // Compile the predicate expression once here (build time) when present;
-        // when there is no predicate the node accepts every input and no engine is
-        // required.
-        var effectivePredicate = options.EffectivePredicate;
-        if (!string.IsNullOrWhiteSpace(effectivePredicate))
+        if (!string.IsNullOrWhiteSpace(_options.EffectivePredicate))
         {
             if (expressionEngine is null)
             {
@@ -65,120 +45,173 @@ public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapsh
                     "flow.counter requires an expression engine when a predicate is configured.");
             }
 
-            _acceptPredicate = contextFactory is null
-                ? new ExpressionFlowPredicate<TInput>(effectivePredicate, expressionEngine)
-                : new ExpressionFlowPredicate<TInput>(effectivePredicate, expressionEngine, contextFactory);
+            _predicate = contextFactory is null
+                ? new ExpressionFlowPredicate<FlowValue>(
+                    _options.EffectivePredicate,
+                    expressionEngine)
+                : new ExpressionFlowPredicate<FlowValue>(
+                    _options.EffectivePredicate,
+                    expressionEngine,
+                    contextFactory);
         }
+
+        _pipeline = new ObservabilityPipeline<FlowCounterSnapshot>(
+            _options.BoundedCapacity,
+            Process);
     }
 
-    protected override Task ProcessAsync(FlowMessage<TInput> message)
+    public ITargetBlock<FlowMessage<FlowValue>> Input => _pipeline.Input;
+
+    public ISourceBlock<FlowMessage<FlowResult<FlowCounterSnapshot>>> Output
+        => _pipeline.Output;
+
+    public ISourceBlock<FlowEvent> Events => _pipeline.Events;
+
+    public Task Completion => _pipeline.Completion;
+
+    public void Complete() => _pipeline.Complete();
+
+    public void Fault(Exception exception) => _pipeline.Fault(exception);
+
+    public ValueTask DisposeAsync() => _pipeline.DisposeAsync();
+
+    private FlowMessage<FlowResult<FlowCounterSnapshot>> Process(
+        FlowMessage<FlowValue> message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var input = message.Payload;
-        if (!IsAccepted(input, message))
+        var timestamp = _clock.GetUtcNow();
+        if (message.Payload is null)
         {
-            return Task.CompletedTask;
+            return Failure(
+                message,
+                timestamp,
+                ObservabilityErrorCodeNames.MissingInput,
+                "flow.counter requires FlowValue input.");
         }
 
-        var observedAt = _clock.GetUtcNow();
-        var count = Interlocked.Increment(ref _count);
-        var snapshot = new FlowCounterSnapshot
-        {
-            Timestamp = observedAt,
-            Name = _options.EffectiveName,
-            InputType = _options.InputType,
-            Count = count,
-            RejectedCount = Volatile.Read(ref _rejectedCount),
-            LastObservedAt = observedAt
-        };
-
-        // Carry the correlation id forward onto the snapshot.
-        Emit(message.With(snapshot));
-        EmitEvent(new FlowEvent
-        {
-            Timestamp = _clock.GetUtcNow(),
-            CorrelationId = message.CorrelationId,
-            Name = Incremented,
-            Level = FlowEventLevel.Information,
-            Message = "flow.counter incremented.",
-            Attributes = ObservabilityNodeSupport.CreateAttributes(
-                NodeType,
-                _options.InputType,
-                _options.EffectiveName,
-                count)
-        });
-
-        return Task.CompletedTask;
-    }
-
-    private bool IsAccepted(TInput input, FlowMessage<TInput> message)
-    {
-        if (_acceptPredicate is null)
-        {
-            return true;
-        }
-
+        bool accepted;
         try
         {
-            var accepted = _acceptPredicate.IsMatch(input);
-
-            if (!accepted)
-            {
-                var rejected = Interlocked.Increment(ref _rejectedCount);
-                EmitEvent(new FlowEvent
-                {
-                    Timestamp = _clock.GetUtcNow(),
-                    CorrelationId = message.CorrelationId,
-                    Name = Rejected,
-                    Level = FlowEventLevel.Information,
-                    Message = "flow.counter rejected input.",
-                    Attributes = ObservabilityNodeSupport.CreateAttributes(
-                        NodeType,
-                        _options.InputType,
-                        _options.EffectiveName,
-                        rejected)
-                });
-            }
-
-            return accepted;
+            accepted = _predicate?.IsMatch(message.Payload) ?? true;
         }
         catch (Exception exception)
         {
-            EmitError(new FlowError
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Code = ObservabilityErrorCodes.CounterPredicateFailed,
-                Message = $"flow.counter failed to evaluate input: {exception.Message}",
-                Context = ObservabilityNodeSupport.CreateExpressionContext(_options, _engineName),
-                Exception = exception
-            });
-            EmitEvent(new FlowEvent
-            {
-                Timestamp = _clock.GetUtcNow(),
-                CorrelationId = message.CorrelationId,
-                Name = Failed,
-                Level = FlowEventLevel.Error,
-                Message = "flow.counter failed to evaluate input.",
-                Attributes = ObservabilityNodeSupport.CreateAttributes(
-                    NodeType,
-                    _options.InputType,
-                    _options.EffectiveName)
-            });
-            return false;
+            return Failure(
+                message,
+                timestamp,
+                ObservabilityErrorCodeNames.CounterPredicateFailed,
+                $"flow.counter failed to evaluate input: {exception.Message}",
+                exception);
         }
+
+        var kind = accepted
+            ? ObservabilityResultKinds.CounterSnapshot
+            : ObservabilityResultKinds.CounterRejected;
+        var count = accepted ? ++_count : _count;
+        var rejectedCount = accepted ? _rejectedCount : ++_rejectedCount;
+        var snapshot = new FlowCounterSnapshot
+        {
+            Timestamp = timestamp,
+            Name = _options.EffectiveName,
+            InputType = InputType,
+            Count = count,
+            RejectedCount = rejectedCount,
+            LastObservedAt = timestamp
+        };
+        PublishEvent(
+            message,
+            timestamp,
+            accepted
+                ? ObservabilityDiagnosticNames.CounterIncremented
+                : ObservabilityDiagnosticNames.CounterRejected,
+            accepted ? "flow.counter incremented." : "flow.counter rejected input.",
+            kind,
+            count,
+            rejectedCount,
+            isError: false);
+        return message.With(FlowResult<FlowCounterSnapshot>.Success(
+            kind,
+            snapshot,
+            timestamp));
     }
 
-    private static ValidatedOptions ValidateOptions(FlowCounterOptions? options)
+    private FlowMessage<FlowResult<FlowCounterSnapshot>> Failure(
+        FlowMessage<FlowValue> message,
+        DateTimeOffset timestamp,
+        string errorCode,
+        string errorMessage,
+        Exception? exception = null)
     {
-        ArgumentNullException.ThrowIfNull(options);
-
-        if (string.IsNullOrWhiteSpace(options.InputType))
+        var details = new Dictionary<string, FlowValue>(StringComparer.Ordinal)
         {
-            throw new ArgumentException(
-                "flow.counter option 'inputType' cannot be empty.", nameof(options));
+            ["engine"] = FlowValue.From(_engineName ?? string.Empty),
+            ["expression"] = FlowValue.From(_options.EffectivePredicate ?? string.Empty),
+            ["input"] = message.Payload ?? FlowValue.Null,
+            ["name"] = FlowValue.From(_options.EffectiveName)
+        };
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionId))
+            details["expressionId"] = FlowValue.From(_options.ExpressionId);
+        if (!string.IsNullOrWhiteSpace(_options.ExpressionName))
+            details["expressionName"] = FlowValue.From(_options.ExpressionName);
+        if (exception is not null)
+        {
+            details["exceptionType"] = FlowValue.From(
+                exception.GetType().FullName ?? exception.GetType().Name);
         }
 
+        var error = new DataFlowError(
+            errorCode,
+            errorMessage,
+            category: "Observability.Counter",
+            isTransient: false,
+            details: FlowValue.FromObject(details));
+        PublishEvent(
+            message,
+            timestamp,
+            ObservabilityDiagnosticNames.CounterFailed,
+            error.Message,
+            ObservabilityResultKinds.CounterFailed,
+            _count,
+            _rejectedCount,
+            isError: true);
+        return message.With(FlowResult<FlowCounterSnapshot>.Failure(
+            ObservabilityResultKinds.CounterFailed,
+            error,
+            timestamp));
+    }
+
+    private void PublishEvent(
+        FlowMessage<FlowValue> message,
+        DateTimeOffset timestamp,
+        string name,
+        string text,
+        string resultKind,
+        long count,
+        long rejectedCount,
+        bool isError)
+        => _pipeline.PublishEvent(new FlowEvent
+        {
+            Timestamp = timestamp,
+            CorrelationId = message.CorrelationId,
+            Name = name,
+            Level = isError ? FlowEventLevel.Warning : FlowEventLevel.Information,
+            Message = text,
+            Attributes = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["count"] = count,
+                ["inputType"] = InputType,
+                ["isError"] = isError,
+                ["name"] = _options.EffectiveName,
+                ["nodeType"] = ComponentType,
+                ["rejectedCount"] = rejectedCount,
+                ["resultKind"] = resultKind
+            }
+        });
+
+    private static FlowCounterOptions ValidateOptions(
+        FlowCounterOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
         if (options.BoundedCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -186,18 +219,6 @@ public sealed class FlowCounterNode<TInput> : FlowNode<TInput, FlowCounterSnapsh
                 "flow.counter option 'boundedCapacity' must be greater than zero.");
         }
 
-        return new ValidatedOptions(options);
-    }
-
-    private sealed class ValidatedOptions(FlowCounterOptions counterOptions)
-    {
-        public FlowCounterOptions CounterOptions { get; } = counterOptions;
-
-        public string? EffectivePredicate { get; } = counterOptions.EffectivePredicate;
-
-        public FlowNodeOptions FlowNodeOptions { get; } = new()
-        {
-            InputCapacity = counterOptions.BoundedCapacity
-        };
+        return options;
     }
 }

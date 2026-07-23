@@ -639,19 +639,18 @@ values. Logger and Metrics selector failures are one partial error result that
 carries the usable log entry or metric snapshot. Every descriptor has one
 normal FlowResult Output, Events, and no universal Errors port.
 
-Explicit `RegisterCounter<TInput>()`, `RegisterLogger<TInput>()`, and
-`RegisterMetrics<TInput>()` overloads preserve the released generic direct
-Output and Errors contracts for code-authored compatibility. All factories
-resolve host-owned keyed expression, selector, context, and clock resources.
-Invalid options fail during build as factory diagnostics when the host collects
-build failures.
+The `3.0` composition package exposes only these fixed registrations. All
+factories resolve host-owned keyed expression, selector, context, and clock
+resources. Invalid options fail during preparation as application revision
+diagnostics. Existing generic callers must map CLR values to `FlowValue` and
+route `FlowResult<T>` variants from Output.
 
 `ObservabilityComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the three canonical observability composition nodes, including FlowValue
 options, fixed result ports, and host-owned resource hints. Counter metadata includes the
 conditionally required expression engine plus optional context factory and
 clock resources. Logger metadata includes the dynamic `attribute:{name}`
-FlowValue selector resource pattern, and metrics metadata includes the optional
+selector resource pattern, and metrics metadata includes the optional
 FlowValue `sizeSelector` and `clock` resources. Expression engines, context
 factories, selectors, and clocks remain host-owned keyed resources. The provider
 authors that metadata through the shared validated Designer metadata builder.

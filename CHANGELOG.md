@@ -7,6 +7,24 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Observability 5.0.0
+
+- Consolidated Counter, Logger, and Metrics on the concise `FlowCounterNode`,
+  `FlowLoggerNode`, and `FlowMetricsNode` names with immutable `FlowValue`
+  input, one normal `FlowResult<T>` Output, and component Events.
+- Removed generic direct-result nodes, temporary FlowValue-prefixed nodes,
+  options, log entries and selectors, object selectors, numeric error codes,
+  duplicate pipelines, and universal Errors outputs while preserving clocks,
+  expression contexts, selector partial results, rates, ordering, fan-out, and
+  message lineage.
+
+## FluxFlow.Components.Observability.Composition 3.0.0
+
+- Registers only the consolidated fixed observability nodes, removes generic
+  registration overloads and compatibility-only metadata, preserves canonical
+  aliases and option hints, and resolves exact host-owned expression, context,
+  selector, and clock resource addresses.
+
 ## FluxFlow.Components.Payloads 5.0.0
 
 - Consolidated payload inspection on the concise `PayloadInspectNode` name

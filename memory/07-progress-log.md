@@ -2,6 +2,20 @@
 
 Date: 2026-07-23
 
+## 2026-07-23 - Canonical Observability Consolidation
+
+- Consolidated Counter, Logger, and Metrics on concise FlowValue nodes with one
+  normal FlowResult Output, partial/failure variants, Events, ordering,
+  deterministic clocks, fan-out, and message lineage.
+- Removed generic direct-result nodes and registrations, temporary
+  FlowValue-prefixed contracts, object selectors, numeric errors, Errors
+  streams, compatibility-only options, and obsolete composition-host tests
+  after expression, template, selector, rate, and completion parity coverage.
+- Moved Observability to `5.0.0` and Observability Composition to `3.0.0`;
+  focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. See [[255-observability-canonical-consolidation]].
+
 ## 2026-07-23 - Canonical Sources Consolidation
 
 - Consolidated Sources on concise generated and sequence nodes with immutable

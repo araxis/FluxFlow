@@ -596,6 +596,9 @@ This folder records the extraction work for `FluxFlow.Engine`.
 - `254-payloads-canonical-consolidation.md`: concise FlowContent Payloads
   inspection, removed request DTO and temporary node compatibility, runtime
   major version, and package/compatibility evidence.
+- `255-observability-canonical-consolidation.md`: concise FlowValue
+  Observability nodes, removed generic/direct-result compatibility, major
+  package versions, and package/compatibility evidence.
 - `report.md`: original FluxMq migration spike report supplied for review.
 - `legacy-docs/`: historical pre-cleanup docs; current decisions override older
   API descriptions in this folder.

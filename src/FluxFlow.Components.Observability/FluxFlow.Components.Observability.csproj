@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Observability</PackageId>
     <AssemblyName>FluxFlow.Components.Observability</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone FlowValue observability nodes with canonical normal results and generic direct-result compatibility surfaces.</Description>
+    <Description>Standalone FlowValue observability nodes with canonical normal results and component events.</Description>
     <PackageTags>workflow;dataflow;components;observability</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds FlowValue Counter, Logger, and Metrics nodes with one normal FlowResult output, FlowValue-native selectors, explicit rejected and partial outcomes, and strong message lineage. Released generic nodes remain available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates Counter, Logger, and Metrics on concise FlowValue nodes with one normal FlowResult output and Events. Removes generic direct-result nodes, temporary FlowValue-prefixed contracts, object selectors, numeric error codes, and universal Errors outputs.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

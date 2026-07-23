@@ -7,13 +7,13 @@
     <PackageId>FluxFlow.Components.Observability.Composition</PackageId>
     <AssemblyName>FluxFlow.Components.Observability.Composition</AssemblyName>
     <RootNamespace>FluxFlow.Components.Observability.Composition</RootNamespace>
-    <Version>2.2.0</Version>
+    <Version>3.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
     <Description>Canonical FlowValue observability registration and Designer metadata over host-owned expression, selector, context, and clock resources.</Description>
     <PackageTags>workflow;dataflow;components;observability;composition</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Centralizes canonical metric and logging aliases in typed descriptors and targets addressable Events and semantic processing profile contracts.</PackageReleaseNotes>
+    <PackageReleaseNotes>Registers only the consolidated FlowValue Counter, Logger, and Metrics nodes with fixed result ports, Events, and exact host-owned resource addresses. Removes generic direct-result registration overloads and compatibility-only metadata.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>

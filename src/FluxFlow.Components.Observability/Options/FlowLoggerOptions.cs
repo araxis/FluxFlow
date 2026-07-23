@@ -1,16 +1,19 @@
 using FluxFlow.Components.Observability.Contracts;
+using System.Text.Json.Serialization;
 
 namespace FluxFlow.Components.Observability.Options;
 
 public sealed record FlowLoggerOptions
 {
-    public const string ObjectTypeName = "object";
-
-    public string InputType { get; init; } = ObjectTypeName;
     public string Level { get; init; } = "Information";
+
     public string Category { get; init; } = "workflow";
+
     public string? MessageTemplate { get; init; }
+
+    [JsonConverter(typeof(OneOrManyStringJsonConverter))]
     public string[] AttributeSelectors { get; init; } = [];
+
     public int BoundedCapacity { get; init; } = 128;
 
     internal string EffectiveCategory
@@ -18,14 +21,9 @@ public sealed record FlowLoggerOptions
 
     internal string EffectiveMessageTemplate
         => string.IsNullOrWhiteSpace(MessageTemplate)
-            ? "Observed {inputType} item #{sequence}."
+            ? "Observed item #{sequence}."
             : MessageTemplate;
 
-    /// <summary>
-    /// Resolves <see cref="Level"/> into a <see cref="FlowLogLevel"/>. Throws
-    /// <see cref="InvalidOperationException"/> for an unsupported value so a
-    /// configuration mistake fails fast at construction.
-    /// </summary>
     internal FlowLogLevel ResolveLevel()
     {
         if (string.IsNullOrWhiteSpace(Level) ||

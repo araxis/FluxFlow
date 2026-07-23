@@ -9,7 +9,7 @@ Date: 2026-07-23
   previously fast-forwarded locally to `main` without squashing or rewriting
   its bounded commits, and the cleanup branch now contains the subsequent
   canonical family consolidations through State, Expectations, Sessions,
-  Timers, Sources, Serialization, and Payloads.
+  Timers, Sources, Serialization, Payloads, and Observability.
   The
   provider-neutral MQTT vertical slice and the bounded normal component-family
   migrations through Sessions,
@@ -168,8 +168,7 @@ Date: 2026-07-23
   no universal error output, and optional host-owned codec-catalog and clock
   resources. Focused/shared tests, controlled builds, expected runtime API
   diagnostics, Composition compatibility, 58-package source seeding, both
-  preflights/dry-runs, and a package-only consumer passed. Observability generic
-  compatibility is the next unresolved component-family ledger item. See
+  preflights/dry-runs, and a package-only consumer passed. See
   `254-payloads-canonical-consolidation.md`.
 - `FluxFlow.Components.Serialization` is now `5.0.0` locally and consolidated
   on six concise JSON, text, and Base64 nodes with canonical FlowContent/
@@ -181,8 +180,7 @@ Date: 2026-07-23
   canonical application hosting. Focused/shared tests, controlled builds,
   expected runtime API diagnostics, Composition compatibility, 58-package
   source seeding, both preflights/dry-runs, and a package-only consumer passed.
-  Payloads request compatibility is consolidated; Observability generic
-  compatibility is the next unresolved component-family ledger item.
+  Payloads request compatibility is consolidated.
   See `253-serialization-canonical-consolidation.md`.
 - `FluxFlow.Components.Validation` is now `5.0.0` locally with one
   `FlowValueJsonSchemaValidatorNode` contract. It preserves inline/path schema
@@ -275,20 +273,20 @@ Date: 2026-07-23
   available for compatibility. Metrics Composition is now `2.2.0` with the
   canonical fixed Output, no universal Errors surface, and an exact host-owned
   clock resource. Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Observability is the
-  next bounded family assessment. See `226-vnext-metrics-flowresult.md`.
-- `FluxFlow.Components.Observability` is now `4.0.0` locally with canonical
-  FlowValue Counter, Logger, and Metrics nodes. Each emits one normal FlowResult
-  Output plus Events; rejected Counter inputs are explicit successes, and
-  Logger/Metrics selector failures are one partial result carrying usable data.
-  FlowValue-native selectors avoid object conversion, and Logger accepts scalar
-  or array selector-name configuration. All released generic nodes remain
-  available for compatibility. Observability Composition is now `2.2.0` with
-  parameterless canonical registrations, explicit generic compatibility
-  overloads, no canonical Errors surfaces, and exact host-owned resources.
-  Focused/full tests, controlled builds, binary compatibility,
-  preflight/dry-runs, and a package-only consumer passed. Sources followed as the next
-  bounded family assessment. See `227-vnext-observability-flowvalue.md`.
+  preflight/dry-runs, and a package-only consumer passed. See
+  `226-vnext-metrics-flowresult.md`.
+- `FluxFlow.Components.Observability` is now `5.0.0` locally and consolidated
+  on concise Counter, Logger, and Metrics nodes with immutable FlowValue input,
+  one normal FlowResult Output, partial/failure variants, Events, deterministic
+  clocks, ordering, fan-out, and message lineage. Generic direct-result nodes,
+  object selectors, temporary FlowValue-prefixed contracts, numeric errors,
+  Errors streams, and compatibility-only options are removed after parity.
+  Observability Composition is now `3.0.0` with only fixed registrations,
+  canonical application-host coverage, and exact host-owned resources.
+  Focused/shared tests, controlled builds, expected major API diagnostics,
+  58-package source seeding, preflight/dry-runs, and a package-only consumer
+  passed. Remaining cleanup starts with canonical configuration and Composition
+  migrations. See `255-observability-canonical-consolidation.md`.
 - `FluxFlow.Components.Sources` is now `5.0.0` locally and consolidated on
   concise Generated and Sequence sources with immutable FlowValue output,
   natural zero-input lifecycle, deterministic timing, bounded fan-out, fresh

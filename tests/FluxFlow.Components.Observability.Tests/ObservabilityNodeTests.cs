@@ -4,6 +4,7 @@ using FluxFlow.Components.Observability.Diagnostics;
 using FluxFlow.Components.Observability.Nodes;
 using FluxFlow.Components.Observability.Options;
 using FluxFlow.Data;
+using FluxFlow.Mapping;
 using FluxFlow.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
@@ -11,7 +12,7 @@ using Xunit;
 
 namespace FluxFlow.Components.Observability.Tests;
 
-public sealed class FlowValueObservabilityNodeTests
+public sealed class ObservabilityNodeTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
@@ -19,8 +20,8 @@ public sealed class FlowValueObservabilityNodeTests
     public async Task Counter_emits_counted_and_rejected_results_with_lineage()
     {
         var calls = 0;
-        await using var node = new FlowValueCounterNode(
-            new FlowValueCounterOptions
+        await using var node = new FlowCounterNode(
+            new FlowCounterOptions
             {
                 Name = "accepted",
                 Predicate = "enabled"
@@ -50,8 +51,8 @@ public sealed class FlowValueObservabilityNodeTests
     public async Task Counter_predicate_failure_is_normal_and_later_input_continues()
     {
         var calls = 0;
-        await using var node = new FlowValueCounterNode(
-            new FlowValueCounterOptions { Predicate = "ok" },
+        await using var node = new FlowCounterNode(
+            new FlowCounterOptions { Predicate = "ok" },
             new RecordingExpressionEngine((_, _, _) =>
             {
                 if (++calls == 1)
@@ -75,7 +76,7 @@ public sealed class FlowValueObservabilityNodeTests
     [Fact]
     public async Task Counter_output_fans_out_every_result()
     {
-        await using var node = new FlowValueCounterNode(new FlowValueCounterOptions());
+        await using var node = new FlowCounterNode(new FlowCounterOptions());
         var first = Sink(node.Output);
         var second = Sink(node.Output);
 
@@ -93,17 +94,69 @@ public sealed class FlowValueObservabilityNodeTests
     }
 
     [Fact]
+    public async Task Counter_without_predicate_uses_clock_and_emits_correlated_event()
+    {
+        var timestamp = new DateTimeOffset(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
+        await using var node = new FlowCounterNode(
+            new FlowCounterOptions { Name = "items" },
+            clock: new FakeTimeProvider(timestamp));
+        var results = Sink(node.Output);
+        var events = Sink(node.Events);
+        var input = FlowMessage.Create(FlowValue.From("one"));
+
+        await node.Input.SendAsync(input);
+
+        var snapshot = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        snapshot.Timestamp.ShouldBe(timestamp);
+        snapshot.LastObservedAt.ShouldBe(timestamp);
+        snapshot.InputType.ShouldBe(nameof(FlowValue));
+        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+        @event.Name.ShouldBe(ObservabilityDiagnosticNames.CounterIncremented);
+        @event.CorrelationId.ShouldBe(input.CorrelationId);
+        @event.Attributes["name"].ShouldBe("items");
+        @event.Attributes["nodeType"].ShouldBe("metric.count");
+    }
+
+    [Fact]
+    public async Task Counter_uses_supplied_context_factory()
+    {
+        await using var node = new FlowCounterNode(
+            new FlowCounterOptions { Predicate = "accepted" },
+            new RecordingExpressionEngine((_, context, _) => context.Variables["accepted"]),
+            new DelegateContextFactory(input => new FlowMapContext
+            {
+                Variables = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["input"] = input,
+                    ["accepted"] = input.GetObject()["accepted"].GetBoolean()
+                }
+            }));
+        var results = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.FromObject(
+            new Dictionary<string, FlowValue>(StringComparer.Ordinal)
+            {
+                ["accepted"] = FlowValue.From(true)
+            })));
+
+        var result = await results.ReceiveAsync().WaitAsync(Timeout);
+        result.Payload.IsError.ShouldBeFalse();
+        result.Payload.Value.ShouldNotBeNull().Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Logger_emits_flowvalue_attributes_and_renders_template()
     {
         var timestamp = new DateTimeOffset(2026, 7, 19, 12, 0, 0, TimeSpan.Zero);
-        await using var node = new FlowValueLoggerNode(
-            new FlowValueLoggerOptions
+        await using var node = new FlowLoggerNode(
+            new FlowLoggerOptions
             {
                 Category = "workflow.test",
                 MessageTemplate = "{kind}:{sequence}",
                 AttributeSelectors = ["kind"]
             },
-            new Dictionary<string, IObservabilityFlowValueSelector>(StringComparer.Ordinal)
+            new Dictionary<string, IObservabilityValueSelector>(StringComparer.Ordinal)
             {
                 ["kind"] = new DelegateSelector((input, _) => input.GetObject()["kind"])
             },
@@ -128,9 +181,9 @@ public sealed class FlowValueObservabilityNodeTests
     [Fact]
     public async Task Logger_selector_failures_are_one_partial_result_with_entry()
     {
-        await using var node = new FlowValueLoggerNode(
-            new FlowValueLoggerOptions { AttributeSelectors = ["good", "broken"] },
-            new Dictionary<string, IObservabilityFlowValueSelector>(StringComparer.Ordinal)
+        await using var node = new FlowLoggerNode(
+            new FlowLoggerOptions { AttributeSelectors = ["good", "broken"] },
+            new Dictionary<string, IObservabilityValueSelector>(StringComparer.Ordinal)
             {
                 ["good"] = new DelegateSelector((_, _) => FlowValue.From("kept")),
                 ["broken"] = new DelegateSelector((_, _) =>
@@ -151,11 +204,36 @@ public sealed class FlowValueObservabilityNodeTests
     }
 
     [Fact]
+    public async Task Logger_does_not_expand_substituted_placeholders_and_allows_no_selectors()
+    {
+        await using var node = new FlowLoggerNode(
+            new FlowLoggerOptions
+            {
+                Category = "workflow.test",
+                MessageTemplate = "Observed {input}"
+            });
+        var results = Sink(node.Output);
+        var events = Sink(node.Events);
+        var input = FlowMessage.Create(FlowValue.From("{category}"));
+
+        await node.Input.SendAsync(input);
+
+        var entry = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        entry.Message.ShouldBe("Observed {category}");
+        entry.Attributes.GetObject().ShouldBeEmpty();
+        var @event = await events.ReceiveAsync().WaitAsync(Timeout);
+        @event.Name.ShouldBe(ObservabilityDiagnosticNames.LoggerEmitted);
+        @event.CorrelationId.ShouldBe(input.CorrelationId);
+        @event.Attributes["nodeType"].ShouldBe("log.write");
+    }
+
+    [Fact]
     public async Task Metrics_size_failure_is_partial_and_later_input_continues()
     {
         var calls = 0;
-        await using var node = new FlowValueMetricsNode(
-            new FlowValueMetricsOptions { Name = "items" },
+        await using var node = new FlowMetricsNode(
+            new FlowMetricsOptions { Name = "items" },
             new DelegateSelector((_, _) =>
             {
                 if (++calls == 1)
@@ -181,8 +259,8 @@ public sealed class FlowValueObservabilityNodeTests
     [Fact]
     public async Task Metrics_non_finite_size_is_a_partial_result()
     {
-        await using var node = new FlowValueMetricsNode(
-            new FlowValueMetricsOptions(),
+        await using var node = new FlowMetricsNode(
+            new FlowMetricsOptions(),
             new DelegateSelector((_, _) => FlowValue.From(double.NaN)));
         var results = Sink(node.Output);
 
@@ -197,9 +275,64 @@ public sealed class FlowValueObservabilityNodeTests
     }
 
     [Fact]
+    public async Task Metrics_tracks_rate_and_averages_only_sized_observations()
+    {
+        var firstObservedAt = new DateTimeOffset(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(firstObservedAt);
+        await using var node = new FlowMetricsNode(
+            new FlowMetricsOptions { Name = "messages" },
+            new DelegateSelector((input, _) => input.GetObject()["size"]),
+            clock);
+        var results = Sink(node.Output);
+        var events = Sink(node.Events);
+
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.FromObject(
+            new Dictionary<string, FlowValue> { ["size"] = FlowValue.Null })));
+        var first = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+        clock.Advance(TimeSpan.FromSeconds(2));
+        var secondInput = FlowMessage.Create(FlowValue.FromObject(
+            new Dictionary<string, FlowValue> { ["size"] = FlowValue.From(4) }));
+        await node.Input.SendAsync(secondInput);
+        var second = (await results.ReceiveAsync().WaitAsync(Timeout))
+            .Payload.Value.ShouldNotBeNull();
+
+        first.AverageSize.ShouldBeNull();
+        second.Count.ShouldBe(2);
+        second.LastSize.ShouldBe(4);
+        second.TotalSize.ShouldBe(4);
+        second.AverageSize.ShouldBe(4);
+        second.CurrentRatePerSecond.ShouldBe(0.5d);
+        second.AverageRatePerSecond.ShouldBe(1d);
+        var firstEvent = await events.ReceiveAsync().WaitAsync(Timeout);
+        var secondEvent = await events.ReceiveAsync().WaitAsync(Timeout);
+        firstEvent.Name.ShouldBe(ObservabilityDiagnosticNames.MetricsObserved);
+        secondEvent.CorrelationId.ShouldBe(secondInput.CorrelationId);
+        secondEvent.Attributes["nodeType"].ShouldBe("metric.measure");
+    }
+
+    [Fact]
+    public void Constructors_validate_required_dependencies_and_options()
+    {
+        Should.Throw<ArgumentNullException>(() => new FlowCounterNode(null!));
+        Should.Throw<ArgumentNullException>(() => new FlowLoggerNode(null!));
+        Should.Throw<ArgumentNullException>(() => new FlowMetricsNode(null!));
+        Should.Throw<ArgumentNullException>(() => new FlowCounterNode(
+            new FlowCounterOptions { Predicate = "accepted" }));
+        Should.Throw<ArgumentOutOfRangeException>(() => new FlowCounterNode(
+            new FlowCounterOptions { BoundedCapacity = 0 }));
+        Should.Throw<ArgumentOutOfRangeException>(() => new FlowLoggerNode(
+            new FlowLoggerOptions { BoundedCapacity = 0 }));
+        Should.Throw<ArgumentOutOfRangeException>(() => new FlowMetricsNode(
+            new FlowMetricsOptions { BoundedCapacity = 0 }));
+        Should.Throw<InvalidOperationException>(() => new FlowLoggerNode(
+            new FlowLoggerOptions { Level = "unsupported" }));
+    }
+
+    [Fact]
     public async Task Normal_completion_drains_results_and_events()
     {
-        await using var node = new FlowValueMetricsNode(new FlowValueMetricsOptions());
+        await using var node = new FlowMetricsNode(new FlowMetricsOptions());
         var results = Sink(node.Output);
         var events = Sink(node.Events);
 
@@ -224,9 +357,16 @@ public sealed class FlowValueObservabilityNodeTests
 
     private sealed class DelegateSelector(
         Func<FlowValue, ObservabilityNodeContext, FlowValue> selector)
-        : IObservabilityFlowValueSelector
+        : IObservabilityValueSelector
     {
         public FlowValue Select(FlowValue input, ObservabilityNodeContext context)
             => selector(input, context);
+    }
+
+    private sealed class DelegateContextFactory(
+        Func<FlowValue, FlowMapContext> factory)
+        : IFlowMapContextFactory<FlowValue>
+    {
+        public FlowMapContext Create(FlowValue input) => factory(input);
     }
 }

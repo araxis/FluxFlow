@@ -9,9 +9,9 @@ namespace FluxFlow.Components.Observability.Composition;
 
 public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
-    private static readonly FlowValueCounterOptions CounterDefaults = new();
-    private static readonly FlowValueLoggerOptions LoggerDefaults = new();
-    private static readonly FlowValueMetricsOptions MetricsDefaults = new();
+    private static readonly FlowCounterOptions CounterDefaults = new();
+    private static readonly FlowLoggerOptions LoggerDefaults = new();
+    private static readonly FlowMetricsOptions MetricsDefaults = new();
 
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         =>
@@ -29,11 +29,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Counts accepted input messages and emits counter snapshots.",
             "hash",
             "count")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.CounterDescriptor.Aliases))
-            .AddAttribute("omittedOptions", "inputType,engine")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "inputType and engine are generic compatibility diagnostics; the canonical contract has fixed FlowValue input and selects its engine through a resource.");
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.CounterDescriptor.Aliases));
 
         AddCounterOptions(builder);
         AddCounterResources(builder);
@@ -55,11 +51,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Renders structured log entries from input messages.",
             "list",
             "log")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.LoggerDescriptor.Aliases))
-            .AddAttribute("omittedOptions", "inputType")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "inputType is generic compatibility metadata; the canonical contract has fixed FlowValue input.");
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.LoggerDescriptor.Aliases));
 
         AddLoggerOptions(builder);
         AddLoggerResources(builder);
@@ -67,7 +59,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             builder,
             nameof(FlowValue),
             "Workflow value to log.",
-            "FlowResult<FlowValueLogEntry>",
+            "FlowResult<FlowLogEntry>",
             "Complete, partial, or failed structured log result.");
 
         return builder.Build();
@@ -81,11 +73,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
             "Tracks count, rate, timestamp, and optional size snapshots for inputs.",
             "activity",
             "observeMetrics")
-            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.MetricsDescriptor.Aliases))
-            .AddAttribute("omittedOptions", "inputType,sizeSelector")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "inputType and the diagnostic sizeSelector option belong to generic compatibility; the canonical contract has fixed FlowValue input and selects size through the resource.");
+            .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', ObservabilityCompositionNodeTypes.MetricsDescriptor.Aliases));
 
         AddMetricsOptions(builder);
         AddMetricsResources(builder);
@@ -270,7 +258,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Attribute Selector",
                 order: 1,
                 summary: "Required keyed selector pattern for each configured attributeSelectors entry.",
-                valueType: nameof(IObservabilityFlowValueSelector),
+                valueType: nameof(IObservabilityValueSelector),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: ObservabilityCompositionResourceNames.AttributeSelectorPrefix + "{name}",
@@ -283,7 +271,7 @@ public sealed class ObservabilityComponentDesignMetadataProvider : IComponentDes
                 displayName: "Size Selector",
                 order: 0,
                 summary: "Optional keyed selector used to calculate message size metrics.",
-                valueType: nameof(IObservabilityFlowValueSelector),
+                valueType: nameof(IObservabilityValueSelector),
                 attributes: ResourceDesignMetadataAttributes.CreateHostOwned(
                     ResourceDesignMetadataAttributeValues.Selector,
                     keyPattern: "selector:{name}"))

@@ -4,7 +4,7 @@ using FluxFlow.Nodes;
 
 namespace FluxFlow.Components.Observability.Nodes;
 
-internal sealed class FlowValueObservabilityPipeline<TOutput> : IAsyncDisposable
+internal sealed class ObservabilityPipeline<TOutput> : IAsyncDisposable
 {
     private readonly TransformBlock<
         FlowMessage<FlowValue>,
@@ -16,7 +16,7 @@ internal sealed class FlowValueObservabilityPipeline<TOutput> : IAsyncDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposed;
 
-    public FlowValueObservabilityPipeline(
+    public ObservabilityPipeline(
         int boundedCapacity,
         Func<FlowMessage<FlowValue>, FlowMessage<FlowResult<TOutput>>> process)
     {

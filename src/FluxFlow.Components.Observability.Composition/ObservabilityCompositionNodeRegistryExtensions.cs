@@ -18,7 +18,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
 
         return registry.Register(
             ObservabilityCompositionNodeTypes.CounterDescriptor,
-            CreateFlowValueCounterNode,
+            CreateCounterNode,
             inputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
@@ -27,29 +27,6 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             outputs:
             [
                 CompositionPorts.Metadata<FlowResult<FlowCounterSnapshot>>(
-                    ObservabilityCompositionPortNames.Output)
-            ],
-            registrationType: nodeType);
-    }
-
-    public static CompositionNodeRegistry RegisterCounter<TInput>(
-        this CompositionNodeRegistry registry,
-        string nodeType = ObservabilityCompositionNodeTypes.Counter)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
-
-        return registry.Register(
-            ObservabilityCompositionNodeTypes.CounterDescriptor,
-            CreateCounterNode<TInput>,
-            inputs:
-            [
-                CompositionPorts.Metadata<TInput>(
-                    ObservabilityCompositionPortNames.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Metadata<FlowCounterSnapshot>(
                     ObservabilityCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -64,7 +41,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
 
         return registry.Register(
             ObservabilityCompositionNodeTypes.LoggerDescriptor,
-            CreateFlowValueLoggerNode,
+            CreateLoggerNode,
             inputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
@@ -72,30 +49,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Metadata<FlowResult<FlowValueLogEntry>>(
-                    ObservabilityCompositionPortNames.Output)
-            ],
-            registrationType: nodeType);
-    }
-
-    public static CompositionNodeRegistry RegisterLogger<TInput>(
-        this CompositionNodeRegistry registry,
-        string nodeType = ObservabilityCompositionNodeTypes.Logger)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
-
-        return registry.Register(
-            ObservabilityCompositionNodeTypes.LoggerDescriptor,
-            CreateLoggerNode<TInput>,
-            inputs:
-            [
-                CompositionPorts.Metadata<TInput>(
-                    ObservabilityCompositionPortNames.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Metadata<FlowLogEntry>(
+                CompositionPorts.Metadata<FlowResult<FlowLogEntry>>(
                     ObservabilityCompositionPortNames.Output)
             ],
             registrationType: nodeType);
@@ -110,7 +64,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
 
         return registry.Register(
             ObservabilityCompositionNodeTypes.MetricsDescriptor,
-            CreateFlowValueMetricsNode,
+            CreateMetricsNode,
             inputs:
             [
                 CompositionPorts.Metadata<FlowValue>(
@@ -124,33 +78,10 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             registrationType: nodeType);
     }
 
-    public static CompositionNodeRegistry RegisterMetrics<TInput>(
-        this CompositionNodeRegistry registry,
-        string nodeType = ObservabilityCompositionNodeTypes.Metrics)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentException.ThrowIfNullOrWhiteSpace(nodeType);
-
-        return registry.Register(
-            ObservabilityCompositionNodeTypes.MetricsDescriptor,
-            CreateMetricsNode<TInput>,
-            inputs:
-            [
-                CompositionPorts.Metadata<TInput>(
-                    ObservabilityCompositionPortNames.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Metadata<FlowMetricSnapshot>(
-                    ObservabilityCompositionPortNames.Output)
-            ],
-            registrationType: nodeType);
-    }
-
-    private static ValueTask<ComposedNode> CreateFlowValueCounterNode(
+    private static ValueTask<ComposedNode> CreateCounterNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FlowValueCounterOptions>();
+        var options = context.BindConfiguration<FlowCounterOptions>();
         var expressionEngine = RequiresExpressionEngine(options)
             ? context.GetRequiredResource<IFlowExpressionEngine>(
                 ObservabilityCompositionResourceNames.Engine)
@@ -159,7 +90,7 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             ObservabilityCompositionResourceNames.ContextFactory);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowValueCounterNode(
+        var node = new FlowCounterNode(
             options,
             expressionEngine,
             contextFactory,
@@ -182,14 +113,14 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueLoggerNode(
+    private static ValueTask<ComposedNode> CreateLoggerNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FlowValueLoggerOptions>();
-        var attributeSelectors = ResolveFlowValueAttributeSelectors(context, options);
+        var options = context.BindConfiguration<FlowLoggerOptions>();
+        var attributeSelectors = ResolveAttributeSelectors(context, options);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowValueLoggerNode(options, attributeSelectors, clock);
+        var node = new FlowLoggerNode(options, attributeSelectors, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -201,22 +132,22 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             ],
             outputs:
             [
-                CompositionPorts.Output<FlowResult<FlowValueLogEntry>>(
+                CompositionPorts.Output<FlowResult<FlowLogEntry>>(
                     ObservabilityCompositionPortNames.Output,
                     node.Output)
             ],
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateFlowValueMetricsNode(
+    private static ValueTask<ComposedNode> CreateMetricsNode(
         CompositionNodeFactoryContext context)
     {
-        var options = context.BindConfiguration<FlowValueMetricsOptions>();
-        var sizeSelector = context.GetResource<IObservabilityFlowValueSelector>(
+        var options = context.BindConfiguration<FlowMetricsOptions>();
+        var sizeSelector = context.GetResource<IObservabilityValueSelector>(
             ObservabilityCompositionResourceNames.SizeSelector);
         var clock = context.GetResource<TimeProvider>(
             ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowValueMetricsNode(options, sizeSelector, clock);
+        var node = new FlowMetricsNode(options, sizeSelector, clock);
 
         return ValueTask.FromResult(ComposedNode.Create(
             node,
@@ -235,141 +166,18 @@ public static class ObservabilityCompositionNodeRegistryExtensions
             events: node.Events));
     }
 
-    private static ValueTask<ComposedNode> CreateCounterNode<TInput>(
-        CompositionNodeFactoryContext context)
-    {
-        var options = context.BindConfiguration<FlowCounterOptions>();
-        var expressionEngine = RequiresExpressionEngine(options)
-            ? context.GetRequiredResource<IFlowExpressionEngine>(
-                ObservabilityCompositionResourceNames.Engine)
-            : null;
-        var contextFactory = context.GetResource<IFlowMapContextFactory<TInput>>(
-            ObservabilityCompositionResourceNames.ContextFactory);
-        var clock = context.GetResource<TimeProvider>(
-            ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowCounterNode<TInput>(
-            options,
-            expressionEngine,
-            contextFactory,
-            clock);
-
-        return ValueTask.FromResult(ComposedNode.Create(
-            node,
-            inputs:
-            [
-                CompositionPorts.Input<TInput>(
-                    ObservabilityCompositionPortNames.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Output<FlowCounterSnapshot>(
-                    ObservabilityCompositionPortNames.Output,
-                    node.Output)
-            ],
-            events: node.Events,
-            errors: node.Errors));
-    }
-
-    private static ValueTask<ComposedNode> CreateLoggerNode<TInput>(
-        CompositionNodeFactoryContext context)
-    {
-        var options = context.BindConfiguration<FlowLoggerOptions>();
-        var attributeSelectors = ResolveAttributeSelectors<TInput>(
-            context,
-            options);
-        var clock = context.GetResource<TimeProvider>(
-            ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowLoggerNode<TInput>(
-            options,
-            attributeSelectors,
-            clock);
-
-        return ValueTask.FromResult(ComposedNode.Create(
-            node,
-            inputs:
-            [
-                CompositionPorts.Input<TInput>(
-                    ObservabilityCompositionPortNames.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Output<FlowLogEntry>(
-                    ObservabilityCompositionPortNames.Output,
-                    node.Output)
-            ],
-            events: node.Events,
-            errors: node.Errors));
-    }
-
-    private static ValueTask<ComposedNode> CreateMetricsNode<TInput>(
-        CompositionNodeFactoryContext context)
-    {
-        var options = context.BindConfiguration<FlowMetricsOptions>();
-        var sizeSelector = context.GetResource<IObservabilityValueSelector<TInput>>(
-            ObservabilityCompositionResourceNames.SizeSelector);
-        var clock = context.GetResource<TimeProvider>(
-            ObservabilityCompositionResourceNames.Clock);
-        var node = new FlowMetricsNode<TInput>(
-            options,
-            sizeSelector,
-            clock);
-
-        return ValueTask.FromResult(ComposedNode.Create(
-            node,
-            inputs:
-            [
-                CompositionPorts.Input<TInput>(
-                    ObservabilityCompositionPortNames.Input,
-                    node.Input)
-            ],
-            outputs:
-            [
-                CompositionPorts.Output<FlowMetricSnapshot>(
-                    ObservabilityCompositionPortNames.Output,
-                    node.Output)
-            ],
-            events: node.Events,
-            errors: node.Errors));
-    }
-
-    private static IReadOnlyDictionary<string, IObservabilityValueSelector<TInput>>
-        ResolveAttributeSelectors<TInput>(
+    private static IReadOnlyDictionary<string, IObservabilityValueSelector>
+        ResolveAttributeSelectors(
             CompositionNodeFactoryContext context,
             FlowLoggerOptions options)
     {
-        var selectors = new Dictionary<string, IObservabilityValueSelector<TInput>>(
-            StringComparer.Ordinal);
-        foreach (var configuredName in options.AttributeSelectors ?? [])
-        {
-            var name = NormalizeAttributeSelectorName(configuredName);
-            var resourceName = ObservabilityCompositionResourceNames.AttributeSelector(
-                name);
-            var selector = context.GetRequiredResource<IObservabilityValueSelector<TInput>>(
-                resourceName);
-            if (!selectors.TryAdd(name, selector))
-            {
-                throw new InvalidOperationException(
-                    $"flow.logger attribute selector '{name}' is configured more than once.");
-            }
-        }
-
-        return selectors;
-    }
-
-    private static IReadOnlyDictionary<string, IObservabilityFlowValueSelector>
-        ResolveFlowValueAttributeSelectors(
-            CompositionNodeFactoryContext context,
-            FlowValueLoggerOptions options)
-    {
-        var selectors = new Dictionary<string, IObservabilityFlowValueSelector>(
+        var selectors = new Dictionary<string, IObservabilityValueSelector>(
             StringComparer.Ordinal);
         foreach (var configuredName in options.AttributeSelectors ?? [])
         {
             var name = NormalizeAttributeSelectorName(configuredName);
             var resourceName = ObservabilityCompositionResourceNames.AttributeSelector(name);
-            var selector = context.GetRequiredResource<IObservabilityFlowValueSelector>(
+            var selector = context.GetRequiredResource<IObservabilityValueSelector>(
                 resourceName);
             if (!selectors.TryAdd(name, selector))
             {
@@ -393,10 +201,6 @@ public static class ObservabilityCompositionNodeRegistryExtensions
     }
 
     private static bool RequiresExpressionEngine(FlowCounterOptions options)
-        => !string.IsNullOrWhiteSpace(options.Predicate)
-            || !string.IsNullOrWhiteSpace(options.Expression);
-
-    private static bool RequiresExpressionEngine(FlowValueCounterOptions options)
         => !string.IsNullOrWhiteSpace(options.Predicate)
             || !string.IsNullOrWhiteSpace(options.Expression);
 }

@@ -25,7 +25,7 @@ services
 | Type | Input | Output |
 |------|-------|--------|
 | `metric.count` | `FlowValue` | `FlowResult<FlowCounterSnapshot>` |
-| `log.write` | `FlowValue` | `FlowResult<FlowValueLogEntry>` |
+| `log.write` | `FlowValue` | `FlowResult<FlowLogEntry>` |
 | `metric.measure` | `FlowValue` | `FlowResult<FlowMetricSnapshot>` |
 
 Descriptors expose Events and no universal Errors ports. Counter rejection is a
@@ -99,17 +99,16 @@ each entry resolves the matching `attribute:{name}` resource.
   configured attribute name.
 - Metrics: optional `sizeSelector` and optional `clock`.
 
-Every selector in the canonical contract implements
-`IObservabilityFlowValueSelector` and returns FlowValue directly.
+Every selector implements `IObservabilityValueSelector` and returns FlowValue
+directly.
 
 ## Design Metadata
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
 The canonical catalog adds the traced `Events` output and an optional semantic
-`processing` profile picker, and omits legacy `name`, `boundedCapacity`,
-`maxDegreeOfParallelism`, and `ensureOrdered` options from normal editing.
-Default execution requires no processing profile; raw provider metadata retains
-released declarations for compatibility.
+`processing` profile picker. It keeps implementation-oriented capacity settings
+out of ordinary editing while retaining them in raw provider metadata. Default
+execution requires no processing profile.
 
 
 `ObservabilityComponentDesignMetadataProvider` describes canonical fixed ports,
@@ -118,7 +117,6 @@ selector patterns, and exact host-owned resource addresses. The metadata is
 descriptive only; hosts own palette and inspector rendering, resource selection,
 validation UI, activation, persistence, and sink integration.
 
-Explicit generic registration overloads retain the released direct-result
-contract for code-authored compatibility. Composition `2.x` parameterless
-registrations are canonical; install Composition `1.x` for existing legacy
-definitions.
+Composition `3.0` exposes only the fixed registrations above. Migrate generic
+code-authored registrations by mapping input to FlowValue and routing normal
+`FlowResult<T>` Output variants.
