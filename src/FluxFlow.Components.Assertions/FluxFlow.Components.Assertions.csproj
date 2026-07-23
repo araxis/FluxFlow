@@ -6,12 +6,12 @@
     <PackageId>FluxFlow.Components.Assertions</PackageId>
     <AssemblyName>FluxFlow.Components.Assertions</AssemblyName>
     <RootNamespace>FluxFlow.Components.Assertions</RootNamespace>
-    <Version>4.0.0</Version>
+    <Version>5.0.0</Version>
     <Authors>FluxFlow contributors</Authors>
-    <Description>Standalone expression-driven assertion nodes for canonical FlowValue workflows and explicit typed compatibility scenarios.</Description>
+    <Description>Standalone expression-driven assertions for immutable FluxFlow values with one normal result stream.</Description>
     <PackageTags>workflow;dataflow;components;assertions</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Adds the canonical FlowValue assertion node with pass, fail, and expected evaluation failures represented as normal FlowResult variants. Existing generic assertion contracts remain available for compatibility.</PackageReleaseNotes>
+    <PackageReleaseNotes>Consolidates assertions on the canonical FlowValue node and removes the generic CLR component, redundant result contracts, branch ports, numeric error codes, and dead engine option.</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

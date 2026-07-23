@@ -178,6 +178,34 @@ public sealed class FlowValueAssertionNodeTests
     }
 
     [Fact]
+    public async Task Output_fans_out_accepted_results_in_order()
+    {
+        await using var node = new FlowValueAssertionNode(
+            new FlowValueAssertionOptions { Expression = "assert" },
+            new RecordingExpressionEngine(
+                evaluate: (_, context, _) =>
+                    ((FlowValue)context.Variables["input"]!).GetInteger() > 0));
+        var first = Sink(node.Output);
+        var second = Sink(node.Output);
+
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(1L)));
+        await node.Input.SendAsync(FlowMessage.Create(FlowValue.From(-1L)));
+
+        var firstKinds = new[]
+        {
+            (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind,
+            (await first.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind
+        };
+        var secondKinds = new[]
+        {
+            (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind,
+            (await second.ReceiveAsync().WaitAsync(Timeout)).Payload.Kind
+        };
+        firstKinds.ShouldBe([AssertionResultKinds.Passed, AssertionResultKinds.Failed]);
+        secondKinds.ShouldBe(firstKinds);
+    }
+
+    [Fact]
     public void Canonical_node_rejects_invalid_options_and_has_no_legacy_ports()
     {
         var engine = new RecordingExpressionEngine(evaluate: (_, _, _) => true);
@@ -197,6 +225,7 @@ public sealed class FlowValueAssertionNodeTests
         typeof(FlowValueAssertionNode).GetProperty("Passed").ShouldBeNull();
         typeof(FlowValueAssertionNode).GetProperty("Failed").ShouldBeNull();
         typeof(FlowValueAssertionNode).GetProperty("Errors").ShouldBeNull();
+        typeof(FlowValueAssertionOptions).GetProperty("Engine").ShouldBeNull();
     }
 
     private static FlowValue Score(long score)

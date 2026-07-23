@@ -10,7 +10,7 @@ new definitions and Designer palettes use `data.assert`.
 The package does not choose an expression language, scan assemblies, resolve
 CLR types from strings, or own expression-engine resources.
 
-## Canonical Registration
+## Registration
 
 ```csharp
 services.AddKeyedSingleton<IFlowExpressionEngine>(
@@ -73,20 +73,6 @@ and disposal.
 Invalid options, such as a missing expression or non-positive bounded capacity,
 fail during node activation.
 
-## Typed Compatibility Registration
-
-Existing code-authored hosts can retain explicit CLR contracts:
-
-```csharp
-registry.RegisterAssertion<OrderMessage>("data.assert.order");
-```
-
-That overload creates `FlowAssertionComponent<TInput>` and preserves its
-`Input`, `Output`, `Passed`, `Failed`, Events, and Errors surfaces. The
-`emitPassedInput` and `emitFailedInput` options apply only to this generic
-compatibility registration. Use a distinct node type when canonical and generic
-registrations share one registry.
-
 ## Design Metadata
 
 Hosts should compose this provider through `ComponentDesignMetadataCatalog`.
@@ -107,3 +93,8 @@ released declarations for compatibility.
 
 The metadata is descriptive only. Hosts own palette and inspector rendering,
 resource selection, validation UI, activation, and persistence.
+
+Convert CLR inputs explicitly at the application boundary. Older Passed,
+Failed, and Errors links migrate to conditions over `Kind`, `IsError`, and
+`Error.Code`; engine selection is the required host-owned `engine` resource,
+not a duplicate string option.

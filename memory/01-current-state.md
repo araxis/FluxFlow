@@ -190,20 +190,18 @@ Date: 2026-07-23
   Focused/shared tests, controlled builds, expected major API diagnostics,
   58-package source seeding, both preflights/dry-runs, and a package-only
   consumer passed. See `246-validation-canonical-consolidation.md`.
-- `FluxFlow.Components.Assertions` is now `4.0.0` locally with a canonical
-  `FlowValueAssertionNode` that emits passed and failed rules as successful
-  `FlowResult<FlowValueAssertionResult>` variants and missing/evaluation
-  failures as normal error results. It preserves exact values, expression
-  metadata, timing, diagnostics, message lineage, and later-message
-  continuation without branch or universal Errors ports. The generic
-  standalone component and branch/error contracts remain available for
-  code-authored compatibility. `FluxFlow.Components.Assertions.Composition` is
-  `2.2.0` with canonical fixed ports, parameterless registration, and
-  host-owned `Resources.{name}` engine, FlowValue context factory, and clock
-  addresses. Focused/full tests, zero-warning controlled builds, binary
-  compatibility, release preflight/dry-runs, and a package-only consumer
-  passed. Expectations followed as the next bounded family. See
-  `220-vnext-assertions-flowvalue.md`.
+- `FluxFlow.Components.Assertions` is now `5.0.0` locally with one
+  `FlowValueAssertionNode` contract. It preserves compiled expression behavior,
+  exact immutable input/context values, normal passed/failed/failure result
+  variants, diagnostics, fan-out, timing, and message lineage.
+  `FluxFlow.Components.Assertions.Composition` is `3.0.0` and exposes only
+  canonical `RegisterAssertion()`. The generic CLR component/registration,
+  redundant result contracts, numeric error codes, Passed/Failed/Errors
+  branches, generic-only metadata, and dead engine option were removed after
+  parity coverage. Focused/shared tests, controlled builds, expected major API
+  diagnostics, 58-package source seeding, both preflights/dry-runs, and a
+  package-only consumer passed. See
+  `247-assertions-canonical-consolidation.md`.
 - `FluxFlow.Components.Expectations` is now `4.0.0` locally with canonical
   `FlowEventExpectationNode`. It emits matched, unmet, timeout, and ordered
   completion as successful `FlowResult<EventExpectationResult>` variants and

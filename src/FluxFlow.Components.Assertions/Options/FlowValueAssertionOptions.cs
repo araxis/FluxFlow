@@ -5,7 +5,11 @@ namespace FluxFlow.Components.Assertions.Options;
 /// </summary>
 public sealed record FlowValueAssertionOptions
 {
-    public string? Engine { get; init; }
+    public const string ObjectTypeName = "object";
+
+    public const string DefaultDescription = "Flow assertion";
+
+    public const string DefaultFailureMessage = "Assertion failed.";
 
     public string? Expression { get; init; }
 
@@ -13,7 +17,7 @@ public sealed record FlowValueAssertionOptions
 
     public string? ExpressionName { get; init; }
 
-    public string InputType { get; init; } = AssertionOptions.ObjectTypeName;
+    public string InputType { get; init; } = ObjectTypeName;
 
     public int BoundedCapacity { get; init; } = 128;
 
@@ -23,11 +27,11 @@ public sealed record FlowValueAssertionOptions
 
     internal string EffectiveDescription
         => string.IsNullOrWhiteSpace(Description)
-            ? AssertionOptions.DefaultDescription
+            ? DefaultDescription
             : Description.Trim();
 
     internal string EffectiveFailureMessage
         => string.IsNullOrWhiteSpace(FailureMessage)
-            ? AssertionOptions.DefaultFailureMessage
+            ? DefaultFailureMessage
             : FailureMessage.Trim();
 }

@@ -444,8 +444,9 @@ Use parameterless `RegisterAssertion()` from the optional
 normal successful result kinds; missing input and expression evaluation
 failures remain normal error results. The factory resolves a required keyed
 `IFlowExpressionEngine`; optional keyed `IFlowMapContextFactory<FlowValue>` and
-clock resources stay host-owned. `RegisterAssertion<TInput>(customNodeType)`
-remains available as an explicit generic compatibility registration.
+clock resources stay host-owned. Convert CLR inputs explicitly at the
+application boundary and replace prior Passed, Failed, and Errors links with
+conditions over `FlowResult.Kind`, `IsError`, and `Error.Code`.
 
 `AssertionsComponentDesignMetadataProvider` exposes neutral Designer metadata
 for the `data.assert` composition node so hosts can compose palette, editor,
@@ -453,9 +454,8 @@ validation, or documentation hints without copying package descriptors. The
 metadata includes editable options with section/editor hints, canonical
 `FlowValue`/`FlowResult<FlowValueAssertionResult>` ports, and host-owned resource
 picker hints using `Resources.{name}` for the required `engine` resource plus
-optional `contextFactory` and `clock` resources. Routed-input settings are
-documented as generic compatibility options rather than canonical Designer
-controls.
+optional `contextFactory` and `clock` resources. Engine selection is represented
+only by the required resource, without a duplicate string option.
 
 ## Control Composition
 

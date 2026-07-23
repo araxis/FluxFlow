@@ -9,9 +9,6 @@ namespace FluxFlow.Components.Assertions.Composition;
 
 public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesignMetadataProvider
 {
-    // Explicit generic registrations retain AssertionsCompositionPortNames.Passed
-    // and AssertionsCompositionPortNames.Failed as compatibility-only ports.
-    // Fixed canonical metadata intentionally exposes only Input and Output.
     public IReadOnlyCollection<ComponentDesignMetadata> GetMetadata()
         => [CreateAssertionMetadata()];
 
@@ -25,10 +22,6 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 preferredNodeName: "assert",
                 suggestedEditorWidth: 420)
             .AddAttribute(ComponentDesignMetadataAttributeNames.Aliases, string.Join(',', AssertionsCompositionNodeTypes.AssertDescriptor.Aliases))
-            .AddAttribute("omittedOptions", "emitPassedInput,emitFailedInput")
-            .AddAttribute(
-                "omittedOptionsReason",
-                "Routed-input flags apply only to explicit generic compatibility registrations; the canonical node has one result output.")
             .AddOption(
                 "expression",
                 OptionValueKind.Expression,
@@ -60,19 +53,10 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                     importance: OptionDesignMetadataAttributeValues.Advanced,
                     editor: OptionDesignMetadataAttributeValues.Text))
             .AddOption(
-                "engine",
-                OptionValueKind.Text,
-                displayName: "Engine",
-                helperText: "Diagnostic engine metadata; composition DI selection uses the engine resource.",
-                attributes: OptionDesignMetadataAttributes.Create(
-                    section: "Diagnostics",
-                    importance: OptionDesignMetadataAttributeValues.Advanced,
-                    editor: OptionDesignMetadataAttributeValues.Text))
-            .AddOption(
                 "inputType",
                 OptionValueKind.Text,
                 displayName: "Input Type",
-                defaultValue: AssertionOptions.ObjectTypeName,
+                defaultValue: FlowValueAssertionOptions.ObjectTypeName,
                 helperText: "Optional semantic type name for the FlowValue input.",
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Type Metadata",
@@ -94,7 +78,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Description",
                 helperText: "Description included in assertion results and diagnostics.",
-                defaultValue: AssertionOptions.DefaultDescription,
+                defaultValue: FlowValueAssertionOptions.DefaultDescription,
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Results",
                     importance: OptionDesignMetadataAttributeValues.Advanced,
@@ -104,7 +88,7 @@ public sealed class AssertionsComponentDesignMetadataProvider : IComponentDesign
                 OptionValueKind.Text,
                 displayName: "Failure Message",
                 helperText: "Message included when the assertion fails.",
-                defaultValue: AssertionOptions.DefaultFailureMessage,
+                defaultValue: FlowValueAssertionOptions.DefaultFailureMessage,
                 attributes: OptionDesignMetadataAttributes.Create(
                     section: "Results",
                     importance: OptionDesignMetadataAttributeValues.Advanced,

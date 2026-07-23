@@ -7,6 +7,20 @@ Output/Errors/Events). The optional engine runtime moves to 2.0.0; the new kit a
 packages debut at 1.0.0.
 -->
 
+## FluxFlow.Components.Assertions 5.0.0
+
+- Consolidated assertions on `FlowValueAssertionNode` with compiled
+  expressions, exact immutable input/context behavior, diagnostics, and one
+  normal `FlowResult<FlowValueAssertionResult>` Output.
+- Removed the generic CLR component, redundant typed result/failure/status
+  contracts, numeric error codes, Passed/Failed/Errors branches, and dead
+  `Engine` option.
+
+## FluxFlow.Components.Assertions.Composition 3.0.0
+
+- Registers only canonical `FlowValue` assertions and removes generic CLR
+  registration plus legacy Passed/Failed port constants and metadata.
+
 ## FluxFlow.Components.Validation 5.0.0
 
 - Consolidated JSON Schema validation on `FlowValueJsonSchemaValidatorNode`

@@ -1,11 +1,11 @@
 # FluxFlow.Components.Assertions
 
-Standalone expression-driven assertion nodes. The canonical node evaluates
+Standalone expression-driven assertions. The node evaluates
 immutable `FlowValue` messages and returns pass, fail, or expected evaluation
 errors through one normal `FlowResult<T>` output. It does not require
 `FluxFlow.Engine`, a registry, or a runtime host.
 
-## Canonical Node
+## Node Contract
 
 | Node | Input | Output | Diagnostics |
 |------|-------|--------|-------------|
@@ -76,28 +76,6 @@ mutable services, or secrets in expression contexts.
 `FlowValueAssertionOptions` validates construction-time invariants: expression
 is required, `InputType` cannot be empty, and `BoundedCapacity` must be positive.
 
-## Typed Compatibility
-
-`FlowAssertionComponent<TInput>`, `AssertionOptions`, `FlowAssertionResult`,
-`Passed`, `Failed`, and `Errors` remain available for existing code-authored
-workflows. That generic node preserves optional routed-input behavior and its
-numeric `AssertionErrorCodes` surface.
-
-```csharp
-await using var node = new FlowAssertionComponent<AppMessage>(
-    new AssertionOptions
-    {
-        Expression = "score >= 10",
-        EmitPassedInput = true,
-        EmitFailedInput = true
-    },
-    expressionEngine,
-    appMessageContextFactory);
-```
-
-New configuration-authored workflows should use `FlowValueAssertionNode` so
-rule outcomes and expected failures remain normal workflow data.
-
 ## Composition
 
 Add `FluxFlow.Components.Assertions.Composition` for canonical configuration or
@@ -111,7 +89,6 @@ services.AddKeyedSingleton<IFlowExpressionEngine>(
 registry.RegisterAssertion();
 ```
 
-Parameterless registration owns canonical `data.assert`. Explicit
-`RegisterAssertion<TInput>(customNodeType)` remains available for typed
-compatibility and should use a distinct node type when both forms share a
-registry.
+Parameterless registration owns canonical `data.assert`. Convert CLR inputs
+explicitly at the application boundary and replace older Passed, Failed, and
+Errors links with conditions over `Kind`, `IsError`, and `Error.Code`.
